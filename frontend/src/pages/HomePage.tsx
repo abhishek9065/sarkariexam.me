@@ -52,7 +52,7 @@ export function HomePage() {
                 isAuthenticated={isAuthenticated}
                 onLogin={() => setShowAuthModal(true)}
                 onLogout={logout}
-                onProfileClick={() => { }}
+                onProfileClick={() => navigate('/profile')}
             />
             <Navigation
                 activeTab={activeTab}

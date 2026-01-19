@@ -45,6 +45,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 isAuthenticated={isAuthenticated}
                 onLogin={() => setShowAuthModal(true)}
                 onLogout={logout}
+                onProfileClick={() => navigate('/profile')}
             />
             <Navigation
                 activeTab={type as TabType}

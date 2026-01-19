@@ -6,6 +6,7 @@ import { CategoryPage } from './pages/CategoryPage';
 import { DetailPage } from './pages/DetailPage';
 import { AdminPage } from './pages/AdminPage';
 import { StaticPage } from './pages/StaticPage';
+import { ProfilePage } from './pages/ProfilePage';
 import './styles.css';
 
 export default function App() {
@@ -35,6 +36,9 @@ export default function App() {
 
                         {/* Admin Page */}
                         <Route path="/admin" element={<AdminPage />} />
+
+                        {/* Profile Page */}
+                        <Route path="/profile" element={<ProfilePage />} />
 
                         {/* Static Pages */}
                         <Route path="/about" element={<StaticPage page="about" />} />
