@@ -1,0 +1,119 @@
+.security-logs-container {
+    padding: 20px;
+}
+
+.logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.logs-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.live-indicator {
+    color: #4CAF50;
+    font-size: 0.85rem;
+    font-weight: 600;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.logs-table-wrapper {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.logs-table th {
+    background: var(--bg-secondary);
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.logs-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.time-col {
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.date-small {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.event-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.event-badge.rate_limit {
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+}
+
+.event-badge.auth_failure {
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+}
+
+.ip-col {
+    font-family: monospace;
+    font-weight: 500;
+}
+
+.endpoint-col {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.details-col {
+    max-width: 300px;
+}
+
+.metadata-json {
+    font-family: monospace;
+    font-size: 0.75rem;
+    background: rgba(0, 0, 0, 0.03);
+    padding: 5px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .metadata-json {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
