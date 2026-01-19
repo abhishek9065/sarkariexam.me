@@ -7,6 +7,11 @@ import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import analyticsRouter from './routes/analytics.js';
 import bookmarksRouter from './routes/bookmarks.js';
+import bulkRouter from './routes/bulk.js';
+import jobsRouter from './routes/jobs.js';
+import pushRouter from './routes/push.js';
+import profileRouter from './routes/profile.js';
+import subscriptionsRouter from './routes/subscriptions.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { responseTimeLogger, getPerformanceStats } from './middleware/responseTime.js';
 import {
@@ -93,6 +98,11 @@ app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/bookmarks', bookmarksRouter);
+app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/profile', profileRouter);
+app.use('/api/push', pushRouter);
+app.use('/api/jobs', jobsRouter);
+app.use('/api/bulk', bulkRouter);
 
 // Error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

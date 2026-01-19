@@ -24,7 +24,7 @@ export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
         if (!adminToken) return;
         try {
             setLoading(true);
-            const res = await fetch(`${apiBase}/api/admin/security/logs?limit=50`, {
+            const res = await fetch(`${apiBase}/api/admin/security?limit=50`, {
                 headers: {
                     'Authorization': `Bearer ${adminToken}`
                 }

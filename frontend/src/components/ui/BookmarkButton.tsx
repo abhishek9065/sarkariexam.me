@@ -2,9 +2,9 @@ import { useState } from 'react';
 import './BookmarkButton.css';
 
 interface BookmarkButtonProps {
-    announcementId: number;
+    announcementId: string;
     isBookmarked: boolean;
-    onToggle: (announcementId: number) => Promise<void>;
+    onToggle: (announcementId: string) => Promise<void>;
     isAuthenticated: boolean;
     onLoginRequired?: () => void;
     size?: 'small' | 'medium' | 'large';

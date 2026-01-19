@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SectionTable, SkeletonLoader } from '../components';
+import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { useAuth } from '../context/AuthContext';
 import { formatDate, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, type TabType } from '../utils';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
@@ -151,6 +152,10 @@ export function DetailPage({ type }: DetailPageProps) {
                                 </tbody>
                             </table>
                         </div>
+
+                        {item.jobDetails && (
+                            <JobDetailsRenderer jobDetails={item.jobDetails} />
+                        )}
 
                         {/* Mode of Selection */}
                         <div className="mode-selection">

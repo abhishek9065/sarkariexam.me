@@ -8,7 +8,6 @@ import { bumpCacheVersion } from '../services/cacheVersion.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
 import { sendAnnouncementNotification } from '../services/telegram.js';
-import { sendAnnouncementEmail, isEmailConfigured } from '../services/email.js';
 
 const router = express.Router();
 
@@ -25,7 +24,7 @@ const querySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-// Cursor-based pagination schema (v2)
+// Search schema
 const searchQuerySchema = z.object({
   q: z.string().trim().min(2),
   type: z
@@ -35,6 +34,7 @@ const searchQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+// Cursor-based pagination schema (v2)
 const cursorQuerySchema = z.object({
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
@@ -78,10 +78,10 @@ router.get('/', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcement
     const announcements = await AnnouncementModel.findAll(filters);
 
     return res.json({ data: announcements, count: announcements.length });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching announcements:', error);
     return res.status(500).json({ error: 'Failed to fetch announcements' });
-  }
+    }
 });
 
 // V2: Cursor-based pagination (faster for large datasets)
@@ -90,7 +90,7 @@ router.get(
   cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcementsV2 }),
   cacheControl(120),
   async (req, res) => {
-  try {
+    try {
     const parseResult = cursorQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
       return res.status(400).json({ error: parseResult.error.flatten() });
@@ -108,10 +108,10 @@ router.get(
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
     });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching announcements (v2):', error);
     return res.status(500).json({ error: 'Failed to fetch announcements' });
-  }
+    }
 });
 
 // V3: OPTIMIZED listing cards (minimal fields, 60% less RU consumption)
@@ -120,7 +120,7 @@ router.get(
   cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcementsV3Cards }),
   cacheControl(120),
   async (req, res) => {
-  try {
+    try {
     const parseResult = cursorQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
       return res.status(400).json({ error: parseResult.error.flatten() });
@@ -140,10 +140,10 @@ router.get(
       nextCursor: result.nextCursor,
       hasMore: result.hasMore,
     });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching listing cards (v3):', error);
     return res.status(500).json({ error: 'Failed to fetch listing cards' });
-  }
+    }
 });
 
 // Get categories - long cache (1 hour)
@@ -155,10 +155,10 @@ router.get(
   try {
     const categories = await AnnouncementModel.getCategories();
     return res.json({ data: categories });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching categories:', error);
     return res.status(500).json({ error: 'Failed to fetch categories' });
-  }
+    }
 });
 
 // Get organizations - long cache (1 hour)
@@ -170,10 +170,10 @@ router.get(
   try {
     const organizations = await AnnouncementModel.getOrganizations();
     return res.json({ data: organizations });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching organizations:', error);
     return res.status(500).json({ error: 'Failed to fetch organizations' });
-  }
+    }
 });
 
 // Get tags - medium cache (30 min)
@@ -185,10 +185,10 @@ router.get(
   try {
     const tags = await AnnouncementModel.getTags();
     return res.json({ data: tags });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching tags:', error);
     return res.status(500).json({ error: 'Failed to fetch tags' });
-  }
+    }
 });
 
 // Search announcements (cached)
@@ -197,26 +197,27 @@ router.get(
   cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.search }),
   cacheControl(120),
   async (req, res) => {
-  try {
-    const parseResult = searchQuerySchema.safeParse(req.query);
-    if (!parseResult.success) {
-      return res.status(400).json({ error: parseResult.error.flatten() });
+    try {
+      const parseResult = searchQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+      }
+
+      const filters = parseResult.data;
+      const announcements = await AnnouncementModel.findAll({
+        search: filters.q,
+        type: filters.type,
+        limit: filters.limit,
+        offset: filters.offset,
+      });
+
+      return res.json({ data: announcements, count: announcements.length });
+    } catch (error) {
+      console.error('Error searching announcements:', error);
+      return res.status(500).json({ error: 'Failed to search announcements' });
     }
-
-    const filters = parseResult.data;
-    const announcements = await AnnouncementModel.findAll({
-      search: filters.q,
-      type: filters.type,
-      limit: filters.limit,
-      offset: filters.offset,
-    });
-
-    return res.json({ data: announcements, count: announcements.length });
-  } catch (error) {
-    console.error('Error searching announcements:', error);
-    return res.status(500).json({ error: 'Failed to search announcements' });
   }
-});
+);
 
 // Get single announcement by slug - with caching (10 min server, 5 min browser)
 router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announcementBySlug }), cacheControl(300), async (req, res) => {
@@ -231,10 +232,10 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
     AnnouncementModel.incrementViewCount(String(announcement.id)).catch(console.error);
 
     return res.json({ data: announcement });
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching announcement:', error);
     return res.status(500).json({ error: 'Failed to fetch announcement' });
-  }
+    }
 });
 
 // Create announcement schema
@@ -335,10 +336,10 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     });
 
     return res.status(201).json({ data: announcement });
-  } catch (error) {
+    } catch (error) {
     console.error('Error creating announcement:', error);
     return res.status(500).json({ error: 'Failed to create announcement' });
-  }
+    }
 });
 
 // Update announcement (admin only)
@@ -365,10 +366,10 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
     });
 
     return res.json({ data: announcement });
-  } catch (error) {
+    } catch (error) {
     console.error('Error updating announcement:', error);
     return res.status(500).json({ error: 'Failed to update announcement' });
-  }
+    }
 });
 
 
@@ -391,10 +392,10 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     });
 
     return res.json({ message: 'Announcement deleted successfully' });
-  } catch (error) {
+    } catch (error) {
     console.error('Error deleting announcement:', error);
     return res.status(500).json({ error: 'Failed to delete announcement' });
-  }
+    }
 });
 
 // Export announcements as CSV (admin only)
@@ -424,10 +425,10 @@ router.get('/export/csv', authenticateToken, requireAdmin, async (_req, res) => 
     res.setHeader('Content-Disposition', `attachment; filename="announcements-${new Date().toISOString().split('T')[0]}.csv"`);
 
     return res.send(csv);
-  } catch (error) {
+    } catch (error) {
     console.error('Error exporting announcements:', error);
     return res.status(500).json({ error: 'Failed to export announcements' });
-  }
+    }
 });
 
 export default router;

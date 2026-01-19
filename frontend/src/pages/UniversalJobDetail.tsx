@@ -9,7 +9,7 @@ import type { Announcement } from '../types';
 interface UniversalJobDetailProps {
     item: Announcement;
     isBookmarked?: boolean;
-    onToggleBookmark?: (announcementId: number) => Promise<void>;
+    onToggleBookmark?: (announcementId: string) => Promise<void>;
     isAuthenticated?: boolean;
     onLoginRequired?: () => void;
 }

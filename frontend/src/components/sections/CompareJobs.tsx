@@ -28,7 +28,7 @@ export function CompareJobs({ announcements, onClose }: CompareJobsProps) {
         setSelectedItems([...selectedItems, item]);
     };
 
-    const removeFromCompare = (id: number) => {
+    const removeFromCompare = (id: string) => {
         setSelectedItems(selectedItems.filter(i => i.id !== id));
     };
 

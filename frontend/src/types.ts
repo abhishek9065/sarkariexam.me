@@ -1,7 +1,7 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 
 export interface Tag {
-  id: number;
+  id: string;
   name: string;
   slug: string;
 }
@@ -10,7 +10,7 @@ export interface Tag {
 export type { JobDetails } from './components/admin/JobPostingForm';
 
 export interface Announcement {
-  id: number;
+  id: string;
   title: string;
   slug: string;
   type: ContentType;
@@ -35,7 +35,7 @@ export interface Announcement {
 
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   name: string;
   role: 'user' | 'admin';

@@ -73,13 +73,18 @@ async function createIndexes(): Promise<void> {
         const announcements = getDatabase().collection('announcements');
         const users = getDatabase().collection('users');
         const securityLogs = getDatabase().collection('security_logs');
+        const bookmarks = getDatabase().collection('bookmarks');
+        const subscriptions = getDatabase().collection('subscriptions');
+        const pushSubscriptions = getDatabase().collection('push_subscriptions');
+        const profiles = getDatabase().collection('user_profiles');
 
         // Announcements indexes
         await announcements.createIndex({ slug: 1 }, { unique: true });
         await announcements.createIndex({ category: 1 }); // Partition key simulation
         await announcements.createIndex({ type: 1 });
         await announcements.createIndex({ isActive: 1 });
-        await announcements.createIndex({ createdAt: -1 });
+        await announcements.createIndex({ postedAt: -1 });
+        await announcements.createIndex({ updatedAt: -1 });
         await announcements.createIndex({ viewCount: -1 });
         await announcements.createIndex({ deadline: 1 });
         // Note: Text indexes are not supported in Cosmos DB MongoDB API
@@ -87,6 +92,20 @@ async function createIndexes(): Promise<void> {
 
         // Users indexes
         await users.createIndex({ email: 1 }, { unique: true });
+
+        // Bookmarks indexes
+        await bookmarks.createIndex({ userId: 1, announcementId: 1 }, { unique: true });
+
+        // Subscriptions indexes
+        await subscriptions.createIndex({ email: 1 }, { unique: true });
+        await subscriptions.createIndex({ verificationToken: 1 });
+        await subscriptions.createIndex({ unsubscribeToken: 1 });
+
+        // Push subscriptions indexes
+        await pushSubscriptions.createIndex({ endpoint: 1 }, { unique: true });
+
+        // User profiles indexes
+        await profiles.createIndex({ userId: 1 }, { unique: true });
 
         // Security logs indexes
         await securityLogs.createIndex({ createdAt: -1 });

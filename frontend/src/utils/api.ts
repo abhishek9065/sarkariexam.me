@@ -36,7 +36,7 @@ export async function fetchBookmarks(token: string): Promise<Announcement[]> {
 }
 
 // Add bookmark
-export async function addBookmark(announcementId: number, token: string): Promise<boolean> {
+export async function addBookmark(announcementId: string, token: string): Promise<boolean> {
     const response = await fetch(`${API_BASE}/api/bookmarks`, {
         method: 'POST',
         headers: {
@@ -49,7 +49,7 @@ export async function addBookmark(announcementId: number, token: string): Promis
 }
 
 // Remove bookmark
-export async function removeBookmark(announcementId: number, token: string): Promise<boolean> {
+export async function removeBookmark(announcementId: string, token: string): Promise<boolean> {
     const response = await fetch(`${API_BASE}/api/bookmarks/${announcementId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }

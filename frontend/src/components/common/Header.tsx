@@ -27,29 +27,23 @@ export function Header({ setCurrentPage, user, isAuthenticated, onLogin, onLogou
 
     return (
         <header className="site-header">
-            <h1 className="site-title" onClick={() => setCurrentPage('home')} style={{ cursor: 'pointer' }}>
-                SARKARIEXAMS.ME
-            </h1>
-            <p className="site-subtitle">SarkariExams.me</p>
-            <div className="header-controls">
-                <button className="theme-toggle" onClick={toggleTheme} title={getThemeTooltip()}>
-                    {getThemeIcon()}
-                </button>
-                <div className="header-auth">
+            <div className="header-inner">
+                <h1 className="site-title" onClick={() => setCurrentPage('home')}>
+                    SarkariExams.me
+                </h1>
+                <div className="header-controls">
+                    <button className="theme-toggle" onClick={toggleTheme} title={getThemeTooltip()}>
+                        {getThemeIcon()}
+                    </button>
                     {isAuthenticated ? (
-                        <div className="user-menu">
-                            <span
-                                className="user-name"
-                                onClick={onProfileClick}
-                                style={{ cursor: 'pointer', borderBottom: '1px dashed transparent' }}
-                                title="View Profile"
-                            >
+                        <>
+                            <span className="user-name" onClick={onProfileClick} style={{ cursor: 'pointer' }}>
                                 👤 {user?.name}
                             </span>
-                            <button className="auth-btn logout-btn" onClick={onLogout}>Logout</button>
-                        </div>
+                            <button className="login-btn" onClick={onLogout}>Logout</button>
+                        </>
                     ) : (
-                        <button className="auth-btn login-btn" onClick={onLogin}>🔐 Login</button>
+                        <button className="login-btn" onClick={onLogin}>Login</button>
                     )}
                 </div>
             </div>

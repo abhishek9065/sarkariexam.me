@@ -18,7 +18,8 @@ export function useAnnouncements() {
         queryFn: async (): Promise<Announcement[]> => {
             const res = await fetch(`${API_BASE}/api/announcements`);
             if (!res.ok) throw new Error('Failed to fetch announcements');
-            return res.json();
+            const body = await res.json();
+            return body.data ?? [];
         },
     });
 }
@@ -30,7 +31,8 @@ export function useAnnouncementsByType(type: ContentType) {
         queryFn: async (): Promise<Announcement[]> => {
             const res = await fetch(`${API_BASE}/api/announcements?type=${type}`);
             if (!res.ok) throw new Error('Failed to fetch');
-            return res.json();
+            const body = await res.json();
+            return body.data ?? [];
         },
     });
 }
@@ -43,7 +45,8 @@ export function useAnnouncementBySlug(slug: string | undefined) {
             if (!slug) return null;
             const res = await fetch(`${API_BASE}/api/announcements/${slug}`);
             if (!res.ok) return null;
-            return res.json();
+            const body = await res.json();
+            return body.data ?? null;
         },
         enabled: !!slug,
     });
@@ -59,7 +62,8 @@ export function useBookmarksQuery(token: string | null) {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) return [];
-            return res.json();
+            const body = await res.json();
+            return body.data ?? [];
         },
         enabled: !!token,
     });
@@ -70,7 +74,7 @@ export function useAddBookmark() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ announcementId, token }: { announcementId: number; token: string }) => {
+        mutationFn: async ({ announcementId, token }: { announcementId: string; token: string }) => {
             const res = await fetch(`${API_BASE}/api/bookmarks`, {
                 method: 'POST',
                 headers: {
@@ -93,7 +97,7 @@ export function useRemoveBookmark() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ announcementId, token }: { announcementId: number; token: string }) => {
+        mutationFn: async ({ announcementId, token }: { announcementId: string; token: string }) => {
             const res = await fetch(`${API_BASE}/api/bookmarks/${announcementId}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
@@ -115,7 +119,8 @@ export function useSearchAnnouncements(query: string) {
             if (!query || query.length < 2) return [];
             const res = await fetch(`${API_BASE}/api/announcements/search?q=${encodeURIComponent(query)}`);
             if (!res.ok) return [];
-            return res.json();
+            const body = await res.json();
+            return body.data ?? [];
         },
         enabled: query.length >= 2,
         staleTime: 2 * 60 * 1000, // 2 min for search
@@ -131,7 +136,8 @@ export function usePrefetchAnnouncement() {
             queryKey: queryKeys.announcementBySlug(slug),
             queryFn: async () => {
                 const res = await fetch(`${API_BASE}/api/announcements/${slug}`);
-                return res.json();
+                const body = await res.json();
+                return body.data ?? null;
             },
         });
     };

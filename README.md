@@ -1,6 +1,6 @@
 # Sarkari Result - Government Jobs Portal
 
-A modern, fast, and feature-rich government jobs portal built with React + Vite (Frontend) and Node.js + Express + PostgreSQL (Backend).
+A modern, fast, and feature-rich government jobs portal built with React + Vite (Frontend) and Node.js + Express + MongoDB (Cosmos DB API) (Backend).
 
 ## 🚀 Features
 
@@ -20,14 +20,14 @@ A modern, fast, and feature-rich government jobs portal built with React + Vite 
 | Frontend | React 18, TypeScript, Vite |
 | Styling | CSS3 with CSS Variables |
 | Backend | Node.js, Express, TypeScript |
-| Database | PostgreSQL |
+| Database | MongoDB (Cosmos DB API) |
 | Hosting | Digital Ocean |
 
 ## 📦 Quick Start
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL 14+
+- MongoDB 6+
 - npm or yarn
 
 ### Frontend Setup
@@ -46,9 +46,6 @@ npm install
 cp .env.example .env
 # Edit .env with your database credentials
 
-# Run migrations
-npm run migrate
-
 # Start server
 npm run dev
 ```
@@ -57,7 +54,8 @@ npm run dev
 
 ### Backend (.env)
 ```env
-DATABASE_URL=postgres://user:pass@localhost:5432/sarkari
+COSMOS_CONNECTION_STRING=mongodb://user:pass@localhost:27017/sarkari_db
+COSMOS_DATABASE_NAME=sarkari_db
 JWT_SECRET=your-secret-key
 PORT=5000
 

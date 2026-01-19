@@ -32,7 +32,7 @@ export function AdminPage() {
         applicationFee: '',
     });
     const [message, setMessage] = useState('');
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [bulkJson, setBulkJson] = useState('');
 
     // Preview mode state
@@ -51,7 +51,7 @@ export function AdminPage() {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
         if (!adminToken) return;
 

@@ -8,8 +8,8 @@ import type { Announcement } from '../types';
 import './ProfilePage.css';
 
 interface UserProfile {
-    id: number;
-    userId: number;
+    id: string;
+    userId: string;
     preferredCategories: string[];
     preferredQualifications: string[];
     preferredLocations: string[];

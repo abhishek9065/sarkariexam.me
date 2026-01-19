@@ -1,9 +1,34 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { SecurityLogger } from '../services/securityLogger.js';
+import { ContentType, CreateAnnouncementDto } from '../types.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
 const router = Router();
+
+const adminAnnouncementSchema = z.object({
+    title: z.string().min(10).max(500),
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]),
+    category: z.string().min(3).max(255),
+    organization: z.string().min(2).max(255),
+    content: z.string().optional(),
+    externalLink: z.string().url().optional().or(z.literal('')),
+    location: z.string().optional().or(z.literal('')),
+    deadline: z.string().datetime().optional().or(z.literal('')).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+    minQualification: z.string().optional().or(z.literal('')),
+    ageLimit: z.string().optional().or(z.literal('')),
+    applicationFee: z.string().optional().or(z.literal('')),
+    totalPosts: z.number().int().positive().optional(),
+    tags: z.array(z.string()).optional(),
+    importantDates: z.array(z.object({
+        eventName: z.string(),
+        eventDate: z.string(),
+        description: z.string().optional(),
+    })).optional(),
+    jobDetails: z.any().optional(),
+});
+
 
 // All admin dashboard routes require admin authentication
 router.use(authenticateToken, requireAdmin);
@@ -46,7 +71,7 @@ router.get('/dashboard', async (_req, res) => {
 
         // Top content - take first 10 announcements
         const topContent = announcements.slice(0, 10).map((a, i) => ({
-            id: i + 1,
+            id: (i + 1).toString(),
             title: a.title,
             type: a.type,
             views: Math.floor(Math.random() * 1000) + 100,
@@ -117,6 +142,21 @@ router.get('/security', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/security/logs
+ * Get security logs (alias)
+ */
+router.get('/security/logs', async (req, res) => {
+    try {
+        const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+        const logs = SecurityLogger.getRecentLogs(limit);
+        return res.json({ data: logs });
+    } catch (error) {
+        console.error('Security logs error:', error);
+        return res.status(500).json({ error: 'Failed to load security logs' });
+    }
+});
+
+/**
  * GET /api/admin/announcements
  * Get all announcements for admin management
  */
@@ -140,8 +180,13 @@ router.get('/announcements', async (req, res) => {
  */
 router.post('/announcements', async (req, res) => {
     try {
+        const parseResult = adminAnnouncementSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
         const userId = req.user?.userId ?? 'system';
-        const announcement = await AnnouncementModelMongo.create(req.body, userId);
+        const announcement = await AnnouncementModelMongo.create(parseResult.data as CreateAnnouncementDto, userId);
         return res.status(201).json({ data: announcement });
     } catch (error) {
         console.error('Create announcement error:', error);
@@ -155,7 +200,13 @@ router.post('/announcements', async (req, res) => {
  */
 router.put('/announcements/:id', async (req, res) => {
     try {
-        const announcement = await AnnouncementModelMongo.update(req.params.id, req.body);
+        const updateSchema = adminAnnouncementSchema.partial();
+        const parseResult = updateSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const announcement = await AnnouncementModelMongo.update(req.params.id, parseResult.data as Partial<CreateAnnouncementDto>);
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }

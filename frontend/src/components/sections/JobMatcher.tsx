@@ -9,7 +9,7 @@ interface UserProfile {
 }
 
 interface MatchedJob {
-    id: number;
+    id: string;
     title: string;
     slug: string;
     organization: string;

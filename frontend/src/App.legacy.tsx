@@ -192,7 +192,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [bookmarks, setBookmarks] = useState<Announcement[]>([]);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const { user, token, logout, isAuthenticated } = useAuth();
@@ -293,7 +293,7 @@ function App() {
   }, [isAuthenticated, fetchBookmarks]);
 
   // Toggle bookmark
-  const toggleBookmark = async (announcementId: number) => {
+  const toggleBookmark = async (announcementId: string) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
@@ -1195,10 +1195,10 @@ function AdminPanel({ isLoggedIn, setIsLoggedIn, announcements, refreshData, goB
     applicationFee: '',
   });
   const [message, setMessage] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [bulkJson, setBulkJson] = useState('');
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this announcement?')) return;
     if (!adminToken) return;
 

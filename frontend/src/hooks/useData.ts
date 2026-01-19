@@ -35,7 +35,7 @@ export function useAnnouncements() {
 
 // Hook for bookmarks management
 export function useBookmarks() {
-    const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+    const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
     const [bookmarks, setBookmarks] = useState<Announcement[]>([]);
     const { token, isAuthenticated } = useAuth();
 
@@ -49,7 +49,7 @@ export function useBookmarks() {
         }
     }, [isAuthenticated, token]);
 
-    const toggleBookmark = async (announcementId: number) => {
+    const toggleBookmark = async (announcementId: string) => {
         if (!token) return;
 
         const isBookmarked = bookmarkedIds.has(announcementId);
@@ -72,7 +72,7 @@ export function useBookmarks() {
         }
     };
 
-    const isBookmarked = (id: number) => bookmarkedIds.has(id);
+    const isBookmarked = (id: string) => bookmarkedIds.has(id);
 
     return { bookmarks, bookmarkedIds, toggleBookmark, isBookmarked };
 }

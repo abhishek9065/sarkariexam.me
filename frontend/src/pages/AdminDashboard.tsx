@@ -28,7 +28,7 @@ interface TrendData {
 }
 
 interface TopContent {
-    id: number;
+    id: string;
     title: string;
     type: string;
     views: number;

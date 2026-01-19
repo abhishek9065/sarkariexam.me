@@ -12,7 +12,7 @@ interface AnalyticsData {
 }
 
 interface PopularAnnouncement {
-    id: number;
+    id: string;
     title: string;
     type: string;
     category: string;
