@@ -17,6 +17,7 @@ router.get('/overview', async (_req, res) => {
 
         // Calculate stats
         const total = announcements.length;
+        const totalViews = announcements.reduce((sum, a) => sum + (a.viewCount || 0), 0);
         const byType: Record<string, number> = {};
         const byCategory: Record<string, number> = {};
 
@@ -34,7 +35,7 @@ router.get('/overview', async (_req, res) => {
         return res.json({
             data: {
                 totalAnnouncements: total,
-                totalViews: 0, // Views not tracked without PostgreSQL
+                totalViews,
                 totalEmailSubscribers: 0, // Not tracked yet
                 totalPushSubscribers: 0, // Not tracked yet
                 typeBreakdown,
@@ -62,7 +63,8 @@ router.get('/popular', async (req, res) => {
                 id: a.id,
                 title: a.title,
                 type: a.type,
-                viewCount: 0 // Views not tracked
+                category: a.category || '',
+                viewCount: a.viewCount || 0
             }))
         });
     } catch (error) {

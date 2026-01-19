@@ -15,7 +15,7 @@ interface PopularAnnouncement {
     id: string;
     title: string;
     type: string;
-    category: string;
+    category?: string;
     viewCount: number;
 }
 

@@ -15,8 +15,19 @@ const bulkSchema = z.object({
         organization: z.string().min(2),
         content: z.string().optional(),
         externalLink: z.string().url().optional().or(z.literal('')),
+        location: z.string().optional(),
         deadline: z.string().optional(),
+        minQualification: z.string().optional(),
+        ageLimit: z.string().optional(),
+        applicationFee: z.string().optional(),
+        totalPosts: z.number().int().positive().optional(),
         tags: z.array(z.string()).optional(),
+        importantDates: z.array(z.object({
+            eventName: z.string(),
+            eventDate: z.string(),
+            description: z.string().optional(),
+        })).optional(),
+        jobDetails: z.any().optional(),
     })).min(1),
 });
 
@@ -34,8 +45,15 @@ router.post('/import', authenticateToken, requireAdmin, async (req, res) => {
             organization: item.organization,
             content: item.content,
             externalLink: item.externalLink,
+            location: item.location,
             deadline: item.deadline ? new Date(item.deadline) : undefined,
+            minQualification: item.minQualification,
+            ageLimit: item.ageLimit,
+            applicationFee: item.applicationFee,
+            totalPosts: item.totalPosts,
             tags: item.tags,
+            importantDates: item.importantDates,
+            jobDetails: item.jobDetails,
         }));
 
         const result = await AnnouncementModelMongo.batchInsert(items, req.user!.userId);

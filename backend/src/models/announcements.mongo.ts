@@ -543,8 +543,15 @@ export class AnnouncementModelMongo {
         organization: string;
         content?: string;
         externalLink?: string;
+        location?: string;
         deadline?: Date;
+        minQualification?: string;
+        ageLimit?: string;
+        applicationFee?: string;
+        totalPosts?: number;
         tags?: string[];
+        importantDates?: Array<{ eventName: string; eventDate: string; description?: string }>;
+        jobDetails?: any;
     }>, userId: string): Promise<{ inserted: number; errors: string[] }> {
         const errors: string[] = [];
         const docs: Omit<AnnouncementDoc, '_id'>[] = [];
@@ -560,8 +567,19 @@ export class AnnouncementModelMongo {
                     organization: item.organization,
                     content: item.content,
                     externalLink: item.externalLink,
+                    location: item.location,
                     deadline: item.deadline,
+                    minQualification: item.minQualification,
+                    ageLimit: item.ageLimit,
+                    applicationFee: item.applicationFee,
+                    totalPosts: item.totalPosts,
                     tags: item.tags || [],
+                    importantDates: item.importantDates?.map(date => ({
+                        eventName: date.eventName,
+                        eventDate: new Date(date.eventDate),
+                        description: date.description,
+                    })),
+                    jobDetails: item.jobDetails,
                     postedBy: userId,
                     postedAt: now,
                     updatedAt: now,

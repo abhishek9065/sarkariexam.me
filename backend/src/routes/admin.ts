@@ -42,6 +42,7 @@ router.get('/dashboard', async (_req, res) => {
         // Get all announcements for stats
         const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
         const total = announcements.length;
+        const totalViews = announcements.reduce((sum, a) => sum + (a.viewCount || 0), 0);
 
         // Calculate category stats
         const categoryMap: Record<string, { count: number; views: number }> = {};
@@ -50,6 +51,7 @@ router.get('/dashboard', async (_req, res) => {
                 categoryMap[a.type] = { count: 0, views: 0 };
             }
             categoryMap[a.type].count++;
+            categoryMap[a.type].views += a.viewCount || 0;
         }
         const categories = Object.entries(categoryMap).map(([type, stats]) => ({
             type,
@@ -83,7 +85,7 @@ router.get('/dashboard', async (_req, res) => {
                 overview: {
                     totalAnnouncements: total,
                     totalUsers: 0,
-                    totalViews: 0,
+                    totalViews,
                     totalBookmarks: 0,
                     activeJobs: categoryMap['job']?.count || 0,
                     expiringSoon: 0,
@@ -186,7 +188,7 @@ router.post('/announcements', async (req, res) => {
         }
 
         const userId = req.user?.userId ?? 'system';
-        const announcement = await AnnouncementModelMongo.create(parseResult.data as CreateAnnouncementDto, userId);
+        const announcement = await AnnouncementModelMongo.create(parseResult.data as unknown as CreateAnnouncementDto, userId);
         return res.status(201).json({ data: announcement });
     } catch (error) {
         console.error('Create announcement error:', error);
@@ -206,7 +208,7 @@ router.put('/announcements/:id', async (req, res) => {
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const announcement = await AnnouncementModelMongo.update(req.params.id, parseResult.data as Partial<CreateAnnouncementDto>);
+        const announcement = await AnnouncementModelMongo.update(req.params.id, parseResult.data as unknown as Partial<CreateAnnouncementDto>);
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
