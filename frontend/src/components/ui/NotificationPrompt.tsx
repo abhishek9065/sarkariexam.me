@@ -12,7 +12,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
     return outputArray;
 }
 
-const apiBase = import.meta.env.VITE_API_BASE || '/api';
+const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 export function NotificationPrompt() {
     const [showPrompt, setShowPrompt] = useState(false);

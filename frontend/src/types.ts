@@ -29,6 +29,7 @@ export interface Announcement {
   isActive: boolean;
   viewCount: number;
   tags?: Tag[];
+  importantDates?: { eventName: string; eventDate: string; description?: string }[];
   // Extended job details for comprehensive postings
   jobDetails?: import('./components/admin/JobPostingForm').JobDetails;
 }

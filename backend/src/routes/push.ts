@@ -48,11 +48,12 @@ router.post('/subscribe', optionalAuth, async (req, res) => {
 
     try {
         const now = new Date();
+        const keys = subscription.keys as { p256dh: string; auth: string };
         await getCollectionRef().updateOne(
             { endpoint: subscription.endpoint },
             {
                 $set: {
-                    keys: subscription.keys,
+                    keys,
                     userId: req.user?.userId,
                     updatedAt: now,
                 },

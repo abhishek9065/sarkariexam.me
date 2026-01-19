@@ -56,7 +56,7 @@ router.post('/import', authenticateToken, requireAdmin, async (req, res) => {
             jobDetails: item.jobDetails,
         }));
 
-        const result = await AnnouncementModelMongo.batchInsert(items, req.user!.userId);
+        const result = await AnnouncementModelMongo.batchInsert(items as any, req.user!.userId);
 
         return res.json({
             message: `Imported ${result.inserted} announcements`,
