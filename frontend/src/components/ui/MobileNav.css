@@ -1,0 +1,104 @@
+/* Mobile Bottom Navigation */
+
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+    .mobile-bottom-nav {
+        display: flex;
+        justify-content: space-around;
+        align-items: stretch;
+    }
+}
+
+.mobile-bottom-nav .nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex: 1;
+    padding: 8px 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 12px;
+    margin: 0 4px;
+    min-height: 56px;
+}
+
+.mobile-bottom-nav .nav-btn .nav-icon {
+    font-size: 22px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.mobile-bottom-nav .nav-btn .nav-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
+    line-height: 1.2;
+}
+
+.mobile-bottom-nav .nav-btn:active {
+    transform: scale(0.95);
+}
+
+.mobile-bottom-nav .nav-btn.active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+.mobile-bottom-nav .nav-btn.active .nav-icon {
+    transform: scale(1.1);
+}
+
+.mobile-bottom-nav .nav-btn.active .nav-label {
+    color: white;
+    font-weight: 600;
+}
+
+/* Haptic feedback simulation */
+.mobile-bottom-nav .nav-btn:active .nav-icon {
+    transform: scale(0.9);
+}
+
+/* Dark mode */
+[data-theme="dark"] .mobile-bottom-nav {
+    background: #1e293b;
+    border-top-color: #334155;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* iOS safe area support */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .mobile-bottom-nav {
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    }
+
+    body {
+        padding-bottom: calc(70px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Hide on larger screens */
+@media (min-width: 769px) {
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+
+    body {
+        padding-bottom: 0;
+    }
+}

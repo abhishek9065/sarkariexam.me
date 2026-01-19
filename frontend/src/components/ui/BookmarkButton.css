@@ -1,0 +1,109 @@
+.bookmark-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 50%;
+    outline: none;
+}
+
+.bookmark-btn:hover {
+    transform: scale(1.1);
+}
+
+.bookmark-btn:active {
+    transform: scale(0.95);
+}
+
+.bookmark-btn.animating .bookmark-icon {
+    animation: bookmarkPop 0.3s ease;
+}
+
+@keyframes bookmarkPop {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.4);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Size variations */
+.bookmark-btn-sm {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+}
+
+.bookmark-btn-md {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+}
+
+.bookmark-btn-lg {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+}
+
+/* With label */
+.bookmark-btn:has(.bookmark-label) {
+    border-radius: 20px;
+    padding: 8px 16px;
+    width: auto;
+    height: auto;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.bookmark-btn.bookmarked:has(.bookmark-label) {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.bookmark-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary, #666);
+}
+
+.bookmark-btn.bookmarked .bookmark-label {
+    color: #ef4444;
+}
+
+/* Hover states */
+.bookmark-btn:not(.bookmarked):hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.bookmark-btn.bookmarked:hover {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* Dark mode */
+[data-theme="dark"] .bookmark-btn:has(.bookmark-label) {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .bookmark-btn.bookmarked:has(.bookmark-label) {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .bookmark-label {
+    color: var(--text-secondary, #aaa);
+}
+
+/* Loading state */
+.bookmark-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
