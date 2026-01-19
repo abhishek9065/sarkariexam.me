@@ -32,6 +32,7 @@ export interface Announcement {
   viewCount: number;
   tags?: Tag[];
   importantDates?: ImportantDate[];
+  jobDetails?: any;
 }
 
 export interface Tag {
@@ -63,6 +64,7 @@ export interface CreateAnnouncementDto {
   totalPosts?: number;
   tags?: string[];
   importantDates?: Omit<ImportantDate, 'id' | 'announcementId'>[];
+  jobDetails?: any;
 }
 
 export interface JwtPayload {

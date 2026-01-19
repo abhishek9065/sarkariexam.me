@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons } from '../components';
+import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
 import { SECTIONS, type TabType } from '../utils';
 import { fetchAnnouncements } from '../utils/api';
@@ -93,6 +94,7 @@ export function HomePage() {
             </main>
 
             <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <AuthModal show={showAuthModal} onClose={() => setShowAuthModal(false)} />
         </div>
     );
 }

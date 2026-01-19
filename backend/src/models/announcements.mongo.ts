@@ -31,6 +31,7 @@ interface AnnouncementDoc extends Document {
     isActive: boolean;
     viewCount: number;
     jobDetails?: any;
+    importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
 }
 
 /**
@@ -305,6 +306,21 @@ export class AnnouncementModelMongo {
     /**
      * Find by ID
      */
+    static async findByIds(ids: string[]): Promise<Announcement[]> {
+        const validIds = ids.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+        if (validIds.length === 0) return [];
+
+        try {
+            const docs = await this.collection
+                .find({ _id: { $in: validIds }, isActive: true })
+                .toArray();
+            return docs.map(this.docToAnnouncement);
+        } catch (error) {
+            console.error('[MongoDB] findByIds error:', error);
+            return [];
+        }
+    }
+
     static async findById(id: string): Promise<Announcement | null> {
         try {
             if (!ObjectId.isValid(id)) return null;
@@ -344,6 +360,11 @@ export class AnnouncementModelMongo {
             isActive: true,
             viewCount: 0,
             jobDetails: (data as any).jobDetails || undefined,
+            importantDates: data.importantDates?.map(date => ({
+                eventName: date.eventName,
+                eventDate: new Date(date.eventDate),
+                description: date.description,
+            })),
         };
 
         const result = await this.collection.insertOne(doc as AnnouncementDoc);
@@ -371,6 +392,14 @@ export class AnnouncementModelMongo {
         if (data.applicationFee !== undefined) updateData.applicationFee = data.applicationFee;
         if (data.totalPosts !== undefined) updateData.totalPosts = data.totalPosts;
         if (data.tags) updateData.tags = data.tags;
+        if ((data as any).jobDetails !== undefined) updateData.jobDetails = (data as any).jobDetails;
+        if (data.importantDates !== undefined) {
+            updateData.importantDates = data.importantDates?.map(date => ({
+                eventName: date.eventName,
+                eventDate: new Date(date.eventDate),
+                description: date.description,
+            }));
+        }
 
         await this.collection.updateOne(
             { _id: new ObjectId(id) },
@@ -711,6 +740,14 @@ export class AnnouncementModelMongo {
             updatedAt: doc.updatedAt?.toISOString() as any,
             isActive: doc.isActive,
             viewCount: doc.viewCount,
+            importantDates: doc.importantDates?.map((date, index) => ({
+                id: `${doc._id.toString()}-${index}`,
+                announcementId: doc._id.toString(),
+                eventName: date.eventName,
+                eventDate: date.eventDate?.toISOString() as any,
+                description: date.description,
+            })) || [],
+            jobDetails: doc.jobDetails,
         };
     }
 }

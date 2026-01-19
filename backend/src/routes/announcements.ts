@@ -26,6 +26,15 @@ const querySchema = z.object({
 });
 
 // Cursor-based pagination schema (v2)
+const searchQuerySchema = z.object({
+  q: z.string().trim().min(2),
+  type: z
+    .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
 const cursorQuerySchema = z.object({
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
@@ -179,6 +188,33 @@ router.get(
   } catch (error) {
     console.error('Error fetching tags:', error);
     return res.status(500).json({ error: 'Failed to fetch tags' });
+  }
+});
+
+// Search announcements (cached)
+router.get(
+  '/search',
+  cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.search }),
+  cacheControl(120),
+  async (req, res) => {
+  try {
+    const parseResult = searchQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    const filters = parseResult.data;
+    const announcements = await AnnouncementModel.findAll({
+      search: filters.q,
+      type: filters.type,
+      limit: filters.limit,
+      offset: filters.offset,
+    });
+
+    return res.json({ data: announcements, count: announcements.length });
+  } catch (error) {
+    console.error('Error searching announcements:', error);
+    return res.status(500).json({ error: 'Failed to search announcements' });
   }
 });
 
