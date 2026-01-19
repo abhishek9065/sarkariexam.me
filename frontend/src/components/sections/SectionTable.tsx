@@ -42,18 +42,7 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
                     {items.length > 0 ? (
                         items.slice(0, 10).map((item) => (
                             <li key={item.id} className="section-item">
-                                {/* Organization Logo/Initial */}
-                                {item.organization && (
-                                    <span
-                                        className="org-badge"
-                                        style={{ backgroundColor: getOrgColor(item.organization) }}
-                                        title={item.organization}
-                                    >
-                                        {getInitials(item.organization)}
-                                    </span>
-                                )}
                                 <a href="#" onClick={(e) => { e.preventDefault(); onItemClick(item); }}>
-                                    <span className="item-org">{item.organization}</span>
                                     <span className="item-title">{item.title}</span>
                                     {item.totalPosts && <span className="item-posts">{item.totalPosts} Post</span>}
                                 </a>
