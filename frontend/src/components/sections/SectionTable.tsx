@@ -40,7 +40,7 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
             <div className="section-table-content">
                 <ul>
                     {items.length > 0 ? (
-                        items.slice(0, 20).map((item) => (
+                        items.slice(0, 10).map((item) => (
                             <li key={item.id} className="section-item">
                                 {/* Organization Logo/Initial */}
                                 {item.organization && (
