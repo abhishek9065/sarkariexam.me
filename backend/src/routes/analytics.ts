@@ -56,7 +56,7 @@ router.get('/overview', async (_req, res) => {
 router.get('/popular', async (req, res) => {
     try {
         const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
-        const announcements = await AnnouncementModelMongo.findAll({ limit });
+        const announcements = await AnnouncementModelMongo.getTrending({ limit });
 
         return res.json({
             data: announcements.map(a => ({

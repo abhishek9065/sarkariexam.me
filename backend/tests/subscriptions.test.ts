@@ -50,4 +50,18 @@ describe('subscriptions', () => {
         expect(updated?.verified).toBe(true);
         expect(updated?.isActive).toBe(false);
     });
+
+    it('returns 404 for invalid tokens', async () => {
+        const missingVerify = `missing-verify-${Date.now()}`;
+        const missingUnsub = `missing-unsub-${Date.now()}`;
+
+        await request(app)
+            .get(`/api/subscriptions/verify?token=${encodeURIComponent(missingVerify)}`)
+            .expect(404);
+
+        await request(app)
+            .get(`/api/subscriptions/unsubscribe?token=${encodeURIComponent(missingUnsub)}`)
+            .expect(404);
+    });
+
 });

@@ -8,8 +8,11 @@ import { MongoClient, Db, Collection, ObjectId, Document } from 'mongodb';
 let client: MongoClient | null = null;
 let db: Db | null = null;
 
-const COSMOS_CONNECTION_STRING = process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
-const DATABASE_NAME = process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
+const getConnectionString = (): string | undefined =>
+    process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
+
+const getDatabaseName = (): string =>
+    process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
 
 /**
  * Initialize MongoDB/Cosmos DB connection
@@ -17,14 +20,15 @@ const DATABASE_NAME = process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
 export async function connectToDatabase(): Promise<Db> {
     if (db) return db;
 
-    if (!COSMOS_CONNECTION_STRING) {
+    const connectionString = getConnectionString();
+    if (!connectionString) {
         throw new Error('COSMOS_CONNECTION_STRING or MONGODB_URI is not configured');
     }
 
     try {
         console.log('[CosmosDB] Connecting to database...');
 
-        client = new MongoClient(COSMOS_CONNECTION_STRING, {
+        client = new MongoClient(connectionString, {
             // Cosmos DB specific settings
             retryWrites: false, // Cosmos DB doesn't support retryWrites
             maxPoolSize: 10,
@@ -34,9 +38,10 @@ export async function connectToDatabase(): Promise<Db> {
         });
 
         await client.connect();
-        db = client.db(DATABASE_NAME);
+        const databaseName = getDatabaseName();
+        db = client.db(databaseName);
 
-        console.log('[CosmosDB] Connected successfully to:', DATABASE_NAME);
+        console.log('[CosmosDB] Connected successfully to:', databaseName);
 
         // Create indexes
         await createIndexes();
