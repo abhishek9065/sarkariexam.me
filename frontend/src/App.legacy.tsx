@@ -1740,7 +1740,7 @@ function StaticPage({ type, goBack }: StaticPageProps) {
       <div className="static-page">
         <button className="back-btn" onClick={goBack}>← Back to Home</button>
         <h1 className="page-title">{page.title}</h1>
-        <div className="page-content" dangerouslySetInnerHTML={{ __html: page.content }} />
+        <div className="static-content" dangerouslySetInnerHTML={{ __html: page.content }} />
       </div>
     </main>
   );

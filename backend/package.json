@@ -7,7 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "engines": {
     "node": "20.x"
@@ -48,6 +49,7 @@
     "supertest": "^7.1.4",
     "tsx": "^4.19.1",
     "typescript-eslint": "^8.51.0",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.16",
+    "mongodb-memory-server": "^11.0.1"
   }
 }

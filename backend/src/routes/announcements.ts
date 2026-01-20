@@ -8,6 +8,7 @@ import { bumpCacheVersion } from '../services/cacheVersion.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
 import { sendAnnouncementNotification } from '../services/telegram.js';
+import { recordAnnouncementView } from '../services/analytics.js';
 
 const router = express.Router();
 
@@ -230,6 +231,7 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
 
     // Increment view count (fire and forget, don't block response)
     AnnouncementModel.incrementViewCount(String(announcement.id)).catch(console.error);
+    recordAnnouncementView(String(announcement.id)).catch(console.error);
 
     return res.json({ data: announcement });
     } catch (error) {

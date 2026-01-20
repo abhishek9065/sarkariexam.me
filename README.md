@@ -64,6 +64,14 @@ SENDGRID_API_KEY=your-sendgrid-key
 TELEGRAM_BOT_TOKEN=your-bot-token
 VAPID_PUBLIC_KEY=your-vapid-public
 VAPID_PRIVATE_KEY=your-vapid-private
+
+# CORS (comma-separated origins)
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000,https://sarkariexams.me,https://www.sarkariexams.me
+
+# Rate limiting
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=200
+AUTH_RATE_LIMIT_MAX=20
 ```
 
 ### Frontend (.env)

@@ -1995,7 +1995,7 @@ button {
 /* Link underline animation */
 .section-item .item-title {
   position: relative;
-  display: inline;
+  display: block;
 }
 
 .section-item .item-title::after {

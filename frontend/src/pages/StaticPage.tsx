@@ -124,7 +124,7 @@ export function StaticPage() {
     <div className="static-page">
       <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
       <h1 className="page-title">{page.title}</h1>
-      <div className="page-content" dangerouslySetInnerHTML={{ __html: page.content }} />
+      <div className="static-content" dangerouslySetInnerHTML={{ __html: page.content }} />
     </div>
   );
 }

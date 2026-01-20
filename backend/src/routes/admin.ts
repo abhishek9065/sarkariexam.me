@@ -4,6 +4,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { getDailyRollups } from '../services/analytics.js';
 
 const router = Router();
 
@@ -58,27 +59,19 @@ router.get('/dashboard', async (_req, res) => {
             count: stats.count,
             views: stats.views
         }));
+        const trends = await getDailyRollups(14);
 
-        // Generate fake trend data for last 14 days (no real tracking)
-        const trends = [];
-        for (let i = 13; i >= 0; i--) {
-            const date = new Date();
-            date.setDate(date.getDate() - i);
-            trends.push({
-                date: date.toISOString().split('T')[0],
-                count: Math.floor(Math.random() * 5) + 1,
-                views: Math.floor(Math.random() * 100) + 10
-            });
-        }
-
-        // Top content - take first 10 announcements
-        const topContent = announcements.slice(0, 10).map((a, i) => ({
-            id: (i + 1).toString(),
-            title: a.title,
-            type: a.type,
-            views: Math.floor(Math.random() * 1000) + 100,
-            organization: a.organization || 'Unknown'
-        }));
+        const topContent = announcements
+            .slice()
+            .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
+            .slice(0, 10)
+            .map(a => ({
+                id: a.id,
+                title: a.title,
+                type: a.type,
+                views: a.viewCount || 0,
+                organization: a.organization || 'Unknown'
+            }));
 
         return res.json({
             data: {

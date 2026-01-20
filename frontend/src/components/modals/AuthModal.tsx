@@ -1,6 +1,17 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
+const passwordPattern = '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{8,}$';
+
+const getPasswordError = (password: string): string | null => {
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must include at least one uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must include at least one lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must include at least one number';
+    if (!/[^A-Za-z0-9]/.test(password)) return 'Password must include at least one special character';
+    return null;
+};
+
 interface AuthModalProps {
     show: boolean;
     onClose: () => void;
@@ -26,6 +37,10 @@ export function AuthModal({ show, onClose }: AuthModalProps) {
             } else {
                 if (formData.name.length < 2) {
                     throw new Error('Name must be at least 2 characters');
+                }
+                const passwordError = getPasswordError(formData.password);
+                if (passwordError) {
+                    throw new Error(passwordError);
                 }
                 await register(formData.name, formData.email, formData.password);
             }
@@ -87,7 +102,9 @@ export function AuthModal({ show, onClose }: AuthModalProps) {
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required
-                        minLength={6}
+                        minLength={8}
+                        pattern={isLogin ? undefined : passwordPattern}
+                        title={isLogin ? 'Enter your password' : 'At least 8 characters, with uppercase, lowercase, number, and special character'}
                         className="auth-input"
                     />
                     <button type="submit" className="auth-submit" disabled={loading}>

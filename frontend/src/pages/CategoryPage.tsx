@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { type TabType } from '../utils';
-import { fetchAnnouncementsByType } from '../utils/api';
+import { fetchAnnouncementCardsPage } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
 
 interface CategoryPageProps {
@@ -22,19 +22,54 @@ const CATEGORY_TITLES: Record<ContentType, string> = {
 export function CategoryPage({ type }: CategoryPageProps) {
     const [data, setData] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [cursor, setCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
     const navigate = useNavigate();
     const { user, logout, isAuthenticated } = useAuth();
-    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [, setShowAuthModal] = useState(false);
 
     useEffect(() => {
+        let isActive = true;
         setLoading(true);
-        fetchAnnouncementsByType(type).then(setData)
+        setData([]);
+        setCursor(null);
+        setHasMore(false);
+
+        fetchAnnouncementCardsPage({ type, limit: 50 })
+            .then(response => {
+                if (!isActive) return;
+                setData(response.data);
+                setCursor(response.nextCursor ?? null);
+                setHasMore(response.hasMore);
+            })
             .catch(console.error)
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (isActive) setLoading(false);
+            });
+
+        return () => {
+            isActive = false;
+        };
     }, [type]);
 
     const handleItemClick = (item: Announcement) => {
         navigate(`/${item.type}/${item.slug}`);
+    };
+
+    const handleLoadMore = async () => {
+        if (!hasMore || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const response = await fetchAnnouncementCardsPage({ type, limit: 50, cursor });
+            setData(prev => [...prev, ...response.data]);
+            setCursor(response.nextCursor ?? null);
+            setHasMore(response.hasMore);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoadingMore(false);
+        }
     };
 
     return (
@@ -70,28 +105,37 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 {loading ? (
                     <SkeletonLoader />
                 ) : (
-                    <div className="category-list">
-                        {data.length > 0 ? (
-                            data.map(item => (
-                                <div
-                                    key={item.id}
-                                    className="category-item"
-                                    onClick={() => handleItemClick(item)}
-                                >
-                                    <div className="item-title">{item.title}</div>
-                                    <div className="item-meta">
-                                        <span className="org">{item.organization}</span>
-                                        {item.totalPosts && <span className="posts">{item.totalPosts} Posts</span>}
-                                        {item.deadline && (
-                                            <span className="deadline">Last: {new Date(item.deadline).toLocaleDateString('en-IN')}</span>
-                                        )}
+                    <>
+                        <div className="category-list">
+                            {data.length > 0 ? (
+                                data.map(item => (
+                                    <div
+                                        key={item.id}
+                                        className="category-item"
+                                        onClick={() => handleItemClick(item)}
+                                    >
+                                        <div className="item-title">{item.title}</div>
+                                        <div className="item-meta">
+                                            <span className="org">{item.organization}</span>
+                                            {item.totalPosts && <span className="posts">{item.totalPosts} Posts</span>}
+                                            {item.deadline && (
+                                                <span className="deadline">Last: {new Date(item.deadline).toLocaleDateString('en-IN')}</span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="no-data">No {type}s available at the moment.</p>
+                                ))
+                            ) : (
+                                <p className="no-data">No {type}s available at the moment.</p>
+                            )}
+                        </div>
+                        {hasMore && (
+                            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                                <button className="admin-btn primary" onClick={handleLoadMore} disabled={loadingMore}>
+                                    {loadingMore ? 'Loading...' : 'Load More'}
+                                </button>
+                            </div>
                         )}
-                    </div>
+                    </>
                 )}
             </main>
 

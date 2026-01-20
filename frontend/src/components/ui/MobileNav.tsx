@@ -51,8 +51,8 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
             </button>
 
             <button
-                className={`nav-btn ${isActive('/admit') ? 'active' : ''}`}
-                onClick={() => handleNavigation('/admit')}
+                className={`nav-btn ${isActive('/admit-card') ? 'active' : ''}`}
+                onClick={() => handleNavigation('/admit-card')}
             >
                 <span className="nav-icon">🎫</span>
                 <span className="nav-label">Admit</span>

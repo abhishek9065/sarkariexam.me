@@ -151,6 +151,7 @@ export class AnnouncementModelMongo {
             if (filters?.type) query.type = filters.type;
             if (filters?.category) query.category = { $regex: filters.category, $options: 'i' };
             if (filters?.organization) query.organization = { $regex: filters.organization, $options: 'i' };
+            if (filters?.qualification) query.minQualification = { $regex: filters.qualification, $options: 'i' };
             if (filters?.search && filters.search.trim()) {
                 const safeSearch = escapeRegex(filters.search.trim());
                 const searchRegex = new RegExp(safeSearch, 'i');
@@ -242,7 +243,8 @@ export class AnnouncementModelMongo {
                 deadline: 1,
                 totalPosts: 1,
                 postedAt: 1,
-                viewCount: 1
+                viewCount: 1,
+                isActive: 1
             };
 
             const docs = await this.collection
@@ -268,7 +270,8 @@ export class AnnouncementModelMongo {
                     deadline: doc.deadline?.toISOString() || null,
                     totalPosts: doc.totalPosts || null,
                     postedAt: doc.postedAt?.toISOString() || '',
-                    viewCount: doc.viewCount || 0
+                    viewCount: doc.viewCount || 0,
+                    isActive: doc.isActive
                 })),
                 nextCursor,
                 hasMore

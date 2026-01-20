@@ -17,6 +17,7 @@ const CATEGORIES = [
 
 export function JobAlerts({ onSuccess }: JobAlertsProps) {
     const [email, setEmail] = useState('');
+    const [submittedEmail, setSubmittedEmail] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<Set<ContentType>>(new Set(['job', 'result']));
     const [frequency, setFrequency] = useState<'daily' | 'weekly'>('daily');
     const [loading, setLoading] = useState(false);
@@ -57,6 +58,7 @@ export function JobAlerts({ onSuccess }: JobAlertsProps) {
             if (!res.ok) throw new Error('Failed to subscribe');
 
             setSuccess(true);
+            setSubmittedEmail(email);
             setEmail('');
             onSuccess?.();
         } catch (err) {
@@ -72,8 +74,8 @@ export function JobAlerts({ onSuccess }: JobAlertsProps) {
                 <div className="success-message">
                     <span className="success-icon">✅</span>
                     <h3>Successfully Subscribed!</h3>
-                    <p>You'll receive job alerts at {email}</p>
-                    <button onClick={() => setSuccess(false)}>Subscribe Another</button>
+                    <p>You'll receive job alerts at {submittedEmail || email}</p>
+                    <button onClick={() => { setSuccess(false); setSubmittedEmail(''); }}>Subscribe Another</button>
                 </div>
             </div>
         );

@@ -37,16 +37,30 @@ export function useAnnouncements() {
 export function useBookmarks() {
     const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
     const [bookmarks, setBookmarks] = useState<Announcement[]>([]);
+    const [loading, setLoading] = useState(false);
     const { token, isAuthenticated } = useAuth();
 
     // Fetch bookmarks on mount
     useEffect(() => {
-        if (isAuthenticated && token) {
-            fetchBookmarks(token).then(data => {
+        if (!isAuthenticated || !token) {
+            setBookmarks([]);
+            setBookmarkedIds(new Set());
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
+        fetchBookmarks(token)
+            .then(data => {
                 setBookmarks(data);
                 setBookmarkedIds(new Set(data.map(b => b.id)));
-            });
-        }
+            })
+            .catch(error => {
+                console.error(error);
+                setBookmarks([]);
+                setBookmarkedIds(new Set());
+            })
+            .finally(() => setLoading(false));
     }, [isAuthenticated, token]);
 
     const toggleBookmark = async (announcementId: string) => {
@@ -74,5 +88,5 @@ export function useBookmarks() {
 
     const isBookmarked = (id: string) => bookmarkedIds.has(id);
 
-    return { bookmarks, bookmarkedIds, toggleBookmark, isBookmarked };
+    return { bookmarks, bookmarkedIds, toggleBookmark, isBookmarked, loading };
 }

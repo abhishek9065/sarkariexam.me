@@ -1,20 +1,64 @@
 import { API_BASE } from './constants';
-import type { Announcement } from '../types';
+import type { Announcement, AnnouncementCard, ContentType } from '../types';
+import type { paths } from '../types/api';
 
-// Fetch all announcements
-export async function fetchAnnouncements(): Promise<Announcement[]> {
-    const response = await fetch(`${API_BASE}/api/announcements`);
-    if (!response.ok) throw new Error('Failed to fetch announcements');
-    const body = await response.json() as { data: Announcement[]; count: number };
-    return body.data;
+type AnnouncementCardsResponse =
+    paths['/api/announcements/v3/cards']['get']['responses'][200]['content']['application/json'];
+
+interface AnnouncementCardQuery {
+    type?: ContentType;
+    category?: string;
+    limit?: number;
+    cursor?: string | null;
 }
 
-// Fetch announcements by type
-export async function fetchAnnouncementsByType(type: string): Promise<Announcement[]> {
-    const response = await fetch(`${API_BASE}/api/announcements?type=${type}`);
-    if (!response.ok) throw new Error('Failed to fetch announcements');
-    const body = await response.json() as { data: Announcement[]; count: number };
-    return body.data;
+// Fetch a single page of announcement cards (cursor-based)
+export async function fetchAnnouncementCardsPage(
+    query: AnnouncementCardQuery = {}
+): Promise<AnnouncementCardsResponse> {
+    const params = new URLSearchParams();
+    if (query.type) params.set('type', query.type);
+    if (query.category) params.set('category', query.category);
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.cursor) params.set('cursor', query.cursor);
+
+    const response = await fetch(`${API_BASE}/api/announcements/v3/cards?${params.toString()}`);
+    if (!response.ok) throw new Error('Failed to fetch announcement cards');
+    return response.json() as Promise<AnnouncementCardsResponse>;
+}
+
+async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): Promise<AnnouncementCard[]> {
+    const items: AnnouncementCard[] = [];
+    let cursor: string | null = null;
+    const pageSize = Math.min(50, maxItems);
+
+    while (items.length < maxItems) {
+        const page = await fetchAnnouncementCardsPage({
+            ...query,
+            limit: Math.min(pageSize, maxItems - items.length),
+            cursor,
+        });
+
+        items.push(...page.data);
+
+        if (!page.hasMore || !page.nextCursor) {
+            break;
+        }
+
+        cursor = page.nextCursor;
+    }
+
+    return items;
+}
+
+// Fetch announcement cards across types for listing views
+export async function fetchAnnouncements(maxItems = 150): Promise<Announcement[]> {
+    return fetchCardPages({}, maxItems);
+}
+
+// Fetch announcement cards by type
+export async function fetchAnnouncementsByType(type: ContentType, maxItems = 100): Promise<Announcement[]> {
+    return fetchCardPages({ type }, maxItems);
 }
 
 // Fetch single announcement by slug

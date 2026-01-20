@@ -4,6 +4,23 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+
+/**
+ * Parse comma-separated values.
+ */
+const parseCsv = (value?: string): string[] => {
+  if (!value) return [];
+  return value.split(',').map(item => item.trim()).filter(Boolean);
+};
+
+/**
+ * Parse number with fallback.
+ */
+const parseNumber = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 /**
  * Get environment variable with optional fallback.
  */
@@ -63,6 +80,18 @@ const getDbConnectionString = (): string => {
 const databaseUrl = getDbConnectionString();
 const jwtSecret = getRequiredEnv('JWT_SECRET', 'dev-secret');
 
+const defaultCorsOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://sarkariexams.me',
+  'https://www.sarkariexams.me'
+];
+
+const corsOrigins = parseCsv(process.env.CORS_ORIGINS);
+const rateLimitWindowMs = parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60000);
+const rateLimitMax = parseNumber(process.env.RATE_LIMIT_MAX, 200);
+const authRateLimitMax = parseNumber(process.env.AUTH_RATE_LIMIT_MAX, 20);
+
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
 
@@ -70,6 +99,10 @@ export const config = {
   port: Number(process.env.PORT ?? 5000),
   databaseUrl,
   jwtSecret,
+  corsOrigins: corsOrigins.length > 0 ? corsOrigins : defaultCorsOrigins,
+  rateLimitWindowMs,
+  rateLimitMax,
+  authRateLimitMax,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProduction,
 

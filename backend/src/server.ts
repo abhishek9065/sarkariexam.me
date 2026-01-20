@@ -23,9 +23,12 @@ import {
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { connectToDatabase } from './services/cosmosdb.js';
+import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { ErrorTracking } from './services/errorTracking.js';
 
 const app = express();
+
+export { app };
 
 // Trust proxy for accurate IP detection behind reverse proxies
 app.set('trust proxy', 1);
@@ -36,12 +39,7 @@ app.use(securityHeaders);
 app.use(blockSuspiciousAgents);
 
 // CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'https://sarkariexams.me',
-  'https://www.sarkariexams.me'
-];
+const allowedOrigins = config.corsOrigins;
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -68,8 +66,8 @@ app.use(validateContentType);
 app.use(sanitizeRequestBody);
 
 // Rate limiting
-app.use('/api', rateLimit({ windowMs: 60000, maxRequests: 200 }));
-app.use('/api/auth', rateLimit({ windowMs: 60000, maxRequests: 20 }));
+app.use('/api', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));
+app.use('/api/auth', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.authRateLimitMax }));
 
 // Response time logging
 app.use(responseTimeLogger);
@@ -112,11 +110,14 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // Initialize database and start server
-async function startServer() {
+export async function startServer() {
   try {
     if (process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI) {
       await connectToDatabase();
       console.log('[Server] MongoDB connected successfully');
+      await scheduleAnalyticsRollups().catch(error => {
+        console.error('[Analytics] Rollup init failed:', error);
+      });
     } else {
       console.log('[Server] No MongoDB configured, using fallback data');
     }
@@ -133,4 +134,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}

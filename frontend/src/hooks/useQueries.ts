@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { API_BASE } from '../utils/constants';
+import { fetchAnnouncements, fetchAnnouncementsByType } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
 
 // Query keys for cache management
@@ -16,10 +17,7 @@ export function useAnnouncements() {
     return useQuery({
         queryKey: queryKeys.announcements,
         queryFn: async (): Promise<Announcement[]> => {
-            const res = await fetch(`${API_BASE}/api/announcements`);
-            if (!res.ok) throw new Error('Failed to fetch announcements');
-            const body = await res.json();
-            return body.data ?? [];
+            return fetchAnnouncements();
         },
     });
 }
@@ -29,10 +27,7 @@ export function useAnnouncementsByType(type: ContentType) {
     return useQuery({
         queryKey: queryKeys.announcementsByType(type),
         queryFn: async (): Promise<Announcement[]> => {
-            const res = await fetch(`${API_BASE}/api/announcements?type=${type}`);
-            if (!res.ok) throw new Error('Failed to fetch');
-            const body = await res.json();
-            return body.data ?? [];
+            return fetchAnnouncementsByType(type);
         },
     });
 }

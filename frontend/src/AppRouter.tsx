@@ -7,6 +7,8 @@ import { DetailPage } from './pages/DetailPage';
 import { AdminPage } from './pages/AdminPage';
 import { StaticPage } from './pages/StaticPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { BookmarksPage } from './pages/BookmarksPage';
+import { SubscriptionActionPage } from './pages/SubscriptionActionPage';
 import './styles.css';
 
 export default function App() {
@@ -39,6 +41,13 @@ export default function App() {
 
                         {/* Profile Page */}
                         <Route path="/profile" element={<ProfilePage />} />
+
+                        {/* Bookmarks Page */}
+                        <Route path="/bookmarks" element={<BookmarksPage />} />
+
+                        {/* Subscription Actions */}
+                        <Route path="/verify" element={<SubscriptionActionPage action="verify" />} />
+                        <Route path="/unsubscribe" element={<SubscriptionActionPage action="unsubscribe" />} />
 
                         {/* Static Pages */}
                         <Route path="/about" element={<StaticPage page="about" />} />
