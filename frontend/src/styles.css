@@ -661,14 +661,14 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  color: inherit;
+  color: #1E293B;
   text-decoration: none;
 }
 
 .item-title {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: #1E293B;
   line-height: 1.4;
   transition: color var(--transition-fast);
 }
@@ -695,7 +695,7 @@ button {
 .no-items {
   padding: var(--space-8);
   text-align: center;
-  color: var(--text-muted);
+  color: #64748B;
   font-style: italic;
 }
 
