@@ -138,7 +138,11 @@ router.get('/verify', async (req, res) => {
             { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = result && typeof result === 'object' && 'value' in result
+            ? (result as any).value
+            : result;
+
+        if (!doc) {
             return res.status(404).json({ error: 'Invalid or expired token' });
         }
 
@@ -163,7 +167,11 @@ router.get('/unsubscribe', async (req, res) => {
             { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = result && typeof result === 'object' && 'value' in result
+            ? (result as any).value
+            : result;
+
+        if (!doc) {
             return res.status(404).json({ error: 'Invalid token' });
         }
 
