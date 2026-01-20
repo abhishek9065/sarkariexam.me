@@ -61,7 +61,8 @@ export function JobAlerts({ onSuccess }: JobAlertsProps) {
             setSubmittedEmail(email);
             setEmail('');
             onSuccess?.();
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             setError('Failed to subscribe. Please try again.');
         } finally {
             setLoading(false);

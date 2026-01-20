@@ -7,24 +7,6 @@ interface Toast {
     type: 'success' | 'error' | 'info';
 }
 
-let toastId = 0;
-
-export function useToast() {
-    const [toasts, setToasts] = useState<Toast[]>([]);
-
-    const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-        const id = ++toastId;
-        setToasts(prev => [...prev, { id, message, type }]);
-
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id));
-        }, 5000);
-    };
-
-    return { toasts, showToast };
-}
-
 export function ToastContainer({ toasts }: { toasts: Toast[] }) {
     return (
         <div className="toast-container">
@@ -91,8 +73,6 @@ export function AnimatedCounter({ value, duration = 1000 }: { value: number; dur
 
     useEffect(() => {
         let startTime: number;
-        const startValue = 0;
-
         const animate = (timestamp: number) => {
             if (!startTime) startTime = timestamp;
             const progress = Math.min((timestamp - startTime) / duration, 1);
@@ -108,31 +88,6 @@ export function AnimatedCounter({ value, duration = 1000 }: { value: number; dur
     }, [value, duration]);
 
     return <span>{displayValue.toLocaleString()}</span>;
-}
-
-// Intersection observer hook for animations
-export function useInView(threshold = 0.1) {
-    const [ref, setRef] = useState<HTMLElement | null>(null);
-    const [inView, setInView] = useState(false);
-
-    useEffect(() => {
-        if (!ref) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setInView(true);
-                    observer.unobserve(ref);
-                }
-            },
-            { threshold }
-        );
-
-        observer.observe(ref);
-        return () => observer.disconnect();
-    }, [ref, threshold]);
-
-    return { ref: setRef, inView };
 }
 
 // Skeleton loader with shimmer

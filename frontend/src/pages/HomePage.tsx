@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons } from '../components';
+import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection } from '../components';
 import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
 import { SECTIONS, type TabType } from '../utils';
@@ -25,6 +25,12 @@ export function HomePage() {
 
     // Get data by type for section display
     const getByType = (type: ContentType) => data.filter(item => item.type === type);
+    const stats = {
+        jobs: getByType('job').length,
+        results: getByType('result').length,
+        admitCards: getByType('admit-card').length,
+        total: data.length
+    };
 
     // Handle item click - navigate to SEO-friendly URL
     const handleItemClick = (item: Announcement) => {
@@ -66,8 +72,38 @@ export function HomePage() {
             <Marquee />
 
             <main className="main-content">
+                <section className="hero">
+                    <div className="hero-content">
+                        <p className="hero-eyebrow">Government job updates</p>
+                        <h2 className="hero-title">Verified notifications without the clutter.</h2>
+                        <p className="hero-subtitle">Daily updates across jobs, results, admit cards, and admissions. Built for speed and clarity.</p>
+                        <div className="hero-actions">
+                            <button className="btn btn-primary" onClick={() => handleCategoryClick('job')}>Browse Jobs</button>
+                            <button className="btn btn-secondary" onClick={() => navigate('/results')}>Latest Results</button>
+                        </div>
+                        <div className="hero-pills">
+                            <button className="hero-pill" onClick={() => handleCategoryClick('admit-card')}>Admit Cards</button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('answer-key')}>Answer Keys</button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('syllabus')}>Syllabus</button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('admission')}>Admissions</button>
+                        </div>
+                    </div>
+                    <div className="hero-panel">
+                        <div className="hero-panel-card">
+                            <h3>What you get</h3>
+                            <ul className="hero-list">
+                                <li>Verified listings updated daily</li>
+                                <li>Fast access to results and admit cards</li>
+                                <li>Save bookmarks and share quickly</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Social Buttons at top */}
                 <SocialButtons />
+
+                {!loading && <StatsSection stats={stats} />}
 
                 {/* Featured Exam Cards */}
                 <FeaturedGrid onItemClick={handleCategoryClick} />
@@ -91,6 +127,8 @@ export function HomePage() {
                         })}
                     </div>
                 )}
+
+                <SubscribeBox />
             </main>
 
             <Footer setCurrentPage={(page) => navigate('/' + page)} />

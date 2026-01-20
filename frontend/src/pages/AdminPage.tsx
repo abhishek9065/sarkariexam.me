@@ -15,7 +15,6 @@ export function AdminPage() {
     const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'add' | 'detailed' | 'bulk' | 'security'>('analytics');
     const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem('adminToken'));
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-    const [loading, setLoading] = useState(false);
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
 
     const [formData, setFormData] = useState({
@@ -67,7 +66,8 @@ export function AdminPage() {
             } else {
                 setMessage('Failed to delete');
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             setMessage('Error deleting announcement');
         }
     };
@@ -131,7 +131,8 @@ export function AdminPage() {
                     : 'Invalid credentials.';
                 setMessage(errorMsg);
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             setMessage('Login failed. Check your connection.');
         }
     };
@@ -179,7 +180,8 @@ export function AdminPage() {
             } else {
                 setMessage('Failed to save. Note: Admin API requires authentication.');
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             setMessage('Error saving announcement.');
         }
     };
@@ -419,7 +421,8 @@ export function AdminPage() {
                                         const error = await response.json();
                                         setMessage(error.message || 'Failed to save');
                                     }
-                                } catch (err) {
+                                } catch (error) {
+                                    console.error(error);
                                     setMessage('Error saving job posting');
                                 }
                             }}
@@ -752,7 +755,8 @@ export function AdminPage() {
                                             const error = await response.json();
                                             setMessage(error.message || 'Failed to publish');
                                         }
-                                    } catch (err) {
+                                    } catch (error) {
+                                        console.error(error);
                                         setMessage('Error publishing');
                                     }
                                 }} style={{

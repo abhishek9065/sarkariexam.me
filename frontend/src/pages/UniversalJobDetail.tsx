@@ -36,7 +36,7 @@ export function UniversalJobDetail({
                 month: 'short',
                 year: 'numeric',
             });
-        } catch (e) {
+        } catch {
             return dateString;
         }
     };

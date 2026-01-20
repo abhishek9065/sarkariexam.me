@@ -4,7 +4,6 @@ import type { Announcement, ContentType } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Header, PWAInstallPrompt, SearchFilters } from './components';
-import type { FilterState } from './components/ui/SearchFilters';
 import UPPoliceJobDetail from './pages/UPPoliceJobDetail';
 import UniversalJobDetail from './pages/UniversalJobDetail';
 
@@ -194,7 +193,6 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [bookmarks, setBookmarks] = useState<Announcement[]>([]);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const { user, token, logout, isAuthenticated } = useAuth();
 
   // Advanced search states
@@ -204,18 +202,6 @@ function App() {
   const [searchQualification, setSearchQualification] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'deadline'>('newest');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-
-  // Inline search filters state
-  const [inlineFilters, setInlineFilters] = useState<FilterState>({
-    keyword: '',
-    type: '',
-    location: '',
-    qualification: '',
-    minAge: '',
-    maxAge: '',
-    sortBy: 'latest',
-  });
-
 
   // Get applied filters count
   const appliedFiltersCount = [searchType, searchCategory, searchOrganization, searchQualification].filter(Boolean).length;
@@ -326,11 +312,6 @@ function App() {
   // Filter by type
   const getByType = (type: ContentType) => data.filter((item) => item.type === type);
 
-  // Format date
-  const formatDate = (date: string | undefined) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
 
   // ============ BROWSER HISTORY INTEGRATION ============
   // Navigation state interface for history
@@ -1214,7 +1195,8 @@ function AdminPanel({ isLoggedIn, setIsLoggedIn, announcements, refreshData, goB
       } else {
         setMessage('Failed to delete');
       }
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       setMessage('Error deleting announcement');
     }
   };
@@ -1270,7 +1252,8 @@ function AdminPanel({ isLoggedIn, setIsLoggedIn, announcements, refreshData, goB
           : 'Invalid credentials.';
         setMessage(errorMsg);
       }
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       setMessage('Login failed. Check your connection.');
     }
   };
@@ -1318,7 +1301,8 @@ function AdminPanel({ isLoggedIn, setIsLoggedIn, announcements, refreshData, goB
       } else {
         setMessage('Failed to save. Note: Admin API requires authentication.');
       }
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       setMessage('Error saving announcement.');
     }
   };

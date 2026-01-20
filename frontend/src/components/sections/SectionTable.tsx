@@ -8,26 +8,6 @@ interface SectionTableProps {
     fullWidth?: boolean;
 }
 
-// Generate consistent color from organization name
-const getOrgColor = (org: string): string => {
-    const colors = [
-        '#DC2626', '#D97706', '#059669', '#0891B2',
-        '#2563EB', '#7C3AED', '#DB2777', '#4F46E5'
-    ];
-    let hash = 0;
-    for (let i = 0; i < org.length; i++) {
-        hash = org.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-};
-
-// Get initials from organization name
-const getInitials = (org: string): string => {
-    const words = org.split(' ').filter(w => w.length > 0);
-    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
-    return (words[0][0] + words[1][0]).toUpperCase();
-};
-
 export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth }: SectionTableProps) {
     const formatShortDate = (date: string | undefined) => {
         if (!date) return '';

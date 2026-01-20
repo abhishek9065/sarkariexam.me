@@ -70,17 +70,4 @@ export function LazyImage({
     );
 }
 
-/**
- * Convert image to WebP format URL if supported
- * (For use with CDN that supports format conversion)
- */
-export function getOptimizedImageUrl(src: string, width?: number): string {
-    if (!src) return '';
-
-    // If using Cloudflare Image Optimization
-    // return `/_next/image?url=${encodeURIComponent(src)}&w=${width || 400}&q=80`;
-
-    return src;
-}
-
 export default LazyImage;

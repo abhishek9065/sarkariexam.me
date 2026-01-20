@@ -615,3 +615,171 @@
         border-top: 4px solid #14b8a6;
     }
 }
+
+/* === UI Refresh Overrides === */
+.detail-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.section-header {
+    border-bottom-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+.dates-header {
+    border-bottom-color: var(--accent-blue);
+}
+
+.fees-header {
+    border-bottom-color: var(--accent-green);
+}
+
+.age-header {
+    border-bottom-color: var(--accent-blue);
+}
+
+.vacancy-header {
+    border-bottom-color: var(--accent-yellow);
+}
+
+.eligibility-header {
+    border-bottom-color: var(--accent-blue);
+}
+
+.salary-header {
+    border-bottom-color: var(--accent-green);
+}
+
+.physical-header {
+    border-bottom-color: var(--accent-red);
+}
+
+.exam-header {
+    border-bottom-color: var(--accent-cyan);
+}
+
+.selection-header {
+    border-bottom-color: var(--accent-cyan);
+}
+
+.apply-header {
+    border-bottom-color: var(--accent-blue);
+}
+
+.links-header {
+    border-bottom-color: var(--accent-blue);
+}
+
+.faq-header {
+    border-bottom-color: var(--accent-yellow);
+}
+
+.date-row,
+.fee-row,
+.age-box,
+.eligibility-list li,
+.salary-item,
+.step-content,
+.apply-steps li,
+.exam-meta span {
+    background: var(--bg-secondary);
+}
+
+.date-row {
+    border-left-color: var(--accent-blue);
+}
+
+.date-value {
+    color: var(--accent-blue);
+}
+
+.fee-row {
+    border-left-color: var(--accent-green);
+}
+
+.fee-amount {
+    color: var(--accent-green);
+}
+
+.age-value {
+    color: var(--accent-blue);
+}
+
+.vacancy-table th,
+.relaxation-table th,
+.exam-table th {
+    background: var(--bg-secondary);
+    color: var(--accent-yellow);
+}
+
+.total-cell {
+    color: var(--accent-yellow);
+}
+
+.total-row {
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.eligibility-list li {
+    border-left-color: var(--accent-blue);
+}
+
+.salary-item.highlight {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.35), rgba(16, 185, 129, 0.35));
+}
+
+.salary-value {
+    color: var(--accent-green);
+}
+
+.physical-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-light);
+}
+
+.physical-card li {
+    background: rgba(15, 23, 42, 0.5);
+}
+
+.exam-meta span {
+    color: var(--accent-cyan);
+}
+
+.exam-table th {
+    color: var(--accent-cyan);
+}
+
+.step-number {
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+}
+
+.step-content {
+    border-left-color: var(--accent-cyan);
+}
+
+.step-content h4 {
+    color: var(--accent-cyan);
+}
+
+.apply-steps li {
+    border-left: 4px solid var(--accent-blue);
+}
+
+.link-btn.primary {
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+}
+
+.link-btn.secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.faq-item summary {
+    background: var(--bg-secondary);
+}
+
+.faq-item p {
+    background: var(--bg-card);
+}

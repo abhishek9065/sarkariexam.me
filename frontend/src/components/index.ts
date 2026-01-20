@@ -43,8 +43,6 @@ export {
     AnimatedCounter,
     Skeleton,
     Tooltip,
-    useToast,
-    useInView
 } from './ui/InteractiveComponents';
 export {
     Breadcrumbs,

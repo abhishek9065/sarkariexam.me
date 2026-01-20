@@ -11,7 +11,7 @@ interface DetailPageProps {
     type: ContentType;
 }
 
-export function DetailPage({ type }: DetailPageProps) {
+export function DetailPage({ type: _type }: DetailPageProps) {
     const { slug } = useParams<{ slug: string }>();
     const [item, setItem] = useState<Announcement | null>(null);
     const [relatedItems, setRelatedItems] = useState<Announcement[]>([]);

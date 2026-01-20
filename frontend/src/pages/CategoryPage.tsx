@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, SkeletonLoader } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, SearchBox } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { type TabType } from '../utils';
 import { fetchAnnouncementCardsPage } from '../utils/api';
@@ -23,6 +23,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const [data, setData] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [query, setQuery] = useState('');
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const navigate = useNavigate();
@@ -56,6 +57,14 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const handleItemClick = (item: Announcement) => {
         navigate(`/${item.type}/${item.slug}`);
     };
+
+    const normalizedQuery = query.trim().toLowerCase();
+    const visibleData = normalizedQuery
+        ? data.filter(item =>
+            item.title.toLowerCase().includes(normalizedQuery) ||
+            (item.organization || '').toLowerCase().includes(normalizedQuery)
+        )
+        : data;
 
     const handleLoadMore = async () => {
         if (!hasMore || loadingMore) return;
@@ -100,15 +109,28 @@ export function CategoryPage({ type }: CategoryPageProps) {
             />
 
             <main className="main-content">
-                <h1 className="category-title">{CATEGORY_TITLES[type]}</h1>
+                <div className="category-header">
+                    <div>
+                        <h1 className="category-title">{CATEGORY_TITLES[type]}</h1>
+                        <p className="category-subtitle">{visibleData.length} listings</p>
+                    </div>
+                    <div className="category-controls">
+                        <SearchBox
+                            value={query}
+                            onChange={setQuery}
+                            placeholder="Search by title or organization"
+                            resultCount={visibleData.length}
+                        />
+                    </div>
+                </div>
 
                 {loading ? (
                     <SkeletonLoader />
                 ) : (
                     <>
                         <div className="category-list">
-                            {data.length > 0 ? (
-                                data.map(item => (
+                            {visibleData.length > 0 ? (
+                                visibleData.map(item => (
                                     <div
                                         key={item.id}
                                         className="category-item"
@@ -125,12 +147,12 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                     </div>
                                 ))
                             ) : (
-                                <p className="no-data">No {type}s available at the moment.</p>
+                                <p className="no-data">{normalizedQuery ? 'No items match your search.' : `No ${type}s available at the moment.`}</p>
                             )}
                         </div>
-                        {hasMore && (
+                        {hasMore && !normalizedQuery && (
                             <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                                <button className="admin-btn primary" onClick={handleLoadMore} disabled={loadingMore}>
+                                <button className="btn btn-primary" onClick={handleLoadMore} disabled={loadingMore}>
                                     {loadingMore ? 'Loading...' : 'Load More'}
                                 </button>
                             </div>
