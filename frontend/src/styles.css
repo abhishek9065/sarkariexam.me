@@ -1358,16 +1358,4 @@ button {
   text-transform: uppercase;
 }
 
-/* ============ Light Mode Override ============ */
-[data-theme="light"] {
-  --bg-primary: #F8FAFC;
-  --bg-secondary: #FFFFFF;
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #F1F5F9;
-  --bg-input: #FFFFFF;
-  --text-primary: #1E293B;
-  --text-secondary: #64748B;
-  --text-muted: #94A3B8;
-  --border-primary: #E2E8F0;
-  --border-light: #CBD5E1;
-}
+/* Light mode disabled - always dark theme */
