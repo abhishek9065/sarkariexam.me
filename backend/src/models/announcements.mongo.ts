@@ -679,7 +679,7 @@ export class AnnouncementModelMongo {
 
             const docs = await this.collection
                 .find(query)
-                .sort({ viewCount: -1, postedAt: -1 })
+                .sort({ viewCount: -1 })
                 .limit(options?.limit || 10)
                 .toArray();
 
