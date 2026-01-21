@@ -6,8 +6,20 @@ import { AnnouncementStatus, ContentType, CreateAnnouncementDto } from '../types
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getDailyRollups } from '../services/analytics.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
+import { getCollection } from '../services/cosmosdb.js';
 
 const router = Router();
+
+interface UserDoc {
+    createdAt: Date;
+    isActive: boolean;
+}
+
+interface SubscriptionDoc {
+    createdAt: Date;
+    isActive: boolean;
+    verified: boolean;
+}
 
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
 const dateField = z
@@ -94,6 +106,23 @@ router.get('/dashboard', async (_req, res) => {
         const total = announcements.length;
         const totalViews = announcements.reduce((sum, a) => sum + (a.viewCount || 0), 0);
 
+        const now = new Date();
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(startOfWeek.getDate() - 7);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        const usersCollection = getCollection<UserDoc>('users');
+        const subscriptionsCollection = getCollection<SubscriptionDoc>('subscriptions');
+
+        const [totalUsers, newToday, newThisWeek, activeSubscribers] = await Promise.all([
+            usersCollection.countDocuments({ isActive: true }),
+            usersCollection.countDocuments({ isActive: true, createdAt: { $gte: startOfDay } }),
+            usersCollection.countDocuments({ isActive: true, createdAt: { $gte: startOfWeek } }),
+            subscriptionsCollection.countDocuments({ isActive: true, verified: true }),
+        ]);
+
         // Calculate category stats
         const categoryMap: Record<string, { count: number; views: number }> = {};
         for (const a of announcements) {
@@ -126,7 +155,7 @@ router.get('/dashboard', async (_req, res) => {
             data: {
                 overview: {
                     totalAnnouncements: total,
-                    totalUsers: 0,
+                    totalUsers,
                     totalViews,
                     totalBookmarks: 0,
                     activeJobs: categoryMap['job']?.count || 0,
@@ -138,10 +167,10 @@ router.get('/dashboard', async (_req, res) => {
                 trends,
                 topContent,
                 users: {
-                    totalUsers: 0,
-                    newToday: 0,
-                    newThisWeek: 0,
-                    activeSubscribers: 0
+                    totalUsers,
+                    newToday,
+                    newThisWeek,
+                    activeSubscribers
                 }
             }
         });

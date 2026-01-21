@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import './AnalyticsDashboard.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
@@ -102,42 +103,52 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     }, [adminToken]);
 
     if (loading) {
-        return <div className="analytics-loading">📊 Loading analytics...</div>;
+        return <div className="analytics-loading">Loading analytics...</div>;
     }
 
     if (error) {
-        return <div className="analytics-error">❌ {error}</div>;
+        return <div className="analytics-error">Error: {error}</div>;
     }
 
     if (!analytics) return null;
+
+    const sortedTypeBreakdown = useMemo(() => {
+        return [...(analytics.typeBreakdown ?? [])].sort((a, b) => b.count - a.count);
+    }, [analytics]);
+
+    const sortedCategories = useMemo(() => {
+        return [...(analytics.categoryBreakdown ?? [])]
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 12);
+    }, [analytics]);
 
     return (
         <div className="analytics-dashboard">
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card views">
-                    <div className="stat-icon">👁️</div>
+                    <div className="stat-icon" aria-hidden="true">V</div>
                     <div className="stat-info">
                         <div className="stat-value">{(analytics.totalViews ?? 0).toLocaleString()}</div>
                         <div className="stat-label">Total Views</div>
                     </div>
                 </div>
                 <div className="stat-card posts">
-                    <div className="stat-icon">📄</div>
+                    <div className="stat-icon" aria-hidden="true">A</div>
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalAnnouncements}</div>
                         <div className="stat-label">Announcements</div>
                     </div>
                 </div>
                 <div className="stat-card subscribers">
-                    <div className="stat-icon">📧</div>
+                    <div className="stat-icon" aria-hidden="true">E</div>
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalEmailSubscribers ?? 0}</div>
                         <div className="stat-label">Email Subscribers</div>
                     </div>
                 </div>
                 <div className="stat-card push">
-                    <div className="stat-icon">🔔</div>
+                    <div className="stat-icon" aria-hidden="true">P</div>
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalPushSubscribers ?? 0}</div>
                         <div className="stat-label">Push Subscribers</div>
@@ -147,11 +158,11 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
             {/* Type Breakdown with Donut Chart */}
             <div className="analytics-section">
-                <h3>📊 Posts by Type</h3>
+                <h3>Posts by Type</h3>
                 <div className="chart-container">
                     {/* CSS Donut Chart */}
                     <div className="donut-chart">
-                        <DonutChart data={analytics.typeBreakdown ?? []} total={analytics.totalAnnouncements} />
+                        <DonutChart data={sortedTypeBreakdown} total={analytics.totalAnnouncements} />
                         <div className="donut-center">
                             <span className="donut-value">{analytics.totalAnnouncements}</span>
                             <span className="donut-label">Total</span>
@@ -159,25 +170,31 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     </div>
                     {/* Breakdown Bars */}
                     <div className="type-breakdown">
-                        {(analytics.typeBreakdown ?? []).map((item) => (
-                            <div key={item.type} className="breakdown-item">
-                                <span className={`type-badge ${item.type}`}>{item.type}</span>
-                                <div className="breakdown-bar">
-                                    <div
-                                        className="breakdown-fill"
-                                        style={{ width: `${(item.count / analytics.totalAnnouncements) * 100}%` }}
-                                    />
+                        {sortedTypeBreakdown.map((item) => {
+                            const percent = analytics.totalAnnouncements > 0
+                                ? (item.count / analytics.totalAnnouncements) * 100
+                                : 0;
+                            const barColor = TYPE_COLORS[item.type] || '#6B7280';
+                            return (
+                                <div key={item.type} className="breakdown-item">
+                                    <span className={`type-badge ${item.type}`}>{item.type}</span>
+                                    <div className="breakdown-bar">
+                                        <div
+                                            className="breakdown-fill"
+                                            style={{ width: `${percent}%`, backgroundColor: barColor }}
+                                        />
+                                    </div>
+                                    <span className="breakdown-count">{item.count}</span>
                                 </div>
-                                <span className="breakdown-count">{item.count}</span>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
             {/* Popular Announcements */}
             <div className="analytics-section">
-                <h3>🔥 Most Popular Announcements</h3>
+                <h3>Most Popular Announcements</h3>
                 <table className="analytics-table">
                     <thead>
                         <tr>
@@ -193,7 +210,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                                 <td>{index + 1}</td>
                                 <td>{item.title.substring(0, 50)}{item.title.length > 50 ? '...' : ''}</td>
                                 <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                <td className="view-count">👁️ {(item.viewCount ?? 0).toLocaleString()}</td>
+                                <td className="view-count">{(item.viewCount ?? 0).toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -202,9 +219,9 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
             {/* Category Breakdown */}
             <div className="analytics-section">
-                <h3>📁 Top Categories</h3>
+                <h3>Top Categories</h3>
                 <div className="category-chips">
-                    {(analytics.categoryBreakdown ?? []).map((item) => (
+                    {sortedCategories.map((item) => (
                         <div key={item.category} className="category-chip">
                             <span className="category-name">{item.category}</span>
                             <span className="category-count">{item.count}</span>
