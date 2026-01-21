@@ -71,13 +71,15 @@ const savedSearchFilterSchema = z.object({
     qualification: z.string().trim().optional(),
 });
 
-const savedSearchSchema = z.object({
+const savedSearchBaseSchema = z.object({
     name: z.string().trim().min(3).max(80),
     query: z.string().trim().max(200).optional().default(''),
     filters: savedSearchFilterSchema.optional(),
     notificationsEnabled: z.boolean().optional().default(true),
     frequency: z.enum(['instant', 'daily', 'weekly']).optional().default('daily'),
-}).superRefine((data, ctx) => {
+});
+
+const savedSearchSchema = savedSearchBaseSchema.superRefine((data, ctx) => {
     const hasQuery = Boolean(data.query && data.query.trim());
     const hasFilters = Boolean(data.filters && Object.values(data.filters).some((value) => value && String(value).trim()));
     if (!hasQuery && !hasFilters) {
@@ -89,7 +91,22 @@ const savedSearchSchema = z.object({
     }
 });
 
-const savedSearchUpdateSchema = savedSearchSchema.partial();
+const savedSearchUpdateSchema = savedSearchBaseSchema.partial().superRefine((data, ctx) => {
+    const hasQuery = data.query !== undefined
+        ? Boolean(data.query && data.query.trim())
+        : false;
+    const hasFilters = data.filters !== undefined
+        ? Boolean(data.filters && Object.values(data.filters).some((value) => value && String(value).trim()))
+        : false;
+    const isUpdatingCriteria = data.query !== undefined || data.filters !== undefined;
+    if (isUpdatingCriteria && !hasQuery && !hasFilters) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Provide a keyword or at least one filter',
+            path: ['query'],
+        });
+    }
+});
 
 const QUALIFICATIONS = [
     '10th Pass',

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { app } from '../src/server.js';
 import { getCollection } from '../src/services/cosmosdb.js';
 
+const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
+
 interface SubscriptionDoc {
     email: string;
     categories: string[];
@@ -15,7 +17,7 @@ interface SubscriptionDoc {
     updatedAt: Date;
 }
 
-describe('subscriptions', () => {
+describeOrSkip('subscriptions', () => {
     it('verifies and unsubscribes using tokens', async () => {
         const collection = getCollection<SubscriptionDoc>('subscriptions');
         const now = new Date();

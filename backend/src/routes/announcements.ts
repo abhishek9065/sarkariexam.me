@@ -251,7 +251,7 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
 });
 
 // Create announcement schema
-const createAnnouncementSchema = z.object({
+const createAnnouncementBaseSchema = z.object({
   title: z.string().min(10).max(500),
   type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]),
   category: z.string().min(3).max(255),
@@ -325,7 +325,9 @@ const createAnnouncementSchema = z.object({
     importantLinks: z.array(z.object({ label: z.string(), url: z.string(), type: z.string() })).optional(),
     faqs: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
   }).optional(),
-}).superRefine((data, ctx) => {
+});
+
+const createAnnouncementSchema = createAnnouncementBaseSchema.superRefine((data, ctx) => {
   if (data.status === 'scheduled' && (!data.publishAt || data.publishAt === '')) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -335,6 +337,15 @@ const createAnnouncementSchema = z.object({
   }
 });
 
+const createAnnouncementPartialSchema = createAnnouncementBaseSchema.partial().superRefine((data, ctx) => {
+  if (data.status === 'scheduled' && (!data.publishAt || data.publishAt === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'publishAt is required for scheduled announcements',
+      path: ['publishAt'],
+    });
+  }
+});
 
 // Create announcement (admin only)
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
@@ -374,7 +385,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid announcement ID' });
     }
 
-    const updateSchema = createAnnouncementSchema.partial();
+    const updateSchema = createAnnouncementPartialSchema;
     const parseResult = updateSchema.safeParse(req.body);
     if (!parseResult.success) {
       return res.status(400).json({ error: parseResult.error.flatten() });

@@ -2,7 +2,9 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { app } from '../src/server.js';
 
-describe('auth/register', () => {
+const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
+
+describeOrSkip('auth/register', () => {
     it('registers and logs in a user', async () => {
         const email = `test-${Date.now()}@example.com`;
         const password = 'StrongPass1!';

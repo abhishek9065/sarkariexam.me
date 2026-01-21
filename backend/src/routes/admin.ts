@@ -17,7 +17,7 @@ const dateField = z
     .or(z.literal(''))
     .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
-const adminAnnouncementSchema = z.object({
+const adminAnnouncementBaseSchema = z.object({
     title: z.string().min(10).max(500),
     type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]),
     category: z.string().min(3).max(255),
@@ -41,7 +41,23 @@ const adminAnnouncementSchema = z.object({
         description: z.string().optional(),
     })).optional(),
     jobDetails: z.any().optional(),
-}).superRefine((data, ctx) => {
+});
+
+const adminAnnouncementSchema = adminAnnouncementBaseSchema.superRefine((data, ctx) => {
+    if (data.status === 'scheduled' && (!data.publishAt || data.publishAt === '')) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'publishAt is required for scheduled announcements',
+            path: ['publishAt'],
+        });
+    }
+});
+
+const adminAnnouncementPartialBaseSchema = adminAnnouncementBaseSchema.partial().extend({
+    isActive: z.boolean().optional(),
+});
+
+const adminAnnouncementPartialSchema = adminAnnouncementPartialBaseSchema.superRefine((data, ctx) => {
     if (data.status === 'scheduled' && (!data.publishAt || data.publishAt === '')) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -62,9 +78,7 @@ const adminListQuerySchema = z.object({
 
 const bulkUpdateSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
-    data: adminAnnouncementSchema.partial().extend({
-        isActive: z.boolean().optional(),
-    }),
+    data: adminAnnouncementPartialSchema,
 });
 // All admin dashboard routes require admin authentication
 router.use(authenticateToken, requireAdmin);
@@ -277,7 +291,7 @@ router.post('/announcements/bulk', async (req, res) => {
  */
 router.put('/announcements/:id', async (req, res) => {
     try {
-        const updateSchema = adminAnnouncementSchema.partial();
+        const updateSchema = adminAnnouncementPartialSchema;
         const parseResult = updateSchema.safeParse(req.body);
         if (!parseResult.success) {
             return res.status(400).json({ error: parseResult.error.flatten() });

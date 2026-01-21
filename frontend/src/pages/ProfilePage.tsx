@@ -129,6 +129,9 @@ export function ProfilePage() {
     const [savedSearchSaving, setSavedSearchSaving] = useState(false);
     const [alertsLoading, setAlertsLoading] = useState(false);
     const [digestLoading, setDigestLoading] = useState(false);
+    const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+    const [alerts, setAlerts] = useState<AlertsPayload | null>(null);
+    const [digestPreview, setDigestPreview] = useState<DigestPreview | null>(null);
 
     const resetSavedSearchForm = () => {
         setSavedSearchForm({ ...DEFAULT_SAVED_SEARCH });

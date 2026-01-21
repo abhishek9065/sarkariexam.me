@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { app } from '../src/server.js';
 import { AnnouncementModelMongo } from '../src/models/announcements.mongo.js';
 
+const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
+
 async function createUserToken() {
     const email = `bookmark-${Date.now()}@example.com`;
     const password = 'StrongPass1!';
@@ -19,7 +21,7 @@ async function createUserToken() {
     return { token: registerRes.body?.data?.token as string, email };
 }
 
-describe('bookmarks', () => {
+describeOrSkip('bookmarks', () => {
     it('adds and removes bookmarks', async () => {
         const { token } = await createUserToken();
         expect(token).toBeTypeOf('string');
