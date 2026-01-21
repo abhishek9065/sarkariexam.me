@@ -165,7 +165,7 @@ function sanitizeFilters(filters?: SavedSearchDoc['filters']) {
     return Object.values(cleaned).some(value => value) ? cleaned : undefined;
 }
 
-function getAnnouncementTimestamp(item: { updatedAt?: string; postedAt?: string }) {
+function getAnnouncementTimestamp(item: { updatedAt?: string | Date; postedAt?: string | Date }) {
     const value = item.updatedAt || item.postedAt;
     if (!value) return 0;
     const date = new Date(value);

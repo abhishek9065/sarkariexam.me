@@ -236,7 +236,6 @@ export class AnnouncementModelMongo {
         organization?: string;
         location?: string;
         qualification?: string;
-        location?: string;
         status?: AnnouncementStatus | 'all';
         includeInactive?: boolean;
         sort?: 'newest' | 'oldest' | 'deadline';

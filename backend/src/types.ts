@@ -103,7 +103,11 @@ export interface CreateAnnouncementDto {
   approvedAt?: string;
   approvedBy?: string;
   tags?: string[];
-  importantDates?: Omit<ImportantDate, 'id' | 'announcementId'>[];
+  importantDates?: Array<{
+    eventName: string;
+    eventDate: string;
+    description?: string;
+  }>;
   jobDetails?: any;
 }
 

@@ -274,7 +274,10 @@ router.post('/announcements/bulk', async (req, res) => {
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, data } = parseResult.data;
+        const { ids, data } = parseResult.data as unknown as {
+            ids: string[];
+            data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
+        };
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
 

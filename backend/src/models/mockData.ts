@@ -558,6 +558,8 @@ export const mockAnnouncements: Announcement[] = rawMockAnnouncements.map(item =
     id: item.id.toString(),
     type: item.type as ContentType,
     tags: item.tags?.map(tag => ({ ...tag })) || [],
+    status: 'published',
+    version: 1,
 }));
 
 // Filter mock announcements based on query params
