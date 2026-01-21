@@ -80,7 +80,7 @@ const adminAnnouncementPartialSchema = adminAnnouncementPartialBaseSchema.superR
 });
 
 const adminListQuerySchema = z.object({
-    limit: z.coerce.number().int().min(1).max(200).default(50),
+    limit: z.coerce.number().int().min(1).max(500).default(50),
     offset: z.coerce.number().int().min(0).default(0),
     status: statusSchema.or(z.literal('all')).optional(),
     type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
