@@ -82,6 +82,7 @@ async function createIndexes(): Promise<void> {
         const subscriptions = getDatabase().collection('subscriptions');
         const pushSubscriptions = getDatabase().collection('push_subscriptions');
         const profiles = getDatabase().collection('user_profiles');
+        const savedSearches = getDatabase().collection('saved_searches');
         const analyticsEvents = getDatabase().collection('analytics_events');
         const analyticsRollups = getDatabase().collection('analytics_rollups');
 
@@ -90,6 +91,8 @@ async function createIndexes(): Promise<void> {
         await announcements.createIndex({ category: 1 }); // Partition key simulation
         await announcements.createIndex({ type: 1 });
         await announcements.createIndex({ isActive: 1 });
+        await announcements.createIndex({ status: 1 });
+        await announcements.createIndex({ publishAt: 1 });
         await announcements.createIndex({ postedAt: -1 });
         await announcements.createIndex({ updatedAt: -1 });
         await announcements.createIndex({ viewCount: -1 });
@@ -113,6 +116,9 @@ async function createIndexes(): Promise<void> {
 
         // User profiles indexes
         await profiles.createIndex({ userId: 1 }, { unique: true });
+
+        // Saved searches indexes
+        await savedSearches.createIndex({ userId: 1, createdAt: -1 });
 
         // Security logs indexes
         await securityLogs.createIndex({ createdAt: -1 });

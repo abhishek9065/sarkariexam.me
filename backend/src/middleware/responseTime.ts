@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { recordActiveUser } from '../services/activeUsers.js';
 
 interface RequestLog {
     method: string;
@@ -22,6 +23,7 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
 
     // Log when response finishes
     res.on('finish', () => {
+        recordActiveUser(req);
         const [seconds, nanoseconds] = process.hrtime(startTime);
         const durationMs = Math.round((seconds * 1000) + (nanoseconds / 1000000));
 

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Header, Navigation, Footer, SkeletonLoader } from '../components';
 import { API_BASE } from '../utils';
 import type { TabType } from '../utils/constants';
-import type { Announcement } from '../types';
+import type { Announcement, ContentType } from '../types';
 import './ProfilePage.css';
 
 interface UserProfile {
@@ -19,7 +19,7 @@ interface UserProfile {
     experienceYears: number;
     emailNotifications: boolean;
     pushNotifications: boolean;
-    notificationFrequency: 'instant' | 'daily' | 'weekly';
+    notificationFrequency: NotificationFrequency;
     profileComplete: boolean;
     onboardingCompleted: boolean;
 }
@@ -29,14 +29,90 @@ interface ProfileOptions {
     qualifications: string[];
     ageGroups: string[];
     educationLevels: string[];
-    notificationFrequencies: string[];
+    notificationFrequencies: NotificationFrequency[];
     locations: string[];
+    organizations: string[];
 }
 
 interface Recommendation extends Announcement {
     matchScore: number;
     matchReasons: Record<string, number>;
 }
+
+
+type NotificationFrequency = 'instant' | 'daily' | 'weekly';
+
+interface SavedSearchFilters {
+    type?: ContentType;
+    category?: string;
+    organization?: string;
+    location?: string;
+    qualification?: string;
+}
+
+interface SavedSearch {
+    id: string;
+    name: string;
+    query: string;
+    filters?: SavedSearchFilters;
+    notificationsEnabled: boolean;
+    frequency: NotificationFrequency;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+interface AlertsPayload {
+    windowDays: number;
+    since: string;
+    savedSearches: Array<SavedSearch & { matches: Announcement[]; totalMatches: number }>;
+    preferences: { matches: Recommendation[]; totalMatches: number };
+}
+
+interface DigestPreview {
+    windowDays: number;
+    since: string;
+    generatedAt: string;
+    totalMatches: number;
+    breakdown: {
+        savedSearchMatches: number;
+        preferenceMatches: number;
+    };
+    preview: Announcement[];
+}
+
+type SavedSearchFormState = {
+    name: string;
+    query: string;
+    type: ContentType | '';
+    category: string;
+    organization: string;
+    location: string;
+    qualification: string;
+    notificationsEnabled: boolean;
+    frequency: NotificationFrequency;
+};
+
+const DEFAULT_SAVED_SEARCH: SavedSearchFormState = {
+    name: '',
+    query: '',
+    type: '',
+    category: '',
+    organization: '',
+    location: '',
+    qualification: '',
+    notificationsEnabled: true,
+    frequency: 'daily',
+};
+
+const SEARCH_TYPES: Array<{ value: ContentType | ''; label: string }> = [
+    { value: '', label: 'All types' },
+    { value: 'job', label: 'Jobs' },
+    { value: 'result', label: 'Results' },
+    { value: 'admit-card', label: 'Admit cards' },
+    { value: 'answer-key', label: 'Answer keys' },
+    { value: 'admission', label: 'Admissions' },
+    { value: 'syllabus', label: 'Syllabus' },
+];
 
 export function ProfilePage() {
     const navigate = useNavigate();
@@ -46,7 +122,94 @@ export function ProfilePage() {
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeSection, setActiveSection] = useState<'preferences' | 'notifications' | 'recommendations'>('preferences');
+    const [activeSection, setActiveSection] = useState<'preferences' | 'notifications' | 'recommendations' | 'saved' | 'alerts'>('preferences');
+    const [savedSearchForm, setSavedSearchForm] = useState<SavedSearchFormState>({ ...DEFAULT_SAVED_SEARCH });
+    const [savedSearchEditingId, setSavedSearchEditingId] = useState<string | null>(null);
+    const [savedSearchError, setSavedSearchError] = useState<string | null>(null);
+    const [savedSearchSaving, setSavedSearchSaving] = useState(false);
+    const [alertsLoading, setAlertsLoading] = useState(false);
+    const [digestLoading, setDigestLoading] = useState(false);
+
+    const resetSavedSearchForm = () => {
+        setSavedSearchForm({ ...DEFAULT_SAVED_SEARCH });
+        setSavedSearchEditingId(null);
+        setSavedSearchError(null);
+    };
+
+    const formatDate = (value?: string) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const formatDateTime = (value?: string) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    const fetchSavedSearches = async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/profile/saved-searches`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const { data } = await res.json();
+                setSavedSearches(data || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch saved searches:', error);
+        }
+    };
+
+    const fetchAlerts = async () => {
+        if (!token) return;
+        setAlertsLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/profile/alerts`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const { data } = await res.json();
+                setAlerts(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch alerts:', error);
+        } finally {
+            setAlertsLoading(false);
+        }
+    };
+
+    const fetchDigestPreview = async () => {
+        if (!token) return;
+        setDigestLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/api/profile/digest-preview`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const { data } = await res.json();
+                setDigestPreview(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch digest preview:', error);
+        } finally {
+            setDigestLoading(false);
+        }
+    };
 
     // Fetch profile, options, and recommendations
     useEffect(() => {
@@ -129,6 +292,126 @@ export function ProfilePage() {
         saveProfile({ [key]: updated });
     };
 
+    const handleSavedSearchSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!token) return;
+
+        const trimmedName = savedSearchForm.name.trim();
+        const trimmedQuery = savedSearchForm.query.trim();
+        if (!trimmedName) {
+            setSavedSearchError('Saved search name is required.');
+            return;
+        }
+
+        const filters: SavedSearchFilters = {};
+        if (savedSearchForm.type) filters.type = savedSearchForm.type;
+        if (savedSearchForm.category) filters.category = savedSearchForm.category;
+        if (savedSearchForm.organization) filters.organization = savedSearchForm.organization;
+        if (savedSearchForm.location) filters.location = savedSearchForm.location;
+        if (savedSearchForm.qualification) filters.qualification = savedSearchForm.qualification;
+
+        const hasFilters = Object.keys(filters).length > 0;
+        if (!trimmedQuery && !hasFilters) {
+            setSavedSearchError('Add a keyword or at least one filter.');
+            return;
+        }
+
+        setSavedSearchSaving(true);
+        setSavedSearchError(null);
+
+        try {
+            const payload = {
+                name: trimmedName,
+                query: trimmedQuery,
+                filters: hasFilters ? filters : undefined,
+                notificationsEnabled: savedSearchForm.notificationsEnabled,
+                frequency: savedSearchForm.frequency,
+            };
+
+            const url = savedSearchEditingId
+                ? `${API_BASE}/api/profile/saved-searches/${savedSearchEditingId}`
+                : `${API_BASE}/api/profile/saved-searches`;
+            const method = savedSearchEditingId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                await fetchSavedSearches();
+                resetSavedSearchForm();
+            } else {
+                setSavedSearchError('Unable to save this search.');
+            }
+        } catch (error) {
+            console.error('Failed to save search:', error);
+            setSavedSearchError('Unable to save this search.');
+        } finally {
+            setSavedSearchSaving(false);
+        }
+    };
+
+    const handleSavedSearchEdit = (search: SavedSearch) => {
+        setSavedSearchEditingId(search.id);
+        setSavedSearchForm({
+            name: search.name,
+            query: search.query || '',
+            type: search.filters?.type || '',
+            category: search.filters?.category || '',
+            organization: search.filters?.organization || '',
+            location: search.filters?.location || '',
+            qualification: search.filters?.qualification || '',
+            notificationsEnabled: search.notificationsEnabled,
+            frequency: search.frequency,
+        });
+        setActiveSection('saved');
+    };
+
+    const handleSavedSearchDelete = async (searchId: string) => {
+        if (!token) return;
+        if (!window.confirm('Delete this saved search?')) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/api/profile/saved-searches/${searchId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                await fetchSavedSearches();
+                if (savedSearchEditingId === searchId) {
+                    resetSavedSearchForm();
+                }
+            }
+        } catch (error) {
+            console.error('Failed to delete saved search:', error);
+        }
+    };
+
+    const handleSavedSearchToggle = async (search: SavedSearch, enabled: boolean) => {
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/profile/saved-searches/${search.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ notificationsEnabled: enabled })
+            });
+
+            if (res.ok) {
+                await fetchSavedSearches();
+            }
+        } catch (error) {
+            console.error('Failed to update saved search:', error);
+        }
+    };
+
     if (loading) {
         return (
             <div className="app">
@@ -160,7 +443,7 @@ export function ProfilePage() {
                         <div className="profile-info">
                             <h1>{user?.name || 'User'}</h1>
                             <p>{user?.email}</p>
-                            {profile?.profileComplete && <span className="badge complete">✓ Profile Complete</span>}
+                            {profile?.profileComplete && <span className="badge complete">Profile Complete</span>}
                         </div>
                     </div>
 
@@ -169,19 +452,31 @@ export function ProfilePage() {
                             className={activeSection === 'preferences' ? 'active' : ''}
                             onClick={() => setActiveSection('preferences')}
                         >
-                            🎯 Preferences
+                            Preferences
                         </button>
                         <button
                             className={activeSection === 'recommendations' ? 'active' : ''}
                             onClick={() => setActiveSection('recommendations')}
                         >
-                            💼 For You
+                            For You
                         </button>
                         <button
                             className={activeSection === 'notifications' ? 'active' : ''}
                             onClick={() => setActiveSection('notifications')}
                         >
-                            🔔 Notifications
+                            Notifications
+                        </button>
+                        <button
+                            className={activeSection === 'saved' ? 'active' : ''}
+                            onClick={() => setActiveSection('saved')}
+                        >
+                            Saved Searches
+                        </button>
+                        <button
+                            className={activeSection === 'alerts' ? 'active' : ''}
+                            onClick={() => setActiveSection('alerts')}
+                        >
+                            Alerts
                         </button>
                     </div>
 
@@ -325,12 +620,297 @@ export function ProfilePage() {
                                             type="radio"
                                             name="frequency"
                                             checked={profile?.notificationFrequency === freq}
-                                            onChange={() => saveProfile({ notificationFrequency: freq as any })}
+                                            onChange={() => saveProfile({ notificationFrequency: freq as NotificationFrequency })}
                                         />
                                         <span>{freq.charAt(0).toUpperCase() + freq.slice(1)}</span>
                                     </label>
                                 ))}
                             </div>
+                        </div>
+                    )}
+
+                    {activeSection === 'saved' && (
+                        <div className="profile-section">
+                            <div className="saved-search-header">
+                                <div>
+                                    <h2>Saved Searches</h2>
+                                    <p className="section-hint">Save filters and get alerts when new matches appear.</p>
+                                </div>
+                                <button className="admin-btn secondary" onClick={resetSavedSearchForm}>Reset</button>
+                            </div>
+
+                            <form className="saved-search-form" onSubmit={handleSavedSearchSubmit}>
+                                <div className="saved-search-grid">
+                                    <div className="saved-search-field">
+                                        <label>Name</label>
+                                        <input
+                                            type="text"
+                                            value={savedSearchForm.name}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, name: e.target.value })}
+                                            placeholder="e.g. Banking clerk jobs"
+                                        />
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Keyword</label>
+                                        <input
+                                            type="text"
+                                            value={savedSearchForm.query}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, query: e.target.value })}
+                                            placeholder="e.g. SBI, SSC, Railways"
+                                        />
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Type</label>
+                                        <select
+                                            value={savedSearchForm.type}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, type: e.target.value as ContentType | '' })}
+                                        >
+                                            {SEARCH_TYPES.map((type) => (
+                                                <option key={type.label} value={type.value}>{type.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Category</label>
+                                        <select
+                                            value={savedSearchForm.category}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, category: e.target.value })}
+                                        >
+                                            <option value="">All categories</option>
+                                            {options?.categories.map((cat) => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Organization</label>
+                                        <select
+                                            value={savedSearchForm.organization}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, organization: e.target.value })}
+                                        >
+                                            <option value="">All organizations</option>
+                                            {options?.organizations.map((org) => (
+                                                <option key={org} value={org}>{org}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Location</label>
+                                        <select
+                                            value={savedSearchForm.location}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, location: e.target.value })}
+                                        >
+                                            <option value="">All locations</option>
+                                            {options?.locations.map((loc) => (
+                                                <option key={loc} value={loc}>{loc}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Qualification</label>
+                                        <select
+                                            value={savedSearchForm.qualification}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, qualification: e.target.value })}
+                                        >
+                                            <option value="">All qualifications</option>
+                                            {options?.qualifications.map((qual) => (
+                                                <option key={qual} value={qual}>{qual}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Digest</label>
+                                        <select
+                                            value={savedSearchForm.frequency}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, frequency: e.target.value as NotificationFrequency })}
+                                        >
+                                            {options?.notificationFrequencies.map((freq) => (
+                                                <option key={freq} value={freq}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="saved-search-field checkbox">
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                checked={savedSearchForm.notificationsEnabled}
+                                                onChange={(e) => setSavedSearchForm({ ...savedSearchForm, notificationsEnabled: e.target.checked })}
+                                            />
+                                            Enable notifications
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {savedSearchError && <div className="form-message error">{savedSearchError}</div>}
+
+                                <div className="saved-search-actions">
+                                    <button type="submit" className="admin-btn primary" disabled={savedSearchSaving}>
+                                        {savedSearchEditingId ? 'Update search' : 'Save search'}
+                                    </button>
+                                    {savedSearchEditingId && (
+                                        <button type="button" className="admin-btn secondary" onClick={resetSavedSearchForm}>Cancel edit</button>
+                                    )}
+                                </div>
+                            </form>
+
+                            <div className="saved-search-list">
+                                {savedSearches.length === 0 ? (
+                                    <div className="empty-state">No saved searches yet.</div>
+                                ) : (
+                                    savedSearches.map((search) => (
+                                        <div key={search.id} className="saved-search-card">
+                                            <div className="saved-search-card-header">
+                                                <div>
+                                                    <h3>{search.name}</h3>
+                                                    <p className="saved-search-query">{search.query || 'No keyword filter'}</p>
+                                                </div>
+                                                <div className="saved-search-actions">
+                                                    <button className="admin-btn secondary small" onClick={() => handleSavedSearchEdit(search)}>Edit</button>
+                                                    <button className="admin-btn danger small" onClick={() => handleSavedSearchDelete(search.id)}>Delete</button>
+                                                </div>
+                                            </div>
+                                            <div className="saved-search-tags">
+                                                {search.filters?.type && <span className="filter-tag">Type: {search.filters.type}</span>}
+                                                {search.filters?.category && <span className="filter-tag">Category: {search.filters.category}</span>}
+                                                {search.filters?.organization && <span className="filter-tag">Org: {search.filters.organization}</span>}
+                                                {search.filters?.location && <span className="filter-tag">Location: {search.filters.location}</span>}
+                                                {search.filters?.qualification && <span className="filter-tag">Qualification: {search.filters.qualification}</span>}
+                                            </div>
+                                            <div className="saved-search-toggle">
+                                                <label>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={search.notificationsEnabled}
+                                                        onChange={(e) => handleSavedSearchToggle(search, e.target.checked)}
+                                                    />
+                                                    Notifications ({search.frequency})
+                                                </label>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeSection === 'alerts' && (
+                        <div className="profile-section">
+                            <div className="saved-search-header">
+                                <div>
+                                    <h2>Alerts and digest</h2>
+                                    <p className="section-hint">Latest matches from saved searches and preferences.</p>
+                                </div>
+                                <button className="admin-btn secondary" onClick={() => { fetchAlerts(); fetchDigestPreview(); }}>Refresh</button>
+                            </div>
+
+                            {alertsLoading ? (
+                                <div className="admin-loading">Loading alerts...</div>
+                            ) : alerts ? (
+                                <div className="alerts-content">
+                                    <div className="alert-group">
+                                        <div className="alert-group-header">
+                                            <h3>Saved search alerts</h3>
+                                            <span className="alert-count">{alerts.savedSearches.length} searches</span>
+                                        </div>
+                                        {alerts.savedSearches.length === 0 ? (
+                                            <div className="empty-state">No saved searches yet.</div>
+                                        ) : (
+                                            alerts.savedSearches.map((search) => (
+                                                <div key={search.id} className="alert-card">
+                                                    <div className="alert-card-header">
+                                                        <div>
+                                                            <h4>{search.name}</h4>
+                                                            <span className="alert-count">{search.totalMatches} matches</span>
+                                                        </div>
+                                                        <span className="alert-window">Last {alerts.windowDays} days</span>
+                                                    </div>
+                                                    {search.matches.length === 0 ? (
+                                                        <div className="empty-state">No new matches.</div>
+                                                    ) : (
+                                                        <div className="alert-list">
+                                                            {search.matches.map((match) => (
+                                                                <div
+                                                                    key={match.id}
+                                                                    className="alert-item"
+                                                                    onClick={() => navigate(`/${match.type}/${match.slug}`)}
+                                                                >
+                                                                    <div>
+                                                                        <strong>{match.title}</strong>
+                                                                        <div className="alert-meta">{match.organization} | {match.type}</div>
+                                                                    </div>
+                                                                    <span className="alert-date">{formatDate(match.postedAt)}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    <div className="alert-group">
+                                        <div className="alert-group-header">
+                                            <h3>Preference alerts</h3>
+                                            <span className="alert-count">{alerts.preferences.totalMatches} matches</span>
+                                        </div>
+                                        {alerts.preferences.matches.length === 0 ? (
+                                            <div className="empty-state">No preference alerts yet.</div>
+                                        ) : (
+                                            <div className="alert-list">
+                                                {alerts.preferences.matches.map((match) => (
+                                                    <div
+                                                        key={match.id}
+                                                        className="alert-item"
+                                                        onClick={() => navigate(`/${match.type}/${match.slug}`)}
+                                                    >
+                                                        <div>
+                                                            <strong>{match.title}</strong>
+                                                            <div className="alert-meta">{match.organization} | {match.type}</div>
+                                                        </div>
+                                                        <span className="alert-date">{formatDate(match.postedAt)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="digest-preview">
+                                        <div className="alert-group-header">
+                                            <h3>Digest preview</h3>
+                                            {digestPreview && (
+                                                <span className="alert-window">Generated {formatDateTime(digestPreview.generatedAt)}</span>
+                                            )}
+                                        </div>
+                                        {digestLoading ? (
+                                            <div className="admin-loading">Loading digest preview...</div>
+                                        ) : digestPreview ? (
+                                            digestPreview.preview.length === 0 ? (
+                                                <div className="empty-state">No digest items yet.</div>
+                                            ) : (
+                                                <div className="alert-list">
+                                                    {digestPreview.preview.map((item) => (
+                                                        <div
+                                                            key={item.id}
+                                                            className="alert-item"
+                                                            onClick={() => navigate(`/${item.type}/${item.slug}`)}
+                                                        >
+                                                            <div>
+                                                                <strong>{item.title}</strong>
+                                                                <div className="alert-meta">{item.organization} | {item.type}</div>
+                                                            </div>
+                                                            <span className="alert-date">{formatDate(item.postedAt)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className="empty-state">Digest preview is not available.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="empty-state">Unable to load alerts.</div>
+                            )}
                         </div>
                     )}
                 </div>

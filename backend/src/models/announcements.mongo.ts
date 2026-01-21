@@ -1,9 +1,42 @@
 import { ObjectId, Filter, Sort, WithId, Document } from 'mongodb';
 import { getCollection } from '../services/cosmosdb.js';
-import { Announcement, ContentType, CreateAnnouncementDto, Tag } from '../types.js';
+import { Announcement, AnnouncementStatus, ContentType, CreateAnnouncementDto, Tag } from '../types.js';
 
 function escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+interface AnnouncementVersionDoc {
+    version: number;
+    updatedAt: Date;
+    updatedBy?: string;
+    note?: string;
+    snapshot: {
+        title: string;
+        type: ContentType;
+        category: string;
+        organization: string;
+        content?: string;
+        externalLink?: string;
+        location?: string;
+        deadline?: Date;
+        minQualification?: string;
+        ageLimit?: string;
+        applicationFee?: string;
+        totalPosts?: number;
+        tags: string[];
+        importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
+        jobDetails?: any;
+        status?: AnnouncementStatus;
+        publishAt?: Date;
+        approvedAt?: Date;
+        approvedBy?: string;
+        isActive?: boolean;
+        postedBy?: string;
+        postedAt?: Date;
+        updatedAt?: Date;
+        viewCount?: number;
+    };
 }
 
 /**
@@ -28,10 +61,85 @@ interface AnnouncementDoc extends Document {
     postedBy: string;
     postedAt: Date;
     updatedAt: Date;
+    status?: AnnouncementStatus;
+    publishAt?: Date;
+    approvedAt?: Date;
+    approvedBy?: string;
+    version?: number;
+    versions?: AnnouncementVersionDoc[];
     isActive: boolean;
     viewCount: number;
     jobDetails?: any;
     importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
+}
+
+const DEFAULT_STATUS: AnnouncementStatus = 'published';
+
+function normalizeStatus(status?: AnnouncementStatus | null): AnnouncementStatus {
+    return status ?? DEFAULT_STATUS;
+}
+
+function buildLiveQuery(now: Date = new Date()): Filter<AnnouncementDoc> {
+    return {
+        isActive: true,
+        $and: [
+            {
+                $or: [
+                    { status: { $in: ['published'] } },
+                    { status: { $exists: false } },
+                    { status: null },
+                    { status: 'scheduled', publishAt: { $lte: now } },
+                ],
+            },
+        ],
+    };
+}
+
+function addSearchFilter(query: Filter<AnnouncementDoc>, searchRegex: RegExp): void {
+    const searchClause: Filter<AnnouncementDoc> = {
+        $or: [
+            { title: searchRegex },
+            { content: searchRegex },
+            { organization: searchRegex },
+            { category: searchRegex },
+            { tags: searchRegex },
+        ],
+    };
+
+    if (query.$and) {
+        query.$and.push(searchClause);
+    } else {
+        query.$and = [searchClause];
+    }
+}
+
+function buildVersionSnapshot(doc: AnnouncementDoc): AnnouncementVersionDoc['snapshot'] {
+    return {
+        title: doc.title,
+        type: doc.type,
+        category: doc.category,
+        organization: doc.organization,
+        content: doc.content,
+        externalLink: doc.externalLink,
+        location: doc.location,
+        deadline: doc.deadline,
+        minQualification: doc.minQualification,
+        ageLimit: doc.ageLimit,
+        applicationFee: doc.applicationFee,
+        totalPosts: doc.totalPosts,
+        tags: doc.tags || [],
+        importantDates: doc.importantDates,
+        jobDetails: doc.jobDetails,
+        status: doc.status,
+        publishAt: doc.publishAt,
+        approvedAt: doc.approvedAt,
+        approvedBy: doc.approvedBy,
+        isActive: doc.isActive,
+        postedBy: doc.postedBy,
+        postedAt: doc.postedAt,
+        updatedAt: doc.updatedAt,
+        viewCount: doc.viewCount,
+    };
 }
 
 /**
@@ -51,13 +159,14 @@ export class AnnouncementModelMongo {
         search?: string;
         category?: string;
         organization?: string;
+        location?: string;
         qualification?: string;
         sort?: 'newest' | 'oldest' | 'deadline';
         limit?: number;
         offset?: number;
     }): Promise<Announcement[]> {
         try {
-            const query: Filter<AnnouncementDoc> = { isActive: true };
+            const query: Filter<AnnouncementDoc> = buildLiveQuery();
 
             if (filters?.type) {
                 query.type = filters.type;
@@ -71,6 +180,10 @@ export class AnnouncementModelMongo {
                 query.organization = { $regex: filters.organization, $options: 'i' };
             }
 
+            if (filters?.location) {
+                query.location = { $regex: filters.location, $options: 'i' };
+            }
+
             if (filters?.qualification) {
                 query.minQualification = { $regex: filters.qualification, $options: 'i' };
             }
@@ -78,13 +191,7 @@ export class AnnouncementModelMongo {
             if (filters?.search && filters.search.trim()) {
                 const safeSearch = escapeRegex(filters.search.trim());
                 const searchRegex = new RegExp(safeSearch, 'i');
-                query.$or = [
-                    { title: searchRegex },
-                    { content: searchRegex },
-                    { organization: searchRegex },
-                    { category: searchRegex },
-                    { tags: searchRegex },
-                ];
+                addSearchFilter(query, searchRegex);
             }
 
             // Cosmos DB only indexes _id by default, so use simple sort
@@ -120,6 +227,90 @@ export class AnnouncementModelMongo {
     }
 
     /**
+     * Find all announcements for admin views (includes drafts and scheduled items)
+     */
+    static async findAllAdmin(filters?: {
+        type?: ContentType;
+        search?: string;
+        category?: string;
+        organization?: string;
+        location?: string;
+        qualification?: string;
+        location?: string;
+        status?: AnnouncementStatus | 'all';
+        includeInactive?: boolean;
+        sort?: 'newest' | 'oldest' | 'deadline';
+        limit?: number;
+        offset?: number;
+    }): Promise<Announcement[]> {
+        try {
+            const query: Filter<AnnouncementDoc> = {};
+
+            if (!filters?.includeInactive) {
+                query.isActive = true;
+            }
+
+            if (filters?.status && filters.status !== 'all') {
+                query.status = filters.status as AnnouncementStatus;
+            }
+
+            if (filters?.type) {
+                query.type = filters.type;
+            }
+
+            if (filters?.category) {
+                query.category = { $regex: filters.category, $options: 'i' };
+            }
+
+            if (filters?.organization) {
+                query.organization = { $regex: filters.organization, $options: 'i' };
+            }
+
+            if (filters?.location) {
+                query.location = { $regex: filters.location, $options: 'i' };
+            }
+
+            if (filters?.qualification) {
+                query.minQualification = { $regex: filters.qualification, $options: 'i' };
+            }
+
+            if (filters?.search && filters.search.trim()) {
+                const safeSearch = escapeRegex(filters.search.trim());
+                const searchRegex = new RegExp(safeSearch, 'i');
+                addSearchFilter(query, searchRegex);
+            }
+
+            let sortDirection: 1 | -1 = -1;
+            switch (filters?.sort) {
+                case 'newest':
+                    sortDirection = -1;
+                    break;
+                case 'oldest':
+                    sortDirection = 1;
+                    break;
+                case 'deadline':
+                    sortDirection = -1;
+                    break;
+            }
+
+            const limit = filters?.limit || 100;
+            const skip = filters?.offset || 0;
+
+            const docs = await this.collection
+                .find(query)
+                .sort({ _id: sortDirection })
+                .skip(skip)
+                .limit(limit)
+                .toArray();
+
+            return docs.map(this.docToAnnouncement);
+        } catch (error) {
+            console.error('[MongoDB] findAllAdmin error:', error);
+            return [];
+        }
+    }
+
+    /**
      * Cursor-based pagination for better performance
      */
     static async findAllWithCursor(filters?: {
@@ -127,13 +318,14 @@ export class AnnouncementModelMongo {
         search?: string;
         category?: string;
         organization?: string;
+        location?: string;
         qualification?: string;
         sort?: 'newest' | 'oldest' | 'deadline';
         limit?: number;
         cursor?: string;
     }): Promise<{ data: Announcement[]; nextCursor: string | null; hasMore: boolean }> {
         try {
-            const query: Filter<AnnouncementDoc> = { isActive: true };
+            const query: Filter<AnnouncementDoc> = buildLiveQuery();
             const limit = filters?.limit || 20;
 
             if (filters?.cursor) {
@@ -151,17 +343,12 @@ export class AnnouncementModelMongo {
             if (filters?.type) query.type = filters.type;
             if (filters?.category) query.category = { $regex: filters.category, $options: 'i' };
             if (filters?.organization) query.organization = { $regex: filters.organization, $options: 'i' };
+            if (filters?.location) query.location = { $regex: filters.location, $options: 'i' };
             if (filters?.qualification) query.minQualification = { $regex: filters.qualification, $options: 'i' };
             if (filters?.search && filters.search.trim()) {
                 const safeSearch = escapeRegex(filters.search.trim());
                 const searchRegex = new RegExp(safeSearch, 'i');
-                query.$or = [
-                    { title: searchRegex },
-                    { content: searchRegex },
-                    { organization: searchRegex },
-                    { category: searchRegex },
-                    { tags: searchRegex },
-                ];
+                addSearchFilter(query, searchRegex);
             }
 
             let sort: Sort = { _id: -1 };
@@ -216,7 +403,7 @@ export class AnnouncementModelMongo {
         hasMore: boolean
     }> {
         try {
-            const query: Filter<AnnouncementDoc> = { isActive: true };
+            const query: Filter<AnnouncementDoc> = buildLiveQuery();
             const limit = filters?.limit || 20;
 
             if (filters?.type) {
@@ -295,7 +482,7 @@ export class AnnouncementModelMongo {
             cacheKey,
             async () => {
                 try {
-                    const doc = await this.collection.findOne({ slug, isActive: true });
+                    const doc = await this.collection.findOne({ ...buildLiveQuery(), slug });
                     return doc ? this.docToAnnouncement(doc) : null;
                 } catch (error) {
                     console.error('[MongoDB] findBySlug error:', error);
@@ -315,7 +502,7 @@ export class AnnouncementModelMongo {
 
         try {
             const docs = await this.collection
-                .find({ _id: { $in: validIds }, isActive: true })
+                .find({ ...buildLiveQuery(), _id: { $in: validIds } })
                 .toArray();
             return docs.map(this.docToAnnouncement);
         } catch (error) {
@@ -341,6 +528,9 @@ export class AnnouncementModelMongo {
     static async create(data: CreateAnnouncementDto, userId: string): Promise<Announcement> {
         const slug = this.generateSlug(data.title);
         const now = new Date();
+        const status = normalizeStatus(data.status);
+        const publishAt = data.publishAt ? new Date(data.publishAt) : undefined;
+        const approvedAt = data.approvedAt ? new Date(data.approvedAt) : undefined;
 
         const doc: Omit<AnnouncementDoc, '_id'> = {
             title: data.title,
@@ -360,7 +550,13 @@ export class AnnouncementModelMongo {
             postedBy: userId,
             postedAt: now,
             updatedAt: now,
-            isActive: true,
+            status,
+            publishAt,
+            approvedAt,
+            approvedBy: data.approvedBy,
+            version: 1,
+            versions: [],
+            isActive: status !== 'archived',
             viewCount: 0,
             jobDetails: (data as any).jobDetails || undefined,
             importantDates: data.importantDates?.map(date => ({
@@ -377,10 +573,14 @@ export class AnnouncementModelMongo {
     /**
      * Update announcement
      */
-    static async update(id: string, data: Partial<CreateAnnouncementDto>): Promise<Announcement | null> {
+    static async update(id: string, data: Partial<CreateAnnouncementDto>, updatedBy?: string): Promise<Announcement | null> {
         if (!ObjectId.isValid(id)) return null;
 
-        const updateData: any = { updatedAt: new Date() };
+        const existing = await this.collection.findOne({ _id: new ObjectId(id) });
+        if (!existing) return null;
+
+        const now = new Date();
+        const updateData: Partial<AnnouncementDoc> & { updatedAt: Date } = { updatedAt: now };
 
         if (data.title) updateData.title = data.title;
         if (data.type) updateData.type = data.type;
@@ -403,10 +603,36 @@ export class AnnouncementModelMongo {
                 description: date.description,
             }));
         }
+        if (data.status !== undefined) {
+            const status = normalizeStatus(data.status);
+            updateData.status = status;
+            updateData.isActive = status !== 'archived';
+        }
+        if (data.publishAt !== undefined) updateData.publishAt = data.publishAt ? new Date(data.publishAt) : null;
+        if (data.approvedAt !== undefined) updateData.approvedAt = data.approvedAt ? new Date(data.approvedAt) : null;
+        if (data.approvedBy !== undefined) updateData.approvedBy = data.approvedBy || null;
+        if ((data as any).isActive !== undefined) updateData.isActive = (data as any).isActive;
+
+        const changeKeys = Object.keys(updateData).filter(key => key !== 'updatedAt');
+        const updateOps: any = { $set: updateData };
+
+        if (changeKeys.length > 0) {
+            const versionEntry: AnnouncementVersionDoc = {
+                version: existing.version ?? 1,
+                updatedAt: now,
+                updatedBy,
+                snapshot: buildVersionSnapshot(existing),
+            };
+
+            updateOps.$push = {
+                versions: { $each: [versionEntry], $position: 0, $slice: 20 },
+            };
+            updateOps.$set.version = (existing.version ?? 1) + 1;
+        }
 
         await this.collection.updateOne(
             { _id: new ObjectId(id) },
-            { $set: updateData }
+            updateOps
         );
 
         return this.findById(id);
@@ -449,7 +675,7 @@ export class AnnouncementModelMongo {
      */
     static async getTrending(options?: { type?: ContentType; limit?: number }): Promise<Announcement[]> {
         try {
-            const query: Filter<AnnouncementDoc> = { isActive: true };
+            const query: Filter<AnnouncementDoc> = buildLiveQuery();
             if (options?.type) query.type = options.type;
 
             const docs = await this.collection
@@ -476,7 +702,7 @@ export class AnnouncementModelMongo {
         try {
             const docs = await this.collection
                 .find({
-                    isActive: true,
+                    ...buildLiveQuery(),
                     deadline: { $gte: options.startDate, $lte: options.endDate },
                 })
                 .sort({ deadline: 1 })
@@ -495,7 +721,7 @@ export class AnnouncementModelMongo {
      */
     static async getCategories(): Promise<string[]> {
         try {
-            return await this.collection.distinct('category', { isActive: true });
+            return await this.collection.distinct('category', buildLiveQuery());
         } catch (error) {
             console.error('[MongoDB] getCategories error:', error);
             return [];
@@ -507,7 +733,7 @@ export class AnnouncementModelMongo {
      */
     static async getOrganizations(): Promise<string[]> {
         try {
-            return await this.collection.distinct('organization', { isActive: true });
+            return await this.collection.distinct('organization', buildLiveQuery());
         } catch (error) {
             console.error('[MongoDB] getOrganizations error:', error);
             return [];
@@ -520,7 +746,7 @@ export class AnnouncementModelMongo {
     static async getTags(): Promise<{ name: string; count: number }[]> {
         try {
             const result = await this.collection.aggregate([
-                { $match: { isActive: true } },
+                { $match: buildLiveQuery() },
                 { $unwind: '$tags' },
                 { $group: { _id: '$tags', count: { $sum: 1 } } },
                 { $sort: { count: -1 } },
@@ -586,6 +812,9 @@ export class AnnouncementModelMongo {
                     postedBy: userId,
                     postedAt: now,
                     updatedAt: now,
+                    status: DEFAULT_STATUS,
+                    version: 1,
+                    versions: [],
                     isActive: true,
                     viewCount: 0,
                 } as Omit<AnnouncementDoc, '_id'>);
@@ -613,33 +842,32 @@ export class AnnouncementModelMongo {
     /**
      * Batch update multiple announcements by ID
      */
-    static async batchUpdate(updates: Array<{
-        id: string;
-        data: Partial<{ title: string; content: string; deadline: Date; isActive: boolean }>;
-    }>): Promise<{ updated: number; errors: string[] }> {
+    static async batchUpdate(
+        updates: Array<{
+            id: string;
+            data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
+        }>,
+        updatedBy?: string
+    ): Promise<{ updated: number; errors: string[] }> {
         const errors: string[] = [];
         let updated = 0;
 
-        // Use bulkWrite for efficiency
-        const operations = updates
-            .filter(u => ObjectId.isValid(u.id))
-            .map(update => ({
-                updateOne: {
-                    filter: { _id: new ObjectId(update.id) },
-                    update: { $set: { ...update.data, updatedAt: new Date() } }
+        for (const update of updates) {
+            if (!ObjectId.isValid(update.id)) {
+                errors.push(`Invalid ID: ${update.id}`);
+                continue;
+            }
+
+            try {
+                const result = await this.update(update.id, update.data as Partial<CreateAnnouncementDto>, updatedBy);
+                if (result) {
+                    updated += 1;
+                } else {
+                    errors.push(`Announcement not found: ${update.id}`);
                 }
-            }));
-
-        if (operations.length === 0) {
-            return { updated: 0, errors: ['No valid IDs provided'] };
-        }
-
-        try {
-            const result = await this.collection.bulkWrite(operations, { ordered: false });
-            updated = result.modifiedCount;
-            console.log(`[BatchUpdate] Updated ${updated} documents`);
-        } catch (error: any) {
-            errors.push(`Batch update error: ${error.message}`);
+            } catch (error: any) {
+                errors.push(`Update failed for ${update.id}: ${error?.message || error}`);
+            }
         }
 
         return { updated, errors };
@@ -682,6 +910,9 @@ export class AnnouncementModelMongo {
                         slug: item.slug,
                         postedBy: userId,
                         postedAt: now,
+                        status: DEFAULT_STATUS,
+                        version: 1,
+                        versions: [],
                         isActive: true,
                         viewCount: 0,
                     }
@@ -740,6 +971,41 @@ export class AnnouncementModelMongo {
      * Convert MongoDB document to Announcement type
      */
     private static docToAnnouncement(doc: WithId<AnnouncementDoc>): Announcement {
+        const versions = doc.versions?.map((version) => ({
+            version: version.version,
+            updatedAt: version.updatedAt?.toISOString() as any,
+            updatedBy: version.updatedBy,
+            note: version.note,
+            snapshot: {
+                title: version.snapshot.title,
+                type: version.snapshot.type,
+                category: version.snapshot.category,
+                organization: version.snapshot.organization,
+                content: version.snapshot.content,
+                externalLink: version.snapshot.externalLink,
+                location: version.snapshot.location,
+                deadline: version.snapshot.deadline?.toISOString() as any,
+                minQualification: version.snapshot.minQualification,
+                ageLimit: version.snapshot.ageLimit,
+                applicationFee: version.snapshot.applicationFee,
+                totalPosts: version.snapshot.totalPosts,
+                tags: version.snapshot.tags?.map(t => ({ id: 0, name: t, slug: t.toLowerCase() })) || [],
+                importantDates: version.snapshot.importantDates?.map((date, index) => ({
+                    id: `${doc._id.toString()}-v${version.version}-${index}`,
+                    announcementId: doc._id.toString(),
+                    eventName: date.eventName,
+                    eventDate: date.eventDate?.toISOString() as any,
+                    description: date.description,
+                })) || [],
+                jobDetails: version.snapshot.jobDetails,
+                status: normalizeStatus(version.snapshot.status),
+                publishAt: version.snapshot.publishAt?.toISOString() as any,
+                approvedAt: version.snapshot.approvedAt?.toISOString() as any,
+                approvedBy: version.snapshot.approvedBy,
+                isActive: version.snapshot.isActive ?? true,
+            },
+        })) || [];
+
         return {
             id: doc._id.toString() as any, // Keep as string for MongoDB
             title: doc.title,
@@ -759,6 +1025,12 @@ export class AnnouncementModelMongo {
             postedBy: doc.postedBy?.toString(),
             postedAt: doc.postedAt?.toISOString() as any,
             updatedAt: doc.updatedAt?.toISOString() as any,
+            status: normalizeStatus(doc.status),
+            publishAt: doc.publishAt?.toISOString() as any,
+            approvedAt: doc.approvedAt?.toISOString() as any,
+            approvedBy: doc.approvedBy,
+            version: doc.version ?? 1,
+            versions,
             isActive: doc.isActive,
             viewCount: doc.viewCount,
             importantDates: doc.importantDates?.map((date, index) => ({

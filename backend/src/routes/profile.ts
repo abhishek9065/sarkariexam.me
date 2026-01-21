@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { authenticateToken } from '../middleware/auth.js';
-import { getCollection } from '../services/cosmosdb.js';
+import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { ContentType } from '../types.js';
 
 interface UserProfileDoc {
     userId: string;
@@ -23,8 +24,28 @@ interface UserProfileDoc {
     updatedAt: Date;
 }
 
+
+interface SavedSearchDoc {
+    userId: string;
+    name: string;
+    query: string;
+    filters?: {
+        type?: ContentType;
+        category?: string;
+        organization?: string;
+        location?: string;
+        qualification?: string;
+    };
+    notificationsEnabled: boolean;
+    frequency: 'instant' | 'daily' | 'weekly';
+    lastNotifiedAt?: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 const router = Router();
 const collection = () => getCollection<UserProfileDoc>('user_profiles');
+const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searches');
 
 const profileUpdateSchema = z.object({
     preferredCategories: z.array(z.string()).optional(),
@@ -40,6 +61,35 @@ const profileUpdateSchema = z.object({
     profileComplete: z.boolean().optional(),
     onboardingCompleted: z.boolean().optional(),
 });
+
+
+const savedSearchFilterSchema = z.object({
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
+    category: z.string().trim().optional(),
+    organization: z.string().trim().optional(),
+    location: z.string().trim().optional(),
+    qualification: z.string().trim().optional(),
+});
+
+const savedSearchSchema = z.object({
+    name: z.string().trim().min(3).max(80),
+    query: z.string().trim().max(200).optional().default(''),
+    filters: savedSearchFilterSchema.optional(),
+    notificationsEnabled: z.boolean().optional().default(true),
+    frequency: z.enum(['instant', 'daily', 'weekly']).optional().default('daily'),
+}).superRefine((data, ctx) => {
+    const hasQuery = Boolean(data.query && data.query.trim());
+    const hasFilters = Boolean(data.filters && Object.values(data.filters).some((value) => value && String(value).trim()));
+    if (!hasQuery && !hasFilters) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Provide a keyword or at least one filter',
+            path: ['query'],
+        });
+    }
+});
+
+const savedSearchUpdateSchema = savedSearchSchema.partial();
 
 const QUALIFICATIONS = [
     '10th Pass',
@@ -72,6 +122,64 @@ const EDUCATION_LEVELS = [
 function formatProfile(doc: any) {
     const { _id, ...rest } = doc;
     return { id: _id?.toString?.() || _id, ...rest };
+}
+
+
+function formatSavedSearch(doc: any) {
+    const { _id, ...rest } = doc;
+    return { id: _id?.toString?.() || _id, ...rest };
+}
+
+function cleanFilterValue(value?: string) {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+}
+
+function sanitizeFilters(filters?: SavedSearchDoc['filters']) {
+    if (!filters) return undefined;
+    const cleaned = {
+        type: filters.type,
+        category: cleanFilterValue(filters.category),
+        organization: cleanFilterValue(filters.organization),
+        location: cleanFilterValue(filters.location),
+        qualification: cleanFilterValue(filters.qualification),
+    };
+    return Object.values(cleaned).some(value => value) ? cleaned : undefined;
+}
+
+function getAnnouncementTimestamp(item: { updatedAt?: string; postedAt?: string }) {
+    const value = item.updatedAt || item.postedAt;
+    if (!value) return 0;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function scoreAnnouncement(profile: UserProfileDoc, item: any) {
+    let score = 0;
+    const reasons: Record<string, number> = {};
+
+    if (profile.preferredCategories.includes(item.category)) {
+        score += 40;
+        reasons.category = 40;
+    }
+
+    if (profile.preferredOrganizations.includes(item.organization)) {
+        score += 20;
+        reasons.organization = 20;
+    }
+
+    if (profile.preferredLocations.includes(item.location || '')) {
+        score += 20;
+        reasons.location = 20;
+    }
+
+    if (profile.preferredQualifications.some(q => (item.minQualification || '').toLowerCase().includes(q.toLowerCase()))) {
+        score += 20;
+        reasons.qualification = 20;
+    }
+
+    return { score, reasons };
 }
 
 const LOCATIONS = [
@@ -107,6 +215,61 @@ async function getOrCreateProfile(userId: string) {
 
     const result = await collection().insertOne(profile as any);
     return { ...profile, _id: result.insertedId };
+}
+
+
+async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, limit: number) {
+    const filters = sanitizeFilters(search.filters);
+    const searchLimit = Math.min(200, Math.max(limit * 4, 50));
+
+    const announcements = await AnnouncementModelMongo.findAll({
+        type: filters?.type,
+        category: filters?.category,
+        organization: filters?.organization,
+        location: filters?.location,
+        qualification: filters?.qualification,
+        search: search.query ? search.query : undefined,
+        limit: searchLimit,
+    });
+
+    const matches = announcements
+        .filter(item => getAnnouncementTimestamp(item) >= sinceMs)
+        .slice(0, limit);
+
+    return { matches, totalMatches: matches.length };
+}
+
+function hasProfilePreferences(profile: UserProfileDoc) {
+    return Boolean(
+        profile.preferredCategories.length ||
+        profile.preferredOrganizations.length ||
+        profile.preferredLocations.length ||
+        profile.preferredQualifications.length
+    );
+}
+
+async function getPreferenceAlerts(profile: UserProfileDoc, sinceMs: number, limit: number) {
+    if (!hasProfilePreferences(profile)) {
+        return { matches: [], totalMatches: 0 };
+    }
+
+    const announcements = await AnnouncementModelMongo.findAll({ limit: 200 });
+    const scored = announcements.map(item => ({
+        item,
+        ...scoreAnnouncement(profile, item),
+    }));
+
+    const matches = scored
+        .filter(entry => entry.score > 0 && getAnnouncementTimestamp(entry.item) >= sinceMs)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(entry => ({
+            ...entry.item,
+            matchScore: entry.score,
+            matchReasons: entry.reasons,
+        }));
+
+    return { matches, totalMatches: matches.length };
 }
 
 // Get profile
@@ -167,6 +330,219 @@ router.get('/options', async (_req, res) => {
     } catch (error) {
         console.error('Profile options error:', error);
         return res.status(500).json({ error: 'Failed to load options' });
+    }
+});
+
+
+// Saved searches
+router.get('/saved-searches', authenticateToken, async (req, res) => {
+    try {
+        const searches = await savedSearchesCollection()
+            .find({ userId: req.user!.userId })
+            .sort({ updatedAt: -1 })
+            .toArray();
+
+        return res.json({ data: searches.map(formatSavedSearch) });
+    } catch (error) {
+        console.error('Saved searches fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load saved searches' });
+    }
+});
+
+router.post('/saved-searches', authenticateToken, async (req, res) => {
+    const parseResult = savedSearchSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    try {
+        const now = new Date();
+        const input = parseResult.data;
+        const filters = sanitizeFilters(input.filters);
+
+        const doc: SavedSearchDoc = {
+            userId: req.user!.userId,
+            name: input.name,
+            query: input.query?.trim() || '',
+            filters,
+            notificationsEnabled: input.notificationsEnabled ?? true,
+            frequency: input.frequency ?? 'daily',
+            lastNotifiedAt: null,
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        const result = await savedSearchesCollection().insertOne(doc as any);
+        return res.status(201).json({ data: formatSavedSearch({ ...doc, _id: result.insertedId }) });
+    } catch (error) {
+        console.error('Saved search create error:', error);
+        return res.status(500).json({ error: 'Failed to create saved search' });
+    }
+});
+
+router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid saved search id' });
+    }
+
+    const parseResult = savedSearchUpdateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    try {
+        const now = new Date();
+        const update: Partial<SavedSearchDoc> & { updatedAt: Date } = { updatedAt: now };
+
+        if (parseResult.data.name !== undefined) {
+            update.name = parseResult.data.name.trim();
+        }
+        if (parseResult.data.query !== undefined) {
+            update.query = parseResult.data.query.trim();
+        }
+        if (parseResult.data.filters !== undefined) {
+            update.filters = sanitizeFilters(parseResult.data.filters);
+        }
+        if (parseResult.data.notificationsEnabled !== undefined) {
+            update.notificationsEnabled = parseResult.data.notificationsEnabled;
+        }
+        if (parseResult.data.frequency !== undefined) {
+            update.frequency = parseResult.data.frequency;
+        }
+
+        const result = await savedSearchesCollection().updateOne(
+            { _id: toObjectId(req.params.id), userId: req.user!.userId },
+            { $set: update }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Saved search not found' });
+        }
+
+        const updated = await savedSearchesCollection().findOne({ _id: toObjectId(req.params.id), userId: req.user!.userId });
+        return res.json({ data: updated ? formatSavedSearch(updated) : null });
+    } catch (error) {
+        console.error('Saved search update error:', error);
+        return res.status(500).json({ error: 'Failed to update saved search' });
+    }
+});
+
+router.delete('/saved-searches/:id', authenticateToken, async (req, res) => {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid saved search id' });
+    }
+
+    try {
+        const result = await savedSearchesCollection().deleteOne({
+            _id: toObjectId(req.params.id),
+            userId: req.user!.userId,
+        });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: 'Saved search not found' });
+        }
+
+        return res.json({ message: 'Saved search deleted' });
+    } catch (error) {
+        console.error('Saved search delete error:', error);
+        return res.status(500).json({ error: 'Failed to delete saved search' });
+    }
+});
+
+// Alerts and digest preview
+router.get('/alerts', authenticateToken, async (req, res) => {
+    try {
+        const windowDays = Math.min(30, parseInt(req.query.windowDays as string) || 7);
+        const limit = Math.min(20, parseInt(req.query.limit as string) || 5);
+        const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+        const since = new Date(sinceMs);
+
+        const searches = await savedSearchesCollection()
+            .find({ userId: req.user!.userId })
+            .sort({ updatedAt: -1 })
+            .toArray();
+
+        const savedSearches = await Promise.all(
+            searches.map(async (search) => ({
+                ...formatSavedSearch(search),
+                ...(await buildSavedSearchMatches(search, sinceMs, limit)),
+            }))
+        );
+
+        const profile = await getOrCreateProfile(req.user!.userId);
+        const preferences = await getPreferenceAlerts(profile, sinceMs, limit);
+
+        return res.json({
+            data: {
+                windowDays,
+                since: since.toISOString(),
+                savedSearches,
+                preferences,
+            }
+        });
+    } catch (error) {
+        console.error('Alerts error:', error);
+        return res.status(500).json({ error: 'Failed to load alerts' });
+    }
+});
+
+router.get('/digest-preview', authenticateToken, async (req, res) => {
+    try {
+        const windowDays = Math.min(30, parseInt(req.query.windowDays as string) || 7);
+        const limit = Math.min(20, parseInt(req.query.limit as string) || 8);
+        const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+        const since = new Date(sinceMs);
+
+        const searches = await savedSearchesCollection()
+            .find({ userId: req.user!.userId })
+            .sort({ updatedAt: -1 })
+            .toArray();
+
+        const savedSearches = await Promise.all(
+            searches.map(async (search) => ({
+                ...formatSavedSearch(search),
+                ...(await buildSavedSearchMatches(search, sinceMs, limit)),
+            }))
+        );
+
+        const profile = await getOrCreateProfile(req.user!.userId);
+        const preferences = await getPreferenceAlerts(profile, sinceMs, limit);
+
+        const combined = [
+            ...savedSearches.flatMap(entry => entry.matches || []),
+            ...preferences.matches,
+        ];
+
+        const unique = new Map();
+        for (const item of combined) {
+            const id = item.id;
+            if (!id) continue;
+            const existing = unique.get(id);
+            if (!existing || getAnnouncementTimestamp(item) > getAnnouncementTimestamp(existing)) {
+                unique.set(id, item);
+            }
+        }
+
+        const preview = Array.from(unique.values())
+            .sort((a, b) => getAnnouncementTimestamp(b) - getAnnouncementTimestamp(a))
+            .slice(0, limit);
+
+        return res.json({
+            data: {
+                windowDays,
+                since: since.toISOString(),
+                generatedAt: new Date().toISOString(),
+                totalMatches: unique.size,
+                breakdown: {
+                    savedSearchMatches: savedSearches.reduce((sum, entry) => sum + (entry.matches?.length || 0), 0),
+                    preferenceMatches: preferences.matches.length,
+                },
+                preview,
+            }
+        });
+    } catch (error) {
+        console.error('Digest preview error:', error);
+        return res.status(500).json({ error: 'Failed to load digest preview' });
     }
 });
 

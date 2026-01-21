@@ -2,11 +2,20 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { SecurityLogger } from '../services/securityLogger.js';
-import { ContentType, CreateAnnouncementDto } from '../types.js';
+import { AnnouncementStatus, ContentType, CreateAnnouncementDto } from '../types.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getDailyRollups } from '../services/analytics.js';
+import { getActiveUsersStats } from '../services/activeUsers.js';
 
 const router = Router();
+
+const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
+const dateField = z
+    .string()
+    .datetime()
+    .optional()
+    .or(z.literal(''))
+    .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 
 const adminAnnouncementSchema = z.object({
     title: z.string().min(10).max(500),
@@ -16,11 +25,15 @@ const adminAnnouncementSchema = z.object({
     content: z.string().optional(),
     externalLink: z.string().url().optional().or(z.literal('')),
     location: z.string().optional().or(z.literal('')),
-    deadline: z.string().datetime().optional().or(z.literal('')).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+    deadline: dateField,
     minQualification: z.string().optional().or(z.literal('')),
     ageLimit: z.string().optional().or(z.literal('')),
     applicationFee: z.string().optional().or(z.literal('')),
     totalPosts: z.number().int().positive().optional(),
+    status: statusSchema.optional(),
+    publishAt: dateField,
+    approvedAt: dateField,
+    approvedBy: z.string().optional(),
     tags: z.array(z.string()).optional(),
     importantDates: z.array(z.object({
         eventName: z.string(),
@@ -28,9 +41,31 @@ const adminAnnouncementSchema = z.object({
         description: z.string().optional(),
     })).optional(),
     jobDetails: z.any().optional(),
+}).superRefine((data, ctx) => {
+    if (data.status === 'scheduled' && (!data.publishAt || data.publishAt === '')) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'publishAt is required for scheduled announcements',
+            path: ['publishAt'],
+        });
+    }
 });
 
+const adminListQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+    status: statusSchema.or(z.literal('all')).optional(),
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
+    search: z.string().trim().optional(),
+    includeInactive: z.coerce.boolean().optional(),
+});
 
+const bulkUpdateSchema = z.object({
+    ids: z.array(z.string().min(1)).min(1),
+    data: adminAnnouncementSchema.partial().extend({
+        isActive: z.boolean().optional(),
+    }),
+});
 // All admin dashboard routes require admin authentication
 router.use(authenticateToken, requireAdmin);
 
@@ -41,7 +76,7 @@ router.use(authenticateToken, requireAdmin);
 router.get('/dashboard', async (_req, res) => {
     try {
         // Get all announcements for stats
-        const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
+        const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 1000, includeInactive: true });
         const total = announcements.length;
         const totalViews = announcements.reduce((sum, a) => sum + (a.viewCount || 0), 0);
 
@@ -103,12 +138,27 @@ router.get('/dashboard', async (_req, res) => {
 });
 
 /**
+ * GET /api/admin/active-users
+ * Get active user counts in the last N minutes
+ */
+router.get('/active-users', async (req, res) => {
+    try {
+        const windowMinutes = Math.min(120, parseInt(req.query.windowMinutes as string) || 15);
+        const stats = getActiveUsersStats(windowMinutes);
+        return res.json({ data: stats });
+    } catch (error) {
+        console.error('Active users error:', error);
+        return res.status(500).json({ error: 'Failed to load active users' });
+    }
+});
+
+/**
  * GET /api/admin/stats
  * Get quick stats overview
  */
 router.get('/stats', async (_req, res) => {
     try {
-        const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
+        const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 1000, includeInactive: true });
         return res.json({
             data: {
                 totalAnnouncements: announcements.length,
@@ -157,10 +207,20 @@ router.get('/security/logs', async (req, res) => {
  */
 router.get('/announcements', async (req, res) => {
     try {
-        const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
-        const offset = parseInt(req.query.offset as string) || 0;
+        const parseResult = adminListQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
 
-        const announcements = await AnnouncementModelMongo.findAll({ limit, offset });
+        const filters = parseResult.data;
+        const announcements = await AnnouncementModelMongo.findAllAdmin({
+            limit: filters.limit,
+            offset: filters.offset,
+            status: filters.status,
+            type: filters.type,
+            search: filters.search,
+            includeInactive: filters.includeInactive,
+        });
 
         return res.json({ data: announcements });
     } catch (error) {
@@ -190,6 +250,28 @@ router.post('/announcements', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/announcements/bulk
+ * Bulk update announcements
+ */
+router.post('/announcements/bulk', async (req, res) => {
+    try {
+        const parseResult = bulkUpdateSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const { ids, data } = parseResult.data;
+        const updates = ids.map(id => ({ id, data }));
+        const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
+
+        return res.json({ data: result });
+    } catch (error) {
+        console.error('Bulk update error:', error);
+        return res.status(500).json({ error: 'Failed to update announcements' });
+    }
+});
+
+/**
  * PUT /api/admin/announcements/:id
  * Update announcement
  */
@@ -201,7 +283,7 @@ router.put('/announcements/:id', async (req, res) => {
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const announcement = await AnnouncementModelMongo.update(req.params.id, parseResult.data as unknown as Partial<CreateAnnouncementDto>);
+        const announcement = await AnnouncementModelMongo.update(req.params.id, parseResult.data as unknown as Partial<CreateAnnouncementDto>, req.user?.userId);
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
@@ -209,6 +291,58 @@ router.put('/announcements/:id', async (req, res) => {
     } catch (error) {
         console.error('Update announcement error:', error);
         return res.status(500).json({ error: 'Failed to update announcement' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/:id/approve
+ * Approve and publish an announcement
+ */
+router.post('/announcements/:id/approve', async (req, res) => {
+    try {
+        const now = new Date().toISOString();
+        const announcement = await AnnouncementModelMongo.update(
+            req.params.id,
+            {
+                status: 'published',
+                publishAt: now,
+                approvedAt: now,
+                approvedBy: req.user?.userId,
+            } as Partial<CreateAnnouncementDto>,
+            req.user?.userId
+        );
+        if (!announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+        return res.json({ data: announcement });
+    } catch (error) {
+        console.error('Approve announcement error:', error);
+        return res.status(500).json({ error: 'Failed to approve announcement' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/:id/reject
+ * Reject an announcement back to draft
+ */
+router.post('/announcements/:id/reject', async (req, res) => {
+    try {
+        const announcement = await AnnouncementModelMongo.update(
+            req.params.id,
+            {
+                status: 'draft',
+                approvedAt: '',
+                approvedBy: '',
+            } as Partial<CreateAnnouncementDto>,
+            req.user?.userId
+        );
+        if (!announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+        return res.json({ data: announcement });
+    } catch (error) {
+        console.error('Reject announcement error:', error);
+        return res.status(500).json({ error: 'Failed to reject announcement' });
     }
 });
 

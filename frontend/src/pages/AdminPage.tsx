@@ -1,35 +1,118 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnalyticsDashboard } from '../components/admin/AnalyticsDashboard';
 import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingForm';
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { SecurityLogsTable } from '../components/admin/SecurityLogsTable';
-import type { Announcement, ContentType } from '../types';
+import type { Announcement, ContentType, AnnouncementStatus } from '../types';
+import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
+
+type DashboardOverview = {
+    totalAnnouncements: number;
+    totalViews: number;
+    totalBookmarks: number;
+    activeJobs: number;
+    expiringSoon: number;
+    newToday: number;
+    newThisWeek: number;
+};
+
+type DashboardUsers = {
+    totalUsers: number;
+    newToday: number;
+    newThisWeek: number;
+    activeSubscribers: number;
+};
+
+type DashboardData = {
+    overview: DashboardOverview;
+    users: DashboardUsers;
+};
+
+const CONTENT_TYPES: { value: ContentType; label: string }[] = [
+    { value: 'job', label: 'Latest Jobs' },
+    { value: 'admit-card', label: 'Admit Cards' },
+    { value: 'result', label: 'Latest Results' },
+    { value: 'admission', label: 'Admissions' },
+    { value: 'syllabus', label: 'Syllabus' },
+    { value: 'answer-key', label: 'Answer Keys' },
+];
+
+const LIST_SORT_OPTIONS: { value: 'newest' | 'updated' | 'deadline' | 'views'; label: string }[] = [
+    { value: 'newest', label: 'Newest first' },
+    { value: 'updated', label: 'Recently updated' },
+    { value: 'deadline', label: 'Deadline soonest' },
+    { value: 'views', label: 'Most viewed' },
+];
+
+
+const STATUS_OPTIONS: { value: AnnouncementStatus; label: string }[] = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'pending', label: 'Pending Review' },
+    { value: 'scheduled', label: 'Scheduled' },
+    { value: 'published', label: 'Published' },
+    { value: 'archived', label: 'Archived' },
+];
+
+const ACTIVE_USER_WINDOWS = [15, 30, 60, 120];
+
+const DEFAULT_FORM_DATA = {
+    title: '',
+    type: 'job' as ContentType,
+    category: 'Central Government',
+    organization: '',
+    externalLink: '',
+    location: 'All India',
+    deadline: '',
+    totalPosts: '',
+    minQualification: '',
+    ageLimit: '',
+    applicationFee: '',
+    status: 'published' as AnnouncementStatus,
+    publishAt: '',
+};
+
 
 export function AdminPage() {
     const navigate = useNavigate();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'add' | 'detailed' | 'bulk' | 'security'>('analytics');
+    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'add' | 'detailed' | 'bulk' | 'security' | 'users'>('analytics');
     const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem('adminToken'));
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
+    const [listQuery, setListQuery] = useState('');
+    const [listTypeFilter, setListTypeFilter] = useState<ContentType | 'all'>('all');
+    const [listSort, setListSort] = useState<'newest' | 'updated' | 'deadline' | 'views'>('newest');
+    const [listPage, setListPage] = useState(1);
 
-    const [formData, setFormData] = useState({
-        title: '',
-        type: 'job' as ContentType,
-        category: 'Central Government',
-        organization: '',
-        externalLink: '',
-        location: 'All India',
-        deadline: '',
-        totalPosts: '',
-        minQualification: '',
-        ageLimit: '',
-        applicationFee: '',
-    });
+    const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>('all');
+    const [listLoading, setListLoading] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkStatus, setBulkStatus] = useState<AnnouncementStatus | ''>('');
+    const [bulkPublishAt, setBulkPublishAt] = useState('');
+    const [bulkIsActive, setBulkIsActive] = useState<'keep' | 'active' | 'inactive'>('keep');
+    const [activeUsers, setActiveUsers] = useState<{
+        windowMinutes: number;
+        since: string;
+        total: number;
+        authenticated: number;
+        anonymous: number;
+        admins: number;
+    } | null>(null);
+    const [activeUsersWindow, setActiveUsersWindow] = useState(15);
+    const [activeUsersLoading, setActiveUsersLoading] = useState(false);
+    const [versionTarget, setVersionTarget] = useState<Announcement | null>(null);
+
+    const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+    const [dashboardLoading, setDashboardLoading] = useState(false);
+    const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+    const pageSize = 15;
+
+    const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
     const [message, setMessage] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [bulkJson, setBulkJson] = useState('');
@@ -41,21 +124,68 @@ export function AdminPage() {
     // Fetch data
     const refreshData = async () => {
         if (!adminToken) return;
+        setListLoading(true);
         try {
-            const res = await fetch(`${apiBase}/api/announcements`);
+            const params = new URLSearchParams({
+                limit: '500',
+                offset: '0',
+                includeInactive: 'true',
+            });
+            const res = await fetch(`${apiBase}/api/admin/announcements?${params.toString()}`, {
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
             const data = await res.json();
             setAnnouncements(data.data || []);
         } catch (e) {
             console.error(e);
+        } finally {
+            setListLoading(false);
         }
     };
+
+    const refreshActiveUsers = async () => {
+        if (!adminToken) return;
+        setActiveUsersLoading(true);
+        try {
+            const res = await fetch(`${apiBase}/api/admin/active-users?windowMinutes=${activeUsersWindow}`, {
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            const data = await res.json();
+            setActiveUsers(data.data ?? null);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setActiveUsersLoading(false);
+        }
+    };
+    const refreshDashboard = async () => {
+        if (!adminToken) return;
+        setDashboardLoading(true);
+        setDashboardError(null);
+        try {
+            const res = await fetch(`${apiBase}/api/admin/dashboard`, {
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            if (!res.ok) {
+                throw new Error('Failed to load dashboard');
+            }
+            const payload = await res.json();
+            setDashboard(payload.data ?? null);
+        } catch (error) {
+            console.error(error);
+            setDashboardError('Failed to load user analytics.');
+        } finally {
+            setDashboardLoading(false);
+        }
+    };
+
 
     const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
         if (!adminToken) return;
 
         try {
-            const response = await fetch(`${apiBase}/api/announcements/${id}`, {
+            const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${adminToken}` },
             });
@@ -63,6 +193,7 @@ export function AdminPage() {
             if (response.ok) {
                 setMessage('Deleted successfully');
                 refreshData();
+                refreshDashboard();
             } else {
                 setMessage('Failed to delete');
             }
@@ -80,11 +211,13 @@ export function AdminPage() {
             organization: item.organization,
             externalLink: item.externalLink || '',
             location: item.location || '',
-            deadline: item.deadline ? item.deadline.split('T')[0] : '', // Format date for input
+            deadline: item.deadline ? item.deadline.split('T')[0] : '',
             totalPosts: item.totalPosts ? item.totalPosts.toString() : '',
             minQualification: item.minQualification || '',
             ageLimit: item.ageLimit || '',
             applicationFee: item.applicationFee || '',
+            status: item.status ?? 'published',
+            publishAt: formatDateTimeInput(item.publishAt),
         });
         setEditingId(item.id);
 
@@ -98,6 +231,174 @@ export function AdminPage() {
             setMessage(`Editing: ${item.title}`);
         }
     };
+    const handleDuplicate = (item: Announcement) => {
+        setFormData({
+            ...DEFAULT_FORM_DATA,
+            title: item.title,
+            type: item.type,
+            category: item.category,
+            organization: item.organization,
+            externalLink: item.externalLink || '',
+            location: item.location || '',
+            deadline: item.deadline ? item.deadline.split('T')[0] : '',
+            totalPosts: item.totalPosts ? item.totalPosts.toString() : '',
+            minQualification: item.minQualification || '',
+            ageLimit: item.ageLimit || '',
+            applicationFee: item.applicationFee || '',
+            status: 'draft',
+            publishAt: '',
+        });
+        const hasDetails = item.jobDetails && Object.keys(item.jobDetails).length > 0;
+        setJobDetails(hasDetails ? item.jobDetails : null);
+        setEditingId(null);
+        setShowPreview(false);
+        setPreviewData(null);
+        setActiveAdminTab(hasDetails ? 'detailed' : 'add');
+        setMessage(`Duplicating: ${item.title}`);
+    };
+
+    const handleQuickCreate = (type: ContentType, mode: 'add' | 'detailed') => {
+        setFormData({ ...DEFAULT_FORM_DATA, type });
+        setJobDetails(null);
+        setEditingId(null);
+        setShowPreview(false);
+        setPreviewData(null);
+        setActiveAdminTab(mode);
+        setMessage('');
+    };
+
+    const handleView = (item: Announcement) => {
+        if (!item.slug) return;
+        const url = `/${item.type}/${item.slug}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    const toggleSelection = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = (checked: boolean, ids: string[]) => {
+        if (!checked) {
+            setSelectedIds(new Set());
+            return;
+        }
+        setSelectedIds(new Set(ids));
+    };
+
+    const clearSelection = () => {
+        setSelectedIds(new Set());
+    };
+
+    const handleApprove = async (id: string) => {
+        if (!adminToken) return;
+        try {
+            const response = await fetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            if (response.ok) {
+                setMessage('Announcement approved and published.');
+                refreshData();
+                refreshDashboard();
+            } else {
+                setMessage('Failed to approve announcement.');
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage('Error approving announcement.');
+        }
+    };
+
+    const handleReject = async (id: string) => {
+        if (!adminToken) return;
+        try {
+            const response = await fetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            if (response.ok) {
+                setMessage('Announcement moved back to draft.');
+                refreshData();
+                refreshDashboard();
+            } else {
+                setMessage('Failed to reject announcement.');
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage('Error rejecting announcement.');
+        }
+    };
+
+    const handleBulkUpdate = async () => {
+        if (!adminToken) {
+            setMessage('Not authenticated.');
+            return;
+        }
+        if (selectedIds.size === 0) {
+            setMessage('Select at least one announcement for bulk updates.');
+            return;
+        }
+
+        const payload: Record<string, any> = {};
+        if (bulkStatus) {
+            payload.status = bulkStatus;
+        }
+        if (bulkStatus === 'scheduled' && !bulkPublishAt) {
+            setMessage('Publish time is required for scheduled updates.');
+            return;
+        }
+        if (bulkPublishAt) {
+            payload.publishAt = normalizeDateTime(bulkPublishAt);
+        }
+        if (bulkIsActive === 'active') {
+            payload.isActive = true;
+        } else if (bulkIsActive === 'inactive') {
+            payload.isActive = false;
+        }
+
+        if (Object.keys(payload).length === 0) {
+            setMessage('Choose at least one bulk change before applying.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${apiBase}/api/admin/announcements/bulk`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify({
+                    ids: Array.from(selectedIds),
+                    data: payload,
+                }),
+            });
+
+            if (response.ok) {
+                setMessage('Bulk update complete.');
+                setBulkStatus('');
+                setBulkPublishAt('');
+                setBulkIsActive('keep');
+                clearSelection();
+                refreshData();
+                refreshDashboard();
+            } else {
+                setMessage('Bulk update failed.');
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage('Error applying bulk update.');
+        }
+    };
+
 
     // Handle login - call real auth API
     const handleLogin = async (e: React.FormEvent) => {
@@ -121,6 +422,7 @@ export function AdminPage() {
                     setIsLoggedIn(true);
                     setMessage('Login successful!');
                     refreshData();
+                    refreshDashboard();
                 } else {
                     setMessage('Access denied. Admin role required.');
                 }
@@ -150,10 +452,15 @@ export function AdminPage() {
 
         try {
             const url = editingId
-                ? `${apiBase}/api/announcements/${editingId}`
-                : `${apiBase}/api/announcements`;
+                ? `${apiBase}/api/admin/announcements/${editingId}`
+                : `${apiBase}/api/admin/announcements`;
 
-            const method = editingId ? 'PATCH' : 'POST';
+            const method = editingId ? 'PUT' : 'POST';
+            const payload = {
+                ...formData,
+                totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
+                publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
+            };
 
             const response = await fetch(url, {
                 method,
@@ -161,22 +468,22 @@ export function AdminPage() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${adminToken}`,
                 },
-                body: JSON.stringify({
-                    ...formData,
-                    totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (response.ok) {
                 setMessage(editingId ? 'Announcement updated successfully!' : 'Announcement created successfully!');
-                setFormData({
-                    title: '', type: 'job', category: 'Central Government', organization: '',
-                    externalLink: '', location: 'All India', deadline: '', totalPosts: '',
-                    minQualification: '', ageLimit: '', applicationFee: '',
-                });
+
+                setFormData({ ...DEFAULT_FORM_DATA });
+
                 setEditingId(null);
+
                 refreshData();
+
+                refreshDashboard();
+
                 setActiveAdminTab('list');
+
             } else {
                 setMessage('Failed to save. Note: Admin API requires authentication.');
             }
@@ -186,17 +493,158 @@ export function AdminPage() {
         }
     };
 
-    // Check initial token
-    if (!isLoggedIn && adminToken) {
+    const contentCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const item of announcements) {
+            counts[item.type] = (counts[item.type] ?? 0) + 1;
+        }
+        return counts;
+    }, [announcements]);
+
+    const filteredAnnouncements = useMemo(() => {
+        const query = listQuery.trim().toLowerCase();
+        const filtered = announcements.filter((item) => {
+            if (listTypeFilter !== 'all' && item.type !== listTypeFilter) {
+                return false;
+            }
+            const statusValue = item.status ?? 'published';
+            if (listStatusFilter !== 'all' && statusValue !== listStatusFilter) {
+                return false;
+            }
+            if (!query) return true;
+            const haystack = [item.title, item.organization, item.category, item.id, item.slug]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(query);
+        });
+
+        const getDateValue = (value?: string | null) => (value ? new Date(value).getTime() : 0);
+
+        return [...filtered].sort((a, b) => {
+            switch (listSort) {
+                case 'updated':
+                    return getDateValue(b.updatedAt) - getDateValue(a.updatedAt);
+                case 'deadline': {
+                    const aDeadline = getDateValue(a.deadline);
+                    const bDeadline = getDateValue(b.deadline);
+                    if (!aDeadline && !bDeadline) return 0;
+                    if (!aDeadline) return 1;
+                    if (!bDeadline) return -1;
+                    return aDeadline - bDeadline;
+                }
+                case 'views':
+                    return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+                case 'newest':
+                default:
+                    return getDateValue(b.postedAt) - getDateValue(a.postedAt);
+            }
+        });
+    }, [announcements, listTypeFilter, listStatusFilter, listQuery, listSort]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredAnnouncements.length / pageSize));
+
+    const pagedAnnouncements = useMemo(() => {
+        const start = (listPage - 1) * pageSize;
+        return filteredAnnouncements.slice(start, start + pageSize);
+    }, [filteredAnnouncements, listPage, pageSize]);
+
+    const getAvailabilityStatus = (item: Announcement) => {
+        if (item.deadline) {
+            const deadlineTime = new Date(item.deadline).getTime();
+            if (!Number.isNaN(deadlineTime) && deadlineTime < Date.now()) {
+                return { label: 'Expired', tone: 'danger' };
+            }
+        }
+        if (item.isActive === false) {
+            return { label: 'Inactive', tone: 'muted' };
+        }
+        return { label: 'Active', tone: 'success' };
+    };
+
+    const getWorkflowStatus = (item: Announcement) => {
+        const status = item.status ?? 'published';
+        switch (status) {
+            case 'draft':
+                return { label: 'Draft', tone: 'muted' };
+            case 'pending':
+                return { label: 'Pending', tone: 'warning' };
+            case 'scheduled':
+                return { label: 'Scheduled', tone: 'info' };
+            case 'archived':
+                return { label: 'Archived', tone: 'muted' };
+            case 'published':
+            default:
+                return { label: 'Published', tone: 'success' };
+        }
+    };
+
+    const formatDate = (value?: string) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const formatDateTime = (value?: string) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        return date.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    const formatDateTimeInput = (value?: string) => {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const pad = (num: number) => String(num).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const normalizeDateTime = (value?: string) => {
+        if (!value) return undefined;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toISOString();
+    };
+
+    useEffect(() => {
+        if (!adminToken) return;
         setIsLoggedIn(true);
         refreshData();
-    }
+        refreshDashboard();
+        refreshActiveUsers();
+    }, [adminToken]);
+
+    useEffect(() => {
+        if (!adminToken) return;
+        refreshActiveUsers();
+    }, [activeUsersWindow, adminToken]);
+
+    useEffect(() => {
+        setListPage(1);
+        setSelectedIds(new Set());
+    }, [listQuery, listTypeFilter, listStatusFilter, listSort]);
+
+    useEffect(() => {
+        setListPage((page) => Math.min(page, totalPages));
+    }, [totalPages]);
 
     if (!isLoggedIn) {
         return (
             <div className="admin-container">
                 <div className="admin-login-box">
-                    <h2>🔐 Admin Login</h2>
+                    <h2>Admin Login</h2>
                     <form onSubmit={handleLogin}>
                         <div className="form-group">
                             <label>Email</label>
@@ -214,7 +662,7 @@ export function AdminPage() {
                                 type="password"
                                 value={loginForm.password}
                                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                                placeholder="••••••••"
+                                placeholder="password"
                                 required
                             />
                         </div>
@@ -231,25 +679,29 @@ export function AdminPage() {
         <>
             <div className="admin-container">
                 <div className="admin-header">
-                    <h2>⚙️ Admin Dashboard</h2>
+                    <h2>Admin Dashboard</h2>
                     <div className="admin-tabs">
                         <button className={activeAdminTab === 'analytics' ? 'active' : ''} onClick={() => setActiveAdminTab('analytics')}>
-                            📊 Analytics
+                            Analytics
                         </button>
                         <button className={activeAdminTab === 'list' ? 'active' : ''} onClick={() => setActiveAdminTab('list')}>
-                            📋 All Announcements
+                            All Announcements
                         </button>
                         <button className={activeAdminTab === 'add' ? 'active' : ''} onClick={() => setActiveAdminTab('add')}>
-                            ➕ Quick Add
+                            Quick Add
                         </button>
                         <button className={activeAdminTab === 'detailed' ? 'active' : ''} onClick={() => setActiveAdminTab('detailed')}>
-                            📝 Detailed Post
+                            Detailed Post
                         </button>
                         <button className={activeAdminTab === 'bulk' ? 'active' : ''} onClick={() => setActiveAdminTab('bulk')}>
-                            📥 Bulk Import
+                            Bulk Import
                         </button>
+                        <button className={activeAdminTab === 'users' ? 'active' : ''} onClick={() => setActiveAdminTab('users')}>
+                            Users
+                        </button>
+
                         <button className={activeAdminTab === 'security' ? 'active' : ''} onClick={() => setActiveAdminTab('security')}>
-                            🛡️ Security
+                            Security
                         </button>
                     </div>
                     <button className="admin-btn logout" onClick={() => {
@@ -263,39 +715,342 @@ export function AdminPage() {
 
                 {activeAdminTab === 'analytics' ? (
                     <AnalyticsDashboard adminToken={adminToken} />
+                ) : activeAdminTab === 'users' ? (
+                    <div className="admin-users">
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>User analytics</h3>
+                                <p className="admin-subtitle">Track subscriber growth and engagement.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <button className="admin-btn secondary" onClick={refreshDashboard}>Refresh</button>
+                            </div>
+                        </div>
+
+                        {dashboardLoading ? (
+                            <div className="admin-loading">Loading user analytics...</div>
+                        ) : dashboardError ? (
+                            <div className="admin-error">{dashboardError}</div>
+                        ) : (
+                            <div className="admin-user-grid">
+                                <div className="user-card">
+                                    <div className="card-label">Total users</div>
+                                    <div className="card-value">{dashboard?.users.totalUsers ?? 0}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">New today</div>
+                                    <div className="card-value accent">{dashboard?.users.newToday ?? 0}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">New this week</div>
+                                    <div className="card-value accent">{dashboard?.users.newThisWeek ?? 0}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">Active subscribers</div>
+                                    <div className="card-value">{dashboard?.users.activeSubscribers ?? 0}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="admin-section-panel">
+                            <div className="admin-list-header">
+                                <div>
+                                    <h4>Current users</h4>
+                                    <p className="admin-subtitle">Activity in the last {activeUsersWindow} minutes.</p>
+                                </div>
+                                <div className="admin-list-actions">
+                                    <label htmlFor="activeWindow" className="admin-inline-label">Window</label>
+                                    <select
+                                        id="activeWindow"
+                                        value={activeUsersWindow}
+                                        onChange={(e) => setActiveUsersWindow(parseInt(e.target.value))}
+                                    >
+                                        {ACTIVE_USER_WINDOWS.map((window) => (
+                                            <option key={window} value={window}>{window}m</option>
+                                        ))}
+                                    </select>
+                                    <button className="admin-btn secondary" onClick={refreshActiveUsers}>Refresh</button>
+                                </div>
+                            </div>
+
+                            {activeUsersLoading ? (
+                                <div className="admin-loading">Loading active users...</div>
+                            ) : activeUsers ? (
+                                <div className="admin-user-grid">
+                                    <div className="user-card">
+                                        <div className="card-label">Active now</div>
+                                        <div className="card-value">{activeUsers.total}</div>
+                                    </div>
+                                    <div className="user-card">
+                                        <div className="card-label">Authenticated</div>
+                                        <div className="card-value">{activeUsers.authenticated}</div>
+                                    </div>
+                                    <div className="user-card">
+                                        <div className="card-label">Anonymous</div>
+                                        <div className="card-value">{activeUsers.anonymous}</div>
+                                    </div>
+                                    <div className="user-card">
+                                        <div className="card-label">Admins</div>
+                                        <div className="card-value">{activeUsers.admins}</div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="admin-error">Unable to load active users.</div>
+                            )}
+                        </div>
+                    </div>
                 ) : activeAdminTab === 'list' ? (
                     <div className="admin-list">
-                        <table className="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Title</th>
-                                    <th>Type</th>
-                                    <th>Organization</th>
-                                    <th>Posts</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {announcements.slice(0, 20).map((item) => (
-                                    <tr key={item.id}>
-                                        <td>{item.id}</td>
-                                        <td>{item.title.substring(0, 40)}...</td>
-                                        <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                        <td>{item.organization}</td>
-                                        <td>{item.totalPosts || '-'}</td>
-                                        <td>
-                                            <button className="action-btn edit" onClick={() => handleEdit(item)}>Edit</button>
-                                            <button className="action-btn delete" onClick={() => handleDelete(item.id)}>Delete</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>Content manager</h3>
+                                <p className="admin-subtitle">Add, update, and organize listings across all categories.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <button className="admin-btn secondary" onClick={refreshData}>Refresh</button>
+                                <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>New job</button>
+                            </div>
+                        </div>
+
+                        <div className="admin-quick-create">
+                            {CONTENT_TYPES.map((type) => (
+                                <button
+                                    key={type.value}
+                                    className="quick-create-btn"
+                                    onClick={() => handleQuickCreate(type.value, 'add')}
+                                >
+                                    {type.label}
+                                </button>
+                            ))}
+                            <button className="quick-create-btn outline" onClick={() => handleQuickCreate('job', 'detailed')}>Detailed post</button>
+                        </div>
+
+                        <div className="admin-filter-bar">
+                            <div className="admin-search">
+                                <input
+                                    type="search"
+                                    placeholder="Search by title, organization, category, or ID"
+                                    value={listQuery}
+                                    onChange={(e) => setListQuery(e.target.value)}
+                                />
+                            </div>
+                            <div className="admin-filter-controls">
+                                <label htmlFor="listStatus">Status</label>
+                                <select
+                                    id="listStatus"
+                                    value={listStatusFilter}
+                                    onChange={(e) => setListStatusFilter(e.target.value as AnnouncementStatus | 'all')}
+                                >
+                                    <option value="all">All statuses</option>
+                                    {STATUS_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="admin-filter-controls">
+                                <label htmlFor="listSort">Sort</label>
+                                <select
+                                    id="listSort"
+                                    value={listSort}
+                                    onChange={(e) => setListSort(e.target.value as 'newest' | 'updated' | 'deadline' | 'views')}
+                                >
+                                    {LIST_SORT_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="admin-type-filters">
+                            <button
+                                className={`filter-chip ${listTypeFilter === 'all' ? 'active' : ''}`}
+                                onClick={() => setListTypeFilter('all')}
+                            >
+                                All
+                                <span className="chip-count">{announcements.length}</span>
+                            </button>
+                            {CONTENT_TYPES.map((type) => (
+                                <button
+                                    key={type.value}
+                                    className={`filter-chip ${listTypeFilter === type.value ? 'active' : ''}`}
+                                    onClick={() => setListTypeFilter(type.value)}
+                                >
+                                    {type.label}
+                                    <span className="chip-count">{contentCounts[type.value] ?? 0}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {selectedIds.size > 0 && (
+                            <div className="admin-bulk-panel">
+                                <div>
+                                    <h4>Bulk update</h4>
+                                    <p className="admin-subtitle">Update {selectedIds.size} selected announcements.</p>
+                                </div>
+                                <div className="admin-bulk-controls">
+                                    <div className="bulk-field">
+                                        <label>Status</label>
+                                        <select
+                                            value={bulkStatus}
+                                            onChange={(e) => setBulkStatus(e.target.value as AnnouncementStatus | '')}
+                                        >
+                                            <option value="">No change</option>
+                                            {STATUS_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="bulk-field">
+                                        <label>Publish at</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={bulkPublishAt}
+                                            onChange={(e) => setBulkPublishAt(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="bulk-field">
+                                        <label>Active</label>
+                                        <select
+                                            value={bulkIsActive}
+                                            onChange={(e) => setBulkIsActive(e.target.value as 'keep' | 'active' | 'inactive')}
+                                        >
+                                            <option value="keep">Keep</option>
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                    <div className="admin-bulk-actions">
+                                        <button className="admin-btn primary" onClick={handleBulkUpdate}>Apply</button>
+                                        <button className="admin-btn secondary" onClick={clearSelection}>Clear</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="admin-list-meta">
+                            <span>Showing {pagedAnnouncements.length} of {filteredAnnouncements.length}</span>
+                            <span>Page {listPage} of {totalPages}</span>
+                        </div>
+
+                        {listLoading ? (
+                            <div className="admin-loading">Loading announcements...</div>
+                        ) : (
+                            <div className="admin-table-wrapper">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label="Select all"
+                                                    checked={pagedAnnouncements.length > 0 && pagedAnnouncements.every((item) => selectedIds.has(item.id))}
+                                                    onChange={(e) => toggleSelectAll(e.target.checked, pagedAnnouncements.map((item) => item.id))}
+                                                />
+                                            </th>
+                                            <th>Title</th>
+                                            <th>Type</th>
+                                            <th>Publish</th>
+                                            <th>Deadline</th>
+                                            <th>Views</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pagedAnnouncements.map((item) => {
+                                            const availability = getAvailabilityStatus(item);
+                                            const workflow = getWorkflowStatus(item);
+                                            const statusValue = item.status ?? 'published';
+                                            const canApprove = statusValue !== 'published';
+                                            const canReject = statusValue === 'pending' || statusValue === 'scheduled';
+                                            return (
+                                                <tr key={item.id}>
+                                                    <td>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.has(item.id)}
+                                                            onChange={() => toggleSelection(item.id)}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <div className="title-cell">
+                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-meta">
+                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>{item.category}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>v{item.version ?? 1}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
+                                                    <td>
+                                                        <div className="publish-cell">
+                                                            <span>{formatDateTime(item.publishAt || item.postedAt)}</span>
+                                                            {item.status === 'scheduled' && item.publishAt && (
+                                                                <span className="status-sub info">Scheduled</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td>{formatDate(item.deadline)}</td>
+                                                    <td>{(item.viewCount ?? 0).toLocaleString()}</td>
+                                                    <td>
+                                                        <div className="status-stack">
+                                                            <span className={`status-pill ${workflow.tone}`}>{workflow.label}</span>
+                                                            <span className={`status-sub ${availability.tone}`}>{availability.label}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div className="table-actions">
+                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)}>View</button>
+                                                            <button className="admin-btn primary small" onClick={() => handleEdit(item)}>Edit</button>
+                                                            <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)}>History</button>
+                                                            {canApprove && (
+                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id)}>Approve</button>
+                                                            )}
+                                                            {canReject && (
+                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id)}>Reject</button>
+                                                            )}
+                                                            <button className="admin-btn secondary small" onClick={() => handleDuplicate(item)}>Duplicate</button>
+                                                            <button className="admin-btn danger small" onClick={() => handleDelete(item.id)}>Delete</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {pagedAnnouncements.length === 0 && (
+                                            <tr>
+                                                <td colSpan={8} className="empty-state">No announcements found for this filter.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div className="admin-pagination">
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => setListPage((page) => Math.max(1, page - 1))}
+                                disabled={listPage === 1}
+                            >
+                                Prev
+                            </button>
+                            <div className="pagination-info">Page {listPage} of {totalPages}</div>
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => setListPage((page) => Math.min(totalPages, page + 1))}
+                                disabled={listPage === totalPages}
+                            >
+                                Next
+                            </button>
+                        </div>
                     </div>
-                ) : activeAdminTab === 'detailed' ? (
+) : activeAdminTab === 'detailed' ? (
+
                     <div className="admin-form-container">
-                        <h3>📝 Detailed Job Posting</h3>
+                        <h3>Detailed Job Posting</h3>
                         <p style={{ color: '#666', marginBottom: '15px' }}>
                             Create a comprehensive job posting with all details like UP Police example.
                         </p>
@@ -370,6 +1125,28 @@ export function AdminPage() {
                                     />
                                 </div>
                             </div>
+                            <div className="form-row two-col">
+                                <div className="form-group">
+                                    <label>Status</label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
+                                    >
+                                        {STATUS_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Publish at</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={formData.publishAt}
+                                        onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
+                                        disabled={formData.status !== 'scheduled'}
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         {/* Job Details Form */}
@@ -389,9 +1166,15 @@ export function AdminPage() {
                                 setMessage(editingId ? 'Updating...' : 'Saving...');
                                 try {
                                     const url = editingId
-                                        ? `${apiBase}/api/announcements/${editingId}`
-                                        : `${apiBase}/api/announcements`;
-                                    const method = editingId ? 'PATCH' : 'POST';
+                                        ? `${apiBase}/api/admin/announcements/${editingId}`
+                                        : `${apiBase}/api/admin/announcements`;
+                                    const method = editingId ? 'PUT' : 'POST';
+                                    const payload = {
+                                        ...formData,
+                                        totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
+                                        publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
+                                        jobDetails: details,
+                                    };
 
                                     const response = await fetch(url, {
                                         method,
@@ -399,23 +1182,24 @@ export function AdminPage() {
                                             'Content-Type': 'application/json',
                                             'Authorization': `Bearer ${adminToken}`,
                                         },
-                                        body: JSON.stringify({
-                                            ...formData,
-                                            totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
-                                            jobDetails: details,
-                                        }),
+                                        body: JSON.stringify(payload),
                                     });
 
                                     if (response.ok) {
                                         setMessage(editingId ? 'Job posting updated successfully!' : 'Job posting created successfully!');
-                                        setFormData({
-                                            title: '', type: 'job', category: 'Central Government', organization: '',
-                                            externalLink: '', location: 'All India', deadline: '', totalPosts: '',
-                                            minQualification: '', ageLimit: '', applicationFee: '',
-                                        });
+
+                                        setFormData({ ...DEFAULT_FORM_DATA });
+
                                         setJobDetails(null);
+
                                         setEditingId(null);
+
+                                        setPreviewData(null);
+
                                         refreshData();
+
+                                        refreshDashboard();
+
                                         setActiveAdminTab('list');
                                     } else {
                                         const error = await response.json();
@@ -443,7 +1227,7 @@ export function AdminPage() {
                     </div>
                 ) : activeAdminTab === 'bulk' ? (
                     <div className="admin-form-container">
-                        <h3>📥 Bulk Import Announcements</h3>
+                        <h3>Bulk Import Announcements</h3>
                         <p style={{ color: '#666', marginBottom: '15px' }}>Paste JSON array of announcements below. Required fields: title, type, category, organization.</p>
                         <textarea
                             value={bulkJson}
@@ -490,15 +1274,21 @@ export function AdminPage() {
                                     const result = await response.json();
                                     setMessage(result.message || 'Import complete');
                                     if (response.ok) {
+
                                         refreshData();
+
+                                        refreshDashboard();
+
                                         setBulkJson('');
+
                                     }
+
                                 } catch (err: any) {
                                     setMessage('Invalid JSON: ' + err.message);
                                 }
                             }}
                         >
-                            🚀 Import Announcements
+                            Import Announcements
                         </button>
                     </div>
                 ) : activeAdminTab === 'security' ? (
@@ -622,6 +1412,29 @@ export function AdminPage() {
                                 </div>
                             </div>
 
+                            <div className="form-row two-col">
+                                <div className="form-group">
+                                    <label>Status</label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
+                                    >
+                                        {STATUS_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label>Publish at</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={formData.publishAt}
+                                        onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
+                                        disabled={formData.status !== 'scheduled'}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="form-actions">
                                 <button type="submit" className="admin-btn primary">Save Announcement</button>
                                 <button type="button" className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Cancel</button>
@@ -658,7 +1471,7 @@ export function AdminPage() {
                                 alignItems: 'center'
                             }}>
                                 <div>
-                                    <h2 style={{ margin: 0 }}>👁️ Preview Mode</h2>
+                                    <h2 style={{ margin: 0 }}>Preview Mode</h2>
                                     <p style={{ margin: '5px 0 0', opacity: 0.9 }}>This is how your job posting will appear</p>
                                 </div>
                                 <button onClick={() => setShowPreview(false)} style={{
@@ -670,7 +1483,7 @@ export function AdminPage() {
                                     cursor: 'pointer',
                                     fontWeight: '600'
                                 }}>
-                                    ✕ Close Preview
+                                    Close Preview
                                 </button>
                             </div>
                             <div className="preview-content" style={{ padding: '20px' }}>
@@ -685,19 +1498,19 @@ export function AdminPage() {
                                     <p style={{ margin: 0, opacity: 0.9, fontSize: '1.1rem' }}>{previewData.formData.organization}</p>
                                     <div style={{ marginTop: '15px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                         <span style={{ background: 'rgba(255,255,255,0.2)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
-                                            💼 {previewData.formData.type.toUpperCase()}
+                                            Type: {previewData.formData.type.toUpperCase()}
                                         </span>
                                         <span style={{ background: 'rgba(255,255,255,0.2)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
-                                            🏢 {previewData.formData.category}
+                                            Category: {previewData.formData.category}
                                         </span>
                                         {previewData.formData.totalPosts && (
                                             <span style={{ background: 'rgba(76, 175, 80, 0.3)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
-                                                👥 {previewData.formData.totalPosts} Posts
+                                                Posts: {previewData.formData.totalPosts}
                                             </span>
                                         )}
                                         {previewData.formData.deadline && (
                                             <span style={{ background: 'rgba(244, 67, 54, 0.3)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
-                                                ⏰ Deadline: {new Date(previewData.formData.deadline).toLocaleDateString()}
+                                                Deadline: {new Date(previewData.formData.deadline).toLocaleDateString()}
                                             </span>
                                         )}
                                     </div>
@@ -721,7 +1534,7 @@ export function AdminPage() {
                                     cursor: 'pointer',
                                     fontWeight: '600'
                                 }}>
-                                    ← Back to Edit
+                                    Back to Edit
                                 </button>
                                 <button onClick={async () => {
                                     setShowPreview(false);
@@ -729,10 +1542,10 @@ export function AdminPage() {
                                     setMessage(editingId ? 'Publishing...' : 'Creating...');
                                     try {
                                         const url = editingId
-                                            ? `${apiBase}/api/announcements/${editingId}`
-                                            : `${apiBase}/api/announcements`;
+                                            ? `${apiBase}/api/admin/announcements/${editingId}`
+                                            : `${apiBase}/api/admin/announcements`;
                                         const response = await fetch(url, {
-                                            method: editingId ? 'PATCH' : 'POST',
+                                            method: editingId ? 'PUT' : 'POST',
                                             headers: {
                                                 'Content-Type': 'application/json',
                                                 'Authorization': `Bearer ${adminToken}`,
@@ -740,16 +1553,25 @@ export function AdminPage() {
                                             body: JSON.stringify({
                                                 ...previewData.formData,
                                                 totalPosts: previewData.formData.totalPosts ? parseInt(previewData.formData.totalPosts) : undefined,
+                                                publishAt: previewData.formData.status === 'scheduled' && previewData.formData.publishAt ? normalizeDateTime(previewData.formData.publishAt) : undefined,
                                                 jobDetails: previewData.jobDetails,
                                             }),
                                         });
                                         if (response.ok) {
-                                            setMessage('Published successfully! 🎉');
-                                            setFormData({ title: '', type: 'job', category: 'Central Government', organization: '', externalLink: '', location: 'All India', deadline: '', totalPosts: '', minQualification: '', ageLimit: '', applicationFee: '' });
+                                            setMessage('Published successfully!');
+
+                                            setFormData({ ...DEFAULT_FORM_DATA });
+
                                             setJobDetails(null);
+
                                             setEditingId(null);
+
                                             setPreviewData(null);
+
                                             refreshData();
+
+                                            refreshDashboard();
+
                                             setActiveAdminTab('list');
                                         } else {
                                             const error = await response.json();
@@ -769,16 +1591,54 @@ export function AdminPage() {
                                     fontWeight: '600',
                                     fontSize: '1rem'
                                 }}>
-                                    🚀 Publish Now
+                                    Save Announcement
                                 </button>
                             </div>
                         </div>
                     </div>
                 )
+
             }
+
+            {versionTarget && (
+                <div className="admin-modal-overlay" onClick={() => setVersionTarget(null)}>
+                    <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="admin-modal-header">
+                            <div>
+                                <h3>Version history</h3>
+                                <p className="admin-subtitle">{versionTarget.title}</p>
+                            </div>
+                            <button className="admin-btn secondary small" onClick={() => setVersionTarget(null)}>Close</button>
+                        </div>
+                        <div className="admin-modal-body">
+                            {versionTarget.versions && versionTarget.versions.length > 0 ? (
+                                <div className="version-list">
+                                    {versionTarget.versions.map((version) => (
+                                        <div key={`${versionTarget.id}-${version.version}`} className="version-card">
+                                            <div className="version-meta">
+                                                <span>Version {version.version}</span>
+                                                <span>{formatDateTime(version.updatedAt)}</span>
+                                                <span>{version.updatedBy || 'system'}</span>
+                                            </div>
+                                            <div className="version-details">
+                                                <div><strong>Title:</strong> {version.snapshot.title || '-'}</div>
+                                                <div><strong>Status:</strong> {version.snapshot.status || 'published'}</div>
+                                                <div><strong>Publish at:</strong> {formatDateTime(version.snapshot.publishAt)}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-state">No version history yet.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
 
 export default AdminPage;
+
 

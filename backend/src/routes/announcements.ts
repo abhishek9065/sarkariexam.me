@@ -12,6 +12,14 @@ import { recordAnnouncementView } from '../services/analytics.js';
 
 const router = express.Router();
 
+const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
+const dateField = z
+  .string()
+  .datetime()
+  .optional()
+  .or(z.literal(''))
+  .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+
 const querySchema = z.object({
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
@@ -19,6 +27,7 @@ const querySchema = z.object({
   search: z.string().trim().optional(),
   category: z.string().trim().optional(),
   organization: z.string().trim().optional(),
+  location: z.string().trim().optional(),
   qualification: z.string().trim().optional(),
   sort: z.enum(['newest', 'oldest', 'deadline']).default('newest'),
   limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -43,6 +52,7 @@ const cursorQuerySchema = z.object({
   search: z.string().trim().optional(),
   category: z.string().trim().optional(),
   organization: z.string().trim().optional(),
+  location: z.string().trim().optional(),
   qualification: z.string().trim().optional(),
   sort: z.enum(['newest', 'oldest', 'deadline']).default('newest'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -249,11 +259,15 @@ const createAnnouncementSchema = z.object({
   content: z.string().optional(),
   externalLink: z.string().url().optional().or(z.literal('')),
   location: z.string().optional().or(z.literal('')),
-  deadline: z.string().datetime().optional().or(z.literal('')).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  deadline: dateField,
   minQualification: z.string().optional().or(z.literal('')),
   ageLimit: z.string().optional().or(z.literal('')),
   applicationFee: z.string().optional().or(z.literal('')),
   totalPosts: z.number().int().positive().optional(),
+  status: statusSchema.optional(),
+  publishAt: dateField,
+  approvedAt: dateField,
+  approvedBy: z.string().optional(),
   tags: z.array(z.string()).optional(),
   importantDates: z.array(z.object({
     eventName: z.string(),
@@ -311,6 +325,14 @@ const createAnnouncementSchema = z.object({
     importantLinks: z.array(z.object({ label: z.string(), url: z.string(), type: z.string() })).optional(),
     faqs: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
   }).optional(),
+}).superRefine((data, ctx) => {
+  if (data.status === 'scheduled' && (!data.publishAt || data.publishAt === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'publishAt is required for scheduled announcements',
+      path: ['publishAt'],
+    });
+  }
 });
 
 
@@ -358,7 +380,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: parseResult.error.flatten() });
     }
 
-    const announcement = await AnnouncementModel.update(id, parseResult.data as unknown as Partial<CreateAnnouncementDto>);
+    const announcement = await AnnouncementModel.update(id, parseResult.data as unknown as Partial<CreateAnnouncementDto>, req.user?.userId);
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
     }

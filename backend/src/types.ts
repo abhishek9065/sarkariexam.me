@@ -1,4 +1,5 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
+export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type UserRole = 'user' | 'admin';
 
 export interface User {
@@ -28,6 +29,12 @@ export interface Announcement {
   postedBy?: string;
   postedAt: Date;
   updatedAt: Date;
+  status: AnnouncementStatus;
+  publishAt?: Date;
+  approvedAt?: Date;
+  approvedBy?: string;
+  version: number;
+  versions?: AnnouncementVersion[];
   isActive: boolean;
   viewCount: number;
   tags?: Tag[];
@@ -49,6 +56,35 @@ export interface ImportantDate {
   description?: string;
 }
 
+export interface AnnouncementVersion {
+  version: number;
+  updatedAt: Date;
+  updatedBy?: string;
+  note?: string;
+  snapshot: {
+    title: string;
+    type: ContentType;
+    category: string;
+    organization: string;
+    content?: string;
+    externalLink?: string;
+    location?: string;
+    deadline?: Date;
+    minQualification?: string;
+    ageLimit?: string;
+    applicationFee?: string;
+    totalPosts?: number;
+    tags?: Tag[];
+    importantDates?: ImportantDate[];
+    jobDetails?: any;
+    status?: AnnouncementStatus;
+    publishAt?: Date;
+    approvedAt?: Date;
+    approvedBy?: string;
+    isActive?: boolean;
+  };
+}
+
 export interface CreateAnnouncementDto {
   title: string;
   type: ContentType;
@@ -62,6 +98,10 @@ export interface CreateAnnouncementDto {
   ageLimit?: string;
   applicationFee?: string;
   totalPosts?: number;
+  status?: AnnouncementStatus;
+  publishAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
   tags?: string[];
   importantDates?: Omit<ImportantDate, 'id' | 'announcementId'>[];
   jobDetails?: any;
