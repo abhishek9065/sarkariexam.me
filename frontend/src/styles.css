@@ -1504,6 +1504,13 @@ button {
   color: var(--text-muted);
 }
 
+.auth-hint {
+  margin-top: calc(var(--space-4) * -1 + 6px);
+  margin-bottom: var(--space-4);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .auth-submit {
   width: 100%;
   padding: var(--space-3);

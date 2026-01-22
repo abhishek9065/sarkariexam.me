@@ -79,14 +79,17 @@ export function AuthModal({ show, onClose }: AuthModalProps) {
 
                 <form onSubmit={handleSubmit}>
                     {!isLogin && (
-                        <input
-                            type="text"
-                            placeholder="Full Name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            required
-                            className="auth-input"
-                        />
+                        <>
+                            <input
+                                type="text"
+                                placeholder="Full Name"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                required
+                                className="auth-input"
+                            />
+                            <div className="auth-hint">Name: 2 to 100 characters.</div>
+                        </>
                     )}
                     <input
                         type="email"
@@ -107,6 +110,11 @@ export function AuthModal({ show, onClose }: AuthModalProps) {
                         title={isLogin ? 'Enter your password' : 'At least 8 characters, with uppercase, lowercase, number, and special character'}
                         className="auth-input"
                     />
+                    {!isLogin && (
+                        <div className="auth-hint">
+                            Password: 8+ chars with uppercase, lowercase, number, and special character.
+                        </div>
+                    )}
                     <button type="submit" className="auth-submit" disabled={loading}>
                         {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
                     </button>
