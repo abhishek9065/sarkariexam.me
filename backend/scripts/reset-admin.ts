@@ -49,6 +49,7 @@ async function resetAdmin(email: string, newPassword: string) {
                     $set: {
                         passwordHash,
                         role: 'admin',
+                        isActive: true,
                         updatedAt: now
                     }
                 }
@@ -61,6 +62,7 @@ async function resetAdmin(email: string, newPassword: string) {
                 username: email.split('@')[0],
                 passwordHash,
                 role: 'admin',
+                isActive: true,
                 createdAt: now,
                 updatedAt: now
             });

@@ -25,7 +25,7 @@ async function makeAdmin(email: string) {
 
         const result = await users.updateOne(
             { email: email.toLowerCase() },
-            { $set: { role: 'admin', updatedAt: new Date() } }
+            { $set: { role: 'admin', isActive: true, updatedAt: new Date() } }
         );
 
         if (result.matchedCount === 0) {
