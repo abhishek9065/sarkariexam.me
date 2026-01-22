@@ -51,6 +51,36 @@
   font-size: 13px;
 }
 
+.admin-help-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px dashed var(--border-primary);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.admin-help-panel h3 {
+  margin: 0;
+}
+
+.admin-help-list {
+  margin: var(--space-2) 0 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-help-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .admin-list {
   display: flex;
   flex-direction: column;
@@ -488,6 +518,15 @@
   .admin-list-meta {
     flex-direction: column;
     gap: var(--space-1);
+  }
+
+  .admin-help-panel {
+    flex-direction: column;
+  }
+
+  .admin-help-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
   }
 
   .admin-table th,

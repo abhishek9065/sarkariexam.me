@@ -905,6 +905,24 @@ export function AdminPage() {
 
                 {message && <p className="form-message">{message}</p>}
 
+                <div className="admin-help-panel">
+                    <div>
+                        <h3>Workflow tips</h3>
+                        <p className="admin-subtitle">Quick reminders to keep reviews, scheduling, and bulk edits smooth.</p>
+                        <ul className="admin-help-list">
+                            <li>Move drafts to Pending for review, then Approve to publish or Reject to send back.</li>
+                            <li>Schedule posts with a publish time, then manage them in the Schedule Queue tab.</li>
+                            <li>Use Bulk Update to change status or active state across multiple rows.</li>
+                            <li>Audit Log shows approvals, rejects, deletes, and bulk edits for accountability.</li>
+                        </ul>
+                    </div>
+                    <div className="admin-help-actions">
+                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Open manager</button>
+                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('queue')}>Schedule queue</button>
+                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('audit')}>Audit log</button>
+                    </div>
+                </div>
+
                 {activeAdminTab === 'analytics' ? (
                     <AnalyticsDashboard adminToken={adminToken} />
                 ) : activeAdminTab === 'users' ? (
@@ -1259,7 +1277,7 @@ export function AdminPage() {
                                         })}
                                         {pagedAnnouncements.length === 0 && (
                                             <tr>
-                                                <td colSpan={8} className="empty-state">No announcements found for this filter.</td>
+                                                <td colSpan={8} className="empty-state">No announcements match these filters. Clear filters or add a new one.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -1321,7 +1339,7 @@ export function AdminPage() {
                         </div>
 
                         {scheduledAnnouncements.length === 0 ? (
-                            <div className="empty-state">No scheduled announcements yet.</div>
+                            <div className="empty-state">No scheduled announcements yet. Set status to Scheduled with a publish time to see items here.</div>
                         ) : (
                             <div className="admin-table-wrapper">
                                 <table className="admin-table">
@@ -1646,7 +1664,7 @@ export function AdminPage() {
                         ) : auditError ? (
                             <div className="admin-error">{auditError}</div>
                         ) : auditLogs.length === 0 ? (
-                            <div className="empty-state">No audit entries yet.</div>
+                            <div className="empty-state">No audit entries yet. Approvals, rejects, deletes, and bulk edits will appear here.</div>
                         ) : (
                             <div className="admin-table-wrapper">
                                 <table className="admin-table">
@@ -2013,7 +2031,7 @@ export function AdminPage() {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="empty-state">No version history yet.</div>
+                                <div className="empty-state">No version history yet. Edits create snapshots for review.</div>
                             )}
                         </div>
                     </div>

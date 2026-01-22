@@ -253,6 +253,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         <div className="engagement-value">{ctr}%</div>
                     </div>
                 </div>
+                <p className="engagement-hint">CTR uses card clicks divided by listing views. If listing views are zero, make sure listing view events are tracked.</p>
             </div>
 
             <div className="analytics-section">

@@ -122,7 +122,7 @@ export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
                         ))}
                         {logs.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="empty-state">No security events found.</td>
+                                <td colSpan={5} className="empty-state">No security events yet. Lockouts and suspicious logins will appear here.</td>
                             </tr>
                         )}
                     </tbody>

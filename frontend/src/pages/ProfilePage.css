@@ -246,6 +246,14 @@
     color: var(--text-secondary);
 }
 
+.empty-state-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 .recommendations-list {
     display: flex;
     flex-direction: column;

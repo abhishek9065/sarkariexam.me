@@ -246,6 +246,12 @@
   gap: var(--space-3);
 }
 
+.engagement-hint {
+  margin: var(--space-3) 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .engagement-card {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);

@@ -621,7 +621,12 @@ export function ProfilePage() {
 
                             {recommendations.length === 0 ? (
                                 <div className="empty-state">
-                                    <p>No recommendations yet. Update your preferences to get personalized job matches!</p>
+                                    <p>No recommendations yet. Update your preferences to get personalized job matches.</p>
+                                    <div className="empty-state-actions">
+                                        <button className="admin-btn secondary" onClick={() => setActiveSection('preferences')}>
+                                            Update preferences
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="recommendations-list">
@@ -845,7 +850,7 @@ export function ProfilePage() {
                                 {savedSearchesLoading ? (
                                     <div className="admin-loading">Loading saved searches...</div>
                                 ) : savedSearches.length === 0 ? (
-                                    <div className="empty-state">No saved searches yet.</div>
+                                    <div className="empty-state">No saved searches yet. Use the form above to create one and enable alerts.</div>
                                 ) : (
                                     savedSearches.map((search) => (
                                         <div key={search.id} className="saved-search-card">
@@ -946,7 +951,14 @@ export function ProfilePage() {
                                             <span className="alert-count">{alerts.savedSearches.length} searches</span>
                                         </div>
                                         {alerts.savedSearches.length === 0 ? (
-                                            <div className="empty-state">No saved searches yet.</div>
+                                            <div className="empty-state">
+                                                <p>No saved searches yet. Create one to start seeing alert matches.</p>
+                                                <div className="empty-state-actions">
+                                                    <button className="admin-btn secondary" onClick={() => setActiveSection('saved')}>
+                                                        Create saved search
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ) : (
                                             alerts.savedSearches.map((search) => (
                                                 <div key={search.id} className="alert-card">
@@ -958,7 +970,7 @@ export function ProfilePage() {
                                                         <span className="alert-window">Last {alerts.windowDays} days</span>
                                                     </div>
                                                     {search.matches.length === 0 ? (
-                                                        <div className="empty-state">No new matches.</div>
+                                                        <div className="empty-state">No new matches in this window. Try a longer window or broaden the filters.</div>
                                                     ) : (
                                                         <div className="alert-list">
                                                             {search.matches.map((match) => (
@@ -987,7 +999,14 @@ export function ProfilePage() {
                                             <span className="alert-count">{alerts.preferences.totalMatches} matches</span>
                                         </div>
                                         {alerts.preferences.matches.length === 0 ? (
-                                            <div className="empty-state">No preference alerts yet.</div>
+                                            <div className="empty-state">
+                                                <p>No preference alerts yet. Update your preferences to tune the matches.</p>
+                                                <div className="empty-state-actions">
+                                                    <button className="admin-btn secondary" onClick={() => setActiveSection('preferences')}>
+                                                        Update preferences
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ) : (
                                             <div className="alert-list">
                                                 {alerts.preferences.matches.map((match) => (
@@ -1018,7 +1037,7 @@ export function ProfilePage() {
                                             <div className="admin-loading">Loading digest preview...</div>
                                         ) : digestPreview ? (
                                             digestPreview.preview.length === 0 ? (
-                                                <div className="empty-state">No digest items yet.</div>
+                                                <div className="empty-state">No digest items yet. Expand the window or add saved searches to fill this preview.</div>
                                             ) : (
                                                 <div className="alert-list">
                                                     {digestPreview.preview.map((item) => (
@@ -1037,12 +1056,12 @@ export function ProfilePage() {
                                                 </div>
                                             )
                                         ) : (
-                                            <div className="empty-state">Digest preview is not available.</div>
+                                            <div className="empty-state">Digest preview is not available yet. Try refreshing.</div>
                                         )}
                                     </div>
                                 </div>
                             ) : (
-                                <div className="empty-state">Unable to load alerts.</div>
+                                <div className="empty-state">Unable to load alerts. Try refreshing this page.</div>
                             )}
                         </div>
                     )}
