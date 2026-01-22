@@ -579,6 +579,7 @@ export class AnnouncementModelMongo {
         if (!existing) return null;
 
         const now = new Date();
+        const note = typeof (data as any).note === 'string' ? (data as any).note.trim() || undefined : undefined;
         const updateData: Partial<AnnouncementDoc> & { updatedAt: Date } = { updatedAt: now };
 
         if (data.title) updateData.title = data.title;
@@ -620,6 +621,7 @@ export class AnnouncementModelMongo {
                 version: existing.version ?? 1,
                 updatedAt: now,
                 updatedBy,
+                note: note || undefined,
                 snapshot: buildVersionSnapshot(existing),
             };
 

@@ -20,6 +20,8 @@ interface UserProfile {
     emailNotifications: boolean;
     pushNotifications: boolean;
     notificationFrequency: NotificationFrequency;
+    alertWindowDays: number;
+    alertMaxItems: number;
     profileComplete: boolean;
     onboardingCompleted: boolean;
 }
@@ -273,6 +275,16 @@ export function ProfilePage() {
     }, [isAuthenticated, token, navigate]);
 
     useEffect(() => {
+        if (!profile) return;
+        if (profile.alertWindowDays) {
+            setAlertWindowDays(profile.alertWindowDays);
+        }
+        if (profile.alertMaxItems) {
+            setAlertLimit(profile.alertMaxItems);
+        }
+    }, [profile]);
+
+    useEffect(() => {
         if (!token) return;
         fetchSavedSearches();
     }, [token]);
@@ -328,6 +340,16 @@ export function ProfilePage() {
             : [...current, value];
 
         saveProfile({ [key]: updated });
+    };
+
+    const handleAlertWindowChange = (value: number) => {
+        setAlertWindowDays(value);
+        saveProfile({ alertWindowDays: value });
+    };
+
+    const handleAlertLimitChange = (value: number) => {
+        setAlertLimit(value);
+        saveProfile({ alertMaxItems: value });
     };
 
     const handleSavedSearchSubmit = async (event: React.FormEvent) => {
@@ -664,6 +686,34 @@ export function ProfilePage() {
                                     </label>
                                 ))}
                             </div>
+
+                            <h3>Alert Rules</h3>
+                            <div className="alert-rule-grid">
+                                <label className="alert-rule">
+                                    <span>Alert window</span>
+                                    <select
+                                        value={alertWindowDays}
+                                        onChange={(e) => handleAlertWindowChange(parseInt(e.target.value, 10))}
+                                    >
+                                        <option value={3}>Last 3 days</option>
+                                        <option value={7}>Last 7 days</option>
+                                        <option value={14}>Last 14 days</option>
+                                        <option value={30}>Last 30 days</option>
+                                    </select>
+                                </label>
+                                <label className="alert-rule">
+                                    <span>Max items per alert</span>
+                                    <select
+                                        value={alertLimit}
+                                        onChange={(e) => handleAlertLimitChange(parseInt(e.target.value, 10))}
+                                    >
+                                        <option value={4}>4 items</option>
+                                        <option value={6}>6 items</option>
+                                        <option value={8}>8 items</option>
+                                        <option value={12}>12 items</option>
+                                    </select>
+                                </label>
+                            </div>
                         </div>
                     )}
 
@@ -858,7 +908,7 @@ export function ProfilePage() {
                                     <label>Window</label>
                                     <select
                                         value={alertWindowDays}
-                                        onChange={(e) => setAlertWindowDays(parseInt(e.target.value, 10))}
+                                        onChange={(e) => handleAlertWindowChange(parseInt(e.target.value, 10))}
                                     >
                                         <option value={3}>Last 3 days</option>
                                         <option value={7}>Last 7 days</option>
@@ -870,7 +920,7 @@ export function ProfilePage() {
                                     <label>Max items</label>
                                     <select
                                         value={alertLimit}
-                                        onChange={(e) => setAlertLimit(parseInt(e.target.value, 10))}
+                                        onChange={(e) => handleAlertLimitChange(parseInt(e.target.value, 10))}
                                     >
                                         <option value={4}>4 items</option>
                                         <option value={6}>6 items</option>

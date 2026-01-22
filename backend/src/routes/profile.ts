@@ -19,6 +19,8 @@ interface UserProfileDoc {
     emailNotifications: boolean;
     pushNotifications: boolean;
     notificationFrequency: 'instant' | 'daily' | 'weekly';
+    alertWindowDays: number;
+    alertMaxItems: number;
     profileComplete: boolean;
     onboardingCompleted: boolean;
     createdAt: Date;
@@ -59,6 +61,8 @@ const profileUpdateSchema = z.object({
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
     notificationFrequency: z.enum(['instant', 'daily', 'weekly']).optional(),
+    alertWindowDays: z.number().int().min(1).max(30).optional(),
+    alertMaxItems: z.number().int().min(1).max(20).optional(),
     profileComplete: z.boolean().optional(),
     onboardingCompleted: z.boolean().optional(),
 });
@@ -225,6 +229,8 @@ async function getOrCreateProfile(userId: string) {
         emailNotifications: true,
         pushNotifications: false,
         notificationFrequency: 'daily',
+        alertWindowDays: 7,
+        alertMaxItems: 6,
         profileComplete: false,
         onboardingCompleted: false,
         createdAt: now,
@@ -479,8 +485,15 @@ router.delete('/saved-searches/:id', authenticateToken, async (req, res) => {
 // Alerts and digest preview
 router.get('/alerts', authenticateToken, async (req, res) => {
     try {
-        const windowDays = Math.min(30, parseInt(req.query.windowDays as string) || 7);
-        const limit = Math.min(20, parseInt(req.query.limit as string) || 5);
+        const profile = await getOrCreateProfile(req.user!.userId);
+        const windowDays = Math.min(
+            30,
+            parseInt(req.query.windowDays as string) || profile.alertWindowDays || 7
+        );
+        const limit = Math.min(
+            20,
+            parseInt(req.query.limit as string) || profile.alertMaxItems || 5
+        );
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
         const since = new Date(sinceMs);
 
@@ -523,8 +536,15 @@ router.get('/alerts', authenticateToken, async (req, res) => {
 
 router.get('/digest-preview', authenticateToken, async (req, res) => {
     try {
-        const windowDays = Math.min(30, parseInt(req.query.windowDays as string) || 7);
-        const limit = Math.min(20, parseInt(req.query.limit as string) || 8);
+        const profile = await getOrCreateProfile(req.user!.userId);
+        const windowDays = Math.min(
+            30,
+            parseInt(req.query.windowDays as string) || profile.alertWindowDays || 7
+        );
+        const limit = Math.min(
+            20,
+            parseInt(req.query.limit as string) || profile.alertMaxItems || 8
+        );
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
         const since = new Date(sinceMs);
 
@@ -540,7 +560,6 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
             }))
         );
 
-        const profile = await getOrCreateProfile(req.user!.userId);
         const preferences = await getPreferenceAlerts(profile, sinceMs, limit);
 
         const combined = [

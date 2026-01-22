@@ -145,6 +145,51 @@ router.get(
       cursor: filters.cursor?.toString(),
     });
 
+    const filterFlags = {
+      type: Boolean(filters.type),
+      category: Boolean(filters.category),
+      search: Boolean(filters.search),
+      organization: Boolean(filters.organization),
+      location: Boolean(filters.location),
+      qualification: Boolean(filters.qualification),
+    };
+    const hasFilter = Object.values(filterFlags).some(Boolean);
+    const isCategoryOnly = (filterFlags.type || filterFlags.category) &&
+      !filterFlags.search &&
+      !filterFlags.organization &&
+      !filterFlags.location &&
+      !filterFlags.qualification;
+
+    recordAnalyticsEvent({
+      type: 'listing_view',
+      metadata: {
+        count: result.data.length,
+        type: filters.type ?? null,
+        category: filters.category ?? null,
+      },
+    }).catch(console.error);
+
+    if (hasFilter) {
+      recordAnalyticsEvent({
+        type: 'filter_apply',
+        metadata: {
+          ...filterFlags,
+          type: filters.type ?? null,
+          category: filters.category ?? null,
+        },
+      }).catch(console.error);
+    }
+
+    if (isCategoryOnly) {
+      recordAnalyticsEvent({
+        type: 'category_click',
+        metadata: {
+          type: filters.type ?? null,
+          category: filters.category ?? null,
+        },
+      }).catch(console.error);
+    }
+
     return res.json({
       data: result.data,
       count: result.data.length,
@@ -250,6 +295,11 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
     // Increment view count (fire and forget, don't block response)
     AnnouncementModel.incrementViewCount(String(announcement.id)).catch(console.error);
     recordAnnouncementView(String(announcement.id)).catch(console.error);
+    recordAnalyticsEvent({
+      type: 'card_click',
+      announcementId: String(announcement.id),
+      metadata: { type: announcement.type },
+    }).catch(console.error);
 
     return res.json({ data: announcement });
     } catch (error) {

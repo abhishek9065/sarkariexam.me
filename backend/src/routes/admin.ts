@@ -7,6 +7,7 @@ import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getDailyRollups } from '../services/analytics.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
 import { getCollection } from '../services/cosmosdb.js';
+import { getAdminAuditLogs, recordAdminAudit } from '../services/adminAudit.js';
 
 const router = Router();
 
@@ -67,6 +68,7 @@ const adminAnnouncementSchema = adminAnnouncementBaseSchema.superRefine((data, c
 
 const adminAnnouncementPartialBaseSchema = adminAnnouncementBaseSchema.partial().extend({
     isActive: z.boolean().optional(),
+    note: z.string().max(500).optional().or(z.literal('')),
 });
 
 const adminAnnouncementPartialSchema = adminAnnouncementPartialBaseSchema.superRefine((data, ctx) => {
@@ -245,6 +247,21 @@ router.get('/security/logs', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/audit-log
+ * Get admin audit log
+ */
+router.get('/audit-log', async (req, res) => {
+    try {
+        const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
+        const logs = await getAdminAuditLogs(limit);
+        return res.json({ data: logs });
+    } catch (error) {
+        console.error('Audit log error:', error);
+        return res.status(500).json({ error: 'Failed to load audit log' });
+    }
+});
+
+/**
  * GET /api/admin/announcements
  * Get all announcements for admin management
  */
@@ -285,6 +302,13 @@ router.post('/announcements', async (req, res) => {
 
         const userId = req.user?.userId ?? 'system';
         const announcement = await AnnouncementModelMongo.create(parseResult.data as unknown as CreateAnnouncementDto, userId);
+        recordAdminAudit({
+            action: 'create',
+            announcementId: announcement.id,
+            title: announcement.title,
+            userId,
+            metadata: { status: announcement.status },
+        }).catch(console.error);
         return res.status(201).json({ data: announcement });
     } catch (error) {
         console.error('Create announcement error:', error);
@@ -309,6 +333,11 @@ router.post('/announcements/bulk', async (req, res) => {
         };
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
+        recordAdminAudit({
+            action: 'bulk_update',
+            userId: req.user?.userId,
+            metadata: { count: ids.length, status: data.status },
+        }).catch(console.error);
 
         return res.json({ data: result });
     } catch (error) {
@@ -329,10 +358,25 @@ router.put('/announcements/:id', async (req, res) => {
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const announcement = await AnnouncementModelMongo.update(req.params.id, parseResult.data as unknown as Partial<CreateAnnouncementDto>, req.user?.userId);
+        const note = typeof (parseResult.data as any).note === 'string'
+            ? (parseResult.data as any).note.trim() || undefined
+            : undefined;
+        const announcement = await AnnouncementModelMongo.update(
+            req.params.id,
+            parseResult.data as unknown as Partial<CreateAnnouncementDto> & { note?: string },
+            req.user?.userId
+        );
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
+        recordAdminAudit({
+            action: 'update',
+            announcementId: announcement.id,
+            title: announcement.title,
+            userId: req.user?.userId,
+            note,
+            metadata: { fields: Object.keys(parseResult.data) },
+        }).catch(console.error);
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Update announcement error:', error);
@@ -347,6 +391,7 @@ router.put('/announcements/:id', async (req, res) => {
 router.post('/announcements/:id/approve', async (req, res) => {
     try {
         const now = new Date().toISOString();
+        const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
         const announcement = await AnnouncementModelMongo.update(
             req.params.id,
             {
@@ -354,12 +399,20 @@ router.post('/announcements/:id/approve', async (req, res) => {
                 publishAt: now,
                 approvedAt: now,
                 approvedBy: req.user?.userId,
+                note,
             } as Partial<CreateAnnouncementDto>,
             req.user?.userId
         );
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
+        recordAdminAudit({
+            action: 'approve',
+            announcementId: announcement.id,
+            title: announcement.title,
+            userId: req.user?.userId,
+            note,
+        }).catch(console.error);
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Approve announcement error:', error);
@@ -373,18 +426,27 @@ router.post('/announcements/:id/approve', async (req, res) => {
  */
 router.post('/announcements/:id/reject', async (req, res) => {
     try {
+        const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
         const announcement = await AnnouncementModelMongo.update(
             req.params.id,
             {
                 status: 'draft',
                 approvedAt: '',
                 approvedBy: '',
+                note,
             } as Partial<CreateAnnouncementDto>,
             req.user?.userId
         );
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
+        recordAdminAudit({
+            action: 'reject',
+            announcementId: announcement.id,
+            title: announcement.title,
+            userId: req.user?.userId,
+            note,
+        }).catch(console.error);
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Reject announcement error:', error);
@@ -402,6 +464,11 @@ router.delete('/announcements/:id', async (req, res) => {
         if (!deleted) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
+        recordAdminAudit({
+            action: 'delete',
+            announcementId: req.params.id,
+            userId: req.user?.userId,
+        }).catch(console.error);
         return res.json({ message: 'Announcement deleted' });
     } catch (error) {
         console.error('Delete announcement error:', error);

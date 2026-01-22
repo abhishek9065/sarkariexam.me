@@ -158,3 +158,86 @@ export const sendAnnouncementEmail = async (
   console.log(`Sent ${sentCount}/${emails.length} announcement emails`);
   return sentCount;
 };
+
+/**
+ * Send digest email to a subscriber
+ */
+export const sendDigestEmail = async (options: {
+  email: string;
+  announcements: Array<Pick<Announcement, 'title' | 'slug' | 'type' | 'category' | 'organization' | 'deadline'>>;
+  unsubscribeToken: string;
+  frequency: 'daily' | 'weekly';
+  windowLabel: string;
+}): Promise<boolean> => {
+  if (!isConfigured || options.announcements.length === 0) {
+    return false;
+  }
+
+  const unsubscribeUrl = `${config.frontendUrl}/unsubscribe?token=${options.unsubscribeToken}`;
+  const listItems = options.announcements.map((announcement) => {
+    const announcementUrl = `${config.frontendUrl}/${announcement.type}/${announcement.slug}`;
+    const deadline = announcement.deadline
+      ? new Date(announcement.deadline).toLocaleDateString('en-IN')
+      : 'Not specified';
+    return `
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+          <div style="font-weight: 600; color: #111827;">${announcement.title}</div>
+          <div style="color: #6b7280; font-size: 13px;">
+            ${announcement.organization} · ${announcement.category} · Deadline: ${deadline}
+          </div>
+          <a href="${announcementUrl}" style="color: #2563eb; font-size: 13px; text-decoration: none;">
+            View details
+          </a>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  try {
+    await sgMail.send({
+      to: options.email,
+      from: config.emailFrom || 'noreply@sarkariresult.com',
+      subject: `Your ${options.frequency} SarkariExams digest`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #111827; }
+            .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+            .header { background: #1a365d; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f8fafc; }
+            .card { background: white; padding: 16px; border-radius: 8px; }
+            .footer { padding: 16px; text-align: center; font-size: 12px; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>SarkariExams Digest</h1>
+              <p>${options.windowLabel}</p>
+            </div>
+            <div class="content">
+              <div class="card">
+                <p style="margin-top: 0;">Here are the latest updates matching your interests.</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  ${listItems}
+                </table>
+              </div>
+            </div>
+            <div class="footer">
+              <p>You are receiving this email because you subscribed to updates.</p>
+              <p><a href="${unsubscribeUrl}">Unsubscribe</a></p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to send digest email:', error);
+    return false;
+  }
+};

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
-import { getRollupSummary } from '../services/analytics.js';
+import { getDailyRollups, getRollupSummary } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
 
 interface SubscriptionDoc {
@@ -22,6 +22,7 @@ router.get('/overview', async (_req, res) => {
     try {
         const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
         const rollupSummary = await getRollupSummary(30);
+        const dailyRollups = await getDailyRollups(14);
 
         let totalEmailSubscribers = 0;
         let totalPushSubscribers = 0;
@@ -67,7 +68,13 @@ router.get('/overview', async (_req, res) => {
                 totalRegistrations: rollupSummary.registrations,
                 totalSubscriptionsVerified: rollupSummary.subscriptionsVerified,
                 totalSubscriptionsUnsubscribed: rollupSummary.subscriptionsUnsubscribed,
+                totalListingViews: rollupSummary.listingViews,
+                totalCardClicks: rollupSummary.cardClicks,
+                totalCategoryClicks: rollupSummary.categoryClicks,
+                totalFilterApplies: rollupSummary.filterApplies,
                 engagementWindowDays: rollupSummary.days,
+                rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
+                dailyRollups,
                 typeBreakdown,
                 categoryBreakdown,
                 lastUpdated: new Date().toISOString()

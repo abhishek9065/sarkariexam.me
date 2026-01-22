@@ -3,6 +3,10 @@ import { getCollection } from './cosmosdb.js';
 
 export type AnalyticsEventType =
     | 'announcement_view'
+    | 'listing_view'
+    | 'card_click'
+    | 'category_click'
+    | 'filter_apply'
     | 'search'
     | 'bookmark_add'
     | 'bookmark_remove'
@@ -24,6 +28,10 @@ interface AnalyticsEventDoc {
 interface AnalyticsRollupDoc {
     date: string;
     viewCount: number;
+    listingViews: number;
+    cardClicks: number;
+    categoryClicks: number;
+    filterApplies: number;
     searchCount: number;
     bookmarkAdds: number;
     bookmarkRemoves: number;
@@ -143,6 +151,10 @@ export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promi
                 $set: {
                     date: dateKey,
                     viewCount: counts.announcement_view ?? 0,
+                    listingViews: counts.listing_view ?? 0,
+                    cardClicks: counts.card_click ?? 0,
+                    categoryClicks: counts.category_click ?? 0,
+                    filterApplies: counts.filter_apply ?? 0,
                     searchCount: counts.search ?? 0,
                     bookmarkAdds: counts.bookmark_add ?? 0,
                     bookmarkRemoves: counts.bookmark_remove ?? 0,
@@ -165,6 +177,10 @@ export async function getDailyRollups(days: number = 14): Promise<Array<{
     date: string;
     count: number;
     views: number;
+    listingViews: number;
+    cardClicks: number;
+    categoryClicks: number;
+    filterApplies: number;
     searches: number;
     bookmarkAdds: number;
     registrations: number;
@@ -193,6 +209,10 @@ export async function getDailyRollups(days: number = 14): Promise<Array<{
             date: dateKey,
             count: doc?.announcementCount ?? 0,
             views: doc?.viewCount ?? 0,
+            listingViews: doc?.listingViews ?? 0,
+            cardClicks: doc?.cardClicks ?? 0,
+            categoryClicks: doc?.categoryClicks ?? 0,
+            filterApplies: doc?.filterApplies ?? 0,
             searches: doc?.searchCount ?? 0,
             bookmarkAdds: doc?.bookmarkAdds ?? 0,
             registrations: doc?.registrations ?? 0,
@@ -204,7 +224,12 @@ export async function getDailyRollups(days: number = 14): Promise<Array<{
 
 export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
     days: number;
+    lastUpdatedAt: string | null;
     viewCount: number;
+    listingViews: number;
+    cardClicks: number;
+    categoryClicks: number;
+    filterApplies: number;
     searchCount: number;
     bookmarkAdds: number;
     bookmarkRemoves: number;
@@ -219,7 +244,12 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
     if (!rollups) {
         return {
             days,
+            lastUpdatedAt: null,
             viewCount: 0,
+            listingViews: 0,
+            cardClicks: 0,
+            categoryClicks: 0,
+            filterApplies: 0,
             searchCount: 0,
             bookmarkAdds: 0,
             bookmarkRemoves: 0,
@@ -240,21 +270,38 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
         .find({ date: { $gte: getDateKey(start) } })
         .toArray();
 
-    return docs.reduce((acc, doc) => ({
+    return docs.reduce((acc, doc) => {
+        const updatedAt = doc.updatedAt ? doc.updatedAt.toISOString() : null;
+        const lastUpdatedAt = updatedAt && (!acc.lastUpdatedAt || updatedAt > acc.lastUpdatedAt)
+            ? updatedAt
+            : acc.lastUpdatedAt;
+
+        return {
+            days,
+            lastUpdatedAt,
+            viewCount: acc.viewCount + (doc.viewCount ?? 0),
+            listingViews: acc.listingViews + (doc.listingViews ?? 0),
+            cardClicks: acc.cardClicks + (doc.cardClicks ?? 0),
+            categoryClicks: acc.categoryClicks + (doc.categoryClicks ?? 0),
+            filterApplies: acc.filterApplies + (doc.filterApplies ?? 0),
+            searchCount: acc.searchCount + (doc.searchCount ?? 0),
+            bookmarkAdds: acc.bookmarkAdds + (doc.bookmarkAdds ?? 0),
+            bookmarkRemoves: acc.bookmarkRemoves + (doc.bookmarkRemoves ?? 0),
+            registrations: acc.registrations + (doc.registrations ?? 0),
+            subscriptionsVerified: acc.subscriptionsVerified + (doc.subscriptionsVerified ?? 0),
+            subscriptionsUnsubscribed: acc.subscriptionsUnsubscribed + (doc.subscriptionsUnsubscribed ?? 0),
+            savedSearches: acc.savedSearches + (doc.savedSearches ?? 0),
+            digestPreviews: acc.digestPreviews + (doc.digestPreviews ?? 0),
+            alertsViewed: acc.alertsViewed + (doc.alertsViewed ?? 0),
+        };
+    }, {
         days,
-        viewCount: acc.viewCount + (doc.viewCount ?? 0),
-        searchCount: acc.searchCount + (doc.searchCount ?? 0),
-        bookmarkAdds: acc.bookmarkAdds + (doc.bookmarkAdds ?? 0),
-        bookmarkRemoves: acc.bookmarkRemoves + (doc.bookmarkRemoves ?? 0),
-        registrations: acc.registrations + (doc.registrations ?? 0),
-        subscriptionsVerified: acc.subscriptionsVerified + (doc.subscriptionsVerified ?? 0),
-        subscriptionsUnsubscribed: acc.subscriptionsUnsubscribed + (doc.subscriptionsUnsubscribed ?? 0),
-        savedSearches: acc.savedSearches + (doc.savedSearches ?? 0),
-        digestPreviews: acc.digestPreviews + (doc.digestPreviews ?? 0),
-        alertsViewed: acc.alertsViewed + (doc.alertsViewed ?? 0),
-    }), {
-        days,
+        lastUpdatedAt: null,
         viewCount: 0,
+        listingViews: 0,
+        cardClicks: 0,
+        categoryClicks: 0,
+        filterApplies: 0,
         searchCount: 0,
         bookmarkAdds: 0,
         bookmarkRemoves: 0,

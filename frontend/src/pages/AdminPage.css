@@ -373,6 +373,16 @@
   gap: var(--space-2);
 }
 
+.review-note-input {
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
 .admin-btn.small {
   padding: 6px 10px;
   font-size: 11px;

@@ -31,6 +31,17 @@ type DashboardData = {
     users: DashboardUsers;
 };
 
+type AdminAuditLog = {
+    id: string;
+    action: string;
+    announcementId?: string;
+    title?: string;
+    userId?: string;
+    note?: string;
+    metadata?: Record<string, any>;
+    createdAt: string;
+};
+
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
     { value: 'job', label: 'Latest Jobs' },
     { value: 'admit-card', label: 'Admit Cards' },
@@ -79,7 +90,7 @@ export function AdminPage() {
     const navigate = useNavigate();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'add' | 'detailed' | 'bulk' | 'security' | 'users'>('analytics');
+    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit'>('analytics');
     const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem('adminToken'));
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
@@ -105,10 +116,14 @@ export function AdminPage() {
     const [activeUsersWindow, setActiveUsersWindow] = useState(15);
     const [activeUsersLoading, setActiveUsersLoading] = useState(false);
     const [versionTarget, setVersionTarget] = useState<Announcement | null>(null);
+    const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
     const [dashboard, setDashboard] = useState<DashboardData | null>(null);
     const [dashboardLoading, setDashboardLoading] = useState(false);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
+    const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
+    const [auditLoading, setAuditLoading] = useState(false);
+    const [auditError, setAuditError] = useState<string | null>(null);
 
     const pageSize = 15;
 
@@ -176,6 +191,27 @@ export function AdminPage() {
             setDashboardError('Failed to load user analytics.');
         } finally {
             setDashboardLoading(false);
+        }
+    };
+
+    const refreshAuditLogs = async () => {
+        if (!adminToken) return;
+        setAuditLoading(true);
+        setAuditError(null);
+        try {
+            const res = await fetch(`${apiBase}/api/admin/audit-log?limit=50`, {
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            if (!res.ok) {
+                throw new Error('Failed to load audit log');
+            }
+            const payload = await res.json();
+            setAuditLogs(payload.data ?? []);
+        } catch (error) {
+            console.error(error);
+            setAuditError('Failed to load audit log.');
+        } finally {
+            setAuditLoading(false);
         }
     };
 
@@ -297,15 +333,24 @@ export function AdminPage() {
         setSelectedIds(new Set());
     };
 
-    const handleApprove = async (id: string) => {
+    const handleApprove = async (id: string, note?: string) => {
         if (!adminToken) return;
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${adminToken}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify({ note }),
             });
             if (response.ok) {
                 setMessage('Announcement approved and published.');
+                setReviewNotes((prev) => {
+                    const next = { ...prev };
+                    delete next[id];
+                    return next;
+                });
                 refreshData();
                 refreshDashboard();
             } else {
@@ -317,15 +362,24 @@ export function AdminPage() {
         }
     };
 
-    const handleReject = async (id: string) => {
+    const handleReject = async (id: string, note?: string) => {
         if (!adminToken) return;
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${adminToken}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify({ note }),
             });
             if (response.ok) {
                 setMessage('Announcement moved back to draft.');
+                setReviewNotes((prev) => {
+                    const next = { ...prev };
+                    delete next[id];
+                    return next;
+                });
                 refreshData();
                 refreshDashboard();
             } else {
@@ -516,6 +570,25 @@ export function AdminPage() {
         return counts;
     }, [announcements]);
 
+    const scheduledAnnouncements = useMemo(() => {
+        return announcements
+            .filter((item) => (item.status ?? 'published') === 'scheduled' && item.publishAt)
+            .slice()
+            .sort((a, b) => new Date(a.publishAt || 0).getTime() - new Date(b.publishAt || 0).getTime());
+    }, [announcements]);
+
+    const scheduledStats = useMemo(() => {
+        const now = Date.now();
+        const nextDay = now + 24 * 60 * 60 * 1000;
+        const overdue = scheduledAnnouncements.filter((item) => new Date(item.publishAt || 0).getTime() <= now).length;
+        const upcoming24h = scheduledAnnouncements.filter((item) => {
+            const time = new Date(item.publishAt || 0).getTime();
+            return time > now && time <= nextDay;
+        }).length;
+        const nextPublish = scheduledAnnouncements[0]?.publishAt;
+        return { overdue, upcoming24h, nextPublish };
+    }, [scheduledAnnouncements]);
+
     const filteredAnnouncements = useMemo(() => {
         const query = listQuery.trim().toLowerCase();
         const filtered = announcements.filter((item) => {
@@ -633,6 +706,20 @@ export function AdminPage() {
         return date.toISOString();
     };
 
+    const formatRelativeTime = (value?: string | Date) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '-';
+        const diffMs = date.getTime() - Date.now();
+        const absMs = Math.abs(diffMs);
+        const hours = Math.round(absMs / (1000 * 60 * 60));
+        const days = Math.round(absMs / (1000 * 60 * 60 * 24));
+        const label = absMs < 1000 * 60 * 60 * 24
+            ? `${hours}h`
+            : `${days}d`;
+        return diffMs >= 0 ? `In ${label}` : `Overdue by ${label}`;
+    };
+
     useEffect(() => {
         if (!adminToken) return;
         setIsLoggedIn(true);
@@ -645,6 +732,13 @@ export function AdminPage() {
         if (!adminToken) return;
         refreshActiveUsers();
     }, [activeUsersWindow, adminToken]);
+
+    useEffect(() => {
+        if (!adminToken) return;
+        if (activeAdminTab === 'audit') {
+            refreshAuditLogs();
+        }
+    }, [activeAdminTab, adminToken]);
 
     useEffect(() => {
         setListPage(1);
@@ -711,10 +805,16 @@ export function AdminPage() {
                         <button className={activeAdminTab === 'bulk' ? 'active' : ''} onClick={() => setActiveAdminTab('bulk')}>
                             Bulk Import
                         </button>
+                        <button className={activeAdminTab === 'queue' ? 'active' : ''} onClick={() => setActiveAdminTab('queue')}>
+                            Schedule Queue
+                        </button>
                         <button className={activeAdminTab === 'users' ? 'active' : ''} onClick={() => setActiveAdminTab('users')}>
                             Users
                         </button>
 
+                        <button className={activeAdminTab === 'audit' ? 'active' : ''} onClick={() => setActiveAdminTab('audit')}>
+                            Audit Log
+                        </button>
                         <button className={activeAdminTab === 'security' ? 'active' : ''} onClick={() => setActiveAdminTab('security')}>
                             Security
                         </button>
@@ -998,6 +1098,7 @@ export function AdminPage() {
                                             const statusValue = item.status ?? 'published';
                                             const canApprove = statusValue === 'pending' || statusValue === 'scheduled';
                                             const canReject = statusValue === 'pending' || statusValue === 'scheduled';
+                                            const reviewNote = reviewNotes[item.id] ?? '';
                                             return (
                                                 <tr key={item.id}>
                                                     <td>
@@ -1038,14 +1139,23 @@ export function AdminPage() {
                                                     </td>
                                                     <td>
                                                         <div className="table-actions">
+                                                            {(canApprove || canReject) && (
+                                                                <input
+                                                                    className="review-note-input"
+                                                                    type="text"
+                                                                    value={reviewNote}
+                                                                    onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                    placeholder="Review note (optional)"
+                                                                />
+                                                            )}
                                                             <button className="admin-btn secondary small" onClick={() => handleView(item)}>View</button>
                                                             <button className="admin-btn primary small" onClick={() => handleEdit(item)}>Edit</button>
                                                             <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)}>History</button>
                                                             {canApprove && (
-                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id)}>Approve</button>
+                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)}>Approve</button>
                                                             )}
                                                             {canReject && (
-                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id)}>Reject</button>
+                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)}>Reject</button>
                                                             )}
                                                             <button className="admin-btn secondary small" onClick={() => handleDuplicate(item)}>Duplicate</button>
                                                             <button className="admin-btn danger small" onClick={() => handleDelete(item.id)}>Delete</button>
@@ -1082,7 +1192,99 @@ export function AdminPage() {
                             </button>
                         </div>
                     </div>
-) : activeAdminTab === 'detailed' ? (
+                ) : activeAdminTab === 'queue' ? (
+                    <div className="admin-list">
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>Scheduled queue</h3>
+                                <p className="admin-subtitle">Review upcoming scheduled announcements and publish now if needed.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <button className="admin-btn secondary" onClick={refreshData}>Refresh</button>
+                                <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>New job</button>
+                            </div>
+                        </div>
+
+                        <div className="admin-user-grid">
+                            <div className="user-card">
+                                <div className="card-label">Scheduled total</div>
+                                <div className="card-value">{scheduledAnnouncements.length}</div>
+                            </div>
+                            <div className="user-card">
+                                <div className="card-label">Overdue</div>
+                                <div className="card-value accent">{scheduledStats.overdue}</div>
+                            </div>
+                            <div className="user-card">
+                                <div className="card-label">Next 24h</div>
+                                <div className="card-value accent">{scheduledStats.upcoming24h}</div>
+                            </div>
+                            <div className="user-card">
+                                <div className="card-label">Next publish</div>
+                                <div className="card-value">{formatDateTime(scheduledStats.nextPublish)}</div>
+                            </div>
+                        </div>
+
+                        {scheduledAnnouncements.length === 0 ? (
+                            <div className="empty-state">No scheduled announcements yet.</div>
+                        ) : (
+                            <div className="admin-table-wrapper">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Title</th>
+                                            <th>Publish at</th>
+                                            <th>Time</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {scheduledAnnouncements.map((item) => {
+                                            const reviewNote = reviewNotes[item.id] ?? '';
+                                            const publishTime = item.publishAt;
+                                            const isOverdue = publishTime ? new Date(publishTime).getTime() <= Date.now() : false;
+                                            return (
+                                                <tr key={item.id}>
+                                                    <td>
+                                                        <div className="title-cell">
+                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-meta">
+                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>v{item.version ?? 1}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>{formatDateTime(publishTime)}</td>
+                                                    <td>{formatRelativeTime(publishTime)}</td>
+                                                    <td>
+                                                        <span className={`status-pill ${isOverdue ? 'danger' : 'info'}`}>
+                                                            {isOverdue ? 'Overdue' : 'Scheduled'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="table-actions">
+                                                            <input
+                                                                className="review-note-input"
+                                                                type="text"
+                                                                value={reviewNote}
+                                                                onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                placeholder="Review note (optional)"
+                                                            />
+                                                            <button className="admin-btn secondary small" onClick={() => handleEdit(item)}>Edit</button>
+                                                            <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)}>Publish now</button>
+                                                            <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)}>Return to draft</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                ) : activeAdminTab === 'detailed' ? (
 
                     <div className="admin-form-container">
                         <h3>Detailed Job Posting</h3>
@@ -1325,6 +1527,51 @@ export function AdminPage() {
                         >
                             Import Announcements
                         </button>
+                    </div>
+                ) : activeAdminTab === 'audit' ? (
+                    <div className="admin-list">
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>Audit log</h3>
+                                <p className="admin-subtitle">Recent admin actions across create, review, and bulk updates.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <button className="admin-btn secondary" onClick={refreshAuditLogs}>Refresh</button>
+                            </div>
+                        </div>
+
+                        {auditLoading ? (
+                            <div className="admin-loading">Loading audit log...</div>
+                        ) : auditError ? (
+                            <div className="admin-error">{auditError}</div>
+                        ) : auditLogs.length === 0 ? (
+                            <div className="empty-state">No audit entries yet.</div>
+                        ) : (
+                            <div className="admin-table-wrapper">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Action</th>
+                                            <th>Title</th>
+                                            <th>Note</th>
+                                            <th>Admin</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {auditLogs.map((log) => (
+                                            <tr key={log.id}>
+                                                <td>{formatDateTime(log.createdAt)}</td>
+                                                <td><span className="status-pill info">{log.action}</span></td>
+                                                <td>{log.title || log.announcementId || '-'}</td>
+                                                <td>{log.note || '-'}</td>
+                                                <td>{log.userId || 'system'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 ) : activeAdminTab === 'security' ? (
                     <SecurityLogsTable adminToken={adminToken} />
@@ -1659,6 +1906,7 @@ export function AdminPage() {
                                                 <div><strong>Title:</strong> {version.snapshot.title || '-'}</div>
                                                 <div><strong>Status:</strong> {version.snapshot.status || 'published'}</div>
                                                 <div><strong>Publish at:</strong> {formatDateTime(version.snapshot.publishAt)}</div>
+                                                {version.note && <div><strong>Note:</strong> {version.note}</div>}
                                             </div>
                                         </div>
                                     ))}

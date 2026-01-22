@@ -13,6 +13,23 @@ interface AnalyticsData {
     totalRegistrations: number;
     totalSubscriptionsVerified: number;
     totalSubscriptionsUnsubscribed: number;
+    totalListingViews: number;
+    totalCardClicks: number;
+    totalCategoryClicks: number;
+    totalFilterApplies: number;
+    rollupLastUpdatedAt?: string | null;
+    dailyRollups?: Array<{
+        date: string;
+        count: number;
+        views: number;
+        listingViews: number;
+        cardClicks: number;
+        categoryClicks: number;
+        filterApplies: number;
+        searches: number;
+        bookmarkAdds: number;
+        registrations: number;
+    }>;
     engagementWindowDays?: number;
     typeBreakdown: { type: string; count: number }[];
     categoryBreakdown: { category: string; count: number }[];
@@ -108,6 +125,10 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         totalRegistrations: 0,
                         totalSubscriptionsVerified: 0,
                         totalSubscriptionsUnsubscribed: 0,
+                        totalListingViews: 0,
+                        totalCardClicks: 0,
+                        totalCategoryClicks: 0,
+                        totalFilterApplies: 0,
                         typeBreakdown: [],
                         categoryBreakdown: []
                     });
@@ -135,6 +156,12 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
     if (!analytics) return null;
     const engagementWindow = analytics.engagementWindowDays ?? 30;
+    const rollups = analytics.dailyRollups ?? [];
+    const maxViews = Math.max(1, ...rollups.map((item) => item.views ?? 0));
+    const maxSearches = Math.max(1, ...rollups.map((item) => item.searches ?? 0));
+    const ctr = analytics.totalListingViews > 0
+        ? Math.round((analytics.totalCardClicks / analytics.totalListingViews) * 100)
+        : 0;
 
     return (
         <div className="analytics-dashboard">
@@ -192,7 +219,61 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         <div className="engagement-label">Unsubscribes</div>
                         <div className="engagement-value">{(analytics.totalSubscriptionsUnsubscribed ?? 0).toLocaleString()}</div>
                     </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Listing views</div>
+                        <div className="engagement-value">{(analytics.totalListingViews ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Card clicks</div>
+                        <div className="engagement-value">{(analytics.totalCardClicks ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Category clicks</div>
+                        <div className="engagement-value">{(analytics.totalCategoryClicks ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Filter applies</div>
+                        <div className="engagement-value">{(analytics.totalFilterApplies ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">CTR</div>
+                        <div className="engagement-value">{ctr}%</div>
+                    </div>
                 </div>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <h3>Trend lines</h3>
+                    <p className="analytics-subtitle">Views vs searches (daily).</p>
+                </div>
+                {rollups.length === 0 ? (
+                    <div className="empty-state">No rollup data yet.</div>
+                ) : (
+                    <div className="trend-list">
+                        {rollups.map((item) => (
+                            <div key={item.date} className="trend-row">
+                                <div className="trend-date">{item.date}</div>
+                                <div className="trend-bars">
+                                    <div
+                                        className="trend-bar views"
+                                        style={{ width: `${(item.views / maxViews) * 100}%` }}
+                                    />
+                                    <div
+                                        className="trend-bar searches"
+                                        style={{ width: `${(item.searches / maxSearches) * 100}%` }}
+                                    />
+                                </div>
+                                <div className="trend-values">
+                                    {item.views} views · {item.searches} searches
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {analytics.rollupLastUpdatedAt && (
+                    <div className="analytics-subtitle">Last rollup: {new Date(analytics.rollupLastUpdatedAt).toLocaleString()}</div>
+                )}
             </div>
 
             {/* Type Breakdown with Donut Chart */}

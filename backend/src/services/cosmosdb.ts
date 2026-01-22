@@ -85,6 +85,7 @@ async function createIndexes(): Promise<void> {
         const savedSearches = getDatabase().collection('saved_searches');
         const analyticsEvents = getDatabase().collection('analytics_events');
         const analyticsRollups = getDatabase().collection('analytics_rollups');
+        const adminAuditLogs = getDatabase().collection('admin_audit_logs');
 
         // Announcements indexes
         await announcements.createIndex({ slug: 1 }, { unique: true });
@@ -129,6 +130,11 @@ async function createIndexes(): Promise<void> {
         await analyticsEvents.createIndex({ type: 1, createdAt: -1 });
         await analyticsEvents.createIndex({ announcementId: 1 });
         await analyticsRollups.createIndex({ date: 1 }, { unique: true });
+
+        // Admin audit logs
+        await adminAuditLogs.createIndex({ createdAt: -1 });
+        await adminAuditLogs.createIndex({ action: 1, createdAt: -1 });
+        await adminAuditLogs.createIndex({ announcementId: 1 });
 
         console.log('[CosmosDB] Indexes created successfully');
     } catch (error) {
