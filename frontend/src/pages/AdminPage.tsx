@@ -5,6 +5,7 @@ import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingF
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { SecurityLogsTable } from '../components/admin/SecurityLogsTable';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
+import { getApiErrorMessage } from '../utils/errors';
 import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -115,15 +116,19 @@ export function AdminPage() {
     } | null>(null);
     const [activeUsersWindow, setActiveUsersWindow] = useState(15);
     const [activeUsersLoading, setActiveUsersLoading] = useState(false);
+    const [activeUsersError, setActiveUsersError] = useState<string | null>(null);
+    const [activeUsersUpdatedAt, setActiveUsersUpdatedAt] = useState<string | null>(null);
     const [versionTarget, setVersionTarget] = useState<Announcement | null>(null);
     const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
     const [dashboard, setDashboard] = useState<DashboardData | null>(null);
     const [dashboardLoading, setDashboardLoading] = useState(false);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
+    const [dashboardUpdatedAt, setDashboardUpdatedAt] = useState<string | null>(null);
     const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
     const [auditLoading, setAuditLoading] = useState(false);
     const [auditError, setAuditError] = useState<string | null>(null);
+    const [auditUpdatedAt, setAuditUpdatedAt] = useState<string | null>(null);
 
     const pageSize = 15;
 
@@ -149,10 +154,16 @@ export function AdminPage() {
             const res = await fetch(`${apiBase}/api/admin/announcements?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${adminToken}` },
             });
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to load announcements.'));
+                return;
+            }
             const data = await res.json();
             setAnnouncements(data.data || []);
         } catch (e) {
             console.error(e);
+            setMessage('Failed to load announcements.');
         } finally {
             setListLoading(false);
         }
@@ -161,14 +172,24 @@ export function AdminPage() {
     const refreshActiveUsers = async () => {
         if (!adminToken) return;
         setActiveUsersLoading(true);
+        setActiveUsersError(null);
         try {
             const res = await fetch(`${apiBase}/api/admin/active-users?windowMinutes=${activeUsersWindow}`, {
                 headers: { Authorization: `Bearer ${adminToken}` },
             });
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setActiveUsers(null);
+                setActiveUsersError(getApiErrorMessage(errorBody, 'Unable to load active users.'));
+                return;
+            }
             const data = await res.json();
             setActiveUsers(data.data ?? null);
+            setActiveUsersUpdatedAt(new Date().toISOString());
         } catch (error) {
             console.error(error);
+            setActiveUsers(null);
+            setActiveUsersError('Unable to load active users.');
         } finally {
             setActiveUsersLoading(false);
         }
@@ -182,10 +203,13 @@ export function AdminPage() {
                 headers: { Authorization: `Bearer ${adminToken}` },
             });
             if (!res.ok) {
-                throw new Error('Failed to load dashboard');
+                const errorBody = await res.json().catch(() => ({}));
+                setDashboardError(getApiErrorMessage(errorBody, 'Failed to load user analytics.'));
+                return;
             }
             const payload = await res.json();
             setDashboard(payload.data ?? null);
+            setDashboardUpdatedAt(new Date().toISOString());
         } catch (error) {
             console.error(error);
             setDashboardError('Failed to load user analytics.');
@@ -203,10 +227,13 @@ export function AdminPage() {
                 headers: { Authorization: `Bearer ${adminToken}` },
             });
             if (!res.ok) {
-                throw new Error('Failed to load audit log');
+                const errorBody = await res.json().catch(() => ({}));
+                setAuditError(getApiErrorMessage(errorBody, 'Failed to load audit log.'));
+                return;
             }
             const payload = await res.json();
             setAuditLogs(payload.data ?? []);
+            setAuditUpdatedAt(new Date().toISOString());
         } catch (error) {
             console.error(error);
             setAuditError('Failed to load audit log.');
@@ -231,7 +258,8 @@ export function AdminPage() {
                 refreshData();
                 refreshDashboard();
             } else {
-                setMessage('Failed to delete');
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to delete announcement.'));
             }
         } catch (error) {
             console.error(error);
@@ -354,7 +382,8 @@ export function AdminPage() {
                 refreshData();
                 refreshDashboard();
             } else {
-                setMessage('Failed to approve announcement.');
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to approve announcement.'));
             }
         } catch (error) {
             console.error(error);
@@ -383,7 +412,8 @@ export function AdminPage() {
                 refreshData();
                 refreshDashboard();
             } else {
-                setMessage('Failed to reject announcement.');
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to reject announcement.'));
             }
         } catch (error) {
             console.error(error);
@@ -445,7 +475,8 @@ export function AdminPage() {
                 refreshData();
                 refreshDashboard();
             } else {
-                setMessage('Bulk update failed.');
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Bulk update failed.'));
             }
         } catch (error) {
             console.error(error);
@@ -481,11 +512,8 @@ export function AdminPage() {
                     setMessage('Access denied. Admin role required.');
                 }
             } else {
-                const errorResult = await response.json();
-                const errorMsg = typeof errorResult.error === 'string'
-                    ? errorResult.error
-                    : 'Invalid credentials.';
-                setMessage(errorMsg);
+                const errorResult = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorResult, 'Invalid credentials.'));
             }
         } catch (error) {
             console.error(error);
@@ -539,7 +567,8 @@ export function AdminPage() {
                 setActiveAdminTab('list');
 
             } else {
-                setMessage('Failed to save. Note: Admin API requires authentication.');
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to save announcement.'));
             }
         } catch (error) {
             console.error(error);
@@ -720,6 +749,17 @@ export function AdminPage() {
         return diffMs >= 0 ? `In ${label}` : `Overdue by ${label}`;
     };
 
+    const formatLastUpdated = (value?: string | null) => {
+        if (!value) return 'Not updated yet';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Not updated yet';
+        const diffMs = Date.now() - date.getTime();
+        if (diffMs < 60 * 1000) return 'Updated just now';
+        if (diffMs < 60 * 60 * 1000) return `Updated ${Math.round(diffMs / 60000)}m ago`;
+        if (diffMs < 24 * 60 * 60 * 1000) return `Updated ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
+        return `Updated ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
+    };
+
     useEffect(() => {
         if (!adminToken) return;
         setIsLoggedIn(true);
@@ -775,6 +815,7 @@ export function AdminPage() {
                                 required
                             />
                         </div>
+                        <p className="form-hint">Too many failed attempts will lock login for 15 minutes.</p>
                         {message && <p className="form-message">{message}</p>}
                         <button type="submit" className="admin-btn primary">Login</button>
                         <button type="button" className="admin-btn secondary" onClick={() => navigate('/')}>Back to Home</button>
@@ -838,6 +879,7 @@ export function AdminPage() {
                                 <p className="admin-subtitle">Track subscriber growth and engagement.</p>
                             </div>
                             <div className="admin-list-actions">
+                                <span className="admin-updated">{formatLastUpdated(dashboardUpdatedAt)}</span>
                                 <button className="admin-btn secondary" onClick={refreshDashboard}>Refresh</button>
                             </div>
                         </div>
@@ -884,6 +926,7 @@ export function AdminPage() {
                                             <option key={window} value={window}>{window}m</option>
                                         ))}
                                     </select>
+                                    <span className="admin-updated">{formatLastUpdated(activeUsersUpdatedAt)}</span>
                                     <button className="admin-btn secondary" onClick={refreshActiveUsers}>Refresh</button>
                                 </div>
                             </div>
@@ -910,7 +953,7 @@ export function AdminPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="admin-error">Unable to load active users.</div>
+                                <div className="admin-error">{activeUsersError ?? 'Unable to load active users.'}</div>
                             )}
                         </div>
                     </div>
@@ -1536,6 +1579,7 @@ export function AdminPage() {
                                 <p className="admin-subtitle">Recent admin actions across create, review, and bulk updates.</p>
                             </div>
                             <div className="admin-list-actions">
+                                <span className="admin-updated">{formatLastUpdated(auditUpdatedAt)}</span>
                                 <button className="admin-btn secondary" onClick={refreshAuditLogs}>Refresh</button>
                             </div>
                         </div>

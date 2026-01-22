@@ -71,6 +71,19 @@
   flex-wrap: wrap;
 }
 
+.admin-updated {
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.form-hint {
+  margin-top: calc(var(--space-2) * -1);
+  margin-bottom: var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .admin-quick-create {
   display: flex;
   flex-wrap: wrap;

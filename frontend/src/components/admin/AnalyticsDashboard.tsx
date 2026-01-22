@@ -162,6 +162,16 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const ctr = analytics.totalListingViews > 0
         ? Math.round((analytics.totalCardClicks / analytics.totalListingViews) * 100)
         : 0;
+    const formatLastUpdated = (value?: string | null) => {
+        if (!value) return 'Rollup not updated yet';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Rollup not updated yet';
+        const diffMs = Date.now() - date.getTime();
+        if (diffMs < 60 * 1000) return 'Rollup updated just now';
+        if (diffMs < 60 * 60 * 1000) return `Rollup updated ${Math.round(diffMs / 60000)}m ago`;
+        if (diffMs < 24 * 60 * 60 * 1000) return `Rollup updated ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
+        return `Rollup updated ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
+    };
 
     return (
         <div className="analytics-dashboard">
@@ -199,8 +209,11 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
             <div className="analytics-section">
                 <div className="analytics-section-header">
-                    <h3>Engagement (last {engagementWindow} days)</h3>
-                    <p className="analytics-subtitle">Searches, bookmarks, and signups from tracked events.</p>
+                    <div>
+                        <h3>Engagement (last {engagementWindow} days)</h3>
+                        <p className="analytics-subtitle">Searches, bookmarks, and signups from tracked events.</p>
+                    </div>
+                    <span className="analytics-updated">{formatLastUpdated(analytics.rollupLastUpdatedAt ?? null)}</span>
                 </div>
                 <div className="engagement-grid">
                     <div className="engagement-card">

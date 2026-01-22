@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, AuthResponse } from '../types';
+import { getApiErrorMessage } from '../utils/errors';
 
 interface AuthContextType {
     user: User | null;
@@ -15,22 +16,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
-
-function getApiErrorMessage(payload: any, fallback: string): string {
-    if (!payload) return fallback;
-    if (typeof payload.error === 'string') return payload.error;
-    if (typeof payload.message === 'string') return payload.message;
-    const error = payload.error;
-    if (error && typeof error === 'object') {
-        const formErrors = Array.isArray(error.formErrors) ? error.formErrors.filter(Boolean) : [];
-        if (formErrors.length > 0) return formErrors.join(' ');
-        const fieldErrors = error.fieldErrors && typeof error.fieldErrors === 'object'
-            ? Object.values(error.fieldErrors).flat().filter(Boolean)
-            : [];
-        if (fieldErrors.length > 0) return fieldErrors.join(' ');
-    }
-    return fallback;
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
