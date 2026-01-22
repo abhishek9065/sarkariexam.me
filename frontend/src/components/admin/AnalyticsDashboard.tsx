@@ -57,6 +57,18 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const typeBreakdown = analytics?.typeBreakdown ?? [];
+    const categoryBreakdown = analytics?.categoryBreakdown ?? [];
+
+    const sortedTypeBreakdown = useMemo(() => {
+        return [...typeBreakdown].sort((a, b) => b.count - a.count);
+    }, [typeBreakdown]);
+
+    const sortedCategories = useMemo(() => {
+        return [...categoryBreakdown]
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 12);
+    }, [categoryBreakdown]);
 
     useEffect(() => {
         const fetchAnalytics = async () => {
@@ -111,16 +123,6 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     }
 
     if (!analytics) return null;
-
-    const sortedTypeBreakdown = useMemo(() => {
-        return [...(analytics.typeBreakdown ?? [])].sort((a, b) => b.count - a.count);
-    }, [analytics]);
-
-    const sortedCategories = useMemo(() => {
-        return [...(analytics.categoryBreakdown ?? [])]
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 12);
-    }, [analytics]);
 
     return (
         <div className="analytics-dashboard">
