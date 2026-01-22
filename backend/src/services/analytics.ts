@@ -198,7 +198,18 @@ export async function getDailyRollups(days: number = 14): Promise<Array<{
         .toArray();
 
     const map = new Map(docs.map(doc => [doc.date, doc]));
-    const results: Array<{ date: string; count: number; views: number }> = [];
+    const results: Array<{
+        date: string;
+        count: number;
+        views: number;
+        listingViews: number;
+        cardClicks: number;
+        categoryClicks: number;
+        filterApplies: number;
+        searches: number;
+        bookmarkAdds: number;
+        registrations: number;
+    }> = [];
 
     for (let i = 0; i < days; i++) {
         const date = new Date(start);
