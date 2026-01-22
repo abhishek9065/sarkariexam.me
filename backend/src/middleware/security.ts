@@ -56,13 +56,10 @@ export async function bruteForceProtection(req: Request, res: Response, next: Ne
         const record = await RedisCache.get(key);
         
         if (record && record.count >= MAX_FAILED_ATTEMPTS) {
-             // If already blocked, just return the error
-             const ttl = BLOCK_DURATION_SEC; // We could fetch exact TTL if needed, but message is enough
-             const waitTime = Math.ceil(ttl / 60);
-             return res.status(429).json({
-                error: 'Too many failed login attempts',
-                message: `Please try again in ${waitTime} minutes`
-            });
+            // Mark as blocked but allow handler to verify correct credentials.
+            const waitTime = Math.ceil(BLOCK_DURATION_SEC / 60);
+            (req as any).bruteForceBlocked = true;
+            (req as any).bruteForceWaitMinutes = waitTime;
         }
     } catch (err) {
         console.error('Brute force check failed:', err);

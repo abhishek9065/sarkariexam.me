@@ -79,12 +79,20 @@ const loginSchema = z.object({
 
 router.post('/login', bruteForceProtection, async (req, res) => {
   const clientIP = getClientIP(req);
+  const bruteForceBlocked = (req as any).bruteForceBlocked === true;
+  const waitMinutes = (req as any).bruteForceWaitMinutes ?? 15;
 
   try {
     const validated = loginSchema.parse(req.body);
     const user = await UserModelMongo.verifyPassword(validated.email, validated.password);
 
     if (!user) {
+      if (bruteForceBlocked) {
+        return res.status(429).json({
+          error: 'Too many failed login attempts',
+          message: `Please try again in ${waitMinutes} minutes`,
+        });
+      }
       await recordFailedLogin(clientIP);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
