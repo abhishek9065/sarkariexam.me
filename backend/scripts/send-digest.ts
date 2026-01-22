@@ -1,5 +1,21 @@
-import { connectToDatabase, getCollection } from '../src/services/cosmosdb.js';
-import { sendDigestEmail, isEmailConfigured } from '../src/services/email.js';
+type CosmosModule = typeof import('../src/services/cosmosdb.js');
+type EmailModule = typeof import('../src/services/email.js');
+
+const loadCosmos = async (): Promise<CosmosModule> => {
+    try {
+        return await import('../dist/services/cosmosdb.js');
+    } catch {
+        return await import('../src/services/cosmosdb.js');
+    }
+};
+
+const loadEmail = async (): Promise<EmailModule> => {
+    try {
+        return await import('../dist/services/email.js');
+    } catch {
+        return await import('../src/services/email.js');
+    }
+};
 
 interface SubscriptionDoc {
     email: string;
@@ -48,14 +64,17 @@ const liveQuery = {
 };
 
 async function run() {
-    if (!isEmailConfigured()) {
+    const cosmos = await loadCosmos();
+    const email = await loadEmail();
+
+    if (!email.isEmailConfigured()) {
         console.log('[Digest] Email not configured. Exiting.');
         return;
     }
 
-    await connectToDatabase();
-    const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
-    const announcements = getCollection<AnnouncementDoc>('announcements');
+    await cosmos.connectToDatabase();
+    const subscriptions = cosmos.getCollection<SubscriptionDoc>('subscriptions');
+    const announcements = cosmos.getCollection<AnnouncementDoc>('announcements');
 
     const activeSubs = await subscriptions
         .find({ isActive: true, verified: true, frequency })
@@ -89,7 +108,7 @@ async function run() {
             deadline: doc.deadline,
         }));
 
-        const ok = await sendDigestEmail({
+        const ok = await email.sendDigestEmail({
             email: sub.email,
             announcements: items,
             unsubscribeToken: sub.unsubscribeToken,
