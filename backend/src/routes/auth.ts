@@ -36,7 +36,7 @@ router.post('/register', async (req, res) => {
 
     const existingUser = await UserModelMongo.findByEmail(validated.email);
     if (existingUser) {
-      return res.status(400).json({ error: 'Registration failed. Please try again.' });
+      return res.status(409).json({ error: 'Email already registered. Please log in.' });
     }
 
     const user = await UserModelMongo.create({
