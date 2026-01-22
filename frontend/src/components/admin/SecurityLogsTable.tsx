@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getApiErrorMessage } from '../../utils/errors';
 import './SecurityLogsTable.css';
 
 interface SecurityLog {
@@ -19,20 +20,43 @@ const apiBase = import.meta.env.VITE_API_BASE ?? '';
 export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
     const [logs, setLogs] = useState<SecurityLog[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+
+    const formatLastUpdated = (value?: string | null) => {
+        if (!value) return 'Not updated yet';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Not updated yet';
+        const diffMs = Date.now() - date.getTime();
+        if (diffMs < 60 * 1000) return 'Updated just now';
+        if (diffMs < 60 * 60 * 1000) return `Updated ${Math.round(diffMs / 60000)}m ago`;
+        if (diffMs < 24 * 60 * 60 * 1000) return `Updated ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
+        return `Updated ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
+    };
 
     const fetchLogs = async () => {
         if (!adminToken) return;
         try {
             setLoading(true);
+            setError(null);
             const res = await fetch(`${apiBase}/api/admin/security?limit=50`, {
                 headers: {
                     'Authorization': `Bearer ${adminToken}`
                 }
             });
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setError(getApiErrorMessage(errorBody, 'Failed to load security logs.'));
+                setLogs([]);
+                return;
+            }
             const data = await res.json();
             setLogs(data.data || []);
+            setUpdatedAt(new Date().toISOString());
         } catch (error) {
             console.error(error);
+            setError('Failed to load security logs.');
+            setLogs([]);
         } finally {
             setLoading(false);
         }
@@ -54,10 +78,15 @@ export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
             <div className="logs-header">
                 <h3>🛡️ Security Event Logs</h3>
                 <div className="logs-actions">
-                    <button onClick={fetchLogs} className="admin-btn secondary small">Refresh</button>
+                    <span className="logs-updated">{formatLastUpdated(updatedAt)}</span>
+                    <button onClick={fetchLogs} className="admin-btn secondary small" disabled={loading}>
+                        {loading ? 'Refreshing...' : 'Refresh'}
+                    </button>
                     <span className="live-indicator">● Live</span>
                 </div>
             </div>
+
+            {error && <div className="logs-error">{error}</div>}
 
             <div className="logs-table-wrapper">
                 <table className="admin-table logs-table">

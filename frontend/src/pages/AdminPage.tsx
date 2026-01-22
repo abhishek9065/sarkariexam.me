@@ -102,10 +102,12 @@ export function AdminPage() {
 
     const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>('all');
     const [listLoading, setListLoading] = useState(false);
+    const [listUpdatedAt, setListUpdatedAt] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkStatus, setBulkStatus] = useState<AnnouncementStatus | ''>('');
     const [bulkPublishAt, setBulkPublishAt] = useState('');
     const [bulkIsActive, setBulkIsActive] = useState<'keep' | 'active' | 'inactive'>('keep');
+    const [bulkLoading, setBulkLoading] = useState(false);
     const [activeUsers, setActiveUsers] = useState<{
         windowMinutes: number;
         since: string;
@@ -129,6 +131,8 @@ export function AdminPage() {
     const [auditLoading, setAuditLoading] = useState(false);
     const [auditError, setAuditError] = useState<string | null>(null);
     const [auditUpdatedAt, setAuditUpdatedAt] = useState<string | null>(null);
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
 
     const pageSize = 15;
 
@@ -161,6 +165,7 @@ export function AdminPage() {
             }
             const data = await res.json();
             setAnnouncements(data.data || []);
+            setListUpdatedAt(new Date().toISOString());
         } catch (e) {
             console.error(e);
             setMessage('Failed to load announcements.');
@@ -247,6 +252,7 @@ export function AdminPage() {
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
         if (!adminToken) return;
 
+        updateMutating(id, true);
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'DELETE',
@@ -264,6 +270,8 @@ export function AdminPage() {
         } catch (error) {
             console.error(error);
             setMessage('Error deleting announcement');
+        } finally {
+            updateMutating(id, false);
         }
     };
 
@@ -361,8 +369,21 @@ export function AdminPage() {
         setSelectedIds(new Set());
     };
 
+    const updateMutating = (id: string, isMutating: boolean) => {
+        setMutatingIds((prev) => {
+            const next = new Set(prev);
+            if (isMutating) {
+                next.add(id);
+            } else {
+                next.delete(id);
+            }
+            return next;
+        });
+    };
+
     const handleApprove = async (id: string, note?: string) => {
         if (!adminToken) return;
+        updateMutating(id, true);
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
                 method: 'POST',
@@ -388,11 +409,14 @@ export function AdminPage() {
         } catch (error) {
             console.error(error);
             setMessage('Error approving announcement.');
+        } finally {
+            updateMutating(id, false);
         }
     };
 
     const handleReject = async (id: string, note?: string) => {
         if (!adminToken) return;
+        updateMutating(id, true);
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
                 method: 'POST',
@@ -418,6 +442,8 @@ export function AdminPage() {
         } catch (error) {
             console.error(error);
             setMessage('Error rejecting announcement.');
+        } finally {
+            updateMutating(id, false);
         }
     };
 
@@ -453,6 +479,7 @@ export function AdminPage() {
             return;
         }
 
+        setBulkLoading(true);
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/bulk`, {
                 method: 'POST',
@@ -481,6 +508,8 @@ export function AdminPage() {
         } catch (error) {
             console.error(error);
             setMessage('Error applying bulk update.');
+        } finally {
+            setBulkLoading(false);
         }
     };
 
@@ -489,6 +518,7 @@ export function AdminPage() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage('Logging in...');
+        setLoginLoading(true);
         try {
             const response = await fetch(`${apiBase}/api/auth/login`, {
                 method: 'POST',
@@ -518,6 +548,8 @@ export function AdminPage() {
         } catch (error) {
             console.error(error);
             setMessage('Login failed. Check your connection.');
+        } finally {
+            setLoginLoading(false);
         }
     };
 
@@ -803,6 +835,7 @@ export function AdminPage() {
                                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                                 placeholder="admin@sarkari.com"
                                 required
+                                disabled={loginLoading}
                             />
                         </div>
                         <div className="form-group">
@@ -813,11 +846,14 @@ export function AdminPage() {
                                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                                 placeholder="password"
                                 required
+                                disabled={loginLoading}
                             />
                         </div>
                         <p className="form-hint">Too many failed attempts will lock login for 15 minutes.</p>
                         {message && <p className="form-message">{message}</p>}
-                        <button type="submit" className="admin-btn primary">Login</button>
+                        <button type="submit" className="admin-btn primary" disabled={loginLoading}>
+                            {loginLoading ? 'Logging in...' : 'Login'}
+                        </button>
                         <button type="button" className="admin-btn secondary" onClick={() => navigate('/')}>Back to Home</button>
                     </form>
                 </div>
@@ -880,7 +916,9 @@ export function AdminPage() {
                             </div>
                             <div className="admin-list-actions">
                                 <span className="admin-updated">{formatLastUpdated(dashboardUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshDashboard}>Refresh</button>
+                                <button className="admin-btn secondary" onClick={refreshDashboard} disabled={dashboardLoading}>
+                                    {dashboardLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
                             </div>
                         </div>
 
@@ -927,7 +965,9 @@ export function AdminPage() {
                                         ))}
                                     </select>
                                     <span className="admin-updated">{formatLastUpdated(activeUsersUpdatedAt)}</span>
-                                    <button className="admin-btn secondary" onClick={refreshActiveUsers}>Refresh</button>
+                                    <button className="admin-btn secondary" onClick={refreshActiveUsers} disabled={activeUsersLoading}>
+                                        {activeUsersLoading ? 'Refreshing...' : 'Refresh'}
+                                    </button>
                                 </div>
                             </div>
 
@@ -965,7 +1005,10 @@ export function AdminPage() {
                                 <p className="admin-subtitle">Add, update, and organize listings across all categories.</p>
                             </div>
                             <div className="admin-list-actions">
-                                <button className="admin-btn secondary" onClick={refreshData}>Refresh</button>
+                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
+                                <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
+                                    {listLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
                                 <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>New job</button>
                             </div>
                         </div>
@@ -1071,6 +1114,7 @@ export function AdminPage() {
                                         <select
                                             value={bulkStatus}
                                             onChange={(e) => setBulkStatus(e.target.value as AnnouncementStatus | '')}
+                                            disabled={bulkLoading}
                                         >
                                             <option value="">No change</option>
                                             {STATUS_OPTIONS.map((option) => (
@@ -1084,6 +1128,7 @@ export function AdminPage() {
                                             type="datetime-local"
                                             value={bulkPublishAt}
                                             onChange={(e) => setBulkPublishAt(e.target.value)}
+                                            disabled={bulkLoading}
                                         />
                                     </div>
                                     <div className="bulk-field">
@@ -1091,6 +1136,7 @@ export function AdminPage() {
                                         <select
                                             value={bulkIsActive}
                                             onChange={(e) => setBulkIsActive(e.target.value as 'keep' | 'active' | 'inactive')}
+                                            disabled={bulkLoading}
                                         >
                                             <option value="keep">Keep</option>
                                             <option value="active">Active</option>
@@ -1098,8 +1144,10 @@ export function AdminPage() {
                                         </select>
                                     </div>
                                     <div className="admin-bulk-actions">
-                                        <button className="admin-btn primary" onClick={handleBulkUpdate}>Apply</button>
-                                        <button className="admin-btn secondary" onClick={clearSelection}>Clear</button>
+                                        <button className="admin-btn primary" onClick={handleBulkUpdate} disabled={bulkLoading}>
+                                            {bulkLoading ? 'Applying...' : 'Apply'}
+                                        </button>
+                                        <button className="admin-btn secondary" onClick={clearSelection} disabled={bulkLoading}>Clear</button>
                                     </div>
                                 </div>
                             </div>
@@ -1142,6 +1190,7 @@ export function AdminPage() {
                                             const canApprove = statusValue === 'pending' || statusValue === 'scheduled';
                                             const canReject = statusValue === 'pending' || statusValue === 'scheduled';
                                             const reviewNote = reviewNotes[item.id] ?? '';
+                                            const isRowMutating = mutatingIds.has(item.id);
                                             return (
                                                 <tr key={item.id}>
                                                     <td>
@@ -1189,19 +1238,20 @@ export function AdminPage() {
                                                                     value={reviewNote}
                                                                     onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
                                                                     placeholder="Review note (optional)"
+                                                                    disabled={isRowMutating}
                                                                 />
                                                             )}
-                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)}>View</button>
-                                                            <button className="admin-btn primary small" onClick={() => handleEdit(item)}>Edit</button>
-                                                            <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)}>History</button>
+                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
+                                                            <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
+                                                            <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)} disabled={isRowMutating}>History</button>
                                                             {canApprove && (
-                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)}>Approve</button>
+                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
                                                             )}
                                                             {canReject && (
-                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)}>Reject</button>
+                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
                                                             )}
-                                                            <button className="admin-btn secondary small" onClick={() => handleDuplicate(item)}>Duplicate</button>
-                                                            <button className="admin-btn danger small" onClick={() => handleDelete(item.id)}>Delete</button>
+                                                            <button className="admin-btn secondary small" onClick={() => handleDuplicate(item)} disabled={isRowMutating}>Duplicate</button>
+                                                            <button className="admin-btn danger small" onClick={() => handleDelete(item.id)} disabled={isRowMutating}>Delete</button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1243,7 +1293,10 @@ export function AdminPage() {
                                 <p className="admin-subtitle">Review upcoming scheduled announcements and publish now if needed.</p>
                             </div>
                             <div className="admin-list-actions">
-                                <button className="admin-btn secondary" onClick={refreshData}>Refresh</button>
+                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
+                                <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
+                                    {listLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
                                 <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>New job</button>
                             </div>
                         </div>
@@ -1286,6 +1339,7 @@ export function AdminPage() {
                                             const reviewNote = reviewNotes[item.id] ?? '';
                                             const publishTime = item.publishAt;
                                             const isOverdue = publishTime ? new Date(publishTime).getTime() <= Date.now() : false;
+                                            const isRowMutating = mutatingIds.has(item.id);
                                             return (
                                                 <tr key={item.id}>
                                                     <td>
@@ -1313,10 +1367,11 @@ export function AdminPage() {
                                                                 value={reviewNote}
                                                                 onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
                                                                 placeholder="Review note (optional)"
+                                                                disabled={isRowMutating}
                                                             />
-                                                            <button className="admin-btn secondary small" onClick={() => handleEdit(item)}>Edit</button>
-                                                            <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)}>Publish now</button>
-                                                            <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)}>Return to draft</button>
+                                                            <button className="admin-btn secondary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
+                                                            <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Publish now</button>
+                                                            <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Return to draft</button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1580,7 +1635,9 @@ export function AdminPage() {
                             </div>
                             <div className="admin-list-actions">
                                 <span className="admin-updated">{formatLastUpdated(auditUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshAuditLogs}>Refresh</button>
+                                <button className="admin-btn secondary" onClick={refreshAuditLogs} disabled={auditLoading}>
+                                    {auditLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
                             </div>
                         </div>
 
