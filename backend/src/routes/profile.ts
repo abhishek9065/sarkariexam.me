@@ -509,7 +509,6 @@ router.get('/alerts', authenticateToken, async (req, res) => {
             }))
         );
 
-        const profile = await getOrCreateProfile(req.user!.userId);
         const preferences = await getPreferenceAlerts(profile, sinceMs, limit);
 
         recordAnalyticsEvent({
