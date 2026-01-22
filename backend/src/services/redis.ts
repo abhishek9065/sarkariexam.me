@@ -1,4 +1,4 @@
-import { getCache as getMemoryCache, setCache as setMemoryCache } from '../utils/cache.js';
+import { getCache as getMemoryCache, setCache as setMemoryCache, deleteCache as deleteMemoryCache, invalidateCache } from '../utils/cache.js';
 
 /**
  * Redis Cache Service using Upstash REST API
@@ -87,6 +87,7 @@ export async function del(key: string): Promise<void> {
     if (isRedisConfigured) {
         await redisCommand(['DEL', key]);
     }
+    deleteMemoryCache(key);
 }
 
 /**
@@ -98,6 +99,7 @@ export async function invalidatePattern(pattern: string): Promise<void> {
         // The TTL will handle expiration
         console.log(`Cache pattern invalidation requested: ${pattern}`);
     }
+    invalidateCache(pattern);
 }
 
 /**

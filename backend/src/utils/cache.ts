@@ -33,6 +33,10 @@ export function setCache(key: string, data: any, ttlSeconds: number = 300): void
     });
 }
 
+export function deleteCache(key: string): void {
+    cache.delete(key);
+}
+
 export function invalidateCache(pattern?: string): void {
     if (!pattern) {
         cache.clear();
@@ -56,4 +60,4 @@ setInterval(() => {
     }
 }, 60000);
 
-export default { getCache, setCache, invalidateCache };
+export default { getCache, setCache, deleteCache, invalidateCache };
