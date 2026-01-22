@@ -141,6 +141,11 @@ router.get(
     const result = await AnnouncementModel.findListingCards({
       type: filters.type,
       category: filters.category,
+      search: filters.search,
+      organization: filters.organization,
+      location: filters.location,
+      qualification: filters.qualification,
+      sort: filters.sort,
       limit: filters.limit,
       cursor: filters.cursor?.toString(),
     });

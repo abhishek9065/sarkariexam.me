@@ -80,6 +80,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [exporting, setExporting] = useState(false);
     const typeBreakdown = analytics?.typeBreakdown ?? [];
     const categoryBreakdown = analytics?.categoryBreakdown ?? [];
 
@@ -146,6 +147,32 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         fetchAnalytics();
     }, [adminToken]);
 
+    const handleExport = async () => {
+        if (!adminToken) return;
+        setExporting(true);
+        try {
+            const response = await fetch(`${apiBase}/api/analytics/export/csv`, {
+                headers: { Authorization: `Bearer ${adminToken}` }
+            });
+            if (!response.ok) {
+                setError('Failed to export analytics');
+                return;
+            }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `analytics-rollups-${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+            setError('Failed to export analytics');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     if (loading) {
         return <div className="analytics-loading">Loading analytics...</div>;
     }
@@ -175,6 +202,12 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
     return (
         <div className="analytics-dashboard">
+            <div className="analytics-actions">
+                <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                <button className="admin-btn secondary" onClick={handleExport} disabled={exporting}>
+                    {exporting ? 'Exporting...' : 'Export CSV'}
+                </button>
+            </div>
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card views">

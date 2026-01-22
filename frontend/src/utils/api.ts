@@ -8,6 +8,11 @@ type AnnouncementCardsResponse =
 interface AnnouncementCardQuery {
     type?: ContentType;
     category?: string;
+    search?: string;
+    organization?: string;
+    location?: string;
+    qualification?: string;
+    sort?: 'newest' | 'oldest' | 'deadline';
     limit?: number;
     cursor?: string | null;
 }
@@ -19,6 +24,11 @@ export async function fetchAnnouncementCardsPage(
     const params = new URLSearchParams();
     if (query.type) params.set('type', query.type);
     if (query.category) params.set('category', query.category);
+    if (query.search) params.set('search', query.search);
+    if (query.organization) params.set('organization', query.organization);
+    if (query.location) params.set('location', query.location);
+    if (query.qualification) params.set('qualification', query.qualification);
+    if (query.sort) params.set('sort', query.sort);
     if (query.limit) params.set('limit', String(query.limit));
     if (query.cursor) params.set('cursor', query.cursor);
 

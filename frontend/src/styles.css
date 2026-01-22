@@ -2085,7 +2085,31 @@ h1, h2, h3, h4, h5, h6,
 .category-controls {
   flex: 1;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.save-search-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.save-search-prompt p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.save-search-message {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .category-list {

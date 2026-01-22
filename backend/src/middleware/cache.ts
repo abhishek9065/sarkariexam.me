@@ -96,7 +96,12 @@ export const cacheKeys = {
     announcementsV3Cards: (req: Request) => {
         const params = [
             `type:${req.query.type || 'all'}`,
+            `search:${req.query.search || ''}`,
             `category:${req.query.category || ''}`,
+            `organization:${req.query.organization || ''}`,
+            `location:${req.query.location || ''}`,
+            `qualification:${req.query.qualification || ''}`,
+            `sort:${req.query.sort || 'newest'}`,
             `limit:${req.query.limit || 20}`,
             `cursor:${req.query.cursor || ''}`,
         ];

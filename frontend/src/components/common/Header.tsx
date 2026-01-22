@@ -1,4 +1,5 @@
 import type { PageType } from '../../utils/constants';
+import { NotificationCenter } from '../ui/NotificationCenter';
 
 interface HeaderProps {
     setCurrentPage: (page: PageType) => void;
@@ -19,6 +20,7 @@ export function Header({ setCurrentPage, user, isAuthenticated, onLogin, onLogou
                 <div className="header-controls">
                     {isAuthenticated ? (
                         <>
+                            <NotificationCenter />
                             <span className="user-name" onClick={onProfileClick} style={{ cursor: 'pointer' }}>
                                 👤 {user?.name}
                             </span>

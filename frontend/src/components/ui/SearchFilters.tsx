@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ContentType } from '../../types';
 import './SearchFilters.css';
 
@@ -8,6 +8,9 @@ interface SearchFiltersProps {
     qualifications?: string[];
     showTypeFilter?: boolean;
     initialType?: ContentType | '';
+    persistKey?: string;
+    showRecentSearches?: boolean;
+    includeAllTypes?: boolean;
 }
 
 export interface FilterState {
@@ -85,7 +88,10 @@ export function SearchFilters({
     locations = DEFAULT_LOCATIONS,
     qualifications = DEFAULT_QUALIFICATIONS,
     showTypeFilter = true,
-    initialType = ''
+    initialType = '',
+    persistKey,
+    showRecentSearches = true,
+    includeAllTypes = true,
 }: SearchFiltersProps) {
     const [filters, setFilters] = useState<FilterState>({
         keyword: '',
@@ -98,9 +104,51 @@ export function SearchFilters({
     });
     const [showFilters, setShowFilters] = useState(false);
     const [keywordInput, setKeywordInput] = useState('');
+    const storageKey = persistKey ? `filters:${persistKey}` : null;
+    const recentKey = persistKey ? `recent:${persistKey}` : 'recent:global';
+    const pinnedKey = 'pinned-types';
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [pinnedTypes, setPinnedTypes] = useState<ContentType[]>([]);
 
     // Debounce keyword input
     const debouncedKeyword = useDebounce(keywordInput, 300);
+
+    useEffect(() => {
+        if (!storageKey) return;
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return;
+        try {
+            const saved = JSON.parse(raw) as FilterState;
+            const next = { ...saved, type: saved.type ?? initialType };
+            setFilters(next);
+            setKeywordInput(saved.keyword || '');
+            onFilterChange(next);
+        } catch {
+            localStorage.removeItem(storageKey);
+        }
+    }, [storageKey, initialType, onFilterChange]);
+
+    useEffect(() => {
+        const raw = localStorage.getItem(recentKey);
+        if (!raw) return;
+        try {
+            const saved = JSON.parse(raw) as string[];
+            setRecentSearches(saved);
+        } catch {
+            localStorage.removeItem(recentKey);
+        }
+    }, [recentKey]);
+
+    useEffect(() => {
+        const raw = localStorage.getItem(pinnedKey);
+        if (!raw) return;
+        try {
+            const saved = JSON.parse(raw) as ContentType[];
+            setPinnedTypes(saved);
+        } catch {
+            localStorage.removeItem(pinnedKey);
+        }
+    }, []);
 
     // Update filters when debounced keyword changes
     useEffect(() => {
@@ -111,11 +159,44 @@ export function SearchFilters({
         }
     }, [debouncedKeyword]);
 
+    useEffect(() => {
+        if (!storageKey) return;
+        localStorage.setItem(storageKey, JSON.stringify(filters));
+    }, [filters, storageKey]);
+
+    useEffect(() => {
+        if (!showRecentSearches || !debouncedKeyword.trim()) return;
+        const keyword = debouncedKeyword.trim();
+        const next = [keyword, ...recentSearches.filter((item) => item !== keyword)].slice(0, 6);
+        if (next.join('|') === recentSearches.join('|')) return;
+        setRecentSearches(next);
+        localStorage.setItem(recentKey, JSON.stringify(next));
+    }, [debouncedKeyword, recentKey, recentSearches, showRecentSearches]);
+
     const updateFilter = useCallback((key: keyof FilterState, value: string) => {
         const newFilters = { ...filters, [key]: value };
         setFilters(newFilters);
         onFilterChange(newFilters);
     }, [filters, onFilterChange]);
+
+    const togglePin = (value: ContentType) => {
+        setPinnedTypes((prev) => {
+            const next = prev.includes(value)
+                ? prev.filter((item) => item !== value)
+                : [...prev, value];
+            localStorage.setItem(pinnedKey, JSON.stringify(next));
+            return next;
+        });
+    };
+
+    const orderedTypeOptions = useMemo(() => {
+        const baseOptions = includeAllTypes
+            ? TYPE_OPTIONS
+            : TYPE_OPTIONS.filter((option) => option.value);
+        const pinned = baseOptions.filter((option) => option.value && pinnedTypes.includes(option.value as ContentType));
+        const rest = baseOptions.filter((option) => !option.value || !pinnedTypes.includes(option.value as ContentType));
+        return [...pinned, ...rest];
+    }, [includeAllTypes, pinnedTypes]);
 
     const clearFilters = () => {
         const defaultFilters: FilterState = {
@@ -130,6 +211,9 @@ export function SearchFilters({
         setFilters(defaultFilters);
         setKeywordInput('');
         onFilterChange(defaultFilters);
+        if (storageKey) {
+            localStorage.setItem(storageKey, JSON.stringify(defaultFilters));
+        }
     };
 
     const hasActiveFilters = filters.keyword || filters.type || filters.location ||
@@ -176,21 +260,60 @@ export function SearchFilters({
                         <span className="filter-badge">{activeFilterCount}</span>
                     )}
                 </button>
+                {hasActiveFilters && (
+                    <button className="reset-filters-btn" onClick={clearFilters}>
+                        Reset
+                    </button>
+                )}
             </div>
+
+            {showRecentSearches && recentSearches.length > 0 && (
+                <div className="recent-searches">
+                    <span className="recent-label">Recent:</span>
+                    {recentSearches.map((item) => (
+                        <button
+                            key={item}
+                            className="recent-chip"
+                            onClick={() => {
+                                setKeywordInput(item);
+                                updateFilter('keyword', item);
+                            }}
+                        >
+                            {item}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* Type Quick Filter Pills */}
             {showTypeFilter && (
                 <div className="type-filter-pills">
-                    {TYPE_OPTIONS.map(option => (
-                        <button
-                            key={option.value}
-                            className={`type-pill ${filters.type === option.value ? 'active' : ''}`}
-                            onClick={() => updateFilter('type', option.value)}
-                        >
-                            <span className="pill-icon">{option.icon}</span>
-                            <span className="pill-label">{option.label}</span>
-                        </button>
-                    ))}
+                    {orderedTypeOptions.map(option => {
+                        const isPinned = Boolean(option.value && pinnedTypes.includes(option.value as ContentType));
+                        return (
+                            <button
+                                key={option.value}
+                                className={`type-pill ${filters.type === option.value ? 'active' : ''} ${isPinned ? 'pinned' : ''}`}
+                                onClick={() => updateFilter('type', option.value)}
+                            >
+                                <span className="pill-icon">{option.icon}</span>
+                                <span className="pill-label">{option.label}</span>
+                                {option.value && (
+                                    <span
+                                        className={`pin-toggle ${isPinned ? 'active' : ''}`}
+                                        role="button"
+                                        aria-label={isPinned ? 'Unpin category' : 'Pin category'}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            togglePin(option.value as ContentType);
+                                        }}
+                                    >
+                                        {isPinned ? '★' : '☆'}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
 

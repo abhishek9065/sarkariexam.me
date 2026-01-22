@@ -9,6 +9,7 @@ import { StaticPage } from './pages/StaticPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { BookmarksPage } from './pages/BookmarksPage';
 import { SubscriptionActionPage } from './pages/SubscriptionActionPage';
+import { OnboardingModal } from './components/modals/OnboardingModal';
 import './styles.css';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
         <BrowserRouter>
             <AuthProvider>
                 <ThemeProvider>
+                    <OnboardingModal />
                     <Routes>
                         {/* Home Page */}
                         <Route path="/" element={<HomePage />} />

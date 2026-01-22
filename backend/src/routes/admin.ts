@@ -94,6 +94,47 @@ const bulkUpdateSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
     data: adminAnnouncementPartialSchema,
 });
+
+const bulkReviewSchema = z.object({
+    ids: z.array(z.string().min(1)).min(1),
+    note: z.string().max(500).optional().or(z.literal('')),
+});
+
+const auditQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    userId: z.string().trim().optional(),
+    action: z.string().trim().optional(),
+    start: z.string().trim().optional(),
+    end: z.string().trim().optional(),
+});
+
+const adminExportQuerySchema = z.object({
+    status: statusSchema.or(z.literal('all')).optional(),
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
+    includeInactive: z.coerce.boolean().optional(),
+});
+
+const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Date | undefined => {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) {
+        return undefined;
+    }
+
+    if (isDateOnly) {
+        if (boundary === 'start') {
+            parsed.setHours(0, 0, 0, 0);
+        } else {
+            parsed.setHours(23, 59, 59, 999);
+        }
+    }
+
+    return parsed;
+};
 // All admin dashboard routes require admin authentication
 router.use(authenticateToken, requireAdmin);
 
@@ -252,8 +293,30 @@ router.get('/security/logs', async (req, res) => {
  */
 router.get('/audit-log', async (req, res) => {
     try {
-        const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
-        const logs = await getAdminAuditLogs(limit);
+        const parseResult = auditQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const { limit, userId, action, start, end } = parseResult.data;
+        const startDate = parseDateParam(start, 'start');
+        const endDate = parseDateParam(end, 'end');
+
+        if (start && !startDate) {
+            return res.status(400).json({ error: 'Invalid start date' });
+        }
+
+        if (end && !endDate) {
+            return res.status(400).json({ error: 'Invalid end date' });
+        }
+
+        const logs = await getAdminAuditLogs({
+            limit,
+            userId: userId || undefined,
+            action: action || undefined,
+            start: startDate,
+            end: endDate,
+        });
         return res.json({ data: logs });
     } catch (error) {
         console.error('Audit log error:', error);
@@ -286,6 +349,73 @@ router.get('/announcements', async (req, res) => {
     } catch (error) {
         console.error('Admin announcements error:', error);
         return res.status(500).json({ error: 'Failed to load announcements' });
+    }
+});
+
+/**
+ * GET /api/admin/announcements/export/csv
+ * Export announcements (admin view) as CSV
+ */
+router.get('/announcements/export/csv', async (req, res) => {
+    try {
+        const parseResult = adminExportQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const filters = parseResult.data;
+        const announcements = await AnnouncementModelMongo.findAllAdmin({
+            limit: 2000,
+            includeInactive: filters.includeInactive ?? true,
+            status: filters.status && filters.status !== 'all' ? filters.status : undefined,
+            type: filters.type,
+        });
+
+        const headers = [
+            'ID',
+            'Title',
+            'Type',
+            'Category',
+            'Organization',
+            'Location',
+            'Deadline',
+            'Status',
+            'PublishAt',
+            'ApprovedAt',
+            'ApprovedBy',
+            'Views',
+            'Active',
+            'UpdatedAt',
+            'ExternalLink',
+        ];
+
+        const rows = announcements.map(item => [
+            item.id,
+            `"${(item.title || '').replace(/"/g, '""')}"`,
+            item.type,
+            `"${(item.category || '').replace(/"/g, '""')}"`,
+            `"${(item.organization || '').replace(/"/g, '""')}"`,
+            `"${(item.location || '').replace(/"/g, '""')}"`,
+            item.deadline || '',
+            item.status || '',
+            item.publishAt || '',
+            item.approvedAt || '',
+            item.approvedBy || '',
+            item.viewCount ?? 0,
+            item.isActive ? 'true' : 'false',
+            item.updatedAt || '',
+            item.externalLink || ''
+        ].join(','));
+
+        const csv = [headers.join(','), ...rows].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="admin-announcements-${new Date().toISOString().split('T')[0]}.csv"`);
+
+        return res.send(csv);
+    } catch (error) {
+        console.error('Admin announcements export error:', error);
+        return res.status(500).json({ error: 'Failed to export announcements' });
     }
 });
 
@@ -343,6 +473,78 @@ router.post('/announcements/bulk', async (req, res) => {
     } catch (error) {
         console.error('Bulk update error:', error);
         return res.status(500).json({ error: 'Failed to update announcements' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/bulk-approve
+ * Bulk approve announcements
+ */
+router.post('/announcements/bulk-approve', async (req, res) => {
+    try {
+        const parseResult = bulkReviewSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const { ids, note } = parseResult.data;
+        const now = new Date().toISOString();
+        const data = {
+            status: 'published' as const,
+            publishAt: now,
+            approvedAt: now,
+            approvedBy: req.user?.userId,
+            note: note?.trim() || undefined,
+        };
+
+        const updates = ids.map(id => ({ id, data }));
+        const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
+        recordAdminAudit({
+            action: 'bulk_approve',
+            userId: req.user?.userId,
+            note: note?.trim() || undefined,
+            metadata: { count: ids.length },
+        }).catch(console.error);
+
+        return res.json({ data: result });
+    } catch (error) {
+        console.error('Bulk approve error:', error);
+        return res.status(500).json({ error: 'Failed to bulk approve announcements' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/bulk-reject
+ * Bulk reject announcements
+ */
+router.post('/announcements/bulk-reject', async (req, res) => {
+    try {
+        const parseResult = bulkReviewSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const { ids, note } = parseResult.data;
+        const data = {
+            status: 'draft' as const,
+            approvedAt: '',
+            approvedBy: '',
+            note: note?.trim() || undefined,
+        };
+
+        const updates = ids.map(id => ({ id, data }));
+        const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
+        recordAdminAudit({
+            action: 'bulk_reject',
+            userId: req.user?.userId,
+            note: note?.trim() || undefined,
+            metadata: { count: ids.length },
+        }).catch(console.error);
+
+        return res.json({ data: result });
+    } catch (error) {
+        console.error('Bulk reject error:', error);
+        return res.status(500).json({ error: 'Failed to bulk reject announcements' });
     }
 });
 

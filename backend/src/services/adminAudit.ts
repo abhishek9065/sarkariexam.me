@@ -41,9 +41,37 @@ export async function recordAdminAudit(entry: {
     }
 }
 
-export async function getAdminAuditLogs(limit: number = 50): Promise<AdminAuditLog[]> {
+export async function getAdminAuditLogs(input: number | {
+    limit?: number;
+    userId?: string;
+    action?: string;
+    start?: Date;
+    end?: Date;
+} = 50): Promise<AdminAuditLog[]> {
+    const options = typeof input === 'number' ? { limit: input } : input;
+    const query: Record<string, any> = {};
+
+    if (options.userId) {
+        query.userId = options.userId;
+    }
+
+    if (options.action) {
+        query.action = options.action;
+    }
+
+    if (options.start || options.end) {
+        query.createdAt = {};
+        if (options.start) {
+            query.createdAt.$gte = options.start;
+        }
+        if (options.end) {
+            query.createdAt.$lte = options.end;
+        }
+    }
+
+    const limit = options.limit ?? 50;
     const docs = await collection()
-        .find({})
+        .find(query)
         .sort({ createdAt: -1 })
         .limit(limit)
         .toArray();

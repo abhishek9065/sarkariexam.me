@@ -110,4 +110,69 @@ router.get('/popular', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/analytics/export/csv
+ * Export analytics rollups as CSV
+ */
+router.get('/export/csv', async (req, res) => {
+    try {
+        const days = Math.min(60, Math.max(1, parseInt(req.query.days as string) || 30));
+        const rollupSummary = await getRollupSummary(days);
+        const dailyRollups = await getDailyRollups(days);
+        const totalAnnouncementCount = dailyRollups.reduce((sum, row) => sum + (row.count || 0), 0);
+
+        const headers = [
+            'Date',
+            'Announcements',
+            'Views',
+            'ListingViews',
+            'CardClicks',
+            'CategoryClicks',
+            'FilterApplies',
+            'Searches',
+            'BookmarkAdds',
+            'Registrations',
+        ];
+
+        const totalRow = [
+            'TOTAL',
+            totalAnnouncementCount,
+            rollupSummary.viewCount,
+            rollupSummary.listingViews,
+            rollupSummary.cardClicks,
+            rollupSummary.categoryClicks,
+            rollupSummary.filterApplies,
+            rollupSummary.searchCount,
+            rollupSummary.bookmarkAdds,
+            rollupSummary.registrations,
+        ];
+
+        const rows = dailyRollups.map(row => ([
+            row.date,
+            row.count,
+            row.views,
+            row.listingViews,
+            row.cardClicks,
+            row.categoryClicks,
+            row.filterApplies,
+            row.searches,
+            row.bookmarkAdds,
+            row.registrations,
+        ]));
+
+        const csv = [
+            headers.join(','),
+            totalRow.join(','),
+            ...rows.map(values => values.join(',')),
+        ].join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="analytics-rollups-${new Date().toISOString().split('T')[0]}.csv"`);
+        return res.send(csv);
+    } catch (error) {
+        console.error('Analytics export error:', error);
+        return res.status(500).json({ error: 'Failed to export analytics' });
+    }
+});
+
 export default router;

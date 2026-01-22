@@ -383,6 +383,11 @@ export class AnnouncementModelMongo {
     static async findListingCards(filters?: {
         type?: ContentType;
         category?: string;
+        search?: string;
+        organization?: string;
+        location?: string;
+        qualification?: string;
+        sort?: 'newest' | 'oldest' | 'deadline';
         limit?: number;
         cursor?: string;
     }): Promise<{
@@ -413,6 +418,24 @@ export class AnnouncementModelMongo {
                 query.category = { $regex: filters.category, $options: 'i' };
             }
 
+            if (filters?.organization) {
+                query.organization = { $regex: filters.organization, $options: 'i' };
+            }
+
+            if (filters?.location) {
+                query.location = { $regex: filters.location, $options: 'i' };
+            }
+
+            if (filters?.qualification) {
+                query.minQualification = { $regex: filters.qualification, $options: 'i' };
+            }
+
+            if (filters?.search && filters.search.trim()) {
+                const safeSearch = escapeRegex(filters.search.trim());
+                const searchRegex = new RegExp(safeSearch, 'i');
+                addSearchFilter(query, searchRegex);
+            }
+
             // Handle cursor for keyset pagination
             if (filters?.cursor && ObjectId.isValid(filters.cursor)) {
                 query._id = { $lt: new ObjectId(filters.cursor) };
@@ -433,10 +456,15 @@ export class AnnouncementModelMongo {
                 isActive: 1
             };
 
+            let sortDirection: 1 | -1 = -1;
+            if (filters?.sort === 'oldest') {
+                sortDirection = 1;
+            }
+
             const docs = await this.collection
                 .find(query)
                 .project(projection)
-                .sort({ _id: -1 })
+                .sort({ _id: sortDirection })
                 .limit(limit + 1)
                 .toArray();
 

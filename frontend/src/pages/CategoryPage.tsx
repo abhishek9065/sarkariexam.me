@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, SkeletonLoader, SearchBox } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { type TabType } from '../utils';
 import { fetchAnnouncementCardsPage } from '../utils/api';
@@ -23,11 +23,20 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const [data, setData] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [query, setQuery] = useState('');
+    const [filters, setFilters] = useState<FilterState>({
+        keyword: '',
+        type,
+        location: '',
+        qualification: '',
+        minAge: '',
+        maxAge: '',
+        sortBy: 'latest',
+    });
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
+    const [saveSearchMessage, setSaveSearchMessage] = useState('');
     const navigate = useNavigate();
-    const { user, logout, isAuthenticated } = useAuth();
+    const { user, logout, isAuthenticated, token } = useAuth();
     const [, setShowAuthModal] = useState(false);
 
     useEffect(() => {
@@ -37,7 +46,16 @@ export function CategoryPage({ type }: CategoryPageProps) {
         setCursor(null);
         setHasMore(false);
 
-        fetchAnnouncementCardsPage({ type, limit: 50 })
+        const apiSort = filters.sortBy === 'deadline' ? 'deadline' : 'newest';
+
+        fetchAnnouncementCardsPage({
+            type,
+            limit: 50,
+            search: filters.keyword || undefined,
+            location: filters.location || undefined,
+            qualification: filters.qualification || undefined,
+            sort: apiSort,
+        })
             .then(response => {
                 if (!isActive) return;
                 setData(response.data);
@@ -52,25 +70,64 @@ export function CategoryPage({ type }: CategoryPageProps) {
         return () => {
             isActive = false;
         };
+    }, [type, filters]);
+
+    useEffect(() => {
+        setFilters((prev) => ({ ...prev, type }));
     }, [type]);
+
+    useEffect(() => {
+        if (saveSearchMessage) {
+            setSaveSearchMessage('');
+        }
+    }, [filters]);
 
     const handleItemClick = (item: Announcement) => {
         navigate(`/${item.type}/${item.slug}`);
     };
 
-    const normalizedQuery = query.trim().toLowerCase();
-    const visibleData = normalizedQuery
-        ? data.filter(item =>
-            item.title.toLowerCase().includes(normalizedQuery) ||
-            (item.organization || '').toLowerCase().includes(normalizedQuery)
-        )
-        : data;
+    const handleFilterChange = (nextFilters: FilterState) => {
+        if (nextFilters.type && nextFilters.type !== type) {
+            const paths: Record<ContentType, string> = {
+                'job': '/jobs',
+                'result': '/results',
+                'admit-card': '/admit-card',
+                'answer-key': '/answer-key',
+                'admission': '/admission',
+                'syllabus': '/syllabus'
+            };
+            navigate(paths[nextFilters.type]);
+            return;
+        }
+        setFilters(nextFilters);
+    };
+
+    const visibleData = (() => {
+        const items = [...data];
+        switch (filters.sortBy) {
+            case 'posts':
+                return items.sort((a, b) => (b.totalPosts ?? 0) - (a.totalPosts ?? 0));
+            case 'title':
+                return items.sort((a, b) => a.title.localeCompare(b.title));
+            default:
+                return items;
+        }
+    })();
 
     const handleLoadMore = async () => {
         if (!hasMore || loadingMore) return;
         setLoadingMore(true);
         try {
-            const response = await fetchAnnouncementCardsPage({ type, limit: 50, cursor });
+            const apiSort = filters.sortBy === 'deadline' ? 'deadline' : 'newest';
+            const response = await fetchAnnouncementCardsPage({
+                type,
+                limit: 50,
+                cursor,
+                search: filters.keyword || undefined,
+                location: filters.location || undefined,
+                qualification: filters.qualification || undefined,
+                sort: apiSort,
+            });
             setData(prev => [...prev, ...response.data]);
             setCursor(response.nextCursor ?? null);
             setHasMore(response.hasMore);
@@ -78,6 +135,52 @@ export function CategoryPage({ type }: CategoryPageProps) {
             console.error(error);
         } finally {
             setLoadingMore(false);
+        }
+    };
+
+    const hasSaveCriteria = Boolean(filters.keyword || filters.location || filters.qualification);
+
+    const handleSaveSearch = async () => {
+        if (!token) return;
+        if (!hasSaveCriteria) {
+            setSaveSearchMessage('Add a keyword or filter before saving.');
+            return;
+        }
+
+        const nameParts = [];
+        if (filters.keyword) nameParts.push(filters.keyword);
+        nameParts.push(CATEGORY_TITLES[type]);
+        if (filters.location) nameParts.push(filters.location);
+        const name = nameParts.slice(0, 3).join(' • ');
+
+        const payload = {
+            name,
+            query: filters.keyword || '',
+            filters: {
+                type,
+                location: filters.location || undefined,
+                qualification: filters.qualification || undefined,
+            }
+        };
+
+        try {
+            setSaveSearchMessage('Saving...');
+            const res = await fetch(`${API_BASE}/api/profile/saved-searches`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) {
+                setSaveSearchMessage('Saved! You will see alerts in your profile.');
+            } else {
+                setSaveSearchMessage('Unable to save this search.');
+            }
+        } catch (error) {
+            console.error(error);
+            setSaveSearchMessage('Unable to save this search.');
         }
     };
 
@@ -115,12 +218,25 @@ export function CategoryPage({ type }: CategoryPageProps) {
                         <p className="category-subtitle">{visibleData.length} listings</p>
                     </div>
                     <div className="category-controls">
-                        <SearchBox
-                            value={query}
-                            onChange={setQuery}
-                            placeholder="Search by title or organization"
-                            resultCount={visibleData.length}
+                        <SearchFilters
+                            onFilterChange={handleFilterChange}
+                            showTypeFilter
+                            initialType={type}
+                            persistKey={`category-${type}`}
+                            includeAllTypes={false}
                         />
+                        {isAuthenticated && hasSaveCriteria && (
+                            <div className="save-search-prompt">
+                                <div>
+                                    <strong>Save this search</strong>
+                                    <p>Get alerts when matching posts arrive.</p>
+                                </div>
+                                <button className="btn btn-secondary" onClick={handleSaveSearch} disabled={!hasSaveCriteria}>
+                                    Save search
+                                </button>
+                                {saveSearchMessage && <span className="save-search-message">{saveSearchMessage}</span>}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -147,10 +263,10 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                     </div>
                                 ))
                             ) : (
-                                <p className="no-data">{normalizedQuery ? 'No items match your search.' : `No ${type}s available at the moment.`}</p>
+                                <p className="no-data">{hasSaveCriteria ? 'No items match your filters.' : `No ${type}s available at the moment.`}</p>
                             )}
                         </div>
-                        {hasMore && !normalizedQuery && (
+                        {hasMore && (
                             <div style={{ textAlign: 'center', marginTop: '16px' }}>
                                 <button className="btn btn-primary" onClick={handleLoadMore} disabled={loadingMore}>
                                     {loadingMore ? 'Loading...' : 'Load More'}
