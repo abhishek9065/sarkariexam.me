@@ -11,6 +11,7 @@ import {
   getClientIP
 } from '../middleware/security.js';
 import { blacklistToken } from '../middleware/auth.js';
+import { recordAnalyticsEvent } from '../services/analytics.js';
 
 const router = express.Router();
 
@@ -50,6 +51,11 @@ router.post('/register', async (req, res) => {
       config.jwtSecret,
       { expiresIn: JWT_EXPIRY }
     );
+
+    recordAnalyticsEvent({
+      type: 'auth_register',
+      userId: user.id,
+    }).catch(console.error);
 
     return res.status(201).json({
       data: {

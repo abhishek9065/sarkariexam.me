@@ -59,6 +59,7 @@ interface SavedSearch {
     frequency: NotificationFrequency;
     createdAt?: string;
     updatedAt?: string;
+    lastNotifiedAt?: string | null;
 }
 
 interface AlertsPayload {
@@ -127,11 +128,14 @@ export function ProfilePage() {
     const [savedSearchEditingId, setSavedSearchEditingId] = useState<string | null>(null);
     const [savedSearchError, setSavedSearchError] = useState<string | null>(null);
     const [savedSearchSaving, setSavedSearchSaving] = useState(false);
+    const [savedSearchesLoading, setSavedSearchesLoading] = useState(false);
     const [alertsLoading, setAlertsLoading] = useState(false);
     const [digestLoading, setDigestLoading] = useState(false);
     const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
     const [alerts, setAlerts] = useState<AlertsPayload | null>(null);
     const [digestPreview, setDigestPreview] = useState<DigestPreview | null>(null);
+    const [alertWindowDays, setAlertWindowDays] = useState(7);
+    const [alertLimit, setAlertLimit] = useState(6);
 
     const resetSavedSearchForm = () => {
         setSavedSearchForm({ ...DEFAULT_SAVED_SEARCH });
@@ -165,6 +169,7 @@ export function ProfilePage() {
 
     const fetchSavedSearches = async () => {
         if (!token) return;
+        setSavedSearchesLoading(true);
         try {
             const res = await fetch(`${API_BASE}/api/profile/saved-searches`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -175,14 +180,20 @@ export function ProfilePage() {
             }
         } catch (error) {
             console.error('Failed to fetch saved searches:', error);
+        } finally {
+            setSavedSearchesLoading(false);
         }
     };
 
-    const fetchAlerts = async () => {
+    const fetchAlerts = async (windowDays = alertWindowDays, limit = alertLimit) => {
         if (!token) return;
         setAlertsLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api/profile/alerts`, {
+            const params = new URLSearchParams({
+                windowDays: String(windowDays),
+                limit: String(limit),
+            });
+            const res = await fetch(`${API_BASE}/api/profile/alerts?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
@@ -196,11 +207,15 @@ export function ProfilePage() {
         }
     };
 
-    const fetchDigestPreview = async () => {
+    const fetchDigestPreview = async (windowDays = alertWindowDays, limit = alertLimit) => {
         if (!token) return;
         setDigestLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api/profile/digest-preview`, {
+            const params = new URLSearchParams({
+                windowDays: String(windowDays),
+                limit: String(limit),
+            });
+            const res = await fetch(`${API_BASE}/api/profile/digest-preview?${params.toString()}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
@@ -256,6 +271,26 @@ export function ProfilePage() {
 
         fetchData();
     }, [isAuthenticated, token, navigate]);
+
+    useEffect(() => {
+        if (!token) return;
+        fetchSavedSearches();
+    }, [token]);
+
+    useEffect(() => {
+        if (!token) return;
+        if (activeSection === 'saved') {
+            fetchSavedSearches();
+        }
+    }, [activeSection, token]);
+
+    useEffect(() => {
+        if (!token) return;
+        if (activeSection === 'alerts') {
+            fetchAlerts(alertWindowDays, alertLimit);
+            fetchDigestPreview(alertWindowDays, alertLimit);
+        }
+    }, [activeSection, token]);
 
     // Update profile
     const saveProfile = async (updates: Partial<UserProfile>) => {
@@ -757,7 +792,9 @@ export function ProfilePage() {
                             </form>
 
                             <div className="saved-search-list">
-                                {savedSearches.length === 0 ? (
+                                {savedSearchesLoading ? (
+                                    <div className="admin-loading">Loading saved searches...</div>
+                                ) : savedSearches.length === 0 ? (
                                     <div className="empty-state">No saved searches yet.</div>
                                 ) : (
                                     savedSearches.map((search) => (
@@ -766,6 +803,11 @@ export function ProfilePage() {
                                                 <div>
                                                     <h3>{search.name}</h3>
                                                     <p className="saved-search-query">{search.query || 'No keyword filter'}</p>
+                                                    <div className="saved-search-meta">
+                                                        <span>Digest: {search.frequency}</span>
+                                                        <span>Updated: {formatDate(search.updatedAt)}</span>
+                                                        {search.lastNotifiedAt && <span>Last alert: {formatDateTime(search.lastNotifiedAt)}</span>}
+                                                    </div>
                                                 </div>
                                                 <div className="saved-search-actions">
                                                     <button className="admin-btn secondary small" onClick={() => handleSavedSearchEdit(search)}>Edit</button>
@@ -803,7 +845,45 @@ export function ProfilePage() {
                                     <h2>Alerts and digest</h2>
                                     <p className="section-hint">Latest matches from saved searches and preferences.</p>
                                 </div>
-                                <button className="admin-btn secondary" onClick={() => { fetchAlerts(); fetchDigestPreview(); }}>Refresh</button>
+                                <button
+                                    className="admin-btn secondary"
+                                    onClick={() => { fetchAlerts(alertWindowDays, alertLimit); fetchDigestPreview(alertWindowDays, alertLimit); }}
+                                >
+                                    Refresh
+                                </button>
+                            </div>
+
+                            <div className="alert-controls">
+                                <div className="alert-control">
+                                    <label>Window</label>
+                                    <select
+                                        value={alertWindowDays}
+                                        onChange={(e) => setAlertWindowDays(parseInt(e.target.value, 10))}
+                                    >
+                                        <option value={3}>Last 3 days</option>
+                                        <option value={7}>Last 7 days</option>
+                                        <option value={14}>Last 14 days</option>
+                                        <option value={30}>Last 30 days</option>
+                                    </select>
+                                </div>
+                                <div className="alert-control">
+                                    <label>Max items</label>
+                                    <select
+                                        value={alertLimit}
+                                        onChange={(e) => setAlertLimit(parseInt(e.target.value, 10))}
+                                    >
+                                        <option value={4}>4 items</option>
+                                        <option value={6}>6 items</option>
+                                        <option value={8}>8 items</option>
+                                        <option value={12}>12 items</option>
+                                    </select>
+                                </div>
+                                <button
+                                    className="admin-btn primary"
+                                    onClick={() => { fetchAlerts(alertWindowDays, alertLimit); fetchDigestPreview(alertWindowDays, alertLimit); }}
+                                >
+                                    Apply
+                                </button>
                             </div>
 
                             {alertsLoading ? (

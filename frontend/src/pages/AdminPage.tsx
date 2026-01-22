@@ -501,6 +501,21 @@ export function AdminPage() {
         return counts;
     }, [announcements]);
 
+    const statusCounts = useMemo(() => {
+        const counts: Record<AnnouncementStatus, number> = {
+            draft: 0,
+            pending: 0,
+            scheduled: 0,
+            published: 0,
+            archived: 0,
+        };
+        for (const item of announcements) {
+            const status = item.status ?? 'published';
+            counts[status] = (counts[status] ?? 0) + 1;
+        }
+        return counts;
+    }, [announcements]);
+
     const filteredAnnouncements = useMemo(() => {
         const query = listQuery.trim().toLowerCase();
         const filtered = announcements.filter((item) => {
@@ -881,6 +896,26 @@ export function AdminPage() {
                             ))}
                         </div>
 
+                        <div className="admin-status-filters">
+                            <button
+                                className={`filter-chip ${listStatusFilter === 'all' ? 'active' : ''}`}
+                                onClick={() => setListStatusFilter('all')}
+                            >
+                                All statuses
+                                <span className="chip-count">{announcements.length}</span>
+                            </button>
+                            {STATUS_OPTIONS.map((option) => (
+                                <button
+                                    key={option.value}
+                                    className={`filter-chip ${listStatusFilter === option.value ? 'active' : ''}`}
+                                    onClick={() => setListStatusFilter(option.value)}
+                                >
+                                    {option.label}
+                                    <span className="chip-count">{statusCounts[option.value] ?? 0}</span>
+                                </button>
+                            ))}
+                        </div>
+
                         {selectedIds.size > 0 && (
                             <div className="admin-bulk-panel">
                                 <div>
@@ -961,7 +996,7 @@ export function AdminPage() {
                                             const availability = getAvailabilityStatus(item);
                                             const workflow = getWorkflowStatus(item);
                                             const statusValue = item.status ?? 'published';
-                                            const canApprove = statusValue !== 'published';
+                                            const canApprove = statusValue === 'pending' || statusValue === 'scheduled';
                                             const canReject = statusValue === 'pending' || statusValue === 'scheduled';
                                             return (
                                                 <tr key={item.id}>

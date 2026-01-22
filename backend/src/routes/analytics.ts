@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { getRollupSummary } from '../services/analytics.js';
+import { getCollection } from '../services/cosmosdb.js';
+
+interface SubscriptionDoc {
+    isActive: boolean;
+    verified: boolean;
+}
 
 const router = Router();
 
@@ -14,6 +21,23 @@ router.use(authenticateToken, requireAdmin);
 router.get('/overview', async (_req, res) => {
     try {
         const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
+        const rollupSummary = await getRollupSummary(30);
+
+        let totalEmailSubscribers = 0;
+        let totalPushSubscribers = 0;
+        try {
+            const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
+            totalEmailSubscribers = await subscriptions.countDocuments({ isActive: true, verified: true });
+        } catch (error) {
+            console.error('[Analytics] Failed to load subscription count:', error);
+        }
+
+        try {
+            const pushSubs = getCollection('push_subscriptions');
+            totalPushSubscribers = await pushSubs.countDocuments({});
+        } catch (error) {
+            console.error('[Analytics] Failed to load push subscription count:', error);
+        }
 
         // Calculate stats
         const total = announcements.length;
@@ -36,8 +60,14 @@ router.get('/overview', async (_req, res) => {
             data: {
                 totalAnnouncements: total,
                 totalViews,
-                totalEmailSubscribers: 0, // Not tracked yet
-                totalPushSubscribers: 0, // Not tracked yet
+                totalEmailSubscribers,
+                totalPushSubscribers,
+                totalSearches: rollupSummary.searchCount,
+                totalBookmarks: rollupSummary.bookmarkAdds,
+                totalRegistrations: rollupSummary.registrations,
+                totalSubscriptionsVerified: rollupSummary.subscriptionsVerified,
+                totalSubscriptionsUnsubscribed: rollupSummary.subscriptionsUnsubscribed,
+                engagementWindowDays: rollupSummary.days,
                 typeBreakdown,
                 categoryBreakdown,
                 lastUpdated: new Date().toISOString()

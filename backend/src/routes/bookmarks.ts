@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { recordAnalyticsEvent } from '../services/analytics.js';
 
 const router = Router();
 
@@ -70,6 +71,12 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
             return res.status(500).json({ error: 'Failed to save bookmark' });
         }
 
+        recordAnalyticsEvent({
+            type: 'bookmark_add',
+            announcementId,
+            userId: req.user!.userId,
+        }).catch(console.error);
+
         return res.status(201).json({ message: 'Bookmark saved' });
     } catch (error) {
         console.error('Error saving bookmark:', error);
@@ -92,6 +99,12 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
         if (!removed) {
             return res.status(404).json({ error: 'Bookmark not found' });
         }
+
+        recordAnalyticsEvent({
+            type: 'bookmark_remove',
+            announcementId,
+            userId: req.user!.userId,
+        }).catch(console.error);
 
         return res.json({ message: 'Bookmark removed' });
     } catch (error) {

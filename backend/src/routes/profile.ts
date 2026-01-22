@@ -5,6 +5,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { ContentType } from '../types.js';
+import { recordAnalyticsEvent } from '../services/analytics.js';
 
 interface UserProfileDoc {
     userId: string;
@@ -390,6 +391,15 @@ router.post('/saved-searches', authenticateToken, async (req, res) => {
         };
 
         const result = await savedSearchesCollection().insertOne(doc as any);
+        recordAnalyticsEvent({
+            type: 'saved_search_create',
+            userId: req.user!.userId,
+            metadata: {
+                hasQuery: Boolean(doc.query),
+                hasFilters: Boolean(doc.filters),
+                frequency: doc.frequency,
+            },
+        }).catch(console.error);
         return res.status(201).json({ data: formatSavedSearch({ ...doc, _id: result.insertedId }) });
     } catch (error) {
         console.error('Saved search create error:', error);
@@ -489,6 +499,14 @@ router.get('/alerts', authenticateToken, async (req, res) => {
         const profile = await getOrCreateProfile(req.user!.userId);
         const preferences = await getPreferenceAlerts(profile, sinceMs, limit);
 
+        recordAnalyticsEvent({
+            type: 'alerts_view',
+            userId: req.user!.userId,
+            metadata: {
+                windowDays,
+            },
+        }).catch(console.error);
+
         return res.json({
             data: {
                 windowDays,
@@ -543,6 +561,14 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
         const preview = Array.from(unique.values())
             .sort((a, b) => getAnnouncementTimestamp(b) - getAnnouncementTimestamp(a))
             .slice(0, limit);
+
+        recordAnalyticsEvent({
+            type: 'digest_preview',
+            userId: req.user!.userId,
+            metadata: {
+                windowDays,
+            },
+        }).catch(console.error);
 
         return res.json({
             data: {

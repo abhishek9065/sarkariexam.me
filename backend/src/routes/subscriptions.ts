@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { getCollection } from '../services/cosmosdb.js';
 import { isEmailConfigured, sendVerificationEmail } from '../services/email.js';
+import { recordAnalyticsEvent } from '../services/analytics.js';
 
 interface SubscriptionDoc {
     email: string;
@@ -71,6 +72,13 @@ router.post('/', async (req, res) => {
                 await sendVerificationEmail(email, verificationToken, categories);
             }
 
+            if (verified) {
+                recordAnalyticsEvent({
+                    type: 'subscription_verify',
+                    metadata: { source: 'inline' },
+                }).catch(console.error);
+            }
+
             return res.json({
                 data: { verified },
                 message: verified
@@ -112,6 +120,13 @@ router.post('/', async (req, res) => {
             await sendVerificationEmail(email, verificationToken, categories);
         }
 
+        if (verified && !existing.verified) {
+            recordAnalyticsEvent({
+                type: 'subscription_verify',
+                metadata: { source: 'inline' },
+            }).catch(console.error);
+        }
+
         return res.json({
             data: { verified },
             message: verified
@@ -146,6 +161,11 @@ router.get('/verify', async (req, res) => {
             return res.status(404).json({ error: 'Invalid or expired token' });
         }
 
+        recordAnalyticsEvent({
+            type: 'subscription_verify',
+            metadata: { source: 'token' },
+        }).catch(console.error);
+
         return res.json({ message: 'Email verified successfully' });
     } catch (error) {
         console.error('Verify subscription error:', error);
@@ -174,6 +194,11 @@ router.get('/unsubscribe', async (req, res) => {
         if (!doc) {
             return res.status(404).json({ error: 'Invalid token' });
         }
+
+        recordAnalyticsEvent({
+            type: 'subscription_unsubscribe',
+            metadata: { source: 'token' },
+        }).catch(console.error);
 
         return res.json({ message: 'Unsubscribed successfully' });
     } catch (error) {

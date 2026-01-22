@@ -8,7 +8,7 @@ import { bumpCacheVersion } from '../services/cacheVersion.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
 import { sendAnnouncementNotification } from '../services/telegram.js';
-import { recordAnnouncementView } from '../services/analytics.js';
+import { recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
 
 const router = express.Router();
 
@@ -221,6 +221,14 @@ router.get(
         limit: filters.limit,
         offset: filters.offset,
       });
+
+      recordAnalyticsEvent({
+        type: 'search',
+        metadata: {
+          queryLength: filters.q.length,
+          type: filters.type ?? null,
+        },
+      }).catch(console.error);
 
       return res.json({ data: announcements, count: announcements.length });
     } catch (error) {

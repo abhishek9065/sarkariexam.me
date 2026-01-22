@@ -8,6 +8,12 @@ interface AnalyticsData {
     totalViews: number;
     totalEmailSubscribers: number;
     totalPushSubscribers: number;
+    totalSearches: number;
+    totalBookmarks: number;
+    totalRegistrations: number;
+    totalSubscriptionsVerified: number;
+    totalSubscriptionsUnsubscribed: number;
+    engagementWindowDays?: number;
     typeBreakdown: { type: string; count: number }[];
     categoryBreakdown: { category: string; count: number }[];
 }
@@ -97,6 +103,11 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         totalViews: 0,
                         totalEmailSubscribers: 0,
                         totalPushSubscribers: 0,
+                        totalSearches: 0,
+                        totalBookmarks: 0,
+                        totalRegistrations: 0,
+                        totalSubscriptionsVerified: 0,
+                        totalSubscriptionsUnsubscribed: 0,
                         typeBreakdown: [],
                         categoryBreakdown: []
                     });
@@ -123,6 +134,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     }
 
     if (!analytics) return null;
+    const engagementWindow = analytics.engagementWindowDays ?? 30;
 
     return (
         <div className="analytics-dashboard">
@@ -154,6 +166,31 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalPushSubscribers ?? 0}</div>
                         <div className="stat-label">Push Subscribers</div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <h3>Engagement (last {engagementWindow} days)</h3>
+                    <p className="analytics-subtitle">Searches, bookmarks, and signups from tracked events.</p>
+                </div>
+                <div className="engagement-grid">
+                    <div className="engagement-card">
+                        <div className="engagement-label">Searches</div>
+                        <div className="engagement-value">{(analytics.totalSearches ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Bookmarks</div>
+                        <div className="engagement-value">{(analytics.totalBookmarks ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Registrations</div>
+                        <div className="engagement-value">{(analytics.totalRegistrations ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Unsubscribes</div>
+                        <div className="engagement-value">{(analytics.totalSubscriptionsUnsubscribed ?? 0).toLocaleString()}</div>
                     </div>
                 </div>
             </div>
