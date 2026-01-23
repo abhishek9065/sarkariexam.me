@@ -108,6 +108,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [showZeroTrend, setShowZeroTrend] = useState(false);
     const typeBreakdown = analytics?.typeBreakdown ?? [];
     const categoryBreakdown = analytics?.categoryBreakdown ?? [];
 
@@ -120,6 +121,18 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             .sort((a, b) => b.count - a.count)
             .slice(0, 12);
     }, [categoryBreakdown]);
+
+    const rollups = analytics?.dailyRollups ?? [];
+    const { trendRows, zeroTrendCount } = useMemo(() => {
+        const nonZero = rollups.filter((item) => (item.views ?? 0) > 0 || (item.searches ?? 0) > 0);
+        const zeroCount = Math.max(0, rollups.length - nonZero.length);
+        return {
+            trendRows: showZeroTrend ? rollups : nonZero,
+            zeroTrendCount: zeroCount,
+        };
+    }, [rollups, showZeroTrend]);
+    const maxViews = Math.max(1, ...trendRows.map((item) => item.views ?? 0));
+    const maxSearches = Math.max(1, ...trendRows.map((item) => item.searches ?? 0));
 
     useEffect(() => {
         const fetchAnalytics = async () => {
@@ -222,9 +235,6 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
     if (!analytics) return null;
     const engagementWindow = analytics.engagementWindowDays ?? 30;
-    const rollups = analytics.dailyRollups ?? [];
-    const maxViews = Math.max(1, ...rollups.map((item) => item.views ?? 0));
-    const maxSearches = Math.max(1, ...rollups.map((item) => item.searches ?? 0));
     const ctr = analytics.totalListingViews > 0
         ? Math.round((analytics.totalCardClicks / analytics.totalListingViews) * 100)
         : 0;
@@ -237,6 +247,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const funnelHasDirectTraffic = Boolean(
         (funnel?.cardClicks ?? 0) > 0 && (funnel?.detailViews ?? 0) > (funnel?.cardClicks ?? 0)
     );
+    const detailViewsLabel = funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views';
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
@@ -245,7 +256,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             rate: funnel?.listingViews ? Math.round((funnel.cardClicks / funnel.listingViews) * 100) : 0
         },
         {
-            label: 'Detail views',
+            label: detailViewsLabel,
             value: funnel?.detailViews ?? 0,
             rate: funnel?.cardClicks ? Math.round((funnel.detailViews / funnel.cardClicks) * 100) : 0
         },
@@ -366,6 +377,11 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     </div>
                 </div>
                 <p className="engagement-hint">CTR uses card clicks divided by listing views. If listing views are zero, make sure listing view events are tracked.</p>
+                <p className="analytics-hint">
+                    {analytics.rollupLastUpdatedAt
+                        ? 'Zero values mean no tracked activity yet.'
+                        : 'Tracking not configured. Configure rollups to populate engagement metrics.'}
+                </p>
             </div>
 
             <div className="analytics-section">
@@ -410,18 +426,18 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         <thead>
                             <tr>
                                 <th>Type</th>
-                                <th>Listing views</th>
-                                <th>Card clicks</th>
-                                <th>CTR</th>
+                                <th className="numeric">Listing views</th>
+                                <th className="numeric">Card clicks</th>
+                                <th className="numeric">CTR</th>
                             </tr>
                         </thead>
                         <tbody>
                             {ctrByType.map((item) => (
                                 <tr key={item.type}>
                                     <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                    <td>{item.listingViews.toLocaleString()}</td>
-                                    <td>{item.cardClicks.toLocaleString()}</td>
-                                    <td>{item.ctr}%</td>
+                                    <td className="numeric">{item.listingViews.toLocaleString()}</td>
+                                    <td className="numeric">{item.cardClicks.toLocaleString()}</td>
+                                    <td className="numeric">{item.ctr}%</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -563,14 +579,28 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
             <div className="analytics-section">
                 <div className="analytics-section-header">
-                    <h3>Trend lines</h3>
-                    <p className="analytics-subtitle">Views vs searches (daily).</p>
+                    <div>
+                        <h3>Trend lines</h3>
+                        <p className="analytics-subtitle">Views vs searches (daily).</p>
+                    </div>
+                    {zeroTrendCount > 0 && (
+                        <button
+                            className="admin-btn secondary small"
+                            onClick={() => setShowZeroTrend((prev) => !prev)}
+                        >
+                            {showZeroTrend ? `Hide ${zeroTrendCount} zero days` : `Show ${zeroTrendCount} zero days`}
+                        </button>
+                    )}
                 </div>
-                {rollups.length === 0 ? (
-                    <div className="empty-state">No rollup data yet.</div>
+                {trendRows.length === 0 ? (
+                    <div className="empty-state">
+                        {rollups.length === 0
+                            ? 'No rollup data yet.'
+                            : 'All days are zero-activity. Toggle to show them.'}
+                    </div>
                 ) : (
                     <div className="trend-list">
-                        {rollups.map((item) => (
+                        {trendRows.map((item) => (
                             <div key={item.date} className="trend-row">
                                 <div className="trend-date">{item.date}</div>
                                 <div className="trend-bars">
@@ -645,7 +675,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <th>#</th>
                             <th>Title</th>
                             <th>Type</th>
-                            <th>Views</th>
+                            <th className="numeric">Views</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -654,7 +684,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                                 <td>{index + 1}</td>
                                 <td>{item.title.substring(0, 50)}{item.title.length > 50 ? '...' : ''}</td>
                                 <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                <td className="view-count">{(item.viewCount ?? 0).toLocaleString()}</td>
+                                <td className="view-count numeric">{(item.viewCount ?? 0).toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>

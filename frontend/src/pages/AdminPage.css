@@ -14,6 +14,16 @@
   margin-bottom: var(--space-4);
 }
 
+.admin-banner {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  margin-bottom: var(--space-4);
+}
+
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -218,6 +228,12 @@
   color: var(--text-primary);
 }
 
+.admin-filter-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+}
+
 .filter-actions {
   display: flex;
   gap: var(--space-2);
@@ -273,6 +289,8 @@
 .admin-list-meta {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -280,7 +298,7 @@
 .admin-table-wrapper {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-card);
 }
 
@@ -295,6 +313,19 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.admin-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-table tr.selected {
+  background: var(--bg-card-hover);
+}
+
+.cell-muted {
+  color: var(--text-muted);
 }
 
 .title-cell {
@@ -568,6 +599,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  align-items: center;
 }
 
 .review-note-input {
@@ -578,6 +610,51 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font-size: 12px;
+}
+
+.review-note-input.compact {
+  min-width: unset;
+  width: 100%;
+}
+
+.action-menu {
+  position: relative;
+}
+
+.action-menu summary {
+  list-style: none;
+}
+
+.action-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-menu[open] summary {
+  background: var(--bg-card-hover);
+}
+
+.action-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
+  min-width: 180px;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: 6px;
+}
+
+.action-menu-panel .admin-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.action-menu-panel .review-note-input {
+  width: 100%;
 }
 
 .admin-btn.small {

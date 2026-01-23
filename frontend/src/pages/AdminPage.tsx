@@ -1207,6 +1207,23 @@ export function AdminPage() {
         return filteredAnnouncements.slice(start, start + pageSize);
     }, [filteredAnnouncements, listPage, pageSize]);
 
+    const listFilterSummary = useMemo(() => {
+        const parts: string[] = [];
+        const trimmedQuery = listQuery.trim();
+        if (trimmedQuery) {
+            parts.push(`Search: "${trimmedQuery}"`);
+        }
+        if (listTypeFilter !== 'all') {
+            const typeLabel = CONTENT_TYPES.find((type) => type.value === listTypeFilter)?.label ?? listTypeFilter;
+            parts.push(`Type: ${typeLabel}`);
+        }
+        if (listStatusFilter !== 'all') {
+            const statusLabel = STATUS_OPTIONS.find((option) => option.value === listStatusFilter)?.label ?? listStatusFilter;
+            parts.push(`Status: ${statusLabel}`);
+        }
+        return parts.join(' • ');
+    }, [listQuery, listStatusFilter, listTypeFilter]);
+
     const getAvailabilityStatus = (item: Announcement) => {
         if (item.deadline) {
             const deadlineTime = new Date(item.deadline).getTime();
@@ -1342,9 +1359,9 @@ export function AdminPage() {
     }
 
     const formatDate = (value?: string) => {
-        if (!value) return '-';
+        if (!value) return 'N/A';
         const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '-';
+        if (Number.isNaN(date.getTime())) return 'N/A';
         return date.toLocaleDateString('en-IN', {
             day: '2-digit',
             month: 'short',
@@ -1363,6 +1380,11 @@ export function AdminPage() {
             hour: '2-digit',
             minute: '2-digit',
         });
+    };
+
+    const renderDateCell = (value?: string) => {
+        const label = formatDate(value);
+        return label === 'N/A' ? <span className="cell-muted">{label}</span> : label;
     };
 
     function getDateKey(value?: string | Date) {
@@ -1401,15 +1423,15 @@ export function AdminPage() {
         return diffMs >= 0 ? `In ${label}` : `Overdue by ${label}`;
     };
 
-    const formatLastUpdated = (value?: string | null) => {
+    const formatLastUpdated = (value?: string | null, label = 'Updated') => {
         if (!value) return 'Not updated yet';
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return 'Not updated yet';
         const diffMs = Date.now() - date.getTime();
-        if (diffMs < 60 * 1000) return 'Updated just now';
-        if (diffMs < 60 * 60 * 1000) return `Updated ${Math.round(diffMs / 60000)}m ago`;
-        if (diffMs < 24 * 60 * 60 * 1000) return `Updated ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
-        return `Updated ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
+        if (diffMs < 60 * 1000) return `${label} just now`;
+        if (diffMs < 60 * 60 * 1000) return `${label} ${Math.round(diffMs / 60000)}m ago`;
+        if (diffMs < 24 * 60 * 60 * 1000) return `${label} ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
+        return `${label} ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
     };
 
     useEffect(() => {
@@ -1532,7 +1554,7 @@ export function AdminPage() {
                     }}>Logout</button>
                 </div>
 
-                {message && <p className="form-message">{message}</p>}
+                {message && <div className="admin-banner" role="status">{message}</div>}
 
                 <div className="admin-help-panel">
                     <div>
@@ -1546,7 +1568,7 @@ export function AdminPage() {
                         </ul>
                     </div>
                     <div className="admin-help-actions">
-                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Open content manager</button>
+                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Manage listings</button>
                         <button className="admin-btn secondary" onClick={() => setActiveAdminTab('queue')}>Schedule queue</button>
                         <button className="admin-btn secondary" onClick={() => setActiveAdminTab('audit')}>Audit log</button>
                     </div>
@@ -1652,7 +1674,7 @@ export function AdminPage() {
                                 <p className="admin-subtitle">Add, update, and organize listings across all categories.</p>
                             </div>
                             <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
+                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt, 'List refreshed')}</span>
                                 <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
                                     {listLoading ? 'Refreshing...' : 'Refresh'}
                                 </button>
@@ -1751,6 +1773,9 @@ export function AdminPage() {
                                 </button>
                             ))}
                         </div>
+                        {listFilterSummary && (
+                            <div className="admin-filter-summary">{listFilterSummary}</div>
+                        )}
 
                         {selectedIds.size > 0 && (
                             <div className="admin-bulk-panel">
@@ -1819,7 +1844,7 @@ export function AdminPage() {
 
                         <div className="admin-list-meta">
                             <span>Showing {pagedAnnouncements.length} of {filteredAnnouncements.length}</span>
-                            <span>Page {listPage} of {totalPages}</span>
+                            <span>{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select rows to enable bulk actions'}</span>
                         </div>
 
                         {listLoading ? (
@@ -1841,7 +1866,7 @@ export function AdminPage() {
                                             <th>Type</th>
                                             <th>Publish</th>
                                             <th>Deadline</th>
-                                            <th>Views</th>
+                                            <th className="numeric">Views</th>
                                             <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
@@ -1850,14 +1875,21 @@ export function AdminPage() {
                                         {pagedAnnouncements.map((item) => {
                                             const availability = getAvailabilityStatus(item);
                                             const workflow = getWorkflowStatus(item);
+                                            const primaryStatus = availability.label === 'Expired' ? availability : workflow;
+                                            const secondaryStatus = availability.label === 'Expired'
+                                                ? workflow
+                                                : availability.label === 'Active'
+                                                    ? null
+                                                    : availability;
                                             const statusValue = item.status ?? 'published';
                                             const canApprove = statusValue === 'pending' || statusValue === 'scheduled';
                                             const canReject = statusValue === 'pending' || statusValue === 'scheduled';
+                                            const canReview = canApprove || canReject;
                                             const reviewNote = reviewNotes[item.id] ?? '';
                                             const qaWarnings = getAnnouncementWarnings(item);
                                             const isRowMutating = mutatingIds.has(item.id);
                                             return (
-                                                <tr key={item.id}>
+                                                <tr key={item.id} className={selectedIds.has(item.id) ? 'selected' : undefined}>
                                                     <td>
                                                         <input
                                                             type="checkbox"
@@ -1867,9 +1899,9 @@ export function AdminPage() {
                                                     </td>
                                                     <td>
                                                         <div className="title-cell">
-                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-text" title={item.title}>{item.title}</div>
                                                             <div className="title-meta">
-                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
                                                                 <span className="meta-sep">|</span>
                                                                 <span>{item.category}</span>
                                                                 <span className="meta-sep">|</span>
@@ -1894,47 +1926,66 @@ export function AdminPage() {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td>{formatDate(item.deadline)}</td>
-                                                    <td>{(item.viewCount ?? 0).toLocaleString()}</td>
+                                                    <td>{renderDateCell(item.deadline)}</td>
+                                                    <td className="numeric">{(item.viewCount ?? 0).toLocaleString()}</td>
                                                     <td>
                                                         <div className="status-stack">
-                                                            <span className={`status-pill ${workflow.tone}`}>{workflow.label}</span>
-                                                            <span className={`status-sub ${availability.tone}`}>{availability.label}</span>
+                                                            <span className={`status-pill ${primaryStatus.tone}`} title={primaryStatus.label === 'Expired' ? 'Deadline has passed' : undefined}>
+                                                                {primaryStatus.label}
+                                                            </span>
+                                                            {secondaryStatus && (
+                                                                <span className={`status-sub ${secondaryStatus.tone}`}>{secondaryStatus.label}</span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td>
                                                         <div className="table-actions">
-                                                            {(canApprove || canReject) && (
-                                                                <input
-                                                                    className="review-note-input"
-                                                                    type="text"
-                                                                    value={reviewNote}
-                                                                    onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                                                    placeholder="Review note (optional)"
-                                                                    disabled={isRowMutating}
-                                                                />
-                                                            )}
                                                             <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
                                                             <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
-                                                            <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)} disabled={isRowMutating}>History</button>
-                                                            {qaWarnings.length > 0 && (
-                                                                <>
-                                                                    <button className="admin-btn info small" onClick={() => handleQaFix(item)} disabled={isRowMutating}>
-                                                                        Auto-fix
-                                                                    </button>
-                                                                    <button className="admin-btn warning small" onClick={() => handleQaFlag(item)} disabled={isRowMutating}>
-                                                                        Flag
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                            {canApprove && (
-                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
-                                                            )}
-                                                            {canReject && (
-                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
-                                                            )}
-                                                            <button className="admin-btn secondary small" onClick={() => handleDuplicate(item)} disabled={isRowMutating}>Duplicate</button>
-                                                            <button className="admin-btn danger small" onClick={() => handleDelete(item.id)} disabled={isRowMutating}>Delete</button>
+                                                            <details className="action-menu">
+                                                                <summary className="admin-btn secondary small" aria-label="More actions">More</summary>
+                                                                <div className="action-menu-panel">
+                                                                    {canReview && (
+                                                                        <input
+                                                                            className="review-note-input compact"
+                                                                            type="text"
+                                                                            value={reviewNote}
+                                                                            onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                            placeholder="Review note (optional)"
+                                                                            disabled={isRowMutating}
+                                                                        />
+                                                                    )}
+                                                                    <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)} disabled={isRowMutating}>History</button>
+                                                                    {qaWarnings.length > 0 && (
+                                                                        <>
+                                                                            <button
+                                                                                className="admin-btn secondary small"
+                                                                                onClick={() => handleQaFix(item)}
+                                                                                disabled={isRowMutating}
+                                                                                title="Apply automated QA fixes for this row"
+                                                                            >
+                                                                                Auto-fix
+                                                                            </button>
+                                                                            <button
+                                                                                className="admin-btn secondary small"
+                                                                                onClick={() => handleQaFlag(item)}
+                                                                                disabled={isRowMutating}
+                                                                                title="Flag this listing for QA review"
+                                                                            >
+                                                                                Flag
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    {canApprove && (
+                                                                        <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
+                                                                    )}
+                                                                    {canReject && (
+                                                                        <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
+                                                                    )}
+                                                                    <button className="admin-btn secondary small" onClick={() => handleDuplicate(item)} disabled={isRowMutating}>Duplicate</button>
+                                                                    <button className="admin-btn danger small" onClick={() => handleDelete(item.id)} disabled={isRowMutating}>Delete</button>
+                                                                </div>
+                                                            </details>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -2082,11 +2133,13 @@ export function AdminPage() {
                                                 <tr key={item.id}>
                                                     <td>
                                                         <div className="title-cell">
-                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-text" title={item.title}>{item.title}</div>
                                                             <div className="title-meta">
-                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
                                                                 <span className="meta-sep">|</span>
                                                                 <span>{item.category || 'Uncategorized'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>v{item.version ?? 1}</span>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -2114,10 +2167,20 @@ export function AdminPage() {
                                                             <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
                                                             {qaWarnings.length > 0 && (
                                                                 <>
-                                                                    <button className="admin-btn info small" onClick={() => handleQaFix(item)} disabled={isRowMutating}>
+                                                                    <button
+                                                                        className="admin-btn info small"
+                                                                        onClick={() => handleQaFix(item)}
+                                                                        disabled={isRowMutating}
+                                                                        title="Apply automated QA fixes for this row"
+                                                                    >
                                                                         Auto-fix
                                                                     </button>
-                                                                    <button className="admin-btn warning small" onClick={() => handleQaFlag(item)} disabled={isRowMutating}>
+                                                                    <button
+                                                                        className="admin-btn warning small"
+                                                                        onClick={() => handleQaFlag(item)}
+                                                                        disabled={isRowMutating}
+                                                                        title="Flag this listing for QA review"
+                                                                    >
                                                                         Flag
                                                                     </button>
                                                                 </>
@@ -2173,16 +2236,18 @@ export function AdminPage() {
                                                     </td>
                                                     <td>
                                                         <div className="title-cell">
-                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-text" title={item.title}>{item.title}</div>
                                                             <div className="title-meta">
-                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
                                                                 <span className="meta-sep">|</span>
                                                                 <span>{item.category || 'Uncategorized'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>v{item.version ?? 1}</span>
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                                    <td>{formatDate(item.deadline)}</td>
+                                                    <td>{renderDateCell(item.deadline)}</td>
                                                     <td>
                                                         {qaWarnings.length > 0 ? (
                                                             <span className="qa-warning" title={qaWarnings.join(' • ')}>
@@ -2320,9 +2385,9 @@ export function AdminPage() {
                                                     </td>
                                                     <td>
                                                         <div className="title-cell">
-                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-text" title={item.title}>{item.title}</div>
                                                             <div className="title-meta">
-                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
                                                                 <span className="meta-sep">|</span>
                                                                 <span>{item.category || 'Uncategorized'}</span>
                                                                 <span className="meta-sep">|</span>
@@ -2331,7 +2396,7 @@ export function AdminPage() {
                                                         </div>
                                                     </td>
                                                     <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                                    <td>{formatDate(item.deadline)}</td>
+                                                    <td>{renderDateCell(item.deadline)}</td>
                                                     <td>
                                                         {warnings.length === 0 ? (
                                                             <span className="status-sub success">Clear</span>
@@ -2452,7 +2517,7 @@ export function AdminPage() {
                                                             <div>
                                                                 <div className="schedule-title">{item.title}</div>
                                                                 <div className="schedule-meta">
-                                                                    {item.organization || 'Unknown'}
+                                                                    <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
                                                                     {warnings.length > 0 && (
                                                                         <span className="qa-warning" title={warnings.join(' • ')}>
                                                                             QA {warnings.length}
@@ -2496,9 +2561,9 @@ export function AdminPage() {
                                                 <tr key={item.id}>
                                                     <td>
                                                         <div className="title-cell">
-                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-text" title={item.title}>{item.title}</div>
                                                             <div className="title-meta">
-                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
                                                                 <span className="meta-sep">|</span>
                                                                 <span>v{item.version ?? 1}</span>
                                                                 {warnings.length > 0 && (

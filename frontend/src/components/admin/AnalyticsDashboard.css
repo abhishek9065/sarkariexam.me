@@ -219,6 +219,11 @@
   border-bottom: 1px solid var(--border-primary);
 }
 
+.analytics-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .analytics-table tbody tr:hover {
   background: var(--bg-card-hover);
 }
@@ -333,6 +338,7 @@
   font-size: 12px;
   color: var(--text-secondary);
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .funnel-grid {
