@@ -17,6 +17,8 @@ interface AnalyticsData {
     totalCardClicks: number;
     totalCategoryClicks: number;
     totalFilterApplies: number;
+    totalDigestClicks?: number;
+    totalDeepLinkClicks?: number;
     rollupLastUpdatedAt?: string | null;
     dailyRollups?: Array<{
         date: string;
@@ -33,6 +35,31 @@ interface AnalyticsData {
     engagementWindowDays?: number;
     typeBreakdown: { type: string; count: number }[];
     categoryBreakdown: { category: string; count: number }[];
+    funnel?: {
+        listingViews: number;
+        cardClicks: number;
+        detailViews: number;
+        bookmarkAdds: number;
+        subscriptionsVerified: number;
+    };
+    ctrByType?: Array<{
+        type: string;
+        listingViews: number;
+        cardClicks: number;
+        ctr: number;
+    }>;
+    digestClicks?: {
+        total: number;
+        variants: Array<{ variant: string; clicks: number }>;
+        frequencies: Array<{ frequency: string; clicks: number }>;
+        campaigns: Array<{ campaign: string; clicks: number }>;
+    };
+    deepLinkAttribution?: {
+        total: number;
+        sources: Array<{ source: string; clicks: number }>;
+        mediums: Array<{ medium: string; clicks: number }>;
+        campaigns: Array<{ campaign: string; clicks: number }>;
+    };
 }
 
 interface PopularAnnouncement {
@@ -130,8 +157,20 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         totalCardClicks: 0,
                         totalCategoryClicks: 0,
                         totalFilterApplies: 0,
+                        totalDigestClicks: 0,
+                        totalDeepLinkClicks: 0,
                         typeBreakdown: [],
-                        categoryBreakdown: []
+                        categoryBreakdown: [],
+                        funnel: {
+                            listingViews: 0,
+                            cardClicks: 0,
+                            detailViews: 0,
+                            bookmarkAdds: 0,
+                            subscriptionsVerified: 0,
+                        },
+                        ctrByType: [],
+                        digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
+                        deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
                     });
                     setPopular(popularData.data ?? []);
                 } else {
@@ -189,6 +228,33 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const ctr = analytics.totalListingViews > 0
         ? Math.round((analytics.totalCardClicks / analytics.totalListingViews) * 100)
         : 0;
+    const ctrByType = analytics.ctrByType ?? [];
+    const digestClicks = analytics.digestClicks;
+    const deepLinkAttribution = analytics.deepLinkAttribution;
+    const funnel = analytics.funnel;
+    const funnelSteps = [
+        { label: 'Listing views', value: funnel?.listingViews ?? 0 },
+        {
+            label: 'Card clicks',
+            value: funnel?.cardClicks ?? 0,
+            rate: funnel?.listingViews ? Math.round((funnel.cardClicks / funnel.listingViews) * 100) : 0
+        },
+        {
+            label: 'Detail views',
+            value: funnel?.detailViews ?? 0,
+            rate: funnel?.cardClicks ? Math.round((funnel.detailViews / funnel.cardClicks) * 100) : 0
+        },
+        {
+            label: 'Bookmarks',
+            value: funnel?.bookmarkAdds ?? 0,
+            rate: funnel?.detailViews ? Math.round((funnel.bookmarkAdds / funnel.detailViews) * 100) : 0
+        },
+        {
+            label: 'Subscriptions verified',
+            value: funnel?.subscriptionsVerified ?? 0,
+            rate: funnel?.bookmarkAdds ? Math.round((funnel.subscriptionsVerified / funnel.bookmarkAdds) * 100) : 0
+        },
+    ];
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Rollup not updated yet';
         const date = new Date(value);
@@ -285,8 +351,191 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         <div className="engagement-label">CTR</div>
                         <div className="engagement-value">{ctr}%</div>
                     </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Digest clicks</div>
+                        <div className="engagement-value">{(analytics.totalDigestClicks ?? 0).toLocaleString()}</div>
+                    </div>
+                    <div className="engagement-card">
+                        <div className="engagement-label">Deep link clicks</div>
+                        <div className="engagement-value">{(analytics.totalDeepLinkClicks ?? 0).toLocaleString()}</div>
+                    </div>
                 </div>
                 <p className="engagement-hint">CTR uses card clicks divided by listing views. If listing views are zero, make sure listing view events are tracked.</p>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Engagement funnel</h3>
+                        <p className="analytics-subtitle">Conversion steps for the last {engagementWindow} days.</p>
+                    </div>
+                </div>
+                <div className="funnel-grid">
+                    {funnelSteps.map((step, index) => (
+                        <div key={step.label} className="funnel-card">
+                            <div className="funnel-label">{step.label}</div>
+                            <div className="funnel-value">{step.value.toLocaleString()}</div>
+                            {index > 0 && (
+                                <div className="funnel-rate">{step.rate}% of previous</div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>CTR by category (type)</h3>
+                        <p className="analytics-subtitle">Card clicks per listing view, grouped by listing type.</p>
+                    </div>
+                </div>
+                {ctrByType.length === 0 ? (
+                    <div className="empty-state">No CTR data yet. Apply a type filter to generate listing view events.</div>
+                ) : (
+                    <table className="analytics-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Listing views</th>
+                                <th>Card clicks</th>
+                                <th>CTR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {ctrByType.map((item) => (
+                                <tr key={item.type}>
+                                    <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
+                                    <td>{item.listingViews.toLocaleString()}</td>
+                                    <td>{item.cardClicks.toLocaleString()}</td>
+                                    <td>{item.ctr}%</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Digest A/B clicks</h3>
+                        <p className="analytics-subtitle">Click activity from digest emails.</p>
+                    </div>
+                </div>
+                {digestClicks ? (
+                    <div className="digest-grid">
+                        <div className="digest-card">
+                            <div className="digest-label">Total clicks</div>
+                            <div className="digest-value">{digestClicks.total.toLocaleString()}</div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">Variants</div>
+                            <div className="digest-chips">
+                                {digestClicks.variants.length === 0 ? (
+                                    <span className="digest-chip">No data</span>
+                                ) : (
+                                    digestClicks.variants.map((item) => (
+                                        <span key={item.variant} className="digest-chip">
+                                            {item.variant}: {item.clicks}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">Frequency</div>
+                            <div className="digest-chips">
+                                {digestClicks.frequencies.length === 0 ? (
+                                    <span className="digest-chip">No data</span>
+                                ) : (
+                                    digestClicks.frequencies.map((item) => (
+                                        <span key={item.frequency} className="digest-chip">
+                                            {item.frequency}: {item.clicks}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">Top campaigns</div>
+                            <div className="digest-chips">
+                                {digestClicks.campaigns.length === 0 ? (
+                                    <span className="digest-chip">No data</span>
+                                ) : (
+                                    digestClicks.campaigns.map((item) => (
+                                        <span key={item.campaign} className="digest-chip">
+                                            {item.campaign}: {item.clicks}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="empty-state">No digest click data yet.</div>
+                )}
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Deep link attribution</h3>
+                        <p className="analytics-subtitle">Top sources, mediums, and campaigns from tracked links.</p>
+                    </div>
+                </div>
+                {deepLinkAttribution ? (
+                    <div className="digest-grid">
+                        <div className="digest-card">
+                            <div className="digest-label">Total deep link clicks</div>
+                            <div className="digest-value">{deepLinkAttribution.total.toLocaleString()}</div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">Sources</div>
+                            <div className="digest-chips">
+                                {deepLinkAttribution.sources.length === 0 ? (
+                                    <span className="digest-chip">No data</span>
+                                ) : (
+                                    deepLinkAttribution.sources.map((item) => (
+                                        <span key={item.source} className="digest-chip">
+                                            {item.source}: {item.clicks}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">Mediums</div>
+                            <div className="digest-chips">
+                                {deepLinkAttribution.mediums.length === 0 ? (
+                                    <span className="digest-chip">No data</span>
+                                ) : (
+                                    deepLinkAttribution.mediums.map((item) => (
+                                        <span key={item.medium} className="digest-chip">
+                                            {item.medium}: {item.clicks}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">Campaigns</div>
+                            <div className="digest-chips">
+                                {deepLinkAttribution.campaigns.length === 0 ? (
+                                    <span className="digest-chip">No data</span>
+                                ) : (
+                                    deepLinkAttribution.campaigns.map((item) => (
+                                        <span key={item.campaign} className="digest-chip">
+                                            {item.campaign}: {item.clicks}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="empty-state">No deep link attribution data yet.</div>
+                )}
             </div>
 
             <div className="analytics-section">

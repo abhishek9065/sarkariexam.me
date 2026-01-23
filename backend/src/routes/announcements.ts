@@ -300,11 +300,69 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
     // Increment view count (fire and forget, don't block response)
     AnnouncementModel.incrementViewCount(String(announcement.id)).catch(console.error);
     recordAnnouncementView(String(announcement.id)).catch(console.error);
+    const pickQuery = (value: unknown): string | undefined => {
+      if (typeof value === 'string') return value;
+      if (Array.isArray(value)) return value[0];
+      return undefined;
+    };
+
+    const source = pickQuery(req.query.source) || pickQuery(req.query.utm_source);
+    const medium = pickQuery(req.query.medium) || pickQuery(req.query.utm_medium);
+    const campaign = pickQuery(req.query.campaign) || pickQuery(req.query.utm_campaign);
+    const content = pickQuery(req.query.content) || pickQuery(req.query.utm_content);
+    const term = pickQuery(req.query.term) || pickQuery(req.query.utm_term);
+    const variant = pickQuery(req.query.variant) || pickQuery(req.query.ab);
+    const digestType = pickQuery(req.query.digest) || pickQuery(req.query.frequency);
+    const ref = pickQuery(req.query.ref);
+
+    const attribution = {
+      source: source ?? null,
+      medium: medium ?? null,
+      campaign: campaign ?? null,
+      content: content ?? null,
+      term: term ?? null,
+      variant: variant ?? null,
+      digestType: digestType ?? null,
+      ref: ref ?? null,
+    };
+
     recordAnalyticsEvent({
       type: 'card_click',
       announcementId: String(announcement.id),
-      metadata: { type: announcement.type, category: announcement.category ?? null, source: req.query.source ?? null },
+      metadata: {
+        type: announcement.type,
+        category: announcement.category ?? null,
+        ...attribution,
+      },
     }).catch(console.error);
+
+    const hasAttribution = Object.values(attribution).some((value) => value);
+    if (hasAttribution) {
+      recordAnalyticsEvent({
+        type: 'deep_link_click',
+        announcementId: String(announcement.id),
+        metadata: {
+          type: announcement.type,
+          category: announcement.category ?? null,
+          ...attribution,
+        },
+      }).catch(console.error);
+    }
+
+    const sourceValue = (source || '').toLowerCase();
+    const campaignValue = (campaign || '').toLowerCase();
+    const isDigest = sourceValue === 'digest' || campaignValue.includes('digest') || Boolean(digestType);
+    if (isDigest) {
+      recordAnalyticsEvent({
+        type: 'digest_click',
+        announcementId: String(announcement.id),
+        metadata: {
+          type: announcement.type,
+          category: announcement.category ?? null,
+          ...attribution,
+        },
+      }).catch(console.error);
+    }
 
     return res.json({ data: announcement });
     } catch (error) {

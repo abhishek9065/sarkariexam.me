@@ -15,7 +15,9 @@ export type AnalyticsEventType =
     | 'auth_register'
     | 'saved_search_create'
     | 'digest_preview'
-    | 'alerts_view';
+    | 'alerts_view'
+    | 'digest_click'
+    | 'deep_link_click';
 
 interface AnalyticsEventDoc {
     type: AnalyticsEventType;
@@ -40,6 +42,8 @@ interface AnalyticsRollupDoc {
     subscriptionsUnsubscribed: number;
     savedSearches: number;
     digestPreviews: number;
+    digestClicks: number;
+    deepLinkClicks: number;
     alertsViewed: number;
     announcementCount: number;
     updatedAt: Date;
@@ -163,6 +167,8 @@ export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promi
                     subscriptionsUnsubscribed: counts.subscription_unsubscribe ?? 0,
                     savedSearches: counts.saved_search_create ?? 0,
                     digestPreviews: counts.digest_preview ?? 0,
+                    digestClicks: counts.digest_click ?? 0,
+                    deepLinkClicks: counts.deep_link_click ?? 0,
                     alertsViewed: counts.alerts_view ?? 0,
                     announcementCount: postMap.get(dateKey) ?? 0,
                     updatedAt: now,
@@ -249,6 +255,8 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
     subscriptionsUnsubscribed: number;
     savedSearches: number;
     digestPreviews: number;
+    digestClicks: number;
+    deepLinkClicks: number;
     alertsViewed: number;
 }> {
     const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');
@@ -269,6 +277,8 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
             subscriptionsUnsubscribed: 0,
             savedSearches: 0,
             digestPreviews: 0,
+            digestClicks: 0,
+            deepLinkClicks: 0,
             alertsViewed: 0,
         };
     }
@@ -303,6 +313,8 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
             subscriptionsUnsubscribed: acc.subscriptionsUnsubscribed + (doc.subscriptionsUnsubscribed ?? 0),
             savedSearches: acc.savedSearches + (doc.savedSearches ?? 0),
             digestPreviews: acc.digestPreviews + (doc.digestPreviews ?? 0),
+            digestClicks: acc.digestClicks + (doc.digestClicks ?? 0),
+            deepLinkClicks: acc.deepLinkClicks + (doc.deepLinkClicks ?? 0),
             alertsViewed: acc.alertsViewed + (doc.alertsViewed ?? 0),
         };
     }, {
@@ -321,8 +333,198 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
         subscriptionsUnsubscribed: 0,
         savedSearches: 0,
         digestPreviews: 0,
+        digestClicks: 0,
+        deepLinkClicks: 0,
         alertsViewed: 0,
     });
+}
+
+export async function getCtrByType(days: number = DEFAULT_ROLLUP_DAYS): Promise<Array<{
+    type: string;
+    listingViews: number;
+    cardClicks: number;
+    ctr: number;
+}>> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) return [];
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    const [listingAgg, clickAgg] = await Promise.all([
+        events.aggregate([
+            {
+                $match: {
+                    type: 'listing_view',
+                    createdAt: { $gte: start },
+                    'metadata.type': { $exists: true, $ne: null }
+                }
+            },
+            {
+                $group: {
+                    _id: '$metadata.type',
+                    count: { $sum: 1 }
+                }
+            }
+        ]).toArray(),
+        events.aggregate([
+            {
+                $match: {
+                    type: 'card_click',
+                    createdAt: { $gte: start },
+                    'metadata.type': { $exists: true, $ne: null }
+                }
+            },
+            {
+                $group: {
+                    _id: '$metadata.type',
+                    count: { $sum: 1 }
+                }
+            }
+        ]).toArray(),
+    ]);
+
+    const listingMap = new Map<string, number>(
+        listingAgg.map((entry) => [String(entry._id ?? 'unknown'), entry.count as number])
+    );
+    const clickMap = new Map<string, number>(
+        clickAgg.map((entry) => [String(entry._id ?? 'unknown'), entry.count as number])
+    );
+
+    const types = new Set([...listingMap.keys(), ...clickMap.keys()]);
+    return Array.from(types).map((type) => {
+        const listingViews = listingMap.get(type) ?? 0;
+        const cardClicks = clickMap.get(type) ?? 0;
+        const ctr = listingViews > 0 ? Math.round((cardClicks / listingViews) * 100) : 0;
+        return { type, listingViews, cardClicks, ctr };
+    }).sort((a, b) => b.cardClicks - a.cardClicks);
+}
+
+export async function getDigestClickStats(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
+    total: number;
+    variants: Array<{ variant: string; clicks: number }>;
+    frequencies: Array<{ frequency: string; clicks: number }>;
+    campaigns: Array<{ campaign: string; clicks: number }>;
+}> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) {
+        return { total: 0, variants: [], frequencies: [], campaigns: [] };
+    }
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    const [variantAgg, frequencyAgg, campaignAgg, totalAgg] = await Promise.all([
+        events.aggregate([
+            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.variant', 'unknown'] },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]).toArray(),
+        events.aggregate([
+            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.digestType', 'unknown'] },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } }
+        ]).toArray(),
+        events.aggregate([
+            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.campaign', 'unknown'] },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 8 }
+        ]).toArray(),
+        events.aggregate([
+            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
+            { $count: 'total' }
+        ]).toArray(),
+    ]);
+
+    const total = totalAgg[0]?.total ?? 0;
+    return {
+        total,
+        variants: variantAgg.map((entry) => ({ variant: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
+        frequencies: frequencyAgg.map((entry) => ({ frequency: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
+        campaigns: campaignAgg.map((entry) => ({ campaign: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
+    };
+}
+
+export async function getDeepLinkAttribution(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
+    total: number;
+    sources: Array<{ source: string; clicks: number }>;
+    mediums: Array<{ medium: string; clicks: number }>;
+    campaigns: Array<{ campaign: string; clicks: number }>;
+}> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) {
+        return { total: 0, sources: [], mediums: [], campaigns: [] };
+    }
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    const [sourceAgg, mediumAgg, campaignAgg, totalAgg] = await Promise.all([
+        events.aggregate([
+            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.source', 'unknown'] },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 8 }
+        ]).toArray(),
+        events.aggregate([
+            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.medium', 'unknown'] },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 8 }
+        ]).toArray(),
+        events.aggregate([
+            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.campaign', 'unknown'] },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 8 }
+        ]).toArray(),
+        events.aggregate([
+            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
+            { $count: 'total' }
+        ]).toArray(),
+    ]);
+
+    const total = totalAgg[0]?.total ?? 0;
+    return {
+        total,
+        sources: sourceAgg.map((entry) => ({ source: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
+        mediums: mediumAgg.map((entry) => ({ medium: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
+        campaigns: campaignAgg.map((entry) => ({ campaign: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
+    };
 }
 
 export async function scheduleAnalyticsRollups(options?: { days?: number; intervalMs?: number }): Promise<void> {

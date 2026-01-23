@@ -72,8 +72,16 @@ export async function fetchAnnouncementsByType(type: ContentType, maxItems = 100
 }
 
 // Fetch single announcement by slug
-export async function fetchAnnouncementBySlug(slug: string): Promise<Announcement | null> {
-    const response = await fetch(`${API_BASE}/api/announcements/${slug}`);
+export async function fetchAnnouncementBySlug(slug: string, query?: string | URLSearchParams): Promise<Announcement | null> {
+    const queryString = typeof query === 'string'
+        ? query
+        : query
+            ? `?${query.toString()}`
+            : '';
+    const normalizedQuery = queryString && !queryString.startsWith('?')
+        ? `?${queryString}`
+        : queryString;
+    const response = await fetch(`${API_BASE}/api/announcements/${slug}${normalizedQuery}`);
     if (!response.ok) return null;
     const body = await response.json() as { data: Announcement };
     return body.data;

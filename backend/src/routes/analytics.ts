@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
-import { getDailyRollups, getRollupSummary } from '../services/analytics.js';
+import { getDailyRollups, getRollupSummary, getCtrByType, getDigestClickStats, getDeepLinkAttribution } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
 
 interface SubscriptionDoc {
@@ -23,6 +23,11 @@ router.get('/overview', async (_req, res) => {
         const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
         const rollupSummary = await getRollupSummary(30);
         const dailyRollups = await getDailyRollups(14);
+        const [ctrByType, digestClicks, deepLinkAttribution] = await Promise.all([
+            getCtrByType(30),
+            getDigestClickStats(30),
+            getDeepLinkAttribution(30),
+        ]);
 
         let totalEmailSubscribers = 0;
         let totalPushSubscribers = 0;
@@ -72,9 +77,21 @@ router.get('/overview', async (_req, res) => {
                 totalCardClicks: rollupSummary.cardClicks,
                 totalCategoryClicks: rollupSummary.categoryClicks,
                 totalFilterApplies: rollupSummary.filterApplies,
+                totalDigestClicks: rollupSummary.digestClicks,
+                totalDeepLinkClicks: rollupSummary.deepLinkClicks,
                 engagementWindowDays: rollupSummary.days,
                 rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
                 dailyRollups,
+                funnel: {
+                    listingViews: rollupSummary.listingViews,
+                    cardClicks: rollupSummary.cardClicks,
+                    detailViews: rollupSummary.viewCount,
+                    bookmarkAdds: rollupSummary.bookmarkAdds,
+                    subscriptionsVerified: rollupSummary.subscriptionsVerified,
+                },
+                ctrByType,
+                digestClicks,
+                deepLinkAttribution,
                 typeBreakdown,
                 categoryBreakdown,
                 lastUpdated: new Date().toISOString()

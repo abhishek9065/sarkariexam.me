@@ -120,6 +120,7 @@ export function AdminPage() {
     const [bulkPublishAt, setBulkPublishAt] = useState('');
     const [bulkIsActive, setBulkIsActive] = useState<'keep' | 'active' | 'inactive'>('keep');
     const [bulkLoading, setBulkLoading] = useState(false);
+    const [qaBulkLoading, setQaBulkLoading] = useState(false);
     const [reviewBulkNote, setReviewBulkNote] = useState('');
     const [reviewScheduleAt, setReviewScheduleAt] = useState('');
     const [reviewLoading, setReviewLoading] = useState(false);
@@ -478,6 +479,88 @@ export function AdminPage() {
         }
     };
 
+    const applyQaUpdate = async (
+        id: string,
+        payload: Record<string, any>,
+        options?: { successMessage?: string; silent?: boolean }
+    ): Promise<boolean> => {
+        if (!adminToken) {
+            if (!options?.silent) setMessage('Not authenticated.');
+            return false;
+        }
+
+        updateMutating(id, true);
+        try {
+            const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                if (options?.successMessage && !options.silent) {
+                    setMessage(options.successMessage);
+                }
+                return true;
+            }
+
+            const errorBody = await response.json().catch(() => ({}));
+            if (!options?.silent) {
+                setMessage(getApiErrorMessage(errorBody, 'Failed to update announcement.'));
+            }
+            return false;
+        } catch (error) {
+            console.error(error);
+            if (!options?.silent) {
+                setMessage('Failed to update announcement.');
+            }
+            return false;
+        } finally {
+            updateMutating(id, false);
+        }
+    };
+
+    const handleQaFix = async (item: Announcement) => {
+        const { patch, fixes } = buildQaFixPatch(item);
+        if (fixes.length === 0) {
+            setMessage('No auto-fix available for this announcement.');
+            return;
+        }
+
+        const ok = await applyQaUpdate(
+            item.id,
+            { ...patch, note: `QA auto-fix: ${fixes.join('; ')}` },
+            { successMessage: 'QA auto-fix applied.' }
+        );
+
+        if (ok) {
+            refreshData();
+            refreshDashboard();
+        }
+    };
+
+    const handleQaFlag = async (item: Announcement) => {
+        const warnings = getAnnouncementWarnings(item);
+        if (warnings.length === 0) {
+            setMessage('No QA issues found to flag.');
+            return;
+        }
+
+        const ok = await applyQaUpdate(
+            item.id,
+            { status: 'pending', note: `QA flag: ${warnings.join('; ')}` },
+            { successMessage: 'Flagged for QA review.' }
+        );
+
+        if (ok) {
+            refreshData();
+            refreshDashboard();
+        }
+    };
+
     const handleBulkUpdate = async () => {
         if (!adminToken) {
             setMessage('Not authenticated.');
@@ -724,6 +807,89 @@ export function AdminPage() {
         }
     };
 
+    const handleBulkQaFix = async () => {
+        if (!adminToken) {
+            setMessage('Not authenticated.');
+            return;
+        }
+
+        if (selectedIds.size === 0) {
+            setMessage('Select at least one announcement for QA fixes.');
+            return;
+        }
+
+        const targets = announcements.filter(
+            (item) => selectedIds.has(item.id) && getFixableWarnings(item).length > 0
+        );
+        if (targets.length === 0) {
+            setMessage('No fixable QA issues found in the selected announcements.');
+            return;
+        }
+
+        setQaBulkLoading(true);
+        try {
+            const results = await Promise.all(
+                targets.map(async (item) => {
+                    const { patch, fixes } = buildQaFixPatch(item);
+                    if (fixes.length === 0) return false;
+                    return applyQaUpdate(
+                        item.id,
+                        { ...patch, note: `QA auto-fix: ${fixes.join('; ')}` },
+                        { silent: true }
+                    );
+                })
+            );
+
+            const successCount = results.filter(Boolean).length;
+            setMessage(`QA auto-fix applied to ${successCount}/${targets.length} announcements.`);
+            refreshData();
+            refreshDashboard();
+        } finally {
+            setQaBulkLoading(false);
+        }
+    };
+
+    const handleBulkQaFlag = async () => {
+        if (!adminToken) {
+            setMessage('Not authenticated.');
+            return;
+        }
+
+        if (selectedIds.size === 0) {
+            setMessage('Select at least one announcement to flag.');
+            return;
+        }
+
+        const targets = announcements.filter(
+            (item) => selectedIds.has(item.id) && getAnnouncementWarnings(item).length > 0
+        );
+        if (targets.length === 0) {
+            setMessage('No QA issues found to flag.');
+            return;
+        }
+
+        setQaBulkLoading(true);
+        try {
+            const results = await Promise.all(
+                targets.map(async (item) => {
+                    const warnings = getAnnouncementWarnings(item);
+                    return applyQaUpdate(
+                        item.id,
+                        { status: 'pending', note: `QA flag: ${warnings.join('; ')}` },
+                        { silent: true }
+                    );
+                })
+            );
+
+            const successCount = results.filter(Boolean).length;
+            setMessage(`Flagged ${successCount}/${targets.length} announcements for QA review.`);
+            refreshData();
+            refreshDashboard();
+        } finally {
+            setQaBulkLoading(false);
+        }
+    };
+
     const handleScheduleOne = async (id: string, publishAt: string) => {
         if (!adminToken) return;
         updateMutating(id, true);
@@ -918,6 +1084,51 @@ export function AdminPage() {
         return pendingAnnouncements.filter((item) => getAnnouncementWarnings(item).length > 0).length;
     }, [pendingAnnouncements]);
 
+    const pendingSlaStats = useMemo(() => {
+        const buckets = { lt1: 0, d1_3: 0, d3_7: 0, gt7: 0 };
+        const stale: Array<{ item: Announcement; ageDays: number }> = [];
+        let totalDays = 0;
+
+        pendingAnnouncements.forEach((item) => {
+            const base = item.updatedAt || item.postedAt;
+            const baseDate = base ? new Date(base).getTime() : Date.now();
+            const diffMs = Date.now() - baseDate;
+            const ageDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+            totalDays += ageDays;
+
+            if (ageDays > 7) {
+                buckets.gt7 += 1;
+                stale.push({ item, ageDays });
+            } else if (ageDays >= 3) {
+                buckets.d3_7 += 1;
+            } else if (ageDays >= 1) {
+                buckets.d1_3 += 1;
+            } else {
+                buckets.lt1 += 1;
+            }
+        });
+
+        stale.sort((a, b) => b.ageDays - a.ageDays);
+
+        return {
+            buckets,
+            stale: stale.slice(0, 8),
+            averageDays: pendingAnnouncements.length ? Math.round(totalDays / pendingAnnouncements.length) : 0,
+        };
+    }, [pendingAnnouncements]);
+
+    const selectedAnnouncements = useMemo(() => {
+        return announcements.filter((item) => selectedIds.has(item.id));
+    }, [announcements, selectedIds]);
+
+    const selectedQaIssueCount = useMemo(() => {
+        return selectedAnnouncements.filter((item) => getAnnouncementWarnings(item).length > 0).length;
+    }, [selectedAnnouncements]);
+
+    const selectedQaFixableCount = useMemo(() => {
+        return selectedAnnouncements.filter((item) => getFixableWarnings(item).length > 0).length;
+    }, [selectedAnnouncements]);
+
     const scheduledStats = useMemo(() => {
         const now = Date.now();
         const nextDay = now + 24 * 60 * 60 * 1000;
@@ -1060,6 +1271,48 @@ export function AdminPage() {
             warnings.push('External link is invalid');
         }
         return warnings;
+    };
+
+    const getFixableWarnings = (item: Announcement) => {
+        const fixes: string[] = [];
+        if (item.externalLink && !isValidUrl(item.externalLink)) {
+            fixes.push('Clear invalid external link');
+        }
+        if (item.status === 'scheduled' && !item.publishAt) {
+            fixes.push('Move scheduled item back to pending');
+        }
+        if (item.deadline) {
+            const deadlineTime = new Date(item.deadline).getTime();
+            const isExpired = !Number.isNaN(deadlineTime) && deadlineTime < Date.now();
+            const isExpirableType = item.type === 'job' || item.type === 'admission';
+            if (isExpired && isExpirableType && item.isActive !== false) {
+                fixes.push('Deactivate expired listing');
+            }
+        }
+        return fixes;
+    };
+
+    const buildQaFixPatch = (item: Announcement) => {
+        const patch: Record<string, any> = {};
+        const fixes = getFixableWarnings(item);
+
+        if (item.externalLink && !isValidUrl(item.externalLink)) {
+            patch.externalLink = '';
+        }
+        if (item.status === 'scheduled' && !item.publishAt) {
+            patch.status = 'pending';
+            patch.publishAt = '';
+        }
+        if (item.deadline) {
+            const deadlineTime = new Date(item.deadline).getTime();
+            const isExpired = !Number.isNaN(deadlineTime) && deadlineTime < Date.now();
+            const isExpirableType = item.type === 'job' || item.type === 'admission';
+            if (isExpired && isExpirableType && item.isActive !== false) {
+                patch.isActive = false;
+            }
+        }
+
+        return { patch, fixes };
     };
 
     const getFormWarnings = () => {
@@ -1545,6 +1798,20 @@ export function AdminPage() {
                                             {bulkLoading ? 'Applying...' : 'Apply'}
                                         </button>
                                         <button className="admin-btn secondary" onClick={clearSelection} disabled={bulkLoading}>Clear</button>
+                                        <button
+                                            className="admin-btn secondary"
+                                            onClick={handleBulkQaFix}
+                                            disabled={bulkLoading || qaBulkLoading || selectedQaFixableCount === 0}
+                                        >
+                                            {qaBulkLoading ? 'Working...' : `QA auto-fix (${selectedQaFixableCount})`}
+                                        </button>
+                                        <button
+                                            className="admin-btn warning"
+                                            onClick={handleBulkQaFlag}
+                                            disabled={bulkLoading || qaBulkLoading || selectedQaIssueCount === 0}
+                                        >
+                                            Flag QA ({selectedQaIssueCount})
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1650,6 +1917,16 @@ export function AdminPage() {
                                                             <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
                                                             <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
                                                             <button className="admin-btn secondary small" onClick={() => setVersionTarget(item)} disabled={isRowMutating}>History</button>
+                                                            {qaWarnings.length > 0 && (
+                                                                <>
+                                                                    <button className="admin-btn info small" onClick={() => handleQaFix(item)} disabled={isRowMutating}>
+                                                                        Auto-fix
+                                                                    </button>
+                                                                    <button className="admin-btn warning small" onClick={() => handleQaFlag(item)} disabled={isRowMutating}>
+                                                                        Flag
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                             {canApprove && (
                                                                 <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
                                                             )}
@@ -1735,11 +2012,127 @@ export function AdminPage() {
                                 <button className="admin-btn primary" onClick={handleBulkSchedule} disabled={reviewLoading}>
                                     Schedule selected
                                 </button>
+                                <button
+                                    className="admin-btn info"
+                                    onClick={handleBulkQaFix}
+                                    disabled={reviewLoading || qaBulkLoading || selectedQaFixableCount === 0}
+                                >
+                                    {qaBulkLoading ? 'Working...' : `QA auto-fix (${selectedQaFixableCount})`}
+                                </button>
+                                <button
+                                    className="admin-btn warning"
+                                    onClick={handleBulkQaFlag}
+                                    disabled={reviewLoading || qaBulkLoading || selectedQaIssueCount === 0}
+                                >
+                                    Flag QA ({selectedQaIssueCount})
+                                </button>
                                 <button className="admin-btn secondary" onClick={clearSelection} disabled={reviewLoading}>
                                     Clear selection
                                 </button>
                             </div>
                         </div>
+
+                        <div className="admin-section-panel">
+                            <div className="admin-list-header">
+                                <div>
+                                    <h4>SLA view</h4>
+                                    <p className="admin-subtitle">Ageing pending items and stale backlog (7+ days).</p>
+                                </div>
+                                <div className="admin-list-actions">
+                                    <span className="admin-updated">Average age: {pendingSlaStats.averageDays}d</span>
+                                </div>
+                            </div>
+                            <div className="admin-user-grid">
+                                <div className="user-card">
+                                    <div className="card-label">&lt; 1 day</div>
+                                    <div className="card-value">{pendingSlaStats.buckets.lt1}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">1 - 3 days</div>
+                                    <div className="card-value">{pendingSlaStats.buckets.d1_3}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">3 - 7 days</div>
+                                    <div className="card-value">{pendingSlaStats.buckets.d3_7}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">Stale &gt; 7d</div>
+                                    <div className="card-value accent">{pendingSlaStats.buckets.gt7}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {pendingSlaStats.stale.length > 0 && (
+                            <div className="admin-table-wrapper">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Stale pending</th>
+                                            <th>Age</th>
+                                            <th>QA</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingSlaStats.stale.map(({ item, ageDays }) => {
+                                            const warnings = getAnnouncementWarnings(item);
+                                            const reviewNote = reviewNotes[item.id] ?? '';
+                                            const isRowMutating = mutatingIds.has(item.id);
+                                            return (
+                                                <tr key={item.id}>
+                                                    <td>
+                                                        <div className="title-cell">
+                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-meta">
+                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>{item.category || 'Uncategorized'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>{ageDays}d</td>
+                                                    <td>
+                                                        {warnings.length > 0 ? (
+                                                            <span className="qa-warning" title={warnings.join(' • ')}>
+                                                                {warnings.length} issue{warnings.length > 1 ? 's' : ''}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="status-sub success">Clear</span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div className="table-actions">
+                                                            <input
+                                                                className="review-note-input"
+                                                                type="text"
+                                                                value={reviewNote}
+                                                                onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                placeholder="Review note (optional)"
+                                                                disabled={isRowMutating}
+                                                            />
+                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
+                                                            <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
+                                                            {qaWarnings.length > 0 && (
+                                                                <>
+                                                                    <button className="admin-btn info small" onClick={() => handleQaFix(item)} disabled={isRowMutating}>
+                                                                        Auto-fix
+                                                                    </button>
+                                                                    <button className="admin-btn warning small" onClick={() => handleQaFlag(item)} disabled={isRowMutating}>
+                                                                        Flag
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
+                                                            <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
                         {pendingAnnouncements.length === 0 ? (
                             <div className="empty-state">No announcements pending review.</div>

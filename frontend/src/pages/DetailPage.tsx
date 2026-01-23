@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header, Navigation, Footer, SectionTable, SkeletonLoader } from '../components';
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ interface DetailPageProps {
 
 export function DetailPage({ type: _type }: DetailPageProps) {
     const { slug } = useParams<{ slug: string }>();
+    const location = useLocation();
     const [item, setItem] = useState<Announcement | null>(null);
     const [relatedItems, setRelatedItems] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -25,7 +26,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
 
         setLoading(true);
         // Fetch by slug using shared helper
-        fetchAnnouncementBySlug(slug)
+        fetchAnnouncementBySlug(slug, location.search)
             .then(data => {
                 setItem(data);
                 // Fetch related items
@@ -36,7 +37,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
             })
             .catch(console.error)
             .finally(() => setLoading(false));
-    }, [slug]);
+    }, [slug, location.search]);
 
     if (loading) {
         return (

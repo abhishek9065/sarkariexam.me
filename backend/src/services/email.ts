@@ -168,14 +168,40 @@ export const sendDigestEmail = async (options: {
   unsubscribeToken: string;
   frequency: 'daily' | 'weekly';
   windowLabel: string;
+  variant?: 'A' | 'B';
 }): Promise<boolean> => {
   if (!isConfigured || options.announcements.length === 0) {
     return false;
   }
 
   const unsubscribeUrl = `${config.frontendUrl}/unsubscribe?token=${options.unsubscribeToken}`;
+  const resolveVariant = (email: string, provided?: 'A' | 'B') => {
+    if (provided) return provided;
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) {
+      hash = (hash * 31 + email.charCodeAt(i)) >>> 0;
+    }
+    return hash % 2 === 0 ? 'A' : 'B';
+  };
+  const variant = resolveVariant(options.email, options.variant);
+  const campaign = `digest_${options.frequency}_${variant.toLowerCase()}`;
+
+  const buildTrackedUrl = (path: string, params: Record<string, string | undefined>) => {
+    const url = new URL(path, config.frontendUrl);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) url.searchParams.set(key, value);
+    });
+    return url.toString();
+  };
   const listItems = options.announcements.map((announcement) => {
-    const announcementUrl = `${config.frontendUrl}/${announcement.type}/${announcement.slug}`;
+    const announcementUrl = buildTrackedUrl(`/${announcement.type}/${announcement.slug}`, {
+      source: 'digest',
+      medium: 'email',
+      campaign,
+      variant,
+      digest: options.frequency,
+      content: announcement.type,
+    });
     const deadline = announcement.deadline
       ? new Date(announcement.deadline).toLocaleDateString('en-IN')
       : 'Not specified';
@@ -198,7 +224,9 @@ export const sendDigestEmail = async (options: {
     await sgMail.send({
       to: options.email,
       from: config.emailFrom || 'noreply@sarkariresult.com',
-      subject: `Your ${options.frequency} SarkariExams digest`,
+      subject: variant === 'A'
+        ? `Your ${options.frequency} SarkariExams digest`
+        : `${options.announcements.length} fresh updates in your ${options.frequency} digest`,
       html: `
         <!DOCTYPE html>
         <html>
