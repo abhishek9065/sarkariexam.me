@@ -189,6 +189,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
             <Header
                 setCurrentPage={(page) => navigate('/' + page)}
                 user={user}
+                token={token}
                 isAuthenticated={isAuthenticated}
                 onLogin={() => setShowAuthModal(true)}
                 onLogout={logout}

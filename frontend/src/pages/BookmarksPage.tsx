@@ -8,7 +8,7 @@ import type { Announcement } from '../types';
 
 export function BookmarksPage() {
     const navigate = useNavigate();
-    const { user, logout, isAuthenticated } = useAuth();
+    const { user, token, logout, isAuthenticated } = useAuth();
     const { bookmarks, toggleBookmark, isBookmarked, loading } = useBookmarks();
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [query, setQuery] = useState('');
@@ -30,6 +30,7 @@ export function BookmarksPage() {
             <Header
                 setCurrentPage={(page) => navigate('/' + page)}
                 user={user}
+                token={token}
                 isAuthenticated={isAuthenticated}
                 onLogin={() => setShowAuthModal(true)}
                 onLogout={logout}

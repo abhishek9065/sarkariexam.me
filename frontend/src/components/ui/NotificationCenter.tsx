@@ -1,199 +1,194 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import type { Announcement } from '../../types';
 import './NotificationCenter.css';
+
+const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 type NotificationItem = {
     id: string;
     title: string;
     type: string;
-    slug: string;
-    organization?: string;
-    createdAt: string;
+    slug?: string;
     source: string;
+    timestamp: string;
 };
 
-const apiBase = import.meta.env.VITE_API_BASE ?? '';
+const getStorageKey = (userId?: string) => `notifications_read_${userId || 'guest'}`;
 
-export function NotificationCenter() {
+export function NotificationCenter({ token, userId }: { token: string | null; userId?: string }) {
     const navigate = useNavigate();
-    const { token, user, isAuthenticated } = useAuth();
+    const containerRef = useRef<HTMLDivElement | null>(null);
     const [open, setOpen] = useState(false);
+    const [items, setItems] = useState<NotificationItem[]>([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-    const [readIds, setReadIds] = useState<Set<string>>(new Set());
+    const [error, setError] = useState('');
+    const [savedSearchCount, setSavedSearchCount] = useState(0);
 
-    const storageKey = useMemo(() => {
-        if (!user) return null;
-        return `notifications_read_${user.id ?? user.email}`;
-    }, [user]);
-
-    useEffect(() => {
-        if (!storageKey) return;
-        const raw = localStorage.getItem(storageKey);
-        if (!raw) return;
+    const readIds = useMemo(() => {
+        if (!userId) return new Set<string>();
         try {
-            const saved = JSON.parse(raw) as string[];
-            setReadIds(new Set(saved));
+            const stored = localStorage.getItem(getStorageKey(userId));
+            if (!stored) return new Set<string>();
+            return new Set<string>(JSON.parse(stored));
         } catch {
-            localStorage.removeItem(storageKey);
+            return new Set<string>();
         }
-    }, [storageKey]);
+    }, [userId]);
 
-    const unreadCount = notifications.filter((item) => !readIds.has(item.id)).length;
+    const unreadCount = useMemo(() => {
+        if (!items.length) return 0;
+        return items.filter((item) => !readIds.has(item.id)).length;
+    }, [items, readIds]);
 
-    const updateReadIds = (next: Set<string>) => {
-        setReadIds(next);
-        if (storageKey) {
-            localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
-        }
+    const persistReadIds = (next: Set<string>) => {
+        if (!userId) return;
+        localStorage.setItem(getStorageKey(userId), JSON.stringify(Array.from(next)));
+    };
+
+    const markAllRead = () => {
+        const next = new Set(readIds);
+        items.forEach((item) => next.add(item.id));
+        persistReadIds(next);
+        setItems([...items]);
     };
 
     const markRead = (id: string) => {
         const next = new Set(readIds);
         next.add(id);
-        updateReadIds(next);
+        persistReadIds(next);
+        setItems([...items]);
     };
 
-    const markAllRead = () => {
-        const next = new Set(readIds);
-        notifications.forEach((item) => next.add(item.id));
-        updateReadIds(next);
-    };
-
-    const buildNotifications = (alerts: any) => {
-        const items: NotificationItem[] = [];
-        if (!alerts) return items;
-
-        for (const search of alerts.savedSearches || []) {
-            for (const match of search.matches || []) {
-                items.push({
-                    id: match.id,
-                    title: match.title,
-                    type: match.type,
-                    slug: match.slug,
-                    organization: match.organization,
-                    createdAt: match.updatedAt || match.postedAt || new Date().toISOString(),
-                    source: `Saved search: ${search.name}`,
-                });
-            }
-        }
-
-        for (const match of alerts.preferences?.matches || []) {
-            items.push({
-                id: match.id,
-                title: match.title,
-                type: match.type,
-                slug: match.slug,
-                organization: match.organization,
-                createdAt: match.updatedAt || match.postedAt || new Date().toISOString(),
-                source: 'Preferences',
-            });
-        }
-
-        const unique = new Map<string, NotificationItem>();
-        for (const item of items) {
-            const existing = unique.get(item.id);
-            if (!existing || new Date(item.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
-                unique.set(item.id, item);
-            }
-        }
-
-        return Array.from(unique.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const normalizeAnnouncement = (item: Announcement, source: string): NotificationItem => {
+        const timestamp = item.postedAt || item.updatedAt || new Date().toISOString();
+        return {
+            id: `${item.id}:${source}`,
+            title: item.title,
+            type: item.type,
+            slug: item.slug,
+            source,
+            timestamp,
+        };
     };
 
     const fetchNotifications = async () => {
         if (!token) return;
         setLoading(true);
-        setError(null);
+        setError('');
         try {
-            const params = new URLSearchParams({
-                windowDays: '7',
-                limit: '5',
-            });
-            const res = await fetch(`${apiBase}/api/profile/alerts?${params.toString()}`, {
+            const response = await fetch(`${apiBase}/api/profile/alerts?windowDays=7&limit=6`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            if (!res.ok) {
-                setError('Unable to load alerts');
-                setNotifications([]);
+            if (!response.ok) {
+                setError('Unable to load alerts.');
                 return;
             }
-            const payload = await res.json();
-            const items = buildNotifications(payload.data);
-            setNotifications(items);
+            const payload = await response.json();
+            const savedSearches = payload.data?.savedSearches ?? [];
+            const preferences = payload.data?.preferences?.matches ?? [];
+
+            const savedItems = savedSearches.flatMap((entry: any) =>
+                (entry.matches ?? []).map((match: Announcement) => normalizeAnnouncement(match, `saved:${entry.id}`))
+            );
+            const preferenceItems = preferences.map((match: Announcement) => normalizeAnnouncement(match, 'preferences'));
+
+            const combined = [...savedItems, ...preferenceItems]
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                .slice(0, 12);
+
+            setSavedSearchCount(savedSearches.length);
+            setItems(combined);
         } catch (err) {
             console.error(err);
-            setError('Unable to load alerts');
+            setError('Unable to load alerts.');
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        if (!open || !isAuthenticated) return;
+        if (!open) return;
         fetchNotifications();
-    }, [open, isAuthenticated, token]);
+    }, [open]);
 
-    if (!isAuthenticated) return null;
+    useEffect(() => {
+        const handleClick = (event: MouseEvent) => {
+            if (!containerRef.current) return;
+            if (!containerRef.current.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        };
+        if (open) {
+            document.addEventListener('click', handleClick);
+        }
+        return () => document.removeEventListener('click', handleClick);
+    }, [open]);
+
+    if (!token) return null;
 
     return (
-        <div className="notification-center">
-            <button className="notification-trigger" onClick={() => setOpen((value) => !value)}>
-                <span className="notification-icon" aria-hidden="true">🔔</span>
-                {unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}
+        <div className="notification-center" ref={containerRef}>
+            <button className="notification-trigger" onClick={() => setOpen(!open)} aria-label="Notifications">
+                <span className="notification-icon">🔔</span>
+                {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
             </button>
+
             {open && (
                 <div className="notification-panel">
                     <div className="notification-header">
                         <div>
                             <h4>Alerts</h4>
-                            <span className="notification-subtitle">Recent matches from saved searches and preferences.</span>
+                            <span className="notification-subtitle">Latest matches and updates</span>
                         </div>
-                        <div className="notification-actions">
-                            <button className="admin-btn secondary small" onClick={fetchNotifications} disabled={loading}>
-                                {loading ? 'Refreshing...' : 'Refresh'}
-                            </button>
-                            <button className="admin-btn secondary small" onClick={markAllRead} disabled={notifications.length === 0}>
-                                Mark all read
-                            </button>
-                        </div>
+                        <button className="admin-btn secondary small" onClick={markAllRead}>Mark all read</button>
                     </div>
+
                     {loading ? (
-                        <div className="notification-empty">Loading alerts...</div>
+                        <div className="notification-state">Loading alerts...</div>
                     ) : error ? (
-                        <div className="notification-empty">{error}</div>
-                    ) : notifications.length === 0 ? (
-                        <div className="notification-empty">No alerts yet. Save a search to get notified.</div>
+                        <div className="notification-state error">{error}</div>
+                    ) : items.length === 0 ? (
+                        <div className="notification-state">No new alerts yet.</div>
                     ) : (
                         <div className="notification-list">
-                            {notifications.map((item) => {
-                                const isUnread = !readIds.has(item.id);
+                            {items.map((item) => {
+                                const isRead = readIds.has(item.id);
                                 return (
                                     <button
                                         key={item.id}
-                                        className={`notification-item ${isUnread ? 'unread' : ''}`}
+                                        className={`notification-item ${isRead ? 'read' : ''}`}
                                         onClick={() => {
                                             markRead(item.id);
-                                            navigate(`/${item.type}/${item.slug}`);
+                                            if (item.slug) {
+                                                navigate(`/${item.type}/${item.slug}`);
+                                            }
                                             setOpen(false);
                                         }}
                                     >
                                         <div>
                                             <div className="notification-title">{item.title}</div>
                                             <div className="notification-meta">
-                                                <span>{item.organization || 'Unknown'}</span>
-                                                <span className="meta-sep">|</span>
-                                                <span>{item.source}</span>
+                                                {item.source.startsWith('saved') ? 'Saved search' : 'Preferences'} • {new Date(item.timestamp).toLocaleDateString('en-IN')}
                                             </div>
                                         </div>
-                                        <span className="notification-time">{new Date(item.createdAt).toLocaleDateString('en-IN')}</span>
+                                        <span className="notification-type">{item.type}</span>
                                     </button>
                                 );
                             })}
                         </div>
                     )}
+
+                    <div className="notification-footer">
+                        {savedSearchCount === 0 && (
+                            <button className="admin-btn secondary" onClick={() => navigate('/profile')}>
+                                Create a saved search
+                            </button>
+                        )}
+                        <button className="admin-btn primary" onClick={() => navigate('/profile')}>
+                            View all alerts
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

@@ -9,7 +9,7 @@ type SubscriptionAction = 'verify' | 'unsubscribe';
 export function SubscriptionActionPage({ action }: { action: SubscriptionAction }) {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { user, logout, isAuthenticated } = useAuth();
+    const { user, token, logout, isAuthenticated } = useAuth();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');
 
@@ -65,6 +65,7 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
             <Header
                 setCurrentPage={(page) => navigate('/' + page)}
                 user={user}
+                token={token}
                 isAuthenticated={isAuthenticated}
                 onLogin={() => { }}
                 onLogout={logout}

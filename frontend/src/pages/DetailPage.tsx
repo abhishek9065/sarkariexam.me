@@ -18,7 +18,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const [loading, setLoading] = useState(true);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const navigate = useNavigate();
-    const { user, logout, isAuthenticated } = useAuth();
+    const { user, token, logout, isAuthenticated } = useAuth();
 
     useEffect(() => {
         if (!slug) return;
@@ -41,7 +41,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     if (loading) {
         return (
             <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
                 <main className="main-content"><SkeletonLoader /></main>
             </div>
         );
@@ -50,7 +50,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     if (!item) {
         return (
             <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
                 <main className="main-content">
                     <h1>Not Found</h1>
                     <p>The item you're looking for doesn't exist.</p>
@@ -79,7 +79,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
 
     return (
         <div className="app">
-            <Header setCurrentPage={(page) => navigate('/' + page)} user={user} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+            <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
             <Navigation
                 activeTab={item.type as TabType}
                 setActiveTab={() => { }}

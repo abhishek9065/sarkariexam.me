@@ -114,6 +114,7 @@ export function AdminPage() {
     const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>('all');
     const [listLoading, setListLoading] = useState(false);
     const [listUpdatedAt, setListUpdatedAt] = useState<string | null>(null);
+    const [listExporting, setListExporting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkStatus, setBulkStatus] = useState<AnnouncementStatus | ''>('');
     const [bulkPublishAt, setBulkPublishAt] = useState('');
@@ -141,6 +142,7 @@ export function AdminPage() {
     const [dashboardLoading, setDashboardLoading] = useState(false);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
     const [dashboardUpdatedAt, setDashboardUpdatedAt] = useState<string | null>(null);
+    const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>('list');
     const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
     const [auditLoading, setAuditLoading] = useState(false);
     const [auditError, setAuditError] = useState<string | null>(null);
@@ -542,6 +544,48 @@ export function AdminPage() {
         }
     };
 
+    const handleExportAnnouncements = async () => {
+        if (!adminToken) {
+            setMessage('Not authenticated.');
+            return;
+        }
+
+        setListExporting(true);
+        try {
+            const params = new URLSearchParams();
+            params.set('includeInactive', 'true');
+            if (listStatusFilter !== 'all') {
+                params.set('status', listStatusFilter);
+            }
+            if (listTypeFilter !== 'all') {
+                params.set('type', listTypeFilter);
+            }
+
+            const response = await fetch(`${apiBase}/api/admin/announcements/export/csv?${params.toString()}`, {
+                headers: { Authorization: `Bearer ${adminToken}` },
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to export announcements.'));
+                return;
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `announcements-${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error(error);
+            setMessage('Failed to export announcements.');
+        } finally {
+            setListExporting(false);
+        }
+    };
+
     const handleBulkApprove = async () => {
         if (!adminToken) {
             setMessage('Not authenticated.');
@@ -677,6 +721,40 @@ export function AdminPage() {
             setMessage('Error scheduling announcements.');
         } finally {
             setReviewLoading(false);
+        }
+    };
+
+    const handleScheduleOne = async (id: string, publishAt: string) => {
+        if (!adminToken) return;
+        updateMutating(id, true);
+        try {
+            const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify({
+                    status: 'scheduled',
+                    publishAt: normalizeDateTime(publishAt),
+                    note: reviewBulkNote.trim() || undefined,
+                }),
+            });
+
+            if (response.ok) {
+                setMessage('Announcement scheduled.');
+                refreshData();
+                refreshDashboard();
+                refreshAuditLogs();
+            } else {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to schedule announcement.'));
+            }
+        } catch (error) {
+            console.error(error);
+            setMessage('Error scheduling announcement.');
+        } finally {
+            updateMutating(id, false);
         }
     };
 
@@ -835,6 +913,10 @@ export function AdminPage() {
     const pendingAnnouncements = useMemo(() => {
         return announcements.filter((item) => (item.status ?? 'published') === 'pending');
     }, [announcements]);
+
+    const pendingWarningCount = useMemo(() => {
+        return pendingAnnouncements.filter((item) => getAnnouncementWarnings(item).length > 0).length;
+    }, [pendingAnnouncements]);
 
     const scheduledStats = useMemo(() => {
         const now = Date.now();
@@ -1321,6 +1403,9 @@ export function AdminPage() {
                                 <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
                                     {listLoading ? 'Refreshing...' : 'Refresh'}
                                 </button>
+                                <button className="admin-btn secondary" onClick={handleExportAnnouncements} disabled={listExporting}>
+                                    {listExporting ? 'Exporting...' : 'Export CSV'}
+                                </button>
                                 <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>New job</button>
                             </div>
                         </div>
@@ -1738,6 +1823,162 @@ export function AdminPage() {
                             </div>
                         )}
                     </div>
+                ) : activeAdminTab === 'review' ? (
+                    <div className="admin-list">
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>Pending review</h3>
+                                <p className="admin-subtitle">Approve, reject, or schedule pending announcements with QA checks highlighted.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
+                                <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
+                                    {listLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="admin-user-grid">
+                            <div className="user-card">
+                                <div className="card-label">Pending total</div>
+                                <div className="card-value">{pendingAnnouncements.length}</div>
+                            </div>
+                            <div className="user-card">
+                                <div className="card-label">QA warnings</div>
+                                <div className="card-value accent">{pendingWarningCount}</div>
+                            </div>
+                            <div className="user-card">
+                                <div className="card-label">Selected</div>
+                                <div className="card-value">{selectedIds.size}</div>
+                            </div>
+                        </div>
+
+                        <div className="admin-bulk-panel">
+                            <div className="admin-bulk-controls">
+                                <div className="bulk-field">
+                                    <label>Review note</label>
+                                    <input
+                                        type="text"
+                                        value={reviewBulkNote}
+                                        onChange={(e) => setReviewBulkNote(e.target.value)}
+                                        placeholder="Optional note for audit log"
+                                        disabled={reviewLoading}
+                                    />
+                                </div>
+                                <div className="bulk-field">
+                                    <label>Schedule at</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={reviewScheduleAt}
+                                        onChange={(e) => setReviewScheduleAt(e.target.value)}
+                                        disabled={reviewLoading}
+                                    />
+                                </div>
+                            </div>
+                            <div className="admin-bulk-actions">
+                                <button className="admin-btn success" onClick={handleBulkApprove} disabled={reviewLoading}>
+                                    {reviewLoading ? 'Working...' : 'Approve selected'}
+                                </button>
+                                <button className="admin-btn warning" onClick={handleBulkReject} disabled={reviewLoading}>
+                                    Reject selected
+                                </button>
+                                <button className="admin-btn secondary" onClick={handleBulkSchedule} disabled={reviewLoading}>
+                                    Schedule selected
+                                </button>
+                                <button className="admin-btn secondary" onClick={clearSelection} disabled={reviewLoading}>Clear</button>
+                            </div>
+                        </div>
+
+                        {pendingAnnouncements.length === 0 ? (
+                            <div className="empty-state">No pending announcements right now.</div>
+                        ) : (
+                            <div className="admin-table-wrapper">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label="Select all pending"
+                                                    checked={pendingAnnouncements.length > 0 && pendingAnnouncements.every((item) => selectedIds.has(item.id))}
+                                                    onChange={(e) => toggleSelectAll(e.target.checked, pendingAnnouncements.map((item) => item.id))}
+                                                />
+                                            </th>
+                                            <th>Title</th>
+                                            <th>Type</th>
+                                            <th>Deadline</th>
+                                            <th>QA</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingAnnouncements.map((item) => {
+                                            const warnings = getAnnouncementWarnings(item);
+                                            const reviewNote = reviewNotes[item.id] ?? '';
+                                            const isRowMutating = mutatingIds.has(item.id);
+                                            return (
+                                                <tr key={item.id}>
+                                                    <td>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.has(item.id)}
+                                                            onChange={() => toggleSelection(item.id)}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <div className="title-cell">
+                                                            <div className="title-text">{item.title}</div>
+                                                            <div className="title-meta">
+                                                                <span>{item.organization || 'Unknown'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>{item.category || 'Uncategorized'}</span>
+                                                                <span className="meta-sep">|</span>
+                                                                <span>v{item.version ?? 1}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
+                                                    <td>{formatDate(item.deadline)}</td>
+                                                    <td>
+                                                        {warnings.length === 0 ? (
+                                                            <span className="status-sub success">Clear</span>
+                                                        ) : (
+                                                            <span className="qa-warning" title={warnings.join(' • ')}>Issues: {warnings.length}</span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <div className="table-actions">
+                                                            <input
+                                                                className="review-note-input"
+                                                                type="text"
+                                                                value={reviewNote}
+                                                                onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                placeholder="Review note (optional)"
+                                                                disabled={isRowMutating}
+                                                            />
+                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
+                                                            <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
+                                                            <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
+                                                            <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
+                                                            {reviewScheduleAt && (
+                                                                <button
+                                                                    className="admin-btn secondary small"
+                                                                    onClick={() => handleScheduleOne(item.id, reviewScheduleAt)}
+                                                                    disabled={isRowMutating}
+                                                                >
+                                                                    Schedule
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
                 ) : activeAdminTab === 'queue' ? (
                     <div className="admin-list">
                         <div className="admin-list-header">
@@ -1747,6 +1988,20 @@ export function AdminPage() {
                             </div>
                             <div className="admin-list-actions">
                                 <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
+                                <div className="admin-toggle">
+                                    <button
+                                        className={`admin-btn secondary ${scheduleView === 'list' ? 'active' : ''}`}
+                                        onClick={() => setScheduleView('list')}
+                                    >
+                                        List
+                                    </button>
+                                    <button
+                                        className={`admin-btn secondary ${scheduleView === 'calendar' ? 'active' : ''}`}
+                                        onClick={() => setScheduleView('calendar')}
+                                    >
+                                        Calendar
+                                    </button>
+                                </div>
                                 <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
                                     {listLoading ? 'Refreshing...' : 'Refresh'}
                                 </button>
@@ -1785,35 +2040,47 @@ export function AdminPage() {
                             </div>
                         </div>
 
-                        <div className="schedule-calendar">
-                            {scheduleCalendar.map((day) => (
-                                <div key={day.key} className="schedule-day">
-                                    <div className="schedule-day-header">
-                                        <span>{day.label}</span>
-                                        <span className="schedule-count">{day.items.length}</span>
-                                    </div>
-                                    {day.items.length === 0 ? (
-                                        <div className="schedule-empty">No scheduled posts</div>
-                                    ) : (
-                                        <div className="schedule-list">
-                                            {day.items.map((item) => (
-                                                <div key={item.id} className="schedule-item">
-                                                    <div>
-                                                        <div className="schedule-title">{item.title}</div>
-                                                        <div className="schedule-meta">{item.organization || 'Unknown'}</div>
-                                                    </div>
-                                                    <span className="schedule-time">{formatDateTime(item.publishAt)}</span>
-                                                </div>
-                                            ))}
+                        {scheduleView === 'calendar' && (
+                            <div className="schedule-calendar">
+                                {scheduleCalendar.map((day) => (
+                                    <div key={day.key} className="schedule-day">
+                                        <div className="schedule-day-header">
+                                            <span>{day.label}</span>
+                                            <span className="schedule-count">{day.items.length}</span>
                                         </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+                                        {day.items.length === 0 ? (
+                                            <div className="schedule-empty">No scheduled posts</div>
+                                        ) : (
+                                            <div className="schedule-list">
+                                                {day.items.map((item) => {
+                                                    const warnings = getAnnouncementWarnings(item);
+                                                    return (
+                                                        <div key={item.id} className="schedule-item">
+                                                            <div>
+                                                                <div className="schedule-title">{item.title}</div>
+                                                                <div className="schedule-meta">
+                                                                    {item.organization || 'Unknown'}
+                                                                    {warnings.length > 0 && (
+                                                                        <span className="qa-warning" title={warnings.join(' • ')}>
+                                                                            QA {warnings.length}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <span className="schedule-time">{formatDateTime(item.publishAt)}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {scheduledAnnouncements.length === 0 ? (
                             <div className="empty-state">No scheduled announcements yet. Set status to Scheduled with a publish time to see items here.</div>
-                        ) : (
+                        ) : scheduleView === 'list' ? (
                             <div className="admin-table-wrapper">
                                 <table className="admin-table">
                                     <thead>
@@ -1830,6 +2097,7 @@ export function AdminPage() {
                                             const reviewNote = reviewNotes[item.id] ?? '';
                                             const publishTime = item.publishAt;
                                             const isOverdue = publishTime ? new Date(publishTime).getTime() <= Date.now() : false;
+                                            const warnings = getAnnouncementWarnings(item);
                                             const isRowMutating = mutatingIds.has(item.id);
                                             return (
                                                 <tr key={item.id}>
@@ -1840,6 +2108,14 @@ export function AdminPage() {
                                                                 <span>{item.organization || 'Unknown'}</span>
                                                                 <span className="meta-sep">|</span>
                                                                 <span>v{item.version ?? 1}</span>
+                                                                {warnings.length > 0 && (
+                                                                    <>
+                                                                        <span className="meta-sep">|</span>
+                                                                        <span className="qa-warning" title={warnings.join(' • ')}>
+                                                                            QA: {warnings.length} issue{warnings.length > 1 ? 's' : ''}
+                                                                        </span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -1871,7 +2147,7 @@ export function AdminPage() {
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 ) : activeAdminTab === 'detailed' ? (
 

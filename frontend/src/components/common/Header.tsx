@@ -4,13 +4,14 @@ import { NotificationCenter } from '../ui/NotificationCenter';
 interface HeaderProps {
     setCurrentPage: (page: PageType) => void;
     user: any;
+    token?: string | null;
     isAuthenticated: boolean;
     onLogin: () => void;
     onLogout: () => void;
     onProfileClick?: () => void;
 }
 
-export function Header({ setCurrentPage, user, isAuthenticated, onLogin, onLogout, onProfileClick }: HeaderProps) {
+export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, onLogout, onProfileClick }: HeaderProps) {
     return (
         <header className="site-header">
             <div className="header-inner">
@@ -20,7 +21,7 @@ export function Header({ setCurrentPage, user, isAuthenticated, onLogin, onLogou
                 <div className="header-controls">
                     {isAuthenticated ? (
                         <>
-                            <NotificationCenter />
+                            <NotificationCenter token={token ?? null} userId={user?.id} />
                             <span className="user-name" onClick={onProfileClick} style={{ cursor: 'pointer' }}>
                                 👤 {user?.name}
                             </span>

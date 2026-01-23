@@ -475,7 +475,7 @@ export function ProfilePage() {
     if (loading) {
         return (
             <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
+                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
                 <main className="main-content"><SkeletonLoader /></main>
             </div>
         );
@@ -483,7 +483,7 @@ export function ProfilePage() {
 
     return (
         <div className="app">
-            <Header setCurrentPage={(page) => navigate('/' + page)} user={user} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
+            <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
             <Navigation
                 activeTab={'profile' as TabType}
                 setActiveTab={() => { }}

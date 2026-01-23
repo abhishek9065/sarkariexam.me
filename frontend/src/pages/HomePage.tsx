@@ -12,7 +12,7 @@ export function HomePage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>(undefined);
     const navigate = useNavigate();
-    const { user, logout, isAuthenticated } = useAuth();
+    const { user, token, logout, isAuthenticated } = useAuth();
     const [showAuthModal, setShowAuthModal] = useState(false);
 
     // Fetch announcements using shared helper
@@ -55,6 +55,7 @@ export function HomePage() {
             <Header
                 setCurrentPage={(page) => page === 'admin' ? navigate('/admin') : navigate('/' + page)}
                 user={user}
+                token={token}
                 isAuthenticated={isAuthenticated}
                 onLogin={() => setShowAuthModal(true)}
                 onLogout={logout}
