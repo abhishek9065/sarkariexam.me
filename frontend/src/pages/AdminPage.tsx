@@ -1237,7 +1237,7 @@ export function AdminPage() {
         }
     };
 
-    const isValidUrl = (value?: string | null) => {
+    function isValidUrl(value?: string | null) {
         if (!value) return true;
         try {
             new URL(value);
@@ -1245,9 +1245,9 @@ export function AdminPage() {
         } catch {
             return false;
         }
-    };
+    }
 
-    const getAnnouncementWarnings = (item: Announcement) => {
+    function getAnnouncementWarnings(item: Announcement) {
         const warnings: string[] = [];
         if (!item.title || item.title.trim().length < 10) {
             warnings.push('Title is too short');
@@ -1271,9 +1271,9 @@ export function AdminPage() {
             warnings.push('External link is invalid');
         }
         return warnings;
-    };
+    }
 
-    const getFixableWarnings = (item: Announcement) => {
+    function getFixableWarnings(item: Announcement) {
         const fixes: string[] = [];
         if (item.externalLink && !isValidUrl(item.externalLink)) {
             fixes.push('Clear invalid external link');
@@ -1290,9 +1290,9 @@ export function AdminPage() {
             }
         }
         return fixes;
-    };
+    }
 
-    const buildQaFixPatch = (item: Announcement) => {
+    function buildQaFixPatch(item: Announcement) {
         const patch: Record<string, any> = {};
         const fixes = getFixableWarnings(item);
 
@@ -1313,9 +1313,9 @@ export function AdminPage() {
         }
 
         return { patch, fixes };
-    };
+    }
 
-    const getFormWarnings = () => {
+    function getFormWarnings() {
         const warnings: string[] = [];
         if (!formData.title.trim() || formData.title.trim().length < 10) {
             warnings.push('Title should be at least 10 characters.');
@@ -1339,7 +1339,7 @@ export function AdminPage() {
             warnings.push('External link is not a valid URL.');
         }
         return warnings;
-    };
+    }
 
     const formatDate = (value?: string) => {
         if (!value) return '-';
