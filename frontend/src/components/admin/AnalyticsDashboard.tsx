@@ -437,57 +437,59 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     </div>
                 </div>
                 {digestClicks ? (
-                    <div className="digest-grid">
-                        <div className="digest-card">
-                            <div className="digest-label">Total clicks</div>
-                            <div className="digest-value">{digestClicks.total.toLocaleString()}</div>
-                        </div>
-                        <div className="digest-card">
-                            <div className="digest-label">Variants</div>
-                            <div className="digest-chips">
-                                {digestClicks.variants.length === 0 ? (
-                                    <span className="digest-chip">Not configured</span>
-                                ) : (
-                                    digestClicks.variants.map((item) => (
-                                        <span key={item.variant} className="digest-chip">
-                                            {item.variant}: {item.clicks}
-                                        </span>
-                                    ))
-                                )}
+                    <>
+                        <div className="digest-grid">
+                            <div className="digest-card">
+                                <div className="digest-label">Total clicks</div>
+                                <div className="digest-value">{digestClicks.total.toLocaleString()}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Variants</div>
+                                <div className="digest-chips">
+                                    {digestClicks.variants.length === 0 ? (
+                                        <span className="digest-chip">Not configured</span>
+                                    ) : (
+                                        digestClicks.variants.map((item) => (
+                                            <span key={item.variant} className="digest-chip">
+                                                {item.variant}: {item.clicks}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Frequency</div>
+                                <div className="digest-chips">
+                                    {digestClicks.frequencies.length === 0 ? (
+                                        <span className="digest-chip">Not configured</span>
+                                    ) : (
+                                        digestClicks.frequencies.map((item) => (
+                                            <span key={item.frequency} className="digest-chip">
+                                                {item.frequency}: {item.clicks}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Top campaigns</div>
+                                <div className="digest-chips">
+                                    {digestClicks.campaigns.length === 0 ? (
+                                        <span className="digest-chip">Not configured</span>
+                                    ) : (
+                                        digestClicks.campaigns.map((item) => (
+                                            <span key={item.campaign} className="digest-chip">
+                                                {item.campaign}: {item.clicks}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="digest-card">
-                            <div className="digest-label">Frequency</div>
-                            <div className="digest-chips">
-                                {digestClicks.frequencies.length === 0 ? (
-                                    <span className="digest-chip">Not configured</span>
-                                ) : (
-                                    digestClicks.frequencies.map((item) => (
-                                        <span key={item.frequency} className="digest-chip">
-                                            {item.frequency}: {item.clicks}
-                                        </span>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                        <div className="digest-card">
-                            <div className="digest-label">Top campaigns</div>
-                            <div className="digest-chips">
-                                {digestClicks.campaigns.length === 0 ? (
-                                    <span className="digest-chip">Not configured</span>
-                                ) : (
-                                    digestClicks.campaigns.map((item) => (
-                                        <span key={item.campaign} className="digest-chip">
-                                            {item.campaign}: {item.clicks}
-                                        </span>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    {digestTotal === 0 && (
-                        <div className="digest-note">Tracking enabled, no clicks yet.</div>
-                    )}
+                        {digestTotal === 0 && (
+                            <div className="digest-note">Tracking enabled, no clicks yet.</div>
+                        )}
+                    </>
                 ) : (
                     <div className="empty-state">Digest click tracking not configured.</div>
                 )}
@@ -501,57 +503,59 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     </div>
                 </div>
                 {deepLinkAttribution ? (
-                    <div className="digest-grid">
-                        <div className="digest-card">
-                            <div className="digest-label">Total deep link clicks</div>
-                            <div className="digest-value">{deepLinkAttribution.total.toLocaleString()}</div>
-                        </div>
-                        <div className="digest-card">
-                            <div className="digest-label">Sources</div>
-                            <div className="digest-chips">
-                                {deepLinkAttribution.sources.length === 0 ? (
-                                    <span className="digest-chip">Not configured</span>
-                                ) : (
-                                    deepLinkAttribution.sources.map((item) => (
-                                        <span key={item.source} className="digest-chip">
-                                            {item.source}: {item.clicks}
-                                        </span>
-                                    ))
-                                )}
+                    <>
+                        <div className="digest-grid">
+                            <div className="digest-card">
+                                <div className="digest-label">Total deep link clicks</div>
+                                <div className="digest-value">{deepLinkAttribution.total.toLocaleString()}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Sources</div>
+                                <div className="digest-chips">
+                                    {deepLinkAttribution.sources.length === 0 ? (
+                                        <span className="digest-chip">Not configured</span>
+                                    ) : (
+                                        deepLinkAttribution.sources.map((item) => (
+                                            <span key={item.source} className="digest-chip">
+                                                {item.source}: {item.clicks}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Mediums</div>
+                                <div className="digest-chips">
+                                    {deepLinkAttribution.mediums.length === 0 ? (
+                                        <span className="digest-chip">Not configured</span>
+                                    ) : (
+                                        deepLinkAttribution.mediums.map((item) => (
+                                            <span key={item.medium} className="digest-chip">
+                                                {item.medium}: {item.clicks}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Campaigns</div>
+                                <div className="digest-chips">
+                                    {deepLinkAttribution.campaigns.length === 0 ? (
+                                        <span className="digest-chip">Not configured</span>
+                                    ) : (
+                                        deepLinkAttribution.campaigns.map((item) => (
+                                            <span key={item.campaign} className="digest-chip">
+                                                {item.campaign}: {item.clicks}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="digest-card">
-                            <div className="digest-label">Mediums</div>
-                            <div className="digest-chips">
-                                {deepLinkAttribution.mediums.length === 0 ? (
-                                    <span className="digest-chip">Not configured</span>
-                                ) : (
-                                    deepLinkAttribution.mediums.map((item) => (
-                                        <span key={item.medium} className="digest-chip">
-                                            {item.medium}: {item.clicks}
-                                        </span>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                        <div className="digest-card">
-                            <div className="digest-label">Campaigns</div>
-                            <div className="digest-chips">
-                                {deepLinkAttribution.campaigns.length === 0 ? (
-                                    <span className="digest-chip">Not configured</span>
-                                ) : (
-                                    deepLinkAttribution.campaigns.map((item) => (
-                                        <span key={item.campaign} className="digest-chip">
-                                            {item.campaign}: {item.clicks}
-                                        </span>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    {deepLinkTotal === 0 && (
-                        <div className="digest-note">Tracking enabled, no clicks yet.</div>
-                    )}
+                        {deepLinkTotal === 0 && (
+                            <div className="digest-note">Tracking enabled, no clicks yet.</div>
+                        )}
+                    </>
                 ) : (
                     <div className="empty-state">Deep link tracking not configured.</div>
                 )}
