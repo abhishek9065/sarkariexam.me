@@ -46,9 +46,22 @@ interface SavedSearchDoc {
     updatedAt: Date;
 }
 
+interface NotificationDoc {
+    userId: string;
+    announcementId: string;
+    title: string;
+    type: ContentType;
+    slug?: string;
+    organization?: string;
+    source: string;
+    createdAt: Date;
+    readAt?: Date | null;
+}
+
 const router = Router();
 const collection = () => getCollection<UserProfileDoc>('user_profiles');
 const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searches');
+const notificationsCollection = () => getCollection<NotificationDoc>('user_notifications');
 
 const profileUpdateSchema = z.object({
     preferredCategories: z.array(z.string()).optional(),
@@ -148,6 +161,11 @@ function formatProfile(doc: any) {
 
 
 function formatSavedSearch(doc: any) {
+    const { _id, ...rest } = doc;
+    return { id: _id?.toString?.() || _id, ...rest };
+}
+
+function formatNotification(doc: any) {
     const { _id, ...rest } = doc;
     return { id: _id?.toString?.() || _id, ...rest };
 }
@@ -261,6 +279,39 @@ async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, 
         .slice(0, limit);
 
     return { matches, totalMatches: matches.length };
+}
+
+async function upsertNotifications(userId: string, items: any[], source: string) {
+    if (!items.length) return;
+    const ops = items.map(item => ({
+        updateOne: {
+            filter: {
+                userId,
+                announcementId: String(item.id),
+                source,
+            },
+            update: {
+                $setOnInsert: {
+                    userId,
+                    announcementId: String(item.id),
+                    title: item.title,
+                    type: item.type,
+                    slug: item.slug,
+                    organization: item.organization,
+                    source,
+                    createdAt: new Date(),
+                    readAt: null,
+                },
+            },
+            upsert: true,
+        }
+    }));
+
+    try {
+        await notificationsCollection().bulkWrite(ops, { ordered: false });
+    } catch (error) {
+        console.error('[Notifications] Upsert error:', error);
+    }
 }
 
 function hasProfilePreferences(profile: UserProfileDoc) {
@@ -511,6 +562,11 @@ router.get('/alerts', authenticateToken, async (req, res) => {
 
         const preferences = await getPreferenceAlerts(profile, sinceMs, limit);
 
+        await Promise.all([
+            ...savedSearches.map(entry => upsertNotifications(req.user!.userId, entry.matches || [], `saved:${entry.id}`)),
+            upsertNotifications(req.user!.userId, preferences.matches, 'preferences')
+        ]);
+
         recordAnalyticsEvent({
             type: 'alerts_view',
             userId: req.user!.userId,
@@ -580,6 +636,10 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
             .sort((a, b) => getAnnouncementTimestamp(b) - getAnnouncementTimestamp(a))
             .slice(0, limit);
 
+        const topCategory = preview.find(item => item.category)?.category || 'updates';
+        const subjectA = `${preview.length} new ${topCategory} alerts for you`;
+        const subjectB = `Your ${topCategory} digest: ${preview.length} fresh posts`;
+
         recordAnalyticsEvent({
             type: 'digest_preview',
             userId: req.user!.userId,
@@ -598,12 +658,72 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
                     savedSearchMatches: savedSearches.reduce((sum, entry) => sum + (entry.matches?.length || 0), 0),
                     preferenceMatches: preferences.matches.length,
                 },
+                subjects: {
+                    variantA: subjectA,
+                    variantB: subjectB,
+                },
                 preview,
             }
         });
     } catch (error) {
         console.error('Digest preview error:', error);
         return res.status(500).json({ error: 'Failed to load digest preview' });
+    }
+});
+
+// Notification history (persisted)
+router.get('/notifications', authenticateToken, async (req, res) => {
+    try {
+        const limit = Math.min(50, parseInt(req.query.limit as string) || 12);
+        const docs = await notificationsCollection()
+            .find({ userId: req.user!.userId })
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .toArray();
+
+        const unreadCount = await notificationsCollection().countDocuments({ userId: req.user!.userId, readAt: null });
+
+        return res.json({
+            data: docs.map(formatNotification),
+            unreadCount,
+        });
+    } catch (error) {
+        console.error('Notifications fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load notifications' });
+    }
+});
+
+router.post('/notifications/read', authenticateToken, async (req, res) => {
+    try {
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+        const markAll = Boolean(req.body?.all);
+
+        if (!markAll && ids.length === 0) {
+            return res.status(400).json({ error: 'Provide ids or set all=true' });
+        }
+
+        if (markAll) {
+            await notificationsCollection().updateMany(
+                { userId: req.user!.userId, readAt: null },
+                { $set: { readAt: new Date() } }
+            );
+            return res.json({ message: 'All notifications marked as read' });
+        }
+
+        const objectIds = ids.filter(isValidObjectId).map(toObjectId);
+        if (objectIds.length === 0) {
+            return res.status(400).json({ error: 'Invalid notification ids' });
+        }
+
+        await notificationsCollection().updateMany(
+            { _id: { $in: objectIds }, userId: req.user!.userId },
+            { $set: { readAt: new Date() } }
+        );
+
+        return res.json({ message: 'Notifications marked as read' });
+    } catch (error) {
+        console.error('Notifications read error:', error);
+        return res.status(500).json({ error: 'Failed to update notifications' });
     }
 });
 

@@ -21,7 +21,7 @@ export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, 
                 <div className="header-controls">
                     {isAuthenticated ? (
                         <>
-                            <NotificationCenter token={token ?? null} userId={user?.id} />
+                            <NotificationCenter token={token ?? null} />
                             <span className="user-name" onClick={onProfileClick} style={{ cursor: 'pointer' }}>
                                 👤 {user?.name}
                             </span>

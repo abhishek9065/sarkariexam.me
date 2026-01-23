@@ -6,6 +6,21 @@ function escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function buildSearchRegexes(value: string): RegExp[] {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    const exact = new RegExp(escapeRegex(trimmed), 'i');
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    const fuzzyPattern = words
+        .map(word => word.split('').map(char => escapeRegex(char)).join('.*?'))
+        .join('.*');
+    const regexes = [exact];
+    if (trimmed.length >= 4 && fuzzyPattern.length > 0) {
+        regexes.push(new RegExp(fuzzyPattern, 'i'));
+    }
+    return regexes;
+}
+
 interface AnnouncementVersionDoc {
     version: number;
     updatedAt: Date;
@@ -95,15 +110,19 @@ function buildLiveQuery(now: Date = new Date()): Filter<AnnouncementDoc> {
     };
 }
 
-function addSearchFilter(query: Filter<AnnouncementDoc>, searchRegex: RegExp): void {
+function addSearchFilter(query: Filter<AnnouncementDoc>, searchRegexes: RegExp[]): void {
+    const regexes = searchRegexes.length > 0 ? searchRegexes : [];
+    if (regexes.length === 0) return;
+    const orClauses = regexes.flatMap((regex) => ([
+        { title: regex },
+        { content: regex },
+        { organization: regex },
+        { category: regex },
+        { tags: regex },
+    ]));
+
     const searchClause: Filter<AnnouncementDoc> = {
-        $or: [
-            { title: searchRegex },
-            { content: searchRegex },
-            { organization: searchRegex },
-            { category: searchRegex },
-            { tags: searchRegex },
-        ],
+        $or: orClauses,
     };
 
     if (query.$and) {
@@ -189,9 +208,7 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.search && filters.search.trim()) {
-                const safeSearch = escapeRegex(filters.search.trim());
-                const searchRegex = new RegExp(safeSearch, 'i');
-                addSearchFilter(query, searchRegex);
+                addSearchFilter(query, buildSearchRegexes(filters.search));
             }
 
             // Cosmos DB only indexes _id by default, so use simple sort
@@ -274,9 +291,7 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.search && filters.search.trim()) {
-                const safeSearch = escapeRegex(filters.search.trim());
-                const searchRegex = new RegExp(safeSearch, 'i');
-                addSearchFilter(query, searchRegex);
+                addSearchFilter(query, buildSearchRegexes(filters.search));
             }
 
             let sortDirection: 1 | -1 = -1;
@@ -345,9 +360,7 @@ export class AnnouncementModelMongo {
             if (filters?.location) query.location = { $regex: filters.location, $options: 'i' };
             if (filters?.qualification) query.minQualification = { $regex: filters.qualification, $options: 'i' };
             if (filters?.search && filters.search.trim()) {
-                const safeSearch = escapeRegex(filters.search.trim());
-                const searchRegex = new RegExp(safeSearch, 'i');
-                addSearchFilter(query, searchRegex);
+                addSearchFilter(query, buildSearchRegexes(filters.search));
             }
 
             let sort: Sort = { _id: -1 };
@@ -431,9 +444,7 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.search && filters.search.trim()) {
-                const safeSearch = escapeRegex(filters.search.trim());
-                const searchRegex = new RegExp(safeSearch, 'i');
-                addSearchFilter(query, searchRegex);
+                addSearchFilter(query, buildSearchRegexes(filters.search));
             }
 
             // Handle cursor for keyset pagination
@@ -546,6 +557,20 @@ export class AnnouncementModelMongo {
         } catch (error) {
             console.error('[MongoDB] findById error:', error);
             return null;
+        }
+    }
+
+    static async findByIdsAdmin(ids: string[]): Promise<AnnouncementDoc[]> {
+        const validIds = ids.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+        if (validIds.length === 0) return [];
+
+        try {
+            return await this.collection
+                .find({ _id: { $in: validIds } })
+                .toArray();
+        } catch (error) {
+            console.error('[MongoDB] findByIdsAdmin error:', error);
+            return [];
         }
     }
 

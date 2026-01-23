@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Announcement } from '../../types';
 import './NotificationCenter.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 type NotificationItem = {
     id: string;
+    announcementId: string;
     title: string;
     type: string;
     slug?: string;
     source: string;
-    timestamp: string;
+    organization?: string;
+    createdAt: string;
+    readAt?: string | null;
 };
 
-const getStorageKey = (userId?: string) => `notifications_read_${userId || 'guest'}`;
-
-export function NotificationCenter({ token, userId }: { token: string | null; userId?: string }) {
+export function NotificationCenter({ token }: { token: string | null }) {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [open, setOpen] = useState(false);
@@ -24,60 +24,14 @@ export function NotificationCenter({ token, userId }: { token: string | null; us
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [savedSearchCount, setSavedSearchCount] = useState(0);
-
-    const readIds = useMemo(() => {
-        if (!userId) return new Set<string>();
-        try {
-            const stored = localStorage.getItem(getStorageKey(userId));
-            if (!stored) return new Set<string>();
-            return new Set<string>(JSON.parse(stored));
-        } catch {
-            return new Set<string>();
-        }
-    }, [userId]);
-
-    const unreadCount = useMemo(() => {
-        if (!items.length) return 0;
-        return items.filter((item) => !readIds.has(item.id)).length;
-    }, [items, readIds]);
-
-    const persistReadIds = (next: Set<string>) => {
-        if (!userId) return;
-        localStorage.setItem(getStorageKey(userId), JSON.stringify(Array.from(next)));
-    };
-
-    const markAllRead = () => {
-        const next = new Set(readIds);
-        items.forEach((item) => next.add(item.id));
-        persistReadIds(next);
-        setItems([...items]);
-    };
-
-    const markRead = (id: string) => {
-        const next = new Set(readIds);
-        next.add(id);
-        persistReadIds(next);
-        setItems([...items]);
-    };
-
-    const normalizeAnnouncement = (item: Announcement, source: string): NotificationItem => {
-        const timestamp = item.postedAt || item.updatedAt || new Date().toISOString();
-        return {
-            id: `${item.id}:${source}`,
-            title: item.title,
-            type: item.type,
-            slug: item.slug,
-            source,
-            timestamp,
-        };
-    };
+    const [unreadCount, setUnreadCount] = useState(0);
 
     const fetchNotifications = async () => {
         if (!token) return;
         setLoading(true);
         setError('');
         try {
-            const response = await fetch(`${apiBase}/api/profile/alerts?windowDays=7&limit=6`, {
+            const response = await fetch(`${apiBase}/api/profile/notifications?limit=12`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) {
@@ -85,25 +39,52 @@ export function NotificationCenter({ token, userId }: { token: string | null; us
                 return;
             }
             const payload = await response.json();
-            const savedSearches = payload.data?.savedSearches ?? [];
-            const preferences = payload.data?.preferences?.matches ?? [];
-
-            const savedItems = savedSearches.flatMap((entry: any) =>
-                (entry.matches ?? []).map((match: Announcement) => normalizeAnnouncement(match, `saved:${entry.id}`))
+            setItems(payload.data ?? []);
+            setUnreadCount(payload.unreadCount ?? 0);
+            setSavedSearchCount(
+                (payload.data ?? []).filter((item: NotificationItem) => item.source?.startsWith('saved')).length
             );
-            const preferenceItems = preferences.map((match: Announcement) => normalizeAnnouncement(match, 'preferences'));
-
-            const combined = [...savedItems, ...preferenceItems]
-                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                .slice(0, 12);
-
-            setSavedSearchCount(savedSearches.length);
-            setItems(combined);
         } catch (err) {
             console.error(err);
             setError('Unable to load alerts.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const markAllRead = async () => {
+        if (!token) return;
+        try {
+            await fetch(`${apiBase}/api/profile/notifications/read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ all: true }),
+            });
+            setItems((prev) => prev.map((item) => ({ ...item, readAt: new Date().toISOString() })));
+            setUnreadCount(0);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const markRead = async (id: string) => {
+        if (!token) return;
+        try {
+            await fetch(`${apiBase}/api/profile/notifications/read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ ids: [id] }),
+            });
+            setItems((prev) => prev.map((item) => (item.id === id ? { ...item, readAt: new Date().toISOString() } : item)));
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+        } catch (err) {
+            console.error(err);
         }
     };
 
@@ -153,7 +134,7 @@ export function NotificationCenter({ token, userId }: { token: string | null; us
                     ) : (
                         <div className="notification-list">
                             {items.map((item) => {
-                                const isRead = readIds.has(item.id);
+                                const isRead = Boolean(item.readAt);
                                 return (
                                     <button
                                         key={item.id}
@@ -161,7 +142,7 @@ export function NotificationCenter({ token, userId }: { token: string | null; us
                                         onClick={() => {
                                             markRead(item.id);
                                             if (item.slug) {
-                                                navigate(`/${item.type}/${item.slug}`);
+                                                navigate(`/${item.type}/${item.slug}?source=notification`);
                                             }
                                             setOpen(false);
                                         }}
@@ -169,7 +150,7 @@ export function NotificationCenter({ token, userId }: { token: string | null; us
                                         <div>
                                             <div className="notification-title">{item.title}</div>
                                             <div className="notification-meta">
-                                                {item.source.startsWith('saved') ? 'Saved search' : 'Preferences'} • {new Date(item.timestamp).toLocaleDateString('en-IN')}
+                                                {item.source?.startsWith('saved') ? 'Saved search' : 'Preferences'} • {new Date(item.createdAt).toLocaleDateString('en-IN')}
                                             </div>
                                         </div>
                                         <span className="notification-type">{item.type}</span>

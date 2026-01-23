@@ -303,7 +303,7 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
     recordAnalyticsEvent({
       type: 'card_click',
       announcementId: String(announcement.id),
-      metadata: { type: announcement.type },
+      metadata: { type: announcement.type, category: announcement.category ?? null, source: req.query.source ?? null },
     }).catch(console.error);
 
     return res.json({ data: announcement });
