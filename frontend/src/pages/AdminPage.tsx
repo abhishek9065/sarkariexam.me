@@ -1546,7 +1546,7 @@ export function AdminPage() {
                         </ul>
                     </div>
                     <div className="admin-help-actions">
-                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Open manager</button>
+                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Open content manager</button>
                         <button className="admin-btn secondary" onClick={() => setActiveAdminTab('queue')}>Schedule queue</button>
                         <button className="admin-btn secondary" onClick={() => setActiveAdminTab('audit')}>Audit log</button>
                     </div>

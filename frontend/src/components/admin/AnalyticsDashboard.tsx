@@ -231,7 +231,12 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const ctrByType = analytics.ctrByType ?? [];
     const digestClicks = analytics.digestClicks;
     const deepLinkAttribution = analytics.deepLinkAttribution;
+    const digestTotal = digestClicks?.total ?? 0;
+    const deepLinkTotal = deepLinkAttribution?.total ?? 0;
     const funnel = analytics.funnel;
+    const funnelHasDirectTraffic = Boolean(
+        (funnel?.cardClicks ?? 0) > 0 && (funnel?.detailViews ?? 0) > (funnel?.cardClicks ?? 0)
+    );
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
@@ -381,15 +386,23 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         </div>
                     ))}
                 </div>
+                {funnelHasDirectTraffic && (
+                    <p className="analytics-hint">
+                        Detail views can exceed card clicks because they include direct/SEO visits and deep links.
+                    </p>
+                )}
             </div>
 
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
-                        <h3>CTR by category (type)</h3>
+                        <h3>CTR by listing type</h3>
                         <p className="analytics-subtitle">Card clicks per listing view, grouped by listing type.</p>
                     </div>
                 </div>
+                <p className="analytics-hint">
+                    CTR is based on listing views tracked with a type filter, so totals can be lower than overall views.
+                </p>
                 {ctrByType.length === 0 ? (
                     <div className="empty-state">No CTR data yet. Apply a type filter to generate listing view events.</div>
                 ) : (
@@ -433,7 +446,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <div className="digest-label">Variants</div>
                             <div className="digest-chips">
                                 {digestClicks.variants.length === 0 ? (
-                                    <span className="digest-chip">No data</span>
+                                    <span className="digest-chip">Not configured</span>
                                 ) : (
                                     digestClicks.variants.map((item) => (
                                         <span key={item.variant} className="digest-chip">
@@ -447,7 +460,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <div className="digest-label">Frequency</div>
                             <div className="digest-chips">
                                 {digestClicks.frequencies.length === 0 ? (
-                                    <span className="digest-chip">No data</span>
+                                    <span className="digest-chip">Not configured</span>
                                 ) : (
                                     digestClicks.frequencies.map((item) => (
                                         <span key={item.frequency} className="digest-chip">
@@ -461,7 +474,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <div className="digest-label">Top campaigns</div>
                             <div className="digest-chips">
                                 {digestClicks.campaigns.length === 0 ? (
-                                    <span className="digest-chip">No data</span>
+                                    <span className="digest-chip">Not configured</span>
                                 ) : (
                                     digestClicks.campaigns.map((item) => (
                                         <span key={item.campaign} className="digest-chip">
@@ -472,8 +485,11 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             </div>
                         </div>
                     </div>
+                    {digestTotal === 0 && (
+                        <div className="digest-note">Tracking enabled, no clicks yet.</div>
+                    )}
                 ) : (
-                    <div className="empty-state">No digest click data yet.</div>
+                    <div className="empty-state">Digest click tracking not configured.</div>
                 )}
             </div>
 
@@ -494,7 +510,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <div className="digest-label">Sources</div>
                             <div className="digest-chips">
                                 {deepLinkAttribution.sources.length === 0 ? (
-                                    <span className="digest-chip">No data</span>
+                                    <span className="digest-chip">Not configured</span>
                                 ) : (
                                     deepLinkAttribution.sources.map((item) => (
                                         <span key={item.source} className="digest-chip">
@@ -508,7 +524,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <div className="digest-label">Mediums</div>
                             <div className="digest-chips">
                                 {deepLinkAttribution.mediums.length === 0 ? (
-                                    <span className="digest-chip">No data</span>
+                                    <span className="digest-chip">Not configured</span>
                                 ) : (
                                     deepLinkAttribution.mediums.map((item) => (
                                         <span key={item.medium} className="digest-chip">
@@ -522,7 +538,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <div className="digest-label">Campaigns</div>
                             <div className="digest-chips">
                                 {deepLinkAttribution.campaigns.length === 0 ? (
-                                    <span className="digest-chip">No data</span>
+                                    <span className="digest-chip">Not configured</span>
                                 ) : (
                                     deepLinkAttribution.campaigns.map((item) => (
                                         <span key={item.campaign} className="digest-chip">
@@ -533,8 +549,11 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             </div>
                         </div>
                     </div>
+                    {deepLinkTotal === 0 && (
+                        <div className="digest-note">Tracking enabled, no clicks yet.</div>
+                    )}
                 ) : (
-                    <div className="empty-state">No deep link attribution data yet.</div>
+                    <div className="empty-state">Deep link tracking not configured.</div>
                 )}
             </div>
 
@@ -610,7 +629,12 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
 
             {/* Popular Announcements */}
             <div className="analytics-section">
-                <h3>Most Popular Announcements</h3>
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Most Popular Announcements</h3>
+                        <p className="analytics-subtitle">Top 10 announcements by total views.</p>
+                    </div>
+                </div>
                 <table className="analytics-table">
                     <thead>
                         <tr>
