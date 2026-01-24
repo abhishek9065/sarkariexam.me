@@ -201,7 +201,14 @@ export function validateContentType(req: Request, res: Response, next: NextFunct
 
     if (methods.includes(req.method)) {
         const contentType = req.headers['content-type'];
-        if (!contentType || !contentType.includes('application/json')) {
+        const contentLength = Number(req.headers['content-length'] ?? 0);
+        if (!contentType) {
+            if (contentLength === 0) {
+                return next();
+            }
+            return res.status(415).json({ error: 'Content-Type must be application/json' });
+        }
+        if (!contentType.includes('application/json')) {
             return res.status(415).json({ error: 'Content-Type must be application/json' });
         }
     }

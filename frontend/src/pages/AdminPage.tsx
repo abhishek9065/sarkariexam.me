@@ -335,6 +335,10 @@ export function AdminPage() {
             await adminRequest(`${apiBase}/api/auth/logout`, {
                 method: 'POST',
                 maxRetries: 0,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: '{}',
             });
         } catch (error) {
             console.error('Logout API call failed:', error);
