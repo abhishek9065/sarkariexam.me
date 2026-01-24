@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnalyticsDashboard } from '../components/admin/AnalyticsDashboard';
 import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingForm';
@@ -165,6 +165,7 @@ export function AdminPage() {
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
     const storedFilters = useMemo(() => loadListFilters(), []);
     const [listQuery, setListQuery] = useState(storedFilters?.query ?? '');
+    const [debouncedListQuery, setDebouncedListQuery] = useState(listQuery);
     const [listTypeFilter, setListTypeFilter] = useState<ContentType | 'all'>(storedFilters?.type ?? 'all');
     const [listSort, setListSort] = useState<'newest' | 'updated' | 'deadline' | 'views'>(storedFilters?.sort ?? 'newest');
     const [listPage, setListPage] = useState(1);
@@ -220,6 +221,9 @@ export function AdminPage() {
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [pendingEditId, setPendingEditId] = useState<string | null>(null);
+    const listRequestInFlight = useRef(false);
+    const listLastFetchAt = useRef(0);
+    const listRateLimitUntil = useRef(0);
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -356,9 +360,6 @@ export function AdminPage() {
             const data = await res.json();
             setAnnouncements(data.data || []);
             setListUpdatedAt(new Date().toISOString());
-            if (activeAdminTab === 'list') {
-                refreshListData();
-            }
         } catch (e) {
             console.error(e);
             setMessage('Failed to load announcements.');
@@ -367,8 +368,16 @@ export function AdminPage() {
         }
     };
 
-    const refreshListData = useCallback(async () => {
+    const refreshListData = useCallback(async (options?: { force?: boolean }) => {
         if (!isLoggedIn) return;
+        const now = Date.now();
+        if (!options?.force) {
+            if (listRequestInFlight.current) return;
+            if (now < listRateLimitUntil.current) return;
+            if (now - listLastFetchAt.current < 800) return;
+        }
+        listRequestInFlight.current = true;
+        listLastFetchAt.current = now;
         setListLoading(true);
         try {
             const params = new URLSearchParams({
@@ -379,8 +388,15 @@ export function AdminPage() {
             });
             if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
             if (listTypeFilter !== 'all') params.set('type', listTypeFilter);
-            if (listQuery.trim()) params.set('search', listQuery.trim());
+            if (debouncedListQuery.trim()) params.set('search', debouncedListQuery.trim());
             const res = await adminFetch(`${apiBase}/api/admin/announcements?${params.toString()}`);
+            if (res.status === 429) {
+                const retryAfter = res.headers.get('Retry-After');
+                const waitMs = retryAfter && Number.isFinite(Number(retryAfter))
+                    ? Number(retryAfter) * 1000
+                    : 60_000;
+                listRateLimitUntil.current = Date.now() + waitMs;
+            }
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Failed to load announcements.'));
@@ -394,9 +410,10 @@ export function AdminPage() {
             console.error(error);
             setMessage('Failed to load announcements.');
         } finally {
+            listRequestInFlight.current = false;
             setListLoading(false);
         }
-    }, [adminFetch, isLoggedIn, listPage, listQuery, listSort, listStatusFilter, listTypeFilter, pageSize]);
+    }, [adminFetch, debouncedListQuery, isLoggedIn, listPage, listSort, listStatusFilter, listTypeFilter, pageSize]);
 
     const refreshActiveUsers = async () => {
         if (!isLoggedIn) return;
@@ -1659,6 +1676,13 @@ export function AdminPage() {
     }, [listQuery, listTypeFilter, listStatusFilter, listSort]);
 
     useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedListQuery(listQuery);
+        }, 350);
+        return () => window.clearTimeout(timer);
+    }, [listQuery]);
+
+    useEffect(() => {
         const payload: ListFilterState = {
             query: listQuery,
             type: listTypeFilter,
@@ -1679,7 +1703,7 @@ export function AdminPage() {
     useEffect(() => {
         if (!isLoggedIn || activeAdminTab !== 'list') return;
         refreshListData();
-    }, [isLoggedIn, activeAdminTab, listQuery, listTypeFilter, listStatusFilter, listSort, listPage, refreshListData]);
+    }, [isLoggedIn, activeAdminTab, debouncedListQuery, listTypeFilter, listStatusFilter, listSort, listPage, refreshListData]);
 
     useEffect(() => {
         if (!pendingEditId) return;
