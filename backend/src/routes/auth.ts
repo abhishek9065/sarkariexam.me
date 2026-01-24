@@ -69,7 +69,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       config.jwtSecret,
-      buildJwtOptions(config.jwtExpiry)
+      buildJwtOptions(config.jwtExpiry as SignOptions['expiresIn'])
     );
 
     recordAnalyticsEvent({
@@ -141,7 +141,9 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       }
     }
 
-    const expiresIn = user.role === 'admin' ? config.adminJwtExpiry : config.jwtExpiry;
+    const expiresIn = (user.role === 'admin'
+      ? config.adminJwtExpiry
+      : config.jwtExpiry) as SignOptions['expiresIn'];
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       config.jwtSecret,
