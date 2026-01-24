@@ -4,6 +4,8 @@ import { WebSocketServer } from 'ws';
 import { config } from '../config.js';
 import { getAnalyticsOverview } from './analyticsOverview.js';
 import { hasPermission } from './rbac.js';
+import { getClientIP } from '../middleware/security.js';
+import { SecurityLogger } from './securityLogger.js';
 
 const UPDATE_INTERVAL_MS = 30 * 1000;
 
@@ -18,6 +20,33 @@ export function startAnalyticsWebSocket(server: Server) {
             const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
             if (!token) {
                 socket.close(1008, 'Token required');
+                return;
+            }
+
+            const clientIp = getClientIP(req as any);
+            if (config.adminEnforceHttps) {
+                const forwardedProto = req.headers['x-forwarded-proto'];
+                const isSecure = (req as any).secure || forwardedProto === 'https';
+                if (!isSecure) {
+                    SecurityLogger.log({
+                        ip_address: clientIp,
+                        event_type: 'suspicious_activity',
+                        endpoint: '/ws/analytics',
+                        metadata: { reason: 'admin_https_required' },
+                    });
+                    socket.close(1008, 'HTTPS required');
+                    return;
+                }
+            }
+
+            if (config.adminIpAllowlist.length > 0 && !config.adminIpAllowlist.includes(clientIp)) {
+                SecurityLogger.log({
+                    ip_address: clientIp,
+                    event_type: 'suspicious_activity',
+                    endpoint: '/ws/analytics',
+                    metadata: { reason: 'admin_ip_block' },
+                });
+                socket.close(1008, 'Admin access restricted');
                 return;
             }
 

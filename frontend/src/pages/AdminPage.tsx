@@ -231,6 +231,13 @@ export function AdminPage() {
             option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
         );
     }, [categorySearch]);
+    const categoryOptions = useMemo(() => {
+        const current = formData.category;
+        if (current && !filteredCategories.some((option) => option.value === current)) {
+            return [{ value: current, label: current, icon: '🔖' }, ...filteredCategories];
+        }
+        return filteredCategories;
+    }, [filteredCategories, formData.category]);
 
     const pushToast = (message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
@@ -2937,7 +2944,7 @@ export function AdminPage() {
                                         onChange={(e) => setCategorySearch(e.target.value)}
                                     />
                                     <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                                        {filteredCategories.map((option) => (
+                                        {categoryOptions.map((option) => (
                                             <option key={option.value} value={option.value}>
                                                 {option.icon} {option.label}
                                             </option>
@@ -3326,7 +3333,7 @@ export function AdminPage() {
                                         onChange={(e) => setCategorySearch(e.target.value)}
                                     />
                                     <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                                        {filteredCategories.map((option) => (
+                                        {categoryOptions.map((option) => (
                                             <option key={option.value} value={option.value}>
                                                 {option.icon} {option.label}
                                             </option>

@@ -120,6 +120,19 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     await clearFailedLogins(clientIP);
 
     if (user.role === 'admin') {
+      if (config.adminEnforceHttps) {
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const isSecure = req.secure || forwardedProto === 'https';
+        if (!isSecure) {
+          SecurityLogger.log({
+            ip_address: clientIP,
+            event_type: 'auth_failure',
+            endpoint: '/api/auth/login',
+            metadata: { reason: 'admin_https_required', email: user.email }
+          });
+          return res.status(403).json({ error: 'HTTPS required for admin access' });
+        }
+      }
       const allowlist = config.adminIpAllowlist;
       if (allowlist.length > 0 && !allowlist.includes(clientIP)) {
         SecurityLogger.log({
