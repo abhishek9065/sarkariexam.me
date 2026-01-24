@@ -225,21 +225,6 @@ export function AdminPage() {
     const heroActiveJobs = overview?.activeJobs ?? 0;
     const heroNewThisWeek = overview?.newThisWeek ?? 0;
     const heroExpiringSoon = overview?.expiringSoon ?? 0;
-    const filteredCategories = useMemo(() => {
-        const query = categorySearch.trim().toLowerCase();
-        if (!query) return CATEGORY_OPTIONS;
-        return CATEGORY_OPTIONS.filter((option) =>
-            option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
-        );
-    }, [categorySearch]);
-    const categoryOptions = useMemo(() => {
-        const current = formData.category;
-        if (current && !filteredCategories.some((option) => option.value === current)) {
-            return [{ value: current, label: current, icon: '🔖' }, ...filteredCategories];
-        }
-        return filteredCategories;
-    }, [filteredCategories, formData.category]);
-
     const pushToast = (message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
         setToasts((prev) => [...prev, { id, message, tone }]);
@@ -320,6 +305,21 @@ export function AdminPage() {
     const [message, setMessage] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [bulkJson, setBulkJson] = useState('');
+
+    const filteredCategories = useMemo(() => {
+        const query = categorySearch.trim().toLowerCase();
+        if (!query) return CATEGORY_OPTIONS;
+        return CATEGORY_OPTIONS.filter((option) =>
+            option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
+        );
+    }, [categorySearch]);
+    const categoryOptions = useMemo(() => {
+        const current = formData.category;
+        if (current && !filteredCategories.some((option) => option.value === current)) {
+            return [{ value: current, label: current, icon: '🔖' }, ...filteredCategories];
+        }
+        return filteredCategories;
+    }, [filteredCategories, formData.category]);
 
     // Preview mode state
     const [showPreview, setShowPreview] = useState(false);
