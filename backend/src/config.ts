@@ -22,6 +22,14 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
 };
 
 /**
+ * Parse boolean with fallback.
+ */
+const parseBoolean = (value: string | undefined, fallback = false): boolean => {
+  if (value === undefined) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+};
+
+/**
  * Get environment variable with optional fallback.
  */
 const getEnv = (key: string, fallback?: string): string => {
@@ -91,6 +99,15 @@ const corsOrigins = parseCsv(process.env.CORS_ORIGINS);
 const rateLimitWindowMs = parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60000);
 const rateLimitMax = parseNumber(process.env.RATE_LIMIT_MAX, 200);
 const authRateLimitMax = parseNumber(process.env.AUTH_RATE_LIMIT_MAX, 20);
+const adminRateLimitMax = parseNumber(process.env.ADMIN_RATE_LIMIT_MAX, 60);
+const adminIpAllowlist = parseCsv(process.env.ADMIN_IP_ALLOWLIST);
+const adminEmailAllowlist = parseCsv(process.env.ADMIN_EMAIL_ALLOWLIST);
+const adminDomainAllowlist = parseCsv(process.env.ADMIN_DOMAIN_ALLOWLIST);
+const adminEnforceHttps = parseBoolean(process.env.ADMIN_ENFORCE_HTTPS, isProduction);
+const jwtIssuer = process.env.JWT_ISSUER ?? '';
+const jwtAudience = process.env.JWT_AUDIENCE ?? '';
+const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
+const adminJwtExpiry = process.env.ADMIN_JWT_EXPIRY ?? '6h';
 
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
@@ -103,8 +120,17 @@ export const config = {
   rateLimitWindowMs,
   rateLimitMax,
   authRateLimitMax,
+  adminRateLimitMax,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProduction,
+  adminIpAllowlist,
+  adminEmailAllowlist,
+  adminDomainAllowlist,
+  adminEnforceHttps,
+  jwtIssuer,
+  jwtAudience,
+  jwtExpiry,
+  adminJwtExpiry,
 
   // Cosmos DB specific
   cosmosDbName: process.env.COSMOS_DATABASE_NAME || 'sarkari_db',

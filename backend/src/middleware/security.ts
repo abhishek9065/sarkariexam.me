@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
+import { config } from '../config.js';
 import RedisCache from '../services/redis.js';
+import { SecurityLogger } from '../services/securityLogger.js';
 
 /**
  * Comprehensive security middleware
@@ -205,4 +207,46 @@ export function validateContentType(req: Request, res: Response, next: NextFunct
     }
 
     next();
+}
+
+const isIpAllowlisted = (ip: string, allowlist: string[]) => {
+    if (allowlist.length === 0) return true;
+    return allowlist.includes(ip);
+};
+
+/**
+ * Enforce HTTPS for admin routes (optional).
+ */
+export function enforceAdminHttps(req: Request, res: Response, next: NextFunction) {
+    if (!config.adminEnforceHttps) {
+        return next();
+    }
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const isSecure = req.secure || forwardedProto === 'https';
+    if (isSecure) {
+        return next();
+    }
+    return res.status(403).json({ error: 'HTTPS required for admin access' });
+}
+
+/**
+ * Enforce admin IP allowlist (optional).
+ */
+export function enforceAdminIpAllowlist(req: Request, res: Response, next: NextFunction) {
+    if (!config.adminIpAllowlist.length) {
+        return next();
+    }
+    const ip = getClientIP(req);
+    if (isIpAllowlisted(ip, config.adminIpAllowlist)) {
+        return next();
+    }
+
+    SecurityLogger.log({
+        ip_address: ip,
+        event_type: 'suspicious_activity',
+        endpoint: req.originalUrl || req.url,
+        metadata: { reason: 'admin_ip_block' },
+    });
+
+    return res.status(403).json({ error: 'Admin access restricted' });
 }

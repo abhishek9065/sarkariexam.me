@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { VerifyOptions } from 'jsonwebtoken';
 import { config } from '../config.js';
 import { JwtPayload } from '../types.js';
 import RedisCache from '../services/redis.js';
@@ -46,7 +46,10 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    const verifyOptions: VerifyOptions = {};
+    if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
+    if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
+    const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
     req.user = decoded;
     next();
   } catch (error) {
@@ -87,7 +90,10 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    const verifyOptions: VerifyOptions = {};
+    if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
+    if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
+    const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
     req.user = decoded;
   } catch (error) {
     // Invalid token is ignored for optional auth

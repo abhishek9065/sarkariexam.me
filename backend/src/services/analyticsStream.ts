@@ -1,5 +1,5 @@
 import type { Server } from 'http';
-import jwt from 'jsonwebtoken';
+import jwt, { VerifyOptions } from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
 import { config } from '../config.js';
 import { getAnalyticsOverview } from './analyticsOverview.js';
@@ -23,7 +23,10 @@ export function startAnalyticsWebSocket(server: Server) {
 
             let decoded: any;
             try {
-                decoded = jwt.verify(token, config.jwtSecret) as any;
+                const verifyOptions: VerifyOptions = {};
+                if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
+                if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
+                decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as any;
             } catch {
                 socket.close(1008, 'Invalid token');
                 return;

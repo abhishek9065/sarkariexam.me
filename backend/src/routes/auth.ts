@@ -1,5 +1,5 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { config } from '../config.js';
@@ -12,6 +12,7 @@ import {
 } from '../middleware/security.js';
 import { blacklistToken } from '../middleware/auth.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
+import { SecurityLogger } from '../services/securityLogger.js';
 
 const router = express.Router();
 
@@ -29,7 +30,26 @@ const registerSchema = z.object({
   name: z.string().min(2).max(100).trim(),
 });
 
-const JWT_EXPIRY = '1d';
+const buildJwtOptions = (expiresIn: string): SignOptions => {
+  const options: jwt.SignOptions = { expiresIn };
+  if (config.jwtIssuer) options.issuer = config.jwtIssuer;
+  if (config.jwtAudience) options.audience = config.jwtAudience;
+  return options;
+};
+
+const isAdminEmailAllowed = (email: string): boolean => {
+  if (config.adminEmailAllowlist.length > 0 && !config.adminEmailAllowlist.includes(email)) {
+    return false;
+  }
+  if (config.adminDomainAllowlist.length > 0) {
+    const domainAllowed = config.adminDomainAllowlist.some((domain) => {
+      const normalized = domain.startsWith('@') ? domain.slice(1) : domain;
+      return email.endsWith(`@${normalized}`);
+    });
+    if (!domainAllowed) return false;
+  }
+  return true;
+};
 
 router.post('/register', async (req, res) => {
   try {
@@ -49,7 +69,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       config.jwtSecret,
-      { expiresIn: JWT_EXPIRY }
+      buildJwtOptions(config.jwtExpiry)
     );
 
     recordAnalyticsEvent({
@@ -99,10 +119,33 @@ router.post('/login', bruteForceProtection, async (req, res) => {
 
     await clearFailedLogins(clientIP);
 
+    if (user.role === 'admin') {
+      const allowlist = config.adminIpAllowlist;
+      if (allowlist.length > 0 && !allowlist.includes(clientIP)) {
+        SecurityLogger.log({
+          ip_address: clientIP,
+          event_type: 'auth_failure',
+          endpoint: '/api/auth/login',
+          metadata: { reason: 'admin_ip_block', email: user.email }
+        });
+        return res.status(403).json({ error: 'Admin access restricted' });
+      }
+      if (!isAdminEmailAllowed(user.email)) {
+        SecurityLogger.log({
+          ip_address: clientIP,
+          event_type: 'auth_failure',
+          endpoint: '/api/auth/login',
+          metadata: { reason: 'admin_email_block', email: user.email }
+        });
+        return res.status(403).json({ error: 'Admin access restricted' });
+      }
+    }
+
+    const expiresIn = user.role === 'admin' ? config.adminJwtExpiry : config.jwtExpiry;
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       config.jwtSecret,
-      { expiresIn: JWT_EXPIRY }
+      buildJwtOptions(expiresIn)
     );
 
     console.log(`[Auth] Login success: ${user.email} from ${clientIP}`);

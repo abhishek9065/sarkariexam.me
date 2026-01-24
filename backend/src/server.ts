@@ -20,7 +20,9 @@ import {
   securityHeaders,
   blockSuspiciousAgents,
   sanitizeRequestBody,
-  validateContentType
+  validateContentType,
+  enforceAdminHttps,
+  enforceAdminIpAllowlist
 } from './middleware/security.js';
 import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
@@ -71,6 +73,12 @@ app.use(sanitizeRequestBody);
 // Rate limiting
 app.use('/api', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));
 app.use('/api/auth', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.authRateLimitMax }));
+app.use(
+  ['/api/admin', '/api/analytics', '/api/graphql', '/api/bulk', '/api/performance'],
+  enforceAdminHttps,
+  enforceAdminIpAllowlist,
+  rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.adminRateLimitMax, keyPrefix: 'admin' })
+);
 
 // Response time logging
 app.use(responseTimeLogger);
