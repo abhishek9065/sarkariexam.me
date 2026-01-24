@@ -6,6 +6,7 @@ import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { SecurityLogsTable } from '../components/admin/SecurityLogsTable';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
+import { adminRequest } from '../utils/adminRequest';
 import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -207,6 +208,8 @@ export function AdminPage() {
     const [auditError, setAuditError] = useState<string | null>(null);
     const [auditUpdatedAt, setAuditUpdatedAt] = useState<string | null>(null);
     const [auditLimit, setAuditLimit] = useState(50);
+    const [auditPage, setAuditPage] = useState(1);
+    const [auditTotal, setAuditTotal] = useState(0);
     const [auditFilters, setAuditFilters] = useState({
         userId: '',
         action: '',
@@ -219,6 +222,9 @@ export function AdminPage() {
     const [pendingEditId, setPendingEditId] = useState<string | null>(null);
 
     const pageSize = 15;
+    const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
+    const auditStartIndex = auditTotal === 0 ? 0 : (auditPage - 1) * auditLimit + 1;
+    const auditEndIndex = Math.min(auditTotal, auditPage * auditLimit);
     const overview = dashboard?.overview;
     const heroTotalPosts = overview?.totalAnnouncements ?? announcements.length;
     const heroTotalViews = overview?.totalViews ?? 0;
@@ -248,17 +254,16 @@ export function AdminPage() {
     }, [clearAdminSession, pushToast]);
 
     const adminFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const response = await fetch(input, {
-            credentials: 'include',
+        const response = await adminRequest(input, {
             ...init,
+            onRateLimit: (rateLimitResponse) => {
+                const retryAfter = rateLimitResponse.headers.get('Retry-After');
+                const message = retryAfter
+                    ? `Too many requests. Try again in ${retryAfter}s.`
+                    : 'Too many requests. Please wait and try again.';
+                setMessage(message);
+            },
         });
-        if (response.status === 429) {
-            const retryAfter = response.headers.get('Retry-After');
-            const message = retryAfter
-                ? `Too many requests. Try again in ${retryAfter}s.`
-                : 'Too many requests. Please wait and try again.';
-            setMessage(message);
-        }
         if (response.status === 401 || response.status === 403) {
             handleUnauthorized();
         }
@@ -268,9 +273,9 @@ export function AdminPage() {
     const handleLogout = useCallback(async () => {
         setMessage('');
         try {
-            await fetch(`${apiBase}/api/auth/logout`, {
+            await adminRequest(`${apiBase}/api/auth/logout`, {
                 method: 'POST',
-                credentials: 'include',
+                maxRetries: 0,
             });
         } catch (error) {
             console.error('Logout API call failed:', error);
@@ -281,8 +286,8 @@ export function AdminPage() {
 
     const checkSession = useCallback(async () => {
         try {
-            const response = await fetch(`${apiBase}/api/auth/me`, {
-                credentials: 'include',
+            const response = await adminRequest(`${apiBase}/api/auth/me`, {
+                maxRetries: 1,
             });
             if (!response.ok) {
                 clearAdminSession();
@@ -438,13 +443,15 @@ export function AdminPage() {
         }
     };
 
-    const refreshAuditLogs = async () => {
+    const refreshAuditLogs = async (pageOverride?: number) => {
         if (!isLoggedIn) return;
         setAuditLoading(true);
         setAuditError(null);
         try {
+            const page = pageOverride ?? auditPage;
             const params = new URLSearchParams({
                 limit: String(auditLimit),
+                offset: String(Math.max(0, (page - 1) * auditLimit)),
             });
             if (auditFilters.userId) params.set('userId', auditFilters.userId);
             if (auditFilters.action) params.set('action', auditFilters.action);
@@ -455,14 +462,22 @@ export function AdminPage() {
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setAuditError(getApiErrorMessage(errorBody, 'Failed to load audit log.'));
+                setAuditLogs([]);
+                setAuditTotal(0);
                 return;
             }
             const payload = await res.json();
             setAuditLogs(payload.data ?? []);
+            setAuditTotal(payload.meta?.total ?? payload.data?.length ?? 0);
             setAuditUpdatedAt(new Date().toISOString());
+            if (pageOverride) {
+                setAuditPage(pageOverride);
+            }
         } catch (error) {
             console.error(error);
             setAuditError('Failed to load audit log.');
+            setAuditLogs([]);
+            setAuditTotal(0);
         } finally {
             setAuditLoading(false);
         }
@@ -1149,10 +1164,10 @@ export function AdminPage() {
         setMessage('Logging in...');
         setLoginLoading(true);
         try {
-            const response = await fetch(`${apiBase}/api/auth/login`, {
+            const response = await adminRequest(`${apiBase}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+                maxRetries: 0,
                 body: JSON.stringify(loginForm),
             });
 
@@ -1656,6 +1671,10 @@ export function AdminPage() {
     useEffect(() => {
         setListPage((page) => Math.min(page, totalPages));
     }, [totalPages]);
+
+    useEffect(() => {
+        setAuditPage((page) => Math.min(page, auditTotalPages));
+    }, [auditTotalPages]);
 
     useEffect(() => {
         if (!isLoggedIn || activeAdminTab !== 'list') return;
@@ -3251,11 +3270,18 @@ export function AdminPage() {
                                     min={10}
                                     max={200}
                                     value={auditLimit}
-                                    onChange={(e) => setAuditLimit(Number(e.target.value) || 50)}
+                                    onChange={(e) => {
+                                        setAuditLimit(Number(e.target.value) || 50);
+                                        setAuditPage(1);
+                                    }}
                                 />
                             </div>
                             <div className="filter-actions">
-                                <button className="admin-btn secondary" onClick={refreshAuditLogs} disabled={auditLoading}>
+                                <button
+                                    className="admin-btn secondary"
+                                    onClick={() => refreshAuditLogs(1)}
+                                    disabled={auditLoading}
+                                >
                                     Apply
                                 </button>
                                 <button
@@ -3263,7 +3289,7 @@ export function AdminPage() {
                                     onClick={() => {
                                         setAuditFilters({ userId: '', action: '', start: '', end: '' });
                                         setAuditLimit(50);
-                                        refreshAuditLogs();
+                                        refreshAuditLogs(1);
                                     }}
                                     disabled={auditLoading}
                                 >
@@ -3279,30 +3305,54 @@ export function AdminPage() {
                         ) : auditLogs.length === 0 ? (
                             <div className="empty-state">No audit entries yet. Approvals, rejects, deletes, and bulk edits will appear here.</div>
                         ) : (
-                            <div className="admin-table-wrapper">
-                                <table className="admin-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Time</th>
-                                            <th>Action</th>
-                                            <th>Title</th>
-                                            <th>Note</th>
-                                            <th>Admin</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {auditLogs.map((log) => (
-                                            <tr key={log.id}>
-                                                <td>{formatDateTime(log.createdAt)}</td>
-                                                <td><span className="status-pill info">{log.action}</span></td>
-                                                <td>{log.title || log.announcementId || '-'}</td>
-                                                <td>{log.note || '-'}</td>
-                                                <td>{log.userId || 'system'}</td>
+                            <>
+                                <div className="admin-table-wrapper">
+                                    <table className="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Action</th>
+                                                <th>Title</th>
+                                                <th>Note</th>
+                                                <th>Admin</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody>
+                                            {auditLogs.map((log) => (
+                                                <tr key={log.id}>
+                                                    <td>{formatDateTime(log.createdAt)}</td>
+                                                    <td><span className="status-pill info">{log.action}</span></td>
+                                                    <td>{log.title || log.announcementId || '-'}</td>
+                                                    <td>{log.note || '-'}</td>
+                                                    <td>{log.userId || 'system'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="admin-pagination">
+                                    <span className="pagination-info">
+                                        Showing {auditStartIndex}-{auditEndIndex} of {auditTotal}
+                                    </span>
+                                    <button
+                                        className="admin-btn secondary small"
+                                        onClick={() => refreshAuditLogs(Math.max(1, auditPage - 1))}
+                                        disabled={auditLoading || auditPage <= 1}
+                                    >
+                                        Prev
+                                    </button>
+                                    <span className="pagination-info">
+                                        Page {auditPage} of {auditTotalPages}
+                                    </span>
+                                    <button
+                                        className="admin-btn secondary small"
+                                        onClick={() => refreshAuditLogs(Math.min(auditTotalPages, auditPage + 1))}
+                                        disabled={auditLoading || auditPage >= auditTotalPages}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 ) : activeAdminTab === 'security' ? (

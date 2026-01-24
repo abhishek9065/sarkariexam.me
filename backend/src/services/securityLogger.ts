@@ -43,8 +43,12 @@ export class SecurityLogger {
         }
     }
 
-    static getRecentLogs(limit = 50): StoredEvent[] {
-        return securityLogs.slice(0, limit);
+    static getRecentLogs(limit = 50, offset = 0): StoredEvent[] {
+        return securityLogs.slice(offset, offset + limit);
+    }
+
+    static getTotalLogs(): number {
+        return securityLogs.length;
     }
 
     static clearOldLogs(olderThanMs: number = 24 * 60 * 60 * 1000): void {

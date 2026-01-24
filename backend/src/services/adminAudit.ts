@@ -41,14 +41,16 @@ export async function recordAdminAudit(entry: {
     }
 }
 
-export async function getAdminAuditLogs(input: number | {
+type AuditQueryOptions = {
     limit?: number;
+    offset?: number;
     userId?: string;
     action?: string;
     start?: Date;
     end?: Date;
-} = 50): Promise<AdminAuditLog[]> {
-    const options = typeof input === 'number' ? { limit: input } : input;
+};
+
+const buildAuditQuery = (options: AuditQueryOptions) => {
     const query: Record<string, any> = {};
 
     if (options.userId) {
@@ -69,21 +71,43 @@ export async function getAdminAuditLogs(input: number | {
         }
     }
 
-    const limit = options.limit ?? 50;
-    const docs = await collection()
-        .find(query)
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .toArray();
+    return query;
+};
 
-    return docs.map((doc: any) => ({
-        id: doc._id?.toString?.() || doc._id,
-        action: doc.action,
-        announcementId: doc.announcementId,
-        title: doc.title,
-        userId: doc.userId,
-        note: doc.note,
-        metadata: doc.metadata,
-        createdAt: doc.createdAt,
-    }));
+const mapAuditDocs = (docs: any[]): AdminAuditLog[] => docs.map((doc: any) => ({
+    id: doc._id?.toString?.() || doc._id,
+    action: doc.action,
+    announcementId: doc.announcementId,
+    title: doc.title,
+    userId: doc.userId,
+    note: doc.note,
+    metadata: doc.metadata,
+    createdAt: doc.createdAt,
+}));
+
+export async function getAdminAuditLogsPaged(options: AuditQueryOptions = {}): Promise<{ data: AdminAuditLog[]; total: number }> {
+    const query = buildAuditQuery(options);
+    const limit = options.limit ?? 50;
+    const offset = options.offset ?? 0;
+
+    const [docs, total] = await Promise.all([
+        collection()
+            .find(query)
+            .sort({ createdAt: -1 })
+            .skip(offset)
+            .limit(limit)
+            .toArray(),
+        collection().countDocuments(query),
+    ]);
+
+    return {
+        data: mapAuditDocs(docs),
+        total,
+    };
+}
+
+export async function getAdminAuditLogs(input: number | AuditQueryOptions = 50): Promise<AdminAuditLog[]> {
+    const options = typeof input === 'number' ? { limit: input } : input;
+    const result = await getAdminAuditLogsPaged(options);
+    return result.data;
 }

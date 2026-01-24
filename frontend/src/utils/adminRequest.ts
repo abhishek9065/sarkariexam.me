@@ -1,0 +1,75 @@
+type RequestInput = RequestInfo | URL;
+type RequestInitWithRetry = RequestInit & {
+  maxRetries?: number;
+  onRateLimit?: (response: Response) => void;
+};
+
+const queue: Array<() => void> = [];
+let active = 0;
+const MAX_CONCURRENT = 3;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const next = () => {
+  if (active >= MAX_CONCURRENT) return;
+  const task = queue.shift();
+  if (task) task();
+};
+
+const getRetryDelay = (response: Response, attempt: number) => {
+  const retryAfter = response.headers.get('Retry-After');
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return seconds * 1000;
+  }
+  return Math.min(8000, 1000 * Math.pow(2, attempt));
+};
+
+export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {}) => {
+  return new Promise<Response>((resolve, reject) => {
+    const run = async () => {
+      active += 1;
+      const { maxRetries = 2, onRateLimit, ...fetchInit } = init;
+      let attempt = 0;
+
+      while (true) {
+        try {
+          const response = await fetch(input, {
+            credentials: 'include',
+            ...fetchInit,
+          });
+
+          if (response.status === 429 && attempt < maxRetries) {
+            const delay = getRetryDelay(response, attempt);
+            attempt += 1;
+            await wait(delay);
+            continue;
+          }
+
+          if (response.status === 429) {
+            onRateLimit?.(response);
+          }
+
+          resolve(response);
+          break;
+        } catch (error) {
+          if (attempt < maxRetries) {
+            attempt += 1;
+            await wait(Math.min(8000, 500 * Math.pow(2, attempt)));
+            continue;
+          }
+          reject(error);
+          break;
+        }
+      }
+
+      active -= 1;
+      next();
+    };
+
+    queue.push(() => {
+      run().catch(reject);
+    });
+    next();
+  });
+};

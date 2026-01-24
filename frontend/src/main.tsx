@@ -43,6 +43,32 @@ const disableServiceWorkerForAdmin = () => {
 
 disableServiceWorkerForAdmin();
 
+const stripCloudflareBeaconForAdmin = () => {
+  if (!window.location.pathname.startsWith('/admin')) return;
+  const removeBeaconScripts = () => {
+    document
+      .querySelectorAll('script[src*="static.cloudflareinsights.com"]')
+      .forEach((node) => node.parentElement?.removeChild(node));
+  };
+  removeBeaconScripts();
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (!(node instanceof HTMLScriptElement)) return;
+        if (node.src && node.src.includes('static.cloudflareinsights.com')) {
+          node.parentElement?.removeChild(node);
+        }
+      });
+    });
+  });
+
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  window.setTimeout(() => observer.disconnect(), 10000);
+};
+
+stripCloudflareBeaconForAdmin();
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <App />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { adminRequest } from '../../utils/adminRequest';
 import './AnalyticsDashboard.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -220,19 +221,30 @@ export function AnalyticsDashboard({
         try {
             const nocache = options?.forceFresh ? '&nocache=1' : '';
             const headers = adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined;
+            const onRateLimit = (response: Response) => {
+                const retryAfter = response.headers.get('Retry-After');
+                setError(retryAfter
+                    ? `Too many requests. Try again in ${retryAfter}s.`
+                    : 'Too many requests. Please wait and try again.');
+            };
             const [overviewRes, popularRes] = await Promise.all([
-                fetch(`${apiBase}/api/analytics/overview?days=${rangeDays}${nocache}`, {
+                adminRequest(`${apiBase}/api/analytics/overview?days=${rangeDays}${nocache}`, {
                     headers,
-                    credentials: 'include',
+                    onRateLimit,
                 }),
-                fetch(`${apiBase}/api/analytics/popular?limit=10${nocache}`, {
+                adminRequest(`${apiBase}/api/analytics/popular?limit=10${nocache}`, {
                     headers,
-                    credentials: 'include',
+                    onRateLimit,
                 })
             ]);
 
             if (overviewRes.status === 401 || overviewRes.status === 403 || popularRes.status === 401 || popularRes.status === 403) {
                 onUnauthorized?.();
+                return;
+            }
+
+            if (overviewRes.status === 429 || popularRes.status === 429) {
+                setError('Too many requests. Please wait and try again.');
                 return;
             }
 
@@ -346,9 +358,8 @@ export function AnalyticsDashboard({
     const handleExport = async () => {
         setExporting(true);
         try {
-            const response = await fetch(`${apiBase}/api/analytics/export/csv`, {
+            const response = await adminRequest(`${apiBase}/api/analytics/export/csv`, {
                 headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined,
-                credentials: 'include',
             });
             if (response.status === 401 || response.status === 403) {
                 onUnauthorized?.();
@@ -393,13 +404,12 @@ export function AnalyticsDashboard({
     const handlePopularUnpublish = async (item: PopularAnnouncement) => {
         setActionMessage(null);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/${item.id}`, {
+            const response = await adminRequest(`${apiBase}/api/admin/announcements/${item.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
                 },
-                credentials: 'include',
                 body: JSON.stringify({ status: 'archived' }),
             });
             if (response.status === 401 || response.status === 403) {

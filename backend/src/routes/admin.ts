@@ -7,7 +7,7 @@ import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getDailyRollups } from '../services/analytics.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
 import { getCollection } from '../services/cosmosdb.js';
-import { getAdminAuditLogs, recordAdminAudit } from '../services/adminAudit.js';
+import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
 
 const router = Router();
 
@@ -103,6 +103,7 @@ const bulkReviewSchema = z.object({
 
 const auditQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
     userId: z.string().trim().optional(),
     action: z.string().trim().optional(),
     start: z.string().trim().optional(),
@@ -264,9 +265,17 @@ router.get('/stats', async (_req, res) => {
  */
 router.get('/security', requirePermission('security:read'), async (req, res) => {
     try {
-        const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
-        const logs = SecurityLogger.getRecentLogs(limit);
-        return res.json({ data: logs });
+        const limit = Math.min(200, parseInt(req.query.limit as string) || 20);
+        const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+        const logs = SecurityLogger.getRecentLogs(limit, offset);
+        return res.json({
+            data: logs,
+            meta: {
+                total: SecurityLogger.getTotalLogs(),
+                limit,
+                offset,
+            },
+        });
     } catch (error) {
         console.error('Security logs error:', error);
         return res.status(500).json({ error: 'Failed to load security logs' });
@@ -279,9 +288,17 @@ router.get('/security', requirePermission('security:read'), async (req, res) => 
  */
 router.get('/security/logs', requirePermission('security:read'), async (req, res) => {
     try {
-        const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
-        const logs = SecurityLogger.getRecentLogs(limit);
-        return res.json({ data: logs });
+        const limit = Math.min(200, parseInt(req.query.limit as string) || 20);
+        const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+        const logs = SecurityLogger.getRecentLogs(limit, offset);
+        return res.json({
+            data: logs,
+            meta: {
+                total: SecurityLogger.getTotalLogs(),
+                limit,
+                offset,
+            },
+        });
     } catch (error) {
         console.error('Security logs error:', error);
         return res.status(500).json({ error: 'Failed to load security logs' });
@@ -299,7 +316,7 @@ router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { limit, userId, action, start, end } = parseResult.data;
+        const { limit, offset, userId, action, start, end } = parseResult.data;
         const startDate = parseDateParam(start, 'start');
         const endDate = parseDateParam(end, 'end');
 
@@ -311,14 +328,22 @@ router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
             return res.status(400).json({ error: 'Invalid end date' });
         }
 
-        const logs = await getAdminAuditLogs({
+        const { data, total } = await getAdminAuditLogsPaged({
             limit,
+            offset,
             userId: userId || undefined,
             action: action || undefined,
             start: startDate,
             end: endDate,
         });
-        return res.json({ data: logs });
+        return res.json({
+            data,
+            meta: {
+                total,
+                limit,
+                offset,
+            },
+        });
     } catch (error) {
         console.error('Audit log error:', error);
         return res.status(500).json({ error: 'Failed to load audit log' });

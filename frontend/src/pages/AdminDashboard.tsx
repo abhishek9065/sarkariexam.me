@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils';
+import { adminRequest } from '../utils/adminRequest';
 import './AdminDashboard.css';
 
 interface DashboardStats {
@@ -66,9 +67,19 @@ export function AdminDashboard() {
 
         const fetchDashboard = async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/admin/dashboard`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                const res = await adminRequest(`${API_BASE}/api/admin/dashboard`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    onRateLimit: (rateLimitResponse) => {
+                        const retryAfter = rateLimitResponse.headers.get('Retry-After');
+                        setError(retryAfter
+                            ? `Too many requests. Try again in ${retryAfter}s.`
+                            : 'Too many requests. Please wait and try again.');
+                    },
                 });
+
+                if (res.status === 429) {
+                    return;
+                }
 
                 if (!res.ok) {
                     throw new Error('Failed to load dashboard');
