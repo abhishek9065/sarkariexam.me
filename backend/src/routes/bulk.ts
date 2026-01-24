@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { ContentType } from '../types.js';
 
@@ -31,7 +31,7 @@ const bulkSchema = z.object({
     })).min(1),
 });
 
-router.post('/import', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/import', authenticateToken, requirePermission('announcements:write'), async (req, res) => {
     const parseResult = bulkSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });

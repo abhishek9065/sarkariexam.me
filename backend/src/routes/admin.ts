@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { AnnouncementStatus, ContentType, CreateAnnouncementDto } from '../types.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
@@ -135,8 +135,8 @@ const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Da
 
     return parsed;
 };
-// All admin dashboard routes require admin authentication
-router.use(authenticateToken, requireAdmin);
+// All admin dashboard routes require admin-level read access
+router.use(authenticateToken, requirePermission('admin:read'));
 
 /**
  * GET /api/admin/dashboard
@@ -261,7 +261,7 @@ router.get('/stats', async (_req, res) => {
  * GET /api/admin/security
  * Get security logs
  */
-router.get('/security', async (req, res) => {
+router.get('/security', requirePermission('security:read'), async (req, res) => {
     try {
         const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
         const logs = SecurityLogger.getRecentLogs(limit);
@@ -276,7 +276,7 @@ router.get('/security', async (req, res) => {
  * GET /api/admin/security/logs
  * Get security logs (alias)
  */
-router.get('/security/logs', async (req, res) => {
+router.get('/security/logs', requirePermission('security:read'), async (req, res) => {
     try {
         const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
         const logs = SecurityLogger.getRecentLogs(limit);
@@ -291,7 +291,7 @@ router.get('/security/logs', async (req, res) => {
  * GET /api/admin/audit-log
  * Get admin audit log
  */
-router.get('/audit-log', async (req, res) => {
+router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
     try {
         const parseResult = auditQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -328,7 +328,7 @@ router.get('/audit-log', async (req, res) => {
  * GET /api/admin/announcements
  * Get all announcements for admin management
  */
-router.get('/announcements', async (req, res) => {
+router.get('/announcements', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parseResult = adminListQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -356,7 +356,7 @@ router.get('/announcements', async (req, res) => {
  * GET /api/admin/announcements/export/csv
  * Export announcements (admin view) as CSV
  */
-router.get('/announcements/export/csv', async (req, res) => {
+router.get('/announcements/export/csv', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parseResult = adminExportQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -423,7 +423,7 @@ router.get('/announcements/export/csv', async (req, res) => {
  * POST /api/admin/announcements
  * Create new announcement
  */
-router.post('/announcements', async (req, res) => {
+router.post('/announcements', requirePermission('announcements:write'), async (req, res) => {
     try {
         const parseResult = adminAnnouncementSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -450,7 +450,7 @@ router.post('/announcements', async (req, res) => {
  * POST /api/admin/announcements/bulk
  * Bulk update announcements
  */
-router.post('/announcements/bulk', async (req, res) => {
+router.post('/announcements/bulk', requirePermission('announcements:write'), async (req, res) => {
     try {
         const parseResult = bulkUpdateSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -480,7 +480,7 @@ router.post('/announcements/bulk', async (req, res) => {
  * POST /api/admin/announcements/bulk-approve
  * Bulk approve announcements
  */
-router.post('/announcements/bulk-approve', async (req, res) => {
+router.post('/announcements/bulk-approve', requirePermission('announcements:approve'), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -517,7 +517,7 @@ router.post('/announcements/bulk-approve', async (req, res) => {
  * POST /api/admin/announcements/bulk-reject
  * Bulk reject announcements
  */
-router.post('/announcements/bulk-reject', async (req, res) => {
+router.post('/announcements/bulk-reject', requirePermission('announcements:approve'), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -552,7 +552,7 @@ router.post('/announcements/bulk-reject', async (req, res) => {
  * PUT /api/admin/announcements/:id
  * Update announcement
  */
-router.put('/announcements/:id', async (req, res) => {
+router.put('/announcements/:id', requirePermission('announcements:write'), async (req, res) => {
     try {
         const updateSchema = adminAnnouncementPartialSchema;
         const parseResult = updateSchema.safeParse(req.body);
@@ -590,7 +590,7 @@ router.put('/announcements/:id', async (req, res) => {
  * POST /api/admin/announcements/:id/approve
  * Approve and publish an announcement
  */
-router.post('/announcements/:id/approve', async (req, res) => {
+router.post('/announcements/:id/approve', requirePermission('announcements:approve'), async (req, res) => {
     try {
         const now = new Date().toISOString();
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
@@ -626,7 +626,7 @@ router.post('/announcements/:id/approve', async (req, res) => {
  * POST /api/admin/announcements/:id/reject
  * Reject an announcement back to draft
  */
-router.post('/announcements/:id/reject', async (req, res) => {
+router.post('/announcements/:id/reject', requirePermission('announcements:approve'), async (req, res) => {
     try {
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
         const announcement = await AnnouncementModelMongo.update(
@@ -660,7 +660,7 @@ router.post('/announcements/:id/reject', async (req, res) => {
  * DELETE /api/admin/announcements/:id
  * Delete announcement
  */
-router.delete('/announcements/:id', async (req, res) => {
+router.delete('/announcements/:id', requirePermission('announcements:delete'), async (req, res) => {
     try {
         const deleted = await AnnouncementModelMongo.delete(req.params.id);
         if (!deleted) {

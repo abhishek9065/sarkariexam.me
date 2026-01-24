@@ -63,6 +63,17 @@ interface AnalyticsData {
         mediums: Array<{ medium: string; clicks: number }>;
         campaigns: Array<{ campaign: string; clicks: number }>;
     };
+    insights?: {
+        viewTrendPct: number;
+        viewTrendDirection: 'up' | 'down' | 'flat' | string;
+        clickThroughRate: number;
+        funnelDropRate: number;
+        listingCoverage: number;
+        topType?: { type: string; count: number; share?: number | null } | null;
+        topCategory?: { category: string; count: number; share?: number | null } | null;
+        anomaly?: boolean;
+        rollupAgeMinutes?: number | null;
+    };
 }
 
 interface PopularAnnouncement {
@@ -105,6 +116,42 @@ function DonutChart({ data, total }: { data: { type: string; count: number }[]; 
     );
 }
 
+const buildLinePath = (values: number[], width: number, height: number) => {
+    if (values.length === 0) return '';
+    const max = Math.max(1, ...values);
+    const step = values.length > 1 ? width / (values.length - 1) : 0;
+    return values
+        .map((value, index) => {
+            const x = values.length > 1 ? index * step : width / 2;
+            const y = height - (value / max) * height;
+            return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+        })
+        .join(' ');
+};
+
+function TrendChart({
+    data,
+    width = 520,
+    height = 140,
+}: {
+    data: Array<{ date: string; views: number; searches: number }>;
+    width?: number;
+    height?: number;
+}) {
+    if (!data.length) return null;
+    const viewValues = data.map((item) => item.views ?? 0);
+    const searchValues = data.map((item) => item.searches ?? 0);
+    const viewsPath = buildLinePath(viewValues, width, height);
+    const searchesPath = buildLinePath(searchValues, width, height);
+
+    return (
+        <svg className="trend-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Views and searches trend">
+            <path className="trend-line views" d={viewsPath} />
+            <path className="trend-line searches" d={searchesPath} />
+        </svg>
+    );
+}
+
 export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }) {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
@@ -113,6 +160,8 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const [exporting, setExporting] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [showZeroTrend, setShowZeroTrend] = useState(false);
+    const [liveEnabled, setLiveEnabled] = useState(true);
+    const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
     const typeBreakdown = analytics?.typeBreakdown ?? [];
     const categoryBreakdown = analytics?.categoryBreakdown ?? [];
 
@@ -137,6 +186,8 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     }, [rollups, showZeroTrend]);
     const maxViews = Math.max(1, ...trendRows.map((item) => item.views ?? 0));
     const maxSearches = Math.max(1, ...trendRows.map((item) => item.searches ?? 0));
+    const last7Views = rollups.slice(-7).reduce((sum, item) => sum + (item.views ?? 0), 0);
+    const prev7Views = rollups.slice(0, Math.max(0, rollups.length - 7)).reduce((sum, item) => sum + (item.views ?? 0), 0);
 
     const loadAnalytics = useCallback(async (options?: { silent?: boolean }) => {
         if (!adminToken) {
@@ -196,6 +247,17 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     ctrByType: [],
                     digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
                     deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
+                    insights: {
+                        viewTrendPct: 0,
+                        viewTrendDirection: 'flat',
+                        clickThroughRate: 0,
+                        funnelDropRate: 0,
+                        listingCoverage: 0,
+                        topType: null,
+                        topCategory: null,
+                        anomaly: false,
+                        rollupAgeMinutes: null,
+                    },
                 });
                 setPopular(popularData.data ?? []);
                 setError(null);
@@ -213,6 +275,48 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     useEffect(() => {
         loadAnalytics();
     }, [loadAnalytics]);
+
+    useEffect(() => {
+        if (!liveEnabled || !adminToken) {
+            setLiveStatus('idle');
+            return;
+        }
+
+        if (typeof window === 'undefined') return;
+        setLiveStatus('connecting');
+
+        let ws: WebSocket | null = null;
+        const baseUrl = apiBase ? new URL(apiBase, window.location.origin) : new URL(window.location.origin);
+        const wsProtocol = baseUrl.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?token=${encodeURIComponent(adminToken)}`;
+
+        try {
+            ws = new WebSocket(wsUrl);
+        } catch {
+            setLiveStatus('error');
+            return;
+        }
+
+        ws.onopen = () => setLiveStatus('live');
+        ws.onerror = () => setLiveStatus('error');
+        ws.onclose = () => setLiveStatus(liveEnabled ? 'error' : 'idle');
+        ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data as string);
+                if (message?.type === 'analytics:update' && message.data) {
+                    setAnalytics(message.data);
+                }
+            } catch {
+                // ignore malformed messages
+            }
+        };
+
+        return () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        };
+    }, [adminToken, liveEnabled]);
 
     const handleExport = async () => {
         if (!adminToken) return;
@@ -258,6 +362,15 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const deepLinkAttribution = analytics.deepLinkAttribution;
     const digestTotal = digestClicks?.total ?? 0;
     const deepLinkTotal = deepLinkAttribution?.total ?? 0;
+    const insights = analytics.insights;
+    const viewTrendPct = insights?.viewTrendPct ?? 0;
+    const viewTrendDirection = insights?.viewTrendDirection ?? (viewTrendPct > 2 ? 'up' : viewTrendPct < -2 ? 'down' : 'flat');
+    const viewTrendLabel = viewTrendDirection === 'up'
+        ? `Up ${Math.abs(viewTrendPct)}%`
+        : viewTrendDirection === 'down'
+            ? `Down ${Math.abs(viewTrendPct)}%`
+            : 'Stable';
+    const rollupAge = insights?.rollupAgeMinutes ?? null;
     const funnel = analytics.funnel;
     const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
     const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
@@ -307,6 +420,18 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         <div className="analytics-dashboard">
             <div className="analytics-actions">
                 <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                <div className="analytics-live">
+                    <span className={`live-dot ${liveStatus}`} aria-hidden="true" />
+                    <span className="live-text">
+                        {liveStatus === 'live' ? 'Live updates on' : liveStatus === 'connecting' ? 'Connecting...' : liveStatus === 'error' ? 'Live updates paused' : 'Live updates off'}
+                    </span>
+                </div>
+                <button
+                    className="admin-btn secondary small"
+                    onClick={() => setLiveEnabled((prev) => !prev)}
+                >
+                    {liveEnabled ? 'Pause live' : 'Resume live'}
+                </button>
                 <button
                     className="admin-btn secondary"
                     onClick={() => loadAnalytics({ silent: true })}
@@ -415,6 +540,69 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
+                        <h3>Insights</h3>
+                        <p className="analytics-subtitle">Automated signals from the most recent rollups.</p>
+                    </div>
+                </div>
+                <div className="insights-grid">
+                    <div className="insight-card">
+                        <div className="insight-label">Weekly views trend</div>
+                        <div className={`insight-value ${viewTrendDirection}`}>{viewTrendLabel}</div>
+                        <div className="insight-meta">{last7Views.toLocaleString()} vs {prev7Views.toLocaleString()} views</div>
+                    </div>
+                    <div className="insight-card">
+                        <div className="insight-label">Click-through rate</div>
+                        <div className="insight-value">{insights?.clickThroughRate ?? ctr}%</div>
+                        <div className="insight-meta">From listing views to card clicks</div>
+                    </div>
+                    <div className="insight-card">
+                        <div className="insight-label">Funnel drop</div>
+                        <div className="insight-value">{insights?.funnelDropRate ?? 0}%</div>
+                        <div className="insight-meta">Listing views to card clicks</div>
+                    </div>
+                    <div className="insight-card">
+                        <div className="insight-label">Tracking coverage</div>
+                        <div className="insight-value">{insights?.listingCoverage ?? 0}%</div>
+                        <div className="insight-meta">Listing views vs total views</div>
+                    </div>
+                    <div className="insight-card">
+                        <div className="insight-label">Top listing type</div>
+                        <div className="insight-value">{insights?.topType?.type ?? 'N/A'}</div>
+                        <div className="insight-meta">
+                            {insights?.topType
+                                ? `${insights.topType.count} posts - ${insights.topType.share ?? 0}% share`
+                                : 'No dominant type yet'}
+                        </div>
+                    </div>
+                    <div className="insight-card">
+                        <div className="insight-label">Top category</div>
+                        <div className="insight-value">{insights?.topCategory?.category ?? 'N/A'}</div>
+                        <div className="insight-meta">
+                            {insights?.topCategory
+                                ? `${insights.topCategory.count} posts - ${insights.topCategory.share ?? 0}% share`
+                                : 'No dominant category yet'}
+                        </div>
+                    </div>
+                    <div className="insight-card">
+                        <div className="insight-label">Rollup freshness</div>
+                        <div className="insight-value">
+                            {rollupAge === null ? 'Not available' : rollupAge < 60 ? `${rollupAge}m ago` : `${Math.round(rollupAge / 60)}h ago`}
+                        </div>
+                        <div className="insight-meta">Latest rollup update</div>
+                    </div>
+                    {insights?.anomaly && (
+                        <div className="insight-card warning">
+                            <div className="insight-label">Data anomaly</div>
+                            <div className="insight-value">Check funnel</div>
+                            <div className="insight-meta">Detail views exceed card clicks</div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
                         <h3>Engagement funnel</h3>
                         <p className="analytics-subtitle">Conversion steps for the last {engagementWindow} days.</p>
                     </div>
@@ -473,7 +661,14 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                                     <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
                                     <td className="numeric">{item.listingViews.toLocaleString()}</td>
                                     <td className="numeric">{item.cardClicks.toLocaleString()}</td>
-                                    <td className="numeric">{item.ctr}%</td>
+                                    <td className="numeric">
+                                        <div className="ctr-cell">
+                                            <span className="ctr-value">{item.ctr}%</span>
+                                            <span className="ctr-bar">
+                                                <span style={{ width: `${Math.min(100, item.ctr)}%` }} />
+                                            </span>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -635,26 +830,41 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             : 'All days are zero-activity. Toggle to show them.'}
                     </div>
                 ) : (
-                    <div className="trend-list">
-                        {trendRows.map((item) => (
-                            <div key={item.date} className="trend-row">
-                                <div className="trend-date">{item.date}</div>
-                                <div className="trend-bars">
-                                    <div
-                                        className="trend-bar views"
-                                        style={{ width: `${(item.views / maxViews) * 100}%` }}
-                                    />
-                                    <div
-                                        className="trend-bar searches"
-                                        style={{ width: `${(item.searches / maxSearches) * 100}%` }}
-                                    />
-                                </div>
-                                <div className="trend-values">
-                                    {item.views} views · {item.searches} searches
-                                </div>
+                    <>
+                        <div className="trend-chart-wrap">
+                            <TrendChart
+                                data={trendRows.map((item) => ({
+                                    date: item.date,
+                                    views: item.views ?? 0,
+                                    searches: item.searches ?? 0,
+                                }))}
+                            />
+                            <div className="trend-legend">
+                                <span className="legend-item views">Views</span>
+                                <span className="legend-item searches">Searches</span>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                        <div className="trend-list">
+                            {trendRows.map((item) => (
+                                <div key={item.date} className="trend-row">
+                                    <div className="trend-date">{item.date}</div>
+                                    <div className="trend-bars">
+                                        <div
+                                            className="trend-bar views"
+                                            style={{ width: `${(item.views / maxViews) * 100}%` }}
+                                        />
+                                        <div
+                                            className="trend-bar searches"
+                                            style={{ width: `${(item.searches / maxSearches) * 100}%` }}
+                                        />
+                                    </div>
+                                    <div className="trend-values">
+                                        {item.views} views · {item.searches} searches
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
                 )}
                 {analytics.rollupLastUpdatedAt && (
                     <div className="analytics-subtitle">Last rollup: {new Date(analytics.rollupLastUpdatedAt).toLocaleString()}</div>

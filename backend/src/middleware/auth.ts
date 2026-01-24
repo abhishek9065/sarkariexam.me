@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { JwtPayload } from '../types.js';
 import RedisCache from '../services/redis.js';
+import { hasPermission, type Permission } from '../services/rbac.js';
 
 // Extend Express Request type to include user
 declare global {
@@ -59,6 +60,16 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     return;
   }
   next();
+}
+
+export function requirePermission(permission: Permission) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!hasPermission(req.user?.role, permission)) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    next();
+  };
 }
 
 export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {

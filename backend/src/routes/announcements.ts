@@ -1,7 +1,7 @@
 import express from 'express';
 import { z } from 'zod';
 
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 import { cacheControl } from '../middleware/cacheControl.js';
 import { bumpCacheVersion } from '../services/cacheVersion.js';
@@ -469,7 +469,7 @@ const createAnnouncementPartialSchema = createAnnouncementBaseSchema.partial().s
 });
 
 // Create announcement (admin only)
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/', authenticateToken, requirePermission('announcements:write'), async (req, res) => {
   try {
     const parseResult = createAnnouncementSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -499,7 +499,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // Update announcement (admin only)
-router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.patch('/:id', authenticateToken, requirePermission('announcements:write'), async (req, res) => {
   try {
     const id = req.params.id; // String ID for MongoDB
     if (!id || id.length < 1) {
@@ -531,7 +531,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
 
 
 // Delete announcement (admin only)
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requirePermission('announcements:delete'), async (req, res) => {
   try {
     const id = req.params.id; // String ID for MongoDB
     if (!id || id.length < 1) {
@@ -555,7 +555,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // Export announcements as CSV (admin only)
-router.get('/export/csv', authenticateToken, requireAdmin, async (_req, res) => {
+router.get('/export/csv', authenticateToken, requirePermission('announcements:read'), async (_req, res) => {
   try {
     const announcements = await AnnouncementModel.findAll({ limit: 1000 });
 

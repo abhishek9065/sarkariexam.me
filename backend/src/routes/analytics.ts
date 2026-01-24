@@ -1,21 +1,9 @@
 import { Router } from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
-import { getDailyRollups, getRollupSummary, getCtrByType, getDigestClickStats, getDeepLinkAttribution } from '../services/analytics.js';
-import { getCollection } from '../services/cosmosdb.js';
-
-interface SubscriptionDoc {
-    isActive: boolean;
-    verified: boolean;
-}
-
-const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
+import { getDailyRollups, getRollupSummary } from '../services/analytics.js';
+import { getAnalyticsOverview } from '../services/analyticsOverview.js';
 const POPULAR_CACHE_TTL_MS = 60 * 1000;
-
-const overviewCache: { data: any | null; expiresAt: number } = {
-    data: null,
-    expiresAt: 0,
-};
 
 const popularCache: { data: any | null; expiresAt: number } = {
     data: null,
@@ -25,7 +13,7 @@ const popularCache: { data: any | null; expiresAt: number } = {
 const router = Router();
 
 // All analytics routes require admin authentication
-router.use(authenticateToken, requireAdmin);
+router.use(authenticateToken, requirePermission('analytics:read'));
 
 /**
  * GET /api/analytics/overview
@@ -33,108 +21,8 @@ router.use(authenticateToken, requireAdmin);
  */
 router.get('/overview', async (_req, res) => {
     try {
-        if (overviewCache.data && overviewCache.expiresAt > Date.now()) {
-            return res.json({ data: overviewCache.data, cached: true });
-        }
-
-        const [
-            announcements,
-            rollupSummary,
-            dailyRollups,
-            ctrByType,
-            digestClicks,
-            deepLinkAttribution,
-            totalEmailSubscribers,
-            totalPushSubscribers,
-        ] = await Promise.all([
-            AnnouncementModelMongo.findAll({ limit: 1000 }),
-            getRollupSummary(30),
-            getDailyRollups(14),
-            getCtrByType(30),
-            getDigestClickStats(30),
-            getDeepLinkAttribution(30),
-            (async () => {
-                try {
-                    const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
-                    return await subscriptions.countDocuments({ isActive: true, verified: true });
-                } catch (error) {
-                    console.error('[Analytics] Failed to load subscription count:', error);
-                    return 0;
-                }
-            })(),
-            (async () => {
-                try {
-                    const pushSubs = getCollection('push_subscriptions');
-                    return await pushSubs.countDocuments({});
-                } catch (error) {
-                    console.error('[Analytics] Failed to load push subscription count:', error);
-                    return 0;
-                }
-            })(),
-        ]);
-
-        // Calculate stats
-        const total = announcements.length;
-        const totalViews = announcements.reduce((sum, a) => sum + (a.viewCount || 0), 0);
-        const byType: Record<string, number> = {};
-        const byCategory: Record<string, number> = {};
-
-        for (const a of announcements) {
-            byType[a.type] = (byType[a.type] || 0) + 1;
-            if (a.category) {
-                byCategory[a.category] = (byCategory[a.category] || 0) + 1;
-            }
-        }
-
-        // Convert to array format expected by frontend
-        const typeBreakdown = Object.entries(byType).map(([type, count]) => ({ type, count }));
-        const categoryBreakdown = Object.entries(byCategory).map(([category, count]) => ({ category, count }));
-
-        const detailViewsRaw = rollupSummary.viewCount;
-        const detailViewsAdjusted = Math.min(detailViewsRaw, rollupSummary.cardClicks || detailViewsRaw);
-        const hasAnomaly = rollupSummary.cardClicks > 0 && detailViewsRaw > rollupSummary.cardClicks;
-
-        const payload = {
-            totalAnnouncements: total,
-            totalViews,
-            totalEmailSubscribers,
-            totalPushSubscribers,
-            totalSearches: rollupSummary.searchCount,
-            totalBookmarks: rollupSummary.bookmarkAdds,
-            totalRegistrations: rollupSummary.registrations,
-            totalSubscriptionsVerified: rollupSummary.subscriptionsVerified,
-            totalSubscriptionsUnsubscribed: rollupSummary.subscriptionsUnsubscribed,
-            totalListingViews: rollupSummary.listingViews,
-            totalCardClicks: rollupSummary.cardClicks,
-            totalCategoryClicks: rollupSummary.categoryClicks,
-            totalFilterApplies: rollupSummary.filterApplies,
-            totalDigestClicks: rollupSummary.digestClicks,
-            totalDeepLinkClicks: rollupSummary.deepLinkClicks,
-            engagementWindowDays: rollupSummary.days,
-            rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
-            dailyRollups,
-            funnel: {
-                listingViews: rollupSummary.listingViews,
-                cardClicks: rollupSummary.cardClicks,
-                detailViews: detailViewsAdjusted,
-                detailViewsRaw,
-                detailViewsAdjusted,
-                hasAnomaly,
-                bookmarkAdds: rollupSummary.bookmarkAdds,
-                subscriptionsVerified: rollupSummary.subscriptionsVerified,
-            },
-            ctrByType,
-            digestClicks,
-            deepLinkAttribution,
-            typeBreakdown,
-            categoryBreakdown,
-            lastUpdated: new Date().toISOString()
-        };
-
-        overviewCache.data = payload;
-        overviewCache.expiresAt = Date.now() + OVERVIEW_CACHE_TTL_MS;
-
-        return res.json({ data: payload });
+        const { data, cached } = await getAnalyticsOverview();
+        return res.json({ data, cached });
     } catch (error) {
         console.error('Analytics overview error:', error);
         return res.status(500).json({ error: 'Failed to load analytics' });

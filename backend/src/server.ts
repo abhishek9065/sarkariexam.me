@@ -1,11 +1,13 @@
 import cors from 'cors';
 import express from 'express';
+import http from 'http';
 
 import { config } from './config.js';
 import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
 import adminRouter from './routes/admin.js';
 import analyticsRouter from './routes/analytics.js';
+import graphqlRouter from './routes/graphql.js';
 import bookmarksRouter from './routes/bookmarks.js';
 import bulkRouter from './routes/bulk.js';
 import jobsRouter from './routes/jobs.js';
@@ -20,11 +22,12 @@ import {
   sanitizeRequestBody,
   validateContentType
 } from './middleware/security.js';
-import { authenticateToken, requireAdmin } from './middleware/auth.js';
+import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { connectToDatabase } from './services/cosmosdb.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { ErrorTracking } from './services/errorTracking.js';
+import { startAnalyticsWebSocket } from './services/analyticsStream.js';
 
 const app = express();
 
@@ -86,7 +89,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Performance stats (admin only)
-app.get('/api/performance', authenticateToken, requireAdmin, (_req, res) => {
+app.get('/api/performance', authenticateToken, requirePermission('admin:read'), (_req, res) => {
   res.json({ data: getPerformanceStats() });
 });
 
@@ -95,6 +98,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/analytics', analyticsRouter);
+app.use('/api/graphql', graphqlRouter);
 app.use('/api/bookmarks', bookmarksRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/profile', profileRouter);
@@ -129,7 +133,10 @@ export async function startServer() {
   ErrorTracking.init();
   app.use(ErrorTracking.errorHandler);
 
-  app.listen(config.port, () => {
+  const server = http.createServer(app);
+  startAnalyticsWebSocket(server);
+
+  server.listen(config.port, () => {
     console.log(`API running on http://localhost:${config.port}`);
   });
 }

@@ -10,7 +10,7 @@ interface UserDoc extends Document {
     email: string;
     username: string;
     passwordHash: string;
-    role: 'admin' | 'user';
+    role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -21,7 +21,7 @@ export interface User {
     id: string;
     email: string;
     username: string;
-    role: 'admin' | 'user';
+    role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
     isActive: boolean;
     createdAt: string;
     lastLogin?: string;
@@ -69,7 +69,7 @@ export class UserModelMongo {
         email: string;
         username: string;
         password: string;
-        role?: 'admin' | 'user';
+        role?: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
     }): Promise<User> {
         try {
             const passwordHash = await bcrypt.hash(data.password, 10);
@@ -130,7 +130,7 @@ export class UserModelMongo {
         username: string;
         email: string;
         password: string;
-        role: 'admin' | 'user';
+        role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
         isActive: boolean;
     }>): Promise<User | null> {
         if (!ObjectId.isValid(id)) return null;
