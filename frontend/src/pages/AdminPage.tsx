@@ -59,6 +59,25 @@ const LIST_SORT_OPTIONS: { value: 'newest' | 'updated' | 'deadline' | 'views'; l
     { value: 'views', label: 'Most viewed' },
 ];
 
+const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
+
+type ListFilterState = {
+    query?: string;
+    type?: ContentType | 'all';
+    status?: AnnouncementStatus | 'all';
+    sort?: 'newest' | 'updated' | 'deadline' | 'views';
+};
+
+const loadListFilters = (): ListFilterState | null => {
+    try {
+        const raw = localStorage.getItem(LIST_FILTER_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as ListFilterState;
+    } catch {
+        return null;
+    }
+};
+
 
 const STATUS_OPTIONS: { value: AnnouncementStatus; label: string }[] = [
     { value: 'draft', label: 'Draft' },
@@ -106,12 +125,13 @@ export function AdminPage() {
     const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem('adminToken'));
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
-    const [listQuery, setListQuery] = useState('');
-    const [listTypeFilter, setListTypeFilter] = useState<ContentType | 'all'>('all');
-    const [listSort, setListSort] = useState<'newest' | 'updated' | 'deadline' | 'views'>('newest');
+    const storedFilters = useMemo(() => loadListFilters(), []);
+    const [listQuery, setListQuery] = useState(storedFilters?.query ?? '');
+    const [listTypeFilter, setListTypeFilter] = useState<ContentType | 'all'>(storedFilters?.type ?? 'all');
+    const [listSort, setListSort] = useState<'newest' | 'updated' | 'deadline' | 'views'>(storedFilters?.sort ?? 'newest');
     const [listPage, setListPage] = useState(1);
 
-    const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>('all');
+    const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>(storedFilters?.status ?? 'all');
     const [listLoading, setListLoading] = useState(false);
     const [listUpdatedAt, setListUpdatedAt] = useState<string | null>(null);
     const [listExporting, setListExporting] = useState(false);
@@ -1142,6 +1162,10 @@ export function AdminPage() {
     }, [scheduledAnnouncements]);
 
     const formWarnings = useMemo(() => getFormWarnings(), [formData]);
+    const titleMissing = !formData.title.trim();
+    const titleTooShort = formData.title.trim().length > 0 && formData.title.trim().length < 10;
+    const titleInvalid = titleMissing || titleTooShort;
+    const organizationMissing = !formData.organization.trim();
 
     const scheduleCalendar = useMemo(() => {
         const start = new Date();
@@ -1463,6 +1487,16 @@ export function AdminPage() {
     useEffect(() => {
         setListPage(1);
         setSelectedIds(new Set());
+    }, [listQuery, listTypeFilter, listStatusFilter, listSort]);
+
+    useEffect(() => {
+        const payload: ListFilterState = {
+            query: listQuery,
+            type: listTypeFilter,
+            status: listStatusFilter,
+            sort: listSort,
+        };
+        localStorage.setItem(LIST_FILTER_STORAGE_KEY, JSON.stringify(payload));
     }, [listQuery, listTypeFilter, listStatusFilter, listSort]);
 
     useEffect(() => {
@@ -2627,7 +2661,12 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                         placeholder="e.g. UP Police Constable Recruitment 2026"
                                         required
+                                        className={titleInvalid ? 'field-invalid' : ''}
+                                        aria-invalid={titleInvalid || undefined}
                                     />
+                                    {titleInvalid && (
+                                        <span className="field-error">Title must be at least 10 characters.</span>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label>Organization *</label>
@@ -2637,7 +2676,12 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
                                         placeholder="e.g. UPPRPB"
                                         required
+                                        className={organizationMissing ? 'field-invalid' : ''}
+                                        aria-invalid={organizationMissing || undefined}
                                     />
+                                    {organizationMissing && (
+                                        <span className="field-error">Organization is required.</span>
+                                    )}
                                 </div>
                             </div>
                             <div className="form-row two-col">
@@ -2673,7 +2717,7 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.totalPosts}
                                         onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
-                                        placeholder="e.g. 32679"
+                                        placeholder="e.g. 32679 (numbers only)"
                                     />
                                 </div>
                                 <div className="form-group">
@@ -2705,6 +2749,9 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
                                         disabled={formData.status !== 'scheduled'}
                                     />
+                                    {formData.status !== 'scheduled' && (
+                                        <p className="field-hint">Enabled only when Status is Scheduled.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2990,7 +3037,12 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                         placeholder="e.g. SSC CGL 2025 Recruitment"
                                         required
+                                        className={titleInvalid ? 'field-invalid' : ''}
+                                        aria-invalid={titleInvalid || undefined}
                                     />
+                                    {titleInvalid && (
+                                        <span className="field-error">Title must be at least 10 characters.</span>
+                                    )}
                                 </div>
                             </div>
 
@@ -3029,7 +3081,12 @@ export function AdminPage() {
                                         value={formData.organization}
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
                                         required
+                                        className={organizationMissing ? 'field-invalid' : ''}
+                                        aria-invalid={organizationMissing || undefined}
                                     />
+                                    {organizationMissing && (
+                                        <span className="field-error">Organization is required.</span>
+                                    )}
                                 </div>
                                 <div className="form-group">
                                     <label>Location</label>
@@ -3047,6 +3104,7 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.totalPosts}
                                         onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
+                                        placeholder="e.g. 32679 (numbers only)"
                                     />
                                 </div>
                                 <div className="form-group">
@@ -3074,6 +3132,7 @@ export function AdminPage() {
                                         type="text"
                                         value={formData.ageLimit}
                                         onChange={(e) => setFormData({ ...formData, ageLimit: e.target.value })}
+                                        placeholder="e.g., 18-27 years"
                                     />
                                 </div>
                             </div>
@@ -3085,6 +3144,7 @@ export function AdminPage() {
                                         type="text"
                                         value={formData.applicationFee}
                                         onChange={(e) => setFormData({ ...formData, applicationFee: e.target.value })}
+                                        placeholder="e.g., ₹500 / NIL"
                                     />
                                 </div>
                                 <div className="form-group">
@@ -3117,6 +3177,9 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
                                         disabled={formData.status !== 'scheduled'}
                                     />
+                                    {formData.status !== 'scheduled' && (
+                                        <p className="field-hint">Enabled only when Status is Scheduled.</p>
+                                    )}
                                 </div>
                             </div>
 

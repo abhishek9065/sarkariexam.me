@@ -258,7 +258,8 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         {
             label: detailViewsLabel,
             value: funnel?.detailViews ?? 0,
-            rate: funnel?.cardClicks ? Math.round((funnel.detailViews / funnel.cardClicks) * 100) : 0
+            rate: funnel?.cardClicks ? Math.round((funnel.detailViews / funnel.cardClicks) * 100) : 0,
+            rateLabel: funnelHasDirectTraffic ? 'Includes direct traffic' : undefined,
         },
         {
             label: 'Bookmarks',
@@ -393,14 +394,16 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                 </div>
                 <div className="funnel-grid">
                     {funnelSteps.map((step, index) => (
-                        <div key={step.label} className="funnel-card">
-                            <div className="funnel-label">{step.label}</div>
-                            <div className="funnel-value">{step.value.toLocaleString()}</div>
-                            {index > 0 && (
-                                <div className="funnel-rate">{step.rate}% of previous</div>
-                            )}
-                        </div>
-                    ))}
+                            <div key={step.label} className="funnel-card">
+                                <div className="funnel-label">{step.label}</div>
+                                <div className="funnel-value">{step.value.toLocaleString()}</div>
+                                {index > 0 && (
+                                    <div className="funnel-rate">
+                                        {step.rateLabel ?? `${step.rate}% of previous`}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                 </div>
                 {funnelHasDirectTraffic && (
                     <p className="analytics-hint">

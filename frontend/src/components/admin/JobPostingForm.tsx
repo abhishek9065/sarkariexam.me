@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './JobPostingForm.css';
 
 interface ImportantDate {
@@ -155,11 +155,48 @@ const defaultJobDetails: JobDetails = {
 type TabType = 'dates' | 'fees' | 'eligibility' | 'vacancies' | 'exam' | 'links';
 
 export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: JobPostingFormProps) {
+    const draftKey = 'jobDetailsDraft';
     const [activeTab, setActiveTab] = useState<TabType>('dates');
-    const [jobDetails, setJobDetails] = useState<JobDetails>({
-        ...defaultJobDetails,
-        ...initialData,
+    const [jobDetails, setJobDetails] = useState<JobDetails>(() => {
+        if (initialData && Object.keys(initialData).length > 0) {
+            return { ...defaultJobDetails, ...initialData };
+        }
+        try {
+            const saved = localStorage.getItem(draftKey);
+            if (saved) {
+                return { ...defaultJobDetails, ...JSON.parse(saved) };
+            }
+        } catch {
+            // Ignore invalid drafts.
+        }
+        return { ...defaultJobDetails };
     });
+    const [draftNotice, setDraftNotice] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    const [showValidation, setShowValidation] = useState(false);
+
+    const validation = useMemo(() => {
+        const dateErrors = jobDetails.importantDates.map((date) => ({
+            name: !date.name.trim(),
+            date: !date.date,
+        }));
+        const feeErrors = jobDetails.applicationFees.map((fee) => ({
+            category: !fee.category.trim(),
+            amount: !fee.amount || fee.amount <= 0,
+        }));
+        const ageErrors = {
+            minAge: jobDetails.ageLimits.minAge <= 0,
+            maxAge: jobDetails.ageLimits.maxAge <= 0 || jobDetails.ageLimits.maxAge < jobDetails.ageLimits.minAge,
+            asOnDate: !jobDetails.ageLimits.asOnDate,
+        };
+        const hasRequiredErrors =
+            dateErrors.some((entry) => entry.name || entry.date)
+            || feeErrors.some((entry) => entry.category || entry.amount)
+            || ageErrors.minAge
+            || ageErrors.maxAge;
+        return { dateErrors, feeErrors, ageErrors, hasRequiredErrors };
+    }, [jobDetails]);
 
     const tabs = [
         { id: 'dates' as TabType, label: '📅 Dates & Fees', icon: '📅' },
@@ -216,7 +253,25 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
         updateField(path, newArray);
     };
 
-    const handleSubmit = () => {
+    useEffect(() => {
+        const handle = window.setTimeout(() => {
+            try {
+                localStorage.setItem(draftKey, JSON.stringify(jobDetails));
+                setDraftNotice('Draft auto-saved');
+            } catch {
+                // Ignore storage errors.
+            }
+        }, 600);
+        return () => window.clearTimeout(handle);
+    }, [jobDetails]);
+
+    const handleSubmit = async () => {
+        if (validation.hasRequiredErrors) {
+            setShowValidation(true);
+            setDraftNotice('Please fix highlighted fields before saving.');
+            return;
+        }
+        setIsSubmitting(true);
         // Recalculate totals
         const totalVacancies = jobDetails.vacancies.details.reduce((sum, v) => sum + v.total, 0);
         const finalData = {
@@ -226,10 +281,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 total: totalVacancies,
             },
         };
-        onSubmit(finalData);
+        try {
+            await Promise.resolve(onSubmit(finalData));
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handlePreview = () => {
+        if (validation.hasRequiredErrors) {
+            setShowValidation(true);
+            setDraftNotice('Complete required fields before previewing.');
+            return;
+        }
+        setIsPreviewing(true);
         const totalVacancies = jobDetails.vacancies.details.reduce((sum, v) => sum + v.total, 0);
         const finalData = {
             ...jobDetails,
@@ -239,10 +304,24 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
             },
         };
         onPreview?.(finalData);
+        window.setTimeout(() => setIsPreviewing(false), 400);
+    };
+
+    const confirmRemove = (label: string) => window.confirm(`Remove ${label}? This cannot be undone.`);
+
+    const clearDraft = () => {
+        localStorage.removeItem(draftKey);
+        setDraftNotice('Draft cleared');
     };
 
     return (
         <div className="job-posting-form">
+            {showValidation && validation.hasRequiredErrors && (
+                <div className="form-alert">
+                    Some required fields are missing. Fix the highlighted inputs before saving.
+                </div>
+            )}
+            {draftNotice && <div className="form-note">{draftNotice}</div>}
             <div className="form-tabs">
                 {tabs.map(tab => (
                     <button
@@ -260,6 +339,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 {activeTab === 'dates' && (
                     <div className="tab-panel">
                         <h3>📅 Important Dates</h3>
+                        <p className="form-hint">Tip: Click a date field to open the calendar picker.</p>
                         <div className="dynamic-list">
                             {jobDetails.importantDates.map((date, index) => (
                                 <div key={index} className="list-row">
@@ -267,14 +347,28 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         type="text"
                                         placeholder="Event Name"
                                         value={date.name}
+                                        className={(showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name ? 'field-invalid' : ''}
+                                        aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name) || undefined}
                                         onChange={(e) => updateArrayItem('importantDates', index, 'name', e.target.value)}
                                     />
                                     <input
                                         type="date"
                                         value={date.date}
+                                        className={(showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date ? 'field-invalid' : ''}
+                                        aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date) || undefined}
                                         onChange={(e) => updateArrayItem('importantDates', index, 'date', e.target.value)}
                                     />
-                                    <button className="remove-btn" onClick={() => removeArrayItem('importantDates', index)}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this date')) return;
+                                            removeArrayItem('importantDates', index);
+                                        }}
+                                        aria-label="Remove date"
+                                        title="Remove date"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
                             <button className="add-btn" onClick={() => addArrayItem('importantDates', { name: '', date: '' })}>
@@ -290,15 +384,29 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         type="text"
                                         placeholder="Category"
                                         value={fee.category}
+                                        className={(showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.category ? 'field-invalid' : ''}
+                                        aria-invalid={((showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.category) || undefined}
                                         onChange={(e) => updateArrayItem('applicationFees', index, 'category', e.target.value)}
                                     />
                                     <input
                                         type="number"
-                                        placeholder="Amount"
+                                        placeholder="Amount (₹)"
                                         value={fee.amount || ''}
+                                        className={(showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.amount ? 'field-invalid' : ''}
+                                        aria-invalid={((showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.amount) || undefined}
                                         onChange={(e) => updateArrayItem('applicationFees', index, 'amount', parseInt(e.target.value) || 0)}
                                     />
-                                    <button className="remove-btn" onClick={() => removeArrayItem('applicationFees', index)}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this fee')) return;
+                                            removeArrayItem('applicationFees', index);
+                                        }}
+                                        aria-label="Remove fee"
+                                        title="Remove fee"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
                             <button className="add-btn" onClick={() => addArrayItem('applicationFees', { category: '', amount: 0 })}>
@@ -307,6 +415,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                         </div>
 
                         <h3>👤 Age Limits</h3>
+                        <p className="form-hint">Required fields are highlighted. Add relaxations only if they apply.</p>
                         <div className="age-limits-section">
                             <div className="form-row">
                                 <div className="form-group">
@@ -314,6 +423,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                     <input
                                         type="number"
                                         value={jobDetails.ageLimits.minAge}
+                                        className={(showValidation || jobDetails.ageLimits.minAge) && validation.ageErrors.minAge ? 'field-invalid' : ''}
                                         onChange={(e) => updateField('ageLimits.minAge', parseInt(e.target.value) || 0)}
                                     />
                                 </div>
@@ -322,6 +432,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                     <input
                                         type="number"
                                         value={jobDetails.ageLimits.maxAge}
+                                        className={(showValidation || jobDetails.ageLimits.maxAge) && validation.ageErrors.maxAge ? 'field-invalid' : ''}
                                         onChange={(e) => updateField('ageLimits.maxAge', parseInt(e.target.value) || 0)}
                                     />
                                 </div>
@@ -330,6 +441,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                     <input
                                         type="date"
                                         value={jobDetails.ageLimits.asOnDate}
+                                        className={(showValidation || jobDetails.ageLimits.asOnDate) && validation.ageErrors.asOnDate ? 'field-invalid' : ''}
                                         onChange={(e) => updateField('ageLimits.asOnDate', e.target.value)}
                                     />
                                 </div>
@@ -351,7 +463,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         />
                                         <input
                                             type="number"
-                                            placeholder="Years"
+                                            placeholder="Years (+)"
                                             value={rel.years || ''}
                                             onChange={(e) => {
                                                 const newRel = [...jobDetails.ageLimits.relaxations];
@@ -361,7 +473,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         />
                                         <input
                                             type="number"
-                                            placeholder="Max Age"
+                                            placeholder="Max age"
                                             value={rel.maxAge || ''}
                                             onChange={(e) => {
                                                 const newRel = [...jobDetails.ageLimits.relaxations];
@@ -369,12 +481,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                                 updateField('ageLimits.relaxations', newRel);
                                             }}
                                         />
-                                        <button className="remove-btn" onClick={() => {
-                                            updateField('ageLimits.relaxations', jobDetails.ageLimits.relaxations.filter((_, i) => i !== index));
-                                        }}>✕</button>
+                                        <button
+                                            className="remove-btn"
+                                            onClick={() => {
+                                                if (!confirmRemove('this relaxation')) return;
+                                                updateField('ageLimits.relaxations', jobDetails.ageLimits.relaxations.filter((_, i) => i !== index));
+                                            }}
+                                            aria-label="Remove relaxation"
+                                            title="Remove relaxation"
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
                                 ))}
-                                <button className="add-btn" onClick={() => {
+                                <button className="add-btn secondary" onClick={() => {
                                     updateField('ageLimits.relaxations', [...jobDetails.ageLimits.relaxations, { category: '', years: 0, maxAge: 0 }]);
                                 }}>
                                     + Add Relaxation
@@ -388,6 +508,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 {activeTab === 'eligibility' && (
                     <div className="tab-panel">
                         <h3>📚 Eligibility Criteria</h3>
+                        <p className="form-hint">Describe who can apply. Keep it concise and clear.</p>
                         <div className="form-group">
                             <label>Nationality</label>
                             <input
@@ -415,6 +536,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                         </div>
 
                         <h3>💵 Salary Details</h3>
+                        <p className="form-hint">Use currency symbols to clarify pay ranges.</p>
                         <div className="form-row">
                             <div className="form-group">
                                 <label>Pay Level</label>
@@ -446,6 +568,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                         </div>
 
                         <h3>🏃 Physical Requirements</h3>
+                        <p className="form-hint">Include only if the official notification specifies requirements.</p>
                         <div className="physical-req-section">
                             <h4>👨 Male Candidates</h4>
                             <div className="form-row">
@@ -536,6 +659,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 {activeTab === 'vacancies' && (
                     <div className="tab-panel">
                         <h3>📊 Category-wise Vacancy Details</h3>
+                        <p className="form-hint">Totals auto-calculate from male/female counts.</p>
                         <div className="vacancy-table">
                             <div className="vacancy-header">
                                 <span>Category</span>
@@ -579,12 +703,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         }}
                                     />
                                     <input type="number" value={vac.total} disabled className="total-field" />
-                                    <button className="remove-btn" onClick={() => {
-                                        updateField('vacancies.details', jobDetails.vacancies.details.filter((_, i) => i !== index));
-                                    }}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this category')) return;
+                                            updateField('vacancies.details', jobDetails.vacancies.details.filter((_, i) => i !== index));
+                                        }}
+                                        aria-label="Remove vacancy category"
+                                        title="Remove vacancy category"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            <button className="add-btn" onClick={() => {
+                            <button className="add-btn secondary" onClick={() => {
                                 updateField('vacancies.details', [...jobDetails.vacancies.details, { category: '', male: 0, female: 0, total: 0 }]);
                             }}>
                                 + Add Category
@@ -601,6 +733,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 {activeTab === 'exam' && (
                     <div className="tab-panel">
                         <h3>📝 Exam Pattern</h3>
+                        <p className="form-hint">Leave blank if the pattern hasn’t been announced.</p>
                         <div className="form-row">
                             <div className="form-group">
                                 <label>Total Questions</label>
@@ -672,12 +805,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                             updateField('examPattern.subjects', newSubs);
                                         }}
                                     />
-                                    <button className="remove-btn" onClick={() => {
-                                        updateField('examPattern.subjects', jobDetails.examPattern.subjects.filter((_, i) => i !== index));
-                                    }}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this subject')) return;
+                                            updateField('examPattern.subjects', jobDetails.examPattern.subjects.filter((_, i) => i !== index));
+                                        }}
+                                        aria-label="Remove subject"
+                                        title="Remove subject"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            <button className="add-btn" onClick={() => {
+                            <button className="add-btn secondary" onClick={() => {
                                 updateField('examPattern.subjects', [...jobDetails.examPattern.subjects, { name: '', questions: 0, marks: 0 }]);
                             }}>
                                 + Add Subject
@@ -685,6 +826,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                         </div>
 
                         <h3>🎯 Selection Process</h3>
+                        <p className="form-hint">Add steps in the order candidates will experience them.</p>
                         <div className="dynamic-list">
                             {jobDetails.selectionProcess.map((step, index) => (
                                 <div key={index} className="list-row step-row">
@@ -709,14 +851,22 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                             updateField('selectionProcess', newSteps);
                                         }}
                                     />
-                                    <button className="remove-btn" onClick={() => {
-                                        const newSteps = jobDetails.selectionProcess.filter((_, i) => i !== index)
-                                            .map((s, i) => ({ ...s, step: i + 1 }));
-                                        updateField('selectionProcess', newSteps);
-                                    }}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this step')) return;
+                                            const newSteps = jobDetails.selectionProcess.filter((_, i) => i !== index)
+                                                .map((s, i) => ({ ...s, step: i + 1 }));
+                                            updateField('selectionProcess', newSteps);
+                                        }}
+                                        aria-label="Remove step"
+                                        title="Remove step"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            <button className="add-btn" onClick={() => {
+                            <button className="add-btn secondary" onClick={() => {
                                 updateField('selectionProcess', [
                                     ...jobDetails.selectionProcess,
                                     { step: jobDetails.selectionProcess.length + 1, name: '', description: '' }
@@ -732,6 +882,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 {activeTab === 'links' && (
                     <div className="tab-panel">
                         <h3>🔗 Important Links</h3>
+                        <p className="form-hint">Add official links first. Use “Primary” for key actions.</p>
                         <div className="dynamic-list">
                             {jobDetails.importantLinks.map((link, index) => (
                                 <div key={index} className="list-row">
@@ -766,12 +917,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         <option value="primary">Primary</option>
                                         <option value="secondary">Secondary</option>
                                     </select>
-                                    <button className="remove-btn" onClick={() => {
-                                        updateField('importantLinks', jobDetails.importantLinks.filter((_, i) => i !== index));
-                                    }}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this link')) return;
+                                            updateField('importantLinks', jobDetails.importantLinks.filter((_, i) => i !== index));
+                                        }}
+                                        aria-label="Remove link"
+                                        title="Remove link"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            <button className="add-btn" onClick={() => {
+                            <button className="add-btn secondary" onClick={() => {
                                 updateField('importantLinks', [...jobDetails.importantLinks, { label: '', url: '', type: 'primary' }]);
                             }}>
                                 + Add Link
@@ -779,6 +938,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                         </div>
 
                         <h3>📝 How to Apply</h3>
+                        <p className="form-hint">Use short steps. Each line should be a clear action.</p>
                         <div className="dynamic-list">
                             {jobDetails.howToApply.map((step, index) => (
                                 <div key={index} className="list-row">
@@ -793,12 +953,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                             updateField('howToApply', newSteps);
                                         }}
                                     />
-                                    <button className="remove-btn" onClick={() => {
-                                        updateField('howToApply', jobDetails.howToApply.filter((_, i) => i !== index));
-                                    }}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this step')) return;
+                                            updateField('howToApply', jobDetails.howToApply.filter((_, i) => i !== index));
+                                        }}
+                                        aria-label="Remove step"
+                                        title="Remove step"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            <button className="add-btn" onClick={() => {
+                            <button className="add-btn secondary" onClick={() => {
                                 updateField('howToApply', [...jobDetails.howToApply, '']);
                             }}>
                                 + Add Step
@@ -806,6 +974,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                         </div>
 
                         <h3>❓ Frequently Asked Questions</h3>
+                        <p className="form-hint">Add common queries from candidates to reduce support load.</p>
                         <div className="faq-list">
                             {jobDetails.faqs.map((faq, index) => (
                                 <div key={index} className="faq-item">
@@ -828,12 +997,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                             updateField('faqs', newFaqs);
                                         }}
                                     />
-                                    <button className="remove-btn" onClick={() => {
-                                        updateField('faqs', jobDetails.faqs.filter((_, i) => i !== index));
-                                    }}>✕</button>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => {
+                                            if (!confirmRemove('this FAQ')) return;
+                                            updateField('faqs', jobDetails.faqs.filter((_, i) => i !== index));
+                                        }}
+                                        aria-label="Remove FAQ"
+                                        title="Remove FAQ"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
-                            <button className="add-btn" onClick={() => {
+                            <button className="add-btn secondary" onClick={() => {
                                 updateField('faqs', [...jobDetails.faqs, { question: '', answer: '' }]);
                             }}>
                                 + Add FAQ
@@ -844,24 +1021,16 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
             </div>
 
             <div className="form-actions">
-                <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+                <button className="btn-secondary" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+                <button className="btn-secondary subtle" onClick={clearDraft} type="button">Clear draft</button>
                 {onPreview && (
-                    <button className="btn-preview" onClick={handlePreview} style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        👁️ Preview
+                    <button className="btn-outline" onClick={handlePreview} disabled={isPreviewing || isSubmitting}>
+                        {isPreviewing ? 'Opening preview…' : 'Preview (modal)'}
                     </button>
                 )}
-                <button className="btn-primary" onClick={handleSubmit}>Save Job Details</button>
+                <button className="btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving…' : 'Save Job Details'}
+                </button>
             </div>
         </div>
     );
