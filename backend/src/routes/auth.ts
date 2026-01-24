@@ -30,8 +30,8 @@ const registerSchema = z.object({
   name: z.string().min(2).max(100).trim(),
 });
 
-const buildJwtOptions = (expiresIn: string): SignOptions => {
-  const options: jwt.SignOptions = { expiresIn };
+const buildJwtOptions = (expiresIn: SignOptions['expiresIn']): SignOptions => {
+  const options: SignOptions = { expiresIn };
   if (config.jwtIssuer) options.issuer = config.jwtIssuer;
   if (config.jwtAudience) options.audience = config.jwtAudience;
   return options;
