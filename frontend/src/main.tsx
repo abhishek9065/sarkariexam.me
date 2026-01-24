@@ -28,6 +28,21 @@ const recoverFromStaleServiceWorker = () => {
 
 recoverFromStaleServiceWorker();
 
+const disableServiceWorkerForAdmin = () => {
+  if (!('serviceWorker' in navigator) || !('caches' in window)) return;
+  if (!window.location.pathname.startsWith('/admin')) return;
+  if (sessionStorage.getItem('admin-sw-reset') === '1') return;
+  sessionStorage.setItem('admin-sw-reset', '1');
+  Promise.all([
+    navigator.serviceWorker.getRegistrations().then((regs) => Promise.all(regs.map((reg) => reg.unregister()))),
+    caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))),
+  ]).finally(() => {
+    window.location.reload();
+  });
+};
+
+disableServiceWorkerForAdmin();
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <App />
