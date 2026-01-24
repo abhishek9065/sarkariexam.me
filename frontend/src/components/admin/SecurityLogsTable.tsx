@@ -22,6 +22,7 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+    const [pollIntervalMs, setPollIntervalMs] = useState(120000);
 
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Not updated yet';
@@ -41,6 +42,11 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
             const res = await fetch(`${apiBase}/api/admin/security?limit=50`, {
                 credentials: 'include',
             });
+            if (res.status === 429) {
+                setError('Too many requests. Pausing live refresh for 5 minutes.');
+                setPollIntervalMs(5 * 60 * 1000);
+                return;
+            }
             if (res.status === 401 || res.status === 403) {
                 onUnauthorized?.();
                 return;
@@ -66,9 +72,9 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
     useEffect(() => {
         fetchLogs();
         // Poll every 30 seconds for live monitoring
-        const interval = setInterval(fetchLogs, 30000);
+        const interval = setInterval(fetchLogs, pollIntervalMs);
         return () => clearInterval(interval);
-    }, []);
+    }, [pollIntervalMs]);
 
     if (loading && logs.length === 0) {
         return <div className="loading-spinner">Loading logs...</div>;

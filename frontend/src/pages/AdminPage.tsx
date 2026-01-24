@@ -252,6 +252,13 @@ export function AdminPage() {
             credentials: 'include',
             ...init,
         });
+        if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After');
+            const message = retryAfter
+                ? `Too many requests. Try again in ${retryAfter}s.`
+                : 'Too many requests. Please wait and try again.';
+            setMessage(message);
+        }
         if (response.status === 401 || response.status === 403) {
             handleUnauthorized();
         }
