@@ -66,6 +66,7 @@ export function rateLimit(options: RateLimitOptions = {}) {
         res.setHeader('X-RateLimit-Reset', Math.ceil(result.resetTime / 1000));
 
         if (!result.allowed) {
+            const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
             SecurityLogger.log({
                 ip_address: clientIp,
                 event_type: 'rate_limit',
@@ -77,9 +78,10 @@ export function rateLimit(options: RateLimitOptions = {}) {
                 }
             });
 
+            res.setHeader('Retry-After', retryAfter);
             res.status(429).json({
                 error: 'Too many requests',
-                retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000),
+                retryAfter,
             });
             return;
         }

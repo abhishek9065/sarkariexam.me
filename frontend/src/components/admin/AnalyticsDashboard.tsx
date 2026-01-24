@@ -410,6 +410,7 @@ export function AnalyticsDashboard({
                     'Content-Type': 'application/json',
                     ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
                 },
+                maxRetries: 0,
                 body: JSON.stringify({ status: 'archived' }),
             });
             if (response.status === 401 || response.status === 403) {

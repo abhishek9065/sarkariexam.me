@@ -44,6 +44,20 @@ type AdminAuditLog = {
     createdAt: string;
 };
 
+type AdminSummary = {
+    counts: {
+        total: number;
+        byStatus: Record<AnnouncementStatus, number>;
+        byType: Record<ContentType, number>;
+    };
+    pendingSla: {
+        pendingTotal: number;
+        averageDays: number;
+        buckets: { lt1: number; d1_3: number; d3_7: number; gt7: number };
+        stale: Array<Announcement & { ageDays: number }>;
+    };
+};
+
 type ToastTone = 'success' | 'error' | 'info';
 type Toast = {
     id: string;
@@ -204,6 +218,10 @@ export function AdminPage() {
     const [dashboardError, setDashboardError] = useState<string | null>(null);
     const [dashboardUpdatedAt, setDashboardUpdatedAt] = useState<string | null>(null);
     const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>('list');
+    const [adminSummary, setAdminSummary] = useState<AdminSummary | null>(null);
+    const [adminSummaryLoading, setAdminSummaryLoading] = useState(false);
+    const [adminSummaryError, setAdminSummaryError] = useState<string | null>(null);
+    const [adminSummaryUpdatedAt, setAdminSummaryUpdatedAt] = useState<string | null>(null);
     const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
     const [auditLoading, setAuditLoading] = useState(false);
     const [auditError, setAuditError] = useState<string | null>(null);
@@ -258,8 +276,10 @@ export function AdminPage() {
     }, [clearAdminSession, pushToast]);
 
     const adminFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const method = (init?.method ?? 'GET').toUpperCase();
         const response = await adminRequest(input, {
             ...init,
+            maxRetries: method === 'GET' ? 2 : 0,
             onRateLimit: (rateLimitResponse) => {
                 const retryAfter = rateLimitResponse.headers.get('Retry-After');
                 const message = retryAfter
@@ -360,6 +380,7 @@ export function AdminPage() {
             const data = await res.json();
             setAnnouncements(data.data || []);
             setListUpdatedAt(new Date().toISOString());
+            refreshAdminSummary();
         } catch (e) {
             console.error(e);
             setMessage('Failed to load announcements.');
@@ -457,6 +478,28 @@ export function AdminPage() {
             setDashboardError('Failed to load user analytics.');
         } finally {
             setDashboardLoading(false);
+        }
+    };
+
+    const refreshAdminSummary = async () => {
+        if (!isLoggedIn) return;
+        setAdminSummaryLoading(true);
+        setAdminSummaryError(null);
+        try {
+            const res = await adminFetch(`${apiBase}/api/admin/announcements/summary?includeInactive=true`);
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setAdminSummaryError(getApiErrorMessage(errorBody, 'Failed to load admin summary.'));
+                return;
+            }
+            const payload = await res.json();
+            setAdminSummary(payload.data ?? null);
+            setAdminSummaryUpdatedAt(new Date().toISOString());
+        } catch (error) {
+            console.error(error);
+            setAdminSummaryError('Failed to load admin summary.');
+        } finally {
+            setAdminSummaryLoading(false);
         }
     };
 
@@ -1274,14 +1317,20 @@ export function AdminPage() {
     };
 
     const contentCounts = useMemo(() => {
+        if (adminSummary?.counts?.byType) {
+            return adminSummary.counts.byType;
+        }
         const counts: Record<string, number> = {};
         for (const item of announcements) {
             counts[item.type] = (counts[item.type] ?? 0) + 1;
         }
         return counts;
-    }, [announcements]);
+    }, [adminSummary, announcements]);
 
     const statusCounts = useMemo(() => {
+        if (adminSummary?.counts?.byStatus) {
+            return adminSummary.counts.byStatus;
+        }
         const counts: Record<AnnouncementStatus, number> = {
             draft: 0,
             pending: 0,
@@ -1294,7 +1343,7 @@ export function AdminPage() {
             counts[status] = (counts[status] ?? 0) + 1;
         }
         return counts;
-    }, [announcements]);
+    }, [adminSummary, announcements]);
 
     const scheduledAnnouncements = useMemo(() => {
         return announcements
@@ -1312,6 +1361,14 @@ export function AdminPage() {
     }, [pendingAnnouncements]);
 
     const pendingSlaStats = useMemo(() => {
+        if (adminSummary?.pendingSla) {
+            return {
+                buckets: adminSummary.pendingSla.buckets,
+                stale: adminSummary.pendingSla.stale.map((item) => ({ item, ageDays: item.ageDays })),
+                averageDays: adminSummary.pendingSla.averageDays,
+                pendingTotal: adminSummary.pendingSla.pendingTotal,
+            };
+        }
         const buckets = { lt1: 0, d1_3: 0, d3_7: 0, gt7: 0 };
         const stale: Array<{ item: Announcement; ageDays: number }> = [];
         let totalDays = 0;
@@ -1341,8 +1398,9 @@ export function AdminPage() {
             buckets,
             stale: stale.slice(0, 8),
             averageDays: pendingAnnouncements.length ? Math.round(totalDays / pendingAnnouncements.length) : 0,
+            pendingTotal: pendingAnnouncements.length,
         };
-    }, [pendingAnnouncements]);
+    }, [adminSummary, pendingAnnouncements]);
 
     const selectedAnnouncements = useMemo(() => {
         return announcements.filter((item) => selectedIds.has(item.id));
@@ -1647,6 +1705,7 @@ export function AdminPage() {
         refreshData();
         refreshDashboard();
         refreshActiveUsers();
+        refreshAdminSummary();
     }, [isLoggedIn]);
 
     useEffect(() => {
@@ -2071,7 +2130,7 @@ export function AdminPage() {
                                 onClick={() => setListTypeFilter('all')}
                             >
                                 All
-                                <span className="chip-count">{announcements.length}</span>
+                                <span className="chip-count">{adminSummary?.counts.total ?? announcements.length}</span>
                             </button>
                             {CONTENT_TYPES.map((type) => (
                                 <button
@@ -2091,7 +2150,7 @@ export function AdminPage() {
                                 onClick={() => setListStatusFilter('all')}
                             >
                                 All statuses
-                                <span className="chip-count">{announcements.length}</span>
+                                <span className="chip-count">{adminSummary?.counts.total ?? announcements.length}</span>
                             </button>
                             {STATUS_OPTIONS.map((option) => (
                                 <button
@@ -2367,7 +2426,8 @@ export function AdminPage() {
 
                         <div className="admin-review-panel">
                             <div className="admin-review-meta">
-                                <span>{pendingAnnouncements.length} pending</span>
+                                <span>{pendingSlaStats.pendingTotal} pending</span>
+                                <span>Showing {pendingAnnouncements.length} of {pendingSlaStats.pendingTotal}</span>
                                 <span>{selectedIds.size} selected</span>
                             </div>
                             <div className="admin-review-controls">
@@ -2630,7 +2690,7 @@ export function AdminPage() {
                         <div className="admin-user-grid">
                             <div className="user-card">
                                 <div className="card-label">Pending total</div>
-                                <div className="card-value">{pendingAnnouncements.length}</div>
+                                <div className="card-value">{pendingSlaStats.pendingTotal}</div>
                             </div>
                             <div className="user-card">
                                 <div className="card-label">QA warnings</div>

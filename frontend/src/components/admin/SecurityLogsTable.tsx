@@ -27,6 +27,7 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(25);
     const [total, setTotal] = useState(0);
+    const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
 
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const startIndex = total === 0 ? 0 : (page - 1) * limit + 1;
@@ -44,6 +45,9 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
     };
 
     const fetchLogs = async () => {
+        if (cooldownUntil && Date.now() < cooldownUntil) {
+            return;
+        }
         try {
             setLoading(true);
             setError(null);
@@ -57,7 +61,12 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
                 },
             });
             if (res.status === 429) {
-                setPollIntervalMs(5 * 60 * 1000);
+                const retryAfter = res.headers.get('Retry-After');
+                const waitMs = retryAfter && Number.isFinite(Number(retryAfter))
+                    ? Number(retryAfter) * 1000
+                    : 5 * 60 * 1000;
+                setCooldownUntil(Date.now() + waitMs);
+                setPollIntervalMs((current) => Math.max(current, waitMs));
                 return;
             }
             if (res.status === 401 || res.status === 403) {
@@ -74,6 +83,7 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
             setLogs(data.data || []);
             setTotal(data.meta?.total ?? data.data?.length ?? 0);
             setUpdatedAt(new Date().toISOString());
+            setCooldownUntil(null);
         } catch (error) {
             console.error(error);
             setError('Failed to load security logs.');
@@ -84,11 +94,17 @@ export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
     };
 
     useEffect(() => {
+        if (cooldownUntil && Date.now() < cooldownUntil) {
+            const timeout = window.setTimeout(() => {
+                fetchLogs();
+            }, cooldownUntil - Date.now());
+            return () => window.clearTimeout(timeout);
+        }
         fetchLogs();
         // Poll every 30 seconds for live monitoring
         const interval = setInterval(fetchLogs, pollIntervalMs);
         return () => clearInterval(interval);
-    }, [pollIntervalMs, page, limit]);
+    }, [pollIntervalMs, page, limit, cooldownUntil]);
 
     useEffect(() => {
         setPage((current) => Math.min(current, totalPages));

@@ -1,6 +1,7 @@
 type RequestInput = RequestInfo | URL;
 type RequestInitWithRetry = RequestInit & {
   maxRetries?: number;
+  timeoutMs?: number;
   onRateLimit?: (response: Response) => void;
 };
 
@@ -29,15 +30,23 @@ export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {
   return new Promise<Response>((resolve, reject) => {
     const run = async () => {
       active += 1;
-      const { maxRetries = 2, onRateLimit, ...fetchInit } = init;
+      const { maxRetries = 2, timeoutMs = 20000, onRateLimit, ...fetchInit } = init;
       let attempt = 0;
 
       while (true) {
+        const controller = !fetchInit.signal ? new AbortController() : null;
+        const timeout = controller && timeoutMs > 0
+          ? window.setTimeout(() => controller.abort(), timeoutMs)
+          : null;
         try {
           const response = await fetch(input, {
             credentials: 'include',
             ...fetchInit,
+            signal: controller?.signal ?? fetchInit.signal,
           });
+          if (timeout) {
+            window.clearTimeout(timeout);
+          }
 
           if (response.status === 429 && attempt < maxRetries) {
             const delay = getRetryDelay(response, attempt);
@@ -53,6 +62,9 @@ export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {
           resolve(response);
           break;
         } catch (error) {
+          if (timeout) {
+            window.clearTimeout(timeout);
+          }
           if (attempt < maxRetries) {
             attempt += 1;
             await wait(Math.min(8000, 500 * Math.pow(2, attempt)));

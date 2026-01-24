@@ -116,6 +116,10 @@ const adminExportQuerySchema = z.object({
     includeInactive: z.coerce.boolean().optional(),
 });
 
+const adminSummaryQuerySchema = z.object({
+    includeInactive: z.coerce.boolean().optional(),
+});
+
 const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Date | undefined => {
     if (!value) return undefined;
     const trimmed = value.trim();
@@ -391,6 +395,35 @@ router.get('/announcements', requirePermission('announcements:read'), async (req
     } catch (error) {
         console.error('Admin announcements error:', error);
         return res.status(500).json({ error: 'Failed to load announcements' });
+    }
+});
+
+/**
+ * GET /api/admin/announcements/summary
+ * Get counts by status/type and pending SLA summary
+ */
+router.get('/announcements/summary', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parseResult = adminSummaryQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const includeInactive = parseResult.data.includeInactive ?? true;
+        const [counts, pendingSla] = await Promise.all([
+            AnnouncementModelMongo.getAdminCounts({ includeInactive }),
+            AnnouncementModelMongo.getPendingSlaSummary({ includeInactive, staleLimit: 10 }),
+        ]);
+
+        return res.json({
+            data: {
+                counts,
+                pendingSla,
+            },
+        });
+    } catch (error) {
+        console.error('Admin summary error:', error);
+        return res.status(500).json({ error: 'Failed to load admin summary' });
     }
 });
 

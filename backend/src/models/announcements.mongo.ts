@@ -362,6 +362,192 @@ export class AnnouncementModelMongo {
         }
     }
 
+    static async getAdminCounts(options?: { includeInactive?: boolean }): Promise<{
+        total: number;
+        byStatus: Record<AnnouncementStatus, number>;
+        byType: Record<ContentType, number>;
+    }> {
+        try {
+            const query = buildAdminQuery({ includeInactive: options?.includeInactive });
+            const results = await this.collection.aggregate([
+                { $match: query },
+                {
+                    $addFields: {
+                        normalizedStatus: { $ifNull: ['$status', DEFAULT_STATUS] },
+                    },
+                },
+                {
+                    $facet: {
+                        total: [{ $count: 'value' }],
+                        byStatus: [{ $group: { _id: '$normalizedStatus', count: { $sum: 1 } } }],
+                        byType: [{ $group: { _id: '$type', count: { $sum: 1 } } }],
+                    },
+                },
+            ]).toArray();
+
+            const summary = results[0] ?? {};
+            const total = summary.total?.[0]?.value ?? 0;
+            const byStatus: Record<AnnouncementStatus, number> = {
+                draft: 0,
+                pending: 0,
+                scheduled: 0,
+                published: 0,
+                archived: 0,
+            };
+            for (const entry of summary.byStatus ?? []) {
+                const status = entry._id as AnnouncementStatus;
+                if (status && status in byStatus) {
+                    byStatus[status] = entry.count;
+                }
+            }
+
+            const byType: Record<ContentType, number> = {
+                job: 0,
+                result: 0,
+                'admit-card': 0,
+                syllabus: 0,
+                'answer-key': 0,
+                admission: 0,
+            };
+            for (const entry of summary.byType ?? []) {
+                const type = entry._id as ContentType;
+                if (type && type in byType) {
+                    byType[type] = entry.count;
+                }
+            }
+
+            return { total, byStatus, byType };
+        } catch (error) {
+            console.error('[MongoDB] getAdminCounts error:', error);
+            return {
+                total: 0,
+                byStatus: {
+                    draft: 0,
+                    pending: 0,
+                    scheduled: 0,
+                    published: 0,
+                    archived: 0,
+                },
+                byType: {
+                    job: 0,
+                    result: 0,
+                    'admit-card': 0,
+                    syllabus: 0,
+                    'answer-key': 0,
+                    admission: 0,
+                },
+            };
+        }
+    }
+
+    static async getPendingSlaSummary(options?: { includeInactive?: boolean; staleLimit?: number }): Promise<{
+        pendingTotal: number;
+        averageDays: number;
+        buckets: { lt1: number; d1_3: number; d3_7: number; gt7: number };
+        stale: Array<{
+            id: string;
+            title: string;
+            organization?: string;
+            category?: string;
+            type: ContentType;
+            version?: number;
+            status?: AnnouncementStatus;
+            publishAt?: Date;
+            deadline?: Date;
+            externalLink?: string;
+            isActive?: boolean;
+            postedAt?: Date;
+            updatedAt?: Date;
+            ageDays: number;
+        }>;
+    }> {
+        try {
+            const query = buildAdminQuery({ includeInactive: options?.includeInactive, status: 'pending' });
+            const docs = await this.collection
+                .find(query)
+                .project({
+                    title: 1,
+                    organization: 1,
+                    category: 1,
+                    type: 1,
+                    version: 1,
+                    status: 1,
+                    publishAt: 1,
+                    deadline: 1,
+                    externalLink: 1,
+                    isActive: 1,
+                    updatedAt: 1,
+                    postedAt: 1,
+                })
+                .toArray();
+
+            const buckets = { lt1: 0, d1_3: 0, d3_7: 0, gt7: 0 };
+            const staleLimit = options?.staleLimit ?? 10;
+            const stale: Array<{
+                id: string;
+                title: string;
+                organization?: string;
+                category?: string;
+                type: ContentType;
+                version?: number;
+                ageDays: number;
+            }> = [];
+            let totalDays = 0;
+
+            const now = Date.now();
+            for (const doc of docs) {
+                const baseDate = doc.updatedAt || doc.postedAt;
+                const ageDays = baseDate ? Math.max(0, Math.floor((now - new Date(baseDate).getTime()) / (1000 * 60 * 60 * 24))) : 0;
+                totalDays += ageDays;
+                if (ageDays < 1) {
+                    buckets.lt1 += 1;
+                } else if (ageDays < 3) {
+                    buckets.d1_3 += 1;
+                } else if (ageDays < 7) {
+                    buckets.d3_7 += 1;
+                } else {
+                    buckets.gt7 += 1;
+                }
+
+                if (ageDays >= 7) {
+                    stale.push({
+                        id: doc._id?.toString?.() || doc._id,
+                        title: doc.title,
+                        organization: doc.organization,
+                        category: doc.category,
+                        type: doc.type,
+                        version: doc.version,
+                        status: doc.status,
+                        publishAt: doc.publishAt,
+                        deadline: doc.deadline,
+                        externalLink: doc.externalLink,
+                        isActive: doc.isActive,
+                        postedAt: doc.postedAt,
+                        updatedAt: doc.updatedAt,
+                        ageDays,
+                    });
+                }
+            }
+
+            stale.sort((a, b) => b.ageDays - a.ageDays);
+
+            return {
+                pendingTotal: docs.length,
+                averageDays: docs.length ? Math.round(totalDays / docs.length) : 0,
+                buckets,
+                stale: stale.slice(0, staleLimit),
+            };
+        } catch (error) {
+            console.error('[MongoDB] getPendingSlaSummary error:', error);
+            return {
+                pendingTotal: 0,
+                averageDays: 0,
+                buckets: { lt1: 0, d1_3: 0, d3_7: 0, gt7: 0 },
+                stale: [],
+            };
+        }
+    }
+
     /**
      * Cursor-based pagination for better performance
      */
