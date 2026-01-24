@@ -118,6 +118,10 @@
     border-color: #ef4444 !important;
 }
 
+.field-valid {
+    border-color: #22c55e !important;
+}
+
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {

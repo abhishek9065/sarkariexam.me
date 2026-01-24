@@ -103,6 +103,7 @@ interface JobPostingFormProps {
     onSubmit: (data: JobDetails) => void;
     onPreview?: (data: JobDetails) => void;
     onCancel: () => void;
+    isDisabled?: boolean;
 }
 
 const defaultJobDetails: JobDetails = {
@@ -154,7 +155,7 @@ const defaultJobDetails: JobDetails = {
 
 type TabType = 'dates' | 'fees' | 'eligibility' | 'vacancies' | 'exam' | 'links';
 
-export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: JobPostingFormProps) {
+export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isDisabled }: JobPostingFormProps) {
     const draftKey = 'jobDetailsDraft';
     const [activeTab, setActiveTab] = useState<TabType>('dates');
     const [jobDetails, setJobDetails] = useState<JobDetails>(() => {
@@ -177,14 +178,20 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
     const [showValidation, setShowValidation] = useState(false);
 
     const validation = useMemo(() => {
-        const dateErrors = jobDetails.importantDates.map((date) => ({
-            name: !date.name.trim(),
-            date: !date.date,
-        }));
-        const feeErrors = jobDetails.applicationFees.map((fee) => ({
-            category: !fee.category.trim(),
-            amount: !fee.amount || fee.amount <= 0,
-        }));
+        const dateErrors = jobDetails.importantDates.map((date) => {
+            const touched = Boolean(date.name.trim() || date.date);
+            return {
+                name: touched && !date.name.trim(),
+                date: touched && !date.date,
+            };
+        });
+        const feeErrors = jobDetails.applicationFees.map((fee) => {
+            const touched = Boolean(fee.category.trim() || fee.amount);
+            return {
+                category: touched && !fee.category.trim(),
+                amount: false,
+            };
+        });
         const ageErrors = {
             minAge: jobDetails.ageLimits.minAge <= 0,
             maxAge: jobDetails.ageLimits.maxAge <= 0 || jobDetails.ageLimits.maxAge < jobDetails.ageLimits.minAge,
@@ -197,6 +204,16 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
             || ageErrors.maxAge;
         return { dateErrors, feeErrors, ageErrors, hasRequiredErrors };
     }, [jobDetails]);
+
+    const disableActions = validation.hasRequiredErrors || isSubmitting || Boolean(isDisabled);
+
+    useEffect(() => {
+        if (initialData && Object.keys(initialData).length > 0) {
+            setJobDetails({ ...defaultJobDetails, ...initialData });
+            setShowValidation(false);
+            setDraftNotice(null);
+        }
+    }, [initialData]);
 
     const tabs = [
         { id: 'dates' as TabType, label: '📅 Dates & Fees', icon: '📅' },
@@ -316,9 +333,11 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
 
     return (
         <div className="job-posting-form">
-            {showValidation && validation.hasRequiredErrors && (
+            {(validation.hasRequiredErrors || isDisabled) && (
                 <div className="form-alert">
-                    Some required fields are missing. Fix the highlighted inputs before saving.
+                    {isDisabled
+                        ? 'Complete the Basic Information section to enable saving.'
+                        : 'Some required fields are missing. Fix the highlighted inputs before saving.'}
                 </div>
             )}
             {draftNotice && <div className="form-note">{draftNotice}</div>}
@@ -347,14 +366,18 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         type="text"
                                         placeholder="Event Name"
                                         value={date.name}
-                                        className={(showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name ? 'field-invalid' : ''}
+                                        className={(showValidation || date.name.trim() || date.date)
+                                            ? (validation.dateErrors[index]?.name ? 'field-invalid' : 'field-valid')
+                                            : ''}
                                         aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name) || undefined}
                                         onChange={(e) => updateArrayItem('importantDates', index, 'name', e.target.value)}
                                     />
                                     <input
                                         type="date"
                                         value={date.date}
-                                        className={(showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date ? 'field-invalid' : ''}
+                                        className={(showValidation || date.name.trim() || date.date)
+                                            ? (validation.dateErrors[index]?.date ? 'field-invalid' : 'field-valid')
+                                            : ''}
                                         aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date) || undefined}
                                         onChange={(e) => updateArrayItem('importantDates', index, 'date', e.target.value)}
                                     />
@@ -384,7 +407,9 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         type="text"
                                         placeholder="Category"
                                         value={fee.category}
-                                        className={(showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.category ? 'field-invalid' : ''}
+                                        className={(showValidation || fee.category.trim() || fee.amount)
+                                            ? (validation.feeErrors[index]?.category ? 'field-invalid' : 'field-valid')
+                                            : ''}
                                         aria-invalid={((showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.category) || undefined}
                                         onChange={(e) => updateArrayItem('applicationFees', index, 'category', e.target.value)}
                                     />
@@ -392,8 +417,8 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                         type="number"
                                         placeholder="Amount (₹)"
                                         value={fee.amount || ''}
-                                        className={(showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.amount ? 'field-invalid' : ''}
-                                        aria-invalid={((showValidation || fee.category.trim() || fee.amount) && validation.feeErrors[index]?.amount) || undefined}
+                                        className=""
+                                        aria-invalid={undefined}
                                         onChange={(e) => updateArrayItem('applicationFees', index, 'amount', parseInt(e.target.value) || 0)}
                                     />
                                     <button
@@ -423,7 +448,9 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                     <input
                                         type="number"
                                         value={jobDetails.ageLimits.minAge}
-                                        className={(showValidation || jobDetails.ageLimits.minAge) && validation.ageErrors.minAge ? 'field-invalid' : ''}
+                                        className={(showValidation || jobDetails.ageLimits.minAge)
+                                            ? (validation.ageErrors.minAge ? 'field-invalid' : 'field-valid')
+                                            : ''}
                                         onChange={(e) => updateField('ageLimits.minAge', parseInt(e.target.value) || 0)}
                                     />
                                 </div>
@@ -432,7 +459,9 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                     <input
                                         type="number"
                                         value={jobDetails.ageLimits.maxAge}
-                                        className={(showValidation || jobDetails.ageLimits.maxAge) && validation.ageErrors.maxAge ? 'field-invalid' : ''}
+                                        className={(showValidation || jobDetails.ageLimits.maxAge)
+                                            ? (validation.ageErrors.maxAge ? 'field-invalid' : 'field-valid')
+                                            : ''}
                                         onChange={(e) => updateField('ageLimits.maxAge', parseInt(e.target.value) || 0)}
                                     />
                                 </div>
@@ -441,7 +470,9 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                                     <input
                                         type="date"
                                         value={jobDetails.ageLimits.asOnDate}
-                                        className={(showValidation || jobDetails.ageLimits.asOnDate) && validation.ageErrors.asOnDate ? 'field-invalid' : ''}
+                                        className={(showValidation || jobDetails.ageLimits.asOnDate)
+                                            ? (validation.ageErrors.asOnDate ? 'field-invalid' : 'field-valid')
+                                            : ''}
                                         onChange={(e) => updateField('ageLimits.asOnDate', e.target.value)}
                                     />
                                 </div>
@@ -1024,11 +1055,11 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel }: J
                 <button className="btn-secondary" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
                 <button className="btn-secondary subtle" onClick={clearDraft} type="button">Clear draft</button>
                 {onPreview && (
-                    <button className="btn-outline" onClick={handlePreview} disabled={isPreviewing || isSubmitting}>
+                    <button className="btn-outline" onClick={handlePreview} disabled={isPreviewing || disableActions}>
                         {isPreviewing ? 'Opening preview…' : 'Preview (modal)'}
                     </button>
                 )}
-                <button className="btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+                <button className="btn-primary" onClick={handleSubmit} disabled={disableActions}>
                     {isSubmitting ? 'Saving…' : 'Save Job Details'}
                 </button>
             </div>

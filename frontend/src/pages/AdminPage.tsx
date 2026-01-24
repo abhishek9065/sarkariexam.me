@@ -43,6 +43,13 @@ type AdminAuditLog = {
     createdAt: string;
 };
 
+type ToastTone = 'success' | 'error' | 'info';
+type Toast = {
+    id: string;
+    message: string;
+    tone: ToastTone;
+};
+
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
     { value: 'job', label: 'Latest Jobs' },
     { value: 'admit-card', label: 'Admit Cards' },
@@ -177,8 +184,17 @@ export function AdminPage() {
     });
     const [loginLoading, setLoginLoading] = useState(false);
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
+    const [toasts, setToasts] = useState<Toast[]>([]);
 
     const pageSize = 15;
+
+    const pushToast = (message: string, tone: ToastTone = 'info') => {
+        const id = `${Date.now()}-${Math.random()}`;
+        setToasts((prev) => [...prev, { id, message, tone }]);
+        window.setTimeout(() => {
+            setToasts((prev) => prev.filter((toast) => toast.id !== id));
+        }, 3000);
+    };
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
     const [message, setMessage] = useState('');
@@ -993,7 +1009,8 @@ export function AdminPage() {
                     setAdminToken(authToken);
                     localStorage.setItem('adminToken', authToken);
                     setIsLoggedIn(true);
-                    setMessage('Login successful!');
+                    setMessage('');
+                    pushToast('Login successful!', 'success');
                     refreshData();
                     refreshDashboard();
                 } else {
@@ -1166,6 +1183,10 @@ export function AdminPage() {
     const titleTooShort = formData.title.trim().length > 0 && formData.title.trim().length < 10;
     const titleInvalid = titleMissing || titleTooShort;
     const organizationMissing = !formData.organization.trim();
+    const titleLength = formData.title.trim().length;
+    const titleProgress = Math.min(100, Math.round((titleLength / 50) * 100));
+    const titleValid = titleLength >= 10;
+    const organizationValid = !organizationMissing;
 
     const scheduleCalendar = useMemo(() => {
         const start = new Date();
@@ -1408,7 +1429,7 @@ export function AdminPage() {
 
     const renderDateCell = (value?: string) => {
         const label = formatDate(value);
-        return label === 'N/A' ? <span className="cell-muted">{label}</span> : label;
+        return label === 'N/A' ? <span className="cell-muted" title="No deadline set">No deadline</span> : label;
     };
 
     function getDateKey(value?: string | Date) {
@@ -1506,6 +1527,14 @@ export function AdminPage() {
     if (!isLoggedIn) {
         return (
             <div className="admin-container">
+                <div className="toast-stack">
+                    {toasts.map((toast) => (
+                        <div key={toast.id} className={`toast ${toast.tone}`}>
+                            <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
+                            <span>{toast.message}</span>
+                        </div>
+                    ))}
+                </div>
                 <div className="admin-login-box">
                     <h2>Admin Login</h2>
                     <form onSubmit={handleLogin}>
@@ -1545,6 +1574,14 @@ export function AdminPage() {
 
     return (
         <>
+            <div className="toast-stack">
+                {toasts.map((toast) => (
+                    <div key={toast.id} className={`toast ${toast.tone}`}>
+                        <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
+                        <span>{toast.message}</span>
+                    </div>
+                ))}
+            </div>
             <div className="admin-container">
                 <div className="admin-header">
                     <h2>Admin Dashboard</h2>
@@ -1968,7 +2005,7 @@ export function AdminPage() {
                                                                 {primaryStatus.label}
                                                             </span>
                                                             {secondaryStatus && (
-                                                                <span className={`status-sub ${secondaryStatus.tone}`}>{secondaryStatus.label}</span>
+                                                                <span className={`status-sub ${secondaryStatus.tone}`}>• {secondaryStatus.label}</span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -2661,12 +2698,21 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                         placeholder="e.g. UP Police Constable Recruitment 2026"
                                         required
-                                        className={titleInvalid ? 'field-invalid' : ''}
+                                        className={titleInvalid ? 'field-invalid' : titleValid ? 'field-valid' : ''}
                                         aria-invalid={titleInvalid || undefined}
                                     />
                                     {titleInvalid && (
                                         <span className="field-error">Title must be at least 10 characters.</span>
                                     )}
+                                    <div className="field-meta">
+                                        <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
+                                            {titleValid ? '✓ Looks good' : 'Needs 10+ characters'}
+                                        </span>
+                                        <span className="field-count">{titleLength}/50</span>
+                                    </div>
+                                    <div className="field-progress">
+                                        <span style={{ width: `${titleProgress}%` }} />
+                                    </div>
                                 </div>
                                 <div className="form-group">
                                     <label>Organization *</label>
@@ -2676,11 +2722,14 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
                                         placeholder="e.g. UPPRPB"
                                         required
-                                        className={organizationMissing ? 'field-invalid' : ''}
+                                        className={organizationMissing ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
                                         aria-invalid={organizationMissing || undefined}
                                     />
                                     {organizationMissing && (
                                         <span className="field-error">Organization is required.</span>
+                                    )}
+                                    {organizationValid && (
+                                        <span className="field-status ok">✓ Looks good</span>
                                     )}
                                 </div>
                             </div>
@@ -2770,6 +2819,7 @@ export function AdminPage() {
                         {/* Job Details Form */}
                         <JobPostingForm
                             initialData={jobDetails || undefined}
+                            isDisabled={titleInvalid || organizationMissing}
                             onSubmit={async (details) => {
                                 if (!adminToken) {
                                     setMessage('Not authenticated');
@@ -3037,12 +3087,21 @@ export function AdminPage() {
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                         placeholder="e.g. SSC CGL 2025 Recruitment"
                                         required
-                                        className={titleInvalid ? 'field-invalid' : ''}
+                                        className={titleInvalid ? 'field-invalid' : titleValid ? 'field-valid' : ''}
                                         aria-invalid={titleInvalid || undefined}
                                     />
                                     {titleInvalid && (
                                         <span className="field-error">Title must be at least 10 characters.</span>
                                     )}
+                                    <div className="field-meta">
+                                        <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
+                                            {titleValid ? '✓ Looks good' : 'Needs 10+ characters'}
+                                        </span>
+                                        <span className="field-count">{titleLength}/50</span>
+                                    </div>
+                                    <div className="field-progress">
+                                        <span style={{ width: `${titleProgress}%` }} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -3081,11 +3140,14 @@ export function AdminPage() {
                                         value={formData.organization}
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
                                         required
-                                        className={organizationMissing ? 'field-invalid' : ''}
+                                        className={organizationMissing ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
                                         aria-invalid={organizationMissing || undefined}
                                     />
                                     {organizationMissing && (
                                         <span className="field-error">Organization is required.</span>
+                                    )}
+                                    {organizationValid && (
+                                        <span className="field-status ok">✓ Looks good</span>
                                     )}
                                 </div>
                                 <div className="form-group">

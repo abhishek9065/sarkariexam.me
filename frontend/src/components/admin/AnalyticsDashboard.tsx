@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import './AnalyticsDashboard.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -39,6 +39,9 @@ interface AnalyticsData {
         listingViews: number;
         cardClicks: number;
         detailViews: number;
+        detailViewsRaw?: number;
+        detailViewsAdjusted?: number;
+        hasAnomaly?: boolean;
         bookmarkAdds: number;
         subscriptionsVerified: number;
     };
@@ -108,6 +111,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [showZeroTrend, setShowZeroTrend] = useState(false);
     const typeBreakdown = analytics?.typeBreakdown ?? [];
     const categoryBreakdown = analytics?.categoryBreakdown ?? [];
@@ -134,70 +138,81 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const maxViews = Math.max(1, ...trendRows.map((item) => item.views ?? 0));
     const maxSearches = Math.max(1, ...trendRows.map((item) => item.searches ?? 0));
 
-    useEffect(() => {
-        const fetchAnalytics = async () => {
-            if (!adminToken) {
-                setError('Not authenticated');
-                setLoading(false);
-                return;
-            }
+    const loadAnalytics = useCallback(async (options?: { silent?: boolean }) => {
+        if (!adminToken) {
+            setError('Not authenticated');
+            setLoading(false);
+            return;
+        }
 
-            try {
-                const [overviewRes, popularRes] = await Promise.all([
-                    fetch(`${apiBase}/api/analytics/overview`, {
-                        headers: { Authorization: `Bearer ${adminToken}` }
-                    }),
-                    fetch(`${apiBase}/api/analytics/popular?limit=10`, {
-                        headers: { Authorization: `Bearer ${adminToken}` }
-                    })
-                ]);
+        if (options?.silent) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
 
-                if (overviewRes.ok && popularRes.ok) {
-                    const overviewData = await overviewRes.json();
-                    const popularData = await popularRes.json();
-                    // Defensive: Ensure we never set undefined values
+        try {
+            const [overviewRes, popularRes] = await Promise.all([
+                fetch(`${apiBase}/api/analytics/overview`, {
+                    headers: { Authorization: `Bearer ${adminToken}` }
+                }),
+                fetch(`${apiBase}/api/analytics/popular?limit=10`, {
+                    headers: { Authorization: `Bearer ${adminToken}` }
+                })
+            ]);
+
+            if (overviewRes.ok && popularRes.ok) {
+                const overviewData = await overviewRes.json();
+                const popularData = await popularRes.json();
+                // Defensive: Ensure we never set undefined values
                     setAnalytics(overviewData.data ?? {
-                        totalAnnouncements: 0,
-                        totalViews: 0,
-                        totalEmailSubscribers: 0,
-                        totalPushSubscribers: 0,
-                        totalSearches: 0,
-                        totalBookmarks: 0,
-                        totalRegistrations: 0,
-                        totalSubscriptionsVerified: 0,
-                        totalSubscriptionsUnsubscribed: 0,
-                        totalListingViews: 0,
-                        totalCardClicks: 0,
-                        totalCategoryClicks: 0,
-                        totalFilterApplies: 0,
-                        totalDigestClicks: 0,
-                        totalDeepLinkClicks: 0,
-                        typeBreakdown: [],
-                        categoryBreakdown: [],
+                    totalAnnouncements: 0,
+                    totalViews: 0,
+                    totalEmailSubscribers: 0,
+                    totalPushSubscribers: 0,
+                    totalSearches: 0,
+                    totalBookmarks: 0,
+                    totalRegistrations: 0,
+                    totalSubscriptionsVerified: 0,
+                    totalSubscriptionsUnsubscribed: 0,
+                    totalListingViews: 0,
+                    totalCardClicks: 0,
+                    totalCategoryClicks: 0,
+                    totalFilterApplies: 0,
+                    totalDigestClicks: 0,
+                    totalDeepLinkClicks: 0,
+                    typeBreakdown: [],
+                    categoryBreakdown: [],
                         funnel: {
                             listingViews: 0,
                             cardClicks: 0,
                             detailViews: 0,
+                            detailViewsRaw: 0,
+                            detailViewsAdjusted: 0,
+                            hasAnomaly: false,
                             bookmarkAdds: 0,
                             subscriptionsVerified: 0,
                         },
-                        ctrByType: [],
-                        digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
-                        deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
-                    });
-                    setPopular(popularData.data ?? []);
-                } else {
-                    setError('Failed to load analytics');
-                }
-            } catch {
-                setError('Failed to connect to server');
-            } finally {
-                setLoading(false);
+                    ctrByType: [],
+                    digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
+                    deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
+                });
+                setPopular(popularData.data ?? []);
+                setError(null);
+            } else {
+                setError('Failed to load analytics');
             }
-        };
-
-        fetchAnalytics();
+        } catch {
+            setError('Failed to connect to server');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [adminToken]);
+
+    useEffect(() => {
+        loadAnalytics();
+    }, [loadAnalytics]);
 
     const handleExport = async () => {
         if (!adminToken) return;
@@ -244,10 +259,15 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const digestTotal = digestClicks?.total ?? 0;
     const deepLinkTotal = deepLinkAttribution?.total ?? 0;
     const funnel = analytics.funnel;
-    const funnelHasDirectTraffic = Boolean(
-        (funnel?.cardClicks ?? 0) > 0 && (funnel?.detailViews ?? 0) > (funnel?.cardClicks ?? 0)
+    const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
+    const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
+    const hasAnomaly = funnel?.hasAnomaly ?? Boolean(
+        (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
     );
-    const detailViewsLabel = funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views';
+    const funnelHasDirectTraffic = Boolean(
+        (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
+    );
+    const detailViewsLabel = hasAnomaly ? 'Detail views (adjusted)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
@@ -257,8 +277,8 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         },
         {
             label: detailViewsLabel,
-            value: funnel?.detailViews ?? 0,
-            rate: funnel?.cardClicks ? Math.round((funnel.detailViews / funnel.cardClicks) * 100) : 0,
+            value: adjustedDetailViews,
+            rate: funnel?.cardClicks ? Math.round((adjustedDetailViews / funnel.cardClicks) * 100) : 0,
             rateLabel: funnelHasDirectTraffic ? 'Includes direct traffic' : undefined,
         },
         {
@@ -287,6 +307,13 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         <div className="analytics-dashboard">
             <div className="analytics-actions">
                 <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                <button
+                    className="admin-btn secondary"
+                    onClick={() => loadAnalytics({ silent: true })}
+                    disabled={refreshing}
+                >
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
                 <button className="admin-btn secondary" onClick={handleExport} disabled={exporting}>
                     {exporting ? 'Exporting...' : 'Export CSV'}
                 </button>
@@ -393,23 +420,29 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     </div>
                 </div>
                 <div className="funnel-grid">
-                    {funnelSteps.map((step, index) => (
-                            <div key={step.label} className="funnel-card">
-                                <div className="funnel-label">{step.label}</div>
-                                <div className="funnel-value">{step.value.toLocaleString()}</div>
-                                {index > 0 && (
-                                    <div className="funnel-rate">
-                                        {step.rateLabel ?? `${step.rate}% of previous`}
-                                    </div>
-                                )}
+                {funnelSteps.map((step, index) => (
+                    <div key={step.label} className="funnel-card">
+                        <div className="funnel-label">{step.label}</div>
+                        <div className="funnel-value">{step.value.toLocaleString()}</div>
+                        {index > 0 && (
+                            <div className="funnel-rate">
+                                {step.rateLabel ?? `${step.rate}% of previous`}
                             </div>
-                        ))}
+                        )}
+                    </div>
+                ))}
+            </div>
+            {hasAnomaly && (
+                <div className="analytics-warning">
+                    <strong>⚠ Funnel anomaly:</strong> Detail views ({rawDetailViews.toLocaleString()}) exceed card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
+                    Funnel rates use the adjusted value ({adjustedDetailViews.toLocaleString()}).
                 </div>
-                {funnelHasDirectTraffic && (
-                    <p className="analytics-hint">
-                        Detail views can exceed card clicks because they include direct/SEO visits and deep links.
-                    </p>
-                )}
+            )}
+            {funnelHasDirectTraffic && (
+                <p className="analytics-hint">
+                    Detail views can exceed card clicks because they include direct/SEO visits and deep links.
+                </p>
+            )}
             </div>
 
             <div className="analytics-section">

@@ -9,6 +9,19 @@ interface SubscriptionDoc {
     verified: boolean;
 }
 
+const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
+const POPULAR_CACHE_TTL_MS = 60 * 1000;
+
+const overviewCache: { data: any | null; expiresAt: number } = {
+    data: null,
+    expiresAt: 0,
+};
+
+const popularCache: { data: any | null; expiresAt: number } = {
+    data: null,
+    expiresAt: 0,
+};
+
 const router = Router();
 
 // All analytics routes require admin authentication
@@ -20,30 +33,45 @@ router.use(authenticateToken, requireAdmin);
  */
 router.get('/overview', async (_req, res) => {
     try {
-        const announcements = await AnnouncementModelMongo.findAll({ limit: 1000 });
-        const rollupSummary = await getRollupSummary(30);
-        const dailyRollups = await getDailyRollups(14);
-        const [ctrByType, digestClicks, deepLinkAttribution] = await Promise.all([
+        if (overviewCache.data && overviewCache.expiresAt > Date.now()) {
+            return res.json({ data: overviewCache.data, cached: true });
+        }
+
+        const [
+            announcements,
+            rollupSummary,
+            dailyRollups,
+            ctrByType,
+            digestClicks,
+            deepLinkAttribution,
+            totalEmailSubscribers,
+            totalPushSubscribers,
+        ] = await Promise.all([
+            AnnouncementModelMongo.findAll({ limit: 1000 }),
+            getRollupSummary(30),
+            getDailyRollups(14),
             getCtrByType(30),
             getDigestClickStats(30),
             getDeepLinkAttribution(30),
+            (async () => {
+                try {
+                    const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
+                    return await subscriptions.countDocuments({ isActive: true, verified: true });
+                } catch (error) {
+                    console.error('[Analytics] Failed to load subscription count:', error);
+                    return 0;
+                }
+            })(),
+            (async () => {
+                try {
+                    const pushSubs = getCollection('push_subscriptions');
+                    return await pushSubs.countDocuments({});
+                } catch (error) {
+                    console.error('[Analytics] Failed to load push subscription count:', error);
+                    return 0;
+                }
+            })(),
         ]);
-
-        let totalEmailSubscribers = 0;
-        let totalPushSubscribers = 0;
-        try {
-            const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
-            totalEmailSubscribers = await subscriptions.countDocuments({ isActive: true, verified: true });
-        } catch (error) {
-            console.error('[Analytics] Failed to load subscription count:', error);
-        }
-
-        try {
-            const pushSubs = getCollection('push_subscriptions');
-            totalPushSubscribers = await pushSubs.countDocuments({});
-        } catch (error) {
-            console.error('[Analytics] Failed to load push subscription count:', error);
-        }
 
         // Calculate stats
         const total = announcements.length;
@@ -62,41 +90,51 @@ router.get('/overview', async (_req, res) => {
         const typeBreakdown = Object.entries(byType).map(([type, count]) => ({ type, count }));
         const categoryBreakdown = Object.entries(byCategory).map(([category, count]) => ({ category, count }));
 
-        return res.json({
-            data: {
-                totalAnnouncements: total,
-                totalViews,
-                totalEmailSubscribers,
-                totalPushSubscribers,
-                totalSearches: rollupSummary.searchCount,
-                totalBookmarks: rollupSummary.bookmarkAdds,
-                totalRegistrations: rollupSummary.registrations,
-                totalSubscriptionsVerified: rollupSummary.subscriptionsVerified,
-                totalSubscriptionsUnsubscribed: rollupSummary.subscriptionsUnsubscribed,
-                totalListingViews: rollupSummary.listingViews,
-                totalCardClicks: rollupSummary.cardClicks,
-                totalCategoryClicks: rollupSummary.categoryClicks,
-                totalFilterApplies: rollupSummary.filterApplies,
-                totalDigestClicks: rollupSummary.digestClicks,
-                totalDeepLinkClicks: rollupSummary.deepLinkClicks,
-                engagementWindowDays: rollupSummary.days,
-                rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
-                dailyRollups,
-                funnel: {
-                    listingViews: rollupSummary.listingViews,
-                    cardClicks: rollupSummary.cardClicks,
-                    detailViews: rollupSummary.viewCount,
-                    bookmarkAdds: rollupSummary.bookmarkAdds,
-                    subscriptionsVerified: rollupSummary.subscriptionsVerified,
-                },
-                ctrByType,
-                digestClicks,
-                deepLinkAttribution,
-                typeBreakdown,
-                categoryBreakdown,
-                lastUpdated: new Date().toISOString()
-            }
-        });
+        const detailViewsRaw = rollupSummary.viewCount;
+        const detailViewsAdjusted = Math.min(detailViewsRaw, rollupSummary.cardClicks || detailViewsRaw);
+        const hasAnomaly = rollupSummary.cardClicks > 0 && detailViewsRaw > rollupSummary.cardClicks;
+
+        const payload = {
+            totalAnnouncements: total,
+            totalViews,
+            totalEmailSubscribers,
+            totalPushSubscribers,
+            totalSearches: rollupSummary.searchCount,
+            totalBookmarks: rollupSummary.bookmarkAdds,
+            totalRegistrations: rollupSummary.registrations,
+            totalSubscriptionsVerified: rollupSummary.subscriptionsVerified,
+            totalSubscriptionsUnsubscribed: rollupSummary.subscriptionsUnsubscribed,
+            totalListingViews: rollupSummary.listingViews,
+            totalCardClicks: rollupSummary.cardClicks,
+            totalCategoryClicks: rollupSummary.categoryClicks,
+            totalFilterApplies: rollupSummary.filterApplies,
+            totalDigestClicks: rollupSummary.digestClicks,
+            totalDeepLinkClicks: rollupSummary.deepLinkClicks,
+            engagementWindowDays: rollupSummary.days,
+            rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
+            dailyRollups,
+            funnel: {
+                listingViews: rollupSummary.listingViews,
+                cardClicks: rollupSummary.cardClicks,
+                detailViews: detailViewsAdjusted,
+                detailViewsRaw,
+                detailViewsAdjusted,
+                hasAnomaly,
+                bookmarkAdds: rollupSummary.bookmarkAdds,
+                subscriptionsVerified: rollupSummary.subscriptionsVerified,
+            },
+            ctrByType,
+            digestClicks,
+            deepLinkAttribution,
+            typeBreakdown,
+            categoryBreakdown,
+            lastUpdated: new Date().toISOString()
+        };
+
+        overviewCache.data = payload;
+        overviewCache.expiresAt = Date.now() + OVERVIEW_CACHE_TTL_MS;
+
+        return res.json({ data: payload });
     } catch (error) {
         console.error('Analytics overview error:', error);
         return res.status(500).json({ error: 'Failed to load analytics' });
@@ -109,18 +147,25 @@ router.get('/overview', async (_req, res) => {
  */
 router.get('/popular', async (req, res) => {
     try {
+        if (popularCache.data && popularCache.expiresAt > Date.now()) {
+            return res.json({ data: popularCache.data, cached: true });
+        }
+
         const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
         const announcements = await AnnouncementModelMongo.getTrending({ limit });
 
-        return res.json({
-            data: announcements.map(a => ({
-                id: a.id,
-                title: a.title,
-                type: a.type,
-                category: a.category || '',
-                viewCount: a.viewCount || 0
-            }))
-        });
+        const payload = announcements.map(a => ({
+            id: a.id,
+            title: a.title,
+            type: a.type,
+            category: a.category || '',
+            viewCount: a.viewCount || 0
+        }));
+
+        popularCache.data = payload;
+        popularCache.expiresAt = Date.now() + POPULAR_CACHE_TTL_MS;
+
+        return res.json({ data: payload });
     } catch (error) {
         console.error('Popular content error:', error);
         return res.status(500).json({ error: 'Failed to load popular content' });
