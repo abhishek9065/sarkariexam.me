@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnalyticsDashboard } from '../components/admin/AnalyticsDashboard';
 import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingForm';
@@ -67,6 +67,7 @@ const LIST_SORT_OPTIONS: { value: 'newest' | 'updated' | 'deadline' | 'views'; l
 ];
 
 const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
+const ADMIN_USER_STORAGE_KEY = 'adminUserProfile';
 
 type ListFilterState = {
     query?: string;
@@ -80,6 +81,22 @@ const loadListFilters = (): ListFilterState | null => {
         const raw = localStorage.getItem(LIST_FILTER_STORAGE_KEY);
         if (!raw) return null;
         return JSON.parse(raw) as ListFilterState;
+    } catch {
+        return null;
+    }
+};
+
+type AdminUserProfile = {
+    name?: string;
+    email?: string;
+    role?: string;
+};
+
+const loadAdminUser = (): AdminUserProfile | null => {
+    try {
+        const raw = localStorage.getItem(ADMIN_USER_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as AdminUserProfile;
     } catch {
         return null;
     }
@@ -130,6 +147,7 @@ export function AdminPage() {
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit'>('analytics');
     const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem('adminToken'));
+    const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
     const storedFilters = useMemo(() => loadListFilters(), []);
@@ -187,6 +205,12 @@ export function AdminPage() {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const pageSize = 15;
+    const overview = dashboard?.overview;
+    const heroTotalPosts = overview?.totalAnnouncements ?? announcements.length;
+    const heroTotalViews = overview?.totalViews ?? 0;
+    const heroActiveJobs = overview?.activeJobs ?? 0;
+    const heroNewThisWeek = overview?.newThisWeek ?? 0;
+    const heroExpiringSoon = overview?.expiringSoon ?? 0;
 
     const pushToast = (message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
@@ -195,6 +219,31 @@ export function AdminPage() {
             setToasts((prev) => prev.filter((toast) => toast.id !== id));
         }, 3000);
     };
+
+    const clearAdminSession = useCallback(() => {
+        setIsLoggedIn(false);
+        setAdminToken(null);
+        setAdminUser(null);
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
+        setActiveAdminTab('analytics');
+    }, []);
+
+    const handleLogout = useCallback(async () => {
+        setMessage('');
+        if (adminToken) {
+            try {
+                await fetch(`${apiBase}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${adminToken}` },
+                });
+            } catch (error) {
+                console.error('Logout API call failed:', error);
+            }
+        }
+        clearAdminSession();
+        pushToast('Logged out successfully.', 'info');
+    }, [adminToken, clearAdminSession, pushToast]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
     const [message, setMessage] = useState('');
@@ -1008,6 +1057,13 @@ export function AdminPage() {
                 if (userData?.role === 'admin') {
                     setAdminToken(authToken);
                     localStorage.setItem('adminToken', authToken);
+                    const profile: AdminUserProfile = {
+                        name: userData?.name || userData?.username || 'Admin',
+                        email: userData?.email || loginForm.email,
+                        role: userData?.role,
+                    };
+                    setAdminUser(profile);
+                    localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
                     setIsLoggedIn(true);
                     setMessage('');
                     pushToast('Login successful!', 'success');
@@ -1482,10 +1538,14 @@ export function AdminPage() {
     useEffect(() => {
         if (!adminToken) return;
         setIsLoggedIn(true);
+        if (!adminUser) {
+            const storedProfile = loadAdminUser();
+            if (storedProfile) setAdminUser(storedProfile);
+        }
         refreshData();
         refreshDashboard();
         refreshActiveUsers();
-    }, [adminToken]);
+    }, [adminToken, adminUser]);
 
     useEffect(() => {
         if (!adminToken) return;
@@ -1583,8 +1643,74 @@ export function AdminPage() {
                 ))}
             </div>
             <div className="admin-container">
-                <div className="admin-header">
-                    <h2>Admin Dashboard</h2>
+                <div className="admin-hero">
+                    <div className="admin-hero-main">
+                        <div className="admin-hero-title">
+                            <span className="admin-kicker">SarkariExams Admin</span>
+                            <h2>Operations Hub</h2>
+                            <p className="admin-subtitle">Monitor content health, QA, and growth signals in one place.</p>
+                        </div>
+                        <div className="admin-hero-actions">
+                            <div className="admin-quick-actions">
+                                <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
+                                    New job post
+                                </button>
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('review')}>
+                                    Review queue
+                                </button>
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('analytics')}>
+                                    Analytics
+                                </button>
+                            </div>
+                            <details className="admin-user-menu">
+                                <summary className="admin-user-trigger">
+                                    <span className="admin-avatar">
+                                        {(adminUser?.name ?? adminUser?.email ?? 'A').charAt(0).toUpperCase()}
+                                    </span>
+                                    <span className="admin-user-info">
+                                        <span className="admin-user-name">{adminUser?.name ?? 'Admin'}</span>
+                                        <span className="admin-user-role">{adminUser?.role ?? 'admin'}</span>
+                                    </span>
+                                </summary>
+                                <div className="admin-user-panel">
+                                    <div className="admin-user-meta">
+                                        <span>{adminUser?.email ?? 'admin session'}</span>
+                                        <span>Secure session</span>
+                                    </div>
+                                    <button className="admin-btn logout" onClick={handleLogout}>
+                                        Sign out
+                                    </button>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                    <div className="admin-hero-metrics">
+                        <div className="admin-metric">
+                            <span className="metric-label">Total posts</span>
+                            <span className="metric-value">{heroTotalPosts.toLocaleString()}</span>
+                            <span className="metric-sub">All time</span>
+                        </div>
+                        <div className="admin-metric">
+                            <span className="metric-label">Total views</span>
+                            <span className="metric-value">{heroTotalViews.toLocaleString()}</span>
+                            <span className="metric-sub">Combined</span>
+                        </div>
+                        <div className="admin-metric">
+                            <span className="metric-label">Active jobs</span>
+                            <span className="metric-value">{heroActiveJobs.toLocaleString()}</span>
+                            <span className="metric-sub">Published</span>
+                        </div>
+                        <div className="admin-metric">
+                            <span className="metric-label">New this week</span>
+                            <span className="metric-value">{heroNewThisWeek.toLocaleString()}</span>
+                            <span className="metric-sub">
+                                {heroExpiringSoon ? `${heroExpiringSoon} expiring` : 'No expiring alerts'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="admin-nav">
                     <div className="admin-tabs">
                         <button className={activeAdminTab === 'analytics' ? 'active' : ''} onClick={() => setActiveAdminTab('analytics')}>
                             Analytics
@@ -1618,11 +1744,12 @@ export function AdminPage() {
                             Security
                         </button>
                     </div>
-                    <button className="admin-btn logout" onClick={() => {
-                        setIsLoggedIn(false);
-                        setAdminToken(null);
-                        localStorage.removeItem('adminToken');
-                    }}>Logout</button>
+                    <div className="admin-nav-meta">
+                        <span className="admin-nav-pill">{adminUser?.role ?? 'admin'}</span>
+                        {listUpdatedAt && (
+                            <span className="admin-nav-note">{formatLastUpdated(listUpdatedAt, 'Listings synced')}</span>
+                        )}
+                    </div>
                 </div>
 
                 {message && <div className="admin-banner" role="status">{message}</div>}
