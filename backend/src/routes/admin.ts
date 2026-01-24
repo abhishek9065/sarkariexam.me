@@ -8,6 +8,7 @@ import { getDailyRollups } from '../services/analytics.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
 import { getCollection } from '../services/cosmosdb.js';
 import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
+import { idempotency } from '../middleware/idempotency.js';
 
 const router = Router();
 
@@ -410,14 +411,18 @@ router.get('/announcements/summary', requirePermission('announcements:read'), as
         }
 
         const includeInactive = parseResult.data.includeInactive ?? true;
-        const [counts, pendingSla] = await Promise.all([
+        const [counts, pendingSla, qaCounts] = await Promise.all([
             AnnouncementModelMongo.getAdminCounts({ includeInactive }),
             AnnouncementModelMongo.getPendingSlaSummary({ includeInactive, staleLimit: 10 }),
+            AnnouncementModelMongo.getAdminQaCounts({ includeInactive }),
         ]);
 
         return res.json({
             data: {
-                counts,
+                counts: {
+                    ...counts,
+                    ...qaCounts,
+                },
                 pendingSla,
             },
         });
@@ -498,7 +503,7 @@ router.get('/announcements/export/csv', requirePermission('announcements:read'),
  * POST /api/admin/announcements
  * Create new announcement
  */
-router.post('/announcements', requirePermission('announcements:write'), async (req, res) => {
+router.post('/announcements', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parseResult = adminAnnouncementSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -525,7 +530,7 @@ router.post('/announcements', requirePermission('announcements:write'), async (r
  * POST /api/admin/announcements/bulk
  * Bulk update announcements
  */
-router.post('/announcements/bulk', requirePermission('announcements:write'), async (req, res) => {
+router.post('/announcements/bulk', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parseResult = bulkUpdateSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -555,7 +560,7 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), asy
  * POST /api/admin/announcements/bulk-approve
  * Bulk approve announcements
  */
-router.post('/announcements/bulk-approve', requirePermission('announcements:approve'), async (req, res) => {
+router.post('/announcements/bulk-approve', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -592,7 +597,7 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
  * POST /api/admin/announcements/bulk-reject
  * Bulk reject announcements
  */
-router.post('/announcements/bulk-reject', requirePermission('announcements:approve'), async (req, res) => {
+router.post('/announcements/bulk-reject', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -627,7 +632,7 @@ router.post('/announcements/bulk-reject', requirePermission('announcements:appro
  * PUT /api/admin/announcements/:id
  * Update announcement
  */
-router.put('/announcements/:id', requirePermission('announcements:write'), async (req, res) => {
+router.put('/announcements/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const updateSchema = adminAnnouncementPartialSchema;
         const parseResult = updateSchema.safeParse(req.body);
@@ -665,7 +670,7 @@ router.put('/announcements/:id', requirePermission('announcements:write'), async
  * POST /api/admin/announcements/:id/approve
  * Approve and publish an announcement
  */
-router.post('/announcements/:id/approve', requirePermission('announcements:approve'), async (req, res) => {
+router.post('/announcements/:id/approve', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
     try {
         const now = new Date().toISOString();
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
@@ -701,7 +706,7 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
  * POST /api/admin/announcements/:id/reject
  * Reject an announcement back to draft
  */
-router.post('/announcements/:id/reject', requirePermission('announcements:approve'), async (req, res) => {
+router.post('/announcements/:id/reject', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
     try {
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
         const announcement = await AnnouncementModelMongo.update(
@@ -735,7 +740,7 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
  * DELETE /api/admin/announcements/:id
  * Delete announcement
  */
-router.delete('/announcements/:id', requirePermission('announcements:delete'), async (req, res) => {
+router.delete('/announcements/:id', requirePermission('announcements:delete'), idempotency(), async (req, res) => {
     try {
         const deleted = await AnnouncementModelMongo.delete(req.params.id);
         if (!deleted) {

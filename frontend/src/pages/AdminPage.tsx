@@ -49,6 +49,8 @@ type AdminSummary = {
         total: number;
         byStatus: Record<AnnouncementStatus, number>;
         byType: Record<ContentType, number>;
+        totalQaIssues?: number;
+        pendingQaIssues?: number;
     };
     pendingSla: {
         pendingTotal: number;
@@ -242,6 +244,8 @@ export function AdminPage() {
     const listRequestInFlight = useRef(false);
     const listLastFetchAt = useRef(0);
     const listRateLimitUntil = useRef(0);
+    const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
+    const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -277,14 +281,26 @@ export function AdminPage() {
 
     const adminFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
         const method = (init?.method ?? 'GET').toUpperCase();
+        const headers = new Headers(init?.headers ?? {});
+        if (method !== 'GET' && method !== 'HEAD' && !headers.has('Idempotency-Key')) {
+            headers.set('Idempotency-Key', crypto.randomUUID());
+        }
         const response = await adminRequest(input, {
             ...init,
+            headers,
             maxRetries: method === 'GET' ? 2 : 0,
             onRateLimit: (rateLimitResponse) => {
                 const retryAfter = rateLimitResponse.headers.get('Retry-After');
+                const retrySeconds = retryAfter && Number.isFinite(Number(retryAfter))
+                    ? Number(retryAfter)
+                    : 60;
                 const message = retryAfter
-                    ? `Too many requests. Try again in ${retryAfter}s.`
+                    ? `Too many requests. Try again in ${retrySeconds}s.`
                     : 'Too many requests. Please wait and try again.';
+                setRateLimitUntil((current) => {
+                    const nextUntil = Date.now() + retrySeconds * 1000;
+                    return current ? Math.max(current, nextUntil) : nextUntil;
+                });
                 setMessage(message);
             },
         });
@@ -293,6 +309,25 @@ export function AdminPage() {
         }
         return response;
     }, [handleUnauthorized]);
+
+    useEffect(() => {
+        if (!rateLimitUntil) {
+            setRateLimitRemaining(null);
+            return;
+        }
+        const tick = () => {
+            const remainingMs = rateLimitUntil - Date.now();
+            if (remainingMs <= 0) {
+                setRateLimitUntil(null);
+                setRateLimitRemaining(null);
+                return;
+            }
+            setRateLimitRemaining(Math.ceil(remainingMs / 1000));
+        };
+        tick();
+        const timer = window.setInterval(tick, 1000);
+        return () => window.clearInterval(timer);
+    }, [rateLimitUntil]);
 
     const handleLogout = useCallback(async () => {
         setMessage('');
@@ -1357,8 +1392,11 @@ export function AdminPage() {
     }, [announcements]);
 
     const pendingWarningCount = useMemo(() => {
+        if (adminSummary?.counts?.pendingQaIssues !== undefined) {
+            return adminSummary.counts.pendingQaIssues;
+        }
         return pendingAnnouncements.filter((item) => getAnnouncementWarnings(item).length > 0).length;
-    }, [pendingAnnouncements]);
+    }, [adminSummary, pendingAnnouncements]);
 
     const pendingSlaStats = useMemo(() => {
         if (adminSummary?.pendingSla) {
@@ -1787,8 +1825,9 @@ export function AdminPage() {
                     <h2>Admin Login</h2>
                     <form onSubmit={handleLogin}>
                         <div className="form-group">
-                            <label>Email</label>
+                            <label htmlFor="admin-login-email">Email</label>
                             <input
+                                id="admin-login-email"
                                 type="email"
                                 value={loginForm.email}
                                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
@@ -1798,8 +1837,9 @@ export function AdminPage() {
                             />
                         </div>
                         <div className="form-group">
-                            <label>Password</label>
+                            <label htmlFor="admin-login-password">Password</label>
                             <input
+                                id="admin-login-password"
                                 type="password"
                                 value={loginForm.password}
                                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
@@ -1823,15 +1863,20 @@ export function AdminPage() {
     return (
         <>
             <div className="toast-stack">
-                {toasts.map((toast) => (
-                    <div key={toast.id} className={`toast ${toast.tone}`}>
-                        <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
-                        <span>{toast.message}</span>
-                    </div>
-                ))}
-            </div>
-            <div className="admin-container">
-                <div className="admin-hero">
+            {toasts.map((toast) => (
+                <div key={toast.id} className={`toast ${toast.tone}`}>
+                    <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
+                    <span>{toast.message}</span>
+                </div>
+            ))}
+        </div>
+        <div className="admin-container">
+            {rateLimitRemaining && (
+                <div className="admin-banner" role="status">
+                    Rate limited. Retry in {rateLimitRemaining}s.
+                </div>
+            )}
+            <div className="admin-hero">
                     <div className="admin-hero-main">
                         <div className="admin-hero-title">
                             <span className="admin-kicker">SarkariExams Admin</span>
@@ -2095,6 +2140,7 @@ export function AdminPage() {
                                     placeholder="Search by title, organization, category, or ID"
                                     value={listQuery}
                                     onChange={(e) => setListQuery(e.target.value)}
+                                    aria-label="Search announcements"
                                 />
                             </div>
                             <div className="admin-filter-controls">
@@ -2175,8 +2221,9 @@ export function AdminPage() {
                                 </div>
                                 <div className="admin-bulk-controls">
                                     <div className="bulk-field">
-                                        <label>Status</label>
+                                        <label htmlFor="bulk-status">Status</label>
                                         <select
+                                            id="bulk-status"
                                             value={bulkStatus}
                                             onChange={(e) => setBulkStatus(e.target.value as AnnouncementStatus | '')}
                                             disabled={bulkLoading}
@@ -2188,8 +2235,9 @@ export function AdminPage() {
                                         </select>
                                     </div>
                                     <div className="bulk-field">
-                                        <label>Publish at</label>
+                                        <label htmlFor="bulk-publish-at">Publish at</label>
                                         <input
+                                            id="bulk-publish-at"
                                             type="datetime-local"
                                             value={bulkPublishAt}
                                             onChange={(e) => setBulkPublishAt(e.target.value)}
@@ -2197,8 +2245,9 @@ export function AdminPage() {
                                         />
                                     </div>
                                     <div className="bulk-field">
-                                        <label>Active</label>
+                                        <label htmlFor="bulk-active">Active</label>
                                         <select
+                                            id="bulk-active"
                                             value={bulkIsActive}
                                             onChange={(e) => setBulkIsActive(e.target.value as 'keep' | 'active' | 'inactive')}
                                             disabled={bulkLoading}
@@ -2338,6 +2387,7 @@ export function AdminPage() {
                                                                     {canReview && (
                                                                         <input
                                                                             className="review-note-input compact"
+                                                                            aria-label="Review note"
                                                                             type="text"
                                                                             value={reviewNote}
                                                                             onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
@@ -2433,6 +2483,7 @@ export function AdminPage() {
                             <div className="admin-review-controls">
                                 <input
                                     className="review-note-input"
+                                    aria-label="Review note"
                                     type="text"
                                     value={reviewBulkNote}
                                     onChange={(e) => setReviewBulkNote(e.target.value)}
@@ -2548,6 +2599,7 @@ export function AdminPage() {
                                                         <div className="table-actions">
                                                             <input
                                                                 className="review-note-input"
+                                                                aria-label="Review note"
                                                                 type="text"
                                                                 value={reviewNote}
                                                                 onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
@@ -2652,6 +2704,7 @@ export function AdminPage() {
                                                         <div className="table-actions">
                                                             <input
                                                                 className="review-note-input"
+                                                                aria-label="Review note"
                                                                 type="text"
                                                                 value={reviewNote}
                                                                 onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
@@ -2702,26 +2755,28 @@ export function AdminPage() {
                             </div>
                         </div>
 
-                        <div className="admin-bulk-panel">
-                            <div className="admin-bulk-controls">
-                                <div className="bulk-field">
-                                    <label>Review note</label>
-                                    <input
-                                        type="text"
-                                        value={reviewBulkNote}
-                                        onChange={(e) => setReviewBulkNote(e.target.value)}
-                                        placeholder="Optional note for audit log"
-                                        disabled={reviewLoading}
-                                    />
-                                </div>
-                                <div className="bulk-field">
-                                    <label>Schedule at</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={reviewScheduleAt}
-                                        onChange={(e) => setReviewScheduleAt(e.target.value)}
-                                        disabled={reviewLoading}
-                                    />
+                            <div className="admin-bulk-panel">
+                                <div className="admin-bulk-controls">
+                                    <div className="bulk-field">
+                                        <label htmlFor="review-bulk-note">Review note</label>
+                                        <input
+                                            id="review-bulk-note"
+                                            type="text"
+                                            value={reviewBulkNote}
+                                            onChange={(e) => setReviewBulkNote(e.target.value)}
+                                            placeholder="Optional note for audit log"
+                                            disabled={reviewLoading}
+                                        />
+                                    </div>
+                                    <div className="bulk-field">
+                                        <label htmlFor="review-bulk-schedule">Schedule at</label>
+                                        <input
+                                            id="review-bulk-schedule"
+                                            type="datetime-local"
+                                            value={reviewScheduleAt}
+                                            onChange={(e) => setReviewScheduleAt(e.target.value)}
+                                            disabled={reviewLoading}
+                                        />
                                 </div>
                             </div>
                             <div className="admin-bulk-actions">
@@ -2799,6 +2854,7 @@ export function AdminPage() {
                                                         <div className="table-actions">
                                                             <input
                                                                 className="review-note-input"
+                                                                aria-label="Review note"
                                                                 type="text"
                                                                 value={reviewNote}
                                                                 onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
@@ -2979,6 +3035,7 @@ export function AdminPage() {
                                                         <div className="table-actions">
                                                             <input
                                                                 className="review-note-input"
+                                                                aria-label="Review note"
                                                                 type="text"
                                                                 value={reviewNote}
                                                                 onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
@@ -3011,8 +3068,9 @@ export function AdminPage() {
                             <h4 style={{ marginBottom: '15px' }}>Basic Information</h4>
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Title *</label>
+                                    <label htmlFor="detailed-title">Title *</label>
                                     <input
+                                        id="detailed-title"
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -3035,8 +3093,9 @@ export function AdminPage() {
                                     </div>
                                 </div>
                                 <div className="form-group">
-                                    <label>Organization *</label>
+                                    <label htmlFor="detailed-organization">Organization *</label>
                                     <input
+                                        id="detailed-organization"
                                         type="text"
                                         value={formData.organization}
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
@@ -3055,8 +3114,8 @@ export function AdminPage() {
                             </div>
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Type *</label>
-                                    <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
+                                    <label htmlFor="detailed-type">Type *</label>
+                                    <select id="detailed-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
                                         <option value="job">Job</option>
                                         <option value="result">Result</option>
                                         <option value="admit-card">Admit Card</option>
@@ -3066,15 +3125,17 @@ export function AdminPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Category *</label>
+                                    <label htmlFor="detailed-category">Category *</label>
                                     <input
+                                        id="detailed-category-search"
                                         type="search"
                                         className="category-search"
                                         placeholder="Filter categories"
                                         value={categorySearch}
                                         onChange={(e) => setCategorySearch(e.target.value)}
+                                        aria-label="Filter categories"
                                     />
-                                    <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
+                                    <select id="detailed-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
                                         {categoryOptions.map((option) => (
                                             <option key={option.value} value={option.value}>
                                                 {option.icon} {option.label}
@@ -3085,8 +3146,9 @@ export function AdminPage() {
                             </div>
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Total Posts</label>
+                                    <label htmlFor="detailed-total-posts">Total Posts</label>
                                     <input
+                                        id="detailed-total-posts"
                                         type="number"
                                         value={formData.totalPosts}
                                         onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
@@ -3094,8 +3156,9 @@ export function AdminPage() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Last Date to Apply</label>
+                                    <label htmlFor="detailed-deadline">Last Date to Apply</label>
                                     <input
+                                        id="detailed-deadline"
                                         type="date"
                                         value={formData.deadline}
                                         onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
@@ -3104,8 +3167,9 @@ export function AdminPage() {
                             </div>
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Status</label>
+                                    <label htmlFor="detailed-status">Status</label>
                                     <select
+                                        id="detailed-status"
                                         value={formData.status}
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
                                     >
@@ -3115,13 +3179,14 @@ export function AdminPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>
+                                    <label htmlFor="detailed-publish-at">
                                         Publish at
                                         {formData.status !== 'scheduled' && (
                                             <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
                                         )}
                                     </label>
                                     <input
+                                        id="detailed-publish-at"
                                         type="datetime-local"
                                         value={formData.publishAt}
                                         onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
@@ -3311,8 +3376,9 @@ export function AdminPage() {
 
                         <div className="admin-filter-panel">
                             <div className="filter-group">
-                                <label>Admin ID</label>
+                                <label htmlFor="audit-admin-id">Admin ID</label>
                                 <input
+                                    id="audit-admin-id"
                                     type="text"
                                     value={auditFilters.userId}
                                     onChange={(e) => setAuditFilters((prev) => ({ ...prev, userId: e.target.value }))}
@@ -3320,8 +3386,9 @@ export function AdminPage() {
                                 />
                             </div>
                             <div className="filter-group">
-                                <label>Action</label>
+                                <label htmlFor="audit-action">Action</label>
                                 <select
+                                    id="audit-action"
                                     value={auditFilters.action}
                                     onChange={(e) => setAuditFilters((prev) => ({ ...prev, action: e.target.value }))}
                                 >
@@ -3332,24 +3399,27 @@ export function AdminPage() {
                                 </select>
                             </div>
                             <div className="filter-group">
-                                <label>Start date</label>
+                                <label htmlFor="audit-start-date">Start date</label>
                                 <input
+                                    id="audit-start-date"
                                     type="date"
                                     value={auditFilters.start}
                                     onChange={(e) => setAuditFilters((prev) => ({ ...prev, start: e.target.value }))}
                                 />
                             </div>
                             <div className="filter-group">
-                                <label>End date</label>
+                                <label htmlFor="audit-end-date">End date</label>
                                 <input
+                                    id="audit-end-date"
                                     type="date"
                                     value={auditFilters.end}
                                     onChange={(e) => setAuditFilters((prev) => ({ ...prev, end: e.target.value }))}
                                 />
                             </div>
                             <div className="filter-group">
-                                <label>Limit</label>
+                                <label htmlFor="audit-limit">Limit</label>
                                 <input
+                                    id="audit-limit"
                                     type="number"
                                     min={10}
                                     max={200}
@@ -3446,8 +3516,9 @@ export function AdminPage() {
                         <form onSubmit={handleSubmit} className="admin-form">
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Title *</label>
+                                    <label htmlFor="quick-title">Title *</label>
                                     <input
+                                        id="quick-title"
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -3473,8 +3544,8 @@ export function AdminPage() {
 
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Type *</label>
-                                    <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
+                                    <label htmlFor="quick-type">Type *</label>
+                                    <select id="quick-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
                                         <option value="job">Job</option>
                                         <option value="result">Result</option>
                                         <option value="admit-card">Admit Card</option>
@@ -3484,15 +3555,17 @@ export function AdminPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Category *</label>
+                                    <label htmlFor="quick-category">Category *</label>
                                     <input
+                                        id="quick-category-search"
                                         type="search"
                                         className="category-search"
                                         placeholder="Filter categories"
                                         value={categorySearch}
                                         onChange={(e) => setCategorySearch(e.target.value)}
+                                        aria-label="Filter categories"
                                     />
-                                    <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
+                                    <select id="quick-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
                                         {categoryOptions.map((option) => (
                                             <option key={option.value} value={option.value}>
                                                 {option.icon} {option.label}
@@ -3505,8 +3578,9 @@ export function AdminPage() {
                             {/* Rest of form fields - simplified for brevity, assume similar to original */}
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Organization *</label>
+                                    <label htmlFor="quick-organization">Organization *</label>
                                     <input
+                                        id="quick-organization"
                                         type="text"
                                         value={formData.organization}
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
@@ -3522,8 +3596,9 @@ export function AdminPage() {
                                     )}
                                 </div>
                                 <div className="form-group">
-                                    <label>Location</label>
+                                    <label htmlFor="quick-location">Location</label>
                                     <input
+                                        id="quick-location"
                                         type="text"
                                         value={formData.location}
                                         onChange={(e) => setFormData({ ...formData, location: e.target.value })}
@@ -3532,8 +3607,9 @@ export function AdminPage() {
                             </div>
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Total Posts</label>
+                                    <label htmlFor="quick-total-posts">Total Posts</label>
                                     <input
+                                        id="quick-total-posts"
                                         type="number"
                                         value={formData.totalPosts}
                                         onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
@@ -3541,8 +3617,9 @@ export function AdminPage() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Last Date</label>
+                                    <label htmlFor="quick-deadline">Last Date</label>
                                     <input
+                                        id="quick-deadline"
                                         type="date"
                                         value={formData.deadline}
                                         onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
@@ -3552,16 +3629,18 @@ export function AdminPage() {
 
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Qualification</label>
+                                    <label htmlFor="quick-qualification">Qualification</label>
                                     <input
+                                        id="quick-qualification"
                                         type="text"
                                         value={formData.minQualification}
                                         onChange={(e) => setFormData({ ...formData, minQualification: e.target.value })}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Age Limit</label>
+                                    <label htmlFor="quick-age-limit">Age Limit</label>
                                     <input
+                                        id="quick-age-limit"
                                         type="text"
                                         value={formData.ageLimit}
                                         onChange={(e) => setFormData({ ...formData, ageLimit: e.target.value })}
@@ -3572,8 +3651,9 @@ export function AdminPage() {
 
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Application Fee</label>
+                                    <label htmlFor="quick-application-fee">Application Fee</label>
                                     <input
+                                        id="quick-application-fee"
                                         type="text"
                                         value={formData.applicationFee}
                                         onChange={(e) => setFormData({ ...formData, applicationFee: e.target.value })}
@@ -3581,8 +3661,9 @@ export function AdminPage() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>External Link</label>
+                                    <label htmlFor="quick-external-link">External Link</label>
                                     <input
+                                        id="quick-external-link"
                                         type="url"
                                         value={formData.externalLink}
                                         onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
@@ -3592,8 +3673,9 @@ export function AdminPage() {
 
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label>Status</label>
+                                    <label htmlFor="quick-status">Status</label>
                                     <select
+                                        id="quick-status"
                                         value={formData.status}
                                         onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
                                     >
@@ -3603,13 +3685,14 @@ export function AdminPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>
+                                    <label htmlFor="quick-publish-at">
                                         Publish at
                                         {formData.status !== 'scheduled' && (
                                             <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
                                         )}
                                     </label>
                                     <input
+                                        id="quick-publish-at"
                                         type="datetime-local"
                                         value={formData.publishAt}
                                         onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}

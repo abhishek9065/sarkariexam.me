@@ -440,6 +440,61 @@ export class AnnouncementModelMongo {
         }
     }
 
+    static async getAdminQaCounts(options?: { includeInactive?: boolean }): Promise<{
+        totalQaIssues: number;
+        pendingQaIssues: number;
+    }> {
+        try {
+            const now = new Date();
+            const qaOr: Filter<AnnouncementDoc>[] = [
+                { title: { $exists: false } },
+                { title: { $regex: /^.{0,9}$/ } },
+                { category: { $in: [null, ''] } },
+                { organization: { $in: [null, ''] } },
+                {
+                    status: 'scheduled',
+                    $or: [{ publishAt: { $exists: false } }, { publishAt: null }],
+                },
+                { deadline: { $lt: now } },
+                { externalLink: { $exists: true, $ne: '', $not: /^https?:\/\//i } },
+            ];
+
+            const attachOrClause = (base: Filter<AnnouncementDoc>, orClause: Filter<AnnouncementDoc>[]) => {
+                const query: any = { ...base };
+                if (query.$and) {
+                    query.$and = [...query.$and, { $or: orClause }];
+                    return query;
+                }
+                if (query.$or) {
+                    query.$and = [{ $or: query.$or }, { $or: orClause }];
+                    delete query.$or;
+                    return query;
+                }
+                query.$or = orClause;
+                return query;
+            };
+
+            const baseQuery = buildAdminQuery({ includeInactive: options?.includeInactive });
+            const pendingBaseQuery = buildAdminQuery({ includeInactive: options?.includeInactive, status: 'pending' });
+
+            const qaQuery = attachOrClause(baseQuery, qaOr);
+            const pendingQaQuery = attachOrClause(pendingBaseQuery, qaOr);
+
+            const [totalQaIssues, pendingQaIssues] = await Promise.all([
+                this.collection.countDocuments(qaQuery),
+                this.collection.countDocuments(pendingQaQuery),
+            ]);
+
+            return {
+                totalQaIssues,
+                pendingQaIssues,
+            };
+        } catch (error) {
+            console.error('[MongoDB] getAdminQaCounts error:', error);
+            return { totalQaIssues: 0, pendingQaIssues: 0 };
+        }
+    }
+
     static async getPendingSlaSummary(options?: { includeInactive?: boolean; staleLimit?: number }): Promise<{
         pendingTotal: number;
         averageDays: number;

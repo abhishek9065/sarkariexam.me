@@ -409,6 +409,7 @@ export function AnalyticsDashboard({
                 headers: {
                     'Content-Type': 'application/json',
                     ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
+                    'Idempotency-Key': crypto.randomUUID(),
                 },
                 maxRetries: 0,
                 body: JSON.stringify({ status: 'archived' }),
