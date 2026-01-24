@@ -82,6 +82,9 @@ interface PopularAnnouncement {
     type: string;
     category?: string;
     viewCount: number;
+    slug?: string;
+    status?: string;
+    isActive?: boolean;
 }
 
 // CSS-based Donut Chart using conic-gradient
@@ -152,7 +155,15 @@ function TrendChart({
     );
 }
 
-export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }) {
+export function AnalyticsDashboard({
+    adminToken,
+    onEditById,
+    onOpenList,
+}: {
+    adminToken: string | null;
+    onEditById?: (id: string) => void;
+    onOpenList?: () => void;
+}) {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -162,8 +173,16 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const [showZeroTrend, setShowZeroTrend] = useState(false);
     const [liveEnabled, setLiveEnabled] = useState(true);
     const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
+    const [rangeDays, setRangeDays] = useState(30);
+    const [actionMessage, setActionMessage] = useState<string | null>(null);
     const typeBreakdown = analytics?.typeBreakdown ?? [];
     const categoryBreakdown = analytics?.categoryBreakdown ?? [];
+
+    useEffect(() => {
+        if (!actionMessage) return;
+        const timer = window.setTimeout(() => setActionMessage(null), 4000);
+        return () => window.clearTimeout(timer);
+    }, [actionMessage]);
 
     const sortedTypeBreakdown = useMemo(() => {
         return [...typeBreakdown].sort((a, b) => b.count - a.count);
@@ -186,10 +205,10 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     }, [rollups, showZeroTrend]);
     const maxViews = Math.max(1, ...trendRows.map((item) => item.views ?? 0));
     const maxSearches = Math.max(1, ...trendRows.map((item) => item.searches ?? 0));
-    const last7Views = rollups.slice(-7).reduce((sum, item) => sum + (item.views ?? 0), 0);
+    const viewsLast7 = rollups.slice(-7).reduce((sum, item) => sum + (item.views ?? 0), 0);
     const prev7Views = rollups.slice(0, Math.max(0, rollups.length - 7)).reduce((sum, item) => sum + (item.views ?? 0), 0);
 
-    const loadAnalytics = useCallback(async (options?: { silent?: boolean }) => {
+    const loadAnalytics = useCallback(async (options?: { silent?: boolean; forceFresh?: boolean }) => {
         if (!adminToken) {
             setError('Not authenticated');
             setLoading(false);
@@ -203,11 +222,12 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         }
 
         try {
+            const nocache = options?.forceFresh ? '&nocache=1' : '';
             const [overviewRes, popularRes] = await Promise.all([
-                fetch(`${apiBase}/api/analytics/overview`, {
+                fetch(`${apiBase}/api/analytics/overview?days=${rangeDays}${nocache}`, {
                     headers: { Authorization: `Bearer ${adminToken}` }
                 }),
-                fetch(`${apiBase}/api/analytics/popular?limit=10`, {
+                fetch(`${apiBase}/api/analytics/popular?limit=10${nocache}`, {
                     headers: { Authorization: `Bearer ${adminToken}` }
                 })
             ]);
@@ -270,7 +290,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             setLoading(false);
             setRefreshing(false);
         }
-    }, [adminToken]);
+    }, [adminToken, rangeDays]);
 
     useEffect(() => {
         loadAnalytics();
@@ -288,7 +308,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         let ws: WebSocket | null = null;
         const baseUrl = apiBase ? new URL(apiBase, window.location.origin) : new URL(window.location.origin);
         const wsProtocol = baseUrl.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?token=${encodeURIComponent(adminToken)}`;
+        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?token=${encodeURIComponent(adminToken)}&days=${rangeDays}`;
 
         try {
             ws = new WebSocket(wsUrl);
@@ -316,7 +336,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                 ws.close();
             }
         };
-    }, [adminToken, liveEnabled]);
+    }, [adminToken, liveEnabled, rangeDays]);
 
     const handleExport = async () => {
         if (!adminToken) return;
@@ -344,6 +364,51 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         }
     };
 
+    const handlePopularView = (item: PopularAnnouncement) => {
+        if (!item.slug) {
+            setActionMessage('Open list to view this announcement.');
+            return;
+        }
+        window.open(`/${item.type}/${item.slug}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const handlePopularEdit = (item: PopularAnnouncement) => {
+        if (!onEditById) {
+            setActionMessage('Open list to edit this announcement.');
+            return;
+        }
+        onOpenList?.();
+        onEditById(item.id);
+    };
+
+    const handlePopularUnpublish = async (item: PopularAnnouncement) => {
+        if (!adminToken) return;
+        setActionMessage(null);
+        try {
+            const response = await fetch(`${apiBase}/api/admin/announcements/${item.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${adminToken}`,
+                },
+                body: JSON.stringify({ status: 'archived' }),
+            });
+            if (!response.ok) {
+                setActionMessage('Failed to unpublish announcement.');
+                return;
+            }
+            setActionMessage('Announcement unpublished.');
+            loadAnalytics({ silent: true, forceFresh: true });
+        } catch (error) {
+            console.error(error);
+            setActionMessage('Failed to unpublish announcement.');
+        }
+    };
+
+    const handlePopularBoost = () => {
+        setActionMessage('Boosting is not configured yet. Configure promotions to enable this action.');
+    };
+
     if (loading) {
         return <div className="analytics-loading">Loading analytics...</div>;
     }
@@ -362,6 +427,16 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     const deepLinkAttribution = analytics.deepLinkAttribution;
     const digestTotal = digestClicks?.total ?? 0;
     const deepLinkTotal = deepLinkAttribution?.total ?? 0;
+    const digestNotConfigured = !digestClicks;
+    const digestHasNoData = digestClicks && digestClicks.total === 0
+        && digestClicks.variants.length === 0
+        && digestClicks.frequencies.length === 0
+        && digestClicks.campaigns.length === 0;
+    const deepLinkNotConfigured = !deepLinkAttribution;
+    const deepLinkHasNoData = deepLinkAttribution && deepLinkAttribution.total === 0
+        && deepLinkAttribution.sources.length === 0
+        && deepLinkAttribution.mediums.length === 0
+        && deepLinkAttribution.campaigns.length === 0;
     const insights = analytics.insights;
     const viewTrendPct = insights?.viewTrendPct ?? 0;
     const viewTrendDirection = insights?.viewTrendDirection ?? (viewTrendPct > 2 ? 'up' : viewTrendPct < -2 ? 'down' : 'flat');
@@ -371,6 +446,10 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             ? `Down ${Math.abs(viewTrendPct)}%`
             : 'Stable';
     const rollupAge = insights?.rollupAgeMinutes ?? null;
+    const ctrTone = ctr >= 10 ? 'good' : ctr >= 5 ? 'warn' : 'bad';
+    const coverageTone = (insights?.listingCoverage ?? 0) >= 25 ? 'good' : (insights?.listingCoverage ?? 0) >= 10 ? 'warn' : 'bad';
+    const funnelDropTone = (insights?.funnelDropRate ?? 0) >= 80 ? 'bad' : (insights?.funnelDropRate ?? 0) >= 60 ? 'warn' : 'good';
+    const trendTone = viewTrendDirection === 'up' ? 'good' : viewTrendDirection === 'down' ? 'bad' : 'warn';
     const funnel = analytics.funnel;
     const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
     const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
@@ -381,6 +460,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
         (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
     );
     const detailViewsLabel = hasAnomaly ? 'Detail views (adjusted)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
+    const lowCtrThreshold = 5;
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
@@ -419,7 +499,20 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
     return (
         <div className="analytics-dashboard">
             <div className="analytics-actions">
-                <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                <div className="analytics-actions-left">
+                    <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                    <div className="range-toggle">
+                        {[7, 30, 90].map((days) => (
+                            <button
+                                key={days}
+                                className={`admin-btn secondary small ${rangeDays === days ? 'active' : ''}`}
+                                onClick={() => setRangeDays(days)}
+                            >
+                                {days} days
+                            </button>
+                        ))}
+                    </div>
+                </div>
                 <div className="analytics-live">
                     <span className={`live-dot ${liveStatus}`} aria-hidden="true" />
                     <span className="live-text">
@@ -443,6 +536,21 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     {exporting ? 'Exporting...' : 'Export CSV'}
                 </button>
             </div>
+            {actionMessage && (
+                <div className="analytics-note" role="status">{actionMessage}</div>
+            )}
+            <div className="kpi-grid">
+                <div className="kpi-card">
+                    <div className="kpi-label">Views last 7 days</div>
+                    <div className="kpi-value">{viewsLast7.toLocaleString()}</div>
+                    <div className="kpi-sub">Highlights recent demand</div>
+                </div>
+                <div className={`kpi-card ${ctrTone}`}>
+                    <div className="kpi-label">CTR last 30 days</div>
+                    <div className="kpi-value">{ctr}%</div>
+                    <div className="kpi-sub">Card clicks / listing views</div>
+                </div>
+            </div>
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card views">
@@ -450,6 +558,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     <div className="stat-info">
                         <div className="stat-value">{(analytics.totalViews ?? 0).toLocaleString()}</div>
                         <div className="stat-label">Total Views</div>
+                        <div className="stat-meta">All time</div>
                     </div>
                 </div>
                 <div className="stat-card posts">
@@ -457,6 +566,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalAnnouncements}</div>
                         <div className="stat-label">Announcements</div>
+                        <div className="stat-meta">Published + scheduled</div>
                     </div>
                 </div>
                 <div className="stat-card subscribers">
@@ -464,6 +574,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalEmailSubscribers ?? 0}</div>
                         <div className="stat-label">Email Subscribers</div>
+                        <div className="stat-meta">Verified opt-ins</div>
                     </div>
                 </div>
                 <div className="stat-card push">
@@ -471,15 +582,16 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     <div className="stat-info">
                         <div className="stat-value">{analytics.totalPushSubscribers ?? 0}</div>
                         <div className="stat-label">Push Subscribers</div>
+                        <div className="stat-meta">Active devices</div>
                     </div>
                 </div>
             </div>
 
-            <div className="analytics-section">
+            <div className={`analytics-section ${digestNotConfigured || digestHasNoData ? 'section-muted' : ''}`}>
                 <div className="analytics-section-header">
                     <div>
-                        <h3>Engagement (last {engagementWindow} days)</h3>
-                        <p className="analytics-subtitle">Searches, bookmarks, and signups from tracked events.</p>
+                        <h3>Engagement Overview</h3>
+                        <p className="analytics-subtitle">Searches, bookmarks, and signups from the last {engagementWindow} days.</p>
                     </div>
                     <span className="analytics-updated">{formatLastUpdated(analytics.rollupLastUpdatedAt ?? null)}</span>
                 </div>
@@ -516,7 +628,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         <div className="engagement-label">Filter applies</div>
                         <div className="engagement-value">{(analytics.totalFilterApplies ?? 0).toLocaleString()}</div>
                     </div>
-                    <div className="engagement-card">
+                    <div className={`engagement-card ${ctrTone}`}>
                         <div className="engagement-label">CTR</div>
                         <div className="engagement-value">{ctr}%</div>
                     </div>
@@ -545,22 +657,22 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                     </div>
                 </div>
                 <div className="insights-grid">
-                    <div className="insight-card">
+                    <div className={`insight-card ${trendTone}`}>
                         <div className="insight-label">Weekly views trend</div>
                         <div className={`insight-value ${viewTrendDirection}`}>{viewTrendLabel}</div>
-                        <div className="insight-meta">{last7Views.toLocaleString()} vs {prev7Views.toLocaleString()} views</div>
+                        <div className="insight-meta">{viewsLast7.toLocaleString()} vs {prev7Views.toLocaleString()} views</div>
                     </div>
-                    <div className="insight-card">
+                    <div className={`insight-card ${ctrTone}`}>
                         <div className="insight-label">Click-through rate</div>
                         <div className="insight-value">{insights?.clickThroughRate ?? ctr}%</div>
                         <div className="insight-meta">From listing views to card clicks</div>
                     </div>
-                    <div className="insight-card">
+                    <div className={`insight-card ${funnelDropTone}`}>
                         <div className="insight-label">Funnel drop</div>
                         <div className="insight-value">{insights?.funnelDropRate ?? 0}%</div>
                         <div className="insight-meta">Listing views to card clicks</div>
                     </div>
-                    <div className="insight-card">
+                    <div className={`insight-card ${coverageTone}`}>
                         <div className="insight-label">Tracking coverage</div>
                         <div className="insight-value">{insights?.listingCoverage ?? 0}%</div>
                         <div className="insight-meta">Listing views vs total views</div>
@@ -603,8 +715,8 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
-                        <h3>Engagement funnel</h3>
-                        <p className="analytics-subtitle">Conversion steps for the last {engagementWindow} days.</p>
+                        <h3>Engagement Funnel</h3>
+                        <p className="analytics-subtitle">Conversion from views to subscriptions in the last {engagementWindow} days.</p>
                     </div>
                 </div>
                 <div className="funnel-grid">
@@ -624,6 +736,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                 <div className="analytics-warning">
                     <strong>⚠ Funnel anomaly:</strong> Detail views ({rawDetailViews.toLocaleString()}) exceed card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
                     Funnel rates use the adjusted value ({adjustedDetailViews.toLocaleString()}).
+                    <div className="analytics-suggestion">Suggestion: Check SEO/direct traffic tracking and card click events for consistency.</div>
                 </div>
             )}
             {funnelHasDirectTraffic && (
@@ -636,8 +749,8 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
-                        <h3>CTR by listing type</h3>
-                        <p className="analytics-subtitle">Card clicks per listing view, grouped by listing type.</p>
+                        <h3>CTR by Listing Type</h3>
+                        <p className="analytics-subtitle">Card clicks per listing view, grouped by type.</p>
                     </div>
                 </div>
                 <p className="analytics-hint">
@@ -646,40 +759,48 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                 {ctrByType.length === 0 ? (
                     <div className="empty-state">No CTR data yet. Apply a type filter to generate listing view events.</div>
                 ) : (
-                    <table className="analytics-table">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th className="numeric">Listing views</th>
-                                <th className="numeric">Card clicks</th>
-                                <th className="numeric">CTR</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {ctrByType.map((item) => (
-                                <tr key={item.type}>
-                                    <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                    <td className="numeric">{item.listingViews.toLocaleString()}</td>
-                                    <td className="numeric">{item.cardClicks.toLocaleString()}</td>
-                                    <td className="numeric">
-                                        <div className="ctr-cell">
-                                            <span className="ctr-value">{item.ctr}%</span>
-                                            <span className="ctr-bar">
-                                                <span style={{ width: `${Math.min(100, item.ctr)}%` }} />
-                                            </span>
-                                        </div>
-                                    </td>
+                    <>
+                        <table className="analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th className="numeric">Listing views</th>
+                                    <th className="numeric">Card clicks</th>
+                                    <th className="numeric">CTR</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {ctrByType.map((item) => (
+                                    <tr key={item.type}>
+                                        <td>
+                                            <span className={`type-badge ${item.type}`}>{item.type}</span>
+                                            {item.ctr < lowCtrThreshold && (
+                                                <span className="ctr-flag" title="Low CTR">!</span>
+                                            )}
+                                        </td>
+                                        <td className="numeric">{item.listingViews.toLocaleString()}</td>
+                                        <td className="numeric">{item.cardClicks.toLocaleString()}</td>
+                                        <td className="numeric">
+                                            <div className="ctr-cell">
+                                                <span className="ctr-value">{item.ctr}%</span>
+                                                <span className="ctr-bar">
+                                                    <span style={{ width: `${Math.min(100, item.ctr)}%` }} />
+                                                </span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <p className="analytics-hint">Improve titles and thumbnails for low-CTR types (Result, Answer-key) to lift clicks.</p>
+                    </>
                 )}
             </div>
 
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
-                        <h3>Digest A/B clicks</h3>
+                        <h3>Digest A/B Clicks</h3>
                         <p className="analytics-subtitle">Click activity from digest emails.</p>
                     </div>
                 </div>
@@ -736,16 +857,36 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         {digestTotal === 0 && (
                             <div className="digest-note">Tracking enabled, no clicks yet.</div>
                         )}
+                        {(digestHasNoData || digestNotConfigured) && (
+                            <div className="digest-cta">
+                                <button
+                                    className="admin-btn secondary small"
+                                    onClick={() => setActionMessage('Digest setup: configure provider, enable digest campaigns, and record digest_click events.')}
+                                >
+                                    Set up digest emails
+                                </button>
+                            </div>
+                        )}
                     </>
                 ) : (
-                    <div className="empty-state">Digest click tracking not configured.</div>
+                    <div className="empty-state">
+                        Digest click tracking not configured.
+                        <div className="digest-cta">
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => setActionMessage('Digest setup: configure provider, enable digest campaigns, and record digest_click events.')}
+                            >
+                                Set up digest emails
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            <div className="analytics-section">
+            <div className={`analytics-section ${deepLinkNotConfigured || deepLinkHasNoData ? 'section-muted' : ''}`}>
                 <div className="analytics-section-header">
                     <div>
-                        <h3>Deep link attribution</h3>
+                        <h3>Deep Link Attribution</h3>
                         <p className="analytics-subtitle">Top sources, mediums, and campaigns from tracked links.</p>
                     </div>
                 </div>
@@ -802,17 +943,37 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                         {deepLinkTotal === 0 && (
                             <div className="digest-note">Tracking enabled, no clicks yet.</div>
                         )}
+                        {(deepLinkHasNoData || deepLinkNotConfigured) && (
+                            <div className="digest-cta">
+                                <button
+                                    className="admin-btn secondary small"
+                                    onClick={() => setActionMessage('UTM setup: include source/medium/campaign in deep links and emit deep_link_click events.')}
+                                >
+                                    Configure UTM tracking
+                                </button>
+                            </div>
+                        )}
                     </>
                 ) : (
-                    <div className="empty-state">Deep link tracking not configured.</div>
+                    <div className="empty-state">
+                        Deep link tracking not configured.
+                        <div className="digest-cta">
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => setActionMessage('UTM setup: include source/medium/campaign in deep links and emit deep_link_click events.')}
+                            >
+                                Configure UTM tracking
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
-                        <h3>Trend lines</h3>
-                        <p className="analytics-subtitle">Views vs searches (daily).</p>
+                        <h3>Trend Lines</h3>
+                        <p className="analytics-subtitle">Daily views vs searches for the selected range.</p>
                     </div>
                     {zeroTrendCount > 0 && (
                         <button
@@ -912,7 +1073,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                 <div className="analytics-section-header">
                     <div>
                         <h3>Most Popular Announcements</h3>
-                        <p className="analytics-subtitle">Top 10 announcements by total views.</p>
+                        <p className="analytics-subtitle">Top 10 announcements by total views with quick actions.</p>
                     </div>
                 </div>
                 <table className="analytics-table">
@@ -922,6 +1083,7 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                             <th>Title</th>
                             <th>Type</th>
                             <th className="numeric">Views</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -931,6 +1093,20 @@ export function AnalyticsDashboard({ adminToken }: { adminToken: string | null }
                                 <td>{item.title.substring(0, 50)}{item.title.length > 50 ? '...' : ''}</td>
                                 <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
                                 <td className="view-count numeric">{(item.viewCount ?? 0).toLocaleString()}</td>
+                                <td>
+                                    <div className="table-actions compact">
+                                        <button className="admin-btn secondary small" onClick={() => handlePopularView(item)}>View</button>
+                                        <button className="admin-btn secondary small" onClick={() => handlePopularEdit(item)}>Edit</button>
+                                        <button
+                                            className="admin-btn warning small"
+                                            onClick={() => handlePopularUnpublish(item)}
+                                            disabled={item.status === 'archived'}
+                                        >
+                                            Unpublish
+                                        </button>
+                                        <button className="admin-btn secondary small" onClick={handlePopularBoost}>Boost</button>
+                                    </div>
+                                </td>
                             </tr>
                         ))}
                     </tbody>

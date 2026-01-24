@@ -8,17 +8,22 @@ interface SubscriptionDoc {
 }
 
 const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
+const MAX_DAYS = 90;
 
-const overviewCache: { data: any | null; expiresAt: number } = {
-    data: null,
-    expiresAt: 0,
-};
+const overviewCache = new Map<number, { data: any; expiresAt: number }>();
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
-export async function getAnalyticsOverview(): Promise<{ data: any; cached: boolean }> {
-    if (overviewCache.data && overviewCache.expiresAt > Date.now()) {
-        return { data: overviewCache.data, cached: true };
+export async function getAnalyticsOverview(
+    days: number = 30,
+    options?: { bypassCache?: boolean }
+): Promise<{ data: any; cached: boolean }> {
+    const clampedDays = Math.max(1, Math.min(MAX_DAYS, Math.round(days)));
+    if (!options?.bypassCache) {
+        const cachedEntry = overviewCache.get(clampedDays);
+        if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+            return { data: cachedEntry.data, cached: true };
+        }
     }
 
     const [
@@ -32,11 +37,11 @@ export async function getAnalyticsOverview(): Promise<{ data: any; cached: boole
         totalPushSubscribers,
     ] = await Promise.all([
         AnnouncementModelMongo.findAll({ limit: 1000 }),
-        getRollupSummary(30),
-        getDailyRollups(14),
-        getCtrByType(30),
-        getDigestClickStats(30),
-        getDeepLinkAttribution(30),
+        getRollupSummary(clampedDays),
+        getDailyRollups(Math.min(clampedDays, MAX_DAYS)),
+        getCtrByType(clampedDays),
+        getDigestClickStats(clampedDays),
+        getDeepLinkAttribution(clampedDays),
         (async () => {
             try {
                 const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
@@ -153,8 +158,7 @@ export async function getAnalyticsOverview(): Promise<{ data: any; cached: boole
         lastUpdated: new Date().toISOString(),
     };
 
-    overviewCache.data = payload;
-    overviewCache.expiresAt = Date.now() + OVERVIEW_CACHE_TTL_MS;
+    overviewCache.set(clampedDays, { data: payload, expiresAt: Date.now() + OVERVIEW_CACHE_TTL_MS });
 
     return { data: payload, cached: false };
 }

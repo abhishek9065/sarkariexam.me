@@ -14,6 +14,8 @@ export function startAnalyticsWebSocket(server: Server) {
         try {
             const url = new URL(req.url || '', 'http://localhost');
             const token = url.searchParams.get('token');
+            const daysParam = parseInt(url.searchParams.get('days') || '', 10);
+            const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
             if (!token) {
                 socket.close(1008, 'Token required');
                 return;
@@ -34,7 +36,7 @@ export function startAnalyticsWebSocket(server: Server) {
 
             const sendUpdate = async () => {
                 try {
-                    const { data, cached } = await getAnalyticsOverview();
+                    const { data, cached } = await getAnalyticsOverview(days);
                     if (socket.readyState === socket.OPEN) {
                         socket.send(JSON.stringify({ type: 'analytics:update', data, cached }));
                     }

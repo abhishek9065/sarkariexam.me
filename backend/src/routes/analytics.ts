@@ -19,9 +19,12 @@ router.use(authenticateToken, requirePermission('analytics:read'));
  * GET /api/analytics/overview
  * Get analytics overview stats
  */
-router.get('/overview', async (_req, res) => {
+router.get('/overview', async (req, res) => {
     try {
-        const { data, cached } = await getAnalyticsOverview();
+        const daysParam = parseInt(req.query.days as string, 10);
+        const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
+        const bypassCache = req.query.nocache === '1';
+        const { data, cached } = await getAnalyticsOverview(days, { bypassCache });
         return res.json({ data, cached });
     } catch (error) {
         console.error('Analytics overview error:', error);
@@ -35,7 +38,7 @@ router.get('/overview', async (_req, res) => {
  */
 router.get('/popular', async (req, res) => {
     try {
-        if (popularCache.data && popularCache.expiresAt > Date.now()) {
+        if (!req.query.nocache && popularCache.data && popularCache.expiresAt > Date.now()) {
             return res.json({ data: popularCache.data, cached: true });
         }
 
@@ -47,7 +50,10 @@ router.get('/popular', async (req, res) => {
             title: a.title,
             type: a.type,
             category: a.category || '',
-            viewCount: a.viewCount || 0
+            viewCount: a.viewCount || 0,
+            slug: a.slug,
+            status: a.status,
+            isActive: a.isActive,
         }));
 
         popularCache.data = payload;

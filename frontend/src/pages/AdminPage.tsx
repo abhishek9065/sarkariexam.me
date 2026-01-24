@@ -203,6 +203,7 @@ export function AdminPage() {
     const [loginLoading, setLoginLoading] = useState(false);
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [pendingEditId, setPendingEditId] = useState<string | null>(null);
 
     const pageSize = 15;
     const overview = dashboard?.overview;
@@ -529,6 +530,18 @@ export function AdminPage() {
         } finally {
             updateMutating(id, false);
         }
+    };
+
+    const handleEditById = (id: string) => {
+        const target = announcements.find((item) => item.id === id);
+        if (target) {
+            handleEdit(target);
+            setActiveAdminTab('list');
+            return;
+        }
+        setPendingEditId(id);
+        setActiveAdminTab('list');
+        refreshData();
     };
 
     const handleReject = async (id: string, note?: string) => {
@@ -1584,6 +1597,14 @@ export function AdminPage() {
         setListPage((page) => Math.min(page, totalPages));
     }, [totalPages]);
 
+    useEffect(() => {
+        if (!pendingEditId) return;
+        const target = announcements.find((item) => item.id === pendingEditId);
+        if (!target) return;
+        setPendingEditId(null);
+        handleEdit(target);
+    }, [pendingEditId, announcements]);
+
     if (!isLoggedIn) {
         return (
             <div className="admin-container">
@@ -1688,17 +1709,17 @@ export function AdminPage() {
                         <div className="admin-metric">
                             <span className="metric-label">Total posts</span>
                             <span className="metric-value">{heroTotalPosts.toLocaleString()}</span>
-                            <span className="metric-sub">All time</span>
+                            <span className="metric-sub">All time listings</span>
                         </div>
                         <div className="admin-metric">
                             <span className="metric-label">Total views</span>
                             <span className="metric-value">{heroTotalViews.toLocaleString()}</span>
-                            <span className="metric-sub">Combined</span>
+                            <span className="metric-sub">All time views</span>
                         </div>
                         <div className="admin-metric">
                             <span className="metric-label">Active jobs</span>
                             <span className="metric-value">{heroActiveJobs.toLocaleString()}</span>
-                            <span className="metric-sub">Published</span>
+                            <span className="metric-sub">Currently published</span>
                         </div>
                         <div className="admin-metric">
                             <span className="metric-label">New this week</span>
@@ -1773,7 +1794,11 @@ export function AdminPage() {
                 </div>
 
                 {activeAdminTab === 'analytics' ? (
-                    <AnalyticsDashboard adminToken={adminToken} />
+                    <AnalyticsDashboard
+                        adminToken={adminToken}
+                        onEditById={handleEditById}
+                        onOpenList={() => setActiveAdminTab('list')}
+                    />
                 ) : activeAdminTab === 'users' ? (
                     <div className="admin-users">
                         <div className="admin-list-header">
