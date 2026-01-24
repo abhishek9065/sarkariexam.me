@@ -331,7 +331,7 @@ export function AdminPage() {
         setListLoading(true);
         try {
             const params = new URLSearchParams({
-                limit: '1000',
+                limit: '500',
                 offset: '0',
                 includeInactive: 'true',
             });
