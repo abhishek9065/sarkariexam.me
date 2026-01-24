@@ -172,7 +172,9 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
         }
         return { ...defaultJobDetails };
     });
-    const [draftNotice, setDraftNotice] = useState<string | null>(null);
+    const [draftAlert, setDraftAlert] = useState<string | null>(null);
+    const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+    const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
     const [showValidation, setShowValidation] = useState(false);
@@ -206,12 +208,60 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
     }, [jobDetails]);
 
     const disableActions = validation.hasRequiredErrors || isSubmitting || Boolean(isDisabled);
+    const disabledReason = isDisabled
+        ? 'Complete Basic Information to save'
+        : validation.hasRequiredErrors
+            ? 'Please fix validation errors before saving'
+            : undefined;
+
+    const totalVacancies = useMemo(
+        () => jobDetails.vacancies.details.reduce((sum, v) => sum + v.total, 0),
+        [jobDetails.vacancies.details]
+    );
+
+    const tabCompletion = useMemo(() => {
+        const datesComplete =
+            jobDetails.importantDates.length > 0
+            && jobDetails.importantDates.every((date) => date.name.trim() && date.date)
+            && jobDetails.applicationFees.every((fee) => fee.category.trim())
+            && !validation.ageErrors.minAge
+            && !validation.ageErrors.maxAge
+            && Boolean(jobDetails.ageLimits.asOnDate);
+        const eligibilityComplete = Boolean(jobDetails.eligibility.education.trim() || jobDetails.eligibility.additional.length);
+        const vacanciesComplete =
+            jobDetails.vacancies.details.length > 0
+            && jobDetails.vacancies.details.every((row) => row.category.trim() && row.total > 0);
+        const examComplete =
+            jobDetails.examPattern.totalQuestions > 0
+            && jobDetails.examPattern.totalMarks > 0;
+        const linksComplete =
+            jobDetails.importantLinks.length > 0
+            && jobDetails.importantLinks.every((link) => link.label.trim() && link.url.trim());
+        return {
+            dates: datesComplete,
+            eligibility: eligibilityComplete,
+            vacancies: vacanciesComplete,
+            exam: examComplete,
+            links: linksComplete,
+        };
+    }, [jobDetails, validation.ageErrors]);
+
+    const completedSections = Object.values(tabCompletion).filter(Boolean).length;
+    const totalSections = Object.keys(tabCompletion).length;
+    const completionPercent = Math.round((completedSections / totalSections) * 100);
+
+    const todayStart = useMemo(() => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        return now.getTime();
+    }, []);
 
     useEffect(() => {
         if (initialData && Object.keys(initialData).length > 0) {
             setJobDetails({ ...defaultJobDetails, ...initialData });
             setShowValidation(false);
-            setDraftNotice(null);
+            setDraftAlert(null);
+            setLastSavedAt(null);
         }
     }, [initialData]);
 
@@ -222,6 +272,43 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
         { id: 'exam' as TabType, label: '📝 Exam & Selection', icon: '📝' },
         { id: 'links' as TabType, label: '🔗 Links & FAQs', icon: '🔗' },
     ];
+
+    const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
+
+    const formatSavedTime = (timestamp: number) => {
+        const diffMs = Date.now() - timestamp;
+        if (diffMs < 60 * 1000) return 'Last saved just now';
+        if (diffMs < 60 * 60 * 1000) return `Last saved ${Math.round(diffMs / 60000)}m ago`;
+        return `Last saved ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
+    };
+
+    const applyDatePreset = (index: number, days: number) => {
+        const preset = new Date();
+        preset.setDate(preset.getDate() + days);
+        updateArrayItem('importantDates', index, 'date', formatDateInput(preset));
+        setDraftAlert(null);
+    };
+
+    const applyAgeDatePreset = (days: number) => {
+        const preset = new Date();
+        preset.setDate(preset.getDate() + days);
+        updateField('ageLimits.asOnDate', formatDateInput(preset));
+        setDraftAlert(null);
+    };
+
+    const updateImportantDate = (index: number, field: keyof ImportantDate, value: string) => {
+        const next = [...jobDetails.importantDates];
+        next[index] = { ...next[index], [field]: value };
+        if (field === 'date') {
+            next.sort((a, b) => {
+                if (!a.date && !b.date) return 0;
+                if (!a.date) return 1;
+                if (!b.date) return -1;
+                return new Date(a.date).getTime() - new Date(b.date).getTime();
+            });
+        }
+        updateField('importantDates', next);
+    };
 
     // Helper to update nested state
     const updateField = (path: string, value: any) => {
@@ -271,26 +358,36 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
     };
 
     useEffect(() => {
+        setIsSavingDraft(true);
         const handle = window.setTimeout(() => {
             try {
                 localStorage.setItem(draftKey, JSON.stringify(jobDetails));
-                setDraftNotice('Draft auto-saved');
+                setLastSavedAt(Date.now());
             } catch {
                 // Ignore storage errors.
+            } finally {
+                setIsSavingDraft(false);
             }
         }, 600);
         return () => window.clearTimeout(handle);
     }, [jobDetails]);
 
+    useEffect(() => {
+        if (!lastSavedAt) return;
+        const interval = window.setInterval(() => {
+            setLastSavedAt((value) => value);
+        }, 60000);
+        return () => window.clearInterval(interval);
+    }, [lastSavedAt]);
+
     const handleSubmit = async () => {
         if (validation.hasRequiredErrors) {
             setShowValidation(true);
-            setDraftNotice('Please fix highlighted fields before saving.');
+            setDraftAlert('Please fix highlighted fields before saving.');
             return;
         }
         setIsSubmitting(true);
         // Recalculate totals
-        const totalVacancies = jobDetails.vacancies.details.reduce((sum, v) => sum + v.total, 0);
         const finalData = {
             ...jobDetails,
             vacancies: {
@@ -308,11 +405,10 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
     const handlePreview = () => {
         if (validation.hasRequiredErrors) {
             setShowValidation(true);
-            setDraftNotice('Complete required fields before previewing.');
+            setDraftAlert('Complete required fields before previewing.');
             return;
         }
         setIsPreviewing(true);
-        const totalVacancies = jobDetails.vacancies.details.reduce((sum, v) => sum + v.total, 0);
         const finalData = {
             ...jobDetails,
             vacancies: {
@@ -328,7 +424,8 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
 
     const clearDraft = () => {
         localStorage.removeItem(draftKey);
-        setDraftNotice('Draft cleared');
+        setDraftAlert('Draft cleared');
+        setLastSavedAt(null);
     };
 
     return (
@@ -340,7 +437,26 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                         : 'Some required fields are missing. Fix the highlighted inputs before saving.'}
                 </div>
             )}
-            {draftNotice && <div className="form-note">{draftNotice}</div>}
+            {(draftAlert || lastSavedAt) && (
+                <div className={`form-note ${draftAlert ? 'warn' : ''}`}>
+                    {!draftAlert && (
+                        <span className={`save-dot ${isSavingDraft ? 'saving' : 'saved'}`} aria-hidden="true" />
+                    )}
+                    <span>
+                        {draftAlert
+                            ? draftAlert
+                            : lastSavedAt
+                                ? formatSavedTime(lastSavedAt)
+                                : ''}
+                    </span>
+                </div>
+            )}
+            <div className="form-progress">
+                <div className="progress-meta">{completedSections}/{totalSections} sections completed</div>
+                <div className="progress-bar">
+                    <span style={{ width: `${completionPercent}%` }} />
+                </div>
+            </div>
             <div className="form-tabs">
                 {tabs.map(tab => (
                     <button
@@ -349,6 +465,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                         onClick={() => setActiveTab(tab.id)}
                     >
                         {tab.label}
+                        {tabCompletion[tab.id] && <span className="tab-check">✓</span>}
                     </button>
                 ))}
             </div>
@@ -360,7 +477,10 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                         <h3>📅 Important Dates</h3>
                         <p className="form-hint">Tip: Click a date field to open the calendar picker.</p>
                         <div className="dynamic-list">
-                            {jobDetails.importantDates.map((date, index) => (
+                            {jobDetails.importantDates.map((date, index) => {
+                                const dateTime = date.date ? new Date(date.date).getTime() : null;
+                                const isPastDate = dateTime !== null && !Number.isNaN(dateTime) && dateTime < todayStart;
+                                return (
                                 <div key={index} className="list-row">
                                     <input
                                         type="text"
@@ -370,17 +490,29 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                                             ? (validation.dateErrors[index]?.name ? 'field-invalid' : 'field-valid')
                                             : ''}
                                         aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name) || undefined}
-                                        onChange={(e) => updateArrayItem('importantDates', index, 'name', e.target.value)}
+                                        title={validation.dateErrors[index]?.name ? 'Event name is required' : 'Looks good'}
+                                        onChange={(e) => updateImportantDate(index, 'name', e.target.value)}
                                     />
                                     <input
                                         type="date"
                                         value={date.date}
-                                        className={(showValidation || date.name.trim() || date.date)
-                                            ? (validation.dateErrors[index]?.date ? 'field-invalid' : 'field-valid')
-                                            : ''}
+                                        className={[
+                                            (showValidation || date.name.trim() || date.date)
+                                                ? (validation.dateErrors[index]?.date ? 'field-invalid' : 'field-valid')
+                                                : '',
+                                            isPastDate ? 'date-past' : '',
+                                        ].filter(Boolean).join(' ')}
                                         aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date) || undefined}
-                                        onChange={(e) => updateArrayItem('importantDates', index, 'date', e.target.value)}
+                                        title={validation.dateErrors[index]?.date ? 'Date is required' : 'Looks good'}
+                                        onChange={(e) => updateImportantDate(index, 'date', e.target.value)}
                                     />
+                                    {isPastDate && <span className="date-flag">Past</span>}
+                                    <div className="date-presets">
+                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 0)}>Today</button>
+                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 1)}>+1d</button>
+                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 7)}>+7d</button>
+                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 30)}>+30d</button>
+                                    </div>
                                     <button
                                         className="remove-btn"
                                         onClick={() => {
@@ -393,7 +525,8 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                                         ✕
                                     </button>
                                 </div>
-                            ))}
+                                );
+                            })}
                             <button className="add-btn" onClick={() => addArrayItem('importantDates', { name: '', date: '' })}>
                                 + Add Date
                             </button>
@@ -475,6 +608,11 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                                             : ''}
                                         onChange={(e) => updateField('ageLimits.asOnDate', e.target.value)}
                                     />
+                                    <div className="date-presets">
+                                        <button type="button" className="preset-btn" onClick={() => applyAgeDatePreset(0)}>Today</button>
+                                        <button type="button" className="preset-btn" onClick={() => applyAgeDatePreset(7)}>+7d</button>
+                                        <button type="button" className="preset-btn" onClick={() => applyAgeDatePreset(30)}>+30d</button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -755,7 +893,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                         </div>
                         <div className="total-vacancies">
                             <strong>Total Vacancies: </strong>
-                            {jobDetails.vacancies.details.reduce((sum, v) => sum + v.total, 0)}
+                            {totalVacancies}
                         </div>
                     </div>
                 )}
@@ -1055,13 +1193,26 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                 <button className="btn-secondary" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
                 <button className="btn-secondary subtle" onClick={clearDraft} type="button">Clear draft</button>
                 {onPreview && (
-                    <button className="btn-outline" onClick={handlePreview} disabled={isPreviewing || disableActions}>
+                    <button
+                        className="btn-outline"
+                        onClick={handlePreview}
+                        disabled={isPreviewing || disableActions}
+                        title={disableActions ? disabledReason : 'Preview this job post'}
+                    >
                         {isPreviewing ? 'Opening preview…' : 'Preview (modal)'}
                     </button>
                 )}
-                <button className="btn-primary" onClick={handleSubmit} disabled={disableActions}>
+                <button
+                    className="btn-primary"
+                    onClick={handleSubmit}
+                    disabled={disableActions}
+                    title={disableActions ? disabledReason : 'Save job details'}
+                >
                     {isSubmitting ? 'Saving…' : 'Save Job Details'}
                 </button>
+                {disableActions && (
+                    <span className="form-disabled-note">Please fix validation errors above to save.</span>
+                )}
             </div>
         </div>
     );

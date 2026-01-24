@@ -59,6 +59,17 @@ const CONTENT_TYPES: { value: ContentType; label: string }[] = [
     { value: 'answer-key', label: 'Answer Keys' },
 ];
 
+const CATEGORY_OPTIONS: Array<{ value: string; label: string; icon: string }> = [
+    { value: 'Central Government', label: 'Central Government', icon: '🏛️' },
+    { value: 'State Government', label: 'State Government', icon: '🏢' },
+    { value: 'Banking', label: 'Banking', icon: '🏦' },
+    { value: 'Railways', label: 'Railways', icon: '🚆' },
+    { value: 'Defence', label: 'Defence', icon: '🛡️' },
+    { value: 'PSU', label: 'PSU', icon: '⚡' },
+    { value: 'University', label: 'University', icon: '🎓' },
+    { value: 'Police', label: 'Police', icon: '🚓' },
+];
+
 const LIST_SORT_OPTIONS: { value: 'newest' | 'updated' | 'deadline' | 'views'; label: string }[] = [
     { value: 'newest', label: 'Newest first' },
     { value: 'updated', label: 'Recently updated' },
@@ -155,6 +166,7 @@ export function AdminPage() {
     const [listTypeFilter, setListTypeFilter] = useState<ContentType | 'all'>(storedFilters?.type ?? 'all');
     const [listSort, setListSort] = useState<'newest' | 'updated' | 'deadline' | 'views'>(storedFilters?.sort ?? 'newest');
     const [listPage, setListPage] = useState(1);
+    const [categorySearch, setCategorySearch] = useState('');
 
     const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>(storedFilters?.status ?? 'all');
     const [listLoading, setListLoading] = useState(false);
@@ -212,6 +224,13 @@ export function AdminPage() {
     const heroActiveJobs = overview?.activeJobs ?? 0;
     const heroNewThisWeek = overview?.newThisWeek ?? 0;
     const heroExpiringSoon = overview?.expiringSoon ?? 0;
+    const filteredCategories = useMemo(() => {
+        const query = categorySearch.trim().toLowerCase();
+        if (!query) return CATEGORY_OPTIONS;
+        return CATEGORY_OPTIONS.filter((option) =>
+            option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query)
+        );
+    }, [categorySearch]);
 
     const pushToast = (message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
@@ -1471,6 +1490,17 @@ export function AdminPage() {
         }
         return warnings;
     }
+
+    const getWarningTone = (warning: string) => {
+        const lower = warning.toLowerCase();
+        if (lower.includes('required') || lower.includes('at least') || lower.includes('need a publish')) {
+            return 'critical';
+        }
+        if (lower.includes('past') || lower.includes('invalid')) {
+            return 'warning';
+        }
+        return 'warning';
+    };
 
     const formatDate = (value?: string) => {
         if (!value) return 'N/A';
@@ -2899,15 +2929,19 @@ export function AdminPage() {
                                 </div>
                                 <div className="form-group">
                                     <label>Category *</label>
+                                    <input
+                                        type="search"
+                                        className="category-search"
+                                        placeholder="Filter categories"
+                                        value={categorySearch}
+                                        onChange={(e) => setCategorySearch(e.target.value)}
+                                    />
                                     <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                                        <option value="Central Government">Central Government</option>
-                                        <option value="State Government">State Government</option>
-                                        <option value="Banking">Banking</option>
-                                        <option value="Railways">Railways</option>
-                                        <option value="Defence">Defence</option>
-                                        <option value="PSU">PSU</option>
-                                        <option value="University">University</option>
-                                        <option value="Police">Police</option>
+                                        {filteredCategories.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.icon} {option.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
@@ -2943,7 +2977,12 @@ export function AdminPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Publish at</label>
+                                    <label>
+                                        Publish at
+                                        {formData.status !== 'scheduled' && (
+                                            <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
+                                        )}
+                                    </label>
                                     <input
                                         type="datetime-local"
                                         value={formData.publishAt}
@@ -2957,16 +2996,24 @@ export function AdminPage() {
                             </div>
                         </div>
 
-                        {formWarnings.length > 0 && (
-                            <div className="qa-panel">
-                                <h4>QA checks</h4>
-                                <ul>
-                                    {formWarnings.map((warning) => (
-                                        <li key={warning}>{warning}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
+                            {formWarnings.length > 0 && (
+                                <div className="qa-panel">
+                                    <h4>QA checks</h4>
+                                    <ul>
+                                        {formWarnings.map((warning) => {
+                                            const tone = getWarningTone(warning);
+                                            return (
+                                                <li key={warning} className={`qa-item ${tone}`}>
+                                                    <span className="qa-badge" aria-hidden="true">
+                                                        {tone === 'critical' ? '🔴' : '🟡'}
+                                                    </span>
+                                                    <span>{warning}</span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
 
                         {/* Job Details Form */}
                         <JobPostingForm
@@ -3271,14 +3318,19 @@ export function AdminPage() {
                                 </div>
                                 <div className="form-group">
                                     <label>Category *</label>
+                                    <input
+                                        type="search"
+                                        className="category-search"
+                                        placeholder="Filter categories"
+                                        value={categorySearch}
+                                        onChange={(e) => setCategorySearch(e.target.value)}
+                                    />
                                     <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                                        <option value="Central Government">Central Government</option>
-                                        <option value="State Government">State Government</option>
-                                        <option value="Banking">Banking</option>
-                                        <option value="Railways">Railways</option>
-                                        <option value="Defence">Defence</option>
-                                        <option value="PSU">PSU</option>
-                                        <option value="University">University</option>
+                                        {filteredCategories.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.icon} {option.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
@@ -3384,7 +3436,12 @@ export function AdminPage() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Publish at</label>
+                                    <label>
+                                        Publish at
+                                        {formData.status !== 'scheduled' && (
+                                            <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
+                                        )}
+                                    </label>
                                     <input
                                         type="datetime-local"
                                         value={formData.publishAt}
@@ -3401,9 +3458,17 @@ export function AdminPage() {
                                 <div className="qa-panel">
                                     <h4>QA checks</h4>
                                     <ul>
-                                        {formWarnings.map((warning) => (
-                                            <li key={warning}>{warning}</li>
-                                        ))}
+                                        {formWarnings.map((warning) => {
+                                            const tone = getWarningTone(warning);
+                                            return (
+                                                <li key={warning} className={`qa-item ${tone}`}>
+                                                    <span className="qa-badge" aria-hidden="true">
+                                                        {tone === 'critical' ? '🔴' : '🟡'}
+                                                    </span>
+                                                    <span>{warning}</span>
+                                                </li>
+                                            );
+                                        })}
                                     </ul>
                                 </div>
                             )}

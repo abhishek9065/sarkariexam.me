@@ -26,6 +26,55 @@
     color: var(--text-secondary);
     font-size: 12px;
     margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-note.warn {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+}
+
+.save-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(148, 163, 184, 0.6);
+}
+
+.save-dot.saving {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+    animation: pulse 1s infinite;
+}
+
+.save-dot.saved {
+    background: rgba(96, 165, 250, 0.9);
+}
+
+.form-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.progress-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.progress-bar span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #6366f1);
 }
 
 .form-tabs {
@@ -55,6 +104,12 @@
 .tab-btn.active {
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     color: white;
+}
+
+.tab-check {
+    margin-left: 6px;
+    font-size: 11px;
+    color: #22c55e;
 }
 
 .form-content {
@@ -214,6 +269,38 @@
     font-size: 14px;
     flex-shrink: 0;
     transition: background 0.2s ease;
+}
+
+.date-presets {
+    display: flex;
+    gap: 6px;
+}
+
+.preset-btn {
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.preset-btn:hover {
+    border-color: #6366f1;
+    color: var(--text-primary);
+}
+
+.date-flag {
+    font-size: 11px;
+    color: #fca5a5;
+    background: rgba(248, 113, 113, 0.2);
+    padding: 4px 8px;
+    border-radius: 999px;
+}
+
+.date-past {
+    border-color: rgba(248, 113, 113, 0.8) !important;
 }
 
 .remove-btn:hover {
@@ -417,15 +504,26 @@
 .btn-primary:disabled,
 .btn-secondary:disabled,
 .btn-outline:disabled {
-    opacity: 0.6;
+    opacity: 0.45;
     cursor: not-allowed;
     box-shadow: none;
+}
+
+.form-disabled-note {
+    font-size: 12px;
+    color: #fbbf24;
+    margin-left: auto;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
     .job-posting-form {
         padding: 16px;
+    }
+
+    .form-progress {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .form-tabs {
@@ -489,4 +587,19 @@
 
 [data-theme="dark"] .add-btn:hover {
     background: rgba(99, 102, 241, 0.2);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
