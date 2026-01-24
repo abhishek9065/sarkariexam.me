@@ -490,6 +490,13 @@ export class AnnouncementModelMongo {
                 category?: string;
                 type: ContentType;
                 version?: number;
+                status?: AnnouncementStatus;
+                publishAt?: Date;
+                deadline?: Date;
+                externalLink?: string;
+                isActive?: boolean;
+                postedAt?: Date;
+                updatedAt?: Date;
                 ageDays: number;
             }> = [];
             let totalDays = 0;
