@@ -12,12 +12,12 @@ interface SecurityLog {
 }
 
 interface SecurityLogsTableProps {
-    adminToken: string | null;
+    onUnauthorized?: () => void;
 }
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
-export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
+export function SecurityLogsTable({ onUnauthorized }: SecurityLogsTableProps) {
     const [logs, setLogs] = useState<SecurityLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -35,15 +35,16 @@ export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
     };
 
     const fetchLogs = async () => {
-        if (!adminToken) return;
         try {
             setLoading(true);
             setError(null);
             const res = await fetch(`${apiBase}/api/admin/security?limit=50`, {
-                headers: {
-                    'Authorization': `Bearer ${adminToken}`
-                }
+                credentials: 'include',
             });
+            if (res.status === 401 || res.status === 403) {
+                onUnauthorized?.();
+                return;
+            }
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setError(getApiErrorMessage(errorBody, 'Failed to load security logs.'));
@@ -67,7 +68,7 @@ export function SecurityLogsTable({ adminToken }: SecurityLogsTableProps) {
         // Poll every 30 seconds for live monitoring
         const interval = setInterval(fetchLogs, 30000);
         return () => clearInterval(interval);
-    }, [adminToken]);
+    }, []);
 
     if (loading && logs.length === 0) {
         return <div className="loading-spinner">Loading logs...</div>;

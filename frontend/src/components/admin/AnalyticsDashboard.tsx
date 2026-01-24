@@ -159,10 +159,12 @@ export function AnalyticsDashboard({
     adminToken,
     onEditById,
     onOpenList,
+    onUnauthorized,
 }: {
-    adminToken: string | null;
+    adminToken?: string | null;
     onEditById?: (id: string) => void;
     onOpenList?: () => void;
+    onUnauthorized?: () => void;
 }) {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
@@ -209,12 +211,6 @@ export function AnalyticsDashboard({
     const prev7Views = rollups.slice(0, Math.max(0, rollups.length - 7)).reduce((sum, item) => sum + (item.views ?? 0), 0);
 
     const loadAnalytics = useCallback(async (options?: { silent?: boolean; forceFresh?: boolean }) => {
-        if (!adminToken) {
-            setError('Not authenticated');
-            setLoading(false);
-            return;
-        }
-
         if (options?.silent) {
             setRefreshing(true);
         } else {
@@ -223,14 +219,22 @@ export function AnalyticsDashboard({
 
         try {
             const nocache = options?.forceFresh ? '&nocache=1' : '';
+            const headers = adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined;
             const [overviewRes, popularRes] = await Promise.all([
                 fetch(`${apiBase}/api/analytics/overview?days=${rangeDays}${nocache}`, {
-                    headers: { Authorization: `Bearer ${adminToken}` }
+                    headers,
+                    credentials: 'include',
                 }),
                 fetch(`${apiBase}/api/analytics/popular?limit=10${nocache}`, {
-                    headers: { Authorization: `Bearer ${adminToken}` }
+                    headers,
+                    credentials: 'include',
                 })
             ]);
+
+            if (overviewRes.status === 401 || overviewRes.status === 403 || popularRes.status === 401 || popularRes.status === 403) {
+                onUnauthorized?.();
+                return;
+            }
 
             if (overviewRes.ok && popularRes.ok) {
                 const overviewData = await overviewRes.json();
@@ -290,14 +294,14 @@ export function AnalyticsDashboard({
             setLoading(false);
             setRefreshing(false);
         }
-    }, [adminToken, rangeDays]);
+    }, [adminToken, rangeDays, onUnauthorized]);
 
     useEffect(() => {
         loadAnalytics();
     }, [loadAnalytics]);
 
     useEffect(() => {
-        if (!liveEnabled || !adminToken) {
+        if (!liveEnabled) {
             setLiveStatus('idle');
             return;
         }
@@ -308,7 +312,8 @@ export function AnalyticsDashboard({
         let ws: WebSocket | null = null;
         const baseUrl = apiBase ? new URL(apiBase, window.location.origin) : new URL(window.location.origin);
         const wsProtocol = baseUrl.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?token=${encodeURIComponent(adminToken)}&days=${rangeDays}`;
+        const tokenParam = adminToken ? `token=${encodeURIComponent(adminToken)}&` : '';
+        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?${tokenParam}days=${rangeDays}`;
 
         try {
             ws = new WebSocket(wsUrl);
@@ -339,12 +344,16 @@ export function AnalyticsDashboard({
     }, [adminToken, liveEnabled, rangeDays]);
 
     const handleExport = async () => {
-        if (!adminToken) return;
         setExporting(true);
         try {
             const response = await fetch(`${apiBase}/api/analytics/export/csv`, {
-                headers: { Authorization: `Bearer ${adminToken}` }
+                headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined,
+                credentials: 'include',
             });
+            if (response.status === 401 || response.status === 403) {
+                onUnauthorized?.();
+                return;
+            }
             if (!response.ok) {
                 setError('Failed to export analytics');
                 return;
@@ -382,17 +391,21 @@ export function AnalyticsDashboard({
     };
 
     const handlePopularUnpublish = async (item: PopularAnnouncement) => {
-        if (!adminToken) return;
         setActionMessage(null);
         try {
             const response = await fetch(`${apiBase}/api/admin/announcements/${item.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
+                    ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
                 },
+                credentials: 'include',
                 body: JSON.stringify({ status: 'archived' }),
             });
+            if (response.status === 401 || response.status === 403) {
+                onUnauthorized?.();
+                return;
+            }
             if (!response.ok) {
                 setActionMessage('Failed to unpublish announcement.');
                 return;

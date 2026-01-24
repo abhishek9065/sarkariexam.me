@@ -5,6 +5,8 @@ import { JwtPayload } from '../types.js';
 import RedisCache from '../services/redis.js';
 import { hasPermission, type Permission } from '../services/rbac.js';
 
+export const AUTH_COOKIE_NAME = 'auth_token';
+
 // Extend Express Request type to include user
 declare global {
   namespace Express {
@@ -32,7 +34,9 @@ export async function isTokenBlacklisted(token: string): Promise<boolean> {
  */
 export async function authenticateToken(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const headerToken = authHeader && authHeader.split(' ')[1];
+  const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
+  const token = headerToken || cookieToken;
 
   if (!token) {
     res.status(401).json({ error: 'Access token required' });
@@ -77,7 +81,9 @@ export function requirePermission(permission: Permission) {
 
 export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const headerToken = authHeader && authHeader.split(' ')[1];
+  const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
+  const token = headerToken || cookieToken;
 
   if (!token) {
     next();

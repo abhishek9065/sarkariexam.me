@@ -157,9 +157,10 @@ export function AdminPage() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit'>('analytics');
-    const [adminToken, setAdminToken] = useState<string | null>(() => localStorage.getItem('adminToken'));
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [listAnnouncements, setListAnnouncements] = useState<Announcement[]>([]);
+    const [listTotal, setListTotal] = useState(0);
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
     const storedFilters = useMemo(() => loadListFilters(), []);
     const [listQuery, setListQuery] = useState(storedFilters?.query ?? '');
@@ -249,28 +250,71 @@ export function AdminPage() {
 
     const clearAdminSession = useCallback(() => {
         setIsLoggedIn(false);
-        setAdminToken(null);
         setAdminUser(null);
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
     }, []);
 
+    const handleUnauthorized = useCallback((reason = 'Session expired. Please log in again.') => {
+        clearAdminSession();
+        setMessage(reason);
+        pushToast(reason, 'error');
+    }, [clearAdminSession, pushToast]);
+
+    const adminFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const response = await fetch(input, {
+            credentials: 'include',
+            ...init,
+        });
+        if (response.status === 401 || response.status === 403) {
+            handleUnauthorized();
+        }
+        return response;
+    }, [handleUnauthorized]);
+
     const handleLogout = useCallback(async () => {
         setMessage('');
-        if (adminToken) {
-            try {
-                await fetch(`${apiBase}/api/auth/logout`, {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${adminToken}` },
-                });
-            } catch (error) {
-                console.error('Logout API call failed:', error);
-            }
+        try {
+            await fetch(`${apiBase}/api/auth/logout`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+        } catch (error) {
+            console.error('Logout API call failed:', error);
         }
         clearAdminSession();
         pushToast('Logged out successfully.', 'info');
-    }, [adminToken, clearAdminSession, pushToast]);
+    }, [clearAdminSession, pushToast]);
+
+    const checkSession = useCallback(async () => {
+        try {
+            const response = await fetch(`${apiBase}/api/auth/me`, {
+                credentials: 'include',
+            });
+            if (!response.ok) {
+                clearAdminSession();
+                return;
+            }
+            const payload = await response.json();
+            const userData = payload.data?.user;
+            if (userData?.role !== 'admin') {
+                clearAdminSession();
+                return;
+            }
+            const profile: AdminUserProfile = {
+                name: userData?.name || 'Admin',
+                email: userData?.email,
+                role: userData?.role,
+            };
+            setAdminUser(profile);
+            localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
+            setIsLoggedIn(true);
+        } catch (error) {
+            console.error('Session check failed:', error);
+            clearAdminSession();
+        }
+    }, [clearAdminSession]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
     const [message, setMessage] = useState('');
@@ -283,17 +327,15 @@ export function AdminPage() {
 
     // Fetch data
     const refreshData = async () => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         setListLoading(true);
         try {
             const params = new URLSearchParams({
-                limit: '500',
+                limit: '1000',
                 offset: '0',
                 includeInactive: 'true',
             });
-            const res = await fetch(`${apiBase}/api/admin/announcements?${params.toString()}`, {
-                headers: { Authorization: `Bearer ${adminToken}` },
-            });
+            const res = await adminFetch(`${apiBase}/api/admin/announcements?${params.toString()}`);
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Failed to load announcements.'));
@@ -302,6 +344,9 @@ export function AdminPage() {
             const data = await res.json();
             setAnnouncements(data.data || []);
             setListUpdatedAt(new Date().toISOString());
+            if (activeAdminTab === 'list') {
+                refreshListData();
+            }
         } catch (e) {
             console.error(e);
             setMessage('Failed to load announcements.');
@@ -310,14 +355,43 @@ export function AdminPage() {
         }
     };
 
+    const refreshListData = useCallback(async () => {
+        if (!isLoggedIn) return;
+        setListLoading(true);
+        try {
+            const params = new URLSearchParams({
+                limit: String(pageSize),
+                offset: String((listPage - 1) * pageSize),
+                includeInactive: 'true',
+                sort: listSort,
+            });
+            if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
+            if (listTypeFilter !== 'all') params.set('type', listTypeFilter);
+            if (listQuery.trim()) params.set('search', listQuery.trim());
+            const res = await adminFetch(`${apiBase}/api/admin/announcements?${params.toString()}`);
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to load announcements.'));
+                return;
+            }
+            const data = await res.json();
+            setListAnnouncements(data.data || []);
+            setListTotal(data.meta?.total ?? data.data?.length ?? 0);
+            setListUpdatedAt(new Date().toISOString());
+        } catch (error) {
+            console.error(error);
+            setMessage('Failed to load announcements.');
+        } finally {
+            setListLoading(false);
+        }
+    }, [adminFetch, isLoggedIn, listPage, listQuery, listSort, listStatusFilter, listTypeFilter, pageSize]);
+
     const refreshActiveUsers = async () => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         setActiveUsersLoading(true);
         setActiveUsersError(null);
         try {
-            const res = await fetch(`${apiBase}/api/admin/active-users?windowMinutes=${activeUsersWindow}`, {
-                headers: { Authorization: `Bearer ${adminToken}` },
-            });
+            const res = await adminFetch(`${apiBase}/api/admin/active-users?windowMinutes=${activeUsersWindow}`);
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setActiveUsers(null);
@@ -336,13 +410,11 @@ export function AdminPage() {
         }
     };
     const refreshDashboard = async () => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         setDashboardLoading(true);
         setDashboardError(null);
         try {
-            const res = await fetch(`${apiBase}/api/admin/dashboard`, {
-                headers: { Authorization: `Bearer ${adminToken}` },
-            });
+            const res = await adminFetch(`${apiBase}/api/admin/dashboard`);
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setDashboardError(getApiErrorMessage(errorBody, 'Failed to load user analytics.'));
@@ -360,7 +432,7 @@ export function AdminPage() {
     };
 
     const refreshAuditLogs = async () => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         setAuditLoading(true);
         setAuditError(null);
         try {
@@ -372,9 +444,7 @@ export function AdminPage() {
             if (auditFilters.start) params.set('start', auditFilters.start);
             if (auditFilters.end) params.set('end', auditFilters.end);
 
-            const res = await fetch(`${apiBase}/api/admin/audit-log?${params.toString()}`, {
-                headers: { Authorization: `Bearer ${adminToken}` },
-            });
+            const res = await adminFetch(`${apiBase}/api/admin/audit-log?${params.toString()}`);
             if (!res.ok) {
                 const errorBody = await res.json().catch(() => ({}));
                 setAuditError(getApiErrorMessage(errorBody, 'Failed to load audit log.'));
@@ -394,13 +464,15 @@ export function AdminPage() {
 
     const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
-        if (!adminToken) return;
+        if (!isLoggedIn) {
+            setMessage('Not authenticated.');
+            return;
+        }
 
         updateMutating(id, true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bearer ${adminToken}` },
             });
 
             if (response.ok) {
@@ -526,14 +598,13 @@ export function AdminPage() {
     };
 
     const handleApprove = async (id: string, note?: string) => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         updateMutating(id, true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({ note }),
             });
@@ -571,14 +642,13 @@ export function AdminPage() {
     };
 
     const handleReject = async (id: string, note?: string) => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         updateMutating(id, true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({ note }),
             });
@@ -608,18 +678,17 @@ export function AdminPage() {
         payload: Record<string, any>,
         options?: { successMessage?: string; silent?: boolean }
     ): Promise<boolean> => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             if (!options?.silent) setMessage('Not authenticated.');
             return false;
         }
 
         updateMutating(id, true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify(payload),
             });
@@ -686,7 +755,7 @@ export function AdminPage() {
     };
 
     const handleBulkUpdate = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -719,11 +788,10 @@ export function AdminPage() {
 
         setBulkLoading(true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/bulk`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({
                     ids: Array.from(selectedIds),
@@ -752,7 +820,7 @@ export function AdminPage() {
     };
 
     const handleExportAnnouncements = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -768,9 +836,7 @@ export function AdminPage() {
                 params.set('type', listTypeFilter);
             }
 
-            const response = await fetch(`${apiBase}/api/admin/announcements/export/csv?${params.toString()}`, {
-                headers: { Authorization: `Bearer ${adminToken}` },
-            });
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/export/csv?${params.toString()}`);
 
             if (!response.ok) {
                 const errorBody = await response.json().catch(() => ({}));
@@ -794,7 +860,7 @@ export function AdminPage() {
     };
 
     const handleBulkApprove = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -805,11 +871,10 @@ export function AdminPage() {
 
         setReviewLoading(true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/bulk-approve`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk-approve`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({
                     ids: Array.from(selectedIds),
@@ -837,7 +902,7 @@ export function AdminPage() {
     };
 
     const handleBulkReject = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -848,11 +913,10 @@ export function AdminPage() {
 
         setReviewLoading(true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/bulk-reject`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk-reject`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({
                     ids: Array.from(selectedIds),
@@ -880,7 +944,7 @@ export function AdminPage() {
     };
 
     const handleBulkSchedule = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -895,11 +959,10 @@ export function AdminPage() {
 
         setReviewLoading(true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/bulk`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({
                     ids: Array.from(selectedIds),
@@ -932,7 +995,7 @@ export function AdminPage() {
     };
 
     const handleBulkQaFix = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -974,7 +1037,7 @@ export function AdminPage() {
     };
 
     const handleBulkQaFlag = async () => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
@@ -1015,14 +1078,13 @@ export function AdminPage() {
     };
 
     const handleScheduleOne = async (id: string, publishAt: string) => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         updateMutating(id, true);
         try {
-            const response = await fetch(`${apiBase}/api/admin/announcements/${id}`, {
+            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify({
                     status: 'scheduled',
@@ -1049,14 +1111,12 @@ export function AdminPage() {
     };
 
     const downloadCsv = async (endpoint: string, filename: string) => {
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated.');
             return;
         }
         try {
-            const response = await fetch(`${apiBase}${endpoint}`, {
-                headers: { Authorization: `Bearer ${adminToken}` },
-            });
+            const response = await adminFetch(`${apiBase}${endpoint}`);
             if (!response.ok) {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Export failed.'));
@@ -1085,17 +1145,14 @@ export function AdminPage() {
             const response = await fetch(`${apiBase}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify(loginForm),
             });
 
             if (response.ok) {
                 const result = await response.json();
                 const userData = result.data?.user || result.user;
-                const authToken = result.data?.token || result.token;
-
                 if (userData?.role === 'admin') {
-                    setAdminToken(authToken);
-                    localStorage.setItem('adminToken', authToken);
                     const profile: AdminUserProfile = {
                         name: userData?.name || userData?.username || 'Admin',
                         email: userData?.email || loginForm.email,
@@ -1128,7 +1185,7 @@ export function AdminPage() {
         e.preventDefault();
         setMessage('Processing...');
 
-        if (!adminToken) {
+        if (!isLoggedIn) {
             setMessage('Not authenticated. Please log in again.');
             setIsLoggedIn(false);
             return;
@@ -1146,11 +1203,10 @@ export function AdminPage() {
                 publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
             };
 
-            const response = await fetch(url, {
+            const response = await adminFetch(url, {
                 method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${adminToken}`,
                 },
                 body: JSON.stringify(payload),
             });
@@ -1299,53 +1355,11 @@ export function AdminPage() {
         });
     }, [scheduledAnnouncements]);
 
-    const filteredAnnouncements = useMemo(() => {
-        const query = listQuery.trim().toLowerCase();
-        const filtered = announcements.filter((item) => {
-            if (listTypeFilter !== 'all' && item.type !== listTypeFilter) {
-                return false;
-            }
-            const statusValue = item.status ?? 'published';
-            if (listStatusFilter !== 'all' && statusValue !== listStatusFilter) {
-                return false;
-            }
-            if (!query) return true;
-            const haystack = [item.title, item.organization, item.category, item.id, item.slug]
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
-            return haystack.includes(query);
-        });
+    const filteredAnnouncements = useMemo(() => listAnnouncements, [listAnnouncements]);
 
-        const getDateValue = (value?: string | null) => (value ? new Date(value).getTime() : 0);
+    const totalPages = Math.max(1, Math.ceil((listTotal || 0) / pageSize));
 
-        return [...filtered].sort((a, b) => {
-            switch (listSort) {
-                case 'updated':
-                    return getDateValue(b.updatedAt) - getDateValue(a.updatedAt);
-                case 'deadline': {
-                    const aDeadline = getDateValue(a.deadline);
-                    const bDeadline = getDateValue(b.deadline);
-                    if (!aDeadline && !bDeadline) return 0;
-                    if (!aDeadline) return 1;
-                    if (!bDeadline) return -1;
-                    return aDeadline - bDeadline;
-                }
-                case 'views':
-                    return (b.viewCount ?? 0) - (a.viewCount ?? 0);
-                case 'newest':
-                default:
-                    return getDateValue(b.postedAt) - getDateValue(a.postedAt);
-            }
-        });
-    }, [announcements, listTypeFilter, listStatusFilter, listQuery, listSort]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredAnnouncements.length / pageSize));
-
-    const pagedAnnouncements = useMemo(() => {
-        const start = (listPage - 1) * pageSize;
-        return filteredAnnouncements.slice(start, start + pageSize);
-    }, [filteredAnnouncements, listPage, pageSize]);
+    const pagedAnnouncements = useMemo(() => listAnnouncements, [listAnnouncements]);
 
     const listFilterSummary = useMemo(() => {
         const parts: string[] = [];
@@ -1586,28 +1600,30 @@ export function AdminPage() {
     };
 
     useEffect(() => {
-        if (!adminToken) return;
-        setIsLoggedIn(true);
-        if (!adminUser) {
-            const storedProfile = loadAdminUser();
-            if (storedProfile) setAdminUser(storedProfile);
-        }
+        checkSession();
+    }, [checkSession]);
+
+    useEffect(() => {
+        if (!isLoggedIn) return;
         refreshData();
         refreshDashboard();
         refreshActiveUsers();
-    }, [adminToken, adminUser]);
+    }, [isLoggedIn]);
 
     useEffect(() => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         refreshActiveUsers();
-    }, [activeUsersWindow, adminToken]);
+    }, [activeUsersWindow, isLoggedIn]);
 
     useEffect(() => {
-        if (!adminToken) return;
+        if (!isLoggedIn) return;
         if (activeAdminTab === 'audit') {
             refreshAuditLogs();
         }
-    }, [activeAdminTab, adminToken]);
+        if (activeAdminTab === 'list') {
+            refreshListData();
+        }
+    }, [activeAdminTab, isLoggedIn]);
 
     useEffect(() => {
         setSelectedIds(new Set());
@@ -1633,6 +1649,11 @@ export function AdminPage() {
     useEffect(() => {
         setListPage((page) => Math.min(page, totalPages));
     }, [totalPages]);
+
+    useEffect(() => {
+        if (!isLoggedIn || activeAdminTab !== 'list') return;
+        refreshListData();
+    }, [isLoggedIn, activeAdminTab, listQuery, listTypeFilter, listStatusFilter, listSort, listPage, refreshListData]);
 
     useEffect(() => {
         if (!pendingEditId) return;
@@ -1832,9 +1853,9 @@ export function AdminPage() {
 
                 {activeAdminTab === 'analytics' ? (
                     <AnalyticsDashboard
-                        adminToken={adminToken}
                         onEditById={handleEditById}
                         onOpenList={() => setActiveAdminTab('list')}
+                        onUnauthorized={handleUnauthorized}
                     />
                 ) : activeAdminTab === 'users' ? (
                     <div className="admin-users">
@@ -2103,7 +2124,7 @@ export function AdminPage() {
                         )}
 
                         <div className="admin-list-meta">
-                            <span>Showing {pagedAnnouncements.length} of {filteredAnnouncements.length}</span>
+                            <span>Showing {pagedAnnouncements.length} of {listTotal || filteredAnnouncements.length}</span>
                             <span>{selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select rows to enable bulk actions'}</span>
                         </div>
 
@@ -3027,7 +3048,7 @@ export function AdminPage() {
                             initialData={jobDetails || undefined}
                             isDisabled={titleInvalid || organizationMissing}
                             onSubmit={async (details) => {
-                                if (!adminToken) {
+                                if (!isLoggedIn) {
                                     setMessage('Not authenticated');
                                     return;
                                 }
@@ -3050,11 +3071,10 @@ export function AdminPage() {
                                         jobDetails: details,
                                     };
 
-                                    const response = await fetch(url, {
+                                    const response = await adminFetch(url, {
                                         method,
                                         headers: {
                                             'Content-Type': 'application/json',
-                                            'Authorization': `Bearer ${adminToken}`,
                                         },
                                         body: JSON.stringify(payload),
                                     });
@@ -3131,17 +3151,16 @@ export function AdminPage() {
                         <button
                             className="admin-btn primary"
                             onClick={async () => {
-                                if (!adminToken) {
+                                if (!isLoggedIn) {
                                     setMessage('Not authenticated');
                                     return;
                                 }
                                 try {
                                     const jsonData = JSON.parse(bulkJson);
-                                    const response = await fetch(`${apiBase}/api/bulk/import`, {
+                                    const response = await adminFetch(`${apiBase}/api/bulk/import`, {
                                         method: 'POST',
                                         headers: {
                                             'Content-Type': 'application/json',
-                                            'Authorization': `Bearer ${adminToken}`,
                                         },
                                         body: JSON.stringify(jsonData),
                                     });
@@ -3280,7 +3299,7 @@ export function AdminPage() {
                         )}
                     </div>
                 ) : activeAdminTab === 'security' ? (
-                    <SecurityLogsTable adminToken={adminToken} />
+                    <SecurityLogsTable onUnauthorized={handleUnauthorized} />
                 ) : (
                     <div className="admin-form-container">
                         <form onSubmit={handleSubmit} className="admin-form">
@@ -3583,17 +3602,16 @@ export function AdminPage() {
                                 </button>
                                 <button onClick={async () => {
                                     setShowPreview(false);
-                                    if (!adminToken || !previewData) return;
+                                    if (!isLoggedIn || !previewData) return;
                                     setMessage(editingId ? 'Publishing...' : 'Creating...');
                                     try {
                                         const url = editingId
                                             ? `${apiBase}/api/admin/announcements/${editingId}`
                                             : `${apiBase}/api/admin/announcements`;
-                                        const response = await fetch(url, {
+                                        const response = await adminFetch(url, {
                                             method: editingId ? 'PUT' : 'POST',
                                             headers: {
                                                 'Content-Type': 'application/json',
-                                                'Authorization': `Bearer ${adminToken}`,
                                             },
                                             body: JSON.stringify({
                                                 ...previewData.formData,

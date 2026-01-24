@@ -88,6 +88,7 @@ const adminListQuerySchema = z.object({
     type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
     search: z.string().trim().optional(),
     includeInactive: z.coerce.boolean().optional(),
+    sort: z.enum(['newest', 'oldest', 'deadline', 'updated', 'views']).optional(),
 });
 
 const bulkUpdateSchema = z.object({
@@ -336,16 +337,32 @@ router.get('/announcements', requirePermission('announcements:read'), async (req
         }
 
         const filters = parseResult.data;
-        const announcements = await AnnouncementModelMongo.findAllAdmin({
-            limit: filters.limit,
-            offset: filters.offset,
-            status: filters.status,
-            type: filters.type,
-            search: filters.search,
-            includeInactive: filters.includeInactive,
-        });
+        const [announcements, total] = await Promise.all([
+            AnnouncementModelMongo.findAllAdmin({
+                limit: filters.limit,
+                offset: filters.offset,
+                status: filters.status,
+                type: filters.type,
+                search: filters.search,
+                includeInactive: filters.includeInactive,
+                sort: filters.sort,
+            }),
+            AnnouncementModelMongo.countAdmin({
+                status: filters.status,
+                type: filters.type,
+                search: filters.search,
+                includeInactive: filters.includeInactive,
+            }),
+        ]);
 
-        return res.json({ data: announcements });
+        return res.json({
+            data: announcements,
+            meta: {
+                total,
+                limit: filters.limit,
+                offset: filters.offset,
+            },
+        });
     } catch (error) {
         console.error('Admin announcements error:', error);
         return res.status(500).json({ error: 'Failed to load announcements' });

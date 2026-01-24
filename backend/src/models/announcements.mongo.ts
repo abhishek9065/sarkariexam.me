@@ -132,6 +132,69 @@ function addSearchFilter(query: Filter<AnnouncementDoc>, searchRegexes: RegExp[]
     }
 }
 
+function buildAdminQuery(filters?: {
+    type?: ContentType;
+    search?: string;
+    category?: string;
+    organization?: string;
+    location?: string;
+    qualification?: string;
+    status?: AnnouncementStatus | 'all';
+    includeInactive?: boolean;
+}): Filter<AnnouncementDoc> {
+    const query: Filter<AnnouncementDoc> = {};
+
+    if (!filters?.includeInactive) {
+        query.isActive = true;
+    }
+
+    if (filters?.status && filters.status !== 'all') {
+        query.status = filters.status as AnnouncementStatus;
+    }
+
+    if (filters?.type) {
+        query.type = filters.type;
+    }
+
+    if (filters?.category) {
+        query.category = { $regex: filters.category, $options: 'i' };
+    }
+
+    if (filters?.organization) {
+        query.organization = { $regex: filters.organization, $options: 'i' };
+    }
+
+    if (filters?.location) {
+        query.location = { $regex: filters.location, $options: 'i' };
+    }
+
+    if (filters?.qualification) {
+        query.minQualification = { $regex: filters.qualification, $options: 'i' };
+    }
+
+    if (filters?.search && filters.search.trim()) {
+        addSearchFilter(query, buildSearchRegexes(filters.search));
+    }
+
+    return query;
+}
+
+function buildAdminSort(sort?: 'newest' | 'oldest' | 'deadline' | 'updated' | 'views'): Sort {
+    switch (sort) {
+        case 'oldest':
+            return { _id: 1 };
+        case 'deadline':
+            return { deadline: 1, _id: -1 };
+        case 'updated':
+            return { updatedAt: -1, _id: -1 };
+        case 'views':
+            return { viewCount: -1, _id: -1 };
+        case 'newest':
+        default:
+            return { _id: -1 };
+    }
+}
+
 function buildVersionSnapshot(doc: AnnouncementDoc): AnnouncementVersionDoc['snapshot'] {
     return {
         title: doc.title,
@@ -255,64 +318,20 @@ export class AnnouncementModelMongo {
         qualification?: string;
         status?: AnnouncementStatus | 'all';
         includeInactive?: boolean;
-        sort?: 'newest' | 'oldest' | 'deadline';
+        sort?: 'newest' | 'oldest' | 'deadline' | 'updated' | 'views';
         limit?: number;
         offset?: number;
     }): Promise<Announcement[]> {
         try {
-            const query: Filter<AnnouncementDoc> = {};
-
-            if (!filters?.includeInactive) {
-                query.isActive = true;
-            }
-
-            if (filters?.status && filters.status !== 'all') {
-                query.status = filters.status as AnnouncementStatus;
-            }
-
-            if (filters?.type) {
-                query.type = filters.type;
-            }
-
-            if (filters?.category) {
-                query.category = { $regex: filters.category, $options: 'i' };
-            }
-
-            if (filters?.organization) {
-                query.organization = { $regex: filters.organization, $options: 'i' };
-            }
-
-            if (filters?.location) {
-                query.location = { $regex: filters.location, $options: 'i' };
-            }
-
-            if (filters?.qualification) {
-                query.minQualification = { $regex: filters.qualification, $options: 'i' };
-            }
-
-            if (filters?.search && filters.search.trim()) {
-                addSearchFilter(query, buildSearchRegexes(filters.search));
-            }
-
-            let sortDirection: 1 | -1 = -1;
-            switch (filters?.sort) {
-                case 'newest':
-                    sortDirection = -1;
-                    break;
-                case 'oldest':
-                    sortDirection = 1;
-                    break;
-                case 'deadline':
-                    sortDirection = -1;
-                    break;
-            }
+            const query = buildAdminQuery(filters);
+            const sort = buildAdminSort(filters?.sort);
 
             const limit = filters?.limit || 100;
             const skip = filters?.offset || 0;
 
             const docs = await this.collection
                 .find(query)
-                .sort({ _id: sortDirection })
+                .sort(sort)
                 .skip(skip)
                 .limit(limit)
                 .toArray();
@@ -321,6 +340,25 @@ export class AnnouncementModelMongo {
         } catch (error) {
             console.error('[MongoDB] findAllAdmin error:', error);
             return [];
+        }
+    }
+
+    static async countAdmin(filters?: {
+        type?: ContentType;
+        search?: string;
+        category?: string;
+        organization?: string;
+        location?: string;
+        qualification?: string;
+        status?: AnnouncementStatus | 'all';
+        includeInactive?: boolean;
+    }): Promise<number> {
+        try {
+            const query = buildAdminQuery(filters);
+            return await this.collection.countDocuments(query);
+        } catch (error) {
+            console.error('[MongoDB] countAdmin error:', error);
+            return 0;
         }
     }
 

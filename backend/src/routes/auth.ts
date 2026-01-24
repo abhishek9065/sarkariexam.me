@@ -10,7 +10,7 @@ import {
   clearFailedLogins,
   getClientIP
 } from '../middleware/security.js';
-import { blacklistToken } from '../middleware/auth.js';
+import { AUTH_COOKIE_NAME, blacklistToken } from '../middleware/auth.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 
@@ -35,6 +35,34 @@ const buildJwtOptions = (expiresIn: SignOptions['expiresIn']): SignOptions => {
   if (config.jwtIssuer) options.issuer = config.jwtIssuer;
   if (config.jwtAudience) options.audience = config.jwtAudience;
   return options;
+};
+
+const expiryToMs = (expiresIn: SignOptions['expiresIn']): number | undefined => {
+  if (typeof expiresIn === 'number') return expiresIn * 1000;
+  if (typeof expiresIn !== 'string') return undefined;
+  const match = expiresIn.trim().match(/^(\d+)\s*([smhd])$/i);
+  if (!match) return undefined;
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const multiplier = unit === 's'
+    ? 1000
+    : unit === 'm'
+      ? 60 * 1000
+      : unit === 'h'
+        ? 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000;
+  return amount * multiplier;
+};
+
+const setAuthCookie = (res: express.Response, token: string, expiresIn: SignOptions['expiresIn']) => {
+  const maxAge = expiryToMs(expiresIn);
+  res.cookie(AUTH_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'lax',
+    path: '/',
+    ...(maxAge ? { maxAge } : {}),
+  });
 };
 
 const isAdminEmailAllowed = (email: string): boolean => {
@@ -71,6 +99,7 @@ router.post('/register', async (req, res) => {
       config.jwtSecret,
       buildJwtOptions(config.jwtExpiry as SignOptions['expiresIn'])
     );
+    setAuthCookie(res, token, config.jwtExpiry as SignOptions['expiresIn']);
 
     recordAnalyticsEvent({
       type: 'auth_register',
@@ -162,6 +191,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       config.jwtSecret,
       buildJwtOptions(expiresIn)
     );
+    setAuthCookie(res, token, expiresIn);
 
     console.log(`[Auth] Login success: ${user.email} from ${clientIP}`);
 
@@ -182,14 +212,48 @@ router.post('/login', bruteForceProtection, async (req, res) => {
 
 router.post('/logout', async (req, res) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const headerToken = authHeader && authHeader.split(' ')[1];
+  const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
+  const token = headerToken || cookieToken;
 
   if (token) {
     await blacklistToken(token);
     console.log(`[Auth] Logout from ${getClientIP(req)}`);
   }
 
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'lax',
+    path: '/',
+  });
+
   return res.json({ message: 'Logged out successfully' });
+});
+
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const headerToken = authHeader && authHeader.split(' ')[1];
+    const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
+    const token = headerToken || cookieToken;
+    if (!token) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const verifyOptions: jwt.VerifyOptions = {};
+    if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
+    if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
+    const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as { userId: string };
+    const user = await UserModelMongo.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    return res.json({
+      data: { user: { id: user.id, email: user.email, name: user.username, role: user.role } },
+    });
+  } catch {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
 });
 
 export default router;

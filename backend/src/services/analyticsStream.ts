@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { getAnalyticsOverview } from './analyticsOverview.js';
 import { hasPermission } from './rbac.js';
 import { getClientIP } from '../middleware/security.js';
+import { AUTH_COOKIE_NAME } from '../middleware/auth.js';
 import { SecurityLogger } from './securityLogger.js';
 
 const UPDATE_INTERVAL_MS = 30 * 1000;
@@ -12,10 +13,24 @@ const UPDATE_INTERVAL_MS = 30 * 1000;
 export function startAnalyticsWebSocket(server: Server) {
     const wss = new WebSocketServer({ server, path: '/ws/analytics' });
 
+    const getCookieValue = (cookieHeader: string | undefined, name: string): string | null => {
+        if (!cookieHeader) return null;
+        const parts = cookieHeader.split(';');
+        for (const part of parts) {
+            const [key, ...rest] = part.trim().split('=');
+            if (key === name) {
+                return decodeURIComponent(rest.join('='));
+            }
+        }
+        return null;
+    };
+
     wss.on('connection', async (socket, req) => {
         try {
             const url = new URL(req.url || '', 'http://localhost');
-            const token = url.searchParams.get('token');
+            const tokenParam = url.searchParams.get('token');
+            const cookieToken = getCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
+            const token = tokenParam || cookieToken;
             const daysParam = parseInt(url.searchParams.get('days') || '', 10);
             const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
             if (!token) {
