@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+
 import { config } from '../config.js';
 import { Announcement } from '../types.js';
 

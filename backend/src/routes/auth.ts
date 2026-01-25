@@ -3,14 +3,14 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { config } from '../config.js';
-import { UserModelMongo } from '../models/users.mongo.js';
+import { AUTH_COOKIE_NAME, blacklistToken } from '../middleware/auth.js';
 import {
   bruteForceProtection,
   recordFailedLogin,
   clearFailedLogins,
   getClientIP
 } from '../middleware/security.js';
-import { AUTH_COOKIE_NAME, blacklistToken } from '../middleware/auth.js';
+import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 

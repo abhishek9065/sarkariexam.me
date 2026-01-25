@@ -1,6 +1,7 @@
+import { Request, Response } from 'express';
+
 import { rateLimit } from '../middleware/rateLimit.js';
 import { setCache, getCache } from '../utils/cache.js';
-import { Request, Response } from 'express';
 
 // Mock objects
 const mockReq = (ip: string) => ({

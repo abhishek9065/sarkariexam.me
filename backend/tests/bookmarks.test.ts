@@ -1,7 +1,8 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { app } from '../src/server.js';
+
 import { AnnouncementModelMongo } from '../src/models/announcements.mongo.js';
+import { app } from '../src/server.js';
 
 const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
 

@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { authenticateToken } from '../middleware/auth.js';
-import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
-import { ContentType } from '../types.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
+import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
+import { ContentType } from '../types.js';
 
 interface UserProfileDoc {
     userId: string;

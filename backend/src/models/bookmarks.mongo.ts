@@ -1,4 +1,5 @@
 import { ObjectId, Document } from 'mongodb';
+
 import { getCollection } from '../services/cosmosdb.js';
 
 interface BookmarkDoc extends Document {

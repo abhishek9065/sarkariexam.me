@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { VerifyOptions } from 'jsonwebtoken';
+
 import { config } from '../config.js';
-import { JwtPayload } from '../types.js';
-import RedisCache from '../services/redis.js';
 import { hasPermission, type Permission } from '../services/rbac.js';
+import RedisCache from '../services/redis.js';
+import { JwtPayload } from '../types.js';
 
 export const AUTH_COOKIE_NAME = 'auth_token';
 
 // Extend Express Request type to include user
+// eslint-disable-next-line @typescript-eslint/no-namespace
 declare global {
   namespace Express {
     interface Request {

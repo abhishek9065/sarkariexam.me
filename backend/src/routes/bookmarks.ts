@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
+
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
-import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 
 const router = Router();

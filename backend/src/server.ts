@@ -1,20 +1,13 @@
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import express from 'express';
 import http from 'http';
 
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express from 'express';
+
+
 import { config } from './config.js';
-import announcementsRouter from './routes/announcements.js';
-import authRouter from './routes/auth.js';
-import adminRouter from './routes/admin.js';
-import analyticsRouter from './routes/analytics.js';
-import graphqlRouter from './routes/graphql.js';
-import bookmarksRouter from './routes/bookmarks.js';
-import bulkRouter from './routes/bulk.js';
-import jobsRouter from './routes/jobs.js';
-import pushRouter from './routes/push.js';
-import profileRouter from './routes/profile.js';
-import subscriptionsRouter from './routes/subscriptions.js';
+import { authenticateToken, requirePermission } from './middleware/auth.js';
+import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { responseTimeLogger, getPerformanceStats } from './middleware/responseTime.js';
 import {
@@ -25,12 +18,21 @@ import {
   enforceAdminHttps,
   enforceAdminIpAllowlist
 } from './middleware/security.js';
-import { authenticateToken, requirePermission } from './middleware/auth.js';
-import { cloudflareMiddleware } from './middleware/cloudflare.js';
-import { connectToDatabase } from './services/cosmosdb.js';
+import adminRouter from './routes/admin.js';
+import analyticsRouter from './routes/analytics.js';
+import announcementsRouter from './routes/announcements.js';
+import authRouter from './routes/auth.js';
+import bookmarksRouter from './routes/bookmarks.js';
+import bulkRouter from './routes/bulk.js';
+import graphqlRouter from './routes/graphql.js';
+import jobsRouter from './routes/jobs.js';
+import profileRouter from './routes/profile.js';
+import pushRouter from './routes/push.js';
+import subscriptionsRouter from './routes/subscriptions.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
-import { ErrorTracking } from './services/errorTracking.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
+import { connectToDatabase } from './services/cosmosdb.js';
+import { ErrorTracking } from './services/errorTracking.js';
 
 const app = express();
 

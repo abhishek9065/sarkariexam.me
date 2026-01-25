@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+
 import type { UserRole } from '../types.js';
 
 type ActivityRecord = {

@@ -1,4 +1,5 @@
 import type { Collection } from 'mongodb';
+
 import { getCollection } from './cosmosdb.js';
 
 export type AnalyticsEventType =

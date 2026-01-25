@@ -4,11 +4,11 @@ import { z } from 'zod';
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 import { cacheControl } from '../middleware/cacheControl.js';
-import { bumpCacheVersion } from '../services/cacheVersion.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
-import { ContentType, CreateAnnouncementDto } from '../types.js';
-import { sendAnnouncementNotification } from '../services/telegram.js';
 import { recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
+import { bumpCacheVersion } from '../services/cacheVersion.js';
+import { sendAnnouncementNotification } from '../services/telegram.js';
+import { ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = express.Router();
 

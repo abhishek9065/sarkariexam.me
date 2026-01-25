@@ -1,10 +1,11 @@
-import { Router } from 'express';
 import { randomBytes } from 'crypto';
+
+import { Router } from 'express';
 import { z } from 'zod';
 
+import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
 import { isEmailConfigured, sendVerificationEmail } from '../services/email.js';
-import { recordAnalyticsEvent } from '../services/analytics.js';
 
 interface SubscriptionDoc {
     email: string;

@@ -3,8 +3,8 @@
  * Usage: node scripts/reset-admin.js <email> <new_password>
  */
 
-import { MongoClient } from 'mongodb';
 import bcrypt from 'bcrypt';
+import { MongoClient } from 'mongodb';
 
 const COSMOS_CONNECTION_STRING = process.env.COSMOS_CONNECTION_STRING;
 const COSMOS_DATABASE_NAME = process.env.COSMOS_DATABASE_NAME || 'sarkari_db';

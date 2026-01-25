@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { getRealIp } from './cloudflare.js';
+
 import { SecurityLogger } from '../services/securityLogger.js';
+
+import { getRealIp } from './cloudflare.js';
 
 /**
  * In-memory rate limiter

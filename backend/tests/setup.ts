@@ -1,5 +1,6 @@
-import { beforeAll, afterAll, afterEach } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import { beforeAll, afterAll, afterEach } from 'vitest';
+
 import { connectToDatabase, closeConnection, getDatabase } from '../src/services/cosmosdb.js';
 
 let mongoServer: MongoMemoryServer | null = null;

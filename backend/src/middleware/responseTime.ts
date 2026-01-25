@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+
 import { recordActiveUser } from '../services/activeUsers.js';
 
 interface RequestLog {

@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { graphql, buildSchema } from 'graphql';
+
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
-import { hasPermission } from '../services/rbac.js';
-import { getAnalyticsOverview } from '../services/analyticsOverview.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
+import { getAnalyticsOverview } from '../services/analyticsOverview.js';
+import { hasPermission } from '../services/rbac.js';
 
 const router = Router();
 

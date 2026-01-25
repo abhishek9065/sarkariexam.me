@@ -1,11 +1,14 @@
 import type { Server } from 'http';
+
 import jwt, { VerifyOptions } from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
+
 import { config } from '../config.js';
+import { AUTH_COOKIE_NAME } from '../middleware/auth.js';
+import { getClientIP } from '../middleware/security.js';
+
 import { getAnalyticsOverview } from './analyticsOverview.js';
 import { hasPermission } from './rbac.js';
-import { getClientIP } from '../middleware/security.js';
-import { AUTH_COOKIE_NAME } from '../middleware/auth.js';
 import { SecurityLogger } from './securityLogger.js';
 
 const UPDATE_INTERVAL_MS = 30 * 1000;

@@ -1,5 +1,6 @@
-import { ObjectId, WithId, Document } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { ObjectId, WithId, Document } from 'mongodb';
+
 import { getCollection } from '../services/cosmosdb.js';
 
 /**
