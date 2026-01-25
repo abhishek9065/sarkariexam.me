@@ -33,6 +33,8 @@ import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
 import { connectToDatabase } from './services/cosmosdb.js';
 import { ErrorTracking } from './services/errorTracking.js';
+import logger from './utils/logger.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
@@ -59,7 +61,7 @@ app.use(cors({
       callback(null, true);
       return;
     }
-    console.log(`[CORS] Blocked request from: ${origin}`);
+    logger.warn({ origin }, '[CORS] Blocked request');
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -118,38 +120,33 @@ app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
 
-// Error handler
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
-  if (res.headersSent) return _next(err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Global Error Handler
+app.use(errorHandler);
 
 // Initialize database and start server
 export async function startServer() {
   try {
+    ErrorTracking.init();
+    
     if (process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI) {
       await connectToDatabase();
-      console.log('[Server] MongoDB connected successfully');
+      logger.info('[Server] MongoDB connected successfully');
       await scheduleAnalyticsRollups().catch(error => {
-        console.error('[Analytics] Rollup init failed:', error);
+        logger.error({ err: error }, '[Analytics] Rollup init failed');
       });
     } else {
-      console.log('[Server] No MongoDB configured, using fallback data');
+      logger.info('[Server] No MongoDB configured, using fallback data');
     }
   } catch (error) {
-    console.error('[Server] Database connection failed:', error);
-    console.log('[Server] Starting without database - using fallback data');
+    logger.error({ err: error }, '[Server] Database connection failed');
+    logger.info('[Server] Starting without database - using fallback data');
   }
-
-  ErrorTracking.init();
-  app.use(ErrorTracking.errorHandler);
 
   const server = http.createServer(app);
   startAnalyticsWebSocket(server);
 
   server.listen(config.port, () => {
-    console.log(`API running on http://localhost:${config.port}`);
+    logger.info(`API running on http://localhost:${config.port}`);
   });
 }
 
