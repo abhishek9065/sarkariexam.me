@@ -7,11 +7,11 @@ export function Marquee() {
             </span>
             <div className="marquee-track">
                 <div className="marquee-content">
-                    <span className="marquee-item">Welcome to SarkariExams.me - Government Job Information Portal for Academic Year 2025-26</span>
-                    <span className="marquee-item">UPSC CSE 2024 Final Result Published - Check Official Website</span>
-                    <span className="marquee-item">SSC CHSL 2024 Tier 1 Result Available - Direct Official Link Provided</span>
-                    <span className="marquee-item">Railway RRB Group D 2024 Results Released - Verify from Official Source</span>
-                    <span className="marquee-item">Banking PO/Clerk 2024 Admit Cards Available - Download from Bank Websites</span>
+                    <span className="marquee-item">🎓 SarkariExams.me - Academic Year 2025-26</span>
+                    <span className="marquee-item">📋 UPSC CSE 2025 Final Result - Check Official Website</span>
+                    <span className="marquee-item">🏦 SSC CHSL 2024 Tier 1 Result - Check Official Website</span>
+                    <span className="marquee-item">🚂 Railway RRB Group D 2024 Results - Check Official Website</span>
+                    <span className="marquee-item">💼 Banking PO/Clerk 2024 Admit Cards - Check Official Website</span>
                 </div>
             </div>
         </div>

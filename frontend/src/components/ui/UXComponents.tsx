@@ -93,8 +93,8 @@ export function StatsSection({ stats, onCategoryClick }: { stats: { jobs: number
                 />
                 <StatCard 
                     icon="📋" 
-                    value={stats.total} 
-                    label="Total Notifications" 
+                    value={stats.jobs + stats.results + stats.admitCards} 
+                    label="Total Active Items" 
                     color="orange" 
                     onClick={() => onCategoryClick && onCategoryClick('all')}
                 />

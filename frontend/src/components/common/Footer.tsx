@@ -40,7 +40,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
                 </div>
             </div>
             <div className="footer-bottom">
-                <p>© 2024-2026 SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: January 2026</p>
+                <p>© 2025-26 SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: January 25, 2026</p>
                 <p className="legal-notice">⚠️ Always verify information from official sources before applying. We recommend checking original notifications for accuracy.</p>
             </div>
         </footer>
