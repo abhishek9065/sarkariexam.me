@@ -17,7 +17,7 @@ declare global {
  */
 export function loadGoogleAnalytics() {
     if (typeof window === 'undefined') return;
-    if (window.gtag) return; // Already loaded
+    if (typeof window.gtag === 'function') return; // Already loaded
 
     // Load the script
     const script = document.createElement('script');

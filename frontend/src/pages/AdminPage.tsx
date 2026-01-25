@@ -658,7 +658,7 @@ export function AdminPage() {
             publishAt: '',
         });
         const hasDetails = item.jobDetails && Object.keys(item.jobDetails).length > 0;
-        setJobDetails(hasDetails ? item.jobDetails : null);
+        setJobDetails(hasDetails ? item.jobDetails ?? null : null);
         setEditingId(null);
         setShowPreview(false);
         setPreviewData(null);
@@ -1867,20 +1867,20 @@ export function AdminPage() {
     return (
         <>
             <div className="toast-stack">
-            {toasts.map((toast) => (
-                <div key={toast.id} className={`toast ${toast.tone}`}>
-                    <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
-                    <span>{toast.message}</span>
-                </div>
-            ))}
-        </div>
-        <div className="admin-container">
-            {rateLimitRemaining && (
-                <div className="admin-banner" role="status">
-                    Rate limited. Retry in {rateLimitRemaining}s.
-                </div>
-            )}
-            <div className="admin-hero">
+                {toasts.map((toast) => (
+                    <div key={toast.id} className={`toast ${toast.tone}`}>
+                        <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
+                        <span>{toast.message}</span>
+                    </div>
+                ))}
+            </div>
+            <div className="admin-container">
+                {rateLimitRemaining && (
+                    <div className="admin-banner" role="status">
+                        Rate limited. Retry in {rateLimitRemaining}s.
+                    </div>
+                )}
+                <div className="admin-hero">
                     <div className="admin-hero-main">
                         <div className="admin-hero-title">
                             <span className="admin-kicker">SarkariExams Admin</span>
@@ -2612,7 +2612,7 @@ export function AdminPage() {
                                                             />
                                                             <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
                                                             <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
-                                                            {qaWarnings.length > 0 && (
+                                                            {warnings.length > 0 && (
                                                                 <>
                                                                     <button
                                                                         className="admin-btn info small"
@@ -2719,165 +2719,6 @@ export function AdminPage() {
                                                             <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
                                                             <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
                                                             <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                ) : activeAdminTab === 'review' ? (
-                    <div className="admin-list">
-                        <div className="admin-list-header">
-                            <div>
-                                <h3>Pending review</h3>
-                                <p className="admin-subtitle">Approve, reject, or schedule pending announcements with QA checks highlighted.</p>
-                            </div>
-                            <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
-                                    {listLoading ? 'Refreshing...' : 'Refresh'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="admin-user-grid">
-                            <div className="user-card">
-                                <div className="card-label">Pending total</div>
-                                <div className="card-value">{pendingSlaStats.pendingTotal}</div>
-                            </div>
-                            <div className="user-card">
-                                <div className="card-label">QA warnings</div>
-                                <div className="card-value accent">{pendingWarningCount}</div>
-                            </div>
-                            <div className="user-card">
-                                <div className="card-label">Selected</div>
-                                <div className="card-value">{selectedIds.size}</div>
-                            </div>
-                        </div>
-
-                            <div className="admin-bulk-panel">
-                                <div className="admin-bulk-controls">
-                                    <div className="bulk-field">
-                                        <label htmlFor="review-bulk-note">Review note</label>
-                                        <input
-                                            id="review-bulk-note"
-                                            type="text"
-                                            value={reviewBulkNote}
-                                            onChange={(e) => setReviewBulkNote(e.target.value)}
-                                            placeholder="Optional note for audit log"
-                                            disabled={reviewLoading}
-                                        />
-                                    </div>
-                                    <div className="bulk-field">
-                                        <label htmlFor="review-bulk-schedule">Schedule at</label>
-                                        <input
-                                            id="review-bulk-schedule"
-                                            type="datetime-local"
-                                            value={reviewScheduleAt}
-                                            onChange={(e) => setReviewScheduleAt(e.target.value)}
-                                            disabled={reviewLoading}
-                                        />
-                                </div>
-                            </div>
-                            <div className="admin-bulk-actions">
-                                <button className="admin-btn success" onClick={handleBulkApprove} disabled={reviewLoading}>
-                                    {reviewLoading ? 'Working...' : 'Approve selected'}
-                                </button>
-                                <button className="admin-btn warning" onClick={handleBulkReject} disabled={reviewLoading}>
-                                    Reject selected
-                                </button>
-                                <button className="admin-btn secondary" onClick={handleBulkSchedule} disabled={reviewLoading}>
-                                    Schedule selected
-                                </button>
-                                <button className="admin-btn secondary" onClick={clearSelection} disabled={reviewLoading}>Clear</button>
-                            </div>
-                        </div>
-
-                        {pendingAnnouncements.length === 0 ? (
-                            <div className="empty-state">No pending announcements right now.</div>
-                        ) : (
-                            <div className="admin-table-wrapper">
-                                <table className="admin-table">
-                                    <thead>
-                                        <tr>
-                                            <th>
-                                                <input
-                                                    type="checkbox"
-                                                    aria-label="Select all pending"
-                                                    checked={pendingAnnouncements.length > 0 && pendingAnnouncements.every((item) => selectedIds.has(item.id))}
-                                                    onChange={(e) => toggleSelectAll(e.target.checked, pendingAnnouncements.map((item) => item.id))}
-                                                />
-                                            </th>
-                                            <th>Title</th>
-                                            <th>Type</th>
-                                            <th>Deadline</th>
-                                            <th>QA</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingAnnouncements.map((item) => {
-                                            const warnings = getAnnouncementWarnings(item);
-                                            const reviewNote = reviewNotes[item.id] ?? '';
-                                            const isRowMutating = mutatingIds.has(item.id);
-                                            return (
-                                                <tr key={item.id}>
-                                                    <td>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedIds.has(item.id)}
-                                                            onChange={() => toggleSelection(item.id)}
-                                                        />
-                                                    </td>
-                                                    <td>
-                                                        <div className="title-cell">
-                                                            <div className="title-text" title={item.title}>{item.title}</div>
-                                                            <div className="title-meta">
-                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
-                                                                <span className="meta-sep">|</span>
-                                                                <span>{item.category || 'Uncategorized'}</span>
-                                                                <span className="meta-sep">|</span>
-                                                                <span>v{item.version ?? 1}</span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                                    <td>{renderDateCell(item.deadline)}</td>
-                                                    <td>
-                                                        {warnings.length === 0 ? (
-                                                            <span className="status-sub success">Clear</span>
-                                                        ) : (
-                                                            <span className="qa-warning" title={warnings.join(' • ')}>Issues: {warnings.length}</span>
-                                                        )}
-                                                    </td>
-                                                    <td>
-                                                        <div className="table-actions">
-                                                            <input
-                                                                className="review-note-input"
-                                                                aria-label="Review note"
-                                                                type="text"
-                                                                value={reviewNote}
-                                                                onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                                                placeholder="Review note (optional)"
-                                                                disabled={isRowMutating}
-                                                            />
-                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
-                                                            <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
-                                                            <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
-                                                            <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
-                                                            {reviewScheduleAt && (
-                                                                <button
-                                                                    className="admin-btn secondary small"
-                                                                    onClick={() => handleScheduleOne(item.id, reviewScheduleAt)}
-                                                                    disabled={isRowMutating}
-                                                                >
-                                                                    Schedule
-                                                                </button>
-                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -3203,24 +3044,24 @@ export function AdminPage() {
                             </div>
                         </div>
 
-                            {formWarnings.length > 0 && (
-                                <div className="qa-panel">
-                                    <h4>QA checks</h4>
-                                    <ul>
-                                        {formWarnings.map((warning) => {
-                                            const tone = getWarningTone(warning);
-                                            return (
-                                                <li key={warning} className={`qa-item ${tone}`}>
-                                                    <span className="qa-badge" aria-hidden="true">
-                                                        {tone === 'critical' ? '🔴' : '🟡'}
-                                                    </span>
-                                                    <span>{warning}</span>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                </div>
-                            )}
+                        {formWarnings.length > 0 && (
+                            <div className="qa-panel">
+                                <h4>QA checks</h4>
+                                <ul>
+                                    {formWarnings.map((warning) => {
+                                        const tone = getWarningTone(warning);
+                                        return (
+                                            <li key={warning} className={`qa-item ${tone}`}>
+                                                <span className="qa-badge" aria-hidden="true">
+                                                    {tone === 'critical' ? '🔴' : '🟡'}
+                                                </span>
+                                                <span>{warning}</span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        )}
 
                         {/* Job Details Form */}
                         <JobPostingForm
@@ -3372,7 +3213,7 @@ export function AdminPage() {
                             </div>
                             <div className="admin-list-actions">
                                 <span className="admin-updated">{formatLastUpdated(auditUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshAuditLogs} disabled={auditLoading}>
+                                <button className="admin-btn secondary" onClick={() => refreshAuditLogs()} disabled={auditLoading}>
                                     {auditLoading ? 'Refreshing...' : 'Refresh'}
                                 </button>
                             </div>

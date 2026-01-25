@@ -3,7 +3,7 @@ import './styles.css';
 import type { Announcement, ContentType } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { Header, PWAInstallPrompt, SearchFilters } from './components';
+import { Header, PWAInstallPrompt, SearchFilters, type FilterState } from './components';
 import UPPoliceJobDetail from './pages/UPPoliceJobDetail';
 import UniversalJobDetail from './pages/UniversalJobDetail';
 
@@ -202,6 +202,7 @@ function App() {
   const [searchQualification, setSearchQualification] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'deadline'>('newest');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [, setInlineFilters] = useState<FilterState | null>(null);
 
   // Get applied filters count
   const appliedFiltersCount = [searchType, searchCategory, searchOrganization, searchQualification].filter(Boolean).length;

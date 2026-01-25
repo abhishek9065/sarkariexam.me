@@ -239,6 +239,7 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
             && jobDetails.importantLinks.every((link) => link.label.trim() && link.url.trim());
         return {
             dates: datesComplete,
+            fees: datesComplete, // Fees are part of the dates tab
             eligibility: eligibilityComplete,
             vacancies: vacanciesComplete,
             exam: examComplete,
@@ -481,50 +482,50 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                                 const dateTime = date.date ? new Date(date.date).getTime() : null;
                                 const isPastDate = dateTime !== null && !Number.isNaN(dateTime) && dateTime < todayStart;
                                 return (
-                                <div key={index} className="list-row">
-                                    <input
-                                        type="text"
-                                        placeholder="Event Name"
-                                        value={date.name}
-                                        className={(showValidation || date.name.trim() || date.date)
-                                            ? (validation.dateErrors[index]?.name ? 'field-invalid' : 'field-valid')
-                                            : ''}
-                                        aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name) || undefined}
-                                        title={validation.dateErrors[index]?.name ? 'Event name is required' : 'Looks good'}
-                                        onChange={(e) => updateImportantDate(index, 'name', e.target.value)}
-                                    />
-                                    <input
-                                        type="date"
-                                        value={date.date}
-                                        className={[
-                                            (showValidation || date.name.trim() || date.date)
-                                                ? (validation.dateErrors[index]?.date ? 'field-invalid' : 'field-valid')
-                                                : '',
-                                            isPastDate ? 'date-past' : '',
-                                        ].filter(Boolean).join(' ')}
-                                        aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date) || undefined}
-                                        title={validation.dateErrors[index]?.date ? 'Date is required' : 'Looks good'}
-                                        onChange={(e) => updateImportantDate(index, 'date', e.target.value)}
-                                    />
-                                    {isPastDate && <span className="date-flag">Past</span>}
-                                    <div className="date-presets">
-                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 0)}>Today</button>
-                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 1)}>+1d</button>
-                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 7)}>+7d</button>
-                                        <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 30)}>+30d</button>
+                                    <div key={index} className="list-row">
+                                        <input
+                                            type="text"
+                                            placeholder="Event Name"
+                                            value={date.name}
+                                            className={(showValidation || date.name.trim() || date.date)
+                                                ? (validation.dateErrors[index]?.name ? 'field-invalid' : 'field-valid')
+                                                : ''}
+                                            aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.name) || undefined}
+                                            title={validation.dateErrors[index]?.name ? 'Event name is required' : 'Looks good'}
+                                            onChange={(e) => updateImportantDate(index, 'name', e.target.value)}
+                                        />
+                                        <input
+                                            type="date"
+                                            value={date.date}
+                                            className={[
+                                                (showValidation || date.name.trim() || date.date)
+                                                    ? (validation.dateErrors[index]?.date ? 'field-invalid' : 'field-valid')
+                                                    : '',
+                                                isPastDate ? 'date-past' : '',
+                                            ].filter(Boolean).join(' ')}
+                                            aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date) || undefined}
+                                            title={validation.dateErrors[index]?.date ? 'Date is required' : 'Looks good'}
+                                            onChange={(e) => updateImportantDate(index, 'date', e.target.value)}
+                                        />
+                                        {isPastDate && <span className="date-flag">Past</span>}
+                                        <div className="date-presets">
+                                            <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 0)}>Today</button>
+                                            <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 1)}>+1d</button>
+                                            <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 7)}>+7d</button>
+                                            <button type="button" className="preset-btn" onClick={() => applyDatePreset(index, 30)}>+30d</button>
+                                        </div>
+                                        <button
+                                            className="remove-btn"
+                                            onClick={() => {
+                                                if (!confirmRemove('this date')) return;
+                                                removeArrayItem('importantDates', index);
+                                            }}
+                                            aria-label="Remove date"
+                                            title="Remove date"
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
-                                    <button
-                                        className="remove-btn"
-                                        onClick={() => {
-                                            if (!confirmRemove('this date')) return;
-                                            removeArrayItem('importantDates', index);
-                                        }}
-                                        aria-label="Remove date"
-                                        title="Remove date"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
                                 );
                             })}
                             <button className="add-btn" onClick={() => addArrayItem('importantDates', { name: '', date: '' })}>

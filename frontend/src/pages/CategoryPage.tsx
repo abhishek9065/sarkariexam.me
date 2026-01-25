@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState } from '../components';
 import { useAuth } from '../context/AuthContext';
-import { type TabType } from '../utils';
+import { type TabType, API_BASE } from '../utils';
 import { fetchAnnouncementCardsPage } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
 
@@ -58,7 +58,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
         })
             .then(response => {
                 if (!isActive) return;
-                setData(response.data);
+                setData(response.data as Announcement[]);
                 setCursor(response.nextCursor ?? null);
                 setHasMore(response.hasMore);
             })
@@ -128,7 +128,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 qualification: filters.qualification || undefined,
                 sort: apiSort,
             });
-            setData(prev => [...prev, ...response.data]);
+            setData(prev => [...prev, ...response.data] as Announcement[]);
             setCursor(response.nextCursor ?? null);
             setHasMore(response.hasMore);
         } catch (error) {

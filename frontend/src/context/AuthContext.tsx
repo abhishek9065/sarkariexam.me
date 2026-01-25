@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { data } = await response.json() as { data: AuthResponse };
 
-        setUser(data.user);
+        setUser({ ...data.user, role: data.user.role as 'user' | 'admin' });
         setToken(data.token);
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('authUser', JSON.stringify(data.user));
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { data } = await response.json() as { data: AuthResponse };
 
-        setUser(data.user);
+        setUser({ ...data.user, role: data.user.role as 'user' | 'admin' });
         setToken(data.token);
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('authUser', JSON.stringify(data.user));

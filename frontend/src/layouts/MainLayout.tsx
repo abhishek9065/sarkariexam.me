@@ -42,7 +42,7 @@ export function MainLayout({
             />
 
             <Navigation
-                activeTab={activeTab}
+                activeTab={activeTab as import('../utils').TabType | undefined}
                 setActiveTab={setActiveTab || (() => { })}
                 setShowSearch={setShowSearch || (() => { })}
                 goBack={goBack || (() => { })}

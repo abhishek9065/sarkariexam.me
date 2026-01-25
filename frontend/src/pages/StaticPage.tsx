@@ -111,13 +111,18 @@ const pages = {
   }
 };
 
-export function StaticPage() {
+interface StaticPageProps {
+  page?: 'about' | 'contact' | 'privacy' | 'disclaimer';
+}
+
+export function StaticPage({ page: pageProp }: StaticPageProps) {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
 
+  // Use prop if provided, otherwise fallback to URL param
+  const pageType = pageProp || type;
   // Default to about if type is invalid or not found in pages
-  // However, with Router, we might want separate routes or a catch-all
-  const pageKey = (type && type in pages) ? type as keyof typeof pages : 'about';
+  const pageKey = (pageType && pageType in pages) ? pageType as keyof typeof pages : 'about';
   const page = pages[pageKey];
 
   return (

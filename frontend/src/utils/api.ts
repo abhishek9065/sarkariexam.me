@@ -63,12 +63,12 @@ async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): P
 
 // Fetch announcement cards across types for listing views
 export async function fetchAnnouncements(maxItems = 150): Promise<Announcement[]> {
-    return fetchCardPages({}, maxItems);
+    return fetchCardPages({}, maxItems) as Promise<Announcement[]>;
 }
 
 // Fetch announcement cards by type
 export async function fetchAnnouncementsByType(type: ContentType, maxItems = 100): Promise<Announcement[]> {
-    return fetchCardPages({ type }, maxItems);
+    return fetchCardPages({ type }, maxItems) as Promise<Announcement[]>;
 }
 
 // Fetch single announcement by slug
