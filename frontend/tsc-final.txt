@@ -1,0 +1,7 @@
+src/App.legacy.tsx(757,27): error TS2304: Cannot find name 'setInlineFilters'.
+src/layouts/MainLayout.tsx(45,17): error TS2322: Type 'string | undefined' is not assignable to type 'TabType'.
+  Type 'string' is not assignable to type 'TabType'.
+src/pages/AdminPage.tsx(661,23): error TS2345: Argument of type 'JobDetails | null | undefined' is not assignable to parameter of type 'SetStateAction<JobDetails | null>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<JobDetails | null>'.
+src/pages/AdminPage.tsx(2732,21): error TS2367: This comparison appears to be unintentional because the types '"security" | "add" | "bulk" | "detailed" | "queue" | "audit"' and '"review"' have no overlap.
+src/utils/analytics.ts(20,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?

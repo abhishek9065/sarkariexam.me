@@ -1,0 +1,162 @@
+.quick-actions {
+    margin-bottom: var(--space-4);
+}
+
+.quick-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
+.quick-actions-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-family: var(--font-display);
+    color: var(--text-primary);
+}
+
+.quick-actions-count {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--space-3);
+}
+
+.quick-action-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-primary);
+    background: var(--bg-card);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.quick-action-card:hover {
+    border-color: rgba(96, 165, 250, 0.4);
+    background: var(--bg-card-hover);
+    transform: translateY(-1px);
+}
+
+.quick-action-card.critical {
+    border-color: rgba(248, 113, 113, 0.4);
+    background: rgba(248, 113, 113, 0.08);
+}
+
+.quick-action-card.critical:hover {
+    background: rgba(248, 113, 113, 0.15);
+}
+
+.quick-action-card.warning {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.quick-action-card.warning:hover {
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.quick-action-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.quick-action-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.quick-action-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.quick-action-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.quick-action-btn {
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.quick-action-btn:hover {
+    color: var(--text-primary);
+}
+
+.quick-action-btn.critical {
+    border-color: rgba(248, 113, 113, 0.5);
+    background: rgba(248, 113, 113, 0.15);
+    color: var(--accent-red);
+}
+
+.quick-action-btn.critical:hover {
+    background: rgba(248, 113, 113, 0.25);
+}
+
+.quick-action-btn.warning {
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--accent-yellow);
+}
+
+.quick-action-btn.warning:hover {
+    background: rgba(245, 158, 11, 0.25);
+}
+
+.quick-actions-empty {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--border-primary);
+    background: rgba(34, 197, 94, 0.05);
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.quick-actions-icon {
+    font-size: 20px;
+}
+
+/* Mini Sparkline Chart */
+.mini-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 32px;
+    padding: 4px 0;
+}
+
+.mini-chart-bar {
+    width: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to top, rgba(96, 165, 250, 0.6), rgba(96, 165, 250, 0.9));
+    transition: height var(--transition-fast);
+}
+
+.mini-chart-bar:hover {
+    background: var(--accent-blue);
+}

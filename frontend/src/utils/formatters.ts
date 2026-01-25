@@ -50,3 +50,45 @@ export function getTypeBadgeColor(type: string): string {
     };
     return colors[type] || '#666';
 }
+
+// Format date time to readable string (New)
+export function formatDateTime(value?: string | null) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+// Format relative time (New)
+export function formatTimeAgo(value?: string | null) {
+    if (!value) return null; // or '-'
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const diffMs = Date.now() - date.getTime();
+    const absMs = Math.abs(diffMs);
+    const minutes = Math.round(absMs / 60000);
+    const hours = Math.round(absMs / 3600000);
+    const days = Math.round(absMs / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+}
+
+// Validate URL (New)
+export function isValidUrl(value?: string | null) {
+    if (!value) return true;
+    try {
+        new URL(value);
+        return true;
+    } catch {
+        return false;
+    }
+}

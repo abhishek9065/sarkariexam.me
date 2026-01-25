@@ -1,0 +1,71 @@
+src/App.legacy.tsx(10,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/App.legacy.tsx(757,27): error TS2304: Cannot find name 'setInlineFilters'.
+src/AppRouter.tsx(55,67): error TS2322: Type '{ page: string; }' is not assignable to type 'IntrinsicAttributes'.
+  Property 'page' does not exist on type 'IntrinsicAttributes'.
+src/AppRouter.tsx(56,69): error TS2322: Type '{ page: string; }' is not assignable to type 'IntrinsicAttributes'.
+  Property 'page' does not exist on type 'IntrinsicAttributes'.
+src/AppRouter.tsx(57,69): error TS2322: Type '{ page: string; }' is not assignable to type 'IntrinsicAttributes'.
+  Property 'page' does not exist on type 'IntrinsicAttributes'.
+src/AppRouter.tsx(58,72): error TS2322: Type '{ page: string; }' is not assignable to type 'IntrinsicAttributes'.
+  Property 'page' does not exist on type 'IntrinsicAttributes'.
+src/components/admin/AnalyticsDashboard.tsx(5,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/components/admin/JobPostingForm.tsx(468,26): error TS7053: Element implicitly has an 'any' type because expression of type 'TabType' can't be used to index type '{ dates: boolean; eligibility: boolean; vacancies: boolean; exam: boolean; links: boolean; }'.
+  Property 'fees' does not exist on type '{ dates: boolean; eligibility: boolean; vacancies: boolean; exam: boolean; links: boolean; }'.
+src/components/admin/SecurityLogsTable.tsx(19,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/components/common/SubscribeBox.tsx(3,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/components/modals/OnboardingModal.tsx(5,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/components/sections/JobMatcher.tsx(59,33): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/components/ui/NotificationCenter.tsx(5,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/components/ui/NotificationPrompt.tsx(15,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/context/AuthContext.tsx(18,30): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/context/AuthContext.tsx(56,17): error TS2345: Argument of type '{ id: string; email: string; name: string; role: string; createdAt: string; updatedAt: string; }' is not assignable to parameter of type 'SetStateAction<User | null>'.
+  Type '{ id: string; email: string; name: string; role: string; createdAt: string; updatedAt: string; }' is not assignable to type 'User'.
+    Type '{ id: string; email: string; name: string; role: string; createdAt: string; updatedAt: string; }' is not assignable to type '{ role: "user" | "admin"; }'.
+      Types of property 'role' are incompatible.
+        Type 'string' is not assignable to type '"user" | "admin"'.
+src/context/AuthContext.tsx(76,17): error TS2345: Argument of type '{ id: string; email: string; name: string; role: string; createdAt: string; updatedAt: string; }' is not assignable to parameter of type 'SetStateAction<User | null>'.
+  Type '{ id: string; email: string; name: string; role: string; createdAt: string; updatedAt: string; }' is not assignable to type 'User'.
+    Type '{ id: string; email: string; name: string; role: string; createdAt: string; updatedAt: string; }' is not assignable to type '{ role: "user" | "admin"; }'.
+      Types of property 'role' are incompatible.
+        Type 'string' is not assignable to type '"user" | "admin"'.
+src/layouts/MainLayout.tsx(45,17): error TS2322: Type 'string | undefined' is not assignable to type 'TabType'.
+  Type 'string' is not assignable to type 'TabType'.
+src/pages/AdminPage.tsx(12,29): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/pages/AdminPage.tsx(661,23): error TS2345: Argument of type 'JobDetails | null | undefined' is not assignable to parameter of type 'SetStateAction<JobDetails | null>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<JobDetails | null>'.
+src/pages/AdminPage.tsx(2615,62): error TS2552: Cannot find name 'qaWarnings'. Did you mean 'warnings'?
+src/pages/AdminPage.tsx(2732,21): error TS2367: This comparison appears to be unintentional because the types '"security" | "add" | "bulk" | "detailed" | "queue" | "audit"' and '"review"' have no overlap.
+src/pages/AdminPage.tsx(3375,73): error TS2322: Type '(pageOverride?: number) => Promise<void>' is not assignable to type 'MouseEventHandler<HTMLButtonElement>'.
+  Types of parameters 'pageOverride' and 'event' are incompatible.
+    Type 'MouseEvent<HTMLButtonElement, MouseEvent>' is not assignable to type 'number'.
+src/pages/CategoryPage.tsx(61,25): error TS2345: Argument of type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }[]' is not assignable to parameter of type 'SetStateAction<Announcement[]>'.
+  Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }[]' is not assignable to type 'Announcement[]'.
+    Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Announcement'.
+      Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Omit<{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; content?: string | undefined; ... 13 more ...; jobDetails?: { ...; } | undefined; }, "jobDetails">'.
+        Types of property 'deadline' are incompatible.
+          Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+            Type 'null' is not assignable to type 'string | undefined'.
+src/pages/CategoryPage.tsx(131,21): error TS2345: Argument of type '(prev: Announcement[]) => { id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; ... 4 more ...; isActive: boolean; }[]' is not assignable to parameter of type 'SetStateAction<Announcement[]>'.
+  Type '(prev: Announcement[]) => { id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; ... 4 more ...; isActive: boolean; }[]' is not assignable to type '(prevState: Announcement[]) => Announcement[]'.
+    Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }[]' is not assignable to type 'Announcement[]'.
+      Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Announcement'.
+        Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Omit<{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; content?: string | undefined; ... 13 more ...; jobDetails?: { ...; } | undefined; }, "jobDetails">'.
+          Types of property 'deadline' are incompatible.
+            Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+              Type 'null' is not assignable to type 'string | undefined'.
+src/pages/CategoryPage.tsx(168,40): error TS2304: Cannot find name 'API_BASE'.
+src/utils/analytics.ts(5,39): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+src/utils/analytics.ts(20,9): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+src/utils/api.ts(66,5): error TS2322: Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }[]' is not assignable to type 'Announcement[]'.
+  Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Announcement'.
+    Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Omit<{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; content?: string | undefined; ... 13 more ...; jobDetails?: { ...; } | undefined; }, "jobDetails">'.
+      Types of property 'deadline' are incompatible.
+        Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+          Type 'null' is not assignable to type 'string | undefined'.
+src/utils/api.ts(71,5): error TS2322: Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }[]' is not assignable to type 'Announcement[]'.
+  Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Announcement'.
+    Type '{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; deadline?: string | null | undefined; totalPosts?: number | ... 1 more ... | undefined; postedAt: string; viewCount: number; isActive: boolean; }' is not assignable to type 'Omit<{ id: string; title: string; slug: string; type: "job" | "result" | "admit-card" | "syllabus" | "answer-key" | "admission"; category: string; organization: string; content?: string | undefined; ... 13 more ...; jobDetails?: { ...; } | undefined; }, "jobDetails">'.
+      Types of property 'deadline' are incompatible.
+        Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+          Type 'null' is not assignable to type 'string | undefined'.
+src/utils/constants.ts(4,37): error TS2339: Property 'env' does not exist on type 'ImportMeta'.

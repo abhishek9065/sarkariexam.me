@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { JobTemplates, type JobTemplate } from './JobTemplates';
 import './JobPostingForm.css';
 
 interface ImportantDate {
@@ -429,8 +430,31 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
         setLastSavedAt(null);
     };
 
+    const handleTemplateSelect = (template: JobTemplate) => {
+        if (window.confirm(`Apply "${template.name}" template? This will replace current form data.`)) {
+            setJobDetails((prev) => ({
+                ...prev,
+                ...template.data,
+            }));
+            setDraftAlert(`Applied ${template.name} template`);
+        }
+    };
+
     return (
         <div className="job-posting-form">
+            <div className="form-header-actions">
+                <JobTemplates
+                    onSelectTemplate={handleTemplateSelect}
+                    disabled={isDisabled}
+                />
+                <button
+                    className="admin-btn secondary small"
+                    onClick={clearDraft}
+                    type="button"
+                >
+                    Clear Draft
+                </button>
+            </div>
             {(validation.hasRequiredErrors || isDisabled) && (
                 <div className="form-alert">
                     {isDisabled

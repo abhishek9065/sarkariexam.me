@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { adminRequest } from '../../utils/adminRequest';
+import { QuickActions } from './QuickActions';
+import { MiniSparkline } from './MiniSparkline';
 import './AnalyticsDashboard.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -252,7 +254,7 @@ export function AnalyticsDashboard({
                 const overviewData = await overviewRes.json();
                 const popularData = await popularRes.json();
                 // Defensive: Ensure we never set undefined values
-                    setAnalytics(overviewData.data ?? {
+                setAnalytics(overviewData.data ?? {
                     totalAnnouncements: 0,
                     totalViews: 0,
                     totalEmailSubscribers: 0,
@@ -270,16 +272,16 @@ export function AnalyticsDashboard({
                     totalDeepLinkClicks: 0,
                     typeBreakdown: [],
                     categoryBreakdown: [],
-                        funnel: {
-                            listingViews: 0,
-                            cardClicks: 0,
-                            detailViews: 0,
-                            detailViewsRaw: 0,
-                            detailViewsAdjusted: 0,
-                            hasAnomaly: false,
-                            bookmarkAdds: 0,
-                            subscriptionsVerified: 0,
-                        },
+                    funnel: {
+                        listingViews: 0,
+                        cardClicks: 0,
+                        detailViews: 0,
+                        detailViewsRaw: 0,
+                        detailViewsAdjusted: 0,
+                        hasAnomaly: false,
+                        bookmarkAdds: 0,
+                        subscriptionsVerified: 0,
+                    },
                     ctrByType: [],
                     digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
                     deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
@@ -576,6 +578,13 @@ export function AnalyticsDashboard({
                     <div className="kpi-sub">Card clicks / listing views</div>
                 </div>
             </div>
+            {/* Quick Actions */}
+            <QuickActions
+                expiringThisWeek={0}
+                pendingReview={0}
+                onViewExpiring={onOpenList}
+                onViewPending={onOpenList}
+            />
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card views">
@@ -583,7 +592,14 @@ export function AnalyticsDashboard({
                     <div className="stat-info">
                         <div className="stat-value">{(analytics.totalViews ?? 0).toLocaleString()}</div>
                         <div className="stat-label">Total Views</div>
-                        <div className="stat-meta">All time</div>
+                        <div className="stat-meta">
+                            <MiniSparkline
+                                data={rollups.slice(-7).map(r => r.views ?? 0)}
+                                color="blue"
+                                height={24}
+                                width={60}
+                            />
+                        </div>
                     </div>
                 </div>
                 <div className="stat-card posts">
@@ -745,30 +761,30 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 <div className="funnel-grid">
-                {funnelSteps.map((step, index) => (
-                    <div key={step.label} className="funnel-card">
-                        <div className="funnel-label">{step.label}</div>
-                        <div className="funnel-value">{step.value.toLocaleString()}</div>
-                        {index > 0 && (
-                            <div className="funnel-rate">
-                                {step.rateLabel ?? `${step.rate}% of previous`}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-            {hasAnomaly && (
-                <div className="analytics-warning">
-                    <strong>⚠ Funnel anomaly:</strong> Detail views ({rawDetailViews.toLocaleString()}) exceed card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
-                    Funnel rates use the adjusted value ({adjustedDetailViews.toLocaleString()}).
-                    <div className="analytics-suggestion">Suggestion: Check SEO/direct traffic tracking and card click events for consistency.</div>
+                    {funnelSteps.map((step, index) => (
+                        <div key={step.label} className="funnel-card">
+                            <div className="funnel-label">{step.label}</div>
+                            <div className="funnel-value">{step.value.toLocaleString()}</div>
+                            {index > 0 && (
+                                <div className="funnel-rate">
+                                    {step.rateLabel ?? `${step.rate}% of previous`}
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
-            )}
-            {funnelHasDirectTraffic && (
-                <p className="analytics-hint">
-                    Detail views can exceed card clicks because they include direct/SEO visits and deep links.
-                </p>
-            )}
+                {hasAnomaly && (
+                    <div className="analytics-warning">
+                        <strong>⚠ Funnel anomaly:</strong> Detail views ({rawDetailViews.toLocaleString()}) exceed card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
+                        Funnel rates use the adjusted value ({adjustedDetailViews.toLocaleString()}).
+                        <div className="analytics-suggestion">Suggestion: Check SEO/direct traffic tracking and card click events for consistency.</div>
+                    </div>
+                )}
+                {funnelHasDirectTraffic && (
+                    <p className="analytics-hint">
+                        Detail views can exceed card clicks because they include direct/SEO visits and deep links.
+                    </p>
+                )}
             </div>
 
             <div className="analytics-section">
