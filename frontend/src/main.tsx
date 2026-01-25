@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { registerSW } from 'virtual:pwa-register';
 
 import App from './AppRouter';
 import './styles.css';
@@ -31,13 +32,17 @@ recoverFromStaleServiceWorker();
 const disableServiceWorkerForAdmin = () => {
   if (!('serviceWorker' in navigator) || !('caches' in window)) return;
   if (!window.location.pathname.startsWith('/admin')) return;
-  if (sessionStorage.getItem('admin-sw-reset') === '1') return;
-  sessionStorage.setItem('admin-sw-reset', '1');
-  Promise.all([
-    navigator.serviceWorker.getRegistrations().then((regs) => Promise.all(regs.map((reg) => reg.unregister()))),
-    caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))),
-  ]).finally(() => {
-    window.location.reload();
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    if (regs.length === 0) return;
+    const resetCount = Number(sessionStorage.getItem('admin-sw-reset-count') ?? '0');
+    if (resetCount >= 2) return;
+    sessionStorage.setItem('admin-sw-reset-count', String(resetCount + 1));
+    Promise.all([
+      Promise.all(regs.map((reg) => reg.unregister())),
+      caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))),
+    ]).finally(() => {
+      window.location.reload();
+    });
   });
 };
 
@@ -68,6 +73,11 @@ const stripCloudflareBeaconForAdmin = () => {
 };
 
 stripCloudflareBeaconForAdmin();
+
+const shouldRegisterServiceWorker = !window.location.pathname.startsWith('/admin');
+if (shouldRegisterServiceWorker) {
+  registerSW({ immediate: true });
+}
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

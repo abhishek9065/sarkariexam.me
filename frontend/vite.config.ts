@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['favicon.png', 'robots.txt', 'og-image.png', 'icons/*.png'],
       manifest: {
         name: 'SarkariExams.me - Government Jobs & Results',
