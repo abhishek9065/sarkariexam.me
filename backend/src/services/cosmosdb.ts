@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, ObjectId, Document } from 'mongodb';
+import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 
 /**
  * Azure Cosmos DB Service (MongoDB API)

@@ -9,7 +9,7 @@ import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit
 import { getDailyRollups } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
 import { SecurityLogger } from '../services/securityLogger.js';
-import { AnnouncementStatus, ContentType, CreateAnnouncementDto } from '../types.js';
+import { ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = Router();
 

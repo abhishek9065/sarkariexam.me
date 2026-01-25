@@ -1,7 +1,7 @@
 import { ObjectId, Filter, Sort, WithId, Document } from 'mongodb';
 
 import { getCollection } from '../services/cosmosdb.js';
-import { Announcement, AnnouncementStatus, ContentType, CreateAnnouncementDto, Tag } from '../types.js';
+import { Announcement, AnnouncementStatus, ContentType, CreateAnnouncementDto } from '../types.js';
 
 function escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

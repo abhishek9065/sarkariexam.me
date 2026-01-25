@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request } from 'express';
 
 import { rateLimit } from '../middleware/rateLimit.js';
 import { setCache, getCache } from '../utils/cache.js';
@@ -22,11 +22,8 @@ async function testRateLimit() {
     for (let i = 0; i < 5; i++) {
         await new Promise<void>((resolve) => {
             const res: any = {
-                setHeader: (k: string, v: any) => {
-                    // Debug headers
-                    if (k.startsWith('X-RateLimit')) {
-                        // console.log(`[Req ${i+1}] ${k}: ${v}`);
-                    }
+                setHeader: () => {
+                    // Debug headers (disabled)
                 },
                 status: () => ({ json: () => { } }),
             };

@@ -32,7 +32,7 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
 /**
  * Get environment variable with optional fallback.
  */
-const getEnv = (key: string, fallback?: string): string => {
+const _getEnv = (key: string, fallback?: string): string => {
   const value = process.env[key] ?? fallback;
   if (!value) {
     throw new Error(`Missing required env var: ${key}`);

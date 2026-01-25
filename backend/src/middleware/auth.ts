@@ -9,8 +9,8 @@ import { JwtPayload } from '../types.js';
 export const AUTH_COOKIE_NAME = 'auth_token';
 
 // Extend Express Request type to include user
-// eslint-disable-next-line @typescript-eslint/no-namespace
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: JwtPayload;
@@ -58,7 +58,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
     req.user = decoded;
     next();
-  } catch (error) {
+  } catch {
     res.status(403).json({ error: 'Invalid or expired token' });
   }
 }
@@ -103,7 +103,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
     const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
     req.user = decoded;
-  } catch (error) {
+  } catch {
     // Invalid token is ignored for optional auth
   }
 
