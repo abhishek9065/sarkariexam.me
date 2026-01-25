@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 
 const router = Router();
 
@@ -25,7 +26,7 @@ function normalize(value?: string): string {
     return (value || '').toLowerCase();
 }
 
-router.get('/match', async (req, res) => {
+router.get('/match', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.jobMatch }), async (req, res) => {
     const parseResult = matchQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });

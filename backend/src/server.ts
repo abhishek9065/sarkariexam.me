@@ -1,4 +1,8 @@
 import http from 'http';
+import compression from 'compression';
+import swaggerUi from 'swagger-ui-express';
+import fs from 'fs';
+import path from 'path';
 
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -48,6 +52,9 @@ app.use(cloudflareMiddleware());
 app.use(securityHeaders);
 app.use(blockSuspiciousAgents);
 
+// Compression
+app.use(compression());
+
 // CORS configuration
 const allowedOrigins = config.corsOrigins;
 
@@ -75,6 +82,20 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
 app.use(sanitizeRequestBody);
+
+// Swagger UI
+try {
+  const openApiPath = path.join(process.cwd(), '../openapi.json');
+  if (fs.existsSync(openApiPath)) {
+    const openApiParams = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiParams));
+    logger.info('[Server] Swagger UI available at /api/docs');
+  } else {
+    logger.warn('[Server] openapi.json not found, skipping Swagger UI');
+  }
+} catch (err) {
+  logger.error({ err }, '[Server] Failed to load Swagger UI');
+}
 
 // Rate limiting
 app.use('/api', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));

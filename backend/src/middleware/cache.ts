@@ -136,4 +136,15 @@ export const cacheKeys = {
         ];
         return `search:${params.join(':')}`;
     },
+
+    jobMatch: (req: Request) => {
+        const params = [
+            `age:${req.query.age || ''}`,
+            `qual:${req.query.qualification || ''}`,
+            `loc:${req.query.location || ''}`,
+            `cat:${req.query.category || ''}`,
+            `gen:${req.query.gender || ''}`,
+        ];
+        return `jobmatch:${params.join(':')}`;
+    },
 };
