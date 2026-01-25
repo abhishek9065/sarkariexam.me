@@ -265,13 +265,13 @@ export function AdminPage() {
     const heroActiveJobs = overview?.activeJobs ?? 0;
     const heroNewThisWeek = overview?.newThisWeek ?? 0;
     const heroExpiringSoon = overview?.expiringSoon ?? 0;
-    const pushToast = (message: string, tone: ToastTone = 'info') => {
+    const pushToast = useCallback((message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
         setToasts((prev) => [...prev, { id, message, tone }]);
         window.setTimeout(() => {
             setToasts((prev) => prev.filter((toast) => toast.id !== id));
         }, 3000);
-    };
+    }, []);
 
     const clearAdminSession = useCallback(() => {
         setIsLoggedIn(false);

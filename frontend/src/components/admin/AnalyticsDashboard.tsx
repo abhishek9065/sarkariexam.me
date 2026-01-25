@@ -474,7 +474,13 @@ export function AnalyticsDashboard({
             : 'Stable';
     const rollupAge = insights?.rollupAgeMinutes ?? null;
     const ctrTone = ctr >= 10 ? 'good' : ctr >= 5 ? 'warn' : 'bad';
-    const coverageTone = (insights?.listingCoverage ?? 0) >= 25 ? 'good' : (insights?.listingCoverage ?? 0) >= 10 ? 'warn' : 'bad';
+    const listingCoverage = insights?.listingCoverage ?? 0;
+    const coverageTone = listingCoverage >= 25 ? 'good' : listingCoverage >= 10 ? 'warn' : 'bad';
+    const coverageMeta = listingCoverage === 0
+        ? 'No listing view events tracked. Verify listing pages fire view events.'
+        : listingCoverage < 10
+            ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
+            : 'Listing views vs total views';
     const funnelDropTone = (insights?.funnelDropRate ?? 0) >= 80 ? 'bad' : (insights?.funnelDropRate ?? 0) >= 60 ? 'warn' : 'good';
     const trendTone = viewTrendDirection === 'up' ? 'good' : viewTrendDirection === 'down' ? 'bad' : 'warn';
     const funnel = analytics.funnel;
@@ -715,8 +721,8 @@ export function AnalyticsDashboard({
                     </div>
                     <div className={`insight-card ${coverageTone}`}>
                         <div className="insight-label">Tracking coverage</div>
-                        <div className="insight-value">{insights?.listingCoverage ?? 0}%</div>
-                        <div className="insight-meta">Listing views vs total views</div>
+                        <div className="insight-value">{listingCoverage}%</div>
+                        <div className="insight-meta">{coverageMeta}</div>
                     </div>
                     <div className="insight-card">
                         <div className="insight-label">Top listing type</div>
@@ -816,7 +822,7 @@ export function AnalyticsDashboard({
                                         <td>
                                             <span className={`type-badge ${item.type}`}>{item.type}</span>
                                             {item.ctr < lowCtrThreshold && (
-                                                <span className="ctr-flag" title="Low CTR">!</span>
+                                                <span className="ctr-flag" title="Low CTR" aria-label={`Low CTR for ${item.type}`}>Low CTR</span>
                                             )}
                                         </td>
                                         <td className="numeric">{item.listingViews.toLocaleString()}</td>
