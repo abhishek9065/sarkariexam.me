@@ -477,7 +477,7 @@ router.post('/', authenticateToken, requirePermission('announcements:write'), as
     }
 
     const data = parseResult.data;
-    const announcement = await AnnouncementModel.create(data as unknown as CreateAnnouncementDto, req.user!.userId);
+    const announcement = await AnnouncementModel.create(data as CreateAnnouncementDto, req.user!.userId);
 
     // Send Telegram notification (async, don't block response)
     sendAnnouncementNotification(announcement).catch(err => {
@@ -512,7 +512,7 @@ router.patch('/:id', authenticateToken, requirePermission('announcements:write')
       return res.status(400).json({ error: parseResult.error.flatten() });
     }
 
-    const announcement = await AnnouncementModel.update(id, parseResult.data as unknown as Partial<CreateAnnouncementDto>, req.user?.userId);
+    const announcement = await AnnouncementModel.update(id, parseResult.data as Partial<CreateAnnouncementDto>, req.user?.userId);
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
