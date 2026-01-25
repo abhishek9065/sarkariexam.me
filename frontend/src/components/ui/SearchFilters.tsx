@@ -216,12 +216,12 @@ export function SearchFilters({
         }
     };
 
-    const hasActiveFilters = filters.keyword || filters.type || filters.location ||
+    const hasActiveFilters = filters.keyword || (filters.type && filters.type !== initialType) || filters.location ||
         filters.qualification || filters.minAge || filters.maxAge;
 
     const activeFilterCount = [
         filters.keyword,
-        filters.type,
+        (filters.type && filters.type !== initialType) ? filters.type : '',
         filters.location,
         filters.qualification,
         filters.minAge || filters.maxAge
@@ -236,7 +236,7 @@ export function SearchFilters({
                     <input
                         type="text"
                         className="search-input"
-                        placeholder="Search jobs, results, admit cards..."
+                        placeholder="Search jobs, results, admit cards... (Live search - just start typing!)"
                         value={keywordInput}
                         onChange={(e) => setKeywordInput(e.target.value)}
                     />
@@ -322,9 +322,9 @@ export function SearchFilters({
                 <div className="filters-panel">
                     <div className="filters-header">
                         <h3>🎯 Advanced Filters</h3>
-                        {hasActiveFilters && (
+                        {(hasActiveFilters && activeFilterCount > 0) && (
                             <button className="clear-all-btn" onClick={clearFilters}>
-                                Clear All
+                                Clear All ({activeFilterCount})
                             </button>
                         )}
                     </div>
@@ -365,12 +365,12 @@ export function SearchFilters({
                         <div className="filter-group age-filter">
                             <label>
                                 <span className="label-icon">👤</span>
-                                Age Range
+                                Age Range (years)
                             </label>
                             <div className="age-inputs">
                                 <input
                                     type="number"
-                                    placeholder="Min"
+                                    placeholder="Min (18)"
                                     value={filters.minAge}
                                     onChange={(e) => updateFilter('minAge', e.target.value)}
                                     min="18"
@@ -379,7 +379,7 @@ export function SearchFilters({
                                 <span className="age-separator">to</span>
                                 <input
                                     type="number"
-                                    placeholder="Max"
+                                    placeholder="Max (65)"
                                     value={filters.maxAge}
                                     onChange={(e) => updateFilter('maxAge', e.target.value)}
                                     min="18"

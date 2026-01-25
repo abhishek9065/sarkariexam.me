@@ -5,7 +5,7 @@ import { HomePage } from './pages/HomePage';
 import { CategoryPage } from './pages/CategoryPage';
 import { DetailPage } from './pages/DetailPage';
 import { AdminPage } from './pages/AdminPage';
-import { StaticPage } from './pages/StaticPage';
+import { StaticPage } from './pages/StaticPages';
 import { ProfilePage } from './pages/ProfilePage';
 import { BookmarksPage } from './pages/BookmarksPage';
 import { SubscriptionActionPage } from './pages/SubscriptionActionPage';
@@ -52,10 +52,10 @@ export default function App() {
                         <Route path="/unsubscribe" element={<SubscriptionActionPage action="unsubscribe" />} />
 
                         {/* Static Pages */}
-                        <Route path="/about" element={<StaticPage page="about" />} />
-                        <Route path="/contact" element={<StaticPage page="contact" />} />
-                        <Route path="/privacy" element={<StaticPage page="privacy" />} />
-                        <Route path="/disclaimer" element={<StaticPage page="disclaimer" />} />
+                        <Route path="/about" element={<StaticPage type="about" />} />
+                        <Route path="/contact" element={<StaticPage type="contact" />} />
+                        <Route path="/privacy" element={<StaticPage type="privacy" />} />
+                        <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
 
                         {/* Fallback - redirect old ?item= URLs */}
                         <Route path="*" element={<HomePage />} />

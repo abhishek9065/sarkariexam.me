@@ -7,18 +7,20 @@ interface FeaturedGridProps {
 
 export function FeaturedGrid({ onItemClick }: FeaturedGridProps) {
     return (
-        <section className="featured-section">
-            <div className="featured-grid">
+        <section className="featured-section" aria-labelledby="featured-heading">
+            <h2 id="featured-heading" className="featured-heading">Quick Access Categories</h2>
+            <div className="featured-grid" role="group" aria-label="Category quick access buttons">
                 {FEATURED_ITEMS.map((item, idx) => (
-                    <div
+                    <button
                         key={idx}
                         className={`featured-card ${item.color}`}
                         onClick={() => onItemClick(item.type)}
-                        style={{ cursor: 'pointer' }}
+                        aria-label={`View ${item.title} - ${item.subtitle}`}
                     >
                         <span className="featured-title">{item.title}</span>
                         <span className="featured-subtitle">{item.subtitle}</span>
-                    </div>
+                        <span className="card-action" aria-hidden="true">→</span>
+                    </button>
                 ))}
             </div>
         </section>

@@ -58,14 +58,30 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                             key={item.label}
                             className={`nav-link ${isActive ? 'active' : ''}`}
                             onClick={() => handleNavClick(item)}
+                            aria-current={isActive ? 'page' : undefined}
+                            aria-label={`Navigate to ${item.label} section`}
                         >
                             {item.label}
                         </button>
                     );
                 })}
-                <span className="nav-search" onClick={() => { setShowSearch(true); setMobileMenuOpen(false); }}>🔍</span>
+                <button 
+                    className="nav-search" 
+                    onClick={() => { setShowSearch(true); setMobileMenuOpen(false); }}
+                    aria-label="Open search"
+                >
+                    <span aria-hidden="true">🔍</span>
+                    <span className="search-text">Search</span>
+                </button>
                 {isAdmin && (
-                    <button className="nav-link admin-link" onClick={() => { setCurrentPage('admin'); setMobileMenuOpen(false); }}>⚙️ Admin</button>
+                    <button 
+                        className="nav-link admin-link" 
+                        onClick={() => { setCurrentPage('admin'); setMobileMenuOpen(false); }}
+                        aria-label="Admin panel"
+                    >
+                        <span aria-hidden="true">⚙️</span>
+                        <span>Admin</span>
+                    </button>
                 )}
             </div>
 

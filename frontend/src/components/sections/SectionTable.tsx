@@ -11,7 +11,21 @@ interface SectionTableProps {
 export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth }: SectionTableProps) {
     const formatShortDate = (date: string | undefined) => {
         if (!date) return '';
-        return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+        const d = new Date(date);
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+    };
+
+    const getTimestampDisplay = (item: Announcement) => {
+        if (item.deadline && new Date(item.deadline) > new Date()) {
+            return `Deadline: ${formatShortDate(item.deadline)}`;
+        }
+        if (item.updatedAt) {
+            return `Updated: ${formatShortDate(item.updatedAt)}`;
+        }
+        if (item.createdAt) {
+            return `Posted: ${formatShortDate(item.createdAt)}`;
+        }
+        return '';
     };
 
     return (
@@ -27,14 +41,17 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
                                     {item.totalPosts && <span className="item-posts">{item.totalPosts} Post</span>}
                                 </a>
                                 <div className="item-meta">
-                                    {item.deadline && (
-                                        <span className="item-date">{formatShortDate(item.deadline)}</span>
-                                    )}
-                                    {item.viewCount > 100 && (
-                                        <span className="item-views" title={`${item.viewCount} views`}>
-                                            🔥 {item.viewCount > 1000 ? `${(item.viewCount / 1000).toFixed(1)}k` : item.viewCount}
+                                    <span className="item-timestamp" title="Last updated information">
+                                        📅 {getTimestampDisplay(item)}
+                                    </span>
+                                    {item.organization && (
+                                        <span className="item-org" title={`Recruiting organization: ${item.organization}`}>
+                                            🏛️ {item.organization}
                                         </span>
                                     )}
+                                    <span className="item-source" title="Information sourced from official notifications">
+                                        ✓ Official Source
+                                    </span>
                                 </div>
                             </li>
                         ))

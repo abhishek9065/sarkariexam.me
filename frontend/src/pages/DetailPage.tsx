@@ -68,9 +68,42 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     // Type-specific FAQs
     const getFaqs = () => {
         const base = [
-            { q: `${item.organization} ${item.title} कब?`, a: item.deadline ? `तारीख: ${formatDate(item.deadline)}` : 'जल्द घोषित होगी।' },
-            { q: 'आवेदन कैसे करें?', a: 'नीचे दिए गए Important Links से आवेदन करें।' },
+            { 
+                q: `What is the eligibility criteria for ${item.title}?`, 
+                a: `Eligibility includes age limits (usually 18-35 years), educational qualifications (as specified in notification), and category-wise relaxations. Always check the official notification for exact requirements.` 
+            },
+            { 
+                q: 'How to apply online?', 
+                a: 'Visit the official website through "Apply Here" link below → Register with valid details → Fill application form → Upload documents → Pay application fee → Submit form → Take printout of confirmation page.' 
+            },
+            { 
+                q: 'What are the application fees?', 
+                a: 'Fees vary by category: General/OBC candidates typically pay ₹100-₹1000, SC/ST/PWD candidates often get fee exemption. Check official notification for exact amounts.' 
+            },
+            { 
+                q: 'What documents are required?', 
+                a: 'Typically required: Recent photograph (passport size), signature, educational certificates, caste certificate (if applicable), age proof, experience certificates (if required). All documents should be in prescribed format and size.' 
+            },
+            { 
+                q: 'When will results be declared?', 
+                a: item.resultDate ? `Expected result date: ${formatDate(item.resultDate)}` : 'Result dates will be announced separately. Usually declared 30-90 days after exam completion.' 
+            },
         ];
+        
+        if (item.type === 'admit-card') {
+            base.push({ 
+                q: 'How to download admit card?', 
+                a: 'Visit official website → Click on admit card link → Enter registration number and date of birth → Download and print admit card. Ensure all details are correct.' 
+            });
+        }
+        
+        if (item.type === 'result') {
+            base.push({ 
+                q: 'How to check results?', 
+                a: 'Go to official result website → Enter roll number/application number → Click submit → View/download result. Take printout for future reference.' 
+            });
+        }
+        
         return base;
     };
 
@@ -79,14 +112,34 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     };
 
     return (
-        <div className="app">
-            <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+        <div className="app">            <SEO 
+                title={item?.title || 'Loading...'}
+                description={item ? `${item.title} - ${item.organization || 'Government'} | Apply online, check eligibility, important dates` : undefined}
+                announcement={item || undefined}
+                canonicalUrl={`https://sarkariexams.me/${item?.type}/${item?.slug}`}
+            />            <Header 
+                setCurrentPage={(page) => {
+                    if (page === 'home') navigate('/');
+                    else if (page === 'admin') navigate('/admin');
+                    else navigate('/' + page);
+                }} 
+                user={user} 
+                token={token} 
+                isAuthenticated={isAuthenticated} 
+                onLogin={() => { }} 
+                onLogout={logout} 
+                onProfileClick={() => navigate('/profile')} 
+            />
             <Navigation
                 activeTab={item.type as TabType}
                 setActiveTab={() => { }}
                 setShowSearch={() => { }}
                 goBack={() => navigate(-1)}
-                setCurrentPage={(page) => navigate('/' + page)}
+                setCurrentPage={(page) => {
+                    if (page === 'home') navigate('/');
+                    else if (page === 'admin') navigate('/admin');
+                    else navigate('/' + page);
+                }}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => { }}
             />
@@ -154,9 +207,55 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                             </table>
                         </div>
 
-                        {item.jobDetails && (
-                            <JobDetailsRenderer jobDetails={item.jobDetails} />
-                        )}
+                        <div className="job-details-grid">
+                            <div className="detail-section">
+                                <h3>Eligibility Criteria</h3>
+                                <div className="eligibility-info">
+                                    <div className="eligibility-item">
+                                        <strong>Age Limit:</strong> {item.jobDetails?.ageLimit || 'As per official notification'}
+                                    </div>
+                                    <div className="eligibility-item">
+                                        <strong>Educational Qualification:</strong> {item.minQualification || 'As specified in notification'}
+                                    </div>
+                                    <div className="eligibility-item">
+                                        <strong>Physical Standards:</strong> As per recruitment rules (if applicable)
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="detail-section">
+                                <h3>Important Information</h3>
+                                <div className="important-info">
+                                    <div className="info-item">
+                                        <strong>Total Vacancies:</strong> {item.totalPosts ? `${item.totalPosts} positions` : 'Refer to official notification'}
+                                    </div>
+                                    <div className="info-item">
+                                        <strong>Application Fee:</strong> {item.applicationFee || 'As per notification (varies by category)'}
+                                    </div>
+                                    <div className="info-item">
+                                        <strong>Selection Process:</strong> Written Exam → Document Verification → Medical Exam (if applicable)
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="detail-section">
+                                <h3>Key Dates</h3>
+                                <div className="dates-info">
+                                    <div className="date-item">
+                                        <strong>Notification Published:</strong> {item.createdAt ? formatDate(item.createdAt) : 'Check official source'}
+                                    </div>
+                                    <div className="date-item">
+                                        <strong>Application Start:</strong> Refer to official notification
+                                    </div>
+                                    <div className="date-item">
+                                        <strong>Last Date to Apply:</strong> {item.deadline ? formatDate(item.deadline) : 'Check official notification'}
+                                    </div>
+                                    <div className="date-item">
+                                        <strong>Exam Date:</strong> To be announced
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Mode of Selection */}
                         <div className="mode-selection">
@@ -218,7 +317,10 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                 </div>
             </main>
 
-            <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <Footer setCurrentPage={(page) => {
+                if (page === 'home') navigate('/');
+                else navigate('/' + page);
+            }} />
         </div>
     );
 }

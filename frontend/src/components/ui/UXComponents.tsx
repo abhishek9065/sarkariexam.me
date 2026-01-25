@@ -48,26 +48,58 @@ interface StatCardProps {
 }
 
 export function StatCard({ icon, value, label, color, onClick }: StatCardProps) {
+    const CardElement = onClick ? 'button' : 'div';
+    
     return (
-        <div
+        <CardElement
             className={`stat-card ${color}`}
             onClick={onClick}
             style={{ cursor: onClick ? 'pointer' : 'default' }}
+            aria-label={onClick ? `View ${label.toLowerCase()}: ${value.toLocaleString()} items` : undefined}
         >
-            <div className="stat-icon">{icon}</div>
-            <div className="stat-value">{value.toLocaleString()}</div>
+            <div className="stat-icon" aria-hidden="true">{icon}</div>
+            <div className="stat-value" aria-label={`${value.toLocaleString()} ${label.toLowerCase()}`}>{value.toLocaleString()}</div>
             <div className="stat-label">{label}</div>
-        </div>
+            {onClick && <span className="stat-action" aria-hidden="true">→</span>}
+        </CardElement>
     );
 }
 
-export function StatsSection({ stats }: { stats: { jobs: number; results: number; admitCards: number; total: number } }) {
+export function StatsSection({ stats, onCategoryClick }: { stats: { jobs: number; results: number; admitCards: number; total: number }; onCategoryClick?: (type: string) => void }) {
     return (
-        <div className="stats-section">
-            <StatCard icon="💼" value={stats.jobs} label="Active Jobs" color="green" />
-            <StatCard icon="📊" value={stats.results} label="Results" color="blue" />
-            <StatCard icon="🎫" value={stats.admitCards} label="Admit Cards" color="purple" />
-            <StatCard icon="📋" value={stats.total} label="Total Posts" color="orange" />
+        <div className="stats-section" role="group" aria-label="Content statistics">
+            <h3 className="stats-title">Current Content Overview</h3>
+            <div className="stats-grid">
+                <StatCard 
+                    icon="💼" 
+                    value={stats.jobs} 
+                    label="Active Job Notifications" 
+                    color="green" 
+                    onClick={onCategoryClick ? () => onCategoryClick('job') : undefined}
+                />
+                <StatCard 
+                    icon="📊" 
+                    value={stats.results} 
+                    label="Result Announcements" 
+                    color="blue" 
+                    onClick={onCategoryClick ? () => onCategoryClick('result') : undefined}
+                />
+                <StatCard 
+                    icon="🎫" 
+                    value={stats.admitCards} 
+                    label="Admit Card Downloads" 
+                    color="purple" 
+                    onClick={onCategoryClick ? () => onCategoryClick('admit-card') : undefined}
+                />
+                <StatCard 
+                    icon="📋" 
+                    value={stats.total} 
+                    label="Total Notifications" 
+                    color="orange" 
+                    onClick={() => onCategoryClick && onCategoryClick('all')}
+                />
+            </div>
+            <p className="stats-note">Click any statistic to view that category</p>
         </div>
     );
 }

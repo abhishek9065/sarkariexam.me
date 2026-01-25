@@ -1,4 +1,5 @@
 import { API_BASE } from './constants';
+import { filterMockAnnouncements, findMockBySlug, mockAnnouncements } from './mockData';
 import type { Announcement, AnnouncementCard, ContentType } from '../types';
 import type { paths } from '../types/api';
 
@@ -21,20 +22,40 @@ interface AnnouncementCardQuery {
 export async function fetchAnnouncementCardsPage(
     query: AnnouncementCardQuery = {}
 ): Promise<AnnouncementCardsResponse> {
-    const params = new URLSearchParams();
-    if (query.type) params.set('type', query.type);
-    if (query.category) params.set('category', query.category);
-    if (query.search) params.set('search', query.search);
-    if (query.organization) params.set('organization', query.organization);
-    if (query.location) params.set('location', query.location);
-    if (query.qualification) params.set('qualification', query.qualification);
-    if (query.sort) params.set('sort', query.sort);
-    if (query.limit) params.set('limit', String(query.limit));
-    if (query.cursor) params.set('cursor', query.cursor);
+    try {
+        const params = new URLSearchParams();
+        if (query.type) params.set('type', query.type);
+        if (query.category) params.set('category', query.category);
+        if (query.search) params.set('search', query.search);
+        if (query.organization) params.set('organization', query.organization);
+        if (query.location) params.set('location', query.location);
+        if (query.qualification) params.set('qualification', query.qualification);
+        if (query.sort) params.set('sort', query.sort);
+        if (query.limit) params.set('limit', String(query.limit));
+        if (query.cursor) params.set('cursor', query.cursor);
 
-    const response = await fetch(`${API_BASE}/api/announcements/v3/cards?${params.toString()}`);
-    if (!response.ok) throw new Error('Failed to fetch announcement cards');
-    return response.json() as Promise<AnnouncementCardsResponse>;
+        const response = await fetch(`${API_BASE}/api/announcements/v3/cards?${params.toString()}`, {
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<AnnouncementCardsResponse>;
+    } catch (error) {
+        console.warn('Backend unavailable, using mock data:', error);
+        // Fallback to mock data
+        const mockData = filterMockAnnouncements({
+            type: query.type,
+            search: query.search,
+            category: query.category,
+            organization: query.organization,
+            limit: query.limit || 50
+        });
+        return {
+            data: mockData as AnnouncementCard[],
+            hasMore: false,
+            nextCursor: null
+        };
+    }
 }
 
 async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): Promise<AnnouncementCard[]> {
@@ -63,28 +84,47 @@ async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): P
 
 // Fetch announcement cards across types for listing views
 export async function fetchAnnouncements(maxItems = 150): Promise<Announcement[]> {
-    return fetchCardPages({}, maxItems) as Promise<Announcement[]>;
+    try {
+        return await fetchCardPages({}, maxItems);
+    } catch (error) {
+        console.warn('Using mock data for fetchAnnouncements:', error);
+        return filterMockAnnouncements({ limit: maxItems });
+    }
 }
 
 // Fetch announcement cards by type
 export async function fetchAnnouncementsByType(type: ContentType, maxItems = 100): Promise<Announcement[]> {
-    return fetchCardPages({ type }, maxItems) as Promise<Announcement[]>;
+    try {
+        return await fetchCardPages({ type }, maxItems);
+    } catch (error) {
+        console.warn('Using mock data for fetchAnnouncementsByType:', error);
+        return filterMockAnnouncements({ type, limit: maxItems });
+    }
 }
 
 // Fetch single announcement by slug
 export async function fetchAnnouncementBySlug(slug: string, query?: string | URLSearchParams): Promise<Announcement | null> {
-    const queryString = typeof query === 'string'
-        ? query
-        : query
-            ? `?${query.toString()}`
-            : '';
-    const normalizedQuery = queryString && !queryString.startsWith('?')
-        ? `?${queryString}`
-        : queryString;
-    const response = await fetch(`${API_BASE}/api/announcements/${slug}${normalizedQuery}`);
-    if (!response.ok) return null;
-    const body = await response.json() as { data: Announcement };
-    return body.data;
+    try {
+        const queryString = typeof query === 'string'
+            ? query
+            : query
+                ? `?${query.toString()}`
+                : '';
+        const normalizedQuery = queryString && !queryString.startsWith('?')
+            ? `?${queryString}`
+            : queryString;
+        const response = await fetch(`${API_BASE}/api/announcements/${slug}${normalizedQuery}`, {
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const body = await response.json() as { data: Announcement };
+        return body.data;
+    } catch (error) {
+        console.warn('Backend unavailable for slug fetch, using mock data:', error);
+        // Fallback to mock data
+        return findMockBySlug(slug);
+    }
 }
 
 // Fetch user bookmarks
