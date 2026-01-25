@@ -27,7 +27,17 @@ export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, 
                                 <span className="user-icon" aria-hidden="true">👤</span>
                                 <span>{user?.name}</span>
                             </button>
-                            <button className="login-btn logout-btn" onClick={onLogout} aria-label="Logout">Logout</button>
+                            <button 
+                                className="login-btn logout-btn" 
+                                onClick={() => {
+                                    if (window.confirm('Are you sure you want to log out?')) {
+                                        onLogout();
+                                    }
+                                }} 
+                                aria-label="Logout"
+                            >
+                                Logout
+                            </button>
                         </>
                     ) : (
                         <button className="login-btn" onClick={onLogin} aria-label="Login to account">

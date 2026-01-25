@@ -156,9 +156,6 @@ export function HomePage() {
                                 <p>We strongly recommend users verify all details from original sources before applying to any position.</p>
                             </div>
                         </div>
-                        <div className="trust-disclaimer">
-                            <p><strong>Important:</strong> SarkariExams.me is an information aggregator. We are not affiliated with any government organization. Always verify information and apply through official channels.</p>
-                        </div>
                     </div>
                 </section>
 
@@ -206,22 +203,24 @@ export function HomePage() {
                     <div className="cookie-content">
                         <p>
                             <strong>🍪 We use cookies</strong> to improve your experience and analyze site usage. 
-                            By continuing, you consent to our use of cookies.
+                            We use essential cookies for site functionality and optional cookies for analytics.
                         </p>
                         <div className="cookie-actions">
                             <button 
                                 className="cookie-btn accept" 
                                 onClick={() => handleCookieConsent(true)}
-                                aria-label="Accept cookies"
+                                aria-label="Accept all cookies including analytics"
+                                title="Allows all cookies including analytics to help improve the website"
                             >
-                                Accept All
+                                Accept All Cookies
                             </button>
                             <button 
                                 className="cookie-btn decline" 
                                 onClick={() => handleCookieConsent(false)}
-                                aria-label="Decline cookies"
+                                aria-label="Accept only essential cookies"
+                                title="Only essential cookies for basic site functionality"
                             >
-                                Essential Only
+                                Essential Cookies Only
                             </button>
                         </div>
                     </div>

@@ -129,7 +129,7 @@ export function SubscribeBox() {
                 </fieldset>
 
                 <div className="subscribe-input-row">
-                    <label htmlFor="email-input" className="visually-hidden">Email address for notifications</label>
+                    <label htmlFor="email-input" className="email-label">Email address:</label>
                     <input
                         id="email-input"
                         type="email"
@@ -138,14 +138,14 @@ export function SubscribeBox() {
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={status === 'loading'}
                         aria-required="true"
-                        aria-describedby={message ? 'subscription-message' : undefined}
+                        aria-describedby={message ? 'subscription-message category-hint' : 'category-hint'}
                         required
                     />
                     <button 
                         type="submit" 
                         disabled={status === 'loading'} 
                         className={`subscribe-btn ${status === 'loading' ? 'loading' : ''}`}
-                        aria-label="Subscribe to email notifications"
+                        aria-label="Subscribe to receive email notifications for selected categories"
                     >
                         {status === 'loading' ? (
                             <>
