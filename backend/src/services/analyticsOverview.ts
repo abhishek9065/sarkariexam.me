@@ -85,7 +85,10 @@ export async function getAnalyticsOverview(
     const sortedTypes = [...typeBreakdown].sort((a, b) => b.count - a.count);
     const sortedCategories = [...categoryBreakdown].sort((a, b) => b.count - a.count);
     const last7 = dailyRollups.slice(-7);
-    const previous7 = dailyRollups.slice(0, Math.max(0, dailyRollups.length - 7));
+    // Fix: Compare last 7 days with the 7 days IMMEDIATELY preceding them, not all history
+    const prevStart = Math.max(0, dailyRollups.length - 14);
+    const prevEnd = Math.max(0, dailyRollups.length - 7);
+    const previous7 = dailyRollups.slice(prevStart, prevEnd);
     const last7Views = sum(last7.map((row) => row.views ?? 0));
     const prev7Views = sum(previous7.map((row) => row.views ?? 0));
     const viewTrendPct = prev7Views > 0

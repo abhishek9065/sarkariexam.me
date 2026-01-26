@@ -476,7 +476,7 @@ export function AnalyticsDashboard({
     const ctrTone = ctr >= 10 ? 'good' : ctr >= 5 ? 'warn' : 'bad';
     const listingCoverage = insights?.listingCoverage ?? 0;
     const coverageTone = listingCoverage >= 25 ? 'good' : listingCoverage >= 10 ? 'warn' : 'bad';
-    const coverageMeta = listingCoverage === 0
+    const coverageMeta = (listingCoverage === 0 && analytics.totalListingViews === 0)
         ? 'No listing view events tracked. Verify listing pages fire view events.'
         : listingCoverage < 10
             ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
@@ -492,8 +492,9 @@ export function AnalyticsDashboard({
     const funnelHasDirectTraffic = Boolean(
         (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
     );
-    const detailViewsLabel = hasAnomaly ? 'Detail views (adjusted)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
+    const detailViewsLabel = hasAnomaly ? 'Detail views (capped)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
     const lowCtrThreshold = 5;
+    const minViewsForCtrFlag = 20;
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
@@ -821,7 +822,7 @@ export function AnalyticsDashboard({
                                     <tr key={item.type}>
                                         <td>
                                             <span className={`type-badge ${item.type}`}>{item.type}</span>
-                                            {item.ctr < lowCtrThreshold && (
+                                            {item.ctr < lowCtrThreshold && item.listingViews > minViewsForCtrFlag && (
                                                 <span className="ctr-flag" title="Low CTR" aria-label={`Low CTR for ${item.type}`}>Low CTR</span>
                                             )}
                                         </td>

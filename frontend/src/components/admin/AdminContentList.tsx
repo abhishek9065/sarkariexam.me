@@ -238,8 +238,8 @@ export function AdminContentList({
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`type-badge ${item.type}`}>
-                                                {item.type.replace('-', ' ')}
+                                            <span className={`type-badge ${item.type || 'unknown'}`}>
+                                                {item.type ? item.type.replace('-', ' ') : 'Unknown'}
                                             </span>
                                         </td>
                                         <td>
