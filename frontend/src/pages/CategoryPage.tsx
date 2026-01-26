@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState } from '../components';
 import { useAuth } from '../context/AuthContext';
@@ -86,7 +86,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
         navigate(`/${item.type}/${item.slug}`);
     };
 
-    const handleFilterChange = (nextFilters: FilterState) => {
+    const handleFilterChange = useCallback((nextFilters: FilterState) => {
         if (nextFilters.type && nextFilters.type !== type) {
             const paths: Record<ContentType, string> = {
                 'job': '/jobs',
@@ -100,7 +100,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
             return;
         }
         setFilters(nextFilters);
-    };
+    }, [navigate, type]);
 
     const visibleData = (() => {
         const items = [...data];

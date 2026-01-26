@@ -157,7 +157,7 @@ export function SearchFilters({
             setFilters(newFilters);
             onFilterChange(newFilters);
         }
-    }, [debouncedKeyword]);
+    }, [debouncedKeyword, filters, onFilterChange]);
 
     useEffect(() => {
         if (!storageKey) return;
