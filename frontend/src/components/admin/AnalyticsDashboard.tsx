@@ -519,6 +519,26 @@ export function AnalyticsDashboard({
             rate: funnel?.bookmarkAdds ? Math.round((funnel.subscriptionsVerified / funnel.bookmarkAdds) * 100) : 0
         },
     ];
+
+    // Recalculate coverage if 0 but we have views
+    const calculatedCoverage = analytics.totalViews > 0 
+        ? Math.round((analytics.totalListingViews / analytics.totalViews) * 100) 
+        : 0;
+    const finalCoverage = (listingCoverage === 0 && analytics.totalListingViews > 0) 
+        ? calculatedCoverage 
+        : listingCoverage;
+    const finalCoverageTone = finalCoverage >= 25 ? 'good' : finalCoverage >= 10 ? 'warn' : 'bad';
+    const coverageMetaText = finalCoverage === 0
+        ? 'No listing view events tracked. Verify listing pages fire view events.'
+        : finalCoverage < 10
+            ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
+            : 'Listing views vs total views';
+
+    // Weekly trend anomaly check
+    const isNewData = rollups.length <= 7 && prev7Views === 0;
+    const displayTrendLabel = isNewData ? 'New' : viewTrendLabel;
+    const displayTrendTone = isNewData ? 'good' : trendTone;
+
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Rollup not updated yet';
         const date = new Date(value);
@@ -531,7 +551,7 @@ export function AnalyticsDashboard({
     };
 
     return (
-        <div className="analytics-dashboard">
+        <div className={`analytics-dashboard ${refreshing ? 'refreshing' : ''}`}>
             <div className="analytics-actions">
                 <div className="analytics-actions-left">
                     <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
@@ -705,9 +725,9 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 <div className="insights-grid">
-                    <div className={`insight-card ${trendTone}`}>
+                    <div className={`insight-card ${displayTrendTone}`}>
                         <div className="insight-label">Weekly views trend</div>
-                        <div className={`insight-value ${viewTrendDirection}`}>{viewTrendLabel}</div>
+                        <div className={`insight-value ${isNewData ? 'flat' : viewTrendDirection}`}>{displayTrendLabel}</div>
                         <div className="insight-meta">{viewsLast7.toLocaleString()} vs {prev7Views.toLocaleString()} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
@@ -716,21 +736,21 @@ export function AnalyticsDashboard({
                         <div className="insight-meta">From listing views to card clicks</div>
                     </div>
                     <div className={`insight-card ${funnelDropTone}`}>
-                        <div className="insight-label">Funnel drop</div>
+                        <div className="insight-label">Drop-off rate</div>
                         <div className="insight-value">{insights?.funnelDropRate ?? 0}%</div>
-                        <div className="insight-meta">Listing views to card clicks</div>
+                        <div className="insight-meta">Listing views not clicked</div>
                     </div>
-                    <div className={`insight-card ${coverageTone}`}>
+                    <div className={`insight-card ${finalCoverageTone}`}>
                         <div className="insight-label">Tracking coverage</div>
-                        <div className="insight-value">{listingCoverage}%</div>
-                        <div className="insight-meta">{coverageMeta}</div>
+                        <div className="insight-value">{finalCoverage}%</div>
+                        <div className="insight-meta">{coverageMetaText}</div>
                     </div>
                     <div className="insight-card">
                         <div className="insight-label">Top listing type</div>
                         <div className="insight-value">{insights?.topType?.type ?? 'N/A'}</div>
                         <div className="insight-meta">
                             {insights?.topType
-                                ? `${insights.topType.count} posts - ${insights.topType.share ?? 0}% share`
+                                ? `${insights.topType.count} posts - ${(insights.topType.share ?? 0).toFixed(1)}% share`
                                 : 'No dominant type yet'}
                         </div>
                     </div>
@@ -739,7 +759,7 @@ export function AnalyticsDashboard({
                         <div className="insight-value">{insights?.topCategory?.category ?? 'N/A'}</div>
                         <div className="insight-meta">
                             {insights?.topCategory
-                                ? `${insights.topCategory.count} posts - ${insights.topCategory.share ?? 0}% share`
+                                ? `${insights.topCategory.count} posts - ${(insights.topCategory.share ?? 0).toFixed(1)}% share`
                                 : 'No dominant category yet'}
                         </div>
                     </div>
@@ -770,7 +790,10 @@ export function AnalyticsDashboard({
                 <div className="funnel-grid">
                     {funnelSteps.map((step, index) => (
                         <div key={step.label} className="funnel-card">
-                            <div className="funnel-label">{step.label}</div>
+                            <div className="funnel-label" title={step.label === 'Detail views (adjusted)' ? 'Capped at card clicks to calculate conversion' : undefined}>
+                                {step.label}
+                                {step.label === 'Detail views (adjusted)' && <span className="info-icon" title="Adjusted to not exceed card clicks for valid conversion rates">ⓘ</span>}
+                            </div>
                             <div className="funnel-value">{step.value.toLocaleString()}</div>
                             {index > 0 && (
                                 <div className="funnel-rate">
@@ -782,14 +805,15 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>⚠ Funnel anomaly:</strong> Detail views ({rawDetailViews.toLocaleString()}) exceed card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
-                        Funnel rates use the adjusted value ({adjustedDetailViews.toLocaleString()}).
-                        <div className="analytics-suggestion">Suggestion: Check SEO/direct traffic tracking and card click events for consistency.</div>
+                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({rawDetailViews.toLocaleString()}) exceed Card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
+                        <br />
+                        The funnel uses the adjusted value ({adjustedDetailViews.toLocaleString()}) to ensure percentages make sense.
+                        <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
                     </div>
                 )}
-                {funnelHasDirectTraffic && (
+                {funnelHasDirectTraffic && !hasAnomaly && (
                     <p className="analytics-hint">
-                        Detail views can exceed card clicks because they include direct/SEO visits and deep links.
+                        Detail views include direct/SEO visits, so they may exceed card clicks.
                     </p>
                 )}
             </div>
@@ -1015,163 +1039,6 @@ export function AnalyticsDashboard({
                         </div>
                     </div>
                 )}
-            </div>
-
-            <div className="analytics-section">
-                <div className="analytics-section-header">
-                    <div>
-                        <h3>Trend Lines</h3>
-                        <p className="analytics-subtitle">Daily views vs searches for the selected range.</p>
-                    </div>
-                    {zeroTrendCount > 0 && (
-                        <button
-                            className="admin-btn secondary small"
-                            onClick={() => setShowZeroTrend((prev) => !prev)}
-                        >
-                            {showZeroTrend ? `Hide ${zeroTrendCount} zero days` : `Show ${zeroTrendCount} zero days`}
-                        </button>
-                    )}
-                </div>
-                {trendRows.length === 0 ? (
-                    <div className="empty-state">
-                        {rollups.length === 0
-                            ? 'No rollup data yet.'
-                            : 'All days are zero-activity. Toggle to show them.'}
-                    </div>
-                ) : (
-                    <>
-                        <div className="trend-chart-wrap">
-                            <TrendChart
-                                data={trendRows.map((item) => ({
-                                    date: item.date,
-                                    views: item.views ?? 0,
-                                    searches: item.searches ?? 0,
-                                }))}
-                            />
-                            <div className="trend-legend">
-                                <span className="legend-item views">Views</span>
-                                <span className="legend-item searches">Searches</span>
-                            </div>
-                        </div>
-                        <div className="trend-list">
-                            {trendRows.map((item) => (
-                                <div key={item.date} className="trend-row">
-                                    <div className="trend-date">{item.date}</div>
-                                    <div className="trend-bars">
-                                        <div
-                                            className="trend-bar views"
-                                            style={{ width: `${(item.views / maxViews) * 100}%` }}
-                                        />
-                                        <div
-                                            className="trend-bar searches"
-                                            style={{ width: `${(item.searches / maxSearches) * 100}%` }}
-                                        />
-                                    </div>
-                                    <div className="trend-values">
-                                        {item.views} views · {item.searches} searches
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </>
-                )}
-                {analytics.rollupLastUpdatedAt && (
-                    <div className="analytics-subtitle">Last rollup: {new Date(analytics.rollupLastUpdatedAt).toLocaleString()}</div>
-                )}
-            </div>
-
-            {/* Type Breakdown with Donut Chart */}
-            <div className="analytics-section">
-                <h3>Posts by Type</h3>
-                <div className="chart-container">
-                    {/* CSS Donut Chart */}
-                    <div className="donut-chart">
-                        <DonutChart data={sortedTypeBreakdown} total={analytics.totalAnnouncements} />
-                        <div className="donut-center">
-                            <span className="donut-value">{analytics.totalAnnouncements}</span>
-                            <span className="donut-label">Total</span>
-                        </div>
-                    </div>
-                    {/* Breakdown Bars */}
-                    <div className="type-breakdown">
-                        {sortedTypeBreakdown.map((item) => {
-                            const percent = analytics.totalAnnouncements > 0
-                                ? (item.count / analytics.totalAnnouncements) * 100
-                                : 0;
-                            const barColor = TYPE_COLORS[item.type] || '#6B7280';
-                            return (
-                                <div key={item.type} className="breakdown-item">
-                                    <span className={`type-badge ${item.type}`}>{item.type}</span>
-                                    <div className="breakdown-bar">
-                                        <div
-                                            className="breakdown-fill"
-                                            style={{ width: `${percent}%`, backgroundColor: barColor }}
-                                        />
-                                    </div>
-                                    <span className="breakdown-count">{item.count}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            {/* Popular Announcements */}
-            <div className="analytics-section">
-                <div className="analytics-section-header">
-                    <div>
-                        <h3>Most Popular Announcements</h3>
-                        <p className="analytics-subtitle">Top 10 announcements by total views with quick actions.</p>
-                    </div>
-                </div>
-                <table className="analytics-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Title</th>
-                            <th>Type</th>
-                            <th className="numeric">Views</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(popular ?? []).map((item, index) => (
-                            <tr key={item.id}>
-                                <td>{index + 1}</td>
-                                <td>{item.title.substring(0, 50)}{item.title.length > 50 ? '...' : ''}</td>
-                                <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                <td className="view-count numeric">{(item.viewCount ?? 0).toLocaleString()}</td>
-                                <td>
-                                    <div className="table-actions compact">
-                                        <button className="admin-btn secondary small" onClick={() => handlePopularView(item)}>View</button>
-                                        <button className="admin-btn secondary small" onClick={() => handlePopularEdit(item)}>Edit</button>
-                                        <button
-                                            className="admin-btn warning small"
-                                            onClick={() => handlePopularUnpublish(item)}
-                                            disabled={item.status === 'archived'}
-                                        >
-                                            Unpublish
-                                        </button>
-                                        <button className="admin-btn secondary small" onClick={handlePopularBoost}>Boost</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Category Breakdown */}
-            <div className="analytics-section">
-                <h3>Top Categories</h3>
-                <div className="category-chips">
-                    {sortedCategories.map((item) => (
-                        <div key={item.category} className="category-chip">
-                            <span className="category-name">{item.category}</span>
-                            <span className="category-count">{item.count}</span>
-                        </div>
-                    ))}
-                </div>
             </div>
         </div>
     );

@@ -7,7 +7,6 @@ export const CONTENT_TYPES: { value: ContentType; label: string }[] = [
     { value: 'answer-key', label: 'Answer Keys' },
     { value: 'syllabus', label: 'Syllabus' },
     { value: 'admission', label: 'Admission' },
-    { value: 'important', label: 'Important' },
 ];
 
 export const STATUS_OPTIONS: { value: AnnouncementStatus; label: string }[] = [

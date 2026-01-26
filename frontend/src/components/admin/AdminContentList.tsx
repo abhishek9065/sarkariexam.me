@@ -216,6 +216,7 @@ export function AdminContentList({
                         </thead>
                         <tbody>
                             {items.map((item) => {
+                                if (!item) return null;
                                 const availability = getAvailabilityStatus(item);
                                 const workflow = getWorkflowStatus(item);
 
@@ -252,7 +253,7 @@ export function AdminContentList({
                                                 )}
                                             </div>
                                         </td>
-                                        <td>{item.views.toLocaleString()}</td>
+                                        <td>{(item.viewCount ?? 0).toLocaleString()}</td>
                                         <td>
                                             <div className="row-actions">
                                                 <button className="action-btn" title="View" onClick={() => onView(item)}>
@@ -302,9 +303,3 @@ export function AdminContentList({
     );
 }
 
-// Simple formatter if not imported
-function formatDateTime(value?: string | null) {
-    if (!value) return '-';
-    // ... logic or just assume it's moved to utils later
-    return new Date(value).toLocaleDateString();
-}

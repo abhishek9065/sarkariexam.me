@@ -36,8 +36,10 @@ export type AnnouncementVersion = {
   };
 };
 
-export type Announcement = Omit<components['schemas']['Announcement'], 'jobDetails'> & {
+export type Announcement = Omit<components['schemas']['Announcement'], 'jobDetails' | 'deadline' | 'totalPosts'> & {
   jobDetails?: import('./components/admin/JobPostingForm').JobDetails;
+  deadline?: string | null;
+  totalPosts?: number | null;
   status?: AnnouncementStatus;
   publishAt?: string;
   approvedAt?: string;

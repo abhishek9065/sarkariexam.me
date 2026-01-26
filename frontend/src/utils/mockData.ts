@@ -22,7 +22,7 @@ const mockAnnouncements: Announcement[] = [
         updatedAt: '2024-01-10T00:00:00Z',
         isActive: true,
         viewCount: 15420,
-        tags: [{ id: 1, name: 'UPSC', slug: 'upsc' }]
+        tags: [{ id: '1', name: 'UPSC', slug: 'upsc' }]
     },
     {
         id: '2',
@@ -40,7 +40,7 @@ const mockAnnouncements: Announcement[] = [
         updatedAt: '2024-01-05T00:00:00Z',
         isActive: true,
         viewCount: 23567,
-        tags: [{ id: 3, name: 'SSC', slug: 'ssc' }]
+        tags: [{ id: '3', name: 'SSC', slug: 'ssc' }]
     },
     {
         id: '3',
@@ -57,7 +57,7 @@ const mockAnnouncements: Announcement[] = [
         updatedAt: '2024-01-08T00:00:00Z',
         isActive: true,
         viewCount: 18932,
-        tags: [{ id: 5, name: 'IBPS', slug: 'ibps' }]
+        tags: [{ id: '5', name: 'IBPS', slug: 'ibps' }]
     },
     {
         id: '4',
@@ -74,7 +74,7 @@ const mockAnnouncements: Announcement[] = [
         updatedAt: '2026-01-25T00:00:00Z',
         isActive: true,
         viewCount: 54321,
-        tags: [{ id: 17, name: 'Army', slug: 'army' }]
+        tags: [{ id: '17', name: 'Army', slug: 'army' }]
     },
 
     // RESULTS

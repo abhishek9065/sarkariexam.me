@@ -210,7 +210,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
 
     const labels = TYPE_LABELS[item.type] || TYPE_LABELS['job'];
     const selectionModes = SELECTION_MODES[item.type] || SELECTION_MODES['job'];
-    const daysRemaining = getDaysRemaining(item.deadline);
+    const daysRemaining = getDaysRemaining(item.deadline ?? undefined);
 
     // Type-specific FAQs
     const getFaqs = () => {
@@ -233,7 +233,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
             },
             { 
                 q: 'When will results be declared?', 
-                a: item.resultDate ? `Expected result date: ${formatDate(item.resultDate)}` : 'Result dates will be announced separately. Usually declared 30-90 days after exam completion.' 
+                a: 'Result dates will be announced separately. Usually declared 30-90 days after exam completion.' 
             },
         ];
         
@@ -340,13 +340,13 @@ export function DetailPage({ type: _type }: DetailPageProps) {
 
                         {/* Countdown */}
                         {daysRemaining !== null && (
-                            <div className={`countdown-bar ${isExpired(item.deadline) ? 'expired' : isUrgent(item.deadline) ? 'urgent' : 'active'}`}>
-                                {isExpired(item.deadline) ? (
+                            <div className={`countdown-bar ${isExpired(item.deadline ?? undefined) ? 'expired' : isUrgent(item.deadline ?? undefined) ? 'urgent' : 'active'}`}>
+                                {isExpired(item.deadline ?? undefined) ? (
                                     <span>❌ Closed</span>
                                 ) : (
                                     <>
                                         <span>⏰ {daysRemaining} Days Remaining</span>
-                                        <span>Last: {formatDate(item.deadline)}</span>
+                                        <span>Last: {formatDate(item.deadline ?? undefined)}</span>
                                     </>
                                 )}
                             </div>
@@ -386,7 +386,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                 <h3>Eligibility Criteria</h3>
                                 <div className="eligibility-info">
                                     <div className="eligibility-item">
-                                        <strong>Age Limit:</strong> {item.jobDetails?.ageLimit || 'As per official notification'}
+                                        <strong>Age Limit:</strong> {item.ageLimit || 'As per official notification'}
                                     </div>
                                     <div className="eligibility-item">
                                         <strong>Educational Qualification:</strong> {item.minQualification || 'As specified in notification'}
@@ -431,7 +431,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                 <h3>Key Dates</h3>
                                 <div className="dates-info">
                                     <div className="date-item">
-                                        <strong>Notification Published:</strong> {item.createdAt ? formatDate(item.createdAt) : 'Check official source'}
+                                        <strong>Notification Published:</strong> {item.postedAt ? formatDate(item.postedAt) : 'Check official source'}
                                     </div>
                                     <div className="date-item">
                                         <strong>Application Start:</strong> Refer to official notification

@@ -24,8 +24,8 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
         if (item.updatedAt) {
             return `Updated: ${formatShortDate(item.updatedAt)}`;
         }
-        if (item.createdAt) {
-            return `Posted: ${formatShortDate(item.createdAt)}`;
+        if (item.postedAt) {
+            return `Posted: ${formatShortDate(item.postedAt)}`;
         }
         return '';
     };

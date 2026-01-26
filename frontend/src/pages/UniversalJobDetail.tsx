@@ -48,7 +48,7 @@ export function UniversalJobDetail({
         postName: item.category || 'Various Posts',
         totalPosts: item.totalPosts || 'N/A',
         applyStart: item.postedAt,
-        applyEnd: item.deadline,
+        applyEnd: item.deadline ?? undefined,
         examDate: 'As per Schedule',
         link: item.externalLink || '#',
     };
@@ -81,7 +81,7 @@ export function UniversalJobDetail({
             {/* SEO Meta Tags & Structured Data */}
             <SEOHead
                 title={`${job.title} - ${job.organization}`}
-                description={`Apply for ${job.title} at ${job.organization}. Total ${typeof job.totalPosts === 'number' ? job.totalPosts.toLocaleString() : job.totalPosts} vacancies. Last date: ${formatDate(item.deadline)}.`}
+                description={`Apply for ${job.title} at ${job.organization}. Total ${typeof job.totalPosts === 'number' ? job.totalPosts.toLocaleString() : job.totalPosts} vacancies. Last date: ${formatDate(item.deadline ?? undefined)}.`}
                 canonicalUrl={`https://www.sarkariexams.me/${item.type}/${item.slug}`}
                 ogType="article"
                 keywords={[item.type, item.category, item.organization, 'sarkari result', 'government jobs']}
@@ -91,7 +91,7 @@ export function UniversalJobDetail({
                     title: job.title,
                     organization: job.organization,
                     location: item.location || 'India',
-                    deadline: item.deadline,
+                    deadline: item.deadline ?? undefined,
                     totalPosts: typeof job.totalPosts === 'number' ? job.totalPosts : undefined,
                 }}
             />
