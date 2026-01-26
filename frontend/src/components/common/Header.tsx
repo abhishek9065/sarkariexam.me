@@ -38,13 +38,13 @@ export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, 
                                         onLogout();
                                     }
                                 }} 
-                                aria-label="Logout"
+                                aria-label="Log out"
                             >
                                 Logout
                             </button>
                         </>
                     ) : (
-                        <button className="login-btn" onClick={onLogin} aria-label="Login to account">
+                        <button className="login-btn" onClick={onLogin} aria-label="Log in">
                             <span className="login-icon" aria-hidden="true">🔐</span>
                             <span>Login</span>
                         </button>

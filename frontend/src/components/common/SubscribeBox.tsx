@@ -172,6 +172,11 @@ export function SubscribeBox() {
                         disabled={status === 'loading'}
                         aria-required="true"
                         aria-describedby={message ? 'subscription-message category-hint' : 'category-hint'}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        list=""
                         required
                     />
                     {emailSuggestion && (

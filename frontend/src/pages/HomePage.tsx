@@ -97,7 +97,11 @@ export function HomePage() {
 
     useEffect(() => {
         if (!token) {
-            setRecommendations([]);
+            // Show popular jobs as fallback when not authenticated
+            const popularJobs = data.filter(item => 
+                item.type === 'job' && item.viewCount && item.viewCount > 1000
+            ).slice(0, 6);
+            setRecommendations(popularJobs);
             setRecommendationsError(null);
             return;
         }
@@ -106,14 +110,33 @@ export function HomePage() {
             fetchJson<{ data: Announcement[] }>(`${API_BASE}/api/profile/recommendations?limit=6`, {
                 headers: { Authorization: `Bearer ${token}` },
             }, { timeoutMs: 6000, retries: 1 })
-                .then((body) => setRecommendations(body.data || []))
+                .then((body) => {
+                    const recommendations = body.data || [];
+                    if (recommendations.length === 0) {
+                        // Fallback to popular jobs if no personalized recommendations
+                        const fallbackJobs = data.filter(item => 
+                            item.type === 'job' && item.viewCount && item.viewCount > 500
+                        ).slice(0, 6);
+                        setRecommendations(fallbackJobs);
+                    } else {
+                        setRecommendations(recommendations);
+                    }
+                })
                 .catch((err) => {
                     console.error(err);
-                    setRecommendationsError('Unable to load personalized recommendations.');
+                    // Provide fallback recommendations instead of showing error
+                    const fallbackJobs = data.filter(item => 
+                        item.type === 'job'
+                    ).slice(0, 6);
+                    setRecommendations(fallbackJobs);
+                    // Only show error if no fallback data available
+                    if (fallbackJobs.length === 0) {
+                        setRecommendationsError('Unable to load recommendations. Please try refreshing the page.');
+                    }
                 });
         });
         return () => cancel();
-    }, [token]);
+    }, [token, data]);
 
     // Get data by type for section display
     const getByType = (type: ContentType) => data.filter(item => item.type === type);

@@ -65,7 +65,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                             onClick={() => handleNavClick(item)}
                             onMouseEnter={() => prefetchRoute(item.type)}
                             aria-current={isActive ? 'page' : undefined}
-                            aria-label={`Navigate to ${label} section`}
+                            aria-label={label}
                         >
                             {label}
                         </button>
@@ -74,7 +74,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                 <button 
                     className="nav-search" 
                     onClick={() => { setShowSearch(true); setMobileMenuOpen(false); }}
-                    aria-label="Open search"
+                    aria-label="Search"
                 >
                     <span aria-hidden="true">🔍</span>
                     <span className="search-text">{t('nav.search')}</span>

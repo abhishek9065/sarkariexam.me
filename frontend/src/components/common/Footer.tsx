@@ -43,7 +43,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
             </div>
             <div className="footer-bottom">
                 <p>© 2025-26 SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: January 26, 2026</p>
-                <p className="legal-notice">⚠️ {t('footer.legalNotice')} We recommend checking original notifications for accuracy.</p>
+                <p className="legal-notice">⚠️ {t('footer.legalNotice')}</p>
             </div>
         </footer>
     );
