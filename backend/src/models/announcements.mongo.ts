@@ -699,7 +699,7 @@ export class AnnouncementModelMongo {
         qualification?: string;
         salaryMin?: number;
         salaryMax?: number;
-        sort?: 'newest' | 'oldest' | 'deadline';
+        sort?: 'newest' | 'oldest' | 'deadline' | 'views';
         limit?: number;
         cursor?: string;
     }): Promise<{ data: Announcement[]; nextCursor: string | null; hasMore: boolean }> {
@@ -776,7 +776,7 @@ export class AnnouncementModelMongo {
         qualification?: string;
         salaryMin?: number;
         salaryMax?: number;
-        sort?: 'newest' | 'oldest' | 'deadline';
+        sort?: 'newest' | 'oldest' | 'deadline' | 'views';
         limit?: number;
         cursor?: string;
     }): Promise<{

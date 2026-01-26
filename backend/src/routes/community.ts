@@ -232,15 +232,18 @@ router.patch('/qa/:id/answer', authenticateToken, requirePermission('admin:write
             updatedAt: now,
             answeredBy: parseResult.data.answeredBy ?? null,
         };
-        const result = await qaCollection().findOneAndUpdate(
+        const updateResult = await qaCollection().updateOne(
             { _id: toObjectId(id) } as any,
-            { $set: update },
-            { returnDocument: 'after' }
+            { $set: update }
         );
-        if (!result.value) {
+        if (!updateResult.matchedCount) {
             return res.status(404).json({ error: 'Question not found' });
         }
-        return res.json({ data: formatDoc(result.value) });
+        const updatedDoc = await qaCollection().findOne({ _id: toObjectId(id) } as any);
+        if (!updatedDoc) {
+            return res.status(404).json({ error: 'Question not found' });
+        }
+        return res.json({ data: formatDoc(updatedDoc) });
     } catch (error) {
         console.error('QA answer error:', error);
         return res.status(500).json({ error: 'Failed to answer question' });
