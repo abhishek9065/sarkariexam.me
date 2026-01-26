@@ -8,7 +8,7 @@ import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcem
 import { recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
 import { bumpCacheVersion } from '../services/cacheVersion.js';
 import { sendAnnouncementNotification } from '../services/telegram.js';
-import { ContentType, CreateAnnouncementDto } from '../types.js';
+import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = express.Router();
 
@@ -86,6 +86,141 @@ const cacheGroupsToInvalidate = [
   'announcement',
 ];
 
+const pickQueryValue = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+};
+
+const recordListingAnalytics = (req: express.Request, options: {
+  count: number;
+  type?: string | null;
+  category?: string | null;
+  search?: string | null;
+  organization?: string | null;
+  location?: string | null;
+  qualification?: string | null;
+}) => {
+  recordAnalyticsEvent({
+    type: 'listing_view',
+    metadata: {
+      count: options.count,
+      type: options.type ?? null,
+      category: options.category ?? null,
+    },
+  }).catch(console.error);
+
+  const filterFlags = {
+    type: Boolean(options.type),
+    category: Boolean(options.category),
+    search: Boolean(options.search),
+    organization: Boolean(options.organization),
+    location: Boolean(options.location),
+    qualification: Boolean(options.qualification),
+  };
+  const hasFilter = Object.values(filterFlags).some(Boolean);
+  const isCategoryOnly = (filterFlags.type || filterFlags.category) &&
+    !filterFlags.search &&
+    !filterFlags.organization &&
+    !filterFlags.location &&
+    !filterFlags.qualification;
+
+  if (hasFilter) {
+    recordAnalyticsEvent({
+      type: 'filter_apply',
+      metadata: {
+        ...filterFlags,
+        type: options.type ?? null,
+        category: options.category ?? null,
+      },
+    }).catch(console.error);
+  }
+
+  if (isCategoryOnly) {
+    recordAnalyticsEvent({
+      type: 'category_click',
+      metadata: {
+        type: options.type ?? null,
+        category: options.category ?? null,
+      },
+    }).catch(console.error);
+  }
+
+  if (options.search) {
+    recordAnalyticsEvent({
+      type: 'search',
+      metadata: {
+        queryLength: options.search.length,
+        type: options.type ?? null,
+      },
+    }).catch(console.error);
+  }
+};
+
+const recordAnnouncementAnalytics = (req: express.Request, announcement: Announcement) => {
+  const announcementId = String(announcement.id);
+  AnnouncementModel.incrementViewCount(announcementId).catch(console.error);
+  recordAnnouncementView(announcementId).catch(console.error);
+
+  const source = pickQueryValue(req.query.source) || pickQueryValue(req.query.utm_source);
+  const medium = pickQueryValue(req.query.medium) || pickQueryValue(req.query.utm_medium);
+  const campaign = pickQueryValue(req.query.campaign) || pickQueryValue(req.query.utm_campaign);
+  const content = pickQueryValue(req.query.content) || pickQueryValue(req.query.utm_content);
+  const term = pickQueryValue(req.query.term) || pickQueryValue(req.query.utm_term);
+  const variant = pickQueryValue(req.query.variant) || pickQueryValue(req.query.ab);
+  const digestType = pickQueryValue(req.query.digest) || pickQueryValue(req.query.frequency);
+  const ref = pickQueryValue(req.query.ref);
+
+  const attribution = {
+    source: source ?? null,
+    medium: medium ?? null,
+    campaign: campaign ?? null,
+    content: content ?? null,
+    term: term ?? null,
+    variant: variant ?? null,
+    digestType: digestType ?? null,
+    ref: ref ?? null,
+  };
+
+  recordAnalyticsEvent({
+    type: 'card_click',
+    announcementId,
+    metadata: {
+      type: announcement.type,
+      category: announcement.category ?? null,
+      ...attribution,
+    },
+  }).catch(console.error);
+
+  const hasAttribution = Object.values(attribution).some((value) => value);
+  if (hasAttribution) {
+    recordAnalyticsEvent({
+      type: 'deep_link_click',
+      announcementId,
+      metadata: {
+        type: announcement.type,
+        category: announcement.category ?? null,
+        ...attribution,
+      },
+    }).catch(console.error);
+  }
+
+  const sourceValue = (source || '').toLowerCase();
+  const campaignValue = (campaign || '').toLowerCase();
+  const isDigest = sourceValue === 'digest' || campaignValue.includes('digest') || Boolean(digestType);
+  if (isDigest) {
+    recordAnalyticsEvent({
+      type: 'digest_click',
+      announcementId,
+      metadata: {
+        type: announcement.type,
+        category: announcement.category ?? null,
+        ...attribution,
+      },
+    }).catch(console.error);
+  }
+};
+
 async function invalidateAnnouncementCaches(): Promise<void> {
   await Promise.all(cacheGroupsToInvalidate.map(group => bumpCacheVersion(group)));
 }
@@ -141,7 +276,29 @@ router.get(
 // V3: OPTIMIZED listing cards (minimal fields, 60% less RU consumption)
 router.get(
   '/v3/cards',
-  cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcementsV3Cards }),
+  cacheMiddleware({
+    ttl: 300,
+    keyGenerator: cacheKeys.announcementsV3Cards,
+    onHit: (req, cachedData) => {
+      const type = pickQueryValue(req.query.type);
+      const category = pickQueryValue(req.query.category);
+      const search = pickQueryValue(req.query.search);
+      const organization = pickQueryValue(req.query.organization);
+      const location = pickQueryValue(req.query.location);
+      const qualification = pickQueryValue(req.query.qualification);
+      const count = Array.isArray(cachedData?.data) ? cachedData.data.length : 0;
+
+      recordListingAnalytics(req, {
+        count,
+        type,
+        category,
+        search,
+        organization,
+        location,
+        qualification,
+      });
+    },
+  }),
   cacheControl(120),
   async (req, res) => {
     try {
@@ -165,50 +322,15 @@ router.get(
       cursor: filters.cursor?.toString(),
     });
 
-    const filterFlags = {
-      type: Boolean(filters.type),
-      category: Boolean(filters.category),
-      search: Boolean(filters.search),
-      organization: Boolean(filters.organization),
-      location: Boolean(filters.location),
-      qualification: Boolean(filters.qualification),
-    };
-    const hasFilter = Object.values(filterFlags).some(Boolean);
-    const isCategoryOnly = (filterFlags.type || filterFlags.category) &&
-      !filterFlags.search &&
-      !filterFlags.organization &&
-      !filterFlags.location &&
-      !filterFlags.qualification;
-
-    recordAnalyticsEvent({
-      type: 'listing_view',
-      metadata: {
-        count: result.data.length,
-        type: filters.type ?? null,
-        category: filters.category ?? null,
-      },
-    }).catch(console.error);
-
-    if (hasFilter) {
-      recordAnalyticsEvent({
-        type: 'filter_apply',
-        metadata: {
-          ...filterFlags,
-          type: filters.type ?? null,
-          category: filters.category ?? null,
-        },
-      }).catch(console.error);
-    }
-
-    if (isCategoryOnly) {
-      recordAnalyticsEvent({
-        type: 'category_click',
-        metadata: {
-          type: filters.type ?? null,
-          category: filters.category ?? null,
-        },
-      }).catch(console.error);
-    }
+    recordListingAnalytics(req, {
+      count: result.data.length,
+      type: filters.type ?? null,
+      category: filters.category ?? null,
+      search: filters.search ?? null,
+      organization: filters.organization ?? null,
+      location: filters.location ?? null,
+      qualification: filters.qualification ?? null,
+    });
 
     return res.json({
       data: result.data,
@@ -317,7 +439,19 @@ router.get(
 );
 
 // Get single announcement by slug - with caching (10 min server, 5 min browser)
-router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announcementBySlug }), cacheControl(300), async (req, res) => {
+router.get(
+  '/:slug',
+  cacheMiddleware({
+    ttl: 600,
+    keyGenerator: cacheKeys.announcementBySlug,
+    onHit: (req, cachedData) => {
+      const announcement = cachedData?.data as Announcement | undefined;
+      if (!announcement) return;
+      recordAnnouncementAnalytics(req, announcement);
+    },
+  }),
+  cacheControl(300),
+  async (req, res) => {
   try {
     const announcement = await AnnouncementModel.findBySlug(req.params.slug);
 
@@ -325,72 +459,7 @@ router.get('/:slug', cacheMiddleware({ ttl: 600, keyGenerator: cacheKeys.announc
       return res.status(404).json({ error: 'Announcement not found' });
     }
 
-    // Increment view count (fire and forget, don't block response)
-    AnnouncementModel.incrementViewCount(String(announcement.id)).catch(console.error);
-    recordAnnouncementView(String(announcement.id)).catch(console.error);
-    const pickQuery = (value: unknown): string | undefined => {
-      if (typeof value === 'string') return value;
-      if (Array.isArray(value)) return value[0];
-      return undefined;
-    };
-
-    const source = pickQuery(req.query.source) || pickQuery(req.query.utm_source);
-    const medium = pickQuery(req.query.medium) || pickQuery(req.query.utm_medium);
-    const campaign = pickQuery(req.query.campaign) || pickQuery(req.query.utm_campaign);
-    const content = pickQuery(req.query.content) || pickQuery(req.query.utm_content);
-    const term = pickQuery(req.query.term) || pickQuery(req.query.utm_term);
-    const variant = pickQuery(req.query.variant) || pickQuery(req.query.ab);
-    const digestType = pickQuery(req.query.digest) || pickQuery(req.query.frequency);
-    const ref = pickQuery(req.query.ref);
-
-    const attribution = {
-      source: source ?? null,
-      medium: medium ?? null,
-      campaign: campaign ?? null,
-      content: content ?? null,
-      term: term ?? null,
-      variant: variant ?? null,
-      digestType: digestType ?? null,
-      ref: ref ?? null,
-    };
-
-    recordAnalyticsEvent({
-      type: 'card_click',
-      announcementId: String(announcement.id),
-      metadata: {
-        type: announcement.type,
-        category: announcement.category ?? null,
-        ...attribution,
-      },
-    }).catch(console.error);
-
-    const hasAttribution = Object.values(attribution).some((value) => value);
-    if (hasAttribution) {
-      recordAnalyticsEvent({
-        type: 'deep_link_click',
-        announcementId: String(announcement.id),
-        metadata: {
-          type: announcement.type,
-          category: announcement.category ?? null,
-          ...attribution,
-        },
-      }).catch(console.error);
-    }
-
-    const sourceValue = (source || '').toLowerCase();
-    const campaignValue = (campaign || '').toLowerCase();
-    const isDigest = sourceValue === 'digest' || campaignValue.includes('digest') || Boolean(digestType);
-    if (isDigest) {
-      recordAnalyticsEvent({
-        type: 'digest_click',
-        announcementId: String(announcement.id),
-        metadata: {
-          type: announcement.type,
-          category: announcement.category ?? null,
-          ...attribution,
-        },
-      }).catch(console.error);
-    }
+    recordAnnouncementAnalytics(req, announcement);
 
     return res.json({ data: announcement });
     } catch (error) {

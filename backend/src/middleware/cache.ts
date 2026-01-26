@@ -7,6 +7,7 @@ import { getCache, setCache } from '../utils/cache.js';
 interface CacheOptions {
     ttl?: number; // Time to live in seconds
     keyGenerator?: (req: Request) => string;
+    onHit?: (req: Request, data: any) => void | Promise<void>;
 }
 
 /**
@@ -15,7 +16,7 @@ interface CacheOptions {
  * Usage: app.get('/api/endpoint', cacheMiddleware({ ttl: 300 }), handler)
  */
 export function cacheMiddleware(options: CacheOptions = {}) {
-    const { ttl = 300, keyGenerator } = options;
+    const { ttl = 300, keyGenerator, onHit } = options;
 
     return async (req: Request, res: Response, next: NextFunction) => {
         // Only cache GET requests
@@ -57,6 +58,11 @@ export function cacheMiddleware(options: CacheOptions = {}) {
         }
 
         if (cachedData) {
+            if (onHit) {
+                Promise.resolve(onHit(req, cachedData)).catch((err) => {
+                    console.error('[Cache] onHit handler failed:', err);
+                });
+            }
             res.set('X-Cache', RedisCache.isAvailable() ? 'HIT-REDIS' : 'HIT-MEMORY');
             res.set('X-Cache-Key', cacheKey);
             return res.json(cachedData);
