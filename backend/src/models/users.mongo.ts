@@ -106,16 +106,27 @@ export class UserModelMongo {
                 isActive: true
             });
 
-            if (!doc) return null;
+            if (!doc) {
+                console.warn(`[Auth] User not found or inactive: ${email}`);
+                return null;
+            }
 
             const isValid = await bcrypt.compare(password, doc.passwordHash);
-            if (!isValid) return null;
+            if (!isValid) {
+                console.warn(`[Auth] Invalid password attempt for: ${email}`);
+                return null;
+            }
 
-            // Update last login
-            await this.collection.updateOne(
-                { _id: doc._id },
-                { $set: { lastLogin: new Date() } }
-            );
+            // Update last login with error handling
+            try {
+                await this.collection.updateOne(
+                    { _id: doc._id },
+                    { $set: { lastLogin: new Date() } }
+                );
+            } catch (updateError) {
+                console.error('[Auth] Failed to update last login:', updateError);
+                // Continue with login even if lastLogin update fails
+            }
 
             return this.docToUser(doc);
         } catch (error) {

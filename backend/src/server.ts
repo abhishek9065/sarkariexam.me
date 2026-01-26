@@ -140,7 +140,16 @@ app.use('/api/profile', profileRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
+// 404 handler for API routes
+app.use('/api/*', (_req, res) => {
+  res.status(404).json({ 
+    error: 'Endpoint not found',
+    message: 'The requested API endpoint does not exist.'
+  });
+});
 
+// Global error handler (must be last)
+app.use(errorHandler);
 // Global Error Handler
 app.use(errorHandler);
 

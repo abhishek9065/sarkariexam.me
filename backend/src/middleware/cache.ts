@@ -23,10 +23,28 @@ export function cacheMiddleware(options: CacheOptions = {}) {
             return next();
         }
 
-        // Generate cache key
-        const baseKey = keyGenerator
+        // Generate cache key with user context for personalized content
+        let baseKey = keyGenerator
             ? keyGenerator(req)
             : `${req.originalUrl || req.url}`;
+
+        // Include user ID for authenticated requests to prevent data leaks
+        if (req.user?.userId) {
+            baseKey = `user:${req.user.userId}:${baseKey}`;
+        }
+
+        // Normalize query parameters to prevent key variations
+        const url = new URL(req.originalUrl || req.url, 'http://localhost');
+        const sortedParams = Array.from(url.searchParams.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}=${value}`)
+            .join('&');
+        
+        if (sortedParams) {
+            baseKey = `${url.pathname}?${sortedParams}`;
+        } else {
+            baseKey = url.pathname;
+        }
 
         const group = baseKey.split(':')[0] || baseKey;
         const version = await getCacheVersion(group);
@@ -40,6 +58,7 @@ export function cacheMiddleware(options: CacheOptions = {}) {
 
         if (cachedData) {
             res.set('X-Cache', RedisCache.isAvailable() ? 'HIT-REDIS' : 'HIT-MEMORY');
+            res.set('X-Cache-Key', cacheKey);
             return res.json(cachedData);
         }
 
@@ -48,11 +67,17 @@ export function cacheMiddleware(options: CacheOptions = {}) {
 
         // Override json to cache the response
         res.json = (data: any) => {
-            // Store in Redis (async, non-blocking)
-            RedisCache.set(cacheKey, data, ttl).catch(console.error);
-            // Also store in memory as fallback
-            setCache(cacheKey, data, ttl);
+            // Only cache successful responses
+            if (res.statusCode === 200) {
+                // Store in Redis (async, non-blocking)
+                RedisCache.set(cacheKey, data, ttl).catch(err => {
+                    console.error('[Cache] Redis set failed:', err);
+                });
+                // Also store in memory as fallback
+                setCache(cacheKey, data, ttl);
+            }
             res.set('X-Cache', 'MISS');
+            res.set('X-Cache-Key', cacheKey);
             return originalJson(data);
         };
 
@@ -126,6 +151,17 @@ export const cacheKeys = {
         return `calendar:${year}:${month}`;
     },
 
+    jobMatch: (req: Request) => {
+        const params = [
+            `age:${req.query.age || ''}`,
+            `qualification:${req.query.qualification || ''}`,
+            `location:${req.query.location || ''}`,
+            `category:${req.query.category || ''}`,
+            `gender:${req.query.gender || ''}`,
+        ];
+        return `job-match:${params.join(':')}`;
+    },
+
     search: (req: Request) => {
         // Include all search parameters
         const params = [
@@ -135,16 +171,5 @@ export const cacheKeys = {
             `offset:${req.query.offset || 0}`,
         ];
         return `search:${params.join(':')}`;
-    },
-
-    jobMatch: (req: Request) => {
-        const params = [
-            `age:${req.query.age || ''}`,
-            `qual:${req.query.qualification || ''}`,
-            `loc:${req.query.location || ''}`,
-            `cat:${req.query.category || ''}`,
-            `gen:${req.query.gender || ''}`,
-        ];
-        return `jobmatch:${params.join(':')}`;
     },
 };
