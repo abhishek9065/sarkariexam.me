@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 
 import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
@@ -11,6 +12,17 @@ const popularCache: { data: any | null; expiresAt: number } = {
     expiresAt: 0,
 };
 
+// Input validation schemas
+const analyticsQuerySchema = z.object({
+    days: z.coerce.number().int().min(1).max(90).default(30),
+    nocache: z.string().optional().transform(val => val === '1')
+});
+
+const popularQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(50).default(10),
+    nocache: z.string().optional().transform(val => val === '1')
+});
+
 const router = Router();
 
 // All analytics routes require admin authentication
@@ -22,13 +34,19 @@ router.use(authenticateToken, requirePermission('analytics:read'));
  */
 router.get('/overview', async (req, res) => {
     try {
-        const daysParam = parseInt(req.query.days as string, 10);
-        const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
-        const bypassCache = req.query.nocache === '1';
+        const parseResult = analyticsQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ 
+                error: 'Invalid query parameters',
+                details: parseResult.error.flatten().fieldErrors
+            });
+        }
+        
+        const { days, nocache: bypassCache } = parseResult.data;
         const { data, cached } = await getAnalyticsOverview(days, { bypassCache });
         return res.json({ data, cached });
     } catch (error) {
-        console.error('Analytics overview error:', error);
+        console.error('[Analytics] Overview error:', error);
         return res.status(500).json({ error: 'Failed to load analytics' });
     }
 });
@@ -39,11 +57,20 @@ router.get('/overview', async (req, res) => {
  */
 router.get('/popular', async (req, res) => {
     try {
-        if (!req.query.nocache && popularCache.data && popularCache.expiresAt > Date.now()) {
+        const parseResult = popularQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ 
+                error: 'Invalid query parameters',
+                details: parseResult.error.flatten().fieldErrors
+            });
+        }
+        
+        const { limit, nocache: bypassCache } = parseResult.data;
+        
+        if (!bypassCache && popularCache.data && popularCache.expiresAt > Date.now()) {
             return res.json({ data: popularCache.data, cached: true });
         }
 
-        const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
         const announcements = await AnnouncementModelMongo.getTrending({ limit });
 
         const payload = announcements.map(a => ({

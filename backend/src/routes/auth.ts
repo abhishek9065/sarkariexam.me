@@ -3,7 +3,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { config } from '../config.js';
-import { AUTH_COOKIE_NAME, blacklistToken } from '../middleware/auth.js';
+import { AUTH_COOKIE_NAME, blacklistToken, isTokenBlacklisted } from '../middleware/auth.js';
 import {
   bruteForceProtection,
   recordFailedLogin,
@@ -88,10 +88,18 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'Email already registered. Please log in.' });
     }
 
+    // Determine user role based on admin allowlist
+    let userRole: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user' = 'user';
+    if (isAdminEmailAllowed(validated.email)) {
+      userRole = 'admin';
+      console.log(`[Auth] Admin registration: ${validated.email}`);
+    }
+
     const user = await UserModelMongo.create({
       email: validated.email,
       username: validated.name,
       password: validated.password,
+      role: userRole
     });
 
     const token = jwt.sign(
@@ -237,22 +245,61 @@ router.get('/me', async (req, res) => {
     const headerToken = authHeader && authHeader.split(' ')[1];
     const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
     const token = headerToken || cookieToken;
+    
     if (!token) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
+
+    // Check if token is blacklisted
+    if (await isTokenBlacklisted(token)) {
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
     const verifyOptions: jwt.VerifyOptions = {};
     if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
     if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
-    const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as { userId: string };
+    
+    const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as { userId: string; role?: string };
     const user = await UserModelMongo.findById(decoded.userId);
-    if (!user) {
-      return res.status(401).json({ error: 'Not authenticated' });
+    
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'User account deactivated' });
     }
+
+    // For admin users, verify they still have admin privileges
+    if (decoded.role === 'admin' && user.role !== 'admin') {
+      console.warn(`[Auth] Admin privilege removed: ${user.email}`);
+      await blacklistToken(token);
+      return res.status(401).json({ 
+        error: 'Admin privileges revoked',
+        code: 'PRIVILEGES_REVOKED'
+      });
+    }
+
     return res.json({
-      data: { user: { id: user.id, email: user.email, name: user.username, role: user.role } },
+      data: { 
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.username, 
+          role: user.role 
+        } 
+      },
     });
-  } catch {
-    return res.status(401).json({ error: 'Not authenticated' });
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ 
+        error: 'Token expired',
+        code: 'TOKEN_EXPIRED'
+      });
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ 
+        error: 'Invalid token',
+        code: 'TOKEN_INVALID'
+      });
+    }
+    console.error('[Auth] Me endpoint error:', error);
+    return res.status(401).json({ error: 'Authentication failed' });
   }
 });
 

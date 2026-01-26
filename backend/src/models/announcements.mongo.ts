@@ -21,22 +21,31 @@ function buildStringFilter(value?: string) {
     if (values.length > 1) {
         return { $in: values };
     }
-    return { $regex: values[0], $options: 'i' };
+    return { $regex: escapeRegex(values[0]), $options: 'i' };
 }
 
 function buildSearchRegexes(value: string): RegExp[] {
     const trimmed = value.trim();
     if (!trimmed) return [];
-    const exact = new RegExp(escapeRegex(trimmed), 'i');
-    const words = trimmed.split(/\s+/).filter(Boolean);
-    const fuzzyPattern = words
-        .map(word => word.split('').map(char => escapeRegex(char)).join('.*?'))
-        .join('.*');
-    const regexes = [exact];
-    if (trimmed.length >= 4 && fuzzyPattern.length > 0) {
-        regexes.push(new RegExp(fuzzyPattern, 'i'));
+    
+    // Limit input length to prevent ReDoS attacks
+    if (trimmed.length > 100) {
+        throw new Error('Search query too long');
     }
-    return regexes;
+    
+    const exact = new RegExp(escapeRegex(trimmed), 'i');
+    
+    // Only allow fuzzy search for reasonable lengths and simple patterns
+    if (trimmed.length >= 4 && trimmed.length <= 20 && /^[a-zA-Z0-9\s]+$/.test(trimmed)) {
+        const words = trimmed.split(/\s+/).filter(Boolean).slice(0, 5); // Limit words
+        const fuzzyPattern = words
+            .map(word => word.split('').slice(0, 10).map(char => escapeRegex(char)).join('.*?'))
+            .join('.*');
+        
+        return [exact, new RegExp(fuzzyPattern, 'i')];
+    }
+    
+    return [exact];
 }
 
 interface AnnouncementVersionDoc {
@@ -223,11 +232,11 @@ function buildAdminQuery(filters?: {
     }
 
     if (filters?.location) {
-        query.location = { $regex: filters.location, $options: 'i' };
+        query.location = { $regex: escapeRegex(filters.location), $options: 'i' };
     }
 
     if (filters?.qualification) {
-        query.minQualification = { $regex: filters.qualification, $options: 'i' };
+        query.minQualification = { $regex: escapeRegex(filters.qualification), $options: 'i' };
     }
 
     if (filters?.search && filters.search.trim()) {

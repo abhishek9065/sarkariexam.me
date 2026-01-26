@@ -12,6 +12,15 @@ import { ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = express.Router();
 
+// Add rate limiting info to responses
+router.use((req, res, next) => {
+    // Add API version header
+    res.set('X-API-Version', '2.0.0');
+    // Add request timestamp
+    res.set('X-Request-Time', new Date().toISOString());
+    next();
+});
+
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
 const dateField = z
   .string()
@@ -24,11 +33,11 @@ const querySchema = z.object({
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
     .optional(),
-  search: z.string().trim().optional(),
-  category: z.string().trim().optional(),
-  organization: z.string().trim().optional(),
-  location: z.string().trim().optional(),
-  qualification: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
+  category: z.string().trim().max(50).optional(),
+  organization: z.string().trim().max(100).optional(),
+  location: z.string().trim().max(50).optional(),
+  qualification: z.string().trim().max(50).optional(),
   salaryMin: z.coerce.number().min(0).optional(),
   salaryMax: z.coerce.number().min(0).optional(),
   sort: z.enum(['newest', 'oldest', 'deadline', 'views']).default('newest'),
@@ -38,7 +47,7 @@ const querySchema = z.object({
 
 // Search schema
 const searchQuerySchema = z.object({
-  q: z.string().trim().min(2),
+  q: z.string().trim().min(2).max(100),
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
     .optional(),
@@ -267,12 +276,25 @@ router.get(
     try {
       const parseResult = searchQuerySchema.safeParse(req.query);
       if (!parseResult.success) {
-        return res.status(400).json({ error: parseResult.error.flatten() });
+        return res.status(400).json({ 
+          error: 'Invalid search parameters',
+          details: parseResult.error.flatten().fieldErrors
+        });
       }
 
       const filters = parseResult.data;
+      
+      // Sanitize search query to prevent injection attacks
+      const sanitizedQuery = filters.q.replace(/[<>\"'&$]/g, '').trim();
+      if (sanitizedQuery.length < 2) {
+        return res.status(400).json({ 
+          error: 'Search query too short',
+          message: 'Search query must be at least 2 characters after sanitization'
+        });
+      }
+      
       const announcements = await AnnouncementModel.findAll({
-        search: filters.q,
+        search: sanitizedQuery,
         type: filters.type,
         limit: filters.limit,
         offset: filters.offset,

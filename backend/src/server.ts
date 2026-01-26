@@ -23,6 +23,7 @@ import {
   enforceAdminIpAllowlist
 } from './middleware/security.js';
 import adminRouter from './routes/admin.js';
+import adminSetupRouter from './routes/admin-setup.js';
 import analyticsRouter from './routes/analytics.js';
 import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
@@ -131,6 +132,7 @@ app.get('/api/performance', authenticateToken, requirePermission('admin:read'), 
 
 // Core Routes (MongoDB-based)
 app.use('/api/auth', authRouter);
+app.use('/api/auth/admin', adminSetupRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/analytics', analyticsRouter);
@@ -142,8 +144,17 @@ app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
 app.use('/api/community', communityRouter);
+app.use('/api/community', communityRouter);
 
-// Global Error Handler
+// 404 handler for API routes
+app.use('/api/*', (_req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found',
+    message: 'The requested API endpoint does not exist.'
+  });
+});
+
+// Global error handler (must be last)
 app.use(errorHandler);
 
 // Initialize database and start server

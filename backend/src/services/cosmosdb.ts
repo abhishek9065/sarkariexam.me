@@ -7,6 +7,10 @@ import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 
 let client: MongoClient | null = null;
 let db: Db | null = null;
+let isConnecting = false;
+let connectionRetries = 0;
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 5000;
 
 const getConnectionString = (): string | undefined =>
     process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
@@ -15,59 +19,147 @@ const getDatabaseName = (): string =>
     process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
 
 /**
- * Initialize MongoDB/Cosmos DB connection
+ * Sleep utility for delays
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Initialize MongoDB/Cosmos DB connection with retry logic
  */
 export async function connectToDatabase(): Promise<Db> {
     if (db) return db;
+    
+    // Prevent multiple concurrent connection attempts
+    if (isConnecting) {
+        while (isConnecting) {
+            await sleep(100);
+        }
+        if (db) return db;
+    }
+
+    isConnecting = true;
 
     const connectionString = getConnectionString();
     if (!connectionString) {
+        isConnecting = false;
         throw new Error('COSMOS_CONNECTION_STRING or MONGODB_URI is not configured');
     }
 
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            console.log(`[CosmosDB] Connection attempt ${attempt}/${MAX_RETRIES}...`);
+
+            client = new MongoClient(connectionString, {
+                // Cosmos DB specific settings
+                retryWrites: false, // Cosmos DB doesn't support retryWrites
+                maxPoolSize: 10,
+                minPoolSize: 1,
+                connectTimeoutMS: 30000,
+                socketTimeoutMS: 360000,
+                serverSelectionTimeoutMS: 10000,
+                heartbeatFrequencyMS: 30000,
+            });
+
+            await client.connect();
+            const databaseName = getDatabaseName();
+            db = client.db(databaseName);
+
+            // Test the connection
+            await db.admin().ping();
+
+            console.log('[CosmosDB] Connected successfully to:', databaseName);
+            connectionRetries = 0;
+            isConnecting = false;
+
+            // Create indexes
+            try {
+                await createIndexes();
+            } catch (indexError) {
+                console.warn('[CosmosDB] Index creation failed:', indexError);
+                // Don't fail connection for index issues
+            }
+
+            // Setup connection monitoring
+            client.on('close', () => {
+                console.warn('[CosmosDB] Connection closed');
+                db = null;
+                client = null;
+            });
+
+            client.on('error', (error) => {
+                console.error('[CosmosDB] Connection error:', error);
+                db = null;
+                client = null;
+            });
+
+            return db;
+        } catch (error) {
+            console.error(`[CosmosDB] Connection attempt ${attempt} failed:`, error);
+            connectionRetries = attempt;
+            
+            // Clean up failed connection
+            if (client) {
+                try {
+                    await client.close();
+                } catch {
+                    // Ignore close errors
+                }
+                client = null;
+            }
+            db = null;
+
+            if (attempt === MAX_RETRIES) {
+                isConnecting = false;
+                throw new Error(`Failed to connect to database after ${MAX_RETRIES} attempts: ${error}`);
+            }
+
+            // Wait before retry
+            console.log(`[CosmosDB] Retrying in ${RETRY_DELAY}ms...`);
+            await sleep(RETRY_DELAY * attempt); // Exponential backoff
+        }
+    }
+
+    isConnecting = false;
+    throw new Error('Unexpected error in connection loop');
+}
+
+/**
+ * Get database instance with automatic reconnection
+ */
+export async function getDatabase(): Promise<Db> {
+    if (!db) {
+        console.warn('[CosmosDB] Database not connected, attempting reconnection...');
+        return await connectToDatabase();
+    }
+    
+    // Test connection health periodically
     try {
-        console.log('[CosmosDB] Connecting to database...');
-
-        client = new MongoClient(connectionString, {
-            // Cosmos DB specific settings
-            retryWrites: false, // Cosmos DB doesn't support retryWrites
-            maxPoolSize: 10,
-            minPoolSize: 1,
-            connectTimeoutMS: 30000,
-            socketTimeoutMS: 360000,
-        });
-
-        await client.connect();
-        const databaseName = getDatabaseName();
-        db = client.db(databaseName);
-
-        console.log('[CosmosDB] Connected successfully to:', databaseName);
-
-        // Create indexes
-        await createIndexes();
-
+        await db.admin().ping();
         return db;
     } catch (error) {
-        console.error('[CosmosDB] Connection failed:', error);
-        throw error;
+        console.warn('[CosmosDB] Database connection unhealthy, reconnecting...', error);
+        db = null;
+        client = null;
+        return await connectToDatabase();
     }
 }
 
 /**
- * Get database instance
+ * Get a collection by name with connection validation
  */
-export function getDatabase(): Db {
+export function getCollection<T>(name: string): Collection<T> {
     if (!db) {
         throw new Error('Database not connected. Call connectToDatabase() first.');
     }
-    return db;
+    return db.collection<T>(name);
 }
 
 /**
- * Get a collection by name
+ * Async collection getter with auto-reconnection
  */
-export function getCollection<T>(name: string): Collection<T> {
-    return getDatabase().collection<T>(name);
+export async function getCollectionAsync<T>(name: string): Promise<Collection<T>> {
+    const database = await getDatabase();
+    return database.collection<T>(name);
 }
 
 /**
@@ -75,22 +167,23 @@ export function getCollection<T>(name: string): Collection<T> {
  */
 async function createIndexes(): Promise<void> {
     try {
-        const announcements = getDatabase().collection('announcements');
-        const users = getDatabase().collection('users');
-        const securityLogs = getDatabase().collection('security_logs');
-        const bookmarks = getDatabase().collection('bookmarks');
-        const subscriptions = getDatabase().collection('subscriptions');
-        const pushSubscriptions = getDatabase().collection('push_subscriptions');
-        const profiles = getDatabase().collection('user_profiles');
-        const savedSearches = getDatabase().collection('saved_searches');
-        const analyticsEvents = getDatabase().collection('analytics_events');
-        const analyticsRollups = getDatabase().collection('analytics_rollups');
-        const adminAuditLogs = getDatabase().collection('admin_audit_logs');
-        const userNotifications = getDatabase().collection('user_notifications');
-        const communityForums = getDatabase().collection('community_forums');
-        const communityQa = getDatabase().collection('community_qa');
-        const communityGroups = getDatabase().collection('community_groups');
-        const communityFlags = getDatabase().collection('community_flags');
+        const database = await getDatabase();
+        const announcements = database.collection('announcements');
+        const users = database.collection('users');
+        const securityLogs = database.collection('security_logs');
+        const bookmarks = database.collection('bookmarks');
+        const subscriptions = database.collection('subscriptions');
+        const pushSubscriptions = database.collection('push_subscriptions');
+        const profiles = database.collection('user_profiles');
+        const savedSearches = database.collection('saved_searches');
+        const analyticsEvents = database.collection('analytics_events');
+        const analyticsRollups = database.collection('analytics_rollups');
+        const adminAuditLogs = database.collection('admin_audit_logs');
+        const userNotifications = database.collection('user_notifications');
+        const communityForums = database.collection('community_forums');
+        const communityQa = database.collection('community_qa');
+        const communityGroups = database.collection('community_groups');
+        const communityFlags = database.collection('community_flags');
 
         // Announcements indexes
         await announcements.createIndex({ slug: 1 }, { unique: true });

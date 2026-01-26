@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { hasPermission, type Permission } from '../services/rbac.js';
 import RedisCache from '../services/redis.js';
 import { JwtPayload } from '../types.js';
+import { UserModelMongo } from '../models/users.mongo.js';
 
 export const AUTH_COOKIE_NAME = 'auth_token';
 
@@ -56,18 +57,47 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
     if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
     const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
+    
+    // Validate user still exists and is active
+    if (decoded.userId) {
+      const user = await UserModelMongo.findById(decoded.userId);
+      if (!user || !user.isActive) {
+        res.status(401).json({ error: 'User account deactivated' });
+        return;
+      }
+      // Update decoded with latest user data to prevent stale role issues
+      decoded.role = user.role;
+    }
+    
     req.user = decoded;
     next();
-  } catch {
-    res.status(403).json({ error: 'Invalid or expired token' });
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      res.status(401).json({ error: 'Invalid token', code: 'TOKEN_INVALID' });
+    } else {
+      console.error('[Auth] Token verification error:', error);
+      res.status(403).json({ error: 'Token verification failed' });
+    }
   }
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user || req.user.role !== 'admin') {
-    res.status(403).json({ error: 'Admin access required' });
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
     return;
   }
+  
+  if (req.user.role !== 'admin') {
+    console.warn(`[Auth] Non-admin access attempt to admin endpoint: ${req.user.email} (${req.user.role}) to ${req.originalUrl}`);
+    res.status(403).json({ 
+      error: 'Admin access required',
+      message: 'Your account does not have administrative privileges'
+    });
+    return;
+  }
+  
   next();
 }
 

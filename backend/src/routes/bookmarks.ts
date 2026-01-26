@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
@@ -51,16 +52,26 @@ router.get('/ids', optionalAuth, async (req: Request, res: Response) => {
     }
 });
 
+// Input validation schema for bookmarks
+const bookmarkSchema = z.object({
+    announcementId: z.string().trim().min(1).max(24).regex(/^[a-fA-F0-9]{24}$/, 'Invalid announcement ID format')
+});
+
 /**
  * POST /api/bookmarks
  * Add bookmark (requires auth)
  */
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
     try {
-        const { announcementId } = req.body as { announcementId?: string };
-        if (!announcementId) {
-            return res.status(400).json({ error: 'announcementId is required' });
+        const parseResult = bookmarkSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            return res.status(400).json({ 
+                error: 'Invalid input',
+                details: parseResult.error.flatten().fieldErrors
+            });
         }
+
+        const { announcementId } = parseResult.data;
 
         const announcement = await AnnouncementModelMongo.findById(announcementId);
         if (!announcement) {
@@ -94,6 +105,11 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
         const announcementId = req.params.id;
         if (!announcementId) {
             return res.status(400).json({ error: 'announcementId is required' });
+        }
+
+        // Validate ObjectId format
+        if (!/^[a-fA-F0-9]{24}$/.test(announcementId)) {
+            return res.status(400).json({ error: 'Invalid announcement ID format' });
         }
 
         const removed = await BookmarkModelMongo.remove(req.user!.userId, announcementId);
