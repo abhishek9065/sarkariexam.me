@@ -441,15 +441,19 @@ router.get('/announcements/export/csv', requirePermission('announcements:read'),
     try {
         const parseResult = adminExportQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
-            return res.status(400).json({ error: parseResult.error.flatten() });
+            return res.status(400).json({ 
+                error: 'Validation failed',
+                details: parseResult.error.flatten().fieldErrors
+            });
         }
 
-        const filters = parseResult.data;
+        const data = parseResult.data;
+        
         const announcements = await AnnouncementModelMongo.findAllAdmin({
             limit: 2000,
-            includeInactive: filters.includeInactive ?? true,
-            status: filters.status && filters.status !== 'all' ? filters.status : undefined,
-            type: filters.type,
+            includeInactive: data.includeInactive ?? true,
+            status: data.status && data.status !== 'all' ? data.status : undefined,
+            type: data.type,
         });
 
         const headers = [

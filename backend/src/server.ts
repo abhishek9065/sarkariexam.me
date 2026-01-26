@@ -23,6 +23,7 @@ import {
   enforceAdminIpAllowlist
 } from './middleware/security.js';
 import adminRouter from './routes/admin.js';
+import adminSetupRouter from './routes/admin-setup.js';
 import analyticsRouter from './routes/analytics.js';
 import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
@@ -130,6 +131,7 @@ app.get('/api/performance', authenticateToken, requirePermission('admin:read'), 
 
 // Core Routes (MongoDB-based)
 app.use('/api/auth', authRouter);
+app.use('/api/auth/admin', adminSetupRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/analytics', analyticsRouter);

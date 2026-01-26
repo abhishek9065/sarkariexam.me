@@ -67,7 +67,16 @@ router.post('/subscribe', optionalAuth, async (req, res) => {
 
         return res.json({ message: 'Subscription saved' });
     } catch (error) {
-        console.error('Failed to save push subscription:', error);
+        console.error('[Push] Failed to save subscription:', error);
+        if (error instanceof Error) {
+            // Check for specific database errors
+            if (error.message.includes('duplicate')) {
+                return res.status(409).json({ error: 'Subscription already exists' });
+            }
+            if (error.message.includes('validation')) {
+                return res.status(400).json({ error: 'Invalid subscription data' });
+            }
+        }
         return res.status(500).json({ error: 'Failed to save subscription' });
     }
 });

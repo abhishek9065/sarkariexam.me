@@ -5,7 +5,7 @@
 
 export interface SecurityEvent {
     ip_address: string;
-    event_type: 'rate_limit' | 'auth_failure' | 'suspicious_activity';
+    event_type: 'rate_limit' | 'auth_failure' | 'suspicious_activity' | 'admin_setup_failure' | 'admin_setup_success' | 'admin_setup_error' | 'admin_login_failure' | 'admin_login_success';
     endpoint: string;
     metadata?: any;
 }

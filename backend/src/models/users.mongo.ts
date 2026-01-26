@@ -183,12 +183,23 @@ export class UserModelMongo {
     }
 
     /**
-     * Get all users (admin only)
+     * Get all users (admin only) with optional filtering
      */
-    static async findAll(skip: number = 0, limit: number = 20): Promise<User[]> {
+    static async findAll(filters?: {
+        role?: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
+        isActive?: boolean;
+        skip?: number;
+        limit?: number;
+    }): Promise<User[]> {
         try {
+            const { role, isActive, skip = 0, limit = 20 } = filters || {};
+            const query: any = {};
+            
+            if (role) query.role = role;
+            if (isActive !== undefined) query.isActive = isActive;
+            
             const docs = await this.collection
-                .find({})
+                .find(query)
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
