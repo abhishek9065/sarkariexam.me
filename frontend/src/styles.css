@@ -3788,6 +3788,19 @@ button.stat-card:hover .stat-action {
   font-weight: 600;
 }
 
+.retry-btn.secondary {
+  margin-left: var(--space-2);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+}
+
+.error-meta {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* ============ EXAM CALENDAR ============ */
 .exam-calendar {
   margin: var(--space-8) 0;

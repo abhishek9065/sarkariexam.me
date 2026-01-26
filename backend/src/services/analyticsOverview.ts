@@ -1,6 +1,6 @@
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
-import { getDailyRollups, getRollupSummary, getCtrByType, getDigestClickStats, getDeepLinkAttribution } from './analytics.js';
+import { getDailyRollups, getRollupSummary, getCtrByType, getDigestClickStats, getDeepLinkAttribution, getTopSearches } from './analytics.js';
 import { getCollection } from './cosmosdb.js';
 
 interface SubscriptionDoc {
@@ -34,6 +34,7 @@ export async function getAnalyticsOverview(
         ctrByType,
         digestClicks,
         deepLinkAttribution,
+        topSearches,
         totalEmailSubscribers,
         totalPushSubscribers,
     ] = await Promise.all([
@@ -43,6 +44,7 @@ export async function getAnalyticsOverview(
         getCtrByType(clampedDays),
         getDigestClickStats(clampedDays),
         getDeepLinkAttribution(clampedDays),
+        getTopSearches(clampedDays, 12),
         (async () => {
             try {
                 const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
@@ -129,6 +131,7 @@ export async function getAnalyticsOverview(
         engagementWindowDays: rollupSummary.days,
         rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
         dailyRollups,
+        topSearches,
         funnel: {
             listingViews: rollupSummary.listingViews,
             cardClicks: rollupSummary.cardClicks,

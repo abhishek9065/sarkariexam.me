@@ -86,6 +86,13 @@ const cacheGroupsToInvalidate = [
   'announcement',
 ];
 
+const normalizeSearchTerm = (value?: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return null;
+  return trimmed.slice(0, 80).toLowerCase();
+};
+
 const pickQueryValue = (value: unknown): string | undefined => {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value[0];
@@ -101,6 +108,7 @@ const recordListingAnalytics = (req: express.Request, options: {
   location?: string | null;
   qualification?: string | null;
 }) => {
+  const normalizedSearch = normalizeSearchTerm(options.search);
   recordAnalyticsEvent({
     type: 'listing_view',
     metadata: {
@@ -150,6 +158,7 @@ const recordListingAnalytics = (req: express.Request, options: {
     recordAnalyticsEvent({
       type: 'search',
       metadata: {
+        query: normalizedSearch,
         queryLength: options.search.length,
         type: options.type ?? null,
       },
@@ -414,6 +423,7 @@ router.get(
           message: 'Search query must be at least 2 characters after sanitization'
         });
       }
+      const normalizedQuery = normalizeSearchTerm(sanitizedQuery);
       
       const announcements = await AnnouncementModel.findAll({
         search: sanitizedQuery,
@@ -425,6 +435,7 @@ router.get(
       recordAnalyticsEvent({
         type: 'search',
         metadata: {
+          query: normalizedQuery,
           queryLength: filters.q.length,
           type: filters.type ?? null,
         },

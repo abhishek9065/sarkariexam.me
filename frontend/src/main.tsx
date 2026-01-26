@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 
 import App from './AppRouter';
+import { initErrorMonitoring } from './utils/errorMonitoring';
 import './styles.css';
 
 const recoverFromStaleServiceWorker = () => {
@@ -28,6 +29,8 @@ const recoverFromStaleServiceWorker = () => {
 };
 
 recoverFromStaleServiceWorker();
+
+initErrorMonitoring();
 
 const disableServiceWorkerForAdmin = () => {
   if (!('serviceWorker' in navigator) || !('caches' in window)) return;

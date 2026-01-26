@@ -92,3 +92,8 @@ export function isValidUrl(value?: string | null) {
         return false;
     }
 }
+
+export function formatNumber(value?: number | null, fallback = '0', locale = 'en-IN') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+    return value.toLocaleString(locale);
+}

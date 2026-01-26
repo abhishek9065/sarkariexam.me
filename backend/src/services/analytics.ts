@@ -94,6 +94,47 @@ export async function recordAnalyticsEvent(input: {
     }
 }
 
+export async function getTopSearches(days: number = DEFAULT_ROLLUP_DAYS, limit = 10): Promise<Array<{ query: string; count: number }>> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) return [];
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    try {
+        const rows = await events.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: start },
+                    type: 'search',
+                    'metadata.query': { $exists: true, $type: 'string', $ne: '' },
+                },
+            },
+            {
+                $group: {
+                    _id: '$metadata.query',
+                    count: { $sum: 1 },
+                },
+            },
+            { $sort: { count: -1 } },
+            { $limit: Math.max(1, Math.min(50, limit)) },
+            {
+                $project: {
+                    _id: 0,
+                    query: '$_id',
+                    count: 1,
+                },
+            },
+        ]).toArray();
+
+        return rows as Array<{ query: string; count: number }>;
+    } catch (error) {
+        console.error('[Analytics] Failed to load top searches:', error);
+        return [];
+    }
+}
+
 export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promise<void> {
     const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
     const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');

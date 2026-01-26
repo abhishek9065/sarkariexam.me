@@ -1,9 +1,11 @@
 import React from 'react';
 import { ErrorState } from './UXComponents';
+import { captureError } from '../../utils/errorMonitoring';
 
 interface ErrorBoundaryState {
     hasError: boolean;
     message?: string;
+    errorId?: string;
 }
 
 export class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBoundaryState> {
@@ -14,12 +16,24 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
     }
 
     componentDidCatch(error: Error, info: React.ErrorInfo) {
-        console.error('[ErrorBoundary]', error, info);
+        const errorId = this.state.errorId ?? this.createErrorId();
+        if (!this.state.errorId) {
+            this.setState({ errorId });
+        }
+        console.error('[ErrorBoundary]', errorId, error, info);
+        captureError(error, { componentStack: info.componentStack }, errorId);
     }
 
     handleRetry = () => {
-        this.setState({ hasError: false, message: undefined });
+        this.setState({ hasError: false, message: undefined, errorId: undefined });
     };
+
+    private createErrorId() {
+        if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+            return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    }
 
     render() {
         if (this.state.hasError) {
@@ -29,6 +43,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
                         <ErrorState
                             message={this.state.message || 'An unexpected error occurred.'}
                             onRetry={this.handleRetry}
+                            errorId={this.state.errorId}
                         />
                     </main>
                 </div>

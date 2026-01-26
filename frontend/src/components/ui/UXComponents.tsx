@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { formatNumber } from '../../utils/formatters';
 
 interface BreadcrumbItem {
     label: string;
@@ -49,16 +50,17 @@ interface StatCardProps {
 
 export function StatCard({ icon, value, label, color, onClick }: StatCardProps) {
     const CardElement = onClick ? 'button' : 'div';
+    const formattedValue = formatNumber(value, '0');
     
     return (
         <CardElement
             className={`stat-card ${color}`}
             onClick={onClick}
             style={{ cursor: onClick ? 'pointer' : 'default' }}
-            aria-label={onClick ? `View ${label.toLowerCase()}: ${value.toLocaleString()} items` : undefined}
+            aria-label={onClick ? `View ${label.toLowerCase()}: ${formattedValue} items` : undefined}
         >
             <div className="stat-icon" aria-hidden="true">{icon}</div>
-            <div className="stat-value" aria-label={`${value.toLocaleString()} ${label.toLowerCase()}`}>{value.toLocaleString()}</div>
+            <div className="stat-value" aria-label={`${formattedValue} ${label.toLowerCase()}`}>{formattedValue}</div>
             <div className="stat-label">{label}</div>
             {onClick && <span className="stat-action" aria-hidden="true">→</span>}
         </CardElement>
@@ -131,12 +133,27 @@ export function EmptyState({ icon = '📭', title, description, action }: EmptyS
 }
 
 // Error State
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, errorId }: { message: string; onRetry?: () => void; errorId?: string }) {
     return (
         <div className="error-state">
             <div className="error-icon">⚠️</div>
             <h3>Something went wrong</h3>
             <p>{message}</p>
+            {errorId && (
+                <p className="error-meta">
+                    Error ID: <code>{errorId}</code>{' '}
+                    <button
+                        className="retry-btn secondary"
+                        type="button"
+                        onClick={() => {
+                            if (!navigator.clipboard) return;
+                            navigator.clipboard.writeText(errorId).catch(() => undefined);
+                        }}
+                    >
+                        Copy
+                    </button>
+                </p>
+            )}
             {onRetry && (
                 <button className="retry-btn" onClick={onRetry}>
                     🔄 Try Again

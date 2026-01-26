@@ -4,7 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { OnboardingModal } from './components/modals/OnboardingModal';
-import { ErrorBoundary, SkeletonLoader, AccessibilityPanel } from './components';
+import { ErrorBoundary, SkeletonLoader, AccessibilityPanel, NotificationPrompt } from './components';
 import './styles.css';
 
 const HomePage = lazy(() => import('./pages/HomePage').then((mod) => ({ default: mod.HomePage })));
@@ -19,10 +19,12 @@ const CommunityPage = lazy(() => import('./pages/CommunityPage').then((mod) => (
 
 function AppRoutes() {
     const location = useLocation();
+    const showNotificationPrompt = !location.pathname.startsWith('/admin');
 
     return (
         <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<div className="app"><main className="main-content"><SkeletonLoader /></main></div>}>
+                {showNotificationPrompt && <NotificationPrompt />}
                 <Routes location={location}>
                     {/* Home Page */}
                     <Route path="/" element={<HomePage />} />

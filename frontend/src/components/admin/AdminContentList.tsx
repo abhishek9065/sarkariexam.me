@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Announcement, AnnouncementStatus, ContentType } from '../../types';
 import { CONTENT_TYPES, STATUS_OPTIONS } from './constants';
 import { CopyButton } from './CopyButton';
-import { formatDateTime } from '../../utils/formatters';
+import { formatDateTime, formatNumber } from '../../utils/formatters';
 
 interface AdminContentListProps {
     items: Announcement[];
@@ -253,7 +253,7 @@ export function AdminContentList({
                                                 )}
                                             </div>
                                         </td>
-                                        <td>{(item.viewCount ?? 0).toLocaleString()}</td>
+                                        <td>{formatNumber(item.viewCount)}</td>
                                         <td>
                                             <div className="row-actions">
                                                 <button className="action-btn" title="View" onClick={() => onView(item)}>

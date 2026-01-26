@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { adminRequest } from '../../utils/adminRequest';
+import { formatNumber } from '../../utils/formatters';
 import { QuickActions } from './QuickActions';
 import { MiniSparkline } from './MiniSparkline';
 import './AnalyticsDashboard.css';
@@ -54,6 +55,7 @@ interface AnalyticsData {
         cardClicks: number;
         ctr: number;
     }>;
+    topSearches?: Array<{ query: string; count: number }>;
     digestClicks?: {
         total: number;
         variants: Array<{ variant: string; clicks: number }>;
@@ -283,6 +285,7 @@ export function AnalyticsDashboard({
                         subscriptionsVerified: 0,
                     },
                     ctrByType: [],
+                    topSearches: [],
                     digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
                     deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
                     insights: {
@@ -452,6 +455,7 @@ export function AnalyticsDashboard({
     const ctrByType = analytics.ctrByType ?? [];
     const digestClicks = analytics.digestClicks;
     const deepLinkAttribution = analytics.deepLinkAttribution;
+    const topSearches = analytics.topSearches ?? [];
     const digestTotal = digestClicks?.total ?? 0;
     const deepLinkTotal = deepLinkAttribution?.total ?? 0;
     const digestNotConfigured = !digestClicks;
@@ -596,7 +600,7 @@ export function AnalyticsDashboard({
             <div className="kpi-grid">
                 <div className="kpi-card">
                     <div className="kpi-label">Views last 7 days</div>
-                    <div className="kpi-value">{viewsLast7.toLocaleString()}</div>
+                    <div className="kpi-value">{formatNumber(viewsLast7)}</div>
                     <div className="kpi-sub">Highlights recent demand</div>
                 </div>
                 <div className={`kpi-card ${ctrTone}`}>
@@ -617,7 +621,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card views">
                     <div className="stat-icon" aria-hidden="true">V</div>
                     <div className="stat-info">
-                        <div className="stat-value">{(analytics.totalViews ?? 0).toLocaleString()}</div>
+                        <div className="stat-value">{formatNumber(analytics.totalViews)}</div>
                         <div className="stat-label">Total Views</div>
                         <div className="stat-meta">
                             <MiniSparkline
@@ -640,7 +644,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card subscribers">
                     <div className="stat-icon" aria-hidden="true">E</div>
                     <div className="stat-info">
-                        <div className="stat-value">{analytics.totalEmailSubscribers ?? 0}</div>
+                        <div className="stat-value">{formatNumber(analytics.totalEmailSubscribers)}</div>
                         <div className="stat-label">Email Subscribers</div>
                         <div className="stat-meta">Verified opt-ins</div>
                     </div>
@@ -648,7 +652,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card push">
                     <div className="stat-icon" aria-hidden="true">P</div>
                     <div className="stat-info">
-                        <div className="stat-value">{analytics.totalPushSubscribers ?? 0}</div>
+                        <div className="stat-value">{formatNumber(analytics.totalPushSubscribers)}</div>
                         <div className="stat-label">Push Subscribers</div>
                         <div className="stat-meta">Active devices</div>
                     </div>
@@ -666,35 +670,35 @@ export function AnalyticsDashboard({
                 <div className="engagement-grid">
                     <div className="engagement-card">
                         <div className="engagement-label">Searches</div>
-                        <div className="engagement-value">{(analytics.totalSearches ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalSearches)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Bookmarks</div>
-                        <div className="engagement-value">{(analytics.totalBookmarks ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalBookmarks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Registrations</div>
-                        <div className="engagement-value">{(analytics.totalRegistrations ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalRegistrations)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Unsubscribes</div>
-                        <div className="engagement-value">{(analytics.totalSubscriptionsUnsubscribed ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalSubscriptionsUnsubscribed)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Listing views</div>
-                        <div className="engagement-value">{(analytics.totalListingViews ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalListingViews)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Card clicks</div>
-                        <div className="engagement-value">{(analytics.totalCardClicks ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalCardClicks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Category clicks</div>
-                        <div className="engagement-value">{(analytics.totalCategoryClicks ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalCategoryClicks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Filter applies</div>
-                        <div className="engagement-value">{(analytics.totalFilterApplies ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalFilterApplies)}</div>
                     </div>
                     <div className={`engagement-card ${ctrTone}`}>
                         <div className="engagement-label">CTR</div>
@@ -702,11 +706,11 @@ export function AnalyticsDashboard({
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Digest clicks</div>
-                        <div className="engagement-value">{(analytics.totalDigestClicks ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalDigestClicks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Deep link clicks</div>
-                        <div className="engagement-value">{(analytics.totalDeepLinkClicks ?? 0).toLocaleString()}</div>
+                        <div className="engagement-value">{formatNumber(analytics.totalDeepLinkClicks)}</div>
                     </div>
                 </div>
                 <p className="engagement-hint">CTR uses card clicks divided by listing views. If listing views are zero, make sure listing view events are tracked.</p>
@@ -720,6 +724,36 @@ export function AnalyticsDashboard({
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
+                        <h3>Top Searches</h3>
+                        <p className="analytics-subtitle">Most frequent search terms in the last {engagementWindow} days.</p>
+                    </div>
+                </div>
+                {topSearches.length === 0 ? (
+                    <div className="empty-state">No search terms tracked yet.</div>
+                ) : (
+                    <table className="analytics-table">
+                        <thead>
+                            <tr>
+                                <th>Query</th>
+                                <th className="numeric">Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {topSearches.map((item) => (
+                                <tr key={item.query}>
+                                    <td>{item.query}</td>
+                                    <td className="numeric">{formatNumber(item.count)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+                <p className="analytics-hint">Search terms are normalized (lowercase) and capped at 80 characters.</p>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
                         <h3>Insights</h3>
                         <p className="analytics-subtitle">Automated signals from the most recent rollups.</p>
                     </div>
@@ -728,7 +762,7 @@ export function AnalyticsDashboard({
                     <div className={`insight-card ${displayTrendTone}`}>
                         <div className="insight-label">Weekly views trend</div>
                         <div className={`insight-value ${isNewData ? 'flat' : viewTrendDirection}`}>{displayTrendLabel}</div>
-                        <div className="insight-meta">{viewsLast7.toLocaleString()} vs {prev7Views.toLocaleString()} views</div>
+                        <div className="insight-meta">{formatNumber(viewsLast7)} vs {formatNumber(prev7Views)} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
                         <div className="insight-label">Click-through rate</div>
@@ -794,7 +828,7 @@ export function AnalyticsDashboard({
                                 {step.label}
                                 {step.label === 'Detail views (adjusted)' && <span className="info-icon" title="Adjusted to not exceed card clicks for valid conversion rates">ⓘ</span>}
                             </div>
-                            <div className="funnel-value">{step.value.toLocaleString()}</div>
+                            <div className="funnel-value">{formatNumber(step.value)}</div>
                             {index > 0 && (
                                 <div className="funnel-rate">
                                     {step.rateLabel ?? `${step.rate}% of previous`}
@@ -805,9 +839,9 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({rawDetailViews.toLocaleString()}) exceed Card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
+                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({formatNumber(rawDetailViews)}) exceed Card clicks ({formatNumber(funnel?.cardClicks)}).
                         <br />
-                        The funnel uses the adjusted value ({adjustedDetailViews.toLocaleString()}) to ensure percentages make sense.
+                        The funnel uses the adjusted value ({formatNumber(adjustedDetailViews)}) to ensure percentages make sense.
                         <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
                     </div>
                 )}
@@ -850,8 +884,8 @@ export function AnalyticsDashboard({
                                                 <span className="ctr-flag" title="Low CTR" aria-label={`Low CTR for ${item.type}`}>Low CTR</span>
                                             )}
                                         </td>
-                                        <td className="numeric">{item.listingViews.toLocaleString()}</td>
-                                        <td className="numeric">{item.cardClicks.toLocaleString()}</td>
+                                        <td className="numeric">{formatNumber(item.listingViews)}</td>
+                                        <td className="numeric">{formatNumber(item.cardClicks)}</td>
                                         <td className="numeric">
                                             <div className="ctr-cell">
                                                 <span className="ctr-value">{item.ctr}%</span>
@@ -881,7 +915,7 @@ export function AnalyticsDashboard({
                         <div className="digest-grid">
                             <div className="digest-card">
                                 <div className="digest-label">Total clicks</div>
-                                <div className="digest-value">{digestClicks.total.toLocaleString()}</div>
+                                <div className="digest-value">{formatNumber(digestClicks.total)}</div>
                             </div>
                             <div className="digest-card">
                                 <div className="digest-label">Variants</div>
@@ -967,7 +1001,7 @@ export function AnalyticsDashboard({
                         <div className="digest-grid">
                             <div className="digest-card">
                                 <div className="digest-label">Total deep link clicks</div>
-                                <div className="digest-value">{deepLinkAttribution.total.toLocaleString()}</div>
+                                <div className="digest-value">{formatNumber(deepLinkAttribution.total)}</div>
                             </div>
                             <div className="digest-card">
                                 <div className="digest-label">Sources</div>
