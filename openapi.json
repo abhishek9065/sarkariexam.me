@@ -902,6 +902,87 @@
           }
         }
       }
+    },
+    "/api/support/error-reports": {
+      "get": {
+        "summary": "List error reports",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ErrorReportStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Error reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorReportListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/support/error-reports/{id}": {
+      "patch": {
+        "summary": "Update error report",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorReportUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Error report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2031,15 +2112,125 @@
       "ErrorReportResponse": {
         "type": "object",
         "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ErrorReport"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ErrorReportStatus": {
+        "type": "string",
+        "enum": [
+          "new",
+          "triaged",
+          "resolved"
+        ]
+      },
+      "ErrorReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "errorId": {
+            "type": "string"
+          },
           "message": {
             "type": "string"
           },
-          "id": {
+          "pageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "adminNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "stack": {
+            "type": "string",
+            "nullable": true
+          },
+          "componentStack": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ErrorReportStatus"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "userEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "resolvedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "errorId",
+          "message",
+          "createdAt",
+          "status"
+        ]
+      },
+      "ErrorReportListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErrorReport"
+            }
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ErrorReportUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ErrorReportStatus"
+          },
+          "adminNote": {
             "type": "string"
           }
         },
         "required": [
-          "message"
+          "status"
         ]
       }
     }

@@ -116,6 +116,26 @@ type Toast = {
     tone: ToastTone;
 };
 
+type ErrorReportStatus = 'new' | 'triaged' | 'resolved';
+type ErrorReport = {
+    id: string;
+    errorId: string;
+    message: string;
+    pageUrl?: string | null;
+    userAgent?: string | null;
+    note?: string | null;
+    adminNote?: string | null;
+    stack?: string | null;
+    componentStack?: string | null;
+    createdAt: string;
+    updatedAt?: string | null;
+    status: ErrorReportStatus;
+    userId?: string | null;
+    userEmail?: string | null;
+    resolvedAt?: string | null;
+    resolvedBy?: string | null;
+};
+
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
     { value: 'job', label: 'Latest Jobs' },
     { value: 'admit-card', label: 'Admit Cards' },
@@ -235,7 +255,7 @@ export function AdminPage() {
     
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit' | 'community'>('analytics');
+    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit' | 'community' | 'errors'>('analytics');
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [listAnnouncements, setListAnnouncements] = useState<Announcement[]>([]);
@@ -319,6 +339,12 @@ export function AdminPage() {
     const [flagFilter, setFlagFilter] = useState<'all' | 'open' | 'reviewed' | 'resolved'>('open');
     const [qaAnswerDrafts, setQaAnswerDrafts] = useState<Record<string, string>>({});
     const [communityMutatingIds, setCommunityMutatingIds] = useState<Set<string>>(new Set());
+    const [errorReports, setErrorReports] = useState<ErrorReport[]>([]);
+    const [errorReportsLoading, setErrorReportsLoading] = useState(false);
+    const [errorReportsError, setErrorReportsError] = useState<string | null>(null);
+    const [errorReportsUpdatedAt, setErrorReportsUpdatedAt] = useState<string | null>(null);
+    const [errorReportStatusFilter, setErrorReportStatusFilter] = useState<ErrorReportStatus | 'all'>('new');
+    const [errorReportNotes, setErrorReportNotes] = useState<Record<string, string>>({});
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -699,6 +725,64 @@ export function AdminPage() {
             setAuditTotal(0);
         } finally {
             setAuditLoading(false);
+        }
+    };
+
+    const refreshErrorReports = async () => {
+        if (!isLoggedIn) return;
+        setErrorReportsLoading(true);
+        setErrorReportsError(null);
+        try {
+            const params = new URLSearchParams({
+                limit: '30',
+                offset: '0',
+            });
+            if (errorReportStatusFilter !== 'all') {
+                params.set('status', errorReportStatusFilter);
+            }
+            const res = await adminFetch(`${apiBase}/api/support/error-reports?${params.toString()}`);
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setErrorReportsError(getApiErrorMessage(errorBody, 'Failed to load error reports.'));
+                return;
+            }
+            const payload = await res.json();
+            setErrorReports(payload.data ?? []);
+            setErrorReportsUpdatedAt(new Date().toISOString());
+        } catch (error) {
+            console.error(error);
+            setErrorReportsError('Failed to load error reports.');
+        } finally {
+            setErrorReportsLoading(false);
+        }
+    };
+
+    const updateErrorReport = async (id: string, status: ErrorReportStatus) => {
+        if (!isLoggedIn) return;
+        updateCommunityMutating(id, true);
+        try {
+            const adminNote = errorReportNotes[id]?.trim();
+            const res = await adminFetch(`${apiBase}/api/support/error-reports/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status,
+                    adminNote: adminNote || undefined,
+                }),
+            });
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to update error report.'));
+                return;
+            }
+            const payload = await res.json();
+            setErrorReports((prev) => prev.map((item) => (item.id === id ? payload.data : item)));
+            setMessage('Error report updated.');
+        } catch (error) {
+            console.error(error);
+            setMessage('Failed to update error report.');
+        } finally {
+            updateCommunityMutating(id, false);
         }
     };
 
@@ -2162,7 +2246,15 @@ export function AdminPage() {
         if (activeAdminTab === 'community') {
             refreshCommunity();
         }
+        if (activeAdminTab === 'errors') {
+            refreshErrorReports();
+        }
     }, [activeAdminTab, isLoggedIn]);
+
+    useEffect(() => {
+        if (!isLoggedIn || activeAdminTab !== 'errors') return;
+        refreshErrorReports();
+    }, [errorReportStatusFilter, activeAdminTab, isLoggedIn]);
 
     useEffect(() => {
         if (!isLoggedIn || activeAdminTab !== 'community') return;
@@ -2437,6 +2529,9 @@ export function AdminPage() {
                         </button>
                         <button className={activeAdminTab === 'community' ? 'active' : ''} onClick={() => setActiveAdminTab('community')}>
                             Community
+                        </button>
+                        <button className={activeAdminTab === 'errors' ? 'active' : ''} onClick={() => setActiveAdminTab('errors')}>
+                            Error Reports
                         </button>
 
                         <button className={activeAdminTab === 'audit' ? 'active' : ''} onClick={() => setActiveAdminTab('audit')}>
@@ -2782,6 +2877,94 @@ export function AdminPage() {
                                         </div>
                                     ))
                                 )}
+                            </div>
+                        )}
+                    </div>
+                ) : activeAdminTab === 'errors' ? (
+                    <div className="admin-list">
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>Error reports</h3>
+                                <p className="admin-subtitle">Review client error reports submitted from the UI.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <span className="admin-updated">{formatLastUpdated(errorReportsUpdatedAt)}</span>
+                                <button className="admin-btn secondary" onClick={refreshErrorReports} disabled={errorReportsLoading}>
+                                    {errorReportsLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="admin-community-filter">
+                            <label htmlFor="errorStatusFilter" className="admin-inline-label">Status</label>
+                            <select
+                                id="errorStatusFilter"
+                                value={errorReportStatusFilter}
+                                onChange={(e) => setErrorReportStatusFilter(e.target.value as ErrorReportStatus | 'all')}
+                            >
+                                <option value="new">New</option>
+                                <option value="triaged">Triaged</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="all">All</option>
+                            </select>
+                        </div>
+
+                        {errorReportsError && <div className="admin-error">{errorReportsError}</div>}
+
+                        {errorReportsLoading ? (
+                            <div className="admin-loading">Loading error reports...</div>
+                        ) : errorReports.length === 0 ? (
+                            <div className="empty-state">No error reports available.</div>
+                        ) : (
+                            <div className="admin-community-grid">
+                                {errorReports.map((report) => (
+                                    <div key={report.id} className="admin-community-item">
+                                        <div className="admin-community-header">
+                                            <div>
+                                                <h4>{report.message}</h4>
+                                                <p className="admin-subtitle">Error ID: {report.errorId}</p>
+                                            </div>
+                                            <span className={`status-pill ${report.status === 'new' ? 'danger' : report.status === 'resolved' ? 'success' : 'warning'}`}>
+                                                {report.status}
+                                            </span>
+                                        </div>
+                                        <div className="admin-community-meta">
+                                            <span>{new Date(report.createdAt).toLocaleString()}</span>
+                                            {report.userEmail && <span>User: {report.userEmail}</span>}
+                                            {report.pageUrl && (
+                                                <a href={report.pageUrl} target="_blank" rel="noreferrer" className="community-link">
+                                                    Page link
+                                                </a>
+                                            )}
+                                        </div>
+                                        {report.note && (
+                                            <div className="admin-community-answer">User note: {report.note}</div>
+                                        )}
+                                        <textarea
+                                            className="review-note-input compact"
+                                            rows={3}
+                                            placeholder="Add internal triage notes..."
+                                            value={errorReportNotes[report.id] ?? report.adminNote ?? ''}
+                                            onChange={(e) => setErrorReportNotes((prev) => ({ ...prev, [report.id]: e.target.value }))}
+                                        />
+                                        <div className="admin-community-actions">
+                                            <button
+                                                className="admin-btn warning small"
+                                                onClick={() => updateErrorReport(report.id, 'triaged')}
+                                                disabled={communityMutatingIds.has(report.id)}
+                                            >
+                                                Mark triaged
+                                            </button>
+                                            <button
+                                                className="admin-btn success small"
+                                                onClick={() => updateErrorReport(report.id, 'resolved')}
+                                                disabled={communityMutatingIds.has(report.id)}
+                                            >
+                                                Resolve
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>

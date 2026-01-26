@@ -249,6 +249,7 @@ async function createIndexes(): Promise<void> {
         // Error reports
         await errorReports.createIndex({ createdAt: -1 });
         await errorReports.createIndex({ errorId: 1, createdAt: -1 });
+        await errorReports.createIndex({ status: 1, createdAt: -1 });
 
         console.log('[CosmosDB] Indexes created successfully');
     } catch (error) {
