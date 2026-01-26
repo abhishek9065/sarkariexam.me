@@ -494,6 +494,8 @@ export function AnalyticsDashboard({
     );
     const detailViewsLabel = hasAnomaly ? 'Detail views (adjusted)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
     const lowCtrThreshold = 5;
+    const lowCtrMinViews = 10;
+    
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
@@ -518,6 +520,26 @@ export function AnalyticsDashboard({
             rate: funnel?.bookmarkAdds ? Math.round((funnel.subscriptionsVerified / funnel.bookmarkAdds) * 100) : 0
         },
     ];
+
+    // Recalculate coverage if 0 but we have views
+    const calculatedCoverage = analytics.totalViews > 0 
+        ? Math.round((analytics.totalListingViews / analytics.totalViews) * 100) 
+        : 0;
+    const finalCoverage = (listingCoverage === 0 && analytics.totalListingViews > 0) 
+        ? calculatedCoverage 
+        : listingCoverage;
+    const finalCoverageTone = finalCoverage >= 25 ? 'good' : finalCoverage >= 10 ? 'warn' : 'bad';
+    const coverageMetaText = finalCoverage === 0
+        ? 'No listing view events tracked. Verify listing pages fire view events.'
+        : finalCoverage < 10
+            ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
+            : 'Listing views vs total views';
+
+    // Weekly trend anomaly check
+    const isNewData = rollups.length <= 7 && prev7Views === 0;
+    const displayTrendLabel = isNewData ? 'New' : viewTrendLabel;
+    const displayTrendTone = isNewData ? 'good' : trendTone;
+
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Rollup not updated yet';
         const date = new Date(value);
@@ -530,7 +552,7 @@ export function AnalyticsDashboard({
     };
 
     return (
-        <div className="analytics-dashboard">
+        <div className={`analytics-dashboard ${refreshing ? 'refreshing' : ''}`}>
             <div className="analytics-actions">
                 <div className="analytics-actions-left">
                     <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
@@ -704,9 +726,9 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 <div className="insights-grid">
-                    <div className={`insight-card ${trendTone}`}>
+                    <div className={`insight-card ${displayTrendTone}`}>
                         <div className="insight-label">Weekly views trend</div>
-                        <div className={`insight-value ${viewTrendDirection}`}>{viewTrendLabel}</div>
+                        <div className={`insight-value ${isNewData ? 'flat' : viewTrendDirection}`}>{displayTrendLabel}</div>
                         <div className="insight-meta">{viewsLast7.toLocaleString()} vs {prev7Views.toLocaleString()} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
@@ -715,21 +737,21 @@ export function AnalyticsDashboard({
                         <div className="insight-meta">From listing views to card clicks</div>
                     </div>
                     <div className={`insight-card ${funnelDropTone}`}>
-                        <div className="insight-label">Funnel drop</div>
+                        <div className="insight-label">Drop-off rate</div>
                         <div className="insight-value">{insights?.funnelDropRate ?? 0}%</div>
-                        <div className="insight-meta">Listing views to card clicks</div>
+                        <div className="insight-meta">Listing views not clicked</div>
                     </div>
-                    <div className={`insight-card ${coverageTone}`}>
+                    <div className={`insight-card ${finalCoverageTone}`}>
                         <div className="insight-label">Tracking coverage</div>
-                        <div className="insight-value">{listingCoverage}%</div>
-                        <div className="insight-meta">{coverageMeta}</div>
+                        <div className="insight-value">{finalCoverage}%</div>
+                        <div className="insight-meta">{coverageMetaText}</div>
                     </div>
                     <div className="insight-card">
                         <div className="insight-label">Top listing type</div>
                         <div className="insight-value">{insights?.topType?.type ?? 'N/A'}</div>
                         <div className="insight-meta">
                             {insights?.topType
-                                ? `${insights.topType.count} posts - ${insights.topType.share ?? 0}% share`
+                                ? `${insights.topType.count} posts - ${(insights.topType.share ?? 0).toFixed(1)}% share`
                                 : 'No dominant type yet'}
                         </div>
                     </div>
@@ -738,7 +760,7 @@ export function AnalyticsDashboard({
                         <div className="insight-value">{insights?.topCategory?.category ?? 'N/A'}</div>
                         <div className="insight-meta">
                             {insights?.topCategory
-                                ? `${insights.topCategory.count} posts - ${insights.topCategory.share ?? 0}% share`
+                                ? `${insights.topCategory.count} posts - ${(insights.topCategory.share ?? 0).toFixed(1)}% share`
                                 : 'No dominant category yet'}
                         </div>
                     </div>
@@ -769,7 +791,10 @@ export function AnalyticsDashboard({
                 <div className="funnel-grid">
                     {funnelSteps.map((step, index) => (
                         <div key={step.label} className="funnel-card">
-                            <div className="funnel-label">{step.label}</div>
+                            <div className="funnel-label" title={step.label === 'Detail views (adjusted)' ? 'Capped at card clicks to calculate conversion' : undefined}>
+                                {step.label}
+                                {step.label === 'Detail views (adjusted)' && <span className="info-icon" title="Adjusted to not exceed card clicks for valid conversion rates">ⓘ</span>}
+                            </div>
                             <div className="funnel-value">{step.value.toLocaleString()}</div>
                             {index > 0 && (
                                 <div className="funnel-rate">
@@ -781,14 +806,15 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>⚠ Funnel anomaly:</strong> Detail views ({rawDetailViews.toLocaleString()}) exceed card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
-                        Funnel rates use the adjusted value ({adjustedDetailViews.toLocaleString()}).
-                        <div className="analytics-suggestion">Suggestion: Check SEO/direct traffic tracking and card click events for consistency.</div>
+                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({rawDetailViews.toLocaleString()}) exceed Card clicks ({(funnel?.cardClicks ?? 0).toLocaleString()}).
+                        <br />
+                        The funnel uses the adjusted value ({adjustedDetailViews.toLocaleString()}) to ensure percentages make sense.
+                        <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
                     </div>
                 )}
-                {funnelHasDirectTraffic && (
+                {funnelHasDirectTraffic && !hasAnomaly && (
                     <p className="analytics-hint">
-                        Detail views can exceed card clicks because they include direct/SEO visits and deep links.
+                        Detail views include direct/SEO visits, so they may exceed card clicks.
                     </p>
                 )}
             </div>
@@ -817,26 +843,29 @@ export function AnalyticsDashboard({
                                 </tr>
                             </thead>
                             <tbody>
-                                {ctrByType.map((item) => (
-                                    <tr key={item.type}>
-                                        <td>
-                                            <span className={`type-badge ${item.type}`}>{item.type}</span>
-                                            {item.ctr < lowCtrThreshold && (
-                                                <span className="ctr-flag" title="Low CTR" aria-label={`Low CTR for ${item.type}`}>Low CTR</span>
-                                            )}
-                                        </td>
-                                        <td className="numeric">{item.listingViews.toLocaleString()}</td>
-                                        <td className="numeric">{item.cardClicks.toLocaleString()}</td>
-                                        <td className="numeric">
-                                            <div className="ctr-cell">
-                                                <span className="ctr-value">{item.ctr}%</span>
-                                                <span className="ctr-bar">
-                                                    <span style={{ width: `${Math.min(100, item.ctr)}%` }} />
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {ctrByType.map((item) => {
+                                    const displayedCtr = item.listingViews > 0 ? Math.round((item.cardClicks / item.listingViews) * 100) : 0;
+                                    return (
+                                        <tr key={item.type}>
+                                            <td>
+                                                <span className={`type-badge ${item.type}`}>{item.type}</span>
+                                                {item.listingViews >= lowCtrMinViews && displayedCtr < lowCtrThreshold && (
+                                                    <span className="ctr-flag" title="Low CTR" aria-label={`Low CTR for ${item.type}`}>Low CTR</span>
+                                                )}
+                                            </td>
+                                            <td className="numeric">{item.listingViews.toLocaleString()}</td>
+                                            <td className="numeric">{item.cardClicks.toLocaleString()}</td>
+                                            <td className="numeric">
+                                                <div className="ctr-cell">
+                                                    <span className="ctr-value">{displayedCtr}%</span>
+                                                    <span className="ctr-bar">
+                                                        <span style={{ width: `${Math.min(100, displayedCtr)}%` }} />
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                         <p className="analytics-hint">Improve titles and thumbnails for low-CTR types (Result, Answer-key) to lift clicks.</p>

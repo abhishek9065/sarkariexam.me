@@ -52,8 +52,15 @@ export function HomePage() {
     };
 
     // Navigate to category
-    const handleCategoryClick = (type: ContentType) => {
-        const paths: Record<ContentType, string> = {
+    const handleCategoryClick = (type: string) => {
+        if (type === 'all') {
+            // Optional: navigate to a generic search or jobs page if 'all' is clicked
+            // For now, let's default to jobs or do nothing
+             navigate('/jobs'); 
+             return;
+        }
+
+        const paths: Partial<Record<string, string>> = {
             'job': '/jobs',
             'result': '/results',
             'admit-card': '/admit-card',
@@ -61,7 +68,11 @@ export function HomePage() {
             'admission': '/admission',
             'syllabus': '/syllabus'
         };
-        navigate(paths[type]);
+        
+        const path = paths[type];
+        if (path) {
+            navigate(path);
+        }
     };
 
     return (

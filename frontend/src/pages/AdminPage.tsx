@@ -181,6 +181,15 @@ const DEFAULT_FORM_DATA = {
 
 export function AdminPage() {
     const navigate = useNavigate();
+    const {
+        notifications,
+        removeNotification,
+        notifySuccess,
+        notifyError,
+        notifyWarning,
+        notifyInfo,
+    } = useAdminNotifications();
+    
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit'>('analytics');
@@ -377,6 +386,9 @@ export function AdminPage() {
 
     const handleLogout = useCallback(async () => {
         setMessage('');
+        
+        notifyInfo('Logging out...', 'Ending your admin session securely.', 1500);
+        
         try {
             await adminRequest(`${apiBase}/api/auth/logout`, {
                 method: 'POST',
@@ -388,10 +400,18 @@ export function AdminPage() {
             });
         } catch (error) {
             console.error('Logout API call failed:', error);
+            notifyWarning('Logout Warning', 'Session cleared locally. Server logout may have failed.');
         }
+        
         clearAdminSession();
         pushToast('Logged out successfully.', 'info');
-    }, [clearAdminSession, pushToast]);
+        
+        notifySuccess(
+            'Logout Successful', 
+            'You have been safely logged out. Redirecting to login page...', 
+            3000
+        );
+    }, [clearAdminSession, pushToast, notifyInfo, notifySuccess, notifyWarning]);
 
     const checkSession = useCallback(async () => {
         try {
@@ -633,10 +653,15 @@ export function AdminPage() {
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
         if (!isLoggedIn) {
             setMessage('Not authenticated.');
+            notifyError('Authentication Required', 'Please log in to perform this action.');
             return;
         }
 
         updateMutating(id, true);
+        
+        // Show delete in progress notification
+        notifyInfo('Deleting...', 'Removing announcement from the system.', 2000);
+        
         try {
             const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'DELETE',
@@ -644,15 +669,24 @@ export function AdminPage() {
 
             if (response.ok) {
                 setMessage('Deleted successfully');
+                notifySuccess(
+                    'Announcement Deleted',
+                    'The announcement has been permanently removed.',
+                    4000
+                );
                 refreshData();
                 refreshDashboard();
             } else {
                 const errorBody = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorBody, 'Failed to delete announcement.'));
+                const errorMsg = getApiErrorMessage(errorBody, 'Failed to delete announcement.');
+                setMessage(errorMsg);
+                notifyError('Delete Failed', errorMsg);
             }
         } catch (error) {
             console.error(error);
-            setMessage('Error deleting announcement');
+            const errorMsg = 'Error deleting announcement';
+            setMessage(errorMsg);
+            notifyError('Delete Error', 'Network error occurred while deleting.');
         } finally {
             updateMutating(id, false);
         }
@@ -1405,10 +1439,20 @@ export function AdminPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage('Processing...');
+        
+        // Show processing notification
+        notifyInfo(
+            editingId ? 'Updating...' : 'Creating...',
+            editingId 
+                ? 'Updating announcement with your changes...'
+                : 'Creating new announcement...',
+            3000
+        );
 
         if (!isLoggedIn) {
             setMessage('Not authenticated. Please log in again.');
             setIsLoggedIn(false);
+            notifyError('Authentication Required', 'Please log in again to save changes.');
             return;
         }
 
@@ -1433,7 +1477,17 @@ export function AdminPage() {
             });
 
             if (response.ok) {
-                setMessage(editingId ? 'Announcement updated successfully!' : 'Announcement created successfully!');
+                const successMessage = editingId ? 'Announcement updated successfully!' : 'Announcement created successfully!';
+                setMessage(successMessage);
+
+                // Enhanced success notification
+                notifySuccess(
+                    editingId ? 'Update Complete' : 'Created Successfully',
+                    editingId 
+                        ? `Announcement "${formData.title}" has been updated and is now live.`
+                        : `New announcement "${formData.title}" has been created and published.`,
+                    5000
+                );
 
                 setFormData({ ...DEFAULT_FORM_DATA });
 
@@ -1447,11 +1501,25 @@ export function AdminPage() {
 
             } else {
                 const errorBody = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorBody, 'Failed to save announcement.'));
+                const errorMsg = getApiErrorMessage(errorBody, 'Failed to save announcement.');
+                setMessage(errorMsg);
+                
+                notifyError(
+                    editingId ? 'Update Failed' : 'Creation Failed',
+                    errorMsg,
+                    6000
+                );
             }
         } catch (error) {
             console.error(error);
-            setMessage('Error saving announcement.');
+            const errorMsg = 'Error saving announcement.';
+            setMessage(errorMsg);
+            
+            notifyError(
+                'Save Error',
+                'Network error occurred while saving. Please check your connection and try again.',
+                6000
+            );
         }
     };
 
@@ -1916,82 +1984,114 @@ export function AdminPage() {
 
     if (!isLoggedIn) {
         return (
-            <div className="admin-container">
-                <div className="toast-stack">
-                    {toasts.map((toast) => (
-                        <div key={toast.id} className={`toast ${toast.tone}`}>
-                            <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
-                            <span>{toast.message}</span>
-                        </div>
-                    ))}
-                </div>
-                <div className="admin-login-box-wrapper" style={{ display: 'flex', justifyContent: 'center', minHeight: '100vh', alignItems: 'center' }}>
-                    <AdminLogin
-                        onLogin={async (email, password) => {
-                            // Temporary: mapping to existing handleLogin relying on state or refactoring handleLogin to take args
-                            // But handleLogin uses loginForm state.
-                            // I should update handleLogin to take args or update state before calling.
-                            // Actually, simplest is to update state and call existing logic or extract logic.
-                            // Let's assume for now I should refrain from complex logic change in multi-replace properties.
-                            // I'll define a wrapper here.
-                            setLoginForm({ email, password });
-                            // Wait for state... react state update is async. 
-                            // So I better pass args to handleLogin or call API directly here reusing logic.
-
-                            // Let's refactor handleLogin slightly to take data? No, I can't easily change handleLogin signature in this chunk without ensuring it's not called elsewhere.
-                            // It is called in form onSubmit.
-
-                            // Duplicate logic for safety in this refactor step:
-                            setMessage('Logging in...');
-                            setLoginLoading(true);
-                            try {
-                                const response = await adminRequest(`${apiBase}/api/auth/login`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    maxRetries: 0,
-                                    body: JSON.stringify({ email, password }),
-                                });
-
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    const userData = result.data?.user || result.user;
-                                    if (userData?.role === 'admin') {
-                                        const profile: AdminUserProfile = {
-                                            name: userData?.name || userData?.username || 'Admin',
-                                            email: userData?.email || email,
-                                            role: userData?.role,
-                                        };
-                                        setAdminUser(profile);
-                                        localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
-                                        setIsLoggedIn(true);
-                                        setMessage('');
-                                        pushToast('Login successful!', 'success');
-                                        refreshData();
-                                        refreshDashboard();
-                                    } else {
-                                        setMessage('Access denied. Admin role required.');
-                                    }
-                                } else {
-                                    const errorResult = await response.json().catch(() => ({}));
-                                    setMessage(getApiErrorMessage(errorResult, 'Invalid credentials.'));
-                                }
-                            } catch (error) {
-                                console.error(error);
-                                setMessage('Login failed. Check your connection.');
-                            } finally {
-                                setLoginLoading(false);
-                            }
-                        }}
-                        loading={loginLoading}
-                        error={message}
+            <>
+                <AdminNotificationSystem 
+                    notifications={notifications} 
+                    onRemove={removeNotification} 
+                />
+                
+                {loginLoading && (
+                    <AuthLoadingIndicator 
+                        message="Verifying admin credentials..."
                     />
+                )}
+                
+                <div className="admin-container">
+                    <div className="toast-stack">
+                        {toasts.map((toast) => (
+                            <div key={toast.id} className={`toast ${toast.tone}`}>
+                                <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
+                                <span>{toast.message}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="admin-login-box-wrapper" style={{ display: 'flex', justifyContent: 'center', minHeight: '100vh', alignItems: 'center' }}>
+                        <AdminLogin
+                            onLogin={async (email, password) => {
+                                setMessage('Authenticating...');
+                                setLoginLoading(true);
+                                
+                                try {
+                                    const response = await adminRequest(`${apiBase}/api/auth/login`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        maxRetries: 0,
+                                        body: JSON.stringify({ email, password }),
+                                    });
+
+                                    if (response.ok) {
+                                        const result = await response.json();
+                                        const userData = result.data?.user || result.user;
+                                        if (userData?.role === 'admin') {
+                                            const profile: AdminUserProfile = {
+                                                name: userData?.name || userData?.username || 'Admin',
+                                                email: userData?.email || email,
+                                                role: userData?.role,
+                                            };
+                                            setAdminUser(profile);
+                                            localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
+                                            setIsLoggedIn(true);
+                                            setMessage('');
+                                            
+                                            // Enhanced success notification
+                                            notifySuccess(
+                                                'Login Successful!',
+                                                `Welcome back, ${profile.name}. Redirecting to dashboard...`,
+                                                3000
+                                            );
+                                            
+                                            pushToast('Login successful!', 'success');
+                                            refreshData();
+                                            refreshDashboard();
+                                        } else {
+                                            setMessage('Access denied. Admin role required.');
+                                            notifyError(
+                                                'Access Denied',
+                                                'Admin privileges required to access this portal.',
+                                                5000
+                                            );
+                                        }
+                                    } else {
+                                        const errorResult = await response.json().catch(() => ({}));
+                                        const errorMsg = getApiErrorMessage(errorResult, 'Invalid credentials.');
+                                        setMessage(errorMsg);
+                                        
+                                        notifyError(
+                                            'Authentication Failed',
+                                            errorMsg,
+                                            5000
+                                        );
+                                    }
+                                } catch (error) {
+                                    console.error(error);
+                                    const errorMsg = 'Connection failed. Please check your network and try again.';
+                                    setMessage(errorMsg);
+                                    
+                                    notifyError(
+                                        'Connection Error',
+                                        errorMsg,
+                                        5000
+                                    );
+                                } finally {
+                                    setLoginLoading(false);
+                                }
+                            }}
+                            loading={loginLoading}
+                            error={message}
+                        />
+                    </div>
                 </div>
-            </div>
+            </>
         );
     }
 
     return (
         <>
+            <AdminNotificationSystem 
+                notifications={notifications} 
+                onRemove={removeNotification} 
+            />
+            
             <div className="toast-stack">
                 {toasts.map((toast) => (
                     <div key={toast.id} className={`toast ${toast.tone}`}>
@@ -2504,7 +2604,7 @@ export function AdminPage() {
                                                         </div>
                                                     </td>
                                                     <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                                    <td>{renderDateCell(item.deadline)}</td>
+                                                    <td>{renderDateCell(item.deadline ?? undefined)}</td>
                                                     <td>
                                                         {qaWarnings.length > 0 ? (
                                                             <span className="qa-warning" title={qaWarnings.join(' • ')}>
