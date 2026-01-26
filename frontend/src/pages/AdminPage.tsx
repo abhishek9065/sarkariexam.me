@@ -70,6 +70,45 @@ type AdminSummary = {
     };
 };
 
+type CommunityEntityType = 'forum' | 'qa' | 'group';
+
+type CommunityFlag = {
+    id: string;
+    entityType: CommunityEntityType;
+    entityId: string;
+    reason: string;
+    reporter?: string | null;
+    status: 'open' | 'reviewed' | 'resolved';
+    createdAt: string;
+};
+
+type CommunityForumPost = {
+    id: string;
+    title: string;
+    content: string;
+    category: string;
+    author: string;
+    createdAt: string;
+};
+
+type CommunityQaThread = {
+    id: string;
+    question: string;
+    answer?: string | null;
+    answeredBy?: string | null;
+    author: string;
+    createdAt: string;
+};
+
+type CommunityStudyGroup = {
+    id: string;
+    name: string;
+    topic: string;
+    language: string;
+    link?: string | null;
+    createdAt: string;
+};
+
 type ToastTone = 'success' | 'error' | 'info';
 type Toast = {
     id: string;
@@ -174,6 +213,10 @@ const DEFAULT_FORM_DATA = {
     minQualification: '',
     ageLimit: '',
     applicationFee: '',
+    salaryMin: '',
+    salaryMax: '',
+    difficulty: '' as '' | 'easy' | 'medium' | 'hard',
+    cutoffMarks: '',
     status: 'published' as AnnouncementStatus,
     publishAt: '',
 };
@@ -192,7 +235,7 @@ export function AdminPage() {
     
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit'>('analytics');
+    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit' | 'community'>('analytics');
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [listAnnouncements, setListAnnouncements] = useState<Announcement[]>([]);
@@ -265,6 +308,17 @@ export function AdminPage() {
     const listRateLimitUntil = useRef(0);
     const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
     const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
+    const [communityTab, setCommunityTab] = useState<'flags' | 'forums' | 'qa' | 'groups'>('flags');
+    const [communityFlags, setCommunityFlags] = useState<CommunityFlag[]>([]);
+    const [communityForums, setCommunityForums] = useState<CommunityForumPost[]>([]);
+    const [communityQa, setCommunityQa] = useState<CommunityQaThread[]>([]);
+    const [communityGroups, setCommunityGroups] = useState<CommunityStudyGroup[]>([]);
+    const [communityLoading, setCommunityLoading] = useState(false);
+    const [communityError, setCommunityError] = useState<string | null>(null);
+    const [communityUpdatedAt, setCommunityUpdatedAt] = useState<string | null>(null);
+    const [flagFilter, setFlagFilter] = useState<'all' | 'open' | 'reviewed' | 'resolved'>('open');
+    const [qaAnswerDrafts, setQaAnswerDrafts] = useState<Record<string, string>>({});
+    const [communityMutatingIds, setCommunityMutatingIds] = useState<Set<string>>(new Set());
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -648,6 +702,68 @@ export function AdminPage() {
         }
     };
 
+    const refreshCommunity = async () => {
+        if (!isLoggedIn) return;
+        setCommunityLoading(true);
+        setCommunityError(null);
+        try {
+            const flagParams = new URLSearchParams({
+                limit: '50',
+                offset: '0',
+            });
+            if (flagFilter !== 'all') {
+                flagParams.set('status', flagFilter);
+            }
+
+            const [flagsRes, forumsRes, qaRes, groupsRes] = await Promise.all([
+                adminFetch(`${apiBase}/api/community/flags?${flagParams.toString()}`),
+                adminFetch(`${apiBase}/api/community/forums?limit=30`),
+                adminFetch(`${apiBase}/api/community/qa?limit=30`),
+                adminFetch(`${apiBase}/api/community/groups?limit=30`),
+            ]);
+
+            const errors: string[] = [];
+
+            if (flagsRes.ok) {
+                const payload = await flagsRes.json();
+                setCommunityFlags(payload.data ?? []);
+            } else {
+                errors.push('flags');
+            }
+
+            if (forumsRes.ok) {
+                const payload = await forumsRes.json();
+                setCommunityForums(payload.data ?? []);
+            } else {
+                errors.push('forums');
+            }
+
+            if (qaRes.ok) {
+                const payload = await qaRes.json();
+                setCommunityQa(payload.data ?? []);
+            } else {
+                errors.push('Q&A');
+            }
+
+            if (groupsRes.ok) {
+                const payload = await groupsRes.json();
+                setCommunityGroups(payload.data ?? []);
+            } else {
+                errors.push('groups');
+            }
+
+            if (errors.length > 0) {
+                setCommunityError(`Failed to load ${errors.join(', ')}.`);    
+            }
+            setCommunityUpdatedAt(new Date().toISOString());
+        } catch (error) {
+            console.error(error);
+            setCommunityError('Failed to load community moderation data.');
+        } finally {
+            setCommunityLoading(false);
+        }
+    };
+
 
     const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
@@ -692,6 +808,94 @@ export function AdminPage() {
         }
     };
 
+    const handleCommunityDelete = async (entityType: CommunityEntityType, id: string) => {
+        if (!isLoggedIn) return;
+        if (!window.confirm('Delete this community item?')) return;
+        updateCommunityMutating(id, true);
+        try {
+            const endpoint = entityType === 'forum'
+                ? `${apiBase}/api/community/forums/${id}`
+                : entityType === 'qa'
+                    ? `${apiBase}/api/community/qa/${id}`
+                    : `${apiBase}/api/community/groups/${id}`;
+            const response = await adminFetch(endpoint, { method: 'DELETE' });
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to delete community item.'));
+                return;
+            }
+
+            if (entityType === 'forum') {
+                setCommunityForums((prev) => prev.filter((item) => item.id !== id));
+            } else if (entityType === 'qa') {
+                setCommunityQa((prev) => prev.filter((item) => item.id !== id));
+            } else {
+                setCommunityGroups((prev) => prev.filter((item) => item.id !== id));
+            }
+            setMessage('Community item deleted.');
+        } catch (error) {
+            console.error(error);
+            setMessage('Failed to delete community item.');
+        } finally {
+            updateCommunityMutating(id, false);
+        }
+    };
+
+    const handleResolveFlag = async (id: string) => {
+        if (!isLoggedIn) return;
+        if (!window.confirm('Mark this flag as resolved?')) return;
+        updateCommunityMutating(id, true);
+        try {
+            const response = await adminFetch(`${apiBase}/api/community/flags/${id}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to resolve flag.'));
+                return;
+            }
+            setCommunityFlags((prev) => prev.filter((flag) => flag.id !== id));
+            setMessage('Flag resolved.');
+        } catch (error) {
+            console.error(error);
+            setMessage('Failed to resolve flag.');
+        } finally {
+            updateCommunityMutating(id, false);
+        }
+    };
+
+    const handleAnswerQa = async (id: string) => {
+        if (!isLoggedIn) return;
+        const answer = qaAnswerDrafts[id]?.trim();
+        if (!answer) {
+            setMessage('Answer cannot be empty.');
+            return;
+        }
+        updateCommunityMutating(id, true);
+        try {
+            const response = await adminFetch(`${apiBase}/api/community/qa/${id}/answer`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    answer,
+                    answeredBy: adminUser?.name ?? 'Admin',
+                }),
+            });
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to post answer.'));
+                return;
+            }
+            const payload = await response.json();
+            setCommunityQa((prev) => prev.map((item) => (item.id === id ? payload.data : item)));
+            setQaAnswerDrafts((prev) => ({ ...prev, [id]: '' }));
+            setMessage('Answer posted.');
+        } catch (error) {
+            console.error(error);
+            setMessage('Failed to post answer.');
+        } finally {
+            updateCommunityMutating(id, false);
+        }
+    };
+
     const handleEdit = (item: Announcement) => {
         setFormData({
             title: item.title,
@@ -705,6 +909,10 @@ export function AdminPage() {
             minQualification: item.minQualification || '',
             ageLimit: item.ageLimit || '',
             applicationFee: item.applicationFee || '',
+            salaryMin: item.salaryMin ? item.salaryMin.toString() : '',
+            salaryMax: item.salaryMax ? item.salaryMax.toString() : '',
+            difficulty: item.difficulty || '',
+            cutoffMarks: item.cutoffMarks || '',
             status: item.status ?? 'published',
             publishAt: formatDateTimeInput(item.publishAt),
         });
@@ -734,6 +942,10 @@ export function AdminPage() {
             minQualification: item.minQualification || '',
             ageLimit: item.ageLimit || '',
             applicationFee: item.applicationFee || '',
+            salaryMin: item.salaryMin ? item.salaryMin.toString() : '',
+            salaryMax: item.salaryMax ? item.salaryMax.toString() : '',
+            difficulty: item.difficulty || '',
+            cutoffMarks: item.cutoffMarks || '',
             status: 'draft',
             publishAt: '',
         });
@@ -834,6 +1046,18 @@ export function AdminPage() {
 
     const updateMutating = (id: string, isMutating: boolean) => {
         setMutatingIds((prev) => {
+            const next = new Set(prev);
+            if (isMutating) {
+                next.add(id);
+            } else {
+                next.delete(id);
+            }
+            return next;
+        });
+    };
+
+    const updateCommunityMutating = (id: string, isMutating: boolean) => {
+        setCommunityMutatingIds((prev) => {
             const next = new Set(prev);
             if (isMutating) {
                 next.add(id);
@@ -1465,6 +1689,10 @@ export function AdminPage() {
             const payload = {
                 ...formData,
                 totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
+                salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
+                salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
+                difficulty: formData.difficulty || undefined,
+                cutoffMarks: formData.cutoffMarks || undefined,
                 publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
             };
 
@@ -1931,7 +2159,15 @@ export function AdminPage() {
         if (activeAdminTab === 'list') {
             refreshListData();
         }
+        if (activeAdminTab === 'community') {
+            refreshCommunity();
+        }
     }, [activeAdminTab, isLoggedIn]);
+
+    useEffect(() => {
+        if (!isLoggedIn || activeAdminTab !== 'community') return;
+        refreshCommunity();
+    }, [flagFilter, activeAdminTab, isLoggedIn]);
 
     useEffect(() => {
         setSelectedIds(new Set());
@@ -2199,6 +2435,9 @@ export function AdminPage() {
                         <button className={activeAdminTab === 'users' ? 'active' : ''} onClick={() => setActiveAdminTab('users')}>
                             Users
                         </button>
+                        <button className={activeAdminTab === 'community' ? 'active' : ''} onClick={() => setActiveAdminTab('community')}>
+                            Community
+                        </button>
 
                         <button className={activeAdminTab === 'audit' ? 'active' : ''} onClick={() => setActiveAdminTab('audit')}>
                             Audit Log
@@ -2330,6 +2569,221 @@ export function AdminPage() {
                                 <div className="admin-error">{activeUsersError ?? 'Unable to load active users.'}</div>
                             )}
                         </div>
+                    </div>
+                ) : activeAdminTab === 'community' ? (
+                    <div className="admin-list">
+                        <div className="admin-list-header">
+                            <div>
+                                <h3>Community moderation</h3>
+                                <p className="admin-subtitle">Review reports, answer Q&amp;A, and remove abusive content.</p>
+                            </div>
+                            <div className="admin-list-actions">
+                                <span className="admin-updated">{formatLastUpdated(communityUpdatedAt)}</span>
+                                <button className="admin-btn secondary" onClick={refreshCommunity} disabled={communityLoading}>
+                                    {communityLoading ? 'Refreshing...' : 'Refresh'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="admin-toggle">
+                            <button
+                                className={`admin-btn secondary ${communityTab === 'flags' ? 'active' : ''}`}
+                                onClick={() => setCommunityTab('flags')}
+                            >
+                                Flags
+                            </button>
+                            <button
+                                className={`admin-btn secondary ${communityTab === 'forums' ? 'active' : ''}`}
+                                onClick={() => setCommunityTab('forums')}
+                            >
+                                Forums
+                            </button>
+                            <button
+                                className={`admin-btn secondary ${communityTab === 'qa' ? 'active' : ''}`}
+                                onClick={() => setCommunityTab('qa')}
+                            >
+                                Q&amp;A
+                            </button>
+                            <button
+                                className={`admin-btn secondary ${communityTab === 'groups' ? 'active' : ''}`}
+                                onClick={() => setCommunityTab('groups')}
+                            >
+                                Groups
+                            </button>
+                        </div>
+
+                        {communityTab === 'flags' && (
+                            <div className="admin-community-filter">
+                                <label htmlFor="flagFilter" className="admin-inline-label">Status</label>
+                                <select
+                                    id="flagFilter"
+                                    value={flagFilter}
+                                    onChange={(e) => setFlagFilter(e.target.value as 'all' | 'open' | 'reviewed' | 'resolved')}
+                                >
+                                    <option value="open">Open</option>
+                                    <option value="reviewed">Reviewed</option>
+                                    <option value="resolved">Resolved</option>
+                                    <option value="all">All</option>
+                                </select>
+                            </div>
+                        )}
+
+                        {communityError && <div className="admin-error">{communityError}</div>}
+
+                        {communityLoading ? (
+                            <div className="admin-loading">Loading community moderation data...</div>
+                        ) : communityTab === 'flags' ? (
+                            <div className="admin-community-grid">
+                                {communityFlags.length === 0 ? (
+                                    <div className="empty-state">No flags to review.</div>
+                                ) : (
+                                    communityFlags.map((flag) => (
+                                        <div key={flag.id} className="admin-community-item">
+                                            <div className="admin-community-header">
+                                                <div>
+                                                    <h4>Flagged {flag.entityType.toUpperCase()}</h4>
+                                                    <p className="admin-subtitle">{flag.reason}</p>
+                                                </div>
+                                                <span className={`status-pill ${flag.status === 'open' ? 'danger' : 'info'}`}>{flag.status}</span>
+                                            </div>
+                                            <div className="admin-community-meta">
+                                                <span>Item ID: {flag.entityId}</span>
+                                                <span>Reporter: {flag.reporter || 'Anonymous'}</span>
+                                                <span>{new Date(flag.createdAt).toLocaleString()}</span>
+                                            </div>
+                                            <div className="admin-community-actions">
+                                                <button
+                                                    className="admin-btn warning small"
+                                                    onClick={() => handleCommunityDelete(flag.entityType, flag.entityId)}
+                                                    disabled={communityMutatingIds.has(flag.entityId)}
+                                                >
+                                                    Delete item
+                                                </button>
+                                                <button
+                                                    className="admin-btn secondary small"
+                                                    onClick={() => handleResolveFlag(flag.id)}
+                                                    disabled={communityMutatingIds.has(flag.id)}
+                                                >
+                                                    Resolve flag
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : communityTab === 'forums' ? (
+                            <div className="admin-community-grid">
+                                {communityForums.length === 0 ? (
+                                    <div className="empty-state">No forum posts yet.</div>
+                                ) : (
+                                    communityForums.map((post) => (
+                                        <div key={post.id} className="admin-community-item">
+                                            <div className="admin-community-header">
+                                                <div>
+                                                    <h4>{post.title}</h4>
+                                                    <p className="admin-subtitle">{post.category}</p>
+                                                </div>
+                                            </div>
+                                            <p className="admin-community-content">{post.content}</p>
+                                            <div className="admin-community-meta">
+                                                <span>By {post.author}</span>
+                                                <span>{new Date(post.createdAt).toLocaleString()}</span>
+                                            </div>
+                                            <div className="admin-community-actions">
+                                                <button
+                                                    className="admin-btn warning small"
+                                                    onClick={() => handleCommunityDelete('forum', post.id)}
+                                                    disabled={communityMutatingIds.has(post.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : communityTab === 'qa' ? (
+                            <div className="admin-community-grid">
+                                {communityQa.length === 0 ? (
+                                    <div className="empty-state">No Q&amp;A threads yet.</div>
+                                ) : (
+                                    communityQa.map((thread) => (
+                                        <div key={thread.id} className="admin-community-item">
+                                            <div className="admin-community-header">
+                                                <div>
+                                                    <h4>{thread.question}</h4>
+                                                    <p className="admin-subtitle">Asked by {thread.author}</p>
+                                                </div>
+                                                <span className={`status-pill ${thread.answer ? 'success' : 'warning'}`}>
+                                                    {thread.answer ? 'Answered' : 'Pending'}
+                                                </span>
+                                            </div>
+                                            <div className="admin-community-meta">
+                                                <span>{new Date(thread.createdAt).toLocaleString()}</span>
+                                                {thread.answeredBy && <span>Answered by {thread.answeredBy}</span>}
+                                            </div>
+                                            <div className="admin-community-answer">
+                                                {thread.answer ? thread.answer : 'No answer yet.'}
+                                            </div>
+                                            <textarea
+                                                className="review-note-input compact"
+                                                rows={3}
+                                                placeholder="Write an official answer..."
+                                                value={qaAnswerDrafts[thread.id] ?? ''}
+                                                onChange={(e) => setQaAnswerDrafts((prev) => ({ ...prev, [thread.id]: e.target.value }))}
+                                            />
+                                            <div className="admin-community-actions">
+                                                <button
+                                                    className="admin-btn success small"
+                                                    onClick={() => handleAnswerQa(thread.id)}
+                                                    disabled={communityMutatingIds.has(thread.id)}
+                                                >
+                                                    {communityMutatingIds.has(thread.id) ? 'Saving...' : 'Post answer'}
+                                                </button>
+                                                <button
+                                                    className="admin-btn warning small"
+                                                    onClick={() => handleCommunityDelete('qa', thread.id)}
+                                                    disabled={communityMutatingIds.has(thread.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : (
+                            <div className="admin-community-grid">
+                                {communityGroups.length === 0 ? (
+                                    <div className="empty-state">No study groups yet.</div>
+                                ) : (
+                                    communityGroups.map((group) => (
+                                        <div key={group.id} className="admin-community-item">
+                                            <div className="admin-community-header">
+                                                <div>
+                                                    <h4>{group.name}</h4>
+                                                    <p className="admin-subtitle">{group.topic}</p>
+                                                </div>
+                                                <span className="status-pill info">{group.language}</span>
+                                            </div>
+                                            <div className="admin-community-meta">
+                                                <span>{new Date(group.createdAt).toLocaleString()}</span>
+                                                {group.link && <span>Invite: {group.link}</span>}
+                                            </div>
+                                            <div className="admin-community-actions">
+                                                <button
+                                                    className="admin-btn warning small"
+                                                    onClick={() => handleCommunityDelete('group', group.id)}
+                                                    disabled={communityMutatingIds.has(group.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
                     </div>
                 ) : activeAdminTab === 'list' ? (
                     <AdminContentList
@@ -2765,6 +3219,53 @@ export function AdminPage() {
                             </div>
                             <div className="form-row two-col">
                                 <div className="form-group">
+                                    <label htmlFor="detailed-salary-min">Salary (Min)</label>
+                                    <input
+                                        id="detailed-salary-min"
+                                        type="number"
+                                        value={formData.salaryMin}
+                                        onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                        placeholder="e.g. 25000"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="detailed-salary-max">Salary (Max)</label>
+                                    <input
+                                        id="detailed-salary-max"
+                                        type="number"
+                                        value={formData.salaryMax}
+                                        onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                        placeholder="e.g. 55000"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-row two-col">
+                                <div className="form-group">
+                                    <label htmlFor="detailed-difficulty">Difficulty</label>
+                                    <select
+                                        id="detailed-difficulty"
+                                        value={formData.difficulty}
+                                        onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'easy' | 'medium' | 'hard' | '' })}
+                                    >
+                                        <option value="">Not specified</option>
+                                        <option value="easy">Easy</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="hard">Hard</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="detailed-cutoff">Previous Cutoff</label>
+                                    <input
+                                        id="detailed-cutoff"
+                                        type="text"
+                                        value={formData.cutoffMarks}
+                                        onChange={(e) => setFormData({ ...formData, cutoffMarks: e.target.value })}
+                                        placeholder="e.g. 132/200 or 65%"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-row two-col">
+                                <div className="form-group">
                                     <label htmlFor="detailed-status">Status</label>
                                     <select
                                         id="detailed-status"
@@ -2840,6 +3341,10 @@ export function AdminPage() {
                                     const payload = {
                                         ...formData,
                                         totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
+                                        salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
+                                        salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
+                                        difficulty: formData.difficulty || undefined,
+                                        cutoffMarks: formData.cutoffMarks || undefined,
                                         publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
                                         jobDetails: details,
                                     };
@@ -3249,6 +3754,55 @@ export function AdminPage() {
 
                             <div className="form-row two-col">
                                 <div className="form-group">
+                                    <label htmlFor="quick-salary-min">Salary (Min)</label>
+                                    <input
+                                        id="quick-salary-min"
+                                        type="number"
+                                        value={formData.salaryMin}
+                                        onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                        placeholder="e.g. 25000"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="quick-salary-max">Salary (Max)</label>
+                                    <input
+                                        id="quick-salary-max"
+                                        type="number"
+                                        value={formData.salaryMax}
+                                        onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                        placeholder="e.g. 55000"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row two-col">
+                                <div className="form-group">
+                                    <label htmlFor="quick-difficulty">Difficulty</label>
+                                    <select
+                                        id="quick-difficulty"
+                                        value={formData.difficulty}
+                                        onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'easy' | 'medium' | 'hard' | '' })}
+                                    >
+                                        <option value="">Not specified</option>
+                                        <option value="easy">Easy</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="hard">Hard</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="quick-cutoff">Previous Cutoff</label>
+                                    <input
+                                        id="quick-cutoff"
+                                        type="text"
+                                        value={formData.cutoffMarks}
+                                        onChange={(e) => setFormData({ ...formData, cutoffMarks: e.target.value })}
+                                        placeholder="e.g. 132/200 or 65%"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row two-col">
+                                <div className="form-group">
                                     <label htmlFor="quick-application-fee">Application Fee</label>
                                     <input
                                         id="quick-application-fee"
@@ -3394,6 +3948,21 @@ export function AdminPage() {
                                                 Posts: {previewData.formData.totalPosts}
                                             </span>
                                         )}
+                                        {(previewData.formData.salaryMin || previewData.formData.salaryMax) && (
+                                            <span style={{ background: 'rgba(52, 211, 153, 0.25)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
+                                                Salary: {previewData.formData.salaryMin || '0'} - {previewData.formData.salaryMax || '∞'}
+                                            </span>
+                                        )}
+                                        {previewData.formData.difficulty && (
+                                            <span style={{ background: 'rgba(59, 130, 246, 0.25)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
+                                                Difficulty: {previewData.formData.difficulty}
+                                            </span>
+                                        )}
+                                        {previewData.formData.cutoffMarks && (
+                                            <span style={{ background: 'rgba(245, 158, 11, 0.25)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
+                                                Prev Cutoff: {previewData.formData.cutoffMarks}
+                                            </span>
+                                        )}
                                         {previewData.formData.deadline && (
                                             <span style={{ background: 'rgba(244, 67, 54, 0.3)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
                                                 Deadline: {new Date(previewData.formData.deadline).toLocaleDateString()}
@@ -3438,6 +4007,10 @@ export function AdminPage() {
                                             body: JSON.stringify({
                                                 ...previewData.formData,
                                                 totalPosts: previewData.formData.totalPosts ? parseInt(previewData.formData.totalPosts) : undefined,
+                                                salaryMin: previewData.formData.salaryMin ? parseInt(previewData.formData.salaryMin) : undefined,
+                                                salaryMax: previewData.formData.salaryMax ? parseInt(previewData.formData.salaryMax) : undefined,
+                                                difficulty: previewData.formData.difficulty || undefined,
+                                                cutoffMarks: previewData.formData.cutoffMarks || undefined,
                                                 publishAt: previewData.formData.status === 'scheduled' && previewData.formData.publishAt ? normalizeDateTime(previewData.formData.publishAt) : undefined,
                                                 jobDetails: previewData.jobDetails,
                                             }),

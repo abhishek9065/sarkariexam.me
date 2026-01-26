@@ -1,5 +1,6 @@
 import type { PageType } from '../../utils/constants';
 import { NotificationCenter } from '../ui/NotificationCenter';
+import { LanguageSwitcher } from '../ui/LanguageSwitcher';
 
 interface HeaderProps {
     setCurrentPage: (page: PageType) => void;
@@ -12,6 +13,8 @@ interface HeaderProps {
 }
 
 export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, onLogout, onProfileClick }: HeaderProps) {
+    const displayName = user?.name || user?.email || 'Account';
+
     return (
         <header className="site-header">
             <div className="header-inner">
@@ -20,12 +23,13 @@ export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, 
                     <small className="year-indicator">2025-26</small>
                 </h1>
                 <div className="header-controls">
+                    <LanguageSwitcher />
                     {isAuthenticated ? (
                         <>
                             <NotificationCenter token={token ?? null} />
-                            <button className="user-name" onClick={onProfileClick} aria-label={`User profile: ${user?.name}`}>
+                            <button className="user-name" onClick={onProfileClick} aria-label={`User profile: ${displayName}`}>
                                 <span className="user-icon" aria-hidden="true">👤</span>
-                                <span>{user?.name}</span>
+                                <span>{displayName}</span>
                             </button>
                             <button 
                                 className="login-btn logout-btn" 

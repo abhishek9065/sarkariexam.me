@@ -1,41 +1,119 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection } from '../components';
+import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection, ExamCalendar, ErrorState, MobileNav } from '../components';
 import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
-import { SECTIONS, type TabType } from '../utils';
+import { useLanguage } from '../context/LanguageContext';
+import { SECTIONS, type TabType, API_BASE } from '../utils';
 import { fetchAnnouncements } from '../utils/api';
+import { fetchJson } from '../utils/http';
 import type { Announcement, ContentType } from '../types';
 
 export function HomePage() {
     const [data, setData] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<TabType>(undefined);
     const [showCookieConsent, setShowCookieConsent] = useState(false);
+    const [recommendations, setRecommendations] = useState<Announcement[]>([]);
+    const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
     const [showAuthModal, setShowAuthModal] = useState(false);
+    const { t } = useLanguage();
+    const LOAD_TIMEOUT_MS = 8000;
+    const cookieConsentKey = 'cookieConsent';
+
+    const getStoredConsent = () => {
+        try {
+            return localStorage.getItem(cookieConsentKey);
+        } catch {
+            return sessionStorage.getItem(cookieConsentKey);
+        }
+    };
+
+    const setStoredConsent = (value: string) => {
+        try {
+            localStorage.setItem(cookieConsentKey, value);
+        } catch {
+            sessionStorage.setItem(cookieConsentKey, value);
+        }
+    };
+
+    const runWhenIdle = (callback: () => void, timeout = 1200) => {
+        if ('requestIdleCallback' in window) {
+            const id = (window as any).requestIdleCallback(callback, { timeout });
+            return () => (window as any).cancelIdleCallback(id);
+        }
+        const timer = window.setTimeout(callback, timeout);
+        return () => window.clearTimeout(timer);
+    };
 
     // Check for cookie consent
     useEffect(() => {
-        const hasConsent = localStorage.getItem('cookieConsent');
+        const hasConsent = getStoredConsent();
         if (!hasConsent) {
             setShowCookieConsent(true);
         }
     }, []);
 
     const handleCookieConsent = (accepted: boolean) => {
-        localStorage.setItem('cookieConsent', accepted ? 'accepted' : 'declined');
+        setStoredConsent(accepted ? 'accepted' : 'declined');
         setShowCookieConsent(false);
     };
 
     // Fetch announcements using shared helper
     useEffect(() => {
+        let isActive = true;
+        let didTimeout = false;
+        const timeoutId = setTimeout(() => {
+            if (!isActive) return;
+            didTimeout = true;
+            setError('This is taking longer than usual. Please retry.');
+            setLoading(false);
+        }, LOAD_TIMEOUT_MS);
+
         fetchAnnouncements()
-            .then(setData)
-            .catch(console.error)
-            .finally(() => setLoading(false));
+            .then((items) => {
+                if (!isActive || didTimeout) return;
+                setData(items);
+            })
+            .catch((err) => {
+                console.error(err);
+                if (!isActive || didTimeout) return;
+                setError('Unable to load announcements right now.');
+            })
+            .finally(() => {
+                if (!isActive || didTimeout) return;
+                clearTimeout(timeoutId);
+                setLoading(false);
+            });
+
+        return () => {
+            isActive = false;
+            clearTimeout(timeoutId);
+        };
     }, []);
+
+    useEffect(() => {
+        if (!token) {
+            setRecommendations([]);
+            setRecommendationsError(null);
+            return;
+        }
+        setRecommendationsError(null);
+        const cancel = runWhenIdle(() => {
+            fetchJson<{ data: Announcement[] }>(`${API_BASE}/api/profile/recommendations?limit=6`, {
+                headers: { Authorization: `Bearer ${token}` },
+            }, { timeoutMs: 6000, retries: 1 })
+                .then((body) => setRecommendations(body.data || []))
+                .catch((err) => {
+                    console.error(err);
+                    setRecommendationsError('Unable to load personalized recommendations.');
+                });
+        });
+        return () => cancel();
+    }, [token]);
 
     // Get data by type for section display
     const getByType = (type: ContentType) => data.filter(item => item.type === type);
@@ -108,18 +186,30 @@ export function HomePage() {
             <main className="main-content">
                 <section className="hero">
                     <div className="hero-content">
-                        <p className="hero-eyebrow">Government job information aggregator</p>
-                        <h2 className="hero-title">Centralized job notifications from official sources.</h2>
-                        <p className="hero-subtitle">We aggregate information from government websites and public notifications. Always verify details from original sources before applying.</p>
+                        <p className="hero-eyebrow">{t('hero.eyebrow')}</p>
+                        <h2 className="hero-title">{t('hero.title')}</h2>
+                        <p className="hero-subtitle">{t('hero.subtitle')}</p>
                         <div className="hero-actions">
-                            <button className="btn btn-primary" onClick={() => handleCategoryClick('job')} aria-label="Browse available government jobs">Browse Jobs</button>
-                            <button className="btn btn-secondary" onClick={() => navigate('/results')} aria-label="Check latest examination results">Latest Results</button>
+                            <button className="btn btn-primary" onClick={() => handleCategoryClick('job')} aria-label="Browse available government jobs">
+                                {t('hero.browseJobs')}
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => navigate('/results')} aria-label="Check latest examination results">
+                                {t('hero.latestResults')}
+                            </button>
                         </div>
                         <div className="hero-pills" role="group" aria-label="Quick access to different categories">
-                            <button className="hero-pill" onClick={() => handleCategoryClick('admit-card')} aria-label="Download admit cards">Admit Cards</button>
-                            <button className="hero-pill" onClick={() => handleCategoryClick('answer-key')} aria-label="Check answer keys">Answer Keys</button>
-                            <button className="hero-pill" onClick={() => handleCategoryClick('syllabus')} aria-label="View examination syllabus">Syllabus</button>
-                            <button className="hero-pill" onClick={() => handleCategoryClick('admission')} aria-label="College admission information">Admissions</button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('admit-card')} aria-label="Download admit cards">
+                                {t('hero.pill.admit')}
+                            </button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('answer-key')} aria-label="Check answer keys">
+                                {t('hero.pill.answer')}
+                            </button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('syllabus')} aria-label="View examination syllabus">
+                                {t('hero.pill.syllabus')}
+                            </button>
+                            <button className="hero-pill" onClick={() => handleCategoryClick('admission')} aria-label="College admission information">
+                                {t('hero.pill.admission')}
+                            </button>
                         </div>
                     </div>
                     <div className="hero-panel">
@@ -176,11 +266,13 @@ export function HomePage() {
                 {/* Main Content Sections */}
                 {loading ? (
                     <SkeletonLoader />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={() => navigate(0)} />
                 ) : (
                     <div className="main-sections">
                         <div className="sections-header">
-                            <h2 className="sections-title">Latest Government Notifications</h2>
-                            <p className="sections-subtitle">Browse by category to find relevant opportunities</p>
+                            <h2 className="sections-title">{t('sections.title')}</h2>
+                            <p className="sections-subtitle">{t('sections.subtitle')}</p>
                         </div>
                         <div className="sections-grid">
                             {SECTIONS.map(section => {
@@ -199,6 +291,26 @@ export function HomePage() {
                     </div>
                 )}
 
+                {isAuthenticated && (
+                    <section className="recommendations-section">
+                        <div className="sections-header">
+                            <h2 className="sections-title">Jobs For You</h2>
+                            <p className="sections-subtitle">Personalized based on your profile preferences</p>
+                        </div>
+                        {recommendationsError ? (
+                            <ErrorState message={recommendationsError} />
+                        ) : recommendations.length > 0 ? (
+                            <SectionTable title="Recommended" items={recommendations} onItemClick={handleItemClick} />
+                        ) : (
+                            <p className="no-data">Update your profile preferences to see personalized suggestions.</p>
+                        )}
+                    </section>
+                )}
+
+                {!loading && data.length > 0 && (
+                    <ExamCalendar announcements={data} onItemClick={handleItemClick} />
+                )}
+
                 <SubscribeBox />
             </main>
 
@@ -207,6 +319,7 @@ export function HomePage() {
                 else navigate('/' + page);
             }} />
             <AuthModal show={showAuthModal} onClose={() => setShowAuthModal(false)} />
+            <MobileNav onShowAuth={() => setShowAuthModal(true)} />
             
             {/* Cookie Consent Banner */}
             {showCookieConsent && (

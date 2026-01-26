@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO } from '../components';
+import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons } from '../components';
 import { useAuth } from '../context/AuthContext';
-import { formatDate, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, type TabType } from '../utils';
+import { useLanguage } from '../context/LanguageContext';
+import { formatDate, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
 
@@ -10,33 +11,169 @@ interface DetailPageProps {
     type: ContentType;
 }
 
+const TYPE_TITLES: Record<ContentType, string> = {
+    job: 'Jobs',
+    result: 'Results',
+    'admit-card': 'Admit Cards',
+    'answer-key': 'Answer Keys',
+    admission: 'Admissions',
+    syllabus: 'Syllabus',
+};
+
 export function DetailPage({ type: _type }: DetailPageProps) {
     const { slug } = useParams<{ slug: string }>();
     const location = useLocation();
     const [item, setItem] = useState<Announcement | null>(null);
     const [relatedItems, setRelatedItems] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
+    const [offlineSaved, setOfflineSaved] = useState(false);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
+    const { t } = useLanguage();
+
+    const offlineKey = 'offline-announcements';
+    const LOAD_TIMEOUT_MS = 8000;
+
+    const getOfflineItem = (slugValue: string) => {
+        try {
+            const raw = localStorage.getItem(offlineKey);
+            if (!raw) return null;
+            const items = JSON.parse(raw) as Announcement[];
+            return items.find((entry) => entry.slug === slugValue) || null;
+        } catch {
+            return null;
+        }
+    };
+
+    const handleOfflineSave = () => {
+        if (!item) return;
+        try {
+            const raw = localStorage.getItem(offlineKey);
+            const items = raw ? (JSON.parse(raw) as Announcement[]) : [];
+            const exists = items.find((entry) => entry.slug === item.slug);
+            const next = exists ? items : [item, ...items].slice(0, 50);
+            localStorage.setItem(offlineKey, JSON.stringify(next));
+            setOfflineSaved(true);
+        } catch (err) {
+            console.error('Offline save failed', err);
+        }
+    };
+
+    const handleAddToCalendar = () => {
+        if (!item?.deadline) return;
+        const start = new Date(item.deadline);
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        const formatIcsDate = (date: Date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        const ics = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//SarkariExams.me//EN',
+            'BEGIN:VEVENT',
+            `UID:${item.id}@sarkariexams.me`,
+            `DTSTAMP:${formatIcsDate(new Date())}`,
+            `DTSTART:${formatIcsDate(start)}`,
+            `DTEND:${formatIcsDate(end)}`,
+            `SUMMARY:${item.title}`,
+            `DESCRIPTION:Deadline for ${item.title}`,
+            'END:VEVENT',
+            'END:VCALENDAR',
+        ].join('\n');
+
+        const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${item.slug}-deadline.ics`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleTextToSpeech = () => {
+        if (!item) return;
+        if (!('speechSynthesis' in window)) return;
+        const summary = `${item.title}. Organization: ${item.organization}. ${item.deadline ? `Deadline: ${formatDate(item.deadline)}.` : ''}`;
+        const utterance = new SpeechSynthesisUtterance(summary);
+        utterance.lang = 'en-IN';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const formatSalaryRange = (min?: number | null, max?: number | null) => {
+        if (!min && !max) return null;
+        const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
+        if (min && max) return `₹${fmt(min)} - ₹${fmt(max)}`;
+        if (min) return `₹${fmt(min)}+`;
+        if (max) return `Up to ₹${fmt(max)}`;
+        return null;
+    };
 
     useEffect(() => {
         if (!slug) return;
 
         setLoading(true);
+        setError(null);
+        let isActive = true;
+        let didTimeout = false;
+        const timeoutId = setTimeout(() => {
+            if (!isActive) return;
+            didTimeout = true;
+            setError('This is taking longer than usual. Please retry.');
+            setLoading(false);
+        }, LOAD_TIMEOUT_MS);
         // Fetch by slug using shared helper
         fetchAnnouncementBySlug(slug, location.search)
             .then(data => {
-                setItem(data);
+                if (!isActive || didTimeout) return;
+                if (data) {
+                    setItem(data);
+                } else {
+                    const offline = getOfflineItem(slug);
+                    setItem(offline);
+                }
                 // Fetch related items
                 if (data) {
                     fetchAnnouncementsByType(data.type)
-                        .then(related => setRelatedItems(related.filter(r => r.id !== data.id).slice(0, 5)));
+                        .then(related => {
+                            if (!isActive || didTimeout) return;
+                            const filtered = related.filter(r => r.id !== data.id);
+                            const prioritized = filtered.sort((a, b) => {
+                                const score = (item: Announcement) => {
+                                    let total = 0;
+                                    if (item.organization && item.organization === data.organization) total += 3;
+                                    if (item.category && item.category === data.category) total += 2;
+                                    return total;
+                                };
+                                return score(b) - score(a);
+                            });
+                            setRelatedItems(prioritized.slice(0, 5));
+                        });
                 }
             })
-            .catch(console.error)
-            .finally(() => setLoading(false));
+            .catch((err) => {
+                console.error(err);
+                if (!isActive || didTimeout) return;
+                setError('Unable to load this announcement. Please try again.');
+            })
+            .finally(() => {
+                if (!isActive || didTimeout) return;
+                clearTimeout(timeoutId);
+                setLoading(false);
+            });
+        return () => {
+            isActive = false;
+            clearTimeout(timeoutId);
+        };
     }, [slug, location.search]);
+
+    useEffect(() => {
+        if (!slug) return;
+        const saved = getOfflineItem(slug);
+        setOfflineSaved(Boolean(saved));
+    }, [slug]);
 
     if (loading) {
         return (
@@ -47,14 +184,25 @@ export function DetailPage({ type: _type }: DetailPageProps) {
         );
     }
 
+    if (error) {
+        return (
+            <div className="app">
+                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+                <main className="main-content">
+                    <ErrorState message={error} onRetry={() => navigate(0)} />
+                </main>
+            </div>
+        );
+    }
+
     if (!item) {
         return (
             <div className="app">
                 <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
                 <main className="main-content">
-                    <h1>Not Found</h1>
-                    <p>The item you're looking for doesn't exist.</p>
-                    <button onClick={() => navigate('/')}>Go Home</button>
+                    <h1>{t('detail.notFoundTitle')}</h1>
+                    <p>{t('detail.notFoundBody')}</p>
+                    <button onClick={() => navigate('/')}>{t('detail.goHome')}</button>
                 </main>
             </div>
         );
@@ -146,6 +294,12 @@ export function DetailPage({ type: _type }: DetailPageProps) {
             <main className="main-content">
                 <div className="page-with-sidebar">
                     <div className="detail-page enhanced-detail">
+                        <Breadcrumbs
+                            items={[
+                                { label: TYPE_TITLES[item.type], path: PATHS[item.type] },
+                                { label: item.title },
+                            ]}
+                        />
                         <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
 
                         {/* Header Banner */}
@@ -161,6 +315,27 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                     <span className="posts-label">Total Posts</span>
                                 </div>
                             )}
+                            <div className="detail-header-actions">
+                                <button
+                                    className={`offline-save-btn ${offlineSaved ? 'saved' : ''}`}
+                                    onClick={handleOfflineSave}
+                                >
+                                    {offlineSaved ? 'Saved Offline' : 'Download Offline'}
+                                </button>
+                                <button
+                                    className="offline-save-btn"
+                                    onClick={handleAddToCalendar}
+                                    disabled={!item.deadline}
+                                >
+                                    Add to Calendar
+                                </button>
+                                <button
+                                    className="offline-save-btn"
+                                    onClick={handleTextToSpeech}
+                                >
+                                    Listen
+                                </button>
+                            </div>
                         </div>
 
                         {/* Countdown */}
@@ -231,6 +406,21 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                     <div className="info-item">
                                         <strong>Application Fee:</strong> {item.applicationFee || 'As per notification (varies by category)'}
                                     </div>
+                                    {formatSalaryRange(item.salaryMin ?? undefined, item.salaryMax ?? undefined) && (
+                                        <div className="info-item">
+                                            <strong>Salary Range:</strong> {formatSalaryRange(item.salaryMin ?? undefined, item.salaryMax ?? undefined)}
+                                        </div>
+                                    )}
+                                    {item.difficulty && (
+                                        <div className="info-item">
+                                            <strong>Difficulty:</strong> {item.difficulty.toUpperCase()}
+                                        </div>
+                                    )}
+                                    {item.cutoffMarks && (
+                                        <div className="info-item">
+                                            <strong>Previous Cutoff:</strong> {item.cutoffMarks}
+                                        </div>
+                                    )}
                                     <div className="info-item">
                                         <strong>Selection Process:</strong> Written Exam → Document Verification → Medical Exam (if applicable)
                                     </div>
@@ -279,6 +469,11 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                             </tbody>
                         </table>
 
+                        <ShareButtons
+                            title={item.title}
+                            description={`Latest ${item.type} update from ${item.organization}`}
+                        />
+
                         {/* FAQ */}
                         <div className="faq-section">
                             <h3>❓ FAQ</h3>
@@ -320,6 +515,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                 if (page === 'home') navigate('/');
                 else navigate('/' + page);
             }} />
+            <MobileNav />
         </div>
     );
 }

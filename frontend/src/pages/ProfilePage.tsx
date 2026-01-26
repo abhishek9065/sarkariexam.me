@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Header, Navigation, Footer, SkeletonLoader } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, MobileNav } from '../components';
 import { API_BASE } from '../utils';
 import type { TabType } from '../utils/constants';
 import type { Announcement, ContentType } from '../types';
@@ -50,6 +50,8 @@ interface SavedSearchFilters {
     organization?: string;
     location?: string;
     qualification?: string;
+    salaryMin?: number;
+    salaryMax?: number;
 }
 
 interface SavedSearch {
@@ -91,6 +93,8 @@ type SavedSearchFormState = {
     organization: string;
     location: string;
     qualification: string;
+    salaryMin: string;
+    salaryMax: string;
     notificationsEnabled: boolean;
     frequency: NotificationFrequency;
 };
@@ -103,6 +107,8 @@ const DEFAULT_SAVED_SEARCH: SavedSearchFormState = {
     organization: '',
     location: '',
     qualification: '',
+    salaryMin: '',
+    salaryMax: '',
     notificationsEnabled: true,
     frequency: 'daily',
 };
@@ -167,6 +173,21 @@ export function ProfilePage() {
             hour: '2-digit',
             minute: '2-digit',
         });
+    };
+
+    const formatSalaryRange = (min?: number | null, max?: number | null) => {
+        if (min === undefined && max === undefined) return null;
+        const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
+        if (min !== undefined && max !== undefined) return `₹${fmt(min)} - ₹${fmt(max)}`;
+        if (min !== undefined) return `₹${fmt(min)}+`;
+        if (max !== undefined) return `Up to ₹${fmt(max)}`;
+        return null;
+    };
+
+    const parseSalaryField = (value: string) => {
+        if (!value.trim()) return undefined;
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : undefined;
     };
 
     const fetchSavedSearches = async () => {
@@ -369,6 +390,15 @@ export function ProfilePage() {
         if (savedSearchForm.organization) filters.organization = savedSearchForm.organization;
         if (savedSearchForm.location) filters.location = savedSearchForm.location;
         if (savedSearchForm.qualification) filters.qualification = savedSearchForm.qualification;
+        const salaryMin = parseSalaryField(savedSearchForm.salaryMin);
+        const salaryMax = parseSalaryField(savedSearchForm.salaryMax);
+        if (salaryMin !== undefined) filters.salaryMin = salaryMin;
+        if (salaryMax !== undefined) filters.salaryMax = salaryMax;
+
+        if (salaryMin !== undefined && salaryMax !== undefined && salaryMin > salaryMax) {
+            setSavedSearchError('Minimum salary must be less than or equal to maximum salary.');
+            return;
+        }
 
         const hasFilters = Object.keys(filters).length > 0;
         if (!trimmedQuery && !hasFilters) {
@@ -426,6 +456,8 @@ export function ProfilePage() {
             organization: search.filters?.organization || '',
             location: search.filters?.location || '',
             qualification: search.filters?.qualification || '',
+            salaryMin: search.filters?.salaryMin !== undefined ? String(search.filters.salaryMin) : '',
+            salaryMax: search.filters?.salaryMax !== undefined ? String(search.filters.salaryMax) : '',
             notificationsEnabled: search.notificationsEnabled,
             frequency: search.frequency,
         });
@@ -812,6 +844,26 @@ export function ProfilePage() {
                                         </select>
                                     </div>
                                     <div className="saved-search-field">
+                                        <label>Min Salary (₹)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={savedSearchForm.salaryMin}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, salaryMin: e.target.value })}
+                                            placeholder="e.g. 20000"
+                                        />
+                                    </div>
+                                    <div className="saved-search-field">
+                                        <label>Max Salary (₹)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={savedSearchForm.salaryMax}
+                                            onChange={(e) => setSavedSearchForm({ ...savedSearchForm, salaryMax: e.target.value })}
+                                            placeholder="e.g. 60000"
+                                        />
+                                    </div>
+                                    <div className="saved-search-field">
                                         <label>Digest</label>
                                         <select
                                             value={savedSearchForm.frequency}
@@ -875,6 +927,11 @@ export function ProfilePage() {
                                                 {search.filters?.organization && <span className="filter-tag">Org: {search.filters.organization}</span>}
                                                 {search.filters?.location && <span className="filter-tag">Location: {search.filters.location}</span>}
                                                 {search.filters?.qualification && <span className="filter-tag">Qualification: {search.filters.qualification}</span>}
+                                                {formatSalaryRange(search.filters?.salaryMin, search.filters?.salaryMax) && (
+                                                    <span className="filter-tag">
+                                                        Salary: {formatSalaryRange(search.filters?.salaryMin, search.filters?.salaryMax)}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="saved-search-toggle">
                                                 <label>
@@ -1069,6 +1126,7 @@ export function ProfilePage() {
             </main>
 
             <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <MobileNav onShowAuth={() => {}} />
         </div>
     );
 }

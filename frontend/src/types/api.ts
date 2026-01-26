@@ -17,6 +17,13 @@ export interface paths {
                 query?: {
                     type?: components["schemas"]["ContentType"];
                     category?: string;
+                    search?: string;
+                    organization?: string;
+                    location?: string;
+                    qualification?: string;
+                    salaryMin?: number;
+                    salaryMax?: number;
+                    sort?: "newest" | "oldest" | "deadline" | "views";
                     limit?: number;
                     cursor?: string;
                 };
@@ -583,6 +590,454 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/community/forums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List forum posts */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Forum posts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityForumListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create forum post */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CommunityForumCreateRequest"];
+                };
+            };
+            responses: {
+                /** @description Forum post */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityForumResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/forums/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete forum post */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/qa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Q&A threads */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Q&A threads */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityQaListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create Q&A thread */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CommunityQaCreateRequest"];
+                };
+            };
+            responses: {
+                /** @description Q&A thread */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityQaResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/qa/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Q&A thread */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/qa/{id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Answer Q&A thread */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CommunityQaAnswerRequest"];
+                };
+            };
+            responses: {
+                /** @description Q&A thread */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityQaResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/community/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List study groups */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Study groups */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityGroupListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create study group */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CommunityGroupCreateRequest"];
+                };
+            };
+            responses: {
+                /** @description Study group */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityGroupResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete study group */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List community flags */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                    status?: components["schemas"]["CommunityFlagStatus"];
+                    entityType?: components["schemas"]["CommunityEntityType"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Flags */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityFlagListResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Report abusive content */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CommunityFlagCreateRequest"];
+                };
+            };
+            responses: {
+                /** @description Flag */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CommunityFlagResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/community/flags/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Resolve flag */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Resolved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessageResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -596,6 +1051,14 @@ export interface components {
             type: components["schemas"]["ContentType"];
             category: string;
             organization: string;
+            location?: string | null;
+            minQualification?: string | null;
+            ageLimit?: string | null;
+            salaryMin?: number | null;
+            salaryMax?: number | null;
+            /** @enum {string|null} */
+            difficulty?: "easy" | "medium" | "hard" | null;
+            cutoffMarks?: string | null;
             /** Format: date-time */
             deadline?: string | null;
             totalPosts?: number | null;
@@ -629,6 +1092,11 @@ export interface components {
             minQualification?: string;
             ageLimit?: string;
             applicationFee?: string;
+            salaryMin?: number;
+            salaryMax?: number;
+            /** @enum {string} */
+            difficulty?: "easy" | "medium" | "hard";
+            cutoffMarks?: string;
             totalPosts?: number;
             /** Format: date-time */
             postedAt: string;
@@ -755,6 +1223,109 @@ export interface components {
         };
         RecommendationListResponse: {
             data: components["schemas"]["Recommendation"][];
+        };
+        /** @enum {string} */
+        CommunityEntityType: "forum" | "qa" | "group";
+        /** @enum {string} */
+        CommunityFlagStatus: "open" | "reviewed" | "resolved";
+        CommunityForumPost: {
+            id: string;
+            title: string;
+            content: string;
+            category: string;
+            author: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CommunityQaThread: {
+            id: string;
+            question: string;
+            answer?: string | null;
+            answeredBy?: string | null;
+            author: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CommunityStudyGroup: {
+            id: string;
+            name: string;
+            topic: string;
+            language: string;
+            link?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CommunityFlag: {
+            id: string;
+            entityType: components["schemas"]["CommunityEntityType"];
+            entityId: string;
+            reason: string;
+            reporter?: string | null;
+            status: components["schemas"]["CommunityFlagStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CommunityForumCreateRequest: {
+            title: string;
+            content: string;
+            category: string;
+            author?: string;
+        };
+        CommunityQaCreateRequest: {
+            question: string;
+            author?: string;
+        };
+        CommunityQaAnswerRequest: {
+            answer: string;
+            answeredBy?: string;
+        };
+        CommunityGroupCreateRequest: {
+            name: string;
+            topic: string;
+            language: string;
+            link?: string;
+        };
+        CommunityFlagCreateRequest: {
+            entityType: components["schemas"]["CommunityEntityType"];
+            entityId: string;
+            reason: string;
+            reporter?: string;
+        };
+        CommunityForumResponse: {
+            data: components["schemas"]["CommunityForumPost"];
+        };
+        CommunityQaResponse: {
+            data: components["schemas"]["CommunityQaThread"];
+        };
+        CommunityGroupResponse: {
+            data: components["schemas"]["CommunityStudyGroup"];
+        };
+        CommunityFlagResponse: {
+            data: components["schemas"]["CommunityFlag"];
+        };
+        CommunityForumListResponse: {
+            data: components["schemas"]["CommunityForumPost"][];
+            count?: number;
+        };
+        CommunityQaListResponse: {
+            data: components["schemas"]["CommunityQaThread"][];
+            count?: number;
+        };
+        CommunityGroupListResponse: {
+            data: components["schemas"]["CommunityStudyGroup"][];
+            count?: number;
+        };
+        CommunityFlagListResponse: {
+            data: components["schemas"]["CommunityFlag"][];
+            count?: number;
         };
     };
     responses: never;

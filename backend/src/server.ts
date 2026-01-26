@@ -29,6 +29,7 @@ import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
 import bookmarksRouter from './routes/bookmarks.js';
 import bulkRouter from './routes/bulk.js';
+import communityRouter from './routes/community.js';
 import graphqlRouter from './routes/graphql.js';
 import jobsRouter from './routes/jobs.js';
 import profileRouter from './routes/profile.js';
@@ -142,17 +143,18 @@ app.use('/api/profile', profileRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
+app.use('/api/community', communityRouter);
+app.use('/api/community', communityRouter);
+
 // 404 handler for API routes
 app.use('/api/*', (_req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Endpoint not found',
     message: 'The requested API endpoint does not exist.'
   });
 });
 
 // Global error handler (must be last)
-app.use(errorHandler);
-// Global Error Handler
 app.use(errorHandler);
 
 // Initialize database and start server

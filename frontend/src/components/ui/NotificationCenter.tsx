@@ -16,6 +16,24 @@ type NotificationItem = {
     readAt?: string | null;
 };
 
+type AlertMatch = {
+    id?: string;
+    title?: string;
+    type?: string;
+    slug?: string;
+    organization?: string;
+    updatedAt?: string;
+    postedAt?: string;
+    createdAt?: string;
+};
+
+type AlertsPayload = {
+    data?: {
+        savedSearches?: Array<{ id?: string; matches?: AlertMatch[] }>;
+        preferences?: { matches?: AlertMatch[] };
+    };
+};
+
 export function NotificationCenter({ token }: { token: string | null }) {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -26,6 +44,58 @@ export function NotificationCenter({ token }: { token: string | null }) {
     const [savedSearchCount, setSavedSearchCount] = useState(0);
     const [unreadCount, setUnreadCount] = useState(0);
 
+    const buildItemsFromAlerts = (payload: AlertsPayload): NotificationItem[] => {
+        const itemsList: NotificationItem[] = [];
+        const seen = new Set<string>();
+
+        const pushItem = (match: AlertMatch, source: string) => {
+            if (!match?.id || !match?.title || !match?.type) return;
+            if (seen.has(match.id)) return;
+            seen.add(match.id);
+            itemsList.push({
+                id: `${source}:${match.id}`,
+                announcementId: String(match.id),
+                title: match.title,
+                type: match.type,
+                slug: match.slug,
+                source,
+                organization: match.organization,
+                createdAt: match.updatedAt || match.postedAt || match.createdAt || new Date().toISOString(),
+                readAt: null,
+            });
+        };
+
+        const saved = payload.data?.savedSearches ?? [];
+        saved.forEach((entry) => {
+            const source = entry.id ? `saved:${entry.id}` : 'saved';
+            (entry.matches ?? []).forEach((match) => pushItem(match, source));
+        });
+
+        const prefMatches = payload.data?.preferences?.matches ?? [];
+        prefMatches.forEach((match) => pushItem(match, 'preferences'));
+
+        return itemsList;
+    };
+
+    const fetchAlertsFallback = async (): Promise<boolean> => {
+        if (!token) return false;
+        try {
+            const response = await fetch(`${apiBase}/api/profile/alerts?windowDays=7&limit=12`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) return false;
+            const payload = (await response.json()) as AlertsPayload;
+            const nextItems = buildItemsFromAlerts(payload);
+            setItems(nextItems);
+            setUnreadCount(nextItems.length);
+            setSavedSearchCount(nextItems.filter((item) => item.source?.startsWith('saved')).length);
+            return true;
+        } catch (err) {
+            console.error(err);
+            return false;
+        }
+    };
+
     const fetchNotifications = async () => {
         if (!token) return;
         setLoading(true);
@@ -35,7 +105,10 @@ export function NotificationCenter({ token }: { token: string | null }) {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) {
-                setError('Unable to load alerts.');
+                const fallbackOk = await fetchAlertsFallback();
+                if (!fallbackOk) {
+                    setError('Unable to load alerts.');
+                }
                 return;
             }
             const payload = await response.json();
@@ -46,7 +119,10 @@ export function NotificationCenter({ token }: { token: string | null }) {
             );
         } catch (err) {
             console.error(err);
-            setError('Unable to load alerts.');
+            const fallbackOk = await fetchAlertsFallback();
+            if (!fallbackOk) {
+                setError('Unable to load alerts.');
+            }
         } finally {
             setLoading(false);
         }
@@ -110,13 +186,20 @@ export function NotificationCenter({ token }: { token: string | null }) {
 
     return (
         <div className="notification-center" ref={containerRef}>
-            <button className="notification-trigger" onClick={() => setOpen(!open)} aria-label="Notifications">
+            <button
+                className="notification-trigger"
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setOpen((prev) => !prev);
+                }}
+                aria-label="Notifications"
+            >
                 <span className="notification-icon">🔔</span>
                 {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
             </button>
 
             {open && (
-                <div className="notification-panel">
+                <div className="notification-panel" onClick={(event) => event.stopPropagation()}>
                     <div className="notification-header">
                         <div>
                             <h4>Alerts</h4>

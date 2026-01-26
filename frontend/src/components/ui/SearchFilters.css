@@ -76,7 +76,7 @@
 
 .search-input {
     width: 100%;
-    padding: 14px 44px;
+    padding: 14px 72px 14px 44px;
     font-size: 16px;
     border: 2px solid #e0e0e0;
     border-radius: 12px;
@@ -114,6 +114,72 @@
 .clear-search-btn:hover {
     background: #dc2626;
     transform: scale(1.1);
+}
+
+.voice-search-btn {
+    position: absolute;
+    right: 44px;
+    background: #f3f4f6;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.voice-search-btn:hover {
+    background: #ede9fe;
+    color: #4f46e5;
+    border-color: #c4b5fd;
+}
+
+.voice-search-btn.listening {
+    background: #fde68a;
+    color: #92400e;
+    border-color: #f59e0b;
+}
+
+.search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    margin-top: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    z-index: 20;
+    padding: 6px;
+}
+
+.suggestion-item {
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #111827;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.suggestion-item:hover {
+    background: #f3f4f6;
+}
+
+.voice-search-error {
+    font-size: 12px;
+    color: #b91c1c;
+    margin-bottom: 12px;
 }
 
 /* Filter Toggle Button */
@@ -585,4 +651,62 @@
         background: #6366f1;
         color: white;
     }
+
+    .voice-search-btn {
+        background: #1f2937;
+        color: #d1d5db;
+        border-color: #374151;
+    }
+
+    .voice-search-btn:hover {
+        background: #312e81;
+        color: #c4b5fd;
+    }
+
+    .search-suggestions {
+        background: #0f172a;
+        border-color: #334155;
+    }
+
+    .suggestion-item {
+        color: #e2e8f0;
+    }
+
+    .suggestion-item:hover {
+        background: #1e293b;
+    }
+
+    .multi-chip {
+        background: #0f172a;
+        border-color: #334155;
+        color: #e2e8f0;
+    }
+
+    .multi-chip.active {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: white;
+    }
+}
+
+.multi-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.multi-chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.multi-chip.active {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: white;
 }

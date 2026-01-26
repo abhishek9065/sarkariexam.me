@@ -3,8 +3,8 @@ import type { ContentType } from '../types';
 // API Base URL - defaults to empty for nginx reverse proxy, use VITE_API_BASE for custom backend
 export const API_BASE = import.meta.env.VITE_API_BASE || '';
 
-export type PageType = 'home' | 'admin' | 'about' | 'contact' | 'privacy' | 'disclaimer';
-export type TabType = ContentType | 'bookmarks' | 'profile' | undefined;
+export type PageType = 'home' | 'admin' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'community';
+export type TabType = ContentType | 'bookmarks' | 'profile' | 'community' | undefined;
 
 // Navigation menu items
 export const NAV_ITEMS = [
@@ -15,6 +15,7 @@ export const NAV_ITEMS = [
     { label: 'Admission', type: 'admission' as TabType },
     { label: 'Syllabus', type: 'syllabus' as TabType },
     { label: 'Answer Key', type: 'answer-key' as TabType },
+    { label: 'Community', type: 'community' as TabType },
     { label: '❤️ My Bookmarks', type: 'bookmarks' as TabType },
 ];
 
@@ -66,5 +67,6 @@ export const PATHS: Record<string, string> = {
     'admission': '/admission',
     'syllabus': '/syllabus',
     'bookmarks': '/bookmarks',
+    'community': '/community',
     'undefined': '/' // Home
 };

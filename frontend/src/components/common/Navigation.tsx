@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NAV_ITEMS, PATHS, type PageType, type TabType } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { prefetchRoute } from '../../utils/prefetch';
 
 interface NavProps {
     activeTab: TabType;
@@ -16,6 +18,7 @@ interface NavProps {
 export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthenticated, onShowAuth }: NavProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const { user } = useAuth();
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const isAdmin = user?.role === 'admin';
 
@@ -52,16 +55,19 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                 {NAV_ITEMS.map((item) => {
                     if (item.type === 'bookmarks' && !isAuthenticated) return null;
                     const isActive = activeTab === item.type;
+                    const navKey = item.type ? `nav.${item.type}` : 'nav.home';
+                    const label = t(navKey);
                     
                     return (
                         <button
                             key={item.label}
                             className={`nav-link ${isActive ? 'active' : ''}`}
                             onClick={() => handleNavClick(item)}
+                            onMouseEnter={() => prefetchRoute(item.type)}
                             aria-current={isActive ? 'page' : undefined}
-                            aria-label={`Navigate to ${item.label} section`}
+                            aria-label={`Navigate to ${label} section`}
                         >
-                            {item.label}
+                            {label}
                         </button>
                     );
                 })}
@@ -71,7 +77,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                     aria-label="Open search"
                 >
                     <span aria-hidden="true">🔍</span>
-                    <span className="search-text">Search</span>
+                    <span className="search-text">{t('nav.search')}</span>
                 </button>
                 {isAdmin && (
                     <button 

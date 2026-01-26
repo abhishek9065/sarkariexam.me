@@ -9,6 +9,7 @@ export function SubscribeBox() {
     const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [message, setMessage] = useState('');
     const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    const [emailSuggestion, setEmailSuggestion] = useState('');
 
     const categoryOptions = [
         { value: 'job', label: 'Job Notifications' },
@@ -46,6 +47,34 @@ export function SubscribeBox() {
                 ? prev.filter(c => c !== cat)
                 : [...prev, cat]
         );
+    };
+
+    const detectEmailSuggestion = (value: string) => {
+        const domainTypos: Record<string, string> = {
+            'gmial.com': 'gmail.com',
+            'gamil.com': 'gmail.com',
+            'gmal.com': 'gmail.com',
+            'hotnail.com': 'hotmail.com',
+            'hotmai.com': 'hotmail.com',
+            'yaho.com': 'yahoo.com',
+            'yhoo.com': 'yahoo.com',
+            'outlok.com': 'outlook.com',
+            'outllok.com': 'outlook.com',
+        };
+
+        const parts = value.split('@');
+        if (parts.length !== 2) {
+            setEmailSuggestion('');
+            return;
+        }
+
+        const [name, domain] = parts;
+        const suggestion = domainTypos[domain.toLowerCase()];
+        if (suggestion) {
+            setEmailSuggestion(`${name}@${suggestion}`);
+        } else {
+            setEmailSuggestion('');
+        }
     };
 
     const handleSubscribe = async (e: React.FormEvent) => {
@@ -135,12 +164,28 @@ export function SubscribeBox() {
                         type="email"
                         placeholder="Enter your email address"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setEmail(value);
+                            detectEmailSuggestion(value);
+                        }}
                         disabled={status === 'loading'}
                         aria-required="true"
                         aria-describedby={message ? 'subscription-message category-hint' : 'category-hint'}
                         required
                     />
+                    {emailSuggestion && (
+                        <button
+                            type="button"
+                            className="email-suggestion"
+                            onClick={() => {
+                                setEmail(emailSuggestion);
+                                setEmailSuggestion('');
+                            }}
+                        >
+                            Did you mean {emailSuggestion}?
+                        </button>
+                    )}
                     <button 
                         type="submit" 
                         disabled={status === 'loading'} 

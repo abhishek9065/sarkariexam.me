@@ -7,6 +7,23 @@ function escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function parseFilterList(value?: string): string[] {
+    if (!value) return [];
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function buildStringFilter(value?: string) {
+    if (!value) return undefined;
+    const values = parseFilterList(value);
+    if (values.length > 1) {
+        return { $in: values };
+    }
+    return { $regex: escapeRegex(values[0]), $options: 'i' };
+}
+
 function buildSearchRegexes(value: string): RegExp[] {
     const trimmed = value.trim();
     if (!trimmed) return [];
@@ -48,6 +65,10 @@ interface AnnouncementVersionDoc {
         minQualification?: string;
         ageLimit?: string;
         applicationFee?: string;
+        salaryMin?: number;
+        salaryMax?: number;
+        difficulty?: 'easy' | 'medium' | 'hard';
+        cutoffMarks?: string;
         totalPosts?: number;
         tags: string[];
         importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
@@ -81,6 +102,10 @@ interface AnnouncementDoc extends Document {
     minQualification?: string;
     ageLimit?: string;
     applicationFee?: string;
+    salaryMin?: number;
+    salaryMax?: number;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    cutoffMarks?: string;
     totalPosts?: number;
     tags: string[];
     postedBy: string;
@@ -106,8 +131,14 @@ function normalizeStatus(status?: AnnouncementStatus | null): AnnouncementStatus
 
 function buildLiveQuery(now: Date = new Date()): Filter<AnnouncementDoc> {
     return {
-        isActive: true,
         $and: [
+            {
+                $or: [
+                    { isActive: true },
+                    { isActive: { $exists: false } },
+                    { isActive: null },
+                ],
+            },
             {
                 $or: [
                     { status: { $in: ['published'] } },
@@ -142,6 +173,32 @@ function addSearchFilter(query: Filter<AnnouncementDoc>, searchRegexes: RegExp[]
     }
 }
 
+function addSalaryFilter(query: Filter<AnnouncementDoc>, minSalary?: number, maxSalary?: number): void {
+    const clauses: Filter<AnnouncementDoc>[] = [];
+    if (minSalary !== undefined) {
+        clauses.push({
+            $or: [
+                { salaryMax: { $gte: minSalary } },
+                { salaryMin: { $gte: minSalary } },
+            ],
+        });
+    }
+    if (maxSalary !== undefined) {
+        clauses.push({
+            $or: [
+                { salaryMin: { $lte: maxSalary } },
+                { salaryMax: { $lte: maxSalary } },
+            ],
+        });
+    }
+    if (clauses.length === 0) return;
+    if (query.$and) {
+        query.$and.push(...clauses);
+    } else {
+        query.$and = [...clauses];
+    }
+}
+
 function buildAdminQuery(filters?: {
     type?: ContentType;
     search?: string;
@@ -167,11 +224,11 @@ function buildAdminQuery(filters?: {
     }
 
     if (filters?.category) {
-        query.category = { $regex: escapeRegex(filters.category), $options: 'i' };
+        query.category = buildStringFilter(filters.category);
     }
 
     if (filters?.organization) {
-        query.organization = { $regex: escapeRegex(filters.organization), $options: 'i' };
+        query.organization = buildStringFilter(filters.organization);
     }
 
     if (filters?.location) {
@@ -218,6 +275,10 @@ function buildVersionSnapshot(doc: AnnouncementDoc): AnnouncementVersionDoc['sna
         minQualification: doc.minQualification,
         ageLimit: doc.ageLimit,
         applicationFee: doc.applicationFee,
+        salaryMin: doc.salaryMin,
+        salaryMax: doc.salaryMax,
+        difficulty: doc.difficulty,
+        cutoffMarks: doc.cutoffMarks,
         totalPosts: doc.totalPosts,
         tags: doc.tags || [],
         importantDates: doc.importantDates,
@@ -253,7 +314,9 @@ export class AnnouncementModelMongo {
         organization?: string;
         location?: string;
         qualification?: string;
-        sort?: 'newest' | 'oldest' | 'deadline';
+        salaryMin?: number;
+        salaryMax?: number;
+        sort?: 'newest' | 'oldest' | 'deadline' | 'views';
         limit?: number;
         offset?: number;
     }): Promise<Announcement[]> {
@@ -265,11 +328,11 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.category) {
-                query.category = { $regex: filters.category, $options: 'i' };
+                query.category = buildStringFilter(filters.category);
             }
 
             if (filters?.organization) {
-                query.organization = { $regex: filters.organization, $options: 'i' };
+                query.organization = buildStringFilter(filters.organization);
             }
 
             if (filters?.location) {
@@ -282,6 +345,10 @@ export class AnnouncementModelMongo {
 
             if (filters?.search && filters.search.trim()) {
                 addSearchFilter(query, buildSearchRegexes(filters.search));
+            }
+
+            if (filters?.salaryMin !== undefined || filters?.salaryMax !== undefined) {
+                addSalaryFilter(query, filters.salaryMin, filters.salaryMax);
             }
 
             // Cosmos DB only indexes _id by default, so use simple sort
@@ -630,7 +697,9 @@ export class AnnouncementModelMongo {
         organization?: string;
         location?: string;
         qualification?: string;
-        sort?: 'newest' | 'oldest' | 'deadline';
+        salaryMin?: number;
+        salaryMax?: number;
+        sort?: 'newest' | 'oldest' | 'deadline' | 'views';
         limit?: number;
         cursor?: string;
     }): Promise<{ data: Announcement[]; nextCursor: string | null; hasMore: boolean }> {
@@ -651,16 +720,25 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.type) query.type = filters.type;
-            if (filters?.category) query.category = { $regex: filters.category, $options: 'i' };
-            if (filters?.organization) query.organization = { $regex: filters.organization, $options: 'i' };
+            if (filters?.category) query.category = buildStringFilter(filters.category);
+            if (filters?.organization) query.organization = buildStringFilter(filters.organization);
             if (filters?.location) query.location = { $regex: filters.location, $options: 'i' };
             if (filters?.qualification) query.minQualification = { $regex: filters.qualification, $options: 'i' };
             if (filters?.search && filters.search.trim()) {
                 addSearchFilter(query, buildSearchRegexes(filters.search));
             }
+            if (filters?.salaryMin !== undefined || filters?.salaryMax !== undefined) {
+                addSalaryFilter(query, filters.salaryMin, filters.salaryMax);
+            }
 
             let sort: Sort = { _id: -1 };
-            if (filters?.sort === 'oldest') sort = { _id: 1 };
+            if (filters?.sort === 'oldest') {
+                sort = { _id: 1 };
+            } else if (filters?.sort === 'deadline') {
+                sort = { deadline: 1, _id: -1 };
+            } else if (filters?.sort === 'views') {
+                sort = { viewCount: -1, _id: -1 };
+            }
 
             const docs = await this.collection
                 .find(query)
@@ -696,7 +774,9 @@ export class AnnouncementModelMongo {
         organization?: string;
         location?: string;
         qualification?: string;
-        sort?: 'newest' | 'oldest' | 'deadline';
+        salaryMin?: number;
+        salaryMax?: number;
+        sort?: 'newest' | 'oldest' | 'deadline' | 'views';
         limit?: number;
         cursor?: string;
     }): Promise<{
@@ -707,6 +787,13 @@ export class AnnouncementModelMongo {
             type: string;
             category: string;
             organization: string;
+            location?: string | null;
+            minQualification?: string | null;
+            ageLimit?: string | null;
+            salaryMin?: number | null;
+            salaryMax?: number | null;
+            difficulty?: string | null;
+            cutoffMarks?: string | null;
             deadline: string | null;
             totalPosts: number | null;
             postedAt: string;
@@ -724,11 +811,11 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.category) {
-                query.category = { $regex: filters.category, $options: 'i' };
+                query.category = buildStringFilter(filters.category);
             }
 
             if (filters?.organization) {
-                query.organization = { $regex: filters.organization, $options: 'i' };
+                query.organization = buildStringFilter(filters.organization);
             }
 
             if (filters?.location) {
@@ -741,6 +828,10 @@ export class AnnouncementModelMongo {
 
             if (filters?.search && filters.search.trim()) {
                 addSearchFilter(query, buildSearchRegexes(filters.search));
+            }
+
+            if (filters?.salaryMin !== undefined || filters?.salaryMax !== undefined) {
+                addSalaryFilter(query, filters.salaryMin, filters.salaryMax);
             }
 
             // Handle cursor for keyset pagination
@@ -756,6 +847,13 @@ export class AnnouncementModelMongo {
                 type: 1,
                 category: 1,
                 organization: 1,
+                location: 1,
+                minQualification: 1,
+                ageLimit: 1,
+                salaryMin: 1,
+                salaryMax: 1,
+                difficulty: 1,
+                cutoffMarks: 1,
                 deadline: 1,
                 totalPosts: 1,
                 postedAt: 1,
@@ -763,15 +861,19 @@ export class AnnouncementModelMongo {
                 isActive: 1
             };
 
-            let sortDirection: 1 | -1 = -1;
+            let sort: Sort = { _id: -1 };
             if (filters?.sort === 'oldest') {
-                sortDirection = 1;
+                sort = { _id: 1 };
+            } else if (filters?.sort === 'deadline') {
+                sort = { deadline: 1, _id: -1 };
+            } else if (filters?.sort === 'views') {
+                sort = { viewCount: -1, _id: -1 };
             }
 
             const docs = await this.collection
                 .find(query)
                 .project(projection)
-                .sort({ _id: sortDirection })
+                .sort(sort)
                 .limit(limit + 1)
                 .toArray();
 
@@ -788,6 +890,13 @@ export class AnnouncementModelMongo {
                     type: doc.type || '',
                     category: doc.category || '',
                     organization: doc.organization || '',
+                    location: doc.location || null,
+                    minQualification: doc.minQualification || null,
+                    ageLimit: doc.ageLimit || null,
+                    salaryMin: doc.salaryMin ?? null,
+                    salaryMax: doc.salaryMax ?? null,
+                    difficulty: doc.difficulty || null,
+                    cutoffMarks: doc.cutoffMarks || null,
                     deadline: doc.deadline?.toISOString() || null,
                     totalPosts: doc.totalPosts || null,
                     postedAt: doc.postedAt?.toISOString() || '',
@@ -893,6 +1002,10 @@ export class AnnouncementModelMongo {
             minQualification: data.minQualification || undefined,
             ageLimit: data.ageLimit || undefined,
             applicationFee: data.applicationFee || undefined,
+            salaryMin: data.salaryMin ?? undefined,
+            salaryMax: data.salaryMax ?? undefined,
+            difficulty: (data as any).difficulty || undefined,
+            cutoffMarks: (data as any).cutoffMarks || undefined,
             totalPosts: data.totalPosts || undefined,
             tags: data.tags || [],
             postedBy: userId,
@@ -942,6 +1055,10 @@ export class AnnouncementModelMongo {
         if (data.minQualification !== undefined) updateData.minQualification = data.minQualification;
         if (data.ageLimit !== undefined) updateData.ageLimit = data.ageLimit;
         if (data.applicationFee !== undefined) updateData.applicationFee = data.applicationFee;
+        if ((data as any).salaryMin !== undefined) updateData.salaryMin = (data as any).salaryMin;
+        if ((data as any).salaryMax !== undefined) updateData.salaryMax = (data as any).salaryMax;
+        if ((data as any).difficulty !== undefined) updateData.difficulty = (data as any).difficulty;
+        if ((data as any).cutoffMarks !== undefined) updateData.cutoffMarks = (data as any).cutoffMarks;
         if (data.totalPosts !== undefined) updateData.totalPosts = data.totalPosts;
         if (data.tags) updateData.tags = data.tags;
         if ((data as any).jobDetails !== undefined) updateData.jobDetails = (data as any).jobDetails;
@@ -1370,6 +1487,10 @@ export class AnnouncementModelMongo {
             minQualification: doc.minQualification,
             ageLimit: doc.ageLimit,
             applicationFee: doc.applicationFee,
+            salaryMin: doc.salaryMin,
+            salaryMax: doc.salaryMax,
+            difficulty: doc.difficulty,
+            cutoffMarks: doc.cutoffMarks,
             totalPosts: doc.totalPosts,
             tags: doc.tags?.map(t => ({ id: 0, name: t, slug: t.toLowerCase() })) || [],
             postedBy: doc.postedBy?.toString(),

@@ -1,5 +1,6 @@
 import { API_BASE } from './constants';
 import { filterMockAnnouncements, findMockBySlug, mockAnnouncements } from './mockData';
+import { fetchJson } from './http';
 import type { Announcement, AnnouncementCard, ContentType } from '../types';
 import type { paths } from '../types/api';
 
@@ -8,12 +9,14 @@ type AnnouncementCardsResponse =
 
 interface AnnouncementCardQuery {
     type?: ContentType;
-    category?: string;
+    category?: string | string[];
     search?: string;
-    organization?: string;
+    organization?: string | string[];
     location?: string;
     qualification?: string;
-    sort?: 'newest' | 'oldest' | 'deadline';
+    salaryMin?: number;
+    salaryMax?: number;
+    sort?: 'newest' | 'oldest' | 'deadline' | 'views';
     limit?: number;
     cursor?: string | null;
 }
@@ -25,33 +28,49 @@ export async function fetchAnnouncementCardsPage(
     try {
         const params = new URLSearchParams();
         if (query.type) params.set('type', query.type);
-        if (query.category) params.set('category', query.category);
+        if (query.category) {
+            const value = Array.isArray(query.category) ? query.category.join(',') : query.category;
+            params.set('category', value);
+        }
         if (query.search) params.set('search', query.search);
-        if (query.organization) params.set('organization', query.organization);
+        if (query.organization) {
+            const value = Array.isArray(query.organization) ? query.organization.join(',') : query.organization;
+            params.set('organization', value);
+        }
         if (query.location) params.set('location', query.location);
         if (query.qualification) params.set('qualification', query.qualification);
+        if (query.salaryMin !== undefined) params.set('salaryMin', String(query.salaryMin));
+        if (query.salaryMax !== undefined) params.set('salaryMax', String(query.salaryMax));
         if (query.sort) params.set('sort', query.sort);
         if (query.limit) params.set('limit', String(query.limit));
         if (query.cursor) params.set('cursor', query.cursor);
 
-        const response = await fetch(`${API_BASE}/api/announcements/v3/cards?${params.toString()}`, {
-            signal: AbortSignal.timeout(5000) // 5 second timeout
-        });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<AnnouncementCardsResponse>;
+        return await fetchJson<AnnouncementCardsResponse>(
+            `${API_BASE}/api/announcements/v3/cards?${params.toString()}`,
+            {},
+            { timeoutMs: 6000, retries: 2 }
+        );
     } catch (error) {
         console.warn('Backend unavailable, using mock data:', error);
         // Fallback to mock data
         const mockData = filterMockAnnouncements({
             type: query.type,
             search: query.search,
-            category: query.category,
-            organization: query.organization,
+            category: Array.isArray(query.category) ? undefined : query.category,
+            organization: Array.isArray(query.organization) ? undefined : query.organization,
             limit: query.limit || 50
         });
+        const filtered = mockData.filter((item) => {
+            const categoryMatch = Array.isArray(query.category)
+                ? query.category.includes(item.category)
+                : true;
+            const orgMatch = Array.isArray(query.organization)
+                ? query.organization.includes(item.organization)
+                : true;
+            return categoryMatch && orgMatch;
+        });
         return {
-            data: mockData as AnnouncementCard[],
+            data: filtered as AnnouncementCard[],
             hasMore: false,
             nextCursor: null
         };
@@ -113,17 +132,46 @@ export async function fetchAnnouncementBySlug(slug: string, query?: string | URL
         const normalizedQuery = queryString && !queryString.startsWith('?')
             ? `?${queryString}`
             : queryString;
-        const response = await fetch(`${API_BASE}/api/announcements/${slug}${normalizedQuery}`, {
-            signal: AbortSignal.timeout(5000) // 5 second timeout
-        });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const body = await response.json() as { data: Announcement };
+        const body = await fetchJson<{ data: Announcement }>(
+            `${API_BASE}/api/announcements/${slug}${normalizedQuery}`,
+            {},
+            { timeoutMs: 7000, retries: 2 }
+        );
         return body.data;
     } catch (error) {
         console.warn('Backend unavailable for slug fetch, using mock data:', error);
         // Fallback to mock data
         return findMockBySlug(slug);
+    }
+}
+
+// Fetch categories for filters
+export async function fetchAnnouncementCategories(): Promise<string[]> {
+    try {
+        const body = await fetchJson<{ data: string[] }>(
+            `${API_BASE}/api/announcements/meta/categories`,
+            {},
+            { timeoutMs: 6000, retries: 1 }
+        );
+        return body.data || [];
+    } catch (error) {
+        console.warn('Failed to fetch categories:', error);
+        return [];
+    }
+}
+
+// Fetch organizations for filters
+export async function fetchAnnouncementOrganizations(): Promise<string[]> {
+    try {
+        const body = await fetchJson<{ data: string[] }>(
+            `${API_BASE}/api/announcements/meta/organizations`,
+            {},
+            { timeoutMs: 6000, retries: 1 }
+        );
+        return body.data || [];
+    } catch (error) {
+        console.warn('Failed to fetch organizations:', error);
+        return [];
     }
 }
 
