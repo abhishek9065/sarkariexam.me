@@ -6,6 +6,9 @@ interface SearchFiltersProps {
     onFilterChange: (filters: FilterState) => void;
     locations?: string[];
     qualifications?: string[];
+    categories?: string[];
+    organizations?: string[];
+    suggestions?: string[];
     showTypeFilter?: boolean;
     initialType?: ContentType | '';
     persistKey?: string;
@@ -18,9 +21,13 @@ export interface FilterState {
     type: ContentType | '';
     location: string;
     qualification: string;
+    categories: string[];
+    organizations: string[];
+    minSalary: string;
+    maxSalary: string;
     minAge: string;
     maxAge: string;
-    sortBy: 'latest' | 'deadline' | 'posts' | 'title';
+    sortBy: 'latest' | 'relevance' | 'deadline' | 'posts' | 'title' | 'views';
 }
 
 const TYPE_OPTIONS: { value: ContentType | ''; label: string; icon: string }[] = [
@@ -87,6 +94,9 @@ export function SearchFilters({
     onFilterChange,
     locations = DEFAULT_LOCATIONS,
     qualifications = DEFAULT_QUALIFICATIONS,
+    categories = [],
+    organizations = [],
+    suggestions = [],
     showTypeFilter = true,
     initialType = '',
     persistKey,
@@ -98,12 +108,19 @@ export function SearchFilters({
         type: initialType,
         location: '',
         qualification: '',
+        categories: [],
+        organizations: [],
+        minSalary: '',
+        maxSalary: '',
         minAge: '',
         maxAge: '',
         sortBy: 'latest',
     });
     const [showFilters, setShowFilters] = useState(false);
     const [keywordInput, setKeywordInput] = useState('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [voiceError, setVoiceError] = useState('');
+    const [listening, setListening] = useState(false);
     const storageKey = persistKey ? `filters:${persistKey}` : null;
     const recentKey = persistKey ? `recent:${persistKey}` : 'recent:global';
     const pinnedKey = 'pinned-types';
@@ -119,7 +136,14 @@ export function SearchFilters({
         if (!raw) return;
         try {
             const saved = JSON.parse(raw) as FilterState;
-            const next = { ...saved, type: saved.type ?? initialType };
+            const next = {
+                ...saved,
+                type: saved.type ?? initialType,
+                categories: saved.categories ?? [],
+                organizations: saved.organizations ?? [],
+                minSalary: saved.minSalary ?? '',
+                maxSalary: saved.maxSalary ?? '',
+            };
             setFilters(next);
             setKeywordInput(saved.keyword || '');
             onFilterChange(next);
@@ -173,7 +197,7 @@ export function SearchFilters({
         localStorage.setItem(recentKey, JSON.stringify(next));
     }, [debouncedKeyword, recentKey, recentSearches, showRecentSearches]);
 
-    const updateFilter = useCallback((key: keyof FilterState, value: string) => {
+    const updateFilter = useCallback((key: keyof FilterState, value: string | string[]) => {
         const newFilters = { ...filters, [key]: value };
         setFilters(newFilters);
         onFilterChange(newFilters);
@@ -204,6 +228,10 @@ export function SearchFilters({
             type: initialType,
             location: '',
             qualification: '',
+            categories: [],
+            organizations: [],
+            minSalary: '',
+            maxSalary: '',
             minAge: '',
             maxAge: '',
             sortBy: 'latest',
@@ -217,15 +245,64 @@ export function SearchFilters({
     };
 
     const hasActiveFilters = filters.keyword || (filters.type && filters.type !== initialType) || filters.location ||
-        filters.qualification || filters.minAge || filters.maxAge;
+        filters.qualification || filters.minAge || filters.maxAge || filters.categories.length > 0 || filters.organizations.length > 0 ||
+        filters.minSalary || filters.maxSalary;
 
     const activeFilterCount = [
         filters.keyword,
         (filters.type && filters.type !== initialType) ? filters.type : '',
         filters.location,
         filters.qualification,
-        filters.minAge || filters.maxAge
+        filters.minAge || filters.maxAge,
+        filters.minSalary || filters.maxSalary,
+        filters.categories.length ? 'categories' : '',
+        filters.organizations.length ? 'organizations' : '',
     ].filter(Boolean).length;
+
+    const suggestionItems = useMemo(() => {
+        const pool = [...suggestions, ...categories, ...organizations];
+        const unique = Array.from(new Set(pool.filter(Boolean)));
+        if (!keywordInput.trim()) return [];
+        const needle = keywordInput.toLowerCase();
+        return unique.filter((item) => item.toLowerCase().includes(needle)).slice(0, 6);
+    }, [categories, organizations, suggestions, keywordInput]);
+
+    const toggleMultiValue = (key: 'categories' | 'organizations', value: string) => {
+        const current = filters[key];
+        const next = current.includes(value)
+            ? current.filter((item) => item !== value)
+            : [...current, value];
+        updateFilter(key, next);
+    };
+
+    const handleVoiceSearch = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            setVoiceError('Voice search is not supported on this device.');
+            return;
+        }
+        setVoiceError('');
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => setListening(true);
+        recognition.onerror = () => {
+            setListening(false);
+            setVoiceError('Unable to capture voice. Please try again.');
+        };
+        recognition.onend = () => setListening(false);
+        recognition.onresult = (event: any) => {
+            const transcript = event?.results?.[0]?.[0]?.transcript;
+            if (transcript) {
+                setKeywordInput(transcript);
+                updateFilter('keyword', transcript);
+            }
+        };
+
+        recognition.start();
+    };
 
     return (
         <div className="advanced-search-filters">
@@ -238,7 +315,9 @@ export function SearchFilters({
                         className="search-input"
                         placeholder="Search jobs, results, admit cards... (Live search - just start typing!)"
                         value={keywordInput}
-                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onChange={(e) => { setKeywordInput(e.target.value); setShowSuggestions(true); }}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                     />
                     {keywordInput && (
                         <button
@@ -248,6 +327,33 @@ export function SearchFilters({
                         >
                             ✕
                         </button>
+                    )}
+                    <button
+                        type="button"
+                        className={`voice-search-btn ${listening ? 'listening' : ''}`}
+                        onClick={handleVoiceSearch}
+                        aria-label="Voice search"
+                        title="Search by voice"
+                    >
+                        🎤
+                    </button>
+                    {showSuggestions && suggestionItems.length > 0 && (
+                        <div className="search-suggestions" role="listbox">
+                            {suggestionItems.map((item) => (
+                                <button
+                                    key={item}
+                                    className="suggestion-item"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                        setKeywordInput(item);
+                                        updateFilter('keyword', item);
+                                        setShowSuggestions(false);
+                                    }}
+                                >
+                                    {item}
+                                </button>
+                            ))}
+                        </div>
                     )}
                 </div>
                 <button
@@ -282,6 +388,11 @@ export function SearchFilters({
                             {item}
                         </button>
                     ))}
+                </div>
+            )}
+            {voiceError && (
+                <div className="voice-search-error" role="status">
+                    {voiceError}
                 </div>
             )}
 
@@ -330,6 +441,48 @@ export function SearchFilters({
                     </div>
 
                     <div className="filters-grid">
+                        {categories.length > 0 && (
+                            <div className="filter-group">
+                                <label>
+                                    <span className="label-icon">🏷️</span>
+                                    Category
+                                </label>
+                                <div className="multi-select">
+                                    {categories.slice(0, 12).map((category) => (
+                                        <button
+                                            key={category}
+                                            type="button"
+                                            className={`multi-chip ${filters.categories.includes(category) ? 'active' : ''}`}
+                                            onClick={() => toggleMultiValue('categories', category)}
+                                        >
+                                            {category}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {organizations.length > 0 && (
+                            <div className="filter-group">
+                                <label>
+                                    <span className="label-icon">🏢</span>
+                                    Department / Organization
+                                </label>
+                                <div className="multi-select">
+                                    {organizations.slice(0, 12).map((org) => (
+                                        <button
+                                            key={org}
+                                            type="button"
+                                            className={`multi-chip ${filters.organizations.includes(org) ? 'active' : ''}`}
+                                            onClick={() => toggleMultiValue('organizations', org)}
+                                        >
+                                            {org}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="filter-group">
                             <label>
                                 <span className="label-icon">📍</span>
@@ -360,6 +513,30 @@ export function SearchFilters({
                                     <option key={q} value={q}>{q}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div className="filter-group age-filter">
+                            <label>
+                                <span className="label-icon">💵</span>
+                                Salary Range (₹/month)
+                            </label>
+                            <div className="age-inputs">
+                                <input
+                                    type="number"
+                                    placeholder="Min"
+                                    value={filters.minSalary}
+                                    onChange={(e) => updateFilter('minSalary', e.target.value)}
+                                    min="0"
+                                />
+                                <span className="age-separator">to</span>
+                                <input
+                                    type="number"
+                                    placeholder="Max"
+                                    value={filters.maxSalary}
+                                    onChange={(e) => updateFilter('maxSalary', e.target.value)}
+                                    min="0"
+                                />
+                            </div>
                         </div>
 
                         <div className="filter-group age-filter">
@@ -398,9 +575,11 @@ export function SearchFilters({
                                 onChange={(e) => updateFilter('sortBy', e.target.value as FilterState['sortBy'])}
                             >
                                 <option value="latest">Latest First</option>
+                                <option value="relevance">Relevance</option>
                                 <option value="deadline">Deadline Soon</option>
                                 <option value="posts">Most Vacancies</option>
                                 <option value="title">Alphabetical</option>
+                                <option value="views">Most Viewed</option>
                             </select>
                         </div>
                     </div>
@@ -424,6 +603,24 @@ export function SearchFilters({
                                 <span className="filter-tag">
                                     📍 {filters.location}
                                     <button onClick={() => updateFilter('location', '')}>✕</button>
+                                </span>
+                            )}
+                            {(filters.minSalary || filters.maxSalary) && (
+                                <span className="filter-tag">
+                                    💵 {filters.minSalary || '0'} - {filters.maxSalary || '∞'}
+                                    <button onClick={() => { updateFilter('minSalary', ''); updateFilter('maxSalary', ''); }}>✕</button>
+                                </span>
+                            )}
+                            {filters.categories.length > 0 && (
+                                <span className="filter-tag">
+                                    🏷️ {filters.categories.join(', ')}
+                                    <button onClick={() => updateFilter('categories', [])}>✕</button>
+                                </span>
+                            )}
+                            {filters.organizations.length > 0 && (
+                                <span className="filter-tag">
+                                    🏢 {filters.organizations.join(', ')}
+                                    <button onClick={() => updateFilter('organizations', [])}>✕</button>
                                 </span>
                             )}
                             {filters.qualification && (

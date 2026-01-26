@@ -28,6 +28,7 @@ import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
 import bookmarksRouter from './routes/bookmarks.js';
 import bulkRouter from './routes/bulk.js';
+import communityRouter from './routes/community.js';
 import graphqlRouter from './routes/graphql.js';
 import jobsRouter from './routes/jobs.js';
 import profileRouter from './routes/profile.js';
@@ -140,6 +141,7 @@ app.use('/api/profile', profileRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
+app.use('/api/community', communityRouter);
 
 // Global Error Handler
 app.use(errorHandler);

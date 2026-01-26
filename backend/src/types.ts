@@ -25,6 +25,10 @@ export interface Announcement {
   minQualification?: string;
   ageLimit?: string;
   applicationFee?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  cutoffMarks?: string;
   totalPosts?: number;
   postedBy?: string;
   postedAt: Date;
@@ -73,6 +77,10 @@ export interface AnnouncementVersion {
     minQualification?: string;
     ageLimit?: string;
     applicationFee?: string;
+    salaryMin?: number;
+    salaryMax?: number;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    cutoffMarks?: string;
     totalPosts?: number;
     tags?: Tag[];
     importantDates?: ImportantDate[];
@@ -97,6 +105,10 @@ export interface CreateAnnouncementDto {
   minQualification?: string;
   ageLimit?: string;
   applicationFee?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  cutoffMarks?: string;
   totalPosts?: number;
   status?: AnnouncementStatus;
   publishAt?: string;

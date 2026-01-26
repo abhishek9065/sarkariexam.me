@@ -38,6 +38,8 @@ interface SavedSearchDoc {
         organization?: string;
         location?: string;
         qualification?: string;
+        salaryMin?: number;
+        salaryMax?: number;
     };
     notificationsEnabled: boolean;
     frequency: 'instant' | 'daily' | 'weekly';
@@ -87,6 +89,16 @@ const savedSearchFilterSchema = z.object({
     organization: z.string().trim().optional(),
     location: z.string().trim().optional(),
     qualification: z.string().trim().optional(),
+    salaryMin: z.coerce.number().min(0).optional(),
+    salaryMax: z.coerce.number().min(0).optional(),
+}).superRefine((filters, ctx) => {
+    if (filters.salaryMin !== undefined && filters.salaryMax !== undefined && filters.salaryMin > filters.salaryMax) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Minimum salary must be less than or equal to maximum salary',
+            path: ['salaryMin'],
+        });
+    }
 });
 
 const savedSearchBaseSchema = z.object({
@@ -99,7 +111,7 @@ const savedSearchBaseSchema = z.object({
 
 const savedSearchSchema = savedSearchBaseSchema.superRefine((data, ctx) => {
     const hasQuery = Boolean(data.query && data.query.trim());
-    const hasFilters = Boolean(data.filters && Object.values(data.filters).some((value) => value && String(value).trim()));
+    const hasFilters = Boolean(data.filters && Object.values(data.filters).some(hasFilterValue));
     if (!hasQuery && !hasFilters) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -114,7 +126,7 @@ const savedSearchUpdateSchema = savedSearchBaseSchema.partial().superRefine((dat
         ? Boolean(data.query && data.query.trim())
         : false;
     const hasFilters = data.filters !== undefined
-        ? Boolean(data.filters && Object.values(data.filters).some((value) => value && String(value).trim()))
+        ? Boolean(data.filters && Object.values(data.filters).some(hasFilterValue))
         : false;
     const isUpdatingCriteria = data.query !== undefined || data.filters !== undefined;
     if (isUpdatingCriteria && !hasQuery && !hasFilters) {
@@ -176,6 +188,18 @@ function cleanFilterValue(value?: string) {
     return trimmed ? trimmed : undefined;
 }
 
+function cleanNumberValue(value?: number | null) {
+    if (value === undefined || value === null) return undefined;
+    return Number.isFinite(value) ? value : undefined;
+}
+
+function hasFilterValue(value: unknown) {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value === 'string') return value.trim().length > 0;
+    return Boolean(value);
+}
+
 function sanitizeFilters(filters?: SavedSearchDoc['filters']) {
     if (!filters) return undefined;
     const cleaned = {
@@ -184,8 +208,10 @@ function sanitizeFilters(filters?: SavedSearchDoc['filters']) {
         organization: cleanFilterValue(filters.organization),
         location: cleanFilterValue(filters.location),
         qualification: cleanFilterValue(filters.qualification),
+        salaryMin: cleanNumberValue(filters.salaryMin),
+        salaryMax: cleanNumberValue(filters.salaryMax),
     };
-    return Object.values(cleaned).some(value => value) ? cleaned : undefined;
+    return Object.values(cleaned).some(hasFilterValue) ? cleaned : undefined;
 }
 
 function getAnnouncementTimestamp(item: { updatedAt?: string | Date; postedAt?: string | Date }) {
@@ -270,6 +296,8 @@ async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, 
         organization: filters?.organization,
         location: filters?.location,
         qualification: filters?.qualification,
+        salaryMin: filters?.salaryMin,
+        salaryMax: filters?.salaryMax,
         search: search.query ? search.query : undefined,
         limit: searchLimit,
     });

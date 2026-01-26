@@ -1,4 +1,5 @@
 import type { Announcement } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface SectionTableProps {
     title: string;
@@ -9,6 +10,7 @@ interface SectionTableProps {
 }
 
 export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth }: SectionTableProps) {
+    const { t } = useLanguage();
     const formatShortDate = (date: string | undefined) => {
         if (!date) return '';
         const d = new Date(date);
@@ -56,13 +58,13 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
                             </li>
                         ))
                     ) : (
-                        <li className="no-items">No {title.toLowerCase()} available at the moment.</li>
+                        <li className="no-items">{t('section.noItems')}</li>
                     )}
                 </ul>
             </div>
             {onViewMore && (
                 <div className="section-table-footer">
-                    <button className="view-more-btn" onClick={onViewMore}>View More</button>
+                    <button className="view-more-btn" onClick={onViewMore}>{t('section.viewMore')}</button>
                 </div>
             )}
         </div>

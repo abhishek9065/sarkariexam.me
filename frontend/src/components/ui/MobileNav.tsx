@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import './MobileNav.css';
 
 interface MobileNavProps {
@@ -10,6 +11,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const { isAuthenticated } = useAuth();
+    const { t } = useLanguage();
 
     const isActive = (path: string) => {
         if (path === '/') return location.pathname === '/';
@@ -31,7 +33,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
                 onClick={() => handleNavigation('/')}
             >
                 <span className="nav-icon">🏠</span>
-                <span className="nav-label">Home</span>
+                <span className="nav-label">{t('nav.home')}</span>
             </button>
 
             <button
@@ -39,7 +41,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
                 onClick={() => handleNavigation('/jobs')}
             >
                 <span className="nav-icon">💼</span>
-                <span className="nav-label">Jobs</span>
+                <span className="nav-label">{t('nav.job')}</span>
             </button>
 
             <button
@@ -47,7 +49,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
                 onClick={() => handleNavigation('/results')}
             >
                 <span className="nav-icon">📊</span>
-                <span className="nav-label">Results</span>
+                <span className="nav-label">{t('nav.result')}</span>
             </button>
 
             <button
@@ -55,7 +57,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
                 onClick={() => handleNavigation('/admit-card')}
             >
                 <span className="nav-icon">🎫</span>
-                <span className="nav-label">Admit</span>
+                <span className="nav-label">{t('nav.admit-card')}</span>
             </button>
 
             <button
@@ -63,7 +65,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
                 onClick={() => handleNavigation('/profile')}
             >
                 <span className="nav-icon">{isAuthenticated ? '👤' : '🔐'}</span>
-                <span className="nav-label">{isAuthenticated ? 'Profile' : 'Login'}</span>
+                <span className="nav-label">{isAuthenticated ? t('nav.profile') : t('nav.login')}</span>
             </button>
         </nav>
     );
