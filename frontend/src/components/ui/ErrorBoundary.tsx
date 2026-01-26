@@ -1,11 +1,13 @@
 import React from 'react';
 import { ErrorState } from './UXComponents';
-import { captureError } from '../../utils/errorMonitoring';
+import { captureError, reportIssue } from '../../utils/errorMonitoring';
 
 interface ErrorBoundaryState {
     hasError: boolean;
     message?: string;
     errorId?: string;
+    stack?: string;
+    componentStack?: string;
 }
 
 export class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBoundaryState> {
@@ -20,12 +22,15 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
         if (!this.state.errorId) {
             this.setState({ errorId });
         }
+        if (!this.state.stack || !this.state.componentStack) {
+            this.setState({ stack: error.stack, componentStack: info.componentStack });
+        }
         console.error('[ErrorBoundary]', errorId, error, info);
         captureError(error, { componentStack: info.componentStack }, errorId);
     }
 
     handleRetry = () => {
-        this.setState({ hasError: false, message: undefined, errorId: undefined });
+        this.setState({ hasError: false, message: undefined, errorId: undefined, stack: undefined, componentStack: undefined });
     };
 
     private createErrorId() {
@@ -34,6 +39,18 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
         }
         return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
     }
+
+    handleReport = async () => {
+        if (!this.state.errorId) return;
+        const note = window.prompt('What were you doing when this error happened? (Optional)');
+        await reportIssue({
+            errorId: this.state.errorId,
+            message: this.state.message || 'Unknown error',
+            note: note?.trim() || undefined,
+            stack: this.state.stack,
+            componentStack: this.state.componentStack,
+        });
+    };
 
     render() {
         if (this.state.hasError) {
@@ -44,6 +61,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
                             message={this.state.message || 'An unexpected error occurred.'}
                             onRetry={this.handleRetry}
                             errorId={this.state.errorId}
+                            onReport={this.handleReport}
                         />
                     </main>
                 </div>

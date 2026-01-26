@@ -133,7 +133,17 @@ export function EmptyState({ icon = '📭', title, description, action }: EmptyS
 }
 
 // Error State
-export function ErrorState({ message, onRetry, errorId }: { message: string; onRetry?: () => void; errorId?: string }) {
+export function ErrorState({
+    message,
+    onRetry,
+    errorId,
+    onReport,
+}: {
+    message: string;
+    onRetry?: () => void;
+    errorId?: string;
+    onReport?: () => void;
+}) {
     return (
         <div className="error-state">
             <div className="error-icon">⚠️</div>
@@ -153,6 +163,11 @@ export function ErrorState({ message, onRetry, errorId }: { message: string; onR
                         Copy
                     </button>
                 </p>
+            )}
+            {onReport && (
+                <button className="retry-btn secondary" onClick={onReport}>
+                    Report Issue
+                </button>
             )}
             {onRetry && (
                 <button className="retry-btn" onClick={onRetry}>

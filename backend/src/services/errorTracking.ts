@@ -24,6 +24,7 @@ export function initSentry(): void {
         Sentry.init({
             dsn: SENTRY_DSN,
             environment: process.env.NODE_ENV || 'development',
+            release: process.env.SENTRY_RELEASE || process.env.APP_VERSION,
             tracesSampleRate: 1.0,
             debug: false, // Set to true for debugging
         });

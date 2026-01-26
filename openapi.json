@@ -875,6 +875,33 @@
           }
         }
       }
+    },
+    "/api/support/error-report": {
+      "post": {
+        "summary": "Report a client error",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1966,6 +1993,53 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "ErrorReportRequest": {
+        "type": "object",
+        "properties": {
+          "errorId": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "pageUrl": {
+            "type": "string"
+          },
+          "userAgent": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          },
+          "componentStack": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "errorId",
+          "message"
+        ]
+      },
+      "ErrorReportResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
         ]
       }
     }

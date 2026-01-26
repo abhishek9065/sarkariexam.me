@@ -2,6 +2,8 @@ import * as Sentry from '@sentry/react';
 
 const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 const environment = import.meta.env.MODE;
+const release = (import.meta.env.VITE_SENTRY_RELEASE || import.meta.env.VITE_APP_VERSION) as string | undefined;
+const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 let initialized = false;
 
@@ -14,6 +16,7 @@ export function initErrorMonitoring() {
         Sentry.init({
             dsn,
             environment,
+            release,
             tracesSampleRate: 0.05,
             normalizeDepth: 5,
         });
@@ -36,3 +39,29 @@ export function captureError(error: Error, context?: { componentStack?: string }
     }
 }
 
+export async function reportIssue(input: {
+    errorId: string;
+    message: string;
+    note?: string;
+    stack?: string;
+    componentStack?: string;
+}) {
+    try {
+        const token = localStorage.getItem('authToken');
+        await fetch(`${apiBase}/api/support/error-report`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+                ...input,
+                pageUrl: window.location.href,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+            }),
+        });
+    } catch (error) {
+        console.error('[ErrorReport] Failed to submit report:', error);
+    }
+}

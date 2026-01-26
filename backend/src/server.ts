@@ -35,6 +35,7 @@ import jobsRouter from './routes/jobs.js';
 import profileRouter from './routes/profile.js';
 import pushRouter from './routes/push.js';
 import subscriptionsRouter from './routes/subscriptions.js';
+import supportRouter from './routes/support.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
 import { connectToDatabase } from './services/cosmosdb.js';
@@ -144,6 +145,7 @@ app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
 app.use('/api/community', communityRouter);
+app.use('/api/support', supportRouter);
 app.use('/api/community', communityRouter);
 
 // 404 handler for API routes
