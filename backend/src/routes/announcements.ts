@@ -24,11 +24,11 @@ const querySchema = z.object({
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
     .optional(),
-  search: z.string().trim().optional(),
-  category: z.string().trim().optional(),
-  organization: z.string().trim().optional(),
-  location: z.string().trim().optional(),
-  qualification: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
+  category: z.string().trim().max(50).optional(),
+  organization: z.string().trim().max(100).optional(),
+  location: z.string().trim().max(50).optional(),
+  qualification: z.string().trim().max(50).optional(),
   sort: z.enum(['newest', 'oldest', 'deadline']).default('newest'),
   limit: z.coerce.number().int().min(1).max(200).default(100),
   offset: z.coerce.number().int().min(0).default(0),
@@ -36,7 +36,7 @@ const querySchema = z.object({
 
 // Search schema
 const searchQuerySchema = z.object({
-  q: z.string().trim().min(2),
+  q: z.string().trim().min(2).max(100),
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
     .optional(),
