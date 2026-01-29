@@ -13,6 +13,23 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
+const dismissKey = 'notification_prompt_dismissed';
+
+const getStoredDismissed = () => {
+    try {
+        return localStorage.getItem(dismissKey);
+    } catch {
+        return sessionStorage.getItem(dismissKey);
+    }
+};
+
+const setStoredDismissed = (value: string) => {
+    try {
+        localStorage.setItem(dismissKey, value);
+    } catch {
+        sessionStorage.setItem(dismissKey, value);
+    }
+};
 
 export function NotificationPrompt() {
     const [showPrompt, setShowPrompt] = useState(false);
@@ -27,12 +44,19 @@ export function NotificationPrompt() {
         setPermission(Notification.permission);
 
         // Check if dismissed recently (7-day cooldown)
-        const dismissed = localStorage.getItem('notification_prompt_dismissed');
+        const dismissed = getStoredDismissed();
         if (dismissed) {
+            if (dismissed === 'permanent') {
+                return;
+            }
             const dismissedTime = parseInt(dismissed, 10);
-            const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
-            if (daysSinceDismissed < 7) {
-                return; // Don't show if dismissed within last 7 days
+            if (Number.isFinite(dismissedTime)) {
+                const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+                if (daysSinceDismissed < 7) {
+                    return; // Don't show if dismissed within last 7 days
+                }
+            } else {
+                return;
             }
         }
 
@@ -49,6 +73,7 @@ export function NotificationPrompt() {
             const perm = await Notification.requestPermission();
             setPermission(perm);
             setShowPrompt(false);
+            setStoredDismissed('permanent');
 
             if (perm === 'granted') {
                 // Subscribe to push notifications
@@ -91,7 +116,7 @@ export function NotificationPrompt() {
 
     const handleDismiss = () => {
         setShowPrompt(false);
-        localStorage.setItem('notification_prompt_dismissed', Date.now().toString());
+        setStoredDismissed('permanent');
     };
 
     if (!showPrompt || permission !== 'default') return null;

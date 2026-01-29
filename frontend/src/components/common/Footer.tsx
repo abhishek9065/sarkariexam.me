@@ -8,6 +8,7 @@ interface FooterProps {
 export function Footer({ setCurrentPage }: FooterProps) {
     const navigate = useNavigate();
     const { t } = useLanguage();
+    const lastUpdated = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
     return (
         <footer className="site-footer">
@@ -42,7 +43,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
                 </div>
             </div>
             <div className="footer-bottom">
-                <p>© 2025-26 SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: January 26, 2026</p>
+                <p>© 2025-26 SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: {lastUpdated}</p>
                 <p className="legal-notice">⚠️ {t('footer.legalNotice')}</p>
             </div>
         </footer>

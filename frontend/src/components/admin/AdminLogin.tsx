@@ -63,7 +63,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
         const shouldRemember = localStorage.getItem('admin_remember') === 'true';
         
         if (savedEmail && shouldRemember) {
-            setEmail(savedEmail);
+            setEmail(savedEmail.trim());
             setRememberMe(true);
         }
         generateCaptcha();
@@ -82,6 +82,11 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
         
         const score = Object.values(requirements).filter(Boolean).length;
         return { score, requirements };
+    };
+    
+    const handlePasswordChange = (value: string) => {
+        setPassword(value);
+        setPasswordStrength(calculatePasswordStrength(value));
     };
 
     // Handle forgot password submission
@@ -455,6 +460,22 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                             >
                                 Forgot Password?
                             </button>
+                            {rememberMe && email && (
+                                <button 
+                                    type="button" 
+                                    className="forgot-password-link" 
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit', marginRight: '12px', color: '#94a3b8' }}
+                                    onClick={() => {
+                                        setEmail('');
+                                        setRememberMe(false);
+                                        localStorage.removeItem('admin_email');
+                                        localStorage.removeItem('admin_remember');
+                                    }}
+                                    disabled={loading}
+                                >
+                                    Use a different email
+                                </button>
+                            )}
                             {onEnable2FA && (
                                 <button 
                                     type="button" 

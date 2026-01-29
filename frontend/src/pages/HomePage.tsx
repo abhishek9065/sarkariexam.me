@@ -17,6 +17,7 @@ export function HomePage() {
     const [showCookieConsent, setShowCookieConsent] = useState(false);
     const [recommendations, setRecommendations] = useState<Announcement[]>([]);
     const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
+    const [recommendationsLoading, setRecommendationsLoading] = useState(false);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -103,9 +104,11 @@ export function HomePage() {
             ).slice(0, 6);
             setRecommendations(popularJobs);
             setRecommendationsError(null);
+            setRecommendationsLoading(false);
             return;
         }
         setRecommendationsError(null);
+        setRecommendationsLoading(true);
         const cancel = runWhenIdle(() => {
             fetchJson<{ data: Announcement[] }>(`${API_BASE}/api/profile/recommendations?limit=6`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -130,13 +133,16 @@ export function HomePage() {
                     ).slice(0, 6);
                     setRecommendations(fallbackJobs);
                     // Only show error if no fallback data available
-                    if (fallbackJobs.length === 0) {
-                        setRecommendationsError('Unable to load recommendations. Please try refreshing the page.');
+                    if (fallbackJobs.length === 0 && !loading) {
+                        setRecommendationsError('No recommendations available yet. Please update your profile preferences.');
                     }
+                })
+                .finally(() => {
+                    setRecommendationsLoading(false);
                 });
         });
         return () => cancel();
-    }, [token, data]);
+    }, [token, data, loading]);
 
     // Get data by type for section display
     const getByType = (type: ContentType) => data.filter(item => item.type === type);
@@ -320,7 +326,9 @@ export function HomePage() {
                             <h2 className="sections-title">Jobs For You</h2>
                             <p className="sections-subtitle">Personalized based on your profile preferences</p>
                         </div>
-                        {recommendationsError ? (
+                        {recommendationsLoading ? (
+                            <p className="no-data">Loading personalized suggestions...</p>
+                        ) : recommendationsError ? (
                             <ErrorState message={recommendationsError} />
                         ) : recommendations.length > 0 ? (
                             <SectionTable title="Recommended" items={recommendations} onItemClick={handleItemClick} />
