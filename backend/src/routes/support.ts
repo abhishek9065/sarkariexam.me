@@ -40,6 +40,7 @@ const listQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(50).optional(),
     offset: z.coerce.number().int().min(0).max(500).optional(),
     status: z.enum(['new', 'triaged', 'resolved']).optional(),
+    errorId: z.string().trim().min(2).max(120).optional(),
 });
 
 const updateSchema = z.object({
@@ -97,9 +98,13 @@ router.get('/error-reports', authenticateToken, requirePermission('admin:read'),
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
-        const query: Partial<ErrorReportDoc> = {};
+        const query: Partial<ErrorReportDoc> & { errorId?: any } = {};
         if (parseResult.data.status) {
             query.status = parseResult.data.status;
+        }
+        if (parseResult.data.errorId) {
+            const escaped = parseResult.data.errorId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            query.errorId = { $regex: escaped, $options: 'i' };
         }
         const [items, total] = await Promise.all([
             reportsCollection()

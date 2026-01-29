@@ -1092,6 +1092,7 @@ export interface paths {
                     limit?: number;
                     offset?: number;
                     status?: components["schemas"]["ErrorReportStatus"];
+                    errorId?: string;
                 };
                 header?: never;
                 path?: never;

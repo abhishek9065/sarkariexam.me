@@ -345,6 +345,7 @@ export function AdminPage() {
     const [errorReportsUpdatedAt, setErrorReportsUpdatedAt] = useState<string | null>(null);
     const [errorReportStatusFilter, setErrorReportStatusFilter] = useState<ErrorReportStatus | 'all'>('new');
     const [errorReportNotes, setErrorReportNotes] = useState<Record<string, string>>({});
+    const [errorReportQuery, setErrorReportQuery] = useState('');
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -739,6 +740,10 @@ export function AdminPage() {
             });
             if (errorReportStatusFilter !== 'all') {
                 params.set('status', errorReportStatusFilter);
+            }
+            const trimmedQuery = errorReportQuery.trim();
+            if (trimmedQuery) {
+                params.set('errorId', trimmedQuery);
             }
             const res = await adminFetch(`${apiBase}/api/support/error-reports?${params.toString()}`);
             if (!res.ok) {
@@ -2254,7 +2259,7 @@ export function AdminPage() {
     useEffect(() => {
         if (!isLoggedIn || activeAdminTab !== 'errors') return;
         refreshErrorReports();
-    }, [errorReportStatusFilter, activeAdminTab, isLoggedIn]);
+    }, [errorReportStatusFilter, errorReportQuery, activeAdminTab, isLoggedIn]);
 
     useEffect(() => {
         if (!isLoggedIn || activeAdminTab !== 'community') return;
@@ -2907,6 +2912,14 @@ export function AdminPage() {
                                 <option value="resolved">Resolved</option>
                                 <option value="all">All</option>
                             </select>
+                            <label htmlFor="errorIdFilter" className="admin-inline-label">Error ID</label>
+                            <input
+                                id="errorIdFilter"
+                                type="text"
+                                placeholder="Search error ID"
+                                value={errorReportQuery}
+                                onChange={(e) => setErrorReportQuery(e.target.value)}
+                            />
                         </div>
 
                         {errorReportsError && <div className="admin-error">{errorReportsError}</div>}
@@ -2939,6 +2952,23 @@ export function AdminPage() {
                                         </div>
                                         {report.note && (
                                             <div className="admin-community-answer">User note: {report.note}</div>
+                                        )}
+                                        {(report.stack || report.componentStack || report.userAgent) && (
+                                            <details className="admin-trace">
+                                                <summary>Debug details</summary>
+                                                {report.userAgent && (
+                                                    <p className="admin-trace-meta"><strong>User agent:</strong> {report.userAgent}</p>
+                                                )}
+                                                {report.stack && (
+                                                    <pre className="admin-trace-block">{report.stack}</pre>
+                                                )}
+                                                {report.componentStack && (
+                                                    <>
+                                                        <p className="admin-trace-meta"><strong>Component stack:</strong></p>
+                                                        <pre className="admin-trace-block">{report.componentStack}</pre>
+                                                    </>
+                                                )}
+                                            </details>
                                         )}
                                         <textarea
                                             className="review-note-input compact"

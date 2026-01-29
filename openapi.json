@@ -931,6 +931,13 @@
             "schema": {
               "$ref": "#/components/schemas/ErrorReportStatus"
             }
+          },
+          {
+            "name": "errorId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
