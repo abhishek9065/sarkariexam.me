@@ -1,1 +1,484 @@
-import React, { useState, useEffect } from 'react';\nimport './PasswordPolicy.css';\n\nexport interface PasswordPolicyRule {\n    id: string;\n    name: string;\n    description: string;\n    requirement: string;\n    isActive: boolean;\n    severity: 'required' | 'recommended' | 'optional';\n    regex?: string;\n    minValue?: number;\n    maxValue?: number;\n}\n\nexport interface PasswordCompliance {\n    score: number; // 0-100\n    passed: string[];\n    failed: string[];\n    warnings: string[];\n    isCompliant: boolean;\n    strengthLevel: 'very-weak' | 'weak' | 'fair' | 'good' | 'strong' | 'very-strong';\n}\n\ninterface PasswordPolicyProps {\n    rules: PasswordPolicyRule[];\n    currentPassword?: string;\n    onUpdateRule: (ruleId: string, updates: Partial<PasswordPolicyRule>) => Promise<void>;\n    onTestPassword?: (password: string) => PasswordCompliance;\n    loading?: boolean;\n}\n\nconst DEFAULT_RULES: PasswordPolicyRule[] = [\n    {\n        id: 'min-length',\n        name: 'Minimum Length',\n        description: 'Password must be at least 8 characters long',\n        requirement: 'At least 8 characters',\n        isActive: true,\n        severity: 'required',\n        minValue: 8\n    },\n    {\n        id: 'max-length',\n        name: 'Maximum Length',\n        description: 'Password cannot exceed 128 characters',\n        requirement: 'Maximum 128 characters',\n        isActive: true,\n        severity: 'recommended',\n        maxValue: 128\n    },\n    {\n        id: 'uppercase',\n        name: 'Uppercase Letter',\n        description: 'Password must contain at least one uppercase letter (A-Z)',\n        requirement: 'At least 1 uppercase letter',\n        isActive: true,\n        severity: 'required',\n        regex: '[A-Z]'\n    },\n    {\n        id: 'lowercase',\n        name: 'Lowercase Letter',\n        description: 'Password must contain at least one lowercase letter (a-z)',\n        requirement: 'At least 1 lowercase letter',\n        isActive: true,\n        severity: 'required',\n        regex: '[a-z]'\n    },\n    {\n        id: 'number',\n        name: 'Numeric Character',\n        description: 'Password must contain at least one number (0-9)',\n        requirement: 'At least 1 number',\n        isActive: true,\n        severity: 'required',\n        regex: '[0-9]'\n    },\n    {\n        id: 'special',\n        name: 'Special Character',\n        description: 'Password must contain at least one special character (!@#$%^&*)',\n        requirement: 'At least 1 special character',\n        isActive: true,\n        severity: 'recommended',\n        regex: '[!@#$%^&*(),.?\":{}|<>]'\n    },\n    {\n        id: 'no-dictionary',\n        name: 'No Dictionary Words',\n        description: 'Password should not contain common dictionary words',\n        requirement: 'Avoid common words',\n        isActive: true,\n        severity: 'recommended'\n    },\n    {\n        id: 'no-repetition',\n        name: 'No Character Repetition',\n        description: 'Password should not have more than 2 consecutive identical characters',\n        requirement: 'No character repetition (aaa)',\n        isActive: true,\n        severity: 'recommended',\n        regex: '(.)\\\\1{2,}'\n    },\n    {\n        id: 'no-sequence',\n        name: 'No Sequential Characters',\n        description: 'Password should not contain sequential characters (abc, 123)',\n        requirement: 'Avoid sequences (abc, 123)',\n        isActive: true,\n        severity: 'recommended'\n    },\n    {\n        id: 'no-personal-info',\n        name: 'No Personal Information',\n        description: 'Password should not contain personal information like name, email',\n        requirement: 'Avoid personal information',\n        isActive: true,\n        severity: 'required'\n    }\n];\n\nexport function PasswordPolicy({ \n    rules = DEFAULT_RULES, \n    currentPassword = '', \n    onUpdateRule, \n    onTestPassword, \n    loading = false \n}: PasswordPolicyProps) {\n    const [testPassword, setTestPassword] = useState('');\n    const [compliance, setCompliance] = useState<PasswordCompliance | null>(null);\n    const [showTestPassword, setShowTestPassword] = useState(false);\n    const [selectedSeverity, setSelectedSeverity] = useState<'all' | 'required' | 'recommended' | 'optional'>('all');\n\n    // Test password compliance\n    const testPasswordCompliance = (password: string): PasswordCompliance => {\n        if (onTestPassword) {\n            return onTestPassword(password);\n        }\n\n        // Default implementation\n        const passed: string[] = [];\n        const failed: string[] = [];\n        const warnings: string[] = [];\n        let score = 0;\n\n        const activeRules = rules.filter(rule => rule.isActive);\n        const totalRules = activeRules.length;\n\n        activeRules.forEach(rule => {\n            let rulePass = false;\n\n            switch (rule.id) {\n                case 'min-length':\n                    rulePass = password.length >= (rule.minValue || 8);\n                    break;\n                case 'max-length':\n                    rulePass = password.length <= (rule.maxValue || 128);\n                    break;\n                case 'uppercase':\n                case 'lowercase':\n                case 'number':\n                case 'special':\n                    if (rule.regex) {\n                        rulePass = new RegExp(rule.regex).test(password);\n                    }\n                    break;\n                case 'no-repetition':\n                    if (rule.regex) {\n                        rulePass = !new RegExp(rule.regex).test(password);\n                    }\n                    break;\n                case 'no-sequence':\n                    // Simple sequence detection\n                    rulePass = !/(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz|123|234|345|456|567|678|789)/i.test(password);\n                    break;\n                case 'no-dictionary':\n                    // Simple dictionary word check (in real app, use proper dictionary)\n                    const commonWords = ['password', 'admin', '12345', 'qwerty', 'letmein', 'welcome', 'monkey', 'dragon'];\n                    rulePass = !commonWords.some(word => password.toLowerCase().includes(word));\n                    break;\n                case 'no-personal-info':\n                    // Basic check (in real app, check against user info)\n                    rulePass = !/(admin|user|test|example|sarkari)/i.test(password);\n                    break;\n                default:\n                    rulePass = true;\n            }\n\n            if (rulePass) {\n                passed.push(rule.name);\n                if (rule.severity === 'required') score += 15;\n                else if (rule.severity === 'recommended') score += 10;\n                else score += 5;\n            } else {\n                if (rule.severity === 'required') {\n                    failed.push(rule.name);\n                } else {\n                    warnings.push(rule.name);\n                }\n            }\n        });\n\n        // Normalize score to 0-100\n        score = Math.min(100, Math.max(0, score));\n\n        const isCompliant = failed.length === 0;\n        let strengthLevel: PasswordCompliance['strengthLevel'] = 'very-weak';\n\n        if (score >= 90) strengthLevel = 'very-strong';\n        else if (score >= 75) strengthLevel = 'strong';\n        else if (score >= 60) strengthLevel = 'good';\n        else if (score >= 40) strengthLevel = 'fair';\n        else if (score >= 20) strengthLevel = 'weak';\n\n        return {\n            score,\n            passed,\n            failed,\n            warnings,\n            isCompliant,\n            strengthLevel\n        };\n    };\n\n    useEffect(() => {\n        if (testPassword || currentPassword) {\n            const password = testPassword || currentPassword;\n            setCompliance(testPasswordCompliance(password));\n        } else {\n            setCompliance(null);\n        }\n    }, [testPassword, currentPassword, rules]);\n\n    const handleToggleRule = async (rule: PasswordPolicyRule) => {\n        try {\n            await onUpdateRule(rule.id, { isActive: !rule.isActive });\n        } catch (error) {\n            console.error('Failed to update rule:', error);\n        }\n    };\n\n    const getSeverityIcon = (severity: string) => {\n        switch (severity) {\n            case 'required': return '🔴';\n            case 'recommended': return '🟡';\n            case 'optional': return '🟢';\n            default: return '🔘';\n        }\n    };\n\n    const getStrengthColor = (level: string) => {\n        switch (level) {\n            case 'very-strong': return '#16a34a';\n            case 'strong': return '#22c55e';\n            case 'good': return '#65a30d';\n            case 'fair': return '#eab308';\n            case 'weak': return '#f97316';\n            case 'very-weak': return '#ef4444';\n            default: return '#64748b';\n        }\n    };\n\n    const getStrengthIcon = (level: string) => {\n        switch (level) {\n            case 'very-strong': return '🛡️';\n            case 'strong': return '🔒';\n            case 'good': return '✅';\n            case 'fair': return '⚠️';\n            case 'weak': return '🔓';\n            case 'very-weak': return '❌';\n            default: return '🔘';\n        }\n    };\n\n    const filteredRules = rules.filter(rule => \n        selectedSeverity === 'all' || rule.severity === selectedSeverity\n    );\n\n    const requiredRules = rules.filter(rule => rule.severity === 'required' && rule.isActive);\n    const recommendedRules = rules.filter(rule => rule.severity === 'recommended' && rule.isActive);\n    const optionalRules = rules.filter(rule => rule.severity === 'optional' && rule.isActive);\n\n    return (\n        <div className=\"password-policy\">\n            <div className=\"policy-header\">\n                <div className=\"header-title\">\n                    <h2>🔐 Password Policy Management</h2>\n                    <p>Configure password requirements and security policies</p>\n                </div>\n                \n                <div className=\"policy-stats\">\n                    <div className=\"stat-card required\">\n                        <span className=\"stat-value\">{requiredRules.length}</span>\n                        <span className=\"stat-label\">Required Rules</span>\n                    </div>\n                    <div className=\"stat-card recommended\">\n                        <span className=\"stat-value\">{recommendedRules.length}</span>\n                        <span className=\"stat-label\">Recommended</span>\n                    </div>\n                    <div className=\"stat-card optional\">\n                        <span className=\"stat-value\">{optionalRules.length}</span>\n                        <span className=\"stat-label\">Optional</span>\n                    </div>\n                </div>\n            </div>\n\n            {/* Password Tester */}\n            <div className=\"password-tester\">\n                <div className=\"tester-header\">\n                    <h3>🔍 Password Compliance Checker</h3>\n                    <p>Test a password against current policy rules</p>\n                </div>\n                \n                <div className=\"test-input-group\">\n                    <div className=\"test-input-wrapper\">\n                        <input\n                            type={showTestPassword ? 'text' : 'password'}\n                            value={testPassword}\n                            onChange={(e) => setTestPassword(e.target.value)}\n                            placeholder=\"Enter password to test compliance...\"\n                            className=\"test-password-input\"\n                        />\n                        <button\n                            type=\"button\"\n                            className=\"password-toggle\"\n                            onClick={() => setShowTestPassword(!showTestPassword)}\n                        >\n                            {showTestPassword ? '👁️' : '👁️‍🗨️'}\n                        </button>\n                    </div>\n                    \n                    {compliance && testPassword && (\n                        <div className=\"compliance-result\">\n                            <div className=\"compliance-overview\">\n                                <div className=\"compliance-score\">\n                                    <div \n                                        className=\"score-circle\"\n                                        style={{ \n                                            background: `conic-gradient(${getStrengthColor(compliance.strengthLevel)} ${compliance.score * 3.6}deg, rgba(100, 116, 139, 0.2) ${compliance.score * 3.6}deg)` \n                                        }}\n                                    >\n                                        <div className=\"score-content\">\n                                            <span className=\"score-value\">{compliance.score}</span>\n                                            <span className=\"score-label\">Score</span>\n                                        </div>\n                                    </div>\n                                </div>\n                                \n                                <div className=\"compliance-details\">\n                                    <div className=\"strength-indicator\">\n                                        <span className=\"strength-icon\">\n                                            {getStrengthIcon(compliance.strengthLevel)}\n                                        </span>\n                                        <span \n                                            className=\"strength-text\"\n                                            style={{ color: getStrengthColor(compliance.strengthLevel) }}\n                                        >\n                                            {compliance.strengthLevel.replace('-', ' ').toUpperCase()}\n                                        </span>\n                                    </div>\n                                    \n                                    <div className=\"compliance-status\">\n                                        <span className={`status-badge ${compliance.isCompliant ? 'compliant' : 'non-compliant'}`}>\n                                            {compliance.isCompliant ? '✅ Compliant' : '❌ Non-Compliant'}\n                                        </span>\n                                    </div>\n                                    \n                                    <div className=\"compliance-summary\">\n                                        <div className=\"summary-item\">\n                                            <span className=\"summary-label\">Passed:</span>\n                                            <span className=\"summary-value passed\">{compliance.passed.length}</span>\n                                        </div>\n                                        <div className=\"summary-item\">\n                                            <span className=\"summary-label\">Failed:</span>\n                                            <span className=\"summary-value failed\">{compliance.failed.length}</span>\n                                        </div>\n                                        <div className=\"summary-item\">\n                                            <span className=\"summary-label\">Warnings:</span>\n                                            <span className=\"summary-value warnings\">{compliance.warnings.length}</span>\n                                        </div>\n                                    </div>\n                                </div>\n                            </div>\n                            \n                            {(compliance.failed.length > 0 || compliance.warnings.length > 0) && (\n                                <div className=\"compliance-issues\">\n                                    {compliance.failed.length > 0 && (\n                                        <div className=\"issues-section failed\">\n                                            <h4>❌ Failed Requirements:</h4>\n                                            <ul>\n                                                {compliance.failed.map(issue => (\n                                                    <li key={issue}>{issue}</li>\n                                                ))}\n                                            </ul>\n                                        </div>\n                                    )}\n                                    \n                                    {compliance.warnings.length > 0 && (\n                                        <div className=\"issues-section warnings\">\n                                            <h4>⚠️ Recommendations:</h4>\n                                            <ul>\n                                                {compliance.warnings.map(warning => (\n                                                    <li key={warning}>{warning}</li>\n                                                ))}\n                                            </ul>\n                                        </div>\n                                    )}\n                                </div>\n                            )}\n                        </div>\n                    )}\n                </div>\n            </div>\n\n            {/* Policy Rules */}\n            <div className=\"policy-rules\">\n                <div className=\"rules-header\">\n                    <h3>⚙️ Policy Rules Configuration</h3>\n                    \n                    <select \n                        value={selectedSeverity} \n                        onChange={(e) => setSelectedSeverity(e.target.value as any)}\n                        className=\"severity-filter\"\n                    >\n                        <option value=\"all\">All Severities</option>\n                        <option value=\"required\">🔴 Required Only</option>\n                        <option value=\"recommended\">🟡 Recommended Only</option>\n                        <option value=\"optional\">🟢 Optional Only</option>\n                    </select>\n                </div>\n                \n                <div className=\"rules-list\">\n                    {filteredRules.map((rule) => (\n                        <div key={rule.id} className={`rule-card ${rule.isActive ? 'active' : 'inactive'} ${rule.severity}`}>\n                            <div className=\"rule-main\">\n                                <div className=\"rule-toggle\">\n                                    <input\n                                        type=\"checkbox\"\n                                        checked={rule.isActive}\n                                        onChange={() => handleToggleRule(rule)}\n                                        disabled={loading}\n                                        className=\"rule-checkbox\"\n                                    />\n                                </div>\n                                \n                                <div className=\"rule-content\">\n                                    <div className=\"rule-header\">\n                                        <div className=\"rule-title\">\n                                            <span className=\"severity-icon\">\n                                                {getSeverityIcon(rule.severity)}\n                                            </span>\n                                            <span className=\"rule-name\">{rule.name}</span>\n                                        </div>\n                                        <span className={`severity-badge ${rule.severity}`}>\n                                            {rule.severity.toUpperCase()}\n                                        </span>\n                                    </div>\n                                    \n                                    <div className=\"rule-description\">\n                                        {rule.description}\n                                    </div>\n                                    \n                                    <div className=\"rule-requirement\">\n                                        <strong>Requirement:</strong> {rule.requirement}\n                                    </div>\n                                    \n                                    {rule.regex && (\n                                        <div className=\"rule-regex\">\n                                            <strong>Pattern:</strong> \n                                            <code>{rule.regex}</code>\n                                        </div>\n                                    )}\n                                </div>\n                            </div>\n                        </div>\n                    ))}\n                </div>\n            </div>\n        </div>\n    );\n}\n\nexport default PasswordPolicy;"
+import React, { useState, useEffect } from 'react';
+import './PasswordPolicy.css';
+
+export interface PasswordPolicyRule {
+    id: string;
+    name: string;
+    description: string;
+    requirement: string;
+    isActive: boolean;
+    severity: 'required' | 'recommended' | 'optional';
+    regex?: string;
+    minValue?: number;
+    maxValue?: number;
+}
+
+export interface PasswordCompliance {
+    score: number; // 0-100
+    passed: string[];
+    failed: string[];
+    warnings: string[];
+    isCompliant: boolean;
+    strengthLevel: 'very-weak' | 'weak' | 'fair' | 'good' | 'strong' | 'very-strong';
+}
+
+interface PasswordPolicyProps {
+    rules: PasswordPolicyRule[];
+    currentPassword?: string;
+    onUpdateRule: (ruleId: string, updates: Partial<PasswordPolicyRule>) => Promise<void>;
+    onTestPassword?: (password: string) => PasswordCompliance;
+    loading?: boolean;
+}
+
+const DEFAULT_RULES: PasswordPolicyRule[] = [
+    {
+        id: 'min-length',
+        name: 'Minimum Length',
+        description: 'Password must be at least 8 characters long',
+        requirement: 'At least 8 characters',
+        isActive: true,
+        severity: 'required',
+        minValue: 8
+    },
+    {
+        id: 'max-length',
+        name: 'Maximum Length',
+        description: 'Password cannot exceed 128 characters',
+        requirement: 'Maximum 128 characters',
+        isActive: true,
+        severity: 'recommended',
+        maxValue: 128
+    },
+    {
+        id: 'uppercase',
+        name: 'Uppercase Letter',
+        description: 'Password must contain at least one uppercase letter (A-Z)',
+        requirement: 'At least 1 uppercase letter',
+        isActive: true,
+        severity: 'required',
+        regex: '[A-Z]'
+    },
+    {
+        id: 'lowercase',
+        name: 'Lowercase Letter',
+        description: 'Password must contain at least one lowercase letter (a-z)',
+        requirement: 'At least 1 lowercase letter',
+        isActive: true,
+        severity: 'required',
+        regex: '[a-z]'
+    },
+    {
+        id: 'number',
+        name: 'Numeric Character',
+        description: 'Password must contain at least one number (0-9)',
+        requirement: 'At least 1 number',
+        isActive: true,
+        severity: 'required',
+        regex: '[0-9]'
+    },
+    {
+        id: 'special',
+        name: 'Special Character',
+        description: 'Password must contain at least one special character (!@#$%^&*)',
+        requirement: 'At least 1 special character',
+        isActive: true,
+        severity: 'recommended',
+        regex: '[!@#$%^&*(),.?":{}|<>]'
+    },
+    {
+        id: 'no-dictionary',
+        name: 'No Dictionary Words',
+        description: 'Password should not contain common dictionary words',
+        requirement: 'Avoid common words',
+        isActive: true,
+        severity: 'recommended'
+    },
+    {
+        id: 'no-repetition',
+        name: 'No Character Repetition',
+        description: 'Password should not have more than 2 consecutive identical characters',
+        requirement: 'No character repetition (aaa)',
+        isActive: true,
+        severity: 'recommended',
+        regex: '(.)\\\\1{2,}'
+    },
+    {
+        id: 'no-sequence',
+        name: 'No Sequential Characters',
+        description: 'Password should not contain sequential characters (abc, 123)',
+        requirement: 'Avoid sequences (abc, 123)',
+        isActive: true,
+        severity: 'recommended'
+    },
+    {
+        id: 'no-personal-info',
+        name: 'No Personal Information',
+        description: 'Password should not contain personal information like name, email',
+        requirement: 'Avoid personal information',
+        isActive: true,
+        severity: 'required'
+    }
+];
+
+export function PasswordPolicy({ 
+    rules = DEFAULT_RULES, 
+    currentPassword = '', 
+    onUpdateRule, 
+    onTestPassword, 
+    loading = false 
+}: PasswordPolicyProps) {
+    const [testPassword, setTestPassword] = useState('');
+    const [compliance, setCompliance] = useState<PasswordCompliance | null>(null);
+    const [showTestPassword, setShowTestPassword] = useState(false);
+    const [selectedSeverity, setSelectedSeverity] = useState<'all' | 'required' | 'recommended' | 'optional'>('all');
+
+    // Test password compliance
+    const testPasswordCompliance = (password: string): PasswordCompliance => {
+        if (onTestPassword) {
+            return onTestPassword(password);
+        }
+
+        // Default implementation
+        const passed: string[] = [];
+        const failed: string[] = [];
+        const warnings: string[] = [];
+        let score = 0;
+
+        const activeRules = rules.filter(rule => rule.isActive);
+        const totalRules = activeRules.length;
+
+        activeRules.forEach(rule => {
+            let rulePass = false;
+
+            switch (rule.id) {
+                case 'min-length':
+                    rulePass = password.length >= (rule.minValue || 8);
+                    break;
+                case 'max-length':
+                    rulePass = password.length <= (rule.maxValue || 128);
+                    break;
+                case 'uppercase':
+                case 'lowercase':
+                case 'number':
+                case 'special':
+                    if (rule.regex) {
+                        rulePass = new RegExp(rule.regex).test(password);
+                    }
+                    break;
+                case 'no-repetition':
+                    if (rule.regex) {
+                        rulePass = !new RegExp(rule.regex).test(password);
+                    }
+                    break;
+                case 'no-sequence':
+                    // Simple sequence detection
+                    rulePass = !/(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz|123|234|345|456|567|678|789)/i.test(password);
+                    break;
+                case 'no-dictionary':
+                    // Simple dictionary word check (in real app, use proper dictionary)
+                    const commonWords = ['password', 'admin', '12345', 'qwerty', 'letmein', 'welcome', 'monkey', 'dragon'];
+                    rulePass = !commonWords.some(word => password.toLowerCase().includes(word));
+                    break;
+                case 'no-personal-info':
+                    // Basic check (in real app, check against user info)
+                    rulePass = !/(admin|user|test|example|sarkari)/i.test(password);
+                    break;
+                default:
+                    rulePass = true;
+            }
+
+            if (rulePass) {
+                passed.push(rule.name);
+                if (rule.severity === 'required') score += 15;
+                else if (rule.severity === 'recommended') score += 10;
+                else score += 5;
+            } else {
+                if (rule.severity === 'required') {
+                    failed.push(rule.name);
+                } else {
+                    warnings.push(rule.name);
+                }
+            }
+        });
+
+        // Normalize score to 0-100
+        score = Math.min(100, Math.max(0, score));
+
+        const isCompliant = failed.length === 0;
+        let strengthLevel: PasswordCompliance['strengthLevel'] = 'very-weak';
+
+        if (score >= 90) strengthLevel = 'very-strong';
+        else if (score >= 75) strengthLevel = 'strong';
+        else if (score >= 60) strengthLevel = 'good';
+        else if (score >= 40) strengthLevel = 'fair';
+        else if (score >= 20) strengthLevel = 'weak';
+
+        return {
+            score,
+            passed,
+            failed,
+            warnings,
+            isCompliant,
+            strengthLevel
+        };
+    };
+
+    useEffect(() => {
+        if (testPassword || currentPassword) {
+            const password = testPassword || currentPassword;
+            setCompliance(testPasswordCompliance(password));
+        } else {
+            setCompliance(null);
+        }
+    }, [testPassword, currentPassword, rules]);
+
+    const handleToggleRule = async (rule: PasswordPolicyRule) => {
+        try {
+            await onUpdateRule(rule.id, { isActive: !rule.isActive });
+        } catch (error) {
+            console.error('Failed to update rule:', error);
+        }
+    };
+
+    const getSeverityIcon = (severity: string) => {
+        switch (severity) {
+            case 'required': return '🔴';
+            case 'recommended': return '🟡';
+            case 'optional': return '🟢';
+            default: return '🔘';
+        }
+    };
+
+    const getStrengthColor = (level: string) => {
+        switch (level) {
+            case 'very-strong': return '#16a34a';
+            case 'strong': return '#22c55e';
+            case 'good': return '#65a30d';
+            case 'fair': return '#eab308';
+            case 'weak': return '#f97316';
+            case 'very-weak': return '#ef4444';
+            default: return '#64748b';
+        }
+    };
+
+    const getStrengthIcon = (level: string) => {
+        switch (level) {
+            case 'very-strong': return '🛡️';
+            case 'strong': return '🔒';
+            case 'good': return '✅';
+            case 'fair': return '⚠️';
+            case 'weak': return '🔓';
+            case 'very-weak': return '❌';
+            default: return '🔘';
+        }
+    };
+
+    const filteredRules = rules.filter(rule => 
+        selectedSeverity === 'all' || rule.severity === selectedSeverity
+    );
+
+    const requiredRules = rules.filter(rule => rule.severity === 'required' && rule.isActive);
+    const recommendedRules = rules.filter(rule => rule.severity === 'recommended' && rule.isActive);
+    const optionalRules = rules.filter(rule => rule.severity === 'optional' && rule.isActive);
+
+    return (
+        <div className="password-policy">
+            <div className="policy-header">
+                <div className="header-title">
+                    <h2>🔐 Password Policy Management</h2>
+                    <p>Configure password requirements and security policies</p>
+                </div>
+                
+                <div className="policy-stats">
+                    <div className="stat-card required">
+                        <span className="stat-value">{requiredRules.length}</span>
+                        <span className="stat-label">Required Rules</span>
+                    </div>
+                    <div className="stat-card recommended">
+                        <span className="stat-value">{recommendedRules.length}</span>
+                        <span className="stat-label">Recommended</span>
+                    </div>
+                    <div className="stat-card optional">
+                        <span className="stat-value">{optionalRules.length}</span>
+                        <span className="stat-label">Optional</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Password Tester */}
+            <div className="password-tester">
+                <div className="tester-header">
+                    <h3>🔍 Password Compliance Checker</h3>
+                    <p>Test a password against current policy rules</p>
+                </div>
+                
+                <div className="test-input-group">
+                    <div className="test-input-wrapper">
+                        <input
+                            type={showTestPassword ? 'text' : 'password'}
+                            value={testPassword}
+                            onChange={(e) => setTestPassword(e.target.value)}
+                            placeholder="Enter password to test compliance..."
+                            className="test-password-input"
+                        />
+                        <button
+                            type="button"
+                            className="password-toggle"
+                            onClick={() => setShowTestPassword(!showTestPassword)}
+                        >
+                            {showTestPassword ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                    </div>
+                    
+                    {compliance && testPassword && (
+                        <div className="compliance-result">
+                            <div className="compliance-overview">
+                                <div className="compliance-score">
+                                    <div 
+                                        className="score-circle"
+                                        style={{ 
+                                            background: `conic-gradient(${getStrengthColor(compliance.strengthLevel)} ${compliance.score * 3.6}deg, rgba(100, 116, 139, 0.2) ${compliance.score * 3.6}deg)` 
+                                        }}
+                                    >
+                                        <div className="score-content">
+                                            <span className="score-value">{compliance.score}</span>
+                                            <span className="score-label">Score</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="compliance-details">
+                                    <div className="strength-indicator">
+                                        <span className="strength-icon">
+                                            {getStrengthIcon(compliance.strengthLevel)}
+                                        </span>
+                                        <span 
+                                            className="strength-text"
+                                            style={{ color: getStrengthColor(compliance.strengthLevel) }}
+                                        >
+                                            {compliance.strengthLevel.replace('-', ' ').toUpperCase()}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="compliance-status">
+                                        <span className={`status-badge ${compliance.isCompliant ? 'compliant' : 'non-compliant'}`}>
+                                            {compliance.isCompliant ? '✅ Compliant' : '❌ Non-Compliant'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="compliance-summary">
+                                        <div className="summary-item">
+                                            <span className="summary-label">Passed:</span>
+                                            <span className="summary-value passed">{compliance.passed.length}</span>
+                                        </div>
+                                        <div className="summary-item">
+                                            <span className="summary-label">Failed:</span>
+                                            <span className="summary-value failed">{compliance.failed.length}</span>
+                                        </div>
+                                        <div className="summary-item">
+                                            <span className="summary-label">Warnings:</span>
+                                            <span className="summary-value warnings">{compliance.warnings.length}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {(compliance.failed.length > 0 || compliance.warnings.length > 0) && (
+                                <div className="compliance-issues">
+                                    {compliance.failed.length > 0 && (
+                                        <div className="issues-section failed">
+                                            <h4>❌ Failed Requirements:</h4>
+                                            <ul>
+                                                {compliance.failed.map(issue => (
+                                                    <li key={issue}>{issue}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    
+                                    {compliance.warnings.length > 0 && (
+                                        <div className="issues-section warnings">
+                                            <h4>⚠️ Recommendations:</h4>
+                                            <ul>
+                                                {compliance.warnings.map(warning => (
+                                                    <li key={warning}>{warning}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Policy Rules */}
+            <div className="policy-rules">
+                <div className="rules-header">
+                    <h3>⚙️ Policy Rules Configuration</h3>
+                    
+                    <select 
+                        value={selectedSeverity} 
+                        onChange={(e) => setSelectedSeverity(e.target.value as any)}
+                        className="severity-filter"
+                    >
+                        <option value="all">All Severities</option>
+                        <option value="required">🔴 Required Only</option>
+                        <option value="recommended">🟡 Recommended Only</option>
+                        <option value="optional">🟢 Optional Only</option>
+                    </select>
+                </div>
+                
+                <div className="rules-list">
+                    {filteredRules.map((rule) => (
+                        <div key={rule.id} className={`rule-card ${rule.isActive ? 'active' : 'inactive'} ${rule.severity}`}>
+                            <div className="rule-main">
+                                <div className="rule-toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={rule.isActive}
+                                        onChange={() => handleToggleRule(rule)}
+                                        disabled={loading}
+                                        className="rule-checkbox"
+                                    />
+                                </div>
+                                
+                                <div className="rule-content">
+                                    <div className="rule-header">
+                                        <div className="rule-title">
+                                            <span className="severity-icon">
+                                                {getSeverityIcon(rule.severity)}
+                                            </span>
+                                            <span className="rule-name">{rule.name}</span>
+                                        </div>
+                                        <span className={`severity-badge ${rule.severity}`}>
+                                            {rule.severity.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="rule-description">
+                                        {rule.description}
+                                    </div>
+                                    
+                                    <div className="rule-requirement">
+                                        <strong>Requirement:</strong> {rule.requirement}
+                                    </div>
+                                    
+                                    {rule.regex && (
+                                        <div className="rule-regex">
+                                            <strong>Pattern:</strong> 
+                                            <code>{rule.regex}</code>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default PasswordPolicy;"

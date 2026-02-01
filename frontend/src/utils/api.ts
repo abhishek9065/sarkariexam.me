@@ -19,6 +19,7 @@ interface AnnouncementCardQuery {
     sort?: 'newest' | 'oldest' | 'deadline' | 'views';
     limit?: number;
     cursor?: string | null;
+    prefetch?: boolean;
 }
 
 // Fetch a single page of announcement cards (cursor-based)
@@ -44,6 +45,7 @@ export async function fetchAnnouncementCardsPage(
         if (query.sort) params.set('sort', query.sort);
         if (query.limit) params.set('limit', String(query.limit));
         if (query.cursor) params.set('cursor', query.cursor);
+        if (query.prefetch) params.set('prefetch', '1');
 
         const body = await fetchJson<AnnouncementCardsResponse>(
             `${API_BASE}/api/announcements/v3/cards?${params.toString()}`,

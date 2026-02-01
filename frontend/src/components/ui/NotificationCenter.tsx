@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './NotificationCenter.css';
+import { prefetchAnnouncementDetail } from '../../utils/prefetch';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
@@ -253,6 +254,8 @@ export function NotificationCenter({ token }: { token: string | null }) {
                                     <button
                                         key={item.id}
                                         className={`notification-item ${isRead ? 'read' : ''}`}
+                                        onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
+                                        onFocus={() => prefetchAnnouncementDetail(item.slug)}
                                         onClick={() => {
                                             markRead(item.id);
                                             if (item.slug) {

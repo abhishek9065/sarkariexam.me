@@ -257,6 +257,7 @@ export function AdminPage() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit' | 'community' | 'errors'>('analytics');
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [listAnnouncements, setListAnnouncements] = useState<Announcement[]>([]);
@@ -2511,6 +2512,7 @@ export function AdminPage() {
                     <div className="admin-tabs">
                         <button className={activeAdminTab === 'analytics' ? 'active' : ''} onClick={() => setActiveAdminTab('analytics')}>
                             Analytics
+                            {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
                         </button>
                         <button className={activeAdminTab === 'list' ? 'active' : ''} onClick={() => setActiveAdminTab('list')}>
                             All Announcements
@@ -2580,6 +2582,7 @@ export function AdminPage() {
                         onEditById={handleEditById}
                         onOpenList={() => setActiveAdminTab('list')}
                         onUnauthorized={handleUnauthorized}
+                        onLoadingChange={setAnalyticsLoading}
                     />
                 ) : activeAdminTab === 'users' ? (
                     <div className="admin-users">

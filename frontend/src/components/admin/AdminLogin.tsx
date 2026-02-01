@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './AdminLogin.css';
+import { LazyImage } from '../ui/LazyImage';
 
 interface AdminLoginProps {
     onLogin: (email: string, pass: string, twoFactorCode?: string) => Promise<void>;
@@ -825,10 +826,11 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
 
                             <div className="qr-code-section">
                                 <div className="qr-code-container">
-                                    <img 
-                                        src={qrCodeData.qrCode} 
-                                        alt="2FA QR Code" 
+                                    <LazyImage
+                                        src={qrCodeData.qrCode}
+                                        alt="2FA QR Code"
                                         className="qr-code"
+                                        placeholder="skeleton"
                                     />
                                 </div>
                                 <div className="backup-secret">

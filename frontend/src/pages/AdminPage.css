@@ -279,6 +279,8 @@
   border: none;
   border-radius: 0;
   overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
 
@@ -291,6 +293,7 @@
   transition: all var(--transition-fast);
   border: 1px solid transparent;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .admin-tabs button:hover {
@@ -303,6 +306,23 @@
   border: 1px solid rgba(96, 165, 250, 0.45);
   color: #fff;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.4) inset;
+}
+
+.tab-spinner {
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.6);
+  border-top-color: transparent;
+  display: inline-block;
+  animation: adminTabSpin 0.8s linear infinite;
+}
+
+@keyframes adminTabSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .admin-nav-meta {

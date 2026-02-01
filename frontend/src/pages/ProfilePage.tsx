@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Header, Navigation, Footer, SkeletonLoader, MobileNav } from '../components';
 import { API_BASE } from '../utils';
+import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { TabType } from '../utils/constants';
 import type { Announcement, ContentType } from '../types';
 import './ProfilePage.css';
@@ -667,6 +668,7 @@ export function ProfilePage() {
                                             key={rec.id}
                                             className="recommendation-card"
                                             onClick={() => navigate(`/${rec.type}/${rec.slug}`)}
+                                            onMouseEnter={() => prefetchAnnouncementDetail(rec.slug)}
                                         >
                                             <div className="match-score">
                                                 {Math.round(rec.matchScore)}% Match
@@ -1035,6 +1037,7 @@ export function ProfilePage() {
                                                                     key={match.id}
                                                                     className="alert-item"
                                                                     onClick={() => navigate(`/${match.type}/${match.slug}`)}
+                                                                    onMouseEnter={() => prefetchAnnouncementDetail(match.slug)}
                                                                 >
                                                                     <div>
                                                                         <strong>{match.title}</strong>
@@ -1071,6 +1074,7 @@ export function ProfilePage() {
                                                         key={match.id}
                                                         className="alert-item"
                                                         onClick={() => navigate(`/${match.type}/${match.slug}`)}
+                                                        onMouseEnter={() => prefetchAnnouncementDetail(match.slug)}
                                                     >
                                                         <div>
                                                             <strong>{match.title}</strong>
@@ -1102,6 +1106,7 @@ export function ProfilePage() {
                                                             key={item.id}
                                                             className="alert-item"
                                                             onClick={() => navigate(`/${item.type}/${item.slug}`)}
+                                                            onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
                                                         >
                                                             <div>
                                                                 <strong>{item.title}</strong>

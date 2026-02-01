@@ -1,6 +1,6 @@
 import type { TabType } from './constants';
 import type { ContentType } from '../types';
-import { fetchAnnouncementCardsPage } from './api';
+import { fetchAnnouncementBySlug, fetchAnnouncementCardsPage } from './api';
 
 const prefetchers: Partial<Record<TabType, () => Promise<unknown>>> = {
     job: () => import('../pages/CategoryPage'),
@@ -16,12 +16,14 @@ const prefetchers: Partial<Record<TabType, () => Promise<unknown>>> = {
 
 const prefetchOnce = new Set<string>();
 const dataPrefetchOnce = new Set<string>();
+const detailPrefetchOnce = new Set<string>();
+let detailChunkPrefetched = false;
 
 function prefetchListingCards(type: ContentType) {
     const key = `cards:${type}`;
     if (dataPrefetchOnce.has(key)) return;
     dataPrefetchOnce.add(key);
-    fetchAnnouncementCardsPage({ type, limit: 24 }).catch(() => {
+    fetchAnnouncementCardsPage({ type, limit: 24, prefetch: true }).catch(() => {
         dataPrefetchOnce.delete(key);
     });
 }
@@ -46,4 +48,19 @@ export function prefetchRoute(type: TabType) {
     if (isContentType(type)) {
         prefetchListingCards(type);
     }
+}
+
+export function prefetchAnnouncementDetail(slug?: string | null) {
+    if (!slug || detailPrefetchOnce.has(slug)) return;
+    detailPrefetchOnce.add(slug);
+    if (!detailChunkPrefetched) {
+        detailChunkPrefetched = true;
+        import('../pages/DetailPage').catch(() => {
+            detailChunkPrefetched = false;
+        });
+    }
+    const params = new URLSearchParams({ prefetch: '1' });
+    fetchAnnouncementBySlug(slug, params).catch(() => {
+        detailPrefetchOnce.delete(slug);
+    });
 }

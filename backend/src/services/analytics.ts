@@ -333,6 +333,76 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
         .find({ date: { $gte: getDateKey(start) } })
         .toArray();
 
+    if (docs.length === 0) {
+        const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+        if (!events) {
+            return {
+                days,
+                lastUpdatedAt: null,
+                viewCount: 0,
+                listingViews: 0,
+                cardClicks: 0,
+                categoryClicks: 0,
+                filterApplies: 0,
+                searchCount: 0,
+                bookmarkAdds: 0,
+                bookmarkRemoves: 0,
+                registrations: 0,
+                subscriptionsVerified: 0,
+                subscriptionsUnsubscribed: 0,
+                savedSearches: 0,
+                digestPreviews: 0,
+                digestClicks: 0,
+                deepLinkClicks: 0,
+                alertsViewed: 0,
+            };
+        }
+
+        try {
+            const eventAgg = await events.aggregate([
+                { $match: { createdAt: { $gte: start } } },
+                {
+                    $group: {
+                        _id: '$type',
+                        count: { $sum: 1 }
+                    }
+                }
+            ]).toArray();
+
+            const counts = new Map<AnalyticsEventType, number>();
+            for (const entry of eventAgg) {
+                const type = entry._id as AnalyticsEventType;
+                if (!type) continue;
+                counts.set(type, entry.count as number);
+            }
+
+            const getCount = (type: AnalyticsEventType) => counts.get(type) ?? 0;
+
+            return {
+                days,
+                lastUpdatedAt: null,
+                viewCount: getCount('announcement_view'),
+                listingViews: getCount('listing_view'),
+                cardClicks: getCount('card_click'),
+                categoryClicks: getCount('category_click'),
+                filterApplies: getCount('filter_apply'),
+                searchCount: getCount('search'),
+                bookmarkAdds: getCount('bookmark_add'),
+                bookmarkRemoves: getCount('bookmark_remove'),
+                registrations: getCount('auth_register'),
+                subscriptionsVerified: getCount('subscription_verify'),
+                subscriptionsUnsubscribed: getCount('subscription_unsubscribe'),
+                savedSearches: getCount('saved_search_create'),
+                digestPreviews: getCount('digest_preview'),
+                digestClicks: getCount('digest_click'),
+                deepLinkClicks: getCount('deep_link_click'),
+                alertsViewed: getCount('alerts_view'),
+            };
+        } catch (error) {
+            console.error('[Analytics] Rollup fallback failed:', error);
+        }
+    }
+
     return docs.reduce((acc, doc) => {
         const updatedAt = doc.updatedAt ? doc.updatedAt.toISOString() : null;
         const lastUpdatedAt = updatedAt && (!acc.lastUpdatedAt || updatedAt > acc.lastUpdatedAt)

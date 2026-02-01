@@ -82,7 +82,10 @@ export async function getAnalyticsOverview(
 
     const detailViewsRaw = rollupSummary.viewCount;
     const detailViewsAdjusted = Math.min(detailViewsRaw, rollupSummary.cardClicks || detailViewsRaw);
-    const hasAnomaly = rollupSummary.cardClicks > 0 && detailViewsRaw > rollupSummary.cardClicks;
+    const overageRatio = rollupSummary.cardClicks > 0
+        ? (detailViewsRaw - rollupSummary.cardClicks) / rollupSummary.cardClicks
+        : 0;
+    const hasAnomaly = rollupSummary.cardClicks > 0 && detailViewsRaw > rollupSummary.cardClicks && overageRatio > 0.35;
 
     const sortedTypes = [...typeBreakdown].sort((a, b) => b.count - a.count);
     const sortedCategories = [...categoryBreakdown].sort((a, b) => b.count - a.count);

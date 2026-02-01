@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils';
+import { formatNumber } from '../utils/formatters';
 import { adminRequest } from '../utils/adminRequest';
 import './AdminDashboard.css';
 
@@ -58,6 +59,14 @@ export function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'overview' | 'content' | 'users'>('overview');
     const [error, setError] = useState<string | null>(null);
+    const [numberLocale] = useState(() => {
+        if (typeof window === 'undefined') return 'en-IN';
+        try {
+            return localStorage.getItem('admin_number_locale') || 'en-IN';
+        } catch {
+            return 'en-IN';
+        }
+    });
 
     useEffect(() => {
         if (!isAuthenticated || user?.role !== 'admin') {
@@ -126,6 +135,9 @@ export function AdminDashboard() {
     };
 
     const maxTrendCount = Math.max(...(data?.trends?.map(t => t.count) || [1]));
+    const formatMetric = (value: number | null | undefined) => (
+        formatNumber(typeof value === 'number' ? value : undefined, '0', numberLocale)
+    );
 
     return (
         <div className="admin-dashboard">
@@ -166,28 +178,28 @@ export function AdminDashboard() {
                         <div className="stat-card primary">
                             <div className="stat-icon">📋</div>
                             <div className="stat-content">
-                                <div className="stat-value">{data.overview.totalAnnouncements}</div>
+                                <div className="stat-value">{formatMetric(data.overview.totalAnnouncements)}</div>
                                 <div className="stat-label">Total Listings</div>
                             </div>
                         </div>
                         <div className="stat-card success">
                             <div className="stat-icon">👥</div>
                             <div className="stat-content">
-                                <div className="stat-value">{data.overview.totalUsers}</div>
+                                <div className="stat-value">{formatMetric(data.overview.totalUsers)}</div>
                                 <div className="stat-label">Total Users</div>
                             </div>
                         </div>
                         <div className="stat-card info">
                             <div className="stat-icon">👁️</div>
                             <div className="stat-content">
-                                <div className="stat-value">{(data.overview?.totalViews ?? 0).toLocaleString()}</div>
+                                <div className="stat-value">{formatMetric(data.overview?.totalViews ?? 0)}</div>
                                 <div className="stat-label">Total Views</div>
                             </div>
                         </div>
                         <div className="stat-card warning">
                             <div className="stat-icon">⏰</div>
                             <div className="stat-content">
-                                <div className="stat-value">{data.overview.expiringSoon}</div>
+                                <div className="stat-value">{formatMetric(data.overview.expiringSoon)}</div>
                                 <div className="stat-label">Expiring Soon</div>
                             </div>
                         </div>
@@ -197,19 +209,19 @@ export function AdminDashboard() {
                     <div className="quick-stats">
                         <div className="quick-stat">
                             <span className="label">New Today</span>
-                            <span className="value green">+{data.overview.newToday}</span>
+                            <span className="value green">+{formatMetric(data.overview.newToday)}</span>
                         </div>
                         <div className="quick-stat">
                             <span className="label">This Week</span>
-                            <span className="value blue">+{data.overview.newThisWeek}</span>
+                            <span className="value blue">+{formatMetric(data.overview.newThisWeek)}</span>
                         </div>
                         <div className="quick-stat">
                             <span className="label">Active Jobs</span>
-                            <span className="value purple">{data.overview.activeJobs}</span>
+                            <span className="value purple">{formatMetric(data.overview.activeJobs)}</span>
                         </div>
                         <div className="quick-stat">
                             <span className="label">Bookmarks</span>
-                            <span className="value orange">{data.overview.totalBookmarks}</span>
+                            <span className="value orange">{formatMetric(data.overview.totalBookmarks)}</span>
                         </div>
                     </div>
 
@@ -228,7 +240,7 @@ export function AdminDashboard() {
                                                 background: getTypeColor(cat.type)
                                             }}
                                         />
-                                        <span className="bar-value">{cat.count}</span>
+                                        <span className="bar-value">{formatMetric(cat.count)}</span>
                                     </div>
                                 </div>
                             ))}
@@ -269,7 +281,7 @@ export function AdminDashboard() {
                                             >
                                                 {item.type}
                                             </span>
-                                            <span>{(item.views ?? 0).toLocaleString()} views</span>
+                                            <span>{formatMetric(item.views ?? 0)} views</span>
                                         </div>
                                     </div>
                                 </div>
@@ -282,19 +294,19 @@ export function AdminDashboard() {
                         <h3>👥 User Overview</h3>
                         <div className="user-stats-grid">
                             <div className="user-stat">
-                                <div className="value">{data.users.totalUsers}</div>
+                                <div className="value">{formatMetric(data.users.totalUsers)}</div>
                                 <div className="label">Total Users</div>
                             </div>
                             <div className="user-stat">
-                                <div className="value green">+{data.users.newToday}</div>
+                                <div className="value green">+{formatMetric(data.users.newToday)}</div>
                                 <div className="label">New Today</div>
                             </div>
                             <div className="user-stat">
-                                <div className="value blue">+{data.users.newThisWeek}</div>
+                                <div className="value blue">+{formatMetric(data.users.newThisWeek)}</div>
                                 <div className="label">This Week</div>
                             </div>
                             <div className="user-stat">
-                                <div className="value purple">{data.users.activeSubscribers}</div>
+                                <div className="value purple">{formatMetric(data.users.activeSubscribers)}</div>
                                 <div className="label">Subscribers</div>
                             </div>
                         </div>

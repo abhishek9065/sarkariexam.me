@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { formatDate, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
+import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
 
@@ -311,7 +311,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                             </div>
                             {item.totalPosts && (
                                 <div className="posts-highlight">
-                                    <span className="posts-number">{item.totalPosts.toLocaleString()}</span>
+                                    <span className="posts-number">{formatNumber(item.totalPosts ?? undefined)}</span>
                                     <span className="posts-label">Total Posts</span>
                                 </div>
                             )}

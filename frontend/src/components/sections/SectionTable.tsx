@@ -1,5 +1,6 @@
 import type { Announcement } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
+import { prefetchAnnouncementDetail } from '../../utils/prefetch';
 
 interface SectionTableProps {
     title: string;
@@ -38,7 +39,12 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
                     {items.length > 0 ? (
                         items.slice(0, 10).map((item) => (
                             <li key={item.id} className="section-item">
-                                <a href={`/${item.type}/${item.slug}`} onClick={(e) => { e.preventDefault(); onItemClick(item); }}>
+                                <a
+                                    href={`/${item.type}/${item.slug}`}
+                                    onClick={(e) => { e.preventDefault(); onItemClick(item); }}
+                                    onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
+                                    onFocus={() => prefetchAnnouncementDetail(item.slug)}
+                                >
                                     <span className="item-title">{item.title}</span>
                                     {item.totalPosts && <span className="item-posts">{item.totalPosts} Post</span>}
                                 </a>

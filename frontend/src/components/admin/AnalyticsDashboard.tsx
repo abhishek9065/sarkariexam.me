@@ -165,11 +165,13 @@ export function AnalyticsDashboard({
     onEditById,
     onOpenList,
     onUnauthorized,
+    onLoadingChange,
 }: {
     adminToken?: string | null;
     onEditById?: (id: string) => void;
     onOpenList?: () => void;
     onUnauthorized?: () => void;
+    onLoadingChange?: (loading: boolean) => void;
 }) {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
@@ -182,6 +184,14 @@ export function AnalyticsDashboard({
     const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
     const [rangeDays, setRangeDays] = useState(30);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const [numberLocale, setNumberLocale] = useState(() => {
+        if (typeof window === 'undefined') return 'en-IN';
+        try {
+            return localStorage.getItem('admin_number_locale') || 'en-IN';
+        } catch {
+            return 'en-IN';
+        }
+    });
     const typeBreakdown = analytics?.typeBreakdown ?? [];
     const categoryBreakdown = analytics?.categoryBreakdown ?? [];
 
@@ -190,6 +200,19 @@ export function AnalyticsDashboard({
         const timer = window.setTimeout(() => setActionMessage(null), 4000);
         return () => window.clearTimeout(timer);
     }, [actionMessage]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            localStorage.setItem('admin_number_locale', numberLocale);
+        } catch {
+            // ignore storage errors
+        }
+    }, [numberLocale]);
+
+    useEffect(() => {
+        onLoadingChange?.(loading || refreshing);
+    }, [loading, refreshing, onLoadingChange]);
 
     const sortedTypeBreakdown = useMemo(() => {
         return [...typeBreakdown].sort((a, b) => b.count - a.count);
@@ -202,6 +225,9 @@ export function AnalyticsDashboard({
     }, [categoryBreakdown]);
 
     const rollups = analytics?.dailyRollups ?? [];
+    const formatMetric = useCallback((value: number | null | undefined, fallback = '0') => {
+        return formatNumber(typeof value === 'number' ? value : undefined, fallback, numberLocale);
+    }, [numberLocale]);
     const { trendRows, zeroTrendCount } = useMemo(() => {
         const nonZero = rollups.filter((item) => (item.views ?? 0) > 0 || (item.searches ?? 0) > 0);
         const zeroCount = Math.max(0, rollups.length - nonZero.length);
@@ -479,12 +505,6 @@ export function AnalyticsDashboard({
     const rollupAge = insights?.rollupAgeMinutes ?? null;
     const ctrTone = ctr >= 10 ? 'good' : ctr >= 5 ? 'warn' : 'bad';
     const listingCoverage = insights?.listingCoverage ?? 0;
-    const coverageTone = listingCoverage >= 25 ? 'good' : listingCoverage >= 10 ? 'warn' : 'bad';
-    const coverageMeta = (listingCoverage === 0 && analytics.totalListingViews === 0)
-        ? 'No listing view events tracked. Verify listing pages fire view events.'
-        : listingCoverage < 10
-            ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
-            : 'Listing views vs total views';
     const funnelDropTone = (insights?.funnelDropRate ?? 0) >= 80 ? 'bad' : (insights?.funnelDropRate ?? 0) >= 60 ? 'warn' : 'good';
     const trendTone = viewTrendDirection === 'up' ? 'good' : viewTrendDirection === 'down' ? 'bad' : 'warn';
     const funnel = analytics.funnel;
@@ -537,6 +557,7 @@ export function AnalyticsDashboard({
         : finalCoverage < 10
             ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
             : 'Listing views vs total views';
+    const showCoverageAction = finalCoverage === 0;
 
     // Weekly trend anomaly check
     const isNewData = rollups.length <= 7 && prev7Views === 0;
@@ -570,6 +591,17 @@ export function AnalyticsDashboard({
                             </button>
                         ))}
                     </div>
+                    <div className="locale-toggle">
+                        <label htmlFor="number-locale">Number format</label>
+                        <select
+                            id="number-locale"
+                            value={numberLocale}
+                            onChange={(event) => setNumberLocale(event.target.value)}
+                        >
+                            <option value="en-IN">India (4,13,536)</option>
+                            <option value="en-US">International (413,536)</option>
+                        </select>
+                    </div>
                 </div>
                 <div className="analytics-live">
                     <span className={`live-dot ${liveStatus}`} aria-hidden="true" />
@@ -600,7 +632,7 @@ export function AnalyticsDashboard({
             <div className="kpi-grid">
                 <div className="kpi-card">
                     <div className="kpi-label">Views last 7 days</div>
-                    <div className="kpi-value">{formatNumber(viewsLast7)}</div>
+                    <div className="kpi-value">{formatMetric(viewsLast7)}</div>
                     <div className="kpi-sub">Highlights recent demand</div>
                 </div>
                 <div className={`kpi-card ${ctrTone}`}>
@@ -621,7 +653,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card views">
                     <div className="stat-icon" aria-hidden="true">V</div>
                     <div className="stat-info">
-                        <div className="stat-value">{formatNumber(analytics.totalViews)}</div>
+                        <div className="stat-value">{formatMetric(analytics.totalViews)}</div>
                         <div className="stat-label">Total Views</div>
                         <div className="stat-meta">
                             <MiniSparkline
@@ -629,6 +661,7 @@ export function AnalyticsDashboard({
                                 color="blue"
                                 height={24}
                                 width={60}
+                                locale={numberLocale}
                             />
                         </div>
                     </div>
@@ -636,7 +669,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card posts">
                     <div className="stat-icon" aria-hidden="true">A</div>
                     <div className="stat-info">
-                        <div className="stat-value">{analytics.totalAnnouncements}</div>
+                        <div className="stat-value">{formatMetric(analytics.totalAnnouncements)}</div>
                         <div className="stat-label">Announcements</div>
                         <div className="stat-meta">Published + scheduled</div>
                     </div>
@@ -644,7 +677,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card subscribers">
                     <div className="stat-icon" aria-hidden="true">E</div>
                     <div className="stat-info">
-                        <div className="stat-value">{formatNumber(analytics.totalEmailSubscribers)}</div>
+                        <div className="stat-value">{formatMetric(analytics.totalEmailSubscribers)}</div>
                         <div className="stat-label">Email Subscribers</div>
                         <div className="stat-meta">Verified opt-ins</div>
                     </div>
@@ -652,7 +685,7 @@ export function AnalyticsDashboard({
                 <div className="stat-card push">
                     <div className="stat-icon" aria-hidden="true">P</div>
                     <div className="stat-info">
-                        <div className="stat-value">{formatNumber(analytics.totalPushSubscribers)}</div>
+                        <div className="stat-value">{formatMetric(analytics.totalPushSubscribers)}</div>
                         <div className="stat-label">Push Subscribers</div>
                         <div className="stat-meta">Active devices</div>
                     </div>
@@ -670,35 +703,35 @@ export function AnalyticsDashboard({
                 <div className="engagement-grid">
                     <div className="engagement-card">
                         <div className="engagement-label">Searches</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalSearches)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalSearches)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Bookmarks</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalBookmarks)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalBookmarks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Registrations</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalRegistrations)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalRegistrations)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Unsubscribes</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalSubscriptionsUnsubscribed)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalSubscriptionsUnsubscribed)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Listing views</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalListingViews)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalListingViews)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Card clicks</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalCardClicks)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalCardClicks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Category clicks</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalCategoryClicks)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalCategoryClicks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Filter applies</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalFilterApplies)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalFilterApplies)}</div>
                     </div>
                     <div className={`engagement-card ${ctrTone}`}>
                         <div className="engagement-label">CTR</div>
@@ -706,11 +739,11 @@ export function AnalyticsDashboard({
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Digest clicks</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalDigestClicks)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalDigestClicks)}</div>
                     </div>
                     <div className="engagement-card">
                         <div className="engagement-label">Deep link clicks</div>
-                        <div className="engagement-value">{formatNumber(analytics.totalDeepLinkClicks)}</div>
+                        <div className="engagement-value">{formatMetric(analytics.totalDeepLinkClicks)}</div>
                     </div>
                 </div>
                 <p className="engagement-hint">CTR uses card clicks divided by listing views. If listing views are zero, make sure listing view events are tracked.</p>
@@ -742,7 +775,7 @@ export function AnalyticsDashboard({
                             {topSearches.map((item) => (
                                 <tr key={item.query}>
                                     <td>{item.query}</td>
-                                    <td className="numeric">{formatNumber(item.count)}</td>
+                                    <td className="numeric">{formatMetric(item.count)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -762,7 +795,7 @@ export function AnalyticsDashboard({
                     <div className={`insight-card ${displayTrendTone}`}>
                         <div className="insight-label">Weekly views trend</div>
                         <div className={`insight-value ${isNewData ? 'flat' : viewTrendDirection}`}>{displayTrendLabel}</div>
-                        <div className="insight-meta">{formatNumber(viewsLast7)} vs {formatNumber(prev7Views)} views</div>
+                        <div className="insight-meta">{formatMetric(viewsLast7)} vs {formatMetric(prev7Views)} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
                         <div className="insight-label">Click-through rate</div>
@@ -778,6 +811,14 @@ export function AnalyticsDashboard({
                         <div className="insight-label">Tracking coverage</div>
                         <div className="insight-value">{finalCoverage}%</div>
                         <div className="insight-meta">{coverageMetaText}</div>
+                        {showCoverageAction && (
+                            <button
+                                className="admin-btn secondary small insight-action"
+                                onClick={() => setActionMessage('Tracking coverage uses listing_view events from /api/announcements/v3/cards. Ensure list pages hit that endpoint and cache onHit still records events.')}
+                            >
+                                Fix tracking coverage
+                            </button>
+                        )}
                     </div>
                     <div className="insight-card">
                         <div className="insight-label">Top listing type</div>
@@ -828,7 +869,7 @@ export function AnalyticsDashboard({
                                 {step.label}
                                 {step.label === 'Detail views (adjusted)' && <span className="info-icon" title="Adjusted to not exceed card clicks for valid conversion rates">ⓘ</span>}
                             </div>
-                            <div className="funnel-value">{formatNumber(step.value)}</div>
+                            <div className="funnel-value">{formatMetric(step.value)}</div>
                             {index > 0 && (
                                 <div className="funnel-rate">
                                     {step.rateLabel ?? `${step.rate}% of previous`}
@@ -839,9 +880,9 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({formatNumber(rawDetailViews)}) exceed Card clicks ({formatNumber(funnel?.cardClicks)}).
+                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({formatMetric(rawDetailViews)}) exceed Card clicks ({formatMetric(funnel?.cardClicks)}).
                         <br />
-                        The funnel uses the adjusted value ({formatNumber(adjustedDetailViews)}) to ensure percentages make sense.
+                        The funnel uses the adjusted value ({formatMetric(adjustedDetailViews)}) to ensure percentages make sense.
                         <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
                     </div>
                 )}
@@ -884,8 +925,8 @@ export function AnalyticsDashboard({
                                                 <span className="ctr-flag" title="Low CTR" aria-label={`Low CTR for ${item.type}`}>Low CTR</span>
                                             )}
                                         </td>
-                                        <td className="numeric">{formatNumber(item.listingViews)}</td>
-                                        <td className="numeric">{formatNumber(item.cardClicks)}</td>
+                                        <td className="numeric">{formatMetric(item.listingViews)}</td>
+                                        <td className="numeric">{formatMetric(item.cardClicks)}</td>
                                         <td className="numeric">
                                             <div className="ctr-cell">
                                                 <span className="ctr-value">{item.ctr}%</span>
@@ -915,7 +956,7 @@ export function AnalyticsDashboard({
                         <div className="digest-grid">
                             <div className="digest-card">
                                 <div className="digest-label">Total clicks</div>
-                                <div className="digest-value">{formatNumber(digestClicks.total)}</div>
+                                <div className="digest-value">{formatMetric(digestClicks.total)}</div>
                             </div>
                             <div className="digest-card">
                                 <div className="digest-label">Variants</div>
@@ -1001,7 +1042,7 @@ export function AnalyticsDashboard({
                         <div className="digest-grid">
                             <div className="digest-card">
                                 <div className="digest-label">Total deep link clicks</div>
-                                <div className="digest-value">{formatNumber(deepLinkAttribution.total)}</div>
+                                <div className="digest-value">{formatMetric(deepLinkAttribution.total)}</div>
                             </div>
                             <div className="digest-card">
                                 <div className="digest-label">Sources</div>
@@ -1077,3 +1118,4 @@ export function AnalyticsDashboard({
         </div>
     );
 }
+

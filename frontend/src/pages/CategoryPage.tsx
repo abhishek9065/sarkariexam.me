@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, PATHS } from '../utils';
 import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
+import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { Announcement, ContentType } from '../types';
 
 interface CategoryPageProps {
@@ -418,6 +419,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                     <div
                                         key={item.id}
                                         className="category-item"
+                                        onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
                                         onClick={() => handleItemClick(item)}
                                     >
                                         <div className="item-title">{item.title}</div>

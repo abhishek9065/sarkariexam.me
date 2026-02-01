@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { prefetchAnnouncementDetail } from '../../utils/prefetch';
 
 interface UserProfile {
     age: number;
@@ -199,7 +200,13 @@ export function JobMatcher() {
                                     </div>
                                     <div className="job-info">
                                         <h4>
-                                            <a href={`/job/${job.slug}`}>{job.title}</a>
+                                            <a
+                                                href={`/job/${job.slug}`}
+                                                onMouseEnter={() => prefetchAnnouncementDetail(job.slug)}
+                                                onFocus={() => prefetchAnnouncementDetail(job.slug)}
+                                            >
+                                                {job.title}
+                                            </a>
                                         </h4>
                                         <div className="job-meta">
                                             <span>🏢 {job.organization}</span>

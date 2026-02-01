@@ -4,6 +4,7 @@ import { Header, Navigation, Footer, SkeletonLoader, BookmarkButton, ExportButto
 import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
 import { useBookmarks } from '../hooks/useData';
+import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { Announcement } from '../types';
 
 export function BookmarksPage() {
@@ -85,6 +86,7 @@ export function BookmarksPage() {
                                         key={item.id}
                                         className="bookmark-card category-item"
                                         onClick={() => handleItemClick(item)}
+                                        onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
                                     >
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                                             <span className={`type-badge ${item.type}`}>{item.type}</span>

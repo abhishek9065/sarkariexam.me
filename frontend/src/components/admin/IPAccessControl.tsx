@@ -254,4 +254,204 @@ export function IPAccessControl({
                                 <input
                                     type="text"
                                     value={newRule.ip || newRule.range}
-                                    onChange={(e) => {\n                                        const value = e.target.value;\n                                        if (value.includes('/')) {\n                                            setNewRule(prev => ({ ...prev, ip: '', range: value }));\n                                        } else {\n                                            setNewRule(prev => ({ ...prev, ip: value, range: '' }));\n                                        }\n                                    }}\n                                    placeholder=\"192.168.1.1 or 192.168.1.0/24\"\n                                    className=\"ip-input\"\n                                />\n                                <div className=\"input-help\">\n                                    Enter a single IP (192.168.1.1) or CIDR range (192.168.1.0/24)\n                                </div>\n                            </div>\n\n                            <div className=\"form-group\">\n                                <label>Description</label>\n                                <input\n                                    type=\"text\"\n                                    value={newRule.description}\n                                    onChange={(e) => setNewRule(prev => ({ ...prev, description: e.target.value }))}\n                                    placeholder=\"Office network, VPN server, etc.\"\n                                    className=\"description-input\"\n                                />\n                            </div>\n\n                            <div className=\"form-group\">\n                                <label>Priority (1-999, lower = higher priority)</label>\n                                <input\n                                    type=\"number\"\n                                    min=\"1\"\n                                    max=\"999\"\n                                    value={newRule.priority}\n                                    onChange={(e) => setNewRule(prev => ({ ...prev, priority: parseInt(e.target.value) || 100 }))}\n                                    className=\"priority-input\"\n                                />\n                            </div>\n\n                            <div className=\"form-group checkbox-group\">\n                                <label className=\"checkbox-label\">\n                                    <input\n                                        type=\"checkbox\"\n                                        checked={newRule.isActive}\n                                        onChange={(e) => setNewRule(prev => ({ ...prev, isActive: e.target.checked }))}\n                                    />\n                                    <span>Enable rule immediately</span>\n                                </label>\n                            </div>\n                        </div>\n\n                        <div className=\"modal-footer\">\n                            <button \n                                className=\"cancel-btn\"\n                                onClick={() => setShowAddRule(false)}\n                            >\n                                Cancel\n                            </button>\n                            <button \n                                className=\"save-btn\"\n                                onClick={handleAddRule}\n                                disabled={!newRule.description || (!newRule.ip && !newRule.range)}\n                            >\n                                Add Rule\n                            </button>\n                        </div>\n                    </div>\n                </div>\n            )}\n\n            {/* Rules List */}\n            <div className=\"rules-section\">\n                <h3>🛡️ Access Rules ({filteredRules.length})</h3>\n                \n                {filteredRules.length === 0 ? (\n                    <div className=\"no-rules\">\n                        <div className=\"no-rules-icon\">🌐</div>\n                        <h4>No IP Rules Configured</h4>\n                        <p>Add your first IP access rule to start controlling access by IP address.</p>\n                        <button \n                            className=\"add-first-rule-btn\"\n                            onClick={() => setShowAddRule(true)}\n                        >\n                            ➕ Add First Rule\n                        </button>\n                    </div>\n                ) : (\n                    <div className=\"rules-list\">\n                        {filteredRules.map((rule) => (\n                            <div key={rule.id} className={`rule-card ${rule.isActive ? 'active' : 'inactive'} ${rule.type}`}>\n                                <div className=\"rule-main\">\n                                    <div className=\"rule-info\">\n                                        <div className=\"rule-header\">\n                                            <div className=\"rule-type-badge\">\n                                                {rule.type === 'allow' ? '✅ ALLOW' : '🚫 BLOCK'}\n                                            </div>\n                                            <div className=\"rule-ip\">\n                                                <span className=\"ip-icon\">🌐</span>\n                                                <span className=\"ip-text\">{rule.ip}</span>\n                                            </div>\n                                            <div className=\"rule-priority\">\n                                                Priority: {rule.priority}\n                                            </div>\n                                        </div>\n                                        <div className=\"rule-description\">\n                                            {rule.description}\n                                        </div>\n                                        <div className=\"rule-meta\">\n                                            <span>Created by {rule.createdBy}</span>\n                                            <span>•</span>\n                                            <span>{formatTimestamp(rule.createdAt)}</span>\n                                            {rule.lastTriggered && (\n                                                <>\n                                                    <span>•</span>\n                                                    <span>Last used: {formatTimestamp(rule.lastTriggered)}</span>\n                                                </>\n                                            )}\n                                        </div>\n                                    </div>\n                                    <div className=\"rule-stats\">\n                                        <div className=\"stat\">\n                                            <span className=\"stat-value\">{rule.hitCount}</span>\n                                            <span className=\"stat-label\">Hits</span>\n                                        </div>\n                                        <div className={`status-badge ${rule.isActive ? 'active' : 'inactive'}`}>\n                                            {rule.isActive ? '🟢 Active' : '🔴 Inactive'}\n                                        </div>\n                                    </div>\n                                </div>\n                                \n                                <div className=\"rule-actions\">\n                                    <button\n                                        className={`toggle-btn ${rule.isActive ? 'deactivate' : 'activate'}`}\n                                        onClick={() => handleToggleRule(rule)}\n                                        disabled={loading}\n                                        title={rule.isActive ? 'Deactivate rule' : 'Activate rule'}\n                                    >\n                                        {rule.isActive ? '⏸️ Disable' : '▶️ Enable'}\n                                    </button>\n                                    <button\n                                        className=\"delete-btn\"\n                                        onClick={() => handleDeleteRule(rule.id)}\n                                        disabled={loading}\n                                        title=\"Delete rule\"\n                                    >\n                                        🗑️ Delete\n                                    </button>\n                                </div>\n                            </div>\n                        ))}\n                    </div>\n                )}\n            </div>\n\n            {/* Recent Attempts */}\n            <div className=\"attempts-section\">\n                <h3>📊 Recent Access Attempts ({recentAttempts.length})</h3>\n                \n                {recentAttempts.length === 0 ? (\n                    <div className=\"no-attempts\">\n                        <p>No recent access attempts to display.</p>\n                    </div>\n                ) : (\n                    <div className=\"attempts-list\">\n                        <div className=\"attempts-header\">\n                            <div className=\"header-ip\">IP Address</div>\n                            <div className=\"header-location\">Location</div>\n                            <div className=\"header-action\">Action</div>\n                            <div className=\"header-time\">Time</div>\n                            <div className=\"header-reason\">Reason</div>\n                        </div>\n                        {recentAttempts.slice(0, 50).map((attempt) => (\n                            <div key={attempt.id} className={`attempt-row ${attempt.action}`}>\n                                <div className=\"attempt-ip\">\n                                    <span className=\"ip-text\">{attempt.ip}</span>\n                                </div>\n                                <div className=\"attempt-location\">\n                                    <span className=\"location-flag\">{getLocationFlag(attempt.location)}</span>\n                                    <span className=\"location-text\">{attempt.location || 'Unknown'}</span>\n                                </div>\n                                <div className=\"attempt-action\">\n                                    <span className={`action-badge ${attempt.action}`}>\n                                        {attempt.action === 'allowed' ? '✅ Allowed' : '🚫 Blocked'}\n                                    </span>\n                                </div>\n                                <div className=\"attempt-time\">\n                                    {formatTimestamp(attempt.timestamp)}\n                                </div>\n                                <div className=\"attempt-reason\">\n                                    {attempt.reason}\n                                </div>\n                            </div>\n                        ))}\n                    </div>\n                )}\n            </div>\n        </div>\n    );\n}\n\nexport default IPAccessControl;"
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value.includes('/')) {
+                                            setNewRule(prev => ({ ...prev, ip: '', range: value }));
+                                        } else {
+                                            setNewRule(prev => ({ ...prev, ip: value, range: '' }));
+                                        }
+                                    }}
+                                    placeholder="192.168.1.1 or 192.168.1.0/24"
+                                    className="ip-input"
+                                />
+                                <div className="input-help">
+                                    Enter a single IP (192.168.1.1) or CIDR range (192.168.1.0/24)
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Description</label>
+                                <input
+                                    type="text"
+                                    value={newRule.description}
+                                    onChange={(e) => setNewRule(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Office network, VPN server, etc."
+                                    className="description-input"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Priority (1-999, lower = higher priority)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="999"
+                                    value={newRule.priority}
+                                    onChange={(e) => setNewRule(prev => ({ ...prev, priority: parseInt(e.target.value) || 100 }))}
+                                    className="priority-input"
+                                />
+                            </div>
+
+                            <div className="form-group checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={newRule.isActive}
+                                        onChange={(e) => setNewRule(prev => ({ ...prev, isActive: e.target.checked }))}
+                                    />
+                                    <span>Enable rule immediately</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="modal-footer">
+                            <button 
+                                className="cancel-btn"
+                                onClick={() => setShowAddRule(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                className="save-btn"
+                                onClick={handleAddRule}
+                                disabled={!newRule.description || (!newRule.ip && !newRule.range)}
+                            >
+                                Add Rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rules List */}
+            <div className="rules-section">
+                <h3>🛡️ Access Rules ({filteredRules.length})</h3>
+                
+                {filteredRules.length === 0 ? (
+                    <div className="no-rules">
+                        <div className="no-rules-icon">🌐</div>
+                        <h4>No IP Rules Configured</h4>
+                        <p>Add your first IP access rule to start controlling access by IP address.</p>
+                        <button 
+                            className="add-first-rule-btn"
+                            onClick={() => setShowAddRule(true)}
+                        >
+                            ➕ Add First Rule
+                        </button>
+                    </div>
+                ) : (
+                    <div className="rules-list">
+                        {filteredRules.map((rule) => (
+                            <div key={rule.id} className={`rule-card ${rule.isActive ? 'active' : 'inactive'} ${rule.type}`}>
+                                <div className="rule-main">
+                                    <div className="rule-info">
+                                        <div className="rule-header">
+                                            <div className="rule-type-badge">
+                                                {rule.type === 'allow' ? '✅ ALLOW' : '🚫 BLOCK'}
+                                            </div>
+                                            <div className="rule-ip">
+                                                <span className="ip-icon">🌐</span>
+                                                <span className="ip-text">{rule.ip}</span>
+                                            </div>
+                                            <div className="rule-priority">
+                                                Priority: {rule.priority}
+                                            </div>
+                                        </div>
+                                        <div className="rule-description">
+                                            {rule.description}
+                                        </div>
+                                        <div className="rule-meta">
+                                            <span>Created by {rule.createdBy}</span>
+                                            <span>•</span>
+                                            <span>{formatTimestamp(rule.createdAt)}</span>
+                                            {rule.lastTriggered && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>Last used: {formatTimestamp(rule.lastTriggered)}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="rule-stats">
+                                        <div className="stat">
+                                            <span className="stat-value">{rule.hitCount}</span>
+                                            <span className="stat-label">Hits</span>
+                                        </div>
+                                        <div className={`status-badge ${rule.isActive ? 'active' : 'inactive'}`}>
+                                            {rule.isActive ? '🟢 Active' : '🔴 Inactive'}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="rule-actions">
+                                    <button
+                                        className={`toggle-btn ${rule.isActive ? 'deactivate' : 'activate'}`}
+                                        onClick={() => handleToggleRule(rule)}
+                                        disabled={loading}
+                                        title={rule.isActive ? 'Deactivate rule' : 'Activate rule'}
+                                    >
+                                        {rule.isActive ? '⏸️ Disable' : '▶️ Enable'}
+                                    </button>
+                                    <button
+                                        className="delete-btn"
+                                        onClick={() => handleDeleteRule(rule.id)}
+                                        disabled={loading}
+                                        title="Delete rule"
+                                    >
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Recent Attempts */}
+            <div className="attempts-section">
+                <h3>📊 Recent Access Attempts ({recentAttempts.length})</h3>
+                
+                {recentAttempts.length === 0 ? (
+                    <div className="no-attempts">
+                        <p>No recent access attempts to display.</p>
+                    </div>
+                ) : (
+                    <div className="attempts-list">
+                        <div className="attempts-header">
+                            <div className="header-ip">IP Address</div>
+                            <div className="header-location">Location</div>
+                            <div className="header-action">Action</div>
+                            <div className="header-time">Time</div>
+                            <div className="header-reason">Reason</div>
+                        </div>
+                        {recentAttempts.slice(0, 50).map((attempt) => (
+                            <div key={attempt.id} className={`attempt-row ${attempt.action}`}>
+                                <div className="attempt-ip">
+                                    <span className="ip-text">{attempt.ip}</span>
+                                </div>
+                                <div className="attempt-location">
+                                    <span className="location-flag">{getLocationFlag(attempt.location)}</span>
+                                    <span className="location-text">{attempt.location || 'Unknown'}</span>
+                                </div>
+                                <div className="attempt-action">
+                                    <span className={`action-badge ${attempt.action}`}>
+                                        {attempt.action === 'allowed' ? '✅ Allowed' : '🚫 Blocked'}
+                                    </span>
+                                </div>
+                                <div className="attempt-time">
+                                    {formatTimestamp(attempt.timestamp)}
+                                </div>
+                                <div className="attempt-reason">
+                                    {attempt.reason}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default IPAccessControl;"

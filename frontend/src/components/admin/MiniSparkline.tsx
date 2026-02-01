@@ -6,6 +6,7 @@ interface MiniSparklineProps {
     height?: number;
     color?: 'blue' | 'green' | 'yellow' | 'red';
     showChange?: boolean;
+    locale?: string;
 }
 
 export function MiniSparkline({
@@ -14,6 +15,7 @@ export function MiniSparkline({
     height = 32,
     color = 'blue',
     showChange = true,
+    locale = 'en-IN',
 }: MiniSparklineProps) {
     if (!data || data.length === 0) {
         return <div className="mini-sparkline-empty">No data</div>;
@@ -40,6 +42,9 @@ export function MiniSparkline({
             >
                 {bars.map((value, index) => {
                     const barHeight = Math.max(2, (value / max) * height);
+                    const label = Number.isFinite(value)
+                        ? new Intl.NumberFormat(locale).format(value)
+                        : '0';
                     return (
                         <div
                             key={index}
@@ -48,7 +53,7 @@ export function MiniSparkline({
                                 height: `${barHeight}px`,
                                 opacity: 0.4 + (index / bars.length) * 0.6,
                             }}
-                            title={`${value.toLocaleString()}`}
+                            title={label}
                         />
                     );
                 })}

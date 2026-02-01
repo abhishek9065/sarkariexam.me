@@ -38,6 +38,23 @@
   flex-wrap: wrap;
 }
 
+.locale-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.locale-toggle select {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 .range-toggle .admin-btn.active {
   background: rgba(59, 130, 246, 0.2);
   border: 1px solid rgba(96, 165, 250, 0.5);
@@ -668,6 +685,11 @@
 .insight-meta {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.insight-action {
+  margin-top: 6px;
+  align-self: flex-start;
 }
 
 .ctr-cell {

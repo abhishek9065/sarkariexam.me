@@ -99,6 +99,14 @@ const pickQueryValue = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const isPrefetchRequest = (req: express.Request): boolean => {
+  const prefetchParam = pickQueryValue(req.query.prefetch);
+  if (prefetchParam === '1' || prefetchParam === 'true') return true;
+  const purpose = req.headers['purpose'] ?? req.headers['sec-purpose'];
+  if (typeof purpose === 'string' && purpose.toLowerCase().includes('prefetch')) return true;
+  return false;
+};
+
 const recordListingAnalytics = (req: express.Request, options: {
   count: number;
   type?: string | null;
@@ -108,6 +116,7 @@ const recordListingAnalytics = (req: express.Request, options: {
   location?: string | null;
   qualification?: string | null;
 }) => {
+  if (isPrefetchRequest(req)) return;
   const normalizedSearch = normalizeSearchTerm(options.search);
   recordAnalyticsEvent({
     type: 'listing_view',
@@ -458,6 +467,7 @@ router.get(
     onHit: (req, cachedData) => {
       const announcement = cachedData?.data as Announcement | undefined;
       if (!announcement) return;
+      if (isPrefetchRequest(req)) return;
       recordAnnouncementAnalytics(req, announcement);
     },
   }),
@@ -470,7 +480,9 @@ router.get(
       return res.status(404).json({ error: 'Announcement not found' });
     }
 
-    recordAnnouncementAnalytics(req, announcement);
+    if (!isPrefetchRequest(req)) {
+      recordAnnouncementAnalytics(req, announcement);
+    }
 
     return res.json({ data: announcement });
     } catch (error) {

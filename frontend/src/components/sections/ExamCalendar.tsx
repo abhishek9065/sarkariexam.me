@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Announcement } from '../../types';
+import { prefetchAnnouncementDetail } from '../../utils/prefetch';
 
 interface ExamCalendarProps {
     announcements: Announcement[];
@@ -121,6 +122,7 @@ export function ExamCalendar({ announcements, onItemClick }: ExamCalendarProps) 
                                                 className={`event-dot ${e.type}`}
                                                 title={e.title}
                                                 onClick={() => onItemClick(e)}
+                                                onMouseEnter={() => prefetchAnnouncementDetail(e.slug)}
                                             />
                                         ))}
                                         {events.length > 2 && <span className="more">+{events.length - 2}</span>}
@@ -138,7 +140,11 @@ export function ExamCalendar({ announcements, onItemClick }: ExamCalendarProps) 
                 <ul>
                     {upcomingDeadlines.length > 0 ? (
                         upcomingDeadlines.map(event => (
-                            <li key={event.id} onClick={() => onItemClick(event)}>
+                            <li
+                                key={event.id}
+                                onClick={() => onItemClick(event)}
+                                onMouseEnter={() => prefetchAnnouncementDetail(event.slug)}
+                            >
                                 <span className={`type-badge ${event.type}`}>{event.type}</span>
                                 <span className="event-title">{event.title}</span>
                                 <span className="event-date">

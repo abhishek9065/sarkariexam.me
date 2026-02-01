@@ -1,1 +1,603 @@
-import React, { useState, useEffect } from 'react';\nimport './AuditTrail.css';\n\nexport interface AuditEvent {\n    id: string;\n    timestamp: string;\n    userId: string;\n    userName: string;\n    userEmail: string;\n    action: string;\n    resource: string;\n    resourceId: string;\n    details: Record<string, any>;\n    ipAddress: string;\n    userAgent: string;\n    location?: {\n        country: string;\n        city: string;\n        region: string;\n    };\n    severity: 'low' | 'medium' | 'high' | 'critical';\n    category: 'authentication' | 'authorization' | 'data' | 'system' | 'security' | 'admin';\n    status: 'success' | 'failure' | 'warning' | 'info';\n    metadata?: Record<string, any>;\n}\n\nexport interface AuditFilters {\n    dateFrom: string;\n    dateTo: string;\n    userId: string;\n    action: string;\n    resource: string;\n    severity: string[];\n    category: string[];\n    status: string[];\n    ipAddress: string;\n    searchQuery: string;\n}\n\nexport interface AuditStats {\n    totalEvents: number;\n    criticalEvents: number;\n    failedAttempts: number;\n    uniqueUsers: number;\n    topActions: Array<{ action: string; count: number }>;\n    topResources: Array<{ resource: string; count: number }>;\n    eventsByHour: Array<{ hour: string; count: number }>;\n    eventsByCategory: Array<{ category: string; count: number }>;\n}\n\ninterface AuditTrailProps {\n    events: AuditEvent[];\n    stats: AuditStats;\n    loading?: boolean;\n    onExport?: (filters: AuditFilters) => Promise<void>;\n    onRefresh?: () => Promise<void>;\n    onFilterChange?: (filters: AuditFilters) => void;\n    autoRefresh?: boolean;\n    refreshInterval?: number;\n}\n\nconst SEVERITY_COLORS = {\n    low: '#22c55e',\n    medium: '#eab308',\n    high: '#f97316',\n    critical: '#ef4444'\n};\n\nconst STATUS_COLORS = {\n    success: '#22c55e',\n    failure: '#ef4444',\n    warning: '#eab308',\n    info: '#3b82f6'\n};\n\nconst CATEGORY_ICONS = {\n    authentication: '🔐',\n    authorization: '🛡️',\n    data: '📊',\n    system: '⚙️',\n    security: '🔒',\n    admin: '👑'\n};\n\nexport function AuditTrail({ \n    events, \n    stats, \n    loading = false, \n    onExport,\n    onRefresh,\n    onFilterChange,\n    autoRefresh = false,\n    refreshInterval = 30000\n}: AuditTrailProps) {\n    const [filters, setFilters] = useState<AuditFilters>({\n        dateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],\n        dateTo: new Date().toISOString().split('T')[0],\n        userId: '',\n        action: '',\n        resource: '',\n        severity: [],\n        category: [],\n        status: [],\n        ipAddress: '',\n        searchQuery: ''\n    });\n    \n    const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);\n    const [viewMode, setViewMode] = useState<'table' | 'timeline' | 'chart'>('table');\n    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());\n    const [sortConfig, setSortConfig] = useState<{ key: keyof AuditEvent; direction: 'asc' | 'desc' }>({ \n        key: 'timestamp', \n        direction: 'desc' \n    });\n\n    // Auto-refresh functionality\n    useEffect(() => {\n        if (autoRefresh && onRefresh) {\n            const interval = setInterval(onRefresh, refreshInterval);\n            return () => clearInterval(interval);\n        }\n    }, [autoRefresh, refreshInterval, onRefresh]);\n\n    // Filter change handler\n    useEffect(() => {\n        if (onFilterChange) {\n            onFilterChange(filters);\n        }\n    }, [filters, onFilterChange]);\n\n    const handleFilterChange = (key: keyof AuditFilters, value: any) => {\n        setFilters(prev => ({ ...prev, [key]: value }));\n    };\n\n    const handleArrayFilterChange = (key: 'severity' | 'category' | 'status', value: string) => {\n        setFilters(prev => {\n            const currentArray = prev[key] as string[];\n            const newArray = currentArray.includes(value)\n                ? currentArray.filter(item => item !== value)\n                : [...currentArray, value];\n            return { ...prev, [key]: newArray };\n        });\n    };\n\n    const handleSort = (key: keyof AuditEvent) => {\n        setSortConfig(prev => ({\n            key,\n            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'\n        }));\n    };\n\n    const sortedEvents = React.useMemo(() => {\n        return [...events].sort((a, b) => {\n            const aValue = a[sortConfig.key];\n            const bValue = b[sortConfig.key];\n            \n            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;\n            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;\n            return 0;\n        });\n    }, [events, sortConfig]);\n\n    const toggleRowExpansion = (eventId: string) => {\n        setExpandedRows(prev => {\n            const newSet = new Set(prev);\n            if (newSet.has(eventId)) {\n                newSet.delete(eventId);\n            } else {\n                newSet.add(eventId);\n            }\n            return newSet;\n        });\n    };\n\n    const getSeverityIcon = (severity: string) => {\n        switch (severity) {\n            case 'critical': return '🚨';\n            case 'high': return '⚠️';\n            case 'medium': return '⚡';\n            case 'low': return 'ℹ️';\n            default: return '📝';\n        }\n    };\n\n    const getStatusIcon = (status: string) => {\n        switch (status) {\n            case 'success': return '✅';\n            case 'failure': return '❌';\n            case 'warning': return '⚠️';\n            case 'info': return 'ℹ️';\n            default: return '📝';\n        }\n    };\n\n    const formatTimestamp = (timestamp: string) => {\n        return new Date(timestamp).toLocaleString();\n    };\n\n    const formatDetails = (details: Record<string, any>) => {\n        return Object.entries(details).map(([key, value]) => (\n            <div key={key} className=\"detail-item\">\n                <span className=\"detail-key\">{key}:</span>\n                <span className=\"detail-value\">{JSON.stringify(value)}</span>\n            </div>\n        ));\n    };\n\n    const handleExport = async () => {\n        if (onExport) {\n            await onExport(filters);\n        }\n    };\n\n    return (\n        <div className=\"audit-trail\">\n            <div className=\"audit-header\">\n                <div className=\"header-title\">\n                    <h2>📋 Enhanced Audit Trail</h2>\n                    <p>Comprehensive security and activity monitoring with advanced search and analytics</p>\n                </div>\n                \n                <div className=\"header-actions\">\n                    <div className=\"view-mode-selector\">\n                        <button \n                            className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`}\n                            onClick={() => setViewMode('table')}\n                        >\n                            📊 Table\n                        </button>\n                        <button \n                            className={`view-mode-btn ${viewMode === 'timeline' ? 'active' : ''}`}\n                            onClick={() => setViewMode('timeline')}\n                        >\n                            📈 Timeline\n                        </button>\n                        <button \n                            className={`view-mode-btn ${viewMode === 'chart' ? 'active' : ''}`}\n                            onClick={() => setViewMode('chart')}\n                        >\n                            📉 Analytics\n                        </button>\n                    </div>\n                    \n                    <div className=\"action-buttons\">\n                        {onRefresh && (\n                            <button \n                                className=\"refresh-btn\"\n                                onClick={onRefresh}\n                                disabled={loading}\n                            >\n                                🔄 {loading ? 'Refreshing...' : 'Refresh'}\n                            </button>\n                        )}\n                        \n                        {onExport && (\n                            <button \n                                className=\"export-btn\"\n                                onClick={handleExport}\n                                disabled={loading}\n                            >\n                                📥 Export\n                            </button>\n                        )}\n                    </div>\n                </div>\n            </div>\n\n            {/* Statistics Overview */}\n            <div className=\"audit-stats\">\n                <div className=\"stats-grid\">\n                    <div className=\"stat-card total\">\n                        <div className=\"stat-icon\">📊</div>\n                        <div className=\"stat-content\">\n                            <span className=\"stat-value\">{stats.totalEvents.toLocaleString()}</span>\n                            <span className=\"stat-label\">Total Events</span>\n                        </div>\n                    </div>\n                    \n                    <div className=\"stat-card critical\">\n                        <div className=\"stat-icon\">🚨</div>\n                        <div className=\"stat-content\">\n                            <span className=\"stat-value\">{stats.criticalEvents.toLocaleString()}</span>\n                            <span className=\"stat-label\">Critical Events</span>\n                        </div>\n                    </div>\n                    \n                    <div className=\"stat-card failed\">\n                        <div className=\"stat-icon\">❌</div>\n                        <div className=\"stat-content\">\n                            <span className=\"stat-value\">{stats.failedAttempts.toLocaleString()}</span>\n                            <span className=\"stat-label\">Failed Attempts</span>\n                        </div>\n                    </div>\n                    \n                    <div className=\"stat-card users\">\n                        <div className=\"stat-icon\">👥</div>\n                        <div className=\"stat-content\">\n                            <span className=\"stat-value\">{stats.uniqueUsers.toLocaleString()}</span>\n                            <span className=\"stat-label\">Unique Users</span>\n                        </div>\n                    </div>\n                </div>\n            </div>\n\n            {/* Advanced Filters */}\n            <div className=\"audit-filters\">\n                <div className=\"filters-header\">\n                    <h3>🔍 Advanced Filters</h3>\n                </div>\n                \n                <div className=\"filters-grid\">\n                    <div className=\"filter-group date-range\">\n                        <label>Date Range:</label>\n                        <div className=\"date-inputs\">\n                            <input\n                                type=\"date\"\n                                value={filters.dateFrom}\n                                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}\n                                className=\"date-input\"\n                            />\n                            <span>to</span>\n                            <input\n                                type=\"date\"\n                                value={filters.dateTo}\n                                onChange={(e) => handleFilterChange('dateTo', e.target.value)}\n                                className=\"date-input\"\n                            />\n                        </div>\n                    </div>\n                    \n                    <div className=\"filter-group\">\n                        <label>Search:</label>\n                        <input\n                            type=\"text\"\n                            value={filters.searchQuery}\n                            onChange={(e) => handleFilterChange('searchQuery', e.target.value)}\n                            placeholder=\"Search events, users, actions...\"\n                            className=\"search-input\"\n                        />\n                    </div>\n                    \n                    <div className=\"filter-group\">\n                        <label>User ID:</label>\n                        <input\n                            type=\"text\"\n                            value={filters.userId}\n                            onChange={(e) => handleFilterChange('userId', e.target.value)}\n                            placeholder=\"Filter by user ID\"\n                            className=\"text-input\"\n                        />\n                    </div>\n                    \n                    <div className=\"filter-group\">\n                        <label>IP Address:</label>\n                        <input\n                            type=\"text\"\n                            value={filters.ipAddress}\n                            onChange={(e) => handleFilterChange('ipAddress', e.target.value)}\n                            placeholder=\"Filter by IP address\"\n                            className=\"text-input\"\n                        />\n                    </div>\n                    \n                    <div className=\"filter-group\">\n                        <label>Severity:</label>\n                        <div className=\"checkbox-group\">\n                            {['low', 'medium', 'high', 'critical'].map(severity => (\n                                <label key={severity} className=\"checkbox-label\">\n                                    <input\n                                        type=\"checkbox\"\n                                        checked={filters.severity.includes(severity)}\n                                        onChange={() => handleArrayFilterChange('severity', severity)}\n                                    />\n                                    <span className={`severity-badge ${severity}`}>\n                                        {getSeverityIcon(severity)} {severity.toUpperCase()}\n                                    </span>\n                                </label>\n                            ))}\n                        </div>\n                    </div>\n                    \n                    <div className=\"filter-group\">\n                        <label>Category:</label>\n                        <div className=\"checkbox-group\">\n                            {Object.keys(CATEGORY_ICONS).map(category => (\n                                <label key={category} className=\"checkbox-label\">\n                                    <input\n                                        type=\"checkbox\"\n                                        checked={filters.category.includes(category)}\n                                        onChange={() => handleArrayFilterChange('category', category)}\n                                    />\n                                    <span className=\"category-badge\">\n                                        {CATEGORY_ICONS[category as keyof typeof CATEGORY_ICONS]} {category.toUpperCase()}\n                                    </span>\n                                </label>\n                            ))}\n                        </div>\n                    </div>\n                    \n                    <div className=\"filter-group\">\n                        <label>Status:</label>\n                        <div className=\"checkbox-group\">\n                            {['success', 'failure', 'warning', 'info'].map(status => (\n                                <label key={status} className=\"checkbox-label\">\n                                    <input\n                                        type=\"checkbox\"\n                                        checked={filters.status.includes(status)}\n                                        onChange={() => handleArrayFilterChange('status', status)}\n                                    />\n                                    <span className={`status-badge ${status}`}>\n                                        {getStatusIcon(status)} {status.toUpperCase()}\n                                    </span>\n                                </label>\n                            ))}\n                        </div>\n                    </div>\n                </div>\n            </div>\n\n            {/* Events Display */}\n            <div className=\"audit-content\">\n                {viewMode === 'table' && (\n                    <div className=\"events-table-container\">\n                        <div className=\"table-controls\">\n                            <span className=\"results-count\">\n                                Showing {sortedEvents.length} events\n                            </span>\n                        </div>\n                        \n                        <div className=\"events-table\">\n                            <table>\n                                <thead>\n                                    <tr>\n                                        <th></th>\n                                        <th \n                                            className=\"sortable\"\n                                            onClick={() => handleSort('timestamp')}\n                                        >\n                                            Timestamp {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}\n                                        </th>\n                                        <th \n                                            className=\"sortable\"\n                                            onClick={() => handleSort('userName')}\n                                        >\n                                            User {sortConfig.key === 'userName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}\n                                        </th>\n                                        <th \n                                            className=\"sortable\"\n                                            onClick={() => handleSort('action')}\n                                        >\n                                            Action {sortConfig.key === 'action' && (sortConfig.direction === 'asc' ? '↑' : '↓')}\n                                        </th>\n                                        <th \n                                            className=\"sortable\"\n                                            onClick={() => handleSort('resource')}\n                                        >\n                                            Resource {sortConfig.key === 'resource' && (sortConfig.direction === 'asc' ? '↑' : '↓')}\n                                        </th>\n                                        <th>Category</th>\n                                        <th>Severity</th>\n                                        <th>Status</th>\n                                        <th>IP Address</th>\n                                    </tr>\n                                </thead>\n                                <tbody>\n                                    {sortedEvents.map((event) => (\n                                        <React.Fragment key={event.id}>\n                                            <tr \n                                                className={`event-row ${expandedRows.has(event.id) ? 'expanded' : ''}`}\n                                                onClick={() => toggleRowExpansion(event.id)}\n                                            >\n                                                <td className=\"expand-cell\">\n                                                    <span className=\"expand-icon\">\n                                                        {expandedRows.has(event.id) ? '▼' : '▶'}\n                                                    </span>\n                                                </td>\n                                                <td className=\"timestamp-cell\">\n                                                    {formatTimestamp(event.timestamp)}\n                                                </td>\n                                                <td className=\"user-cell\">\n                                                    <div className=\"user-info\">\n                                                        <span className=\"user-name\">{event.userName}</span>\n                                                        <span className=\"user-email\">{event.userEmail}</span>\n                                                    </div>\n                                                </td>\n                                                <td className=\"action-cell\">\n                                                    <code>{event.action}</code>\n                                                </td>\n                                                <td className=\"resource-cell\">\n                                                    <span className=\"resource-name\">{event.resource}</span>\n                                                    {event.resourceId && (\n                                                        <span className=\"resource-id\">#{event.resourceId}</span>\n                                                    )}\n                                                </td>\n                                                <td className=\"category-cell\">\n                                                    <span className=\"category-badge\">\n                                                        {CATEGORY_ICONS[event.category]} {event.category}\n                                                    </span>\n                                                </td>\n                                                <td className=\"severity-cell\">\n                                                    <span \n                                                        className={`severity-badge ${event.severity}`}\n                                                        style={{ color: SEVERITY_COLORS[event.severity] }}\n                                                    >\n                                                        {getSeverityIcon(event.severity)} {event.severity}\n                                                    </span>\n                                                </td>\n                                                <td className=\"status-cell\">\n                                                    <span \n                                                        className={`status-badge ${event.status}`}\n                                                        style={{ color: STATUS_COLORS[event.status] }}\n                                                    >\n                                                        {getStatusIcon(event.status)} {event.status}\n                                                    </span>\n                                                </td>\n                                                <td className=\"ip-cell\">\n                                                    <code>{event.ipAddress}</code>\n                                                    {event.location && (\n                                                        <span className=\"location\">\n                                                            {event.location.city}, {event.location.country}\n                                                        </span>\n                                                    )}\n                                                </td>\n                                            </tr>\n                                            \n                                            {expandedRows.has(event.id) && (\n                                                <tr className=\"event-details-row\">\n                                                    <td colSpan={9}>\n                                                        <div className=\"event-details\">\n                                                            <div className=\"details-section\">\n                                                                <h4>📝 Event Details</h4>\n                                                                {formatDetails(event.details)}\n                                                            </div>\n                                                            \n                                                            <div className=\"details-section\">\n                                                                <h4>🌐 Technical Information</h4>\n                                                                <div className=\"detail-item\">\n                                                                    <span className=\"detail-key\">User Agent:</span>\n                                                                    <span className=\"detail-value\">{event.userAgent}</span>\n                                                                </div>\n                                                                <div className=\"detail-item\">\n                                                                    <span className=\"detail-key\">Event ID:</span>\n                                                                    <span className=\"detail-value\">{event.id}</span>\n                                                                </div>\n                                                                {event.metadata && Object.keys(event.metadata).length > 0 && (\n                                                                    <div className=\"detail-item\">\n                                                                        <span className=\"detail-key\">Metadata:</span>\n                                                                        <div className=\"metadata-content\">\n                                                                            {formatDetails(event.metadata)}\n                                                                        </div>\n                                                                    </div>\n                                                                )}\n                                                            </div>\n                                                        </div>\n                                                    </td>\n                                                </tr>\n                                            )}\n                                        </React.Fragment>\n                                    ))}\n                                </tbody>\n                            </table>\n                        </div>\n                        \n                        {sortedEvents.length === 0 && (\n                            <div className=\"empty-state\">\n                                <div className=\"empty-icon\">📋</div>\n                                <h3>No audit events found</h3>\n                                <p>Try adjusting your filters to see more results</p>\n                            </div>\n                        )}\n                    </div>\n                )}\n                \n                {viewMode === 'timeline' && (\n                    <div className=\"timeline-view\">\n                        <h3>📈 Timeline View (Coming Soon)</h3>\n                        <p>Interactive timeline visualization will be available in the next update.</p>\n                    </div>\n                )}\n                \n                {viewMode === 'chart' && (\n                    <div className=\"analytics-view\">\n                        <h3>📉 Analytics Dashboard (Coming Soon)</h3>\n                        <p>Advanced analytics and visualization charts will be available in the next update.</p>\n                    </div>\n                )}\n            </div>\n        </div>\n    );\n}\n\nexport default AuditTrail;"
+import React, { useState, useEffect } from 'react';
+import './AuditTrail.css';
+import { formatNumber } from '../../utils/formatters';
+
+export interface AuditEvent {
+    id: string;
+    timestamp: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    action: string;
+    resource: string;
+    resourceId: string;
+    details: Record<string, any>;
+    ipAddress: string;
+    userAgent: string;
+    location?: {
+        country: string;
+        city: string;
+        region: string;
+    };
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    category: 'authentication' | 'authorization' | 'data' | 'system' | 'security' | 'admin';
+    status: 'success' | 'failure' | 'warning' | 'info';
+    metadata?: Record<string, any>;
+}
+
+export interface AuditFilters {
+    dateFrom: string;
+    dateTo: string;
+    userId: string;
+    action: string;
+    resource: string;
+    severity: string[];
+    category: string[];
+    status: string[];
+    ipAddress: string;
+    searchQuery: string;
+}
+
+export interface AuditStats {
+    totalEvents: number;
+    criticalEvents: number;
+    failedAttempts: number;
+    uniqueUsers: number;
+    topActions: Array<{ action: string; count: number }>;
+    topResources: Array<{ resource: string; count: number }>;
+    eventsByHour: Array<{ hour: string; count: number }>;
+    eventsByCategory: Array<{ category: string; count: number }>;
+}
+
+interface AuditTrailProps {
+    events: AuditEvent[];
+    stats: AuditStats;
+    loading?: boolean;
+    onExport?: (filters: AuditFilters) => Promise<void>;
+    onRefresh?: () => Promise<void>;
+    onFilterChange?: (filters: AuditFilters) => void;
+    autoRefresh?: boolean;
+    refreshInterval?: number;
+}
+
+const SEVERITY_COLORS = {
+    low: '#22c55e',
+    medium: '#eab308',
+    high: '#f97316',
+    critical: '#ef4444'
+};
+
+const STATUS_COLORS = {
+    success: '#22c55e',
+    failure: '#ef4444',
+    warning: '#eab308',
+    info: '#3b82f6'
+};
+
+const CATEGORY_ICONS = {
+    authentication: '🔐',
+    authorization: '🛡️',
+    data: '📊',
+    system: '⚙️',
+    security: '🔒',
+    admin: '👑'
+};
+
+export function AuditTrail({ 
+    events, 
+    stats, 
+    loading = false, 
+    onExport,
+    onRefresh,
+    onFilterChange,
+    autoRefresh = false,
+    refreshInterval = 30000
+}: AuditTrailProps) {
+    const [numberLocale] = useState(() => {
+        if (typeof window === 'undefined') return 'en-IN';
+        try {
+            return localStorage.getItem('admin_number_locale') || 'en-IN';
+        } catch {
+            return 'en-IN';
+        }
+    });
+    const [filters, setFilters] = useState<AuditFilters>({
+        dateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        dateTo: new Date().toISOString().split('T')[0],
+        userId: '',
+        action: '',
+        resource: '',
+        severity: [],
+        category: [],
+        status: [],
+        ipAddress: '',
+        searchQuery: ''
+    });
+    
+    const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
+    const [viewMode, setViewMode] = useState<'table' | 'timeline' | 'chart'>('table');
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [sortConfig, setSortConfig] = useState<{ key: keyof AuditEvent; direction: 'asc' | 'desc' }>({ 
+        key: 'timestamp', 
+        direction: 'desc' 
+    });
+
+    // Auto-refresh functionality
+    useEffect(() => {
+        if (autoRefresh && onRefresh) {
+            const interval = setInterval(onRefresh, refreshInterval);
+            return () => clearInterval(interval);
+        }
+    }, [autoRefresh, refreshInterval, onRefresh]);
+
+    // Filter change handler
+    useEffect(() => {
+        if (onFilterChange) {
+            onFilterChange(filters);
+        }
+    }, [filters, onFilterChange]);
+
+    const handleFilterChange = (key: keyof AuditFilters, value: any) => {
+        setFilters(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleArrayFilterChange = (key: 'severity' | 'category' | 'status', value: string) => {
+        setFilters(prev => {
+            const currentArray = prev[key] as string[];
+            const newArray = currentArray.includes(value)
+                ? currentArray.filter(item => item !== value)
+                : [...currentArray, value];
+            return { ...prev, [key]: newArray };
+        });
+    };
+
+    const handleSort = (key: keyof AuditEvent) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
+
+    const sortedEvents = React.useMemo(() => {
+        return [...events].sort((a, b) => {
+            const aValue = a[sortConfig.key];
+            const bValue = b[sortConfig.key];
+            
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [events, sortConfig]);
+
+    const toggleRowExpansion = (eventId: string) => {
+        setExpandedRows(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(eventId)) {
+                newSet.delete(eventId);
+            } else {
+                newSet.add(eventId);
+            }
+            return newSet;
+        });
+    };
+
+    const getSeverityIcon = (severity: string) => {
+        switch (severity) {
+            case 'critical': return '🚨';
+            case 'high': return '⚠️';
+            case 'medium': return '⚡';
+            case 'low': return 'ℹ️';
+            default: return '📝';
+        }
+    };
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'success': return '✅';
+            case 'failure': return '❌';
+            case 'warning': return '⚠️';
+            case 'info': return 'ℹ️';
+            default: return '📝';
+        }
+    };
+
+    const formatTimestamp = (timestamp: string) => {
+        return new Date(timestamp).toLocaleString();
+    };
+
+    const formatDetails = (details: Record<string, any>) => {
+        return Object.entries(details).map(([key, value]) => (
+            <div key={key} className="detail-item">
+                <span className="detail-key">{key}:</span>
+                <span className="detail-value">{JSON.stringify(value)}</span>
+            </div>
+        ));
+    };
+
+    const handleExport = async () => {
+        if (onExport) {
+            await onExport(filters);
+        }
+    };
+
+    return (
+        <div className="audit-trail">
+            <div className="audit-header">
+                <div className="header-title">
+                    <h2>📋 Enhanced Audit Trail</h2>
+                    <p>Comprehensive security and activity monitoring with advanced search and analytics</p>
+                </div>
+                
+                <div className="header-actions">
+                    <div className="view-mode-selector">
+                        <button 
+                            className={`view-mode-btn ${viewMode === 'table' ? 'active' : ''}`}
+                            onClick={() => setViewMode('table')}
+                        >
+                            📊 Table
+                        </button>
+                        <button 
+                            className={`view-mode-btn ${viewMode === 'timeline' ? 'active' : ''}`}
+                            onClick={() => setViewMode('timeline')}
+                        >
+                            📈 Timeline
+                        </button>
+                        <button 
+                            className={`view-mode-btn ${viewMode === 'chart' ? 'active' : ''}`}
+                            onClick={() => setViewMode('chart')}
+                        >
+                            📉 Analytics
+                        </button>
+                    </div>
+                    
+                    <div className="action-buttons">
+                        {onRefresh && (
+                            <button 
+                                className="refresh-btn"
+                                onClick={onRefresh}
+                                disabled={loading}
+                            >
+                                🔄 {loading ? 'Refreshing...' : 'Refresh'}
+                            </button>
+                        )}
+                        
+                        {onExport && (
+                            <button 
+                                className="export-btn"
+                                onClick={handleExport}
+                                disabled={loading}
+                            >
+                                📥 Export
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Statistics Overview */}
+            <div className="audit-stats">
+                <div className="stats-grid">
+                    <div className="stat-card total">
+                        <div className="stat-icon">📊</div>
+                        <div className="stat-content">
+                            <span className="stat-value">{formatNumber(stats.totalEvents, '0', numberLocale)}</span>
+                            <span className="stat-label">Total Events</span>
+                        </div>
+                    </div>
+                    
+                    <div className="stat-card critical">
+                        <div className="stat-icon">🚨</div>
+                        <div className="stat-content">
+                            <span className="stat-value">{formatNumber(stats.criticalEvents, '0', numberLocale)}</span>
+                            <span className="stat-label">Critical Events</span>
+                        </div>
+                    </div>
+                    
+                    <div className="stat-card failed">
+                        <div className="stat-icon">❌</div>
+                        <div className="stat-content">
+                            <span className="stat-value">{formatNumber(stats.failedAttempts, '0', numberLocale)}</span>
+                            <span className="stat-label">Failed Attempts</span>
+                        </div>
+                    </div>
+                    
+                    <div className="stat-card users">
+                        <div className="stat-icon">👥</div>
+                        <div className="stat-content">
+                            <span className="stat-value">{formatNumber(stats.uniqueUsers, '0', numberLocale)}</span>
+                            <span className="stat-label">Unique Users</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Advanced Filters */}
+            <div className="audit-filters">
+                <div className="filters-header">
+                    <h3>🔍 Advanced Filters</h3>
+                </div>
+                
+                <div className="filters-grid">
+                    <div className="filter-group date-range">
+                        <label>Date Range:</label>
+                        <div className="date-inputs">
+                            <input
+                                type="date"
+                                value={filters.dateFrom}
+                                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                                className="date-input"
+                            />
+                            <span>to</span>
+                            <input
+                                type="date"
+                                value={filters.dateTo}
+                                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                                className="date-input"
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="filter-group">
+                        <label>Search:</label>
+                        <input
+                            type="text"
+                            value={filters.searchQuery}
+                            onChange={(e) => handleFilterChange('searchQuery', e.target.value)}
+                            placeholder="Search events, users, actions..."
+                            className="search-input"
+                        />
+                    </div>
+                    
+                    <div className="filter-group">
+                        <label>User ID:</label>
+                        <input
+                            type="text"
+                            value={filters.userId}
+                            onChange={(e) => handleFilterChange('userId', e.target.value)}
+                            placeholder="Filter by user ID"
+                            className="text-input"
+                        />
+                    </div>
+                    
+                    <div className="filter-group">
+                        <label>IP Address:</label>
+                        <input
+                            type="text"
+                            value={filters.ipAddress}
+                            onChange={(e) => handleFilterChange('ipAddress', e.target.value)}
+                            placeholder="Filter by IP address"
+                            className="text-input"
+                        />
+                    </div>
+                    
+                    <div className="filter-group">
+                        <label>Severity:</label>
+                        <div className="checkbox-group">
+                            {['low', 'medium', 'high', 'critical'].map(severity => (
+                                <label key={severity} className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.severity.includes(severity)}
+                                        onChange={() => handleArrayFilterChange('severity', severity)}
+                                    />
+                                    <span className={`severity-badge ${severity}`}>
+                                        {getSeverityIcon(severity)} {severity.toUpperCase()}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="filter-group">
+                        <label>Category:</label>
+                        <div className="checkbox-group">
+                            {Object.keys(CATEGORY_ICONS).map(category => (
+                                <label key={category} className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.category.includes(category)}
+                                        onChange={() => handleArrayFilterChange('category', category)}
+                                    />
+                                    <span className="category-badge">
+                                        {CATEGORY_ICONS[category as keyof typeof CATEGORY_ICONS]} {category.toUpperCase()}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className="filter-group">
+                        <label>Status:</label>
+                        <div className="checkbox-group">
+                            {['success', 'failure', 'warning', 'info'].map(status => (
+                                <label key={status} className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.status.includes(status)}
+                                        onChange={() => handleArrayFilterChange('status', status)}
+                                    />
+                                    <span className={`status-badge ${status}`}>
+                                        {getStatusIcon(status)} {status.toUpperCase()}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Events Display */}
+            <div className="audit-content">
+                {viewMode === 'table' && (
+                    <div className="events-table-container">
+                        <div className="table-controls">
+                            <span className="results-count">
+                                Showing {sortedEvents.length} events
+                            </span>
+                        </div>
+                        
+                        <div className="events-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th 
+                                            className="sortable"
+                                            onClick={() => handleSort('timestamp')}
+                                        >
+                                            Timestamp {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="sortable"
+                                            onClick={() => handleSort('userName')}
+                                        >
+                                            User {sortConfig.key === 'userName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="sortable"
+                                            onClick={() => handleSort('action')}
+                                        >
+                                            Action {sortConfig.key === 'action' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th 
+                                            className="sortable"
+                                            onClick={() => handleSort('resource')}
+                                        >
+                                            Resource {sortConfig.key === 'resource' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th>Category</th>
+                                        <th>Severity</th>
+                                        <th>Status</th>
+                                        <th>IP Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sortedEvents.map((event) => (
+                                        <React.Fragment key={event.id}>
+                                            <tr 
+                                                className={`event-row ${expandedRows.has(event.id) ? 'expanded' : ''}`}
+                                                onClick={() => toggleRowExpansion(event.id)}
+                                            >
+                                                <td className="expand-cell">
+                                                    <span className="expand-icon">
+                                                        {expandedRows.has(event.id) ? '▼' : '▶'}
+                                                    </span>
+                                                </td>
+                                                <td className="timestamp-cell">
+                                                    {formatTimestamp(event.timestamp)}
+                                                </td>
+                                                <td className="user-cell">
+                                                    <div className="user-info">
+                                                        <span className="user-name">{event.userName}</span>
+                                                        <span className="user-email">{event.userEmail}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="action-cell">
+                                                    <code>{event.action}</code>
+                                                </td>
+                                                <td className="resource-cell">
+                                                    <span className="resource-name">{event.resource}</span>
+                                                    {event.resourceId && (
+                                                        <span className="resource-id">#{event.resourceId}</span>
+                                                    )}
+                                                </td>
+                                                <td className="category-cell">
+                                                    <span className="category-badge">
+                                                        {CATEGORY_ICONS[event.category]} {event.category}
+                                                    </span>
+                                                </td>
+                                                <td className="severity-cell">
+                                                    <span 
+                                                        className={`severity-badge ${event.severity}`}
+                                                        style={{ color: SEVERITY_COLORS[event.severity] }}
+                                                    >
+                                                        {getSeverityIcon(event.severity)} {event.severity}
+                                                    </span>
+                                                </td>
+                                                <td className="status-cell">
+                                                    <span 
+                                                        className={`status-badge ${event.status}`}
+                                                        style={{ color: STATUS_COLORS[event.status] }}
+                                                    >
+                                                        {getStatusIcon(event.status)} {event.status}
+                                                    </span>
+                                                </td>
+                                                <td className="ip-cell">
+                                                    <code>{event.ipAddress}</code>
+                                                    {event.location && (
+                                                        <span className="location">
+                                                            {event.location.city}, {event.location.country}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                            
+                                            {expandedRows.has(event.id) && (
+                                                <tr className="event-details-row">
+                                                    <td colSpan={9}>
+                                                        <div className="event-details">
+                                                            <div className="details-section">
+                                                                <h4>📝 Event Details</h4>
+                                                                {formatDetails(event.details)}
+                                                            </div>
+                                                            
+                                                            <div className="details-section">
+                                                                <h4>🌐 Technical Information</h4>
+                                                                <div className="detail-item">
+                                                                    <span className="detail-key">User Agent:</span>
+                                                                    <span className="detail-value">{event.userAgent}</span>
+                                                                </div>
+                                                                <div className="detail-item">
+                                                                    <span className="detail-key">Event ID:</span>
+                                                                    <span className="detail-value">{event.id}</span>
+                                                                </div>
+                                                                {event.metadata && Object.keys(event.metadata).length > 0 && (
+                                                                    <div className="detail-item">
+                                                                        <span className="detail-key">Metadata:</span>
+                                                                        <div className="metadata-content">
+                                                                            {formatDetails(event.metadata)}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {sortedEvents.length === 0 && (
+                            <div className="empty-state">
+                                <div className="empty-icon">📋</div>
+                                <h3>No audit events found</h3>
+                                <p>Try adjusting your filters to see more results</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                {viewMode === 'timeline' && (
+                    <div className="timeline-view">
+                        <h3>📈 Timeline View (Coming Soon)</h3>
+                        <p>Interactive timeline visualization will be available in the next update.</p>
+                    </div>
+                )}
+                
+                {viewMode === 'chart' && (
+                    <div className="analytics-view">
+                        <h3>📉 Analytics Dashboard (Coming Soon)</h3>
+                        <p>Advanced analytics and visualization charts will be available in the next update.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default AuditTrail;"
+
+
