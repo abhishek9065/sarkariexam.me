@@ -38,7 +38,7 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import supportRouter from './routes/support.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
-import { connectToDatabase } from './services/cosmosdb.js';
+import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import logger from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -154,6 +154,25 @@ app.get('/', (_req, res) => {
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/healthz', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/health/deep', async (_req, res) => {
+  const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+  const dbOk = dbConfigured ? await healthCheck() : null;
+  const status = dbConfigured && !dbOk ? 'error' : 'ok';
+
+  res
+    .status(status === 'error' ? 503 : 200)
+    .set('Cache-Control', 'no-store')
+    .json({
+      status,
+      timestamp: new Date().toISOString(),
+      db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' }
+    });
 });
 
 // Performance stats (admin only)
