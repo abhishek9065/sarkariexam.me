@@ -1,5 +1,6 @@
 import type { Announcement } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
+import { formatNumber } from '../../utils/formatters';
 import { prefetchAnnouncementDetail } from '../../utils/prefetch';
 
 interface SectionTableProps {
@@ -46,7 +47,7 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
                                     onFocus={() => prefetchAnnouncementDetail(item.slug)}
                                 >
                                     <span className="item-title">{item.title}</span>
-                                    {item.totalPosts && <span className="item-posts">{item.totalPosts} Post</span>}
+                                    {item.totalPosts && <span className="item-posts">{formatNumber(item.totalPosts ?? undefined)} Post</span>}
                                 </a>
                                 <div className="item-meta">
                                     <span className="item-timestamp" title="Last updated information">

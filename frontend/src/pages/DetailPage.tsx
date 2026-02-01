@@ -4,6 +4,7 @@ import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcru
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
+import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
 
@@ -495,7 +496,12 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                 <ul>
                                     {relatedItems.map(r => (
                                         <li key={r.id}>
-                                            <a href="#" onClick={(e) => { e.preventDefault(); handleRelatedClick(r); }}>
+                                            <a
+                                                href="#"
+                                                onClick={(e) => { e.preventDefault(); handleRelatedClick(r); }}
+                                                onMouseEnter={() => prefetchAnnouncementDetail(r.slug)}
+                                                onFocus={() => prefetchAnnouncementDetail(r.slug)}
+                                            >
                                                 {r.title}
                                             </a>
                                         </li>

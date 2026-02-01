@@ -5,6 +5,7 @@ import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
 import { useBookmarks } from '../hooks/useData';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
+import { formatNumber } from '../utils/formatters';
 import type { Announcement } from '../types';
 
 export function BookmarksPage() {
@@ -102,7 +103,7 @@ export function BookmarksPage() {
                                         <div className="item-title">{item.title}</div>
                                         <div className="item-meta">
                                             <span className="org">{item.organization}</span>
-                                            {item.totalPosts && <span className="posts">{item.totalPosts} Posts</span>}
+                                            {item.totalPosts && <span className="posts">{formatNumber(item.totalPosts ?? undefined)} Posts</span>}
                                             {item.deadline && (
                                                 <span className="deadline">
                                                     Last: {new Date(item.deadline).toLocaleDateString('en-IN')}

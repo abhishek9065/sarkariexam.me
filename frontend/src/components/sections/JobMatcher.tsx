@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { prefetchAnnouncementDetail } from '../../utils/prefetch';
+import { formatNumber } from '../../utils/formatters';
 
 interface UserProfile {
     age: number;
@@ -211,7 +212,7 @@ export function JobMatcher() {
                                         <div className="job-meta">
                                             <span>🏢 {job.organization}</span>
                                             <span>📍 {job.location || 'All India'}</span>
-                                            <span>👥 {job.totalPosts} Posts</span>
+                                            <span>👥 {formatNumber(job.totalPosts ?? undefined)} Posts</span>
                                         </div>
                                         <div className="match-reasons">
                                             {job.matchReasons.map((reason, i) => (

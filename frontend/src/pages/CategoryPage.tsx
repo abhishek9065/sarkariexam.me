@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, PATHS } from '../utils';
+import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS } from '../utils';
 import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { Announcement, ContentType } from '../types';
@@ -425,7 +425,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                         <div className="item-title">{item.title}</div>
                                         <div className="item-meta">
                                             <span className="org">{item.organization}</span>
-                                            {item.totalPosts && <span className="posts">{item.totalPosts} Posts</span>}
+                                            {item.totalPosts && <span className="posts">{formatNumber(item.totalPosts ?? undefined)} Posts</span>}
                                             {item.location && <span className="location">{item.location}</span>}
                                             {formatSalaryRange(item.salaryMin ?? undefined, item.salaryMax ?? undefined) && (
                                                 <span className="salary-range">
@@ -467,7 +467,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                         )}
                                         <div className="item-meta secondary">
                                             <span className="posted">Posted: {formatDate(item.postedAt)}</span>
-                                            <span className="views">👁️ {item.viewCount?.toLocaleString() || 0}</span>
+                                            <span className="views">👁️ {formatNumber(item.viewCount ?? undefined)}</span>
                                         </div>
                                     </div>
                                 ))

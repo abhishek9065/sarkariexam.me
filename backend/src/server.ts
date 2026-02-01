@@ -59,7 +59,37 @@ app.use(blockSuspiciousAgents);
 app.use(compression());
 
 // CORS configuration
-const allowedOrigins = config.corsOrigins;
+const normalizeOrigin = (value: string) => value.trim().toLowerCase().replace(/\/$/, '');
+const allowedOrigins = [
+  ...config.corsOrigins,
+  config.frontendUrl,
+]
+  .filter(Boolean)
+  .map((origin) => normalizeOrigin(origin as string));
+const allowedOriginSet = new Set(allowedOrigins);
+const allowedOriginHosts = new Set(
+  allowedOrigins
+    .map((origin) => {
+      try {
+        return new URL(origin).hostname;
+      } catch {
+        return null;
+      }
+    })
+    .filter((host): host is string => Boolean(host))
+);
+const isAllowedOrigin = (origin: string) => {
+  const normalized = normalizeOrigin(origin);
+  if (allowedOriginSet.has(normalized)) return true;
+  try {
+    const hostname = new URL(normalized).hostname;
+    if (allowedOriginHosts.has(hostname)) return true;
+    if (hostname.endsWith('.sarkariexams.me')) return true;
+  } catch {
+    // ignore invalid origin
+  }
+  return false;
+};
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -67,7 +97,7 @@ app.use(cors({
       callback(null, true);
       return;
     }
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
       return;
     }

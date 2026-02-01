@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Announcement } from '../../types';
+import { formatNumber } from '../../utils/formatters';
 import { formatDate } from '../../utils/formatters';
 
 interface CompareJobsProps {
@@ -90,7 +91,7 @@ export function CompareJobs({ announcements, onClose }: CompareJobsProps) {
                                         <td><strong>Total Posts</strong></td>
                                         {selectedItems.map(item => (
                                             <td key={item.id} className="highlight">
-                                                {item.totalPosts?.toLocaleString() || 'N/A'}
+                                                {formatNumber(item.totalPosts ?? undefined, 'N/A')}
                                             </td>
                                         ))}
                                     </tr>

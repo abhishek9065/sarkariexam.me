@@ -4,6 +4,7 @@ import { QuickActionsBar } from '../components/ui/QuickActionsBar';
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { BookmarkButton } from '../components/ui/BookmarkButton';
 import { SEOHead } from '../components/seo/SEOHead';
+import { formatNumber } from '../utils/formatters';
 import type { Announcement } from '../types';
 
 interface UniversalJobDetailProps {
@@ -81,7 +82,7 @@ export function UniversalJobDetail({
             {/* SEO Meta Tags & Structured Data */}
             <SEOHead
                 title={`${job.title} - ${job.organization}`}
-                description={`Apply for ${job.title} at ${job.organization}. Total ${typeof job.totalPosts === 'number' ? job.totalPosts.toLocaleString() : job.totalPosts} vacancies. Last date: ${formatDate(item.deadline ?? undefined)}.`}
+                description={`Apply for ${job.title} at ${job.organization}. Total ${formatNumber(job.totalPosts ?? undefined, String(job.totalPosts ?? 'N/A'))} vacancies. Last date: ${formatDate(item.deadline ?? undefined)}.`}
                 canonicalUrl={`https://www.sarkariexams.me/${item.type}/${item.slug}`}
                 ogType="article"
                 keywords={[item.type, item.category, item.organization, 'sarkari result', 'government jobs']}
@@ -102,7 +103,7 @@ export function UniversalJobDetail({
                 <h1>{job.title}</h1>
                 <p className="job-org">{job.organization}</p>
                 <div className="job-highlight">
-                    <span className="posts-count">👥 {typeof job.totalPosts === 'number' ? job.totalPosts.toLocaleString() : job.totalPosts} Posts</span>
+                    <span className="posts-count">👥 {formatNumber(job.totalPosts ?? undefined, String(job.totalPosts ?? 'N/A'))} Posts</span>
                     <span className="post-name">📋 {job.postName}</span>
                     {onToggleBookmark && (
                         <BookmarkButton
@@ -198,7 +199,7 @@ export function UniversalJobDetail({
                             {vacancy.map((v, i) => (
                                 <tr key={i}>
                                     <td>{v.post}</td>
-                                    <td className="total-cell">{v.total.toLocaleString()}</td>
+                                    <td className="total-cell">{formatNumber(v.total ?? undefined)}</td>
                                 </tr>
                             ))}
                         </tbody>
