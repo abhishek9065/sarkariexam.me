@@ -1,4 +1,6 @@
 import type { TabType } from './constants';
+import type { ContentType } from '../types';
+import { fetchAnnouncementCardsPage } from './api';
 
 const prefetchers: Partial<Record<TabType, () => Promise<unknown>>> = {
     job: () => import('../pages/CategoryPage'),
@@ -13,6 +15,25 @@ const prefetchers: Partial<Record<TabType, () => Promise<unknown>>> = {
 };
 
 const prefetchOnce = new Set<string>();
+const dataPrefetchOnce = new Set<string>();
+
+function prefetchListingCards(type: ContentType) {
+    const key = `cards:${type}`;
+    if (dataPrefetchOnce.has(key)) return;
+    dataPrefetchOnce.add(key);
+    fetchAnnouncementCardsPage({ type, limit: 24 }).catch(() => {
+        dataPrefetchOnce.delete(key);
+    });
+}
+
+function isContentType(value: TabType): value is ContentType {
+    return value === 'job'
+        || value === 'result'
+        || value === 'admit-card'
+        || value === 'answer-key'
+        || value === 'admission'
+        || value === 'syllabus';
+}
 
 export function prefetchRoute(type: TabType) {
     if (!type || prefetchOnce.has(String(type))) return;
@@ -22,4 +43,7 @@ export function prefetchRoute(type: TabType) {
     handler().catch(() => {
         prefetchOnce.delete(String(type));
     });
+    if (isContentType(type)) {
+        prefetchListingCards(type);
+    }
 }

@@ -86,9 +86,17 @@ export function CategoryPage({ type }: CategoryPageProps) {
         })
             .then(response => {
                 if (!isActive || didTimeout) return;
-                setData(response.data as Announcement[]);
+                const items = Array.isArray(response.data) ? (response.data as Announcement[]) : [];
+                if (!Array.isArray(response.data)) {
+                    setError('We could not load listings. Please try again.');
+                    setData([]);
+                    setCursor(null);
+                    setHasMore(false);
+                    return;
+                }
+                setData(items);
                 setCursor(response.nextCursor ?? null);
-                setHasMore(response.hasMore);
+                setHasMore(Boolean(response.hasMore));
             })
             .catch((err) => {
                 console.error(err);

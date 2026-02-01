@@ -14,6 +14,16 @@ export function JobDetailsRenderer({ jobDetails }: JobDetailsRendererProps) {
         return null;
     }
 
+    const toNumber = (value: unknown) => {
+        const num = typeof value === 'number' ? value : Number(value);
+        return Number.isFinite(num) ? num : 0;
+    };
+
+    const formatCount = (value?: number | null) => {
+        const num = toNumber(value);
+        return num.toLocaleString('en-IN');
+    };
+
     const formatDate = (dateStr: string) => {
         if (!dateStr) return 'TBA';
         try {
@@ -123,16 +133,16 @@ export function JobDetailsRenderer({ jobDetails }: JobDetailsRendererProps) {
                             {jobDetails.vacancies.details.map((vac, i) => (
                                 <tr key={i}>
                                     <td>{vac.category}</td>
-                                    <td>{vac.male.toLocaleString()}</td>
-                                    <td>{vac.female.toLocaleString()}</td>
-                                    <td className="total-cell">{vac.total.toLocaleString()}</td>
+                                    <td>{formatCount(vac.male)}</td>
+                                    <td>{formatCount(vac.female)}</td>
+                                    <td className="total-cell">{formatCount(vac.total)}</td>
                                 </tr>
                             ))}
                             <tr className="total-row">
                                 <td><strong>Total</strong></td>
-                                <td><strong>{jobDetails.vacancies.details.reduce((s, v) => s + v.male, 0).toLocaleString()}</strong></td>
-                                <td><strong>{jobDetails.vacancies.details.reduce((s, v) => s + v.female, 0).toLocaleString()}</strong></td>
-                                <td className="total-cell"><strong>{jobDetails.vacancies.total?.toLocaleString()}</strong></td>
+                                <td><strong>{formatCount(jobDetails.vacancies.details.reduce((s, v) => s + toNumber(v.male), 0))}</strong></td>
+                                <td><strong>{formatCount(jobDetails.vacancies.details.reduce((s, v) => s + toNumber(v.female), 0))}</strong></td>
+                                <td className="total-cell"><strong>{formatCount(jobDetails.vacancies.total)}</strong></td>
                             </tr>
                         </tbody>
                     </table>

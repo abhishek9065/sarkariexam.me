@@ -104,6 +104,13 @@ export function NotificationCenter({ token }: { token: string | null }) {
             const response = await fetch(`${apiBase}/api/profile/notifications?limit=12`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
+            if (response.status === 401 || response.status === 403) {
+                setItems([]);
+                setUnreadCount(0);
+                setSavedSearchCount(0);
+                setError('Session expired. Please log in again.');
+                return;
+            }
             if (!response.ok) {
                 const fallbackOk = await fetchAlertsFallback();
                 if (!fallbackOk) {
@@ -167,6 +174,16 @@ export function NotificationCenter({ token }: { token: string | null }) {
     useEffect(() => {
         if (!open) return;
         fetchNotifications();
+    }, [open, token]);
+
+    useEffect(() => {
+        const handleKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setOpen(false);
+        };
+        if (open) {
+            document.addEventListener('keydown', handleKey);
+        }
+        return () => document.removeEventListener('keydown', handleKey);
     }, [open]);
 
     useEffect(() => {
@@ -192,7 +209,14 @@ export function NotificationCenter({ token }: { token: string | null }) {
                     event.stopPropagation();
                     setOpen((prev) => !prev);
                 }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setOpen((prev) => !prev);
+                    }
+                }}
                 aria-label="Notifications"
+                aria-expanded={open}
             >
                 <span className="notification-icon">🔔</span>
                 {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
@@ -211,7 +235,14 @@ export function NotificationCenter({ token }: { token: string | null }) {
                     {loading ? (
                         <div className="notification-state">Loading alerts...</div>
                     ) : error ? (
-                        <div className="notification-state error">{error}</div>
+                        <div className="notification-state error">
+                            {error}
+                            <div style={{ marginTop: '8px' }}>
+                                <button className="admin-btn secondary small" onClick={fetchNotifications}>
+                                    Retry
+                                </button>
+                            </div>
+                        </div>
                     ) : items.length === 0 ? (
                         <div className="notification-state">No new alerts yet.</div>
                     ) : (

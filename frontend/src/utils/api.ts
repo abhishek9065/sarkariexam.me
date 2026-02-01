@@ -45,11 +45,15 @@ export async function fetchAnnouncementCardsPage(
         if (query.limit) params.set('limit', String(query.limit));
         if (query.cursor) params.set('cursor', query.cursor);
 
-        return await fetchJson<AnnouncementCardsResponse>(
+        const body = await fetchJson<AnnouncementCardsResponse>(
             `${API_BASE}/api/announcements/v3/cards?${params.toString()}`,
             {},
             { timeoutMs: 6000, retries: 2 }
         );
+        if (!Array.isArray(body.data)) {
+            throw new Error('Invalid cards response');
+        }
+        return body;
     } catch (error) {
         console.warn('Backend unavailable, using mock data:', error);
         // Fallback to mock data

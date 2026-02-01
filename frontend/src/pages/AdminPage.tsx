@@ -16,6 +16,7 @@ import { ScheduleCalendar } from '../components/admin/ScheduleCalendar';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
+import { formatNumber } from '../utils/formatters';
 import { adminRequest } from '../utils/adminRequest';
 import './AdminPage.css';
 
@@ -2483,22 +2484,22 @@ export function AdminPage() {
                     <div className="admin-hero-metrics">
                         <div className="admin-metric">
                             <span className="metric-label">Total posts</span>
-                            <span className="metric-value">{heroTotalPosts.toLocaleString()}</span>
+                            <span className="metric-value">{formatNumber(heroTotalPosts, '0')}</span>
                             <span className="metric-sub">All time listings</span>
                         </div>
                         <div className="admin-metric">
                             <span className="metric-label">Total views</span>
-                            <span className="metric-value">{heroTotalViews.toLocaleString()}</span>
+                            <span className="metric-value">{formatNumber(heroTotalViews, '0')}</span>
                             <span className="metric-sub">All time views</span>
                         </div>
                         <div className="admin-metric">
                             <span className="metric-label">Active jobs</span>
-                            <span className="metric-value">{heroActiveJobs.toLocaleString()}</span>
+                            <span className="metric-value">{formatNumber(heroActiveJobs, '0')}</span>
                             <span className="metric-sub">Currently published</span>
                         </div>
                         <div className="admin-metric">
                             <span className="metric-label">New this week</span>
-                            <span className="metric-value">{heroNewThisWeek.toLocaleString()}</span>
+                            <span className="metric-value">{formatNumber(heroNewThisWeek, '0')}</span>
                             <span className="metric-sub">
                                 {heroExpiringSoon ? `${heroExpiringSoon} expiring` : 'No expiring alerts'}
                             </span>

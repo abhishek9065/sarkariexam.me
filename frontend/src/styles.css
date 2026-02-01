@@ -294,10 +294,6 @@ button {
   outline-offset: 2px;
 }
 
-.user-name {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
 
 /* ============ NAVIGATION ============ */
 .main-nav {

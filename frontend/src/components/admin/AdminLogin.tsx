@@ -63,8 +63,15 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
         const shouldRemember = localStorage.getItem('admin_remember') === 'true';
         
         if (savedEmail && shouldRemember) {
-            setEmail(savedEmail.trim());
-            setRememberMe(true);
+            const trimmed = savedEmail.trim();
+            const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+            if (isValid) {
+                setEmail(trimmed);
+                setRememberMe(true);
+            } else {
+                localStorage.removeItem('admin_email');
+                localStorage.removeItem('admin_remember');
+            }
         }
         generateCaptcha();
     }, []);
