@@ -44,6 +44,7 @@ import logger from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
+const startedAt = Date.now();
 
 export { app };
 
@@ -173,6 +174,46 @@ app.get('/api/health/deep', async (_req, res) => {
       timestamp: new Date().toISOString(),
       db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' }
     });
+});
+
+app.get('/metrics', (req, res) => {
+  const token = process.env.METRICS_TOKEN;
+  const providedToken = req.get('Authorization')?.replace(/^Bearer\s+/i, '') || req.get('X-Metrics-Token');
+  if (token && token !== providedToken) {
+    res.status(401).type('text/plain').send('unauthorized');
+    return;
+  }
+
+  const uptimeSeconds = (Date.now() - startedAt) / 1000;
+  const memory = process.memoryUsage();
+  const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+
+  const lines = [
+    '# HELP app_uptime_seconds App uptime in seconds',
+    '# TYPE app_uptime_seconds gauge',
+    `app_uptime_seconds ${uptimeSeconds.toFixed(0)}`,
+    '# HELP process_resident_memory_bytes Resident memory size in bytes',
+    '# TYPE process_resident_memory_bytes gauge',
+    `process_resident_memory_bytes ${memory.rss}`,
+    '# HELP process_heap_total_bytes Process heap total in bytes',
+    '# TYPE process_heap_total_bytes gauge',
+    `process_heap_total_bytes ${memory.heapTotal}`,
+    '# HELP process_heap_used_bytes Process heap used in bytes',
+    '# TYPE process_heap_used_bytes gauge',
+    `process_heap_used_bytes ${memory.heapUsed}`,
+    '# HELP process_external_memory_bytes Process external memory in bytes',
+    '# TYPE process_external_memory_bytes gauge',
+    `process_external_memory_bytes ${memory.external}`,
+    '# HELP app_db_configured Database configured (1=yes, 0=no)',
+    '# TYPE app_db_configured gauge',
+    `app_db_configured ${dbConfigured ? 1 : 0}`,
+    '# HELP app_build_info Build information',
+    '# TYPE app_build_info gauge',
+    `app_build_info{node_version="${process.version}"} 1`
+  ];
+
+  res.set('Cache-Control', 'no-store');
+  res.type('text/plain; version=0.0.4').send(`${lines.join('\n')}\n`);
 });
 
 // Performance stats (admin only)
