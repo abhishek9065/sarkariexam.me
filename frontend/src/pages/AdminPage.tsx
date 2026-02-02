@@ -190,6 +190,71 @@ type AdminUserProfile = {
     role?: string;
 };
 
+type AdminTab =
+    | 'analytics'
+    | 'list'
+    | 'review'
+    | 'add'
+    | 'detailed'
+    | 'bulk'
+    | 'queue'
+    | 'security'
+    | 'users'
+    | 'audit'
+    | 'community'
+    | 'errors';
+
+const ADMIN_TAB_META: Record<AdminTab, { label: string; description: string }> = {
+    analytics: {
+        label: 'Analytics Command Center',
+        description: 'Track traffic, conversions, and listing performance in real time.',
+    },
+    list: {
+        label: 'All Announcements',
+        description: 'Filter, audit, and edit every listing across categories.',
+    },
+    review: {
+        label: 'Review Queue',
+        description: 'Triage pending posts, QA alerts, and approvals in one pipeline.',
+    },
+    add: {
+        label: 'Quick Add',
+        description: 'Publish fast updates with lightweight form controls.',
+    },
+    detailed: {
+        label: 'Detailed Post',
+        description: 'Craft full listings with structured details, eligibility, and links.',
+    },
+    bulk: {
+        label: 'Bulk Import',
+        description: 'Apply bulk updates, scheduling, and status changes safely.',
+    },
+    queue: {
+        label: 'Schedule Queue',
+        description: 'Monitor scheduled releases and publish time-sensitive notices.',
+    },
+    users: {
+        label: 'User Insights',
+        description: 'Understand subscriber growth, activity, and cohorts.',
+    },
+    community: {
+        label: 'Community Moderation',
+        description: 'Resolve flags, forums, QA, and study group activity.',
+    },
+    errors: {
+        label: 'Error Reports',
+        description: 'Review client error logs and respond quickly to regressions.',
+    },
+    audit: {
+        label: 'Audit Log',
+        description: 'Trace admin actions for accountability and compliance.',
+    },
+    security: {
+        label: 'Security Center',
+        description: 'Manage access policies, sessions, and risk alerts.',
+    },
+};
+
 const loadAdminUser = (): AdminUserProfile | null => {
     try {
         const raw = localStorage.getItem(ADMIN_USER_STORAGE_KEY);
@@ -256,7 +321,7 @@ export function AdminPage() {
     
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-    const [activeAdminTab, setActiveAdminTab] = useState<'analytics' | 'list' | 'review' | 'add' | 'detailed' | 'bulk' | 'queue' | 'security' | 'users' | 'audit' | 'community' | 'errors'>('analytics');
+    const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('analytics');
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -1955,6 +2020,36 @@ export function AdminPage() {
         return { overdue, upcoming24h, nextPublish };
     }, [scheduledAnnouncements]);
 
+    const pendingTotal = pendingSlaStats.pendingTotal;
+    const scheduledTotal = scheduledAnnouncements.length;
+    const activeTabMeta = ADMIN_TAB_META[activeAdminTab];
+    const opsPulse = [
+        {
+            label: 'Pending review',
+            value: pendingTotal,
+            tone: pendingTotal > 0 ? 'warning' : 'success',
+            onClick: () => setActiveAdminTab('review'),
+        },
+        {
+            label: 'QA alerts',
+            value: pendingWarningCount,
+            tone: pendingWarningCount > 0 ? 'warning' : 'success',
+            onClick: () => setActiveAdminTab('review'),
+        },
+        {
+            label: 'Scheduled',
+            value: scheduledTotal,
+            tone: scheduledTotal > 0 ? 'info' : 'muted',
+            onClick: () => setActiveAdminTab('queue'),
+        },
+        {
+            label: 'Drafts',
+            value: statusCounts.draft ?? 0,
+            tone: statusCounts.draft > 0 ? 'muted' : 'success',
+            onClick: () => setActiveAdminTab('list'),
+        },
+    ];
+
     const formWarnings = useMemo(() => getFormWarnings(), [formData]);
     const titleMissing = !formData.title.trim();
     const titleTooShort = formData.title.trim().length > 0 && formData.title.trim().length < 10;
@@ -2340,7 +2435,7 @@ export function AdminPage() {
                             </div>
                         ))}
                     </div>
-                    <div className="admin-login-box-wrapper" style={{ display: 'flex', justifyContent: 'center', minHeight: '100vh', alignItems: 'center' }}>
+                    <div className="admin-login-box-wrapper">
                         <AdminLogin
                             onLogin={async (email, password) => {
                                 setMessage('Authenticating...');
@@ -2437,7 +2532,7 @@ export function AdminPage() {
             </div>
             <div className="admin-container">
                 {rateLimitRemaining && (
-                    <div className="admin-banner" role="status">
+                    <div className="admin-banner warning" role="status">
                         Rate limited. Retry in {rateLimitRemaining}s.
                     </div>
                 )}
@@ -2507,77 +2602,197 @@ export function AdminPage() {
                         </div>
                     </div>
                 </div>
+                <div className="admin-shell">
+                    <aside className="admin-sidebar">
+                        <div className="admin-nav">
+                            <div className="admin-nav-header">
+                                <div>
+                                    <span className="admin-nav-title">Navigation</span>
+                                    <span className="admin-nav-subtitle">Admin workspace</span>
+                                </div>
+                                <span className="admin-nav-pill">{adminUser?.role ?? 'admin'}</span>
+                            </div>
+                            <div className="admin-nav-group">
+                                <span className="admin-nav-group-title">Overview</span>
+                                <div className="admin-nav-list">
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'analytics' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('analytics')}
+                                    >
+                                        <span>Analytics</span>
+                                        {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'users' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('users')}
+                                    >
+                                        <span>Users</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="admin-nav-group">
+                                <span className="admin-nav-group-title">Content</span>
+                                <div className="admin-nav-list">
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'list' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('list')}
+                                    >
+                                        <span>All Announcements</span>
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'review' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('review')}
+                                    >
+                                        <span>Review Queue</span>
+                                        {pendingTotal > 0 && (
+                                            <span className="admin-nav-count warning">{formatNumber(pendingTotal, '0')}</span>
+                                        )}
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'add' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('add')}
+                                    >
+                                        <span>Quick Add</span>
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'detailed' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('detailed')}
+                                    >
+                                        <span>Detailed Post</span>
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'bulk' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('bulk')}
+                                    >
+                                        <span>Bulk Import</span>
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'queue' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('queue')}
+                                    >
+                                        <span>Schedule Queue</span>
+                                        {scheduledTotal > 0 && (
+                                            <span className="admin-nav-count info">{formatNumber(scheduledTotal, '0')}</span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="admin-nav-group">
+                                <span className="admin-nav-group-title">Trust & QA</span>
+                                <div className="admin-nav-list">
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'community' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('community')}
+                                    >
+                                        <span>Community</span>
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'errors' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('errors')}
+                                    >
+                                        <span>Error Reports</span>
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'audit' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('audit')}
+                                    >
+                                        <span>Audit Log</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="admin-nav-group">
+                                <span className="admin-nav-group-title">Security</span>
+                                <div className="admin-nav-list">
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'security' ? 'active' : ''}`}
+                                        onClick={() => setActiveAdminTab('security')}
+                                    >
+                                        <span>Security</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="admin-nav-meta">
+                                {listUpdatedAt && (
+                                    <span className="admin-nav-note">{formatLastUpdated(listUpdatedAt, 'Listings synced')}</span>
+                                )}
+                                {adminSummaryUpdatedAt && (
+                                    <span className="admin-nav-note">{formatLastUpdated(adminSummaryUpdatedAt, 'Ops summary')}</span>
+                                )}
+                            </div>
+                        </div>
 
-                <div className="admin-nav">
-                    <div className="admin-tabs">
-                        <button className={activeAdminTab === 'analytics' ? 'active' : ''} onClick={() => setActiveAdminTab('analytics')}>
-                            Analytics
-                            {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
-                        </button>
-                        <button className={activeAdminTab === 'list' ? 'active' : ''} onClick={() => setActiveAdminTab('list')}>
-                            All Announcements
-                        </button>
-                        <button className={activeAdminTab === 'review' ? 'active' : ''} onClick={() => setActiveAdminTab('review')}>
-                            Review Queue
-                        </button>
-                        <button className={activeAdminTab === 'add' ? 'active' : ''} onClick={() => setActiveAdminTab('add')}>
-                            Quick Add
-                        </button>
-                        <button className={activeAdminTab === 'detailed' ? 'active' : ''} onClick={() => setActiveAdminTab('detailed')}>
-                            Detailed Post
-                        </button>
-                        <button className={activeAdminTab === 'bulk' ? 'active' : ''} onClick={() => setActiveAdminTab('bulk')}>
-                            Bulk Import
-                        </button>
-                        <button className={activeAdminTab === 'queue' ? 'active' : ''} onClick={() => setActiveAdminTab('queue')}>
-                            Schedule Queue
-                        </button>
-                        <button className={activeAdminTab === 'users' ? 'active' : ''} onClick={() => setActiveAdminTab('users')}>
-                            Users
-                        </button>
-                        <button className={activeAdminTab === 'community' ? 'active' : ''} onClick={() => setActiveAdminTab('community')}>
-                            Community
-                        </button>
-                        <button className={activeAdminTab === 'errors' ? 'active' : ''} onClick={() => setActiveAdminTab('errors')}>
-                            Error Reports
-                        </button>
+                        <div className="admin-sidebar-card admin-ops-card">
+                            <div className="admin-ops-header">
+                                <div>
+                                    <span className="admin-ops-title">Ops pulse</span>
+                                    <span className="admin-ops-subtitle">Queue health at a glance</span>
+                                </div>
+                                {adminSummaryLoading ? (
+                                    <span className="admin-ops-status">Syncing…</span>
+                                ) : adminSummaryUpdatedAt ? (
+                                    <span className="admin-ops-updated">{formatLastUpdated(adminSummaryUpdatedAt, 'Summary')}</span>
+                                ) : null}
+                            </div>
+                            {adminSummaryError && (
+                                <div className="admin-ops-error">{adminSummaryError}</div>
+                            )}
+                            <div className="admin-ops-grid">
+                                {opsPulse.map((stat) => (
+                                    <button
+                                        key={stat.label}
+                                        type="button"
+                                        className={`admin-ops-item ${stat.tone}`}
+                                        onClick={stat.onClick}
+                                    >
+                                        <span className="admin-ops-value">{formatNumber(stat.value, '0')}</span>
+                                        <span className="admin-ops-label">{stat.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                        <button className={activeAdminTab === 'audit' ? 'active' : ''} onClick={() => setActiveAdminTab('audit')}>
-                            Audit Log
-                        </button>
-                        <button className={activeAdminTab === 'security' ? 'active' : ''} onClick={() => setActiveAdminTab('security')}>
-                            Security
-                        </button>
-                    </div>
-                    <div className="admin-nav-meta">
-                        <span className="admin-nav-pill">{adminUser?.role ?? 'admin'}</span>
-                        {listUpdatedAt && (
-                            <span className="admin-nav-note">{formatLastUpdated(listUpdatedAt, 'Listings synced')}</span>
-                        )}
-                    </div>
-                </div>
+                        <div className="admin-help-panel">
+                            <div>
+                                <h3>Workflow tips</h3>
+                                <p className="admin-subtitle">Quick reminders to keep reviews, scheduling, and bulk edits smooth.</p>
+                                <ul className="admin-help-list">
+                                    <li>Move drafts to Pending for review, then Approve to publish or Reject to send back.</li>
+                                    <li>Schedule posts with a publish time, then manage them in the Schedule Queue tab.</li>
+                                    <li>Use Bulk Update to change status or active state across multiple rows.</li>
+                                    <li>Audit Log shows approvals, rejects, deletes, and bulk edits for accountability.</li>
+                                </ul>
+                            </div>
+                            <div className="admin-help-actions">
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Manage listings</button>
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('queue')}>Schedule queue</button>
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('audit')}>Audit log</button>
+                            </div>
+                        </div>
+                    </aside>
 
-                {message && <div className="admin-banner" role="status">{message}</div>}
+                    <section className="admin-workspace">
+                        {message && <div className="admin-banner" role="status">{message}</div>}
 
-                <div className="admin-help-panel">
-                    <div>
-                        <h3>Workflow tips</h3>
-                        <p className="admin-subtitle">Quick reminders to keep reviews, scheduling, and bulk edits smooth.</p>
-                        <ul className="admin-help-list">
-                            <li>Move drafts to Pending for review, then Approve to publish or Reject to send back.</li>
-                            <li>Schedule posts with a publish time, then manage them in the Schedule Queue tab.</li>
-                            <li>Use Bulk Update to change status or active state across multiple rows.</li>
-                            <li>Audit Log shows approvals, rejects, deletes, and bulk edits for accountability.</li>
-                        </ul>
-                    </div>
-                    <div className="admin-help-actions">
-                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Manage listings</button>
-                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('queue')}>Schedule queue</button>
-                        <button className="admin-btn secondary" onClick={() => setActiveAdminTab('audit')}>Audit log</button>
-                    </div>
-                </div>
+                        <div className="admin-context">
+                            <div className="admin-context-info">
+                                <span className="admin-context-kicker">Active module</span>
+                                <h3>{activeTabMeta.label}</h3>
+                                <p className="admin-subtitle">{activeTabMeta.description}</p>
+                            </div>
+                            <div className="admin-context-actions">
+                                <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
+                                    New job post
+                                </button>
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>
+                                    Manage listings
+                                </button>
+                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('review')}>
+                                    Review queue
+                                </button>
+                            </div>
+                        </div>
 
-                {activeAdminTab === 'analytics' ? (
+                        {activeAdminTab === 'analytics' ? (
                     <AnalyticsDashboard
                         onEditById={handleEditById}
                         onOpenList={() => setActiveAdminTab('list')}
@@ -4099,6 +4314,8 @@ export function AdminPage() {
                         </form>
                     </div>
                 )}
+                    </section>
+                </div>
             </div>
 
             {/* Preview Modal */}

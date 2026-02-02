@@ -54,25 +54,27 @@ export function AdminQueue({
                     <span className="admin-updated">{formatLastUpdated(lastUpdated)}</span>
                     <div className="admin-toggle">
                         <button
+                            type="button"
                             className={`admin-btn secondary ${view === 'list' ? 'active' : ''}`}
                             onClick={() => setView('list')}
                         >
                             List
                         </button>
                         <button
+                            type="button"
                             className={`admin-btn secondary ${view === 'calendar' ? 'active' : ''}`}
                             onClick={() => setView('calendar')}
                         >
                             Calendar
                         </button>
                     </div>
-                    <button className="admin-btn secondary" onClick={onRefresh} disabled={loading}>
+                    <button type="button" className="admin-btn secondary" onClick={onRefresh} disabled={loading}>
                         {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
-                    <button className="admin-btn secondary" onClick={onExport}>
+                    <button type="button" className="admin-btn secondary" onClick={onExport}>
                         Export CSV
                     </button>
-                    <button className="admin-btn primary" onClick={onNewJob}>New job</button>
+                    <button type="button" className="admin-btn primary" onClick={onNewJob}>New job</button>
                 </div>
             </div>
 
@@ -137,9 +139,9 @@ export function AdminQueue({
                                     </td>
                                     <td>
                                         <div className="row-actions">
-                                            <button className="admin-btn secondary small" onClick={() => onEdit(item)}>Edit</button>
-                                            <button className="admin-btn success small" onClick={() => onPublishNow(item.id)}>Publish Now</button>
-                                            <button className="admin-btn warning small" onClick={() => onReject(item.id)}>Reject</button>
+                                            <button type="button" className="admin-btn secondary small" onClick={() => onEdit(item)}>Edit</button>
+                                            <button type="button" className="admin-btn success small" onClick={() => onPublishNow(item.id)}>Publish Now</button>
+                                            <button type="button" className="admin-btn warning small" onClick={() => onReject(item.id)}>Reject</button>
                                         </div>
                                     </td>
                                 </tr>

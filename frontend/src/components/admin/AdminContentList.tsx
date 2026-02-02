@@ -124,13 +124,13 @@ export function AdminContentList({
                 </div>
                 <div className="admin-list-actions">
                     <span className="admin-updated">Updated {formatLastUpdated(lastUpdated)}</span>
-                    <button className="admin-btn secondary" onClick={onRefresh} disabled={loading}>
+                    <button type="button" className="admin-btn secondary" onClick={onRefresh} disabled={loading}>
                         {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
-                    <button className="admin-btn secondary" onClick={onExport}>
+                    <button type="button" className="admin-btn secondary" onClick={onExport}>
                         Export CSV
                     </button>
-                    <button className="admin-btn primary" onClick={() => onEdit({} as any)}>New job</button>
+                    <button type="button" className="admin-btn primary" onClick={() => onEdit({} as any)}>New job</button>
                     {/* Note: New Job button here might be better handled by parent calling setActiveTab('add') */}
                 </div>
             </div>
@@ -142,6 +142,7 @@ export function AdminContentList({
                         placeholder="Search by title, organization..."
                         value={searchQuery}
                         onChange={(e) => onSearchChange(e.target.value)}
+                        aria-label="Search announcements"
                         className="admin-search"
                     />
                 </div>
@@ -149,6 +150,7 @@ export function AdminContentList({
                     <select
                         value={typeFilter}
                         onChange={(e) => onTypeFilterChange(e.target.value as ContentType | 'all')}
+                        aria-label="Filter by announcement type"
                         className="admin-select"
                     >
                         <option value="all">All Types</option>
@@ -159,6 +161,7 @@ export function AdminContentList({
                     <select
                         value={statusFilter}
                         onChange={(e) => onStatusFilterChange(e.target.value as AnnouncementStatus | 'all')}
+                        aria-label="Filter by status"
                         className="admin-select"
                     >
                         <option value="all">All Status</option>
@@ -169,6 +172,7 @@ export function AdminContentList({
                     <select
                         value={sortOption}
                         onChange={(e) => onSortChange(e.target.value as any)}
+                        aria-label="Sort announcements"
                         className="admin-select"
                     >
                         <option value="newest">Newest First</option>
@@ -183,10 +187,10 @@ export function AdminContentList({
                 <div className="admin-bulk-actions">
                     <span className="bulk-count">{selectedIds.size} selected</span>
                     <div className="bulk-buttons">
-                        <button className="admin-btn success small" onClick={() => onBulkAction('approve')}>Approve</button>
-                        <button className="admin-btn warning small" onClick={() => onBulkAction('reject')}>Reject</button>
-                        <button className="admin-btn secondary small" onClick={() => onBulkAction('archive')}>Archive</button>
-                        <button className="admin-btn danger small" onClick={() => onBulkAction('delete')}>Delete</button>
+                        <button type="button" className="admin-btn success small" onClick={() => onBulkAction('approve')}>Approve</button>
+                        <button type="button" className="admin-btn warning small" onClick={() => onBulkAction('reject')}>Reject</button>
+                        <button type="button" className="admin-btn secondary small" onClick={() => onBulkAction('archive')}>Archive</button>
+                        <button type="button" className="admin-btn danger small" onClick={() => onBulkAction('delete')}>Delete</button>
                     </div>
                 </div>
             )}
@@ -256,16 +260,16 @@ export function AdminContentList({
                                         <td>{formatNumber(item.viewCount)}</td>
                                         <td>
                                             <div className="row-actions">
-                                                <button className="action-btn" title="View" onClick={() => onView(item)}>
+                                                <button type="button" className="action-btn" title="View" aria-label="View announcement" onClick={() => onView(item)}>
                                                     👁
                                                 </button>
-                                                <button className="action-btn" title="Edit" onClick={() => onEdit(item)}>
+                                                <button type="button" className="action-btn" title="Edit" aria-label="Edit announcement" onClick={() => onEdit(item)}>
                                                     ✎
                                                 </button>
-                                                <button className="action-btn" title="Duplicate" onClick={() => onDuplicate(item)}>
+                                                <button type="button" className="action-btn" title="Duplicate" aria-label="Duplicate announcement" onClick={() => onDuplicate(item)}>
                                                     📋
                                                 </button>
-                                                <button className="action-btn danger" title="Delete" onClick={() => onDelete(item.id, item.title)}>
+                                                <button type="button" className="action-btn danger" title="Delete" aria-label="Delete announcement" onClick={() => onDelete(item.id, item.title)}>
                                                     🗑
                                                 </button>
                                             </div>
@@ -284,6 +288,7 @@ export function AdminContentList({
                 </span>
                 <div className="page-controls">
                     <button
+                        type="button"
                         className="page-btn"
                         disabled={page === 1}
                         onClick={() => onPageChange(page - 1)}
@@ -291,6 +296,7 @@ export function AdminContentList({
                         Previous
                     </button>
                     <button
+                        type="button"
                         className="page-btn"
                         disabled={page >= totalPages}
                         onClick={() => onPageChange(page + 1)}
