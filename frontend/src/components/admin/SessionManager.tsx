@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './SessionManager.css';
 
 export interface SessionData {
@@ -51,8 +51,10 @@ export function SessionManager({
                 case 'loginTime':
                     return new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime();
                 case 'riskScore':
-                    const riskOrder = { high: 3, medium: 2, low: 1 };
-                    return riskOrder[b.riskScore] - riskOrder[a.riskScore];
+                    {
+                        const riskOrder = { high: 3, medium: 2, low: 1 };
+                        return riskOrder[b.riskScore] - riskOrder[a.riskScore];
+                    }
                 default:
                     return 0;
             }
@@ -83,10 +85,6 @@ export function SessionManager({
                 ? prev.filter(id => id !== sessionId)
                 : [...prev, sessionId]
         );
-    };
-
-    const selectAllSessions = () => {
-        setSelectedSessions(filteredSessions.map(s => s.id));
     };
 
     const deselectAllSessions = () => {

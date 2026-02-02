@@ -114,7 +114,6 @@ export function AuditTrail({
         searchQuery: ''
     });
     
-    const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
     const [viewMode, setViewMode] = useState<'table' | 'timeline' | 'chart'>('table');
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [sortConfig, setSortConfig] = useState<{ key: keyof AuditEvent; direction: 'asc' | 'desc' }>({ 
@@ -598,6 +597,6 @@ export function AuditTrail({
     );
 }
 
-export default AuditTrail;"
+export default AuditTrail;
 
 

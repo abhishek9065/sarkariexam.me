@@ -1,5 +1,5 @@
 import type { Announcement } from '../../types';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContextStore';
 import { formatNumber } from '../../utils/formatters';
 import { prefetchAnnouncementDetail } from '../../utils/prefetch';
 

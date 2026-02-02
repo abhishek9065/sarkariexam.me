@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NAV_ITEMS, PATHS, type PageType, type TabType } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContextStore';
 import { prefetchRoute } from '../../utils/prefetch';
 
 interface NavProps {

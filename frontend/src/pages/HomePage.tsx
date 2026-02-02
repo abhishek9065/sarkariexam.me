@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection, ExamCalendar, ErrorState, MobileNav } from '../components';
 import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContextStore';
 import { SECTIONS, type TabType, API_BASE } from '../utils';
 import { fetchAnnouncements } from '../utils/api';
 import { fetchJson } from '../utils/http';

@@ -1,5 +1,5 @@
 import { API_BASE } from './constants';
-import { filterMockAnnouncements, findMockBySlug, mockAnnouncements } from './mockData';
+import { filterMockAnnouncements, findMockBySlug } from './mockData';
 import { fetchJson } from './http';
 import type { Announcement, AnnouncementCard, ContentType } from '../types';
 import type { paths } from '../types/api';

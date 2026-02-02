@@ -1,4 +1,4 @@
-import { useLanguage, type Language } from '../../context/LanguageContext';
+import { useLanguage, type Language } from '../../context/LanguageContextStore';
 
 const LANGUAGE_LABELS: Record<Language, string> = {
     en: 'English',

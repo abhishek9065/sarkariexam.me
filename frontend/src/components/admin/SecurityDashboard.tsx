@@ -113,7 +113,6 @@ export function SecurityDashboard({
 
     const unresolvedAlerts = metrics.alerts.filter(alert => !alert.resolved);
     const criticalAlerts = unresolvedAlerts.filter(alert => alert.severity === 'critical');
-    const highAlerts = unresolvedAlerts.filter(alert => alert.severity === 'high');
 
     return (
         <div className="security-dashboard">
@@ -369,4 +368,4 @@ export function SecurityDashboard({
     );
 }
 
-export default SecurityDashboard;"
+export default SecurityDashboard;

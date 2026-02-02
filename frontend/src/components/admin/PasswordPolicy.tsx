@@ -145,8 +145,6 @@ export function PasswordPolicy({
         let score = 0;
 
         const activeRules = rules.filter(rule => rule.isActive);
-        const totalRules = activeRules.length;
-
         activeRules.forEach(rule => {
             let rulePass = false;
 
@@ -175,10 +173,12 @@ export function PasswordPolicy({
                     rulePass = !/(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz|123|234|345|456|567|678|789)/i.test(password);
                     break;
                 case 'no-dictionary':
-                    // Simple dictionary word check (in real app, use proper dictionary)
-                    const commonWords = ['password', 'admin', '12345', 'qwerty', 'letmein', 'welcome', 'monkey', 'dragon'];
-                    rulePass = !commonWords.some(word => password.toLowerCase().includes(word));
-                    break;
+                    {
+                        // Simple dictionary word check (in real app, use proper dictionary)
+                        const commonWords = ['password', 'admin', '12345', 'qwerty', 'letmein', 'welcome', 'monkey', 'dragon'];
+                        rulePass = !commonWords.some(word => password.toLowerCase().includes(word));
+                        break;
+                    }
                 case 'no-personal-info':
                     // Basic check (in real app, check against user info)
                     rulePass = !/(admin|user|test|example|sarkari)/i.test(password);
@@ -481,4 +481,4 @@ export function PasswordPolicy({
     );
 }
 
-export default PasswordPolicy;"
+export default PasswordPolicy;

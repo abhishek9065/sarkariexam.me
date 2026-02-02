@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { useNavigate } from 'react-router-dom';
 import { AnalyticsDashboard } from '../components/admin/AnalyticsDashboard';
 import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingForm';
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
 import { SecurityLogsTable } from '../components/admin/SecurityLogsTable';
-import { ConfirmDialogProvider, useConfirmDialog } from '../components/admin/ConfirmDialog';
-import { CopyButton } from '../components/admin/CopyButton';
-import { AdminSkeleton } from '../components/admin/AdminSkeleton';
+import { ConfirmDialogProvider } from '../components/admin/ConfirmDialog';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AuthLoadingIndicator } from '../components/admin/AuthLoadingIndicator';
-import { AdminNotificationSystem, useAdminNotifications } from '../components/admin/AdminNotification';
+import { AdminNotificationSystem } from '../components/admin/AdminNotification';
+import { useAdminNotifications } from '../components/admin/useAdminNotifications';
 import { AdminContentList } from '../components/admin/AdminContentList';
 import { AdminQueue } from '../components/admin/AdminQueue';
-import { ScheduleCalendar } from '../components/admin/ScheduleCalendar';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { useTheme } from '../context/ThemeContext';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
@@ -157,13 +154,6 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string; icon: string }> = 
     { value: 'PSU', label: 'PSU', icon: '⚡' },
     { value: 'University', label: 'University', icon: '🎓' },
     { value: 'Police', label: 'Police', icon: '🚓' },
-];
-
-const LIST_SORT_OPTIONS: { value: 'newest' | 'updated' | 'deadline' | 'views'; label: string }[] = [
-    { value: 'newest', label: 'Newest first' },
-    { value: 'updated', label: 'Recently updated' },
-    { value: 'deadline', label: 'Deadline soonest' },
-    { value: 'views', label: 'Most viewed' },
 ];
 
 const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
@@ -334,7 +324,6 @@ const DEFAULT_FORM_DATA = {
 
 
 export function AdminPage() {
-    const navigate = useNavigate();
     const {
         notifications,
         removeNotification,
@@ -358,7 +347,6 @@ export function AdminPage() {
     });
     
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('analytics');
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
@@ -377,12 +365,11 @@ export function AdminPage() {
     const [listStatusFilter, setListStatusFilter] = useState<AnnouncementStatus | 'all'>(storedFilters?.status ?? 'all');
     const [listLoading, setListLoading] = useState(false);
     const [listUpdatedAt, setListUpdatedAt] = useState<string | null>(null);
-    const [listExporting, setListExporting] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkStatus, setBulkStatus] = useState<AnnouncementStatus | ''>('');
     const [bulkPublishAt, setBulkPublishAt] = useState('');
     const [bulkIsActive, setBulkIsActive] = useState<'keep' | 'active' | 'inactive'>('keep');
-    const [bulkLoading, setBulkLoading] = useState(false);
+    const [, setBulkLoading] = useState(false);
     const [qaBulkLoading, setQaBulkLoading] = useState(false);
     const [reviewBulkNote, setReviewBulkNote] = useState('');
     const [reviewScheduleAt, setReviewScheduleAt] = useState('');
@@ -406,7 +393,6 @@ export function AdminPage() {
     const [dashboardLoading, setDashboardLoading] = useState(false);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
     const [dashboardUpdatedAt, setDashboardUpdatedAt] = useState<string | null>(null);
-    const [scheduleView, setScheduleView] = useState<'list' | 'calendar'>('list');
     const [adminSummary, setAdminSummary] = useState<AdminSummary | null>(null);
     const [adminSummaryLoading, setAdminSummaryLoading] = useState(false);
     const [adminSummaryError, setAdminSummaryError] = useState<string | null>(null);
@@ -1531,46 +1517,6 @@ export function AdminPage() {
         }
     };
 
-    const handleExportAnnouncements = async () => {
-        if (!isLoggedIn) {
-            setMessage('Not authenticated.');
-            return;
-        }
-
-        setListExporting(true);
-        try {
-            const params = new URLSearchParams();
-            params.set('includeInactive', 'true');
-            if (listStatusFilter !== 'all') {
-                params.set('status', listStatusFilter);
-            }
-            if (listTypeFilter !== 'all') {
-                params.set('type', listTypeFilter);
-            }
-
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/export/csv?${params.toString()}`);
-
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorBody, 'Failed to export announcements.'));
-                return;
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `announcements-${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error(error);
-            setMessage('Failed to export announcements.');
-        } finally {
-            setListExporting(false);
-        }
-    };
-
     const handleBulkApprove = async () => {
         if (!isLoggedIn) {
             setMessage('Not authenticated.');
@@ -1789,39 +1735,6 @@ export function AdminPage() {
         }
     };
 
-    const handleScheduleOne = async (id: string, publishAt: string) => {
-        if (!isLoggedIn) return;
-        updateMutating(id, true);
-        try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    status: 'scheduled',
-                    publishAt: normalizeDateTime(publishAt),
-                    note: reviewBulkNote.trim() || undefined,
-                }),
-            });
-
-            if (response.ok) {
-                setMessage('Announcement scheduled.');
-                refreshData();
-                refreshDashboard();
-                refreshAuditLogs();
-            } else {
-                const errorBody = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorBody, 'Failed to schedule announcement.'));
-            }
-        } catch (error) {
-            console.error(error);
-            setMessage('Error scheduling announcement.');
-        } finally {
-            updateMutating(id, false);
-        }
-    };
-
     const downloadCsv = async (endpoint: string, filename: string) => {
         if (!isLoggedIn) {
             setMessage('Not authenticated.');
@@ -1847,50 +1760,6 @@ export function AdminPage() {
         }
     };
 
-
-    // Handle login - call real auth API
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setMessage('Logging in...');
-        setLoginLoading(true);
-        try {
-            const response = await adminRequest(`${apiBase}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                maxRetries: 0,
-                body: JSON.stringify(loginForm),
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                const userData = result.data?.user || result.user;
-                if (userData?.role === 'admin') {
-                    const profile: AdminUserProfile = {
-                        name: userData?.name || userData?.username || 'Admin',
-                        email: userData?.email || loginForm.email,
-                        role: userData?.role,
-                    };
-                    setAdminUser(profile);
-                    localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
-                    setIsLoggedIn(true);
-                    setMessage('');
-                    pushToast('Login successful!', 'success');
-                    refreshData();
-                    refreshDashboard();
-                } else {
-                    setMessage('Access denied. Admin role required.');
-                }
-            } else {
-                const errorResult = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorResult, 'Invalid credentials.'));
-            }
-        } catch (error) {
-            console.error(error);
-            setMessage('Login failed. Check your connection.');
-        } finally {
-            setLoginLoading(false);
-        }
-    };
 
     // Handle form submit (create or update announcement)
     const handleSubmit = async (e: React.FormEvent) => {
@@ -1998,17 +1867,6 @@ export function AdminPage() {
             );
         }
     };
-
-    const contentCounts = useMemo(() => {
-        if (adminSummary?.counts?.byType) {
-            return adminSummary.counts.byType;
-        }
-        const counts: Record<string, number> = {};
-        for (const item of announcements) {
-            counts[item.type] = (counts[item.type] ?? 0) + 1;
-        }
-        return counts;
-    }, [adminSummary, announcements]);
 
     const statusCounts = useMemo(() => {
         if (adminSummary?.counts?.byStatus) {
@@ -2181,29 +2039,6 @@ export function AdminPage() {
         && !formData.publishAt;
     const showDeadlineWarning = (touchedFields.deadline || submitAttempted) && deadlineInPast;
 
-    const scheduleCalendar = useMemo(() => {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        return Array.from({ length: 7 }, (_, index) => {
-            const day = new Date(start);
-            day.setDate(start.getDate() + index);
-            const key = getDateKey(day);
-            const items = scheduledAnnouncements.filter((item) => getDateKey(item.publishAt) === key);
-            return {
-                key,
-                label: new Intl.DateTimeFormat('en-IN', {
-                    weekday: 'short',
-                    day: '2-digit',
-                    month: 'short',
-                    timeZone: timeZoneId,
-                }).format(day),
-                items,
-            };
-        });
-    }, [scheduledAnnouncements]);
-
-    const filteredAnnouncements = useMemo(() => listAnnouncements, [listAnnouncements]);
-
     const totalPages = Math.max(1, Math.ceil((listTotal || 0) / pageSize));
 
     const pagedAnnouncements = useMemo(() => listAnnouncements, [listAnnouncements]);
@@ -2225,35 +2060,13 @@ export function AdminPage() {
         return parts.join(' • ');
     }, [listQuery, listStatusFilter, listTypeFilter]);
 
-    const getAvailabilityStatus = (item: Announcement) => {
-        if (item.deadline) {
-            const deadlineTime = new Date(item.deadline).getTime();
-            if (!Number.isNaN(deadlineTime) && deadlineTime < Date.now()) {
-                return { label: 'Expired', tone: 'danger' };
-            }
-        }
-        if (item.isActive === false) {
-            return { label: 'Inactive', tone: 'muted' };
-        }
-        return { label: 'Active', tone: 'success' };
-    };
-
-    const getWorkflowStatus = (item: Announcement) => {
-        const status = item.status ?? 'published';
-        switch (status) {
-            case 'draft':
-                return { label: 'Draft', tone: 'muted' };
-            case 'pending':
-                return { label: 'Pending', tone: 'warning' };
-            case 'scheduled':
-                return { label: 'Scheduled', tone: 'info' };
-            case 'archived':
-                return { label: 'Archived', tone: 'muted' };
-            case 'published':
-            default:
-                return { label: 'Published', tone: 'success' };
-        }
-    };
+    const handleClearListFilters = useCallback(() => {
+        setListQuery('');
+        setListTypeFilter('all');
+        setListStatusFilter('all');
+        setListSort('newest');
+        setListPage(1);
+    }, [setListQuery, setListTypeFilter, setListStatusFilter, setListSort, setListPage]);
 
     function isValidUrl(value?: string | null) {
         if (!value) return true;
@@ -2416,32 +2229,11 @@ export function AdminPage() {
         return label === 'N/A' ? <span className="cell-muted" title="No deadline set">No deadline</span> : label;
     };
 
-    function getDateKey(value?: string | Date) {
-        if (!value) return '';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '';
-        return date.toISOString().slice(0, 10);
-    }
-
     const normalizeDateTime = (value?: string | Date) => {
         if (!value) return undefined;
         const date = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(date.getTime())) return value instanceof Date ? value.toISOString() : value;
         return date.toISOString();
-    };
-
-    const formatRelativeTime = (value?: string | Date) => {
-        if (!value) return '-';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '-';
-        const diffMs = date.getTime() - Date.now();
-        const absMs = Math.abs(diffMs);
-        const hours = Math.round(absMs / (1000 * 60 * 60));
-        const days = Math.round(absMs / (1000 * 60 * 60 * 24));
-        const label = absMs < 1000 * 60 * 60 * 24
-            ? `${hours}h`
-            : `${days}d`;
-        return diffMs >= 0 ? `In ${label}` : `Overdue by ${label}`;
     };
 
     const formatLastUpdated = (value?: string | null, label = 'Updated') => {
@@ -2566,7 +2358,7 @@ export function AdminPage() {
                 )}
 
                 <div className="admin-container">
-                    <div className="toast-stack">
+                    <div className="toast-stack" role="status" aria-live="polite" aria-atomic="true">
                         {toasts.map((toast) => (
                             <div key={toast.id} className={`toast ${toast.tone}`}>
                                 <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
@@ -2661,7 +2453,7 @@ export function AdminPage() {
                 onRemove={removeNotification} 
             />
             
-            <div className="toast-stack">
+            <div className="toast-stack" role="status" aria-live="polite" aria-atomic="true">
                 {toasts.map((toast) => (
                     <div key={toast.id} className={`toast ${toast.tone}`}>
                         <span className="toast-icon">{toast.tone === 'success' ? '✓' : toast.tone === 'error' ? '!' : 'ℹ️'}</span>
@@ -3033,15 +2825,21 @@ export function AdminPage() {
                                 >
                                     Menu
                                 </button>
-                                <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
-                                    New job post
-                                </button>
-                                <button className="admin-btn secondary" onClick={() => handleNavSelect('list')}>
-                                    Manage listings
-                                </button>
-                                <button className="admin-btn secondary" onClick={() => handleNavSelect('review')}>
-                                    Review queue
-                                </button>
+                                {activeAdminTab !== 'add' && activeAdminTab !== 'detailed' && (
+                                    <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
+                                        New job post
+                                    </button>
+                                )}
+                                {activeAdminTab !== 'list' && (
+                                    <button className="admin-btn secondary" onClick={() => handleNavSelect('list')}>
+                                        Manage listings
+                                    </button>
+                                )}
+                                {activeAdminTab !== 'review' && (
+                                    <button className="admin-btn secondary" onClick={() => handleNavSelect('review')}>
+                                        Review queue
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -3498,6 +3296,7 @@ export function AdminPage() {
                             params.set('includeInactive', 'true');
                             downloadCsv(`/api/admin/announcements/export/csv?${params.toString()}`, `admin-announcements-${new Date().toISOString().split('T')[0]}.csv`);
                         }}
+                        onCreate={() => handleQuickCreate('job', 'add')}
                         selectedIds={selectedIds}
                         onSelectionChange={setSelectedIds}
                         onBulkAction={(action) => {
@@ -3513,6 +3312,8 @@ export function AdminPage() {
                         lastUpdated={listUpdatedAt}
                         formatDateTime={formatDateTime}
                         timeZoneLabel={timeZoneLabel}
+                        filterSummary={listFilterSummary}
+                        onClearFilters={handleClearListFilters}
                     />
                 ) : activeAdminTab === 'review' ? (
                     <div className="admin-list">
@@ -3817,12 +3618,13 @@ export function AdminPage() {
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
                                         placeholder="e.g. UP Police Constable Recruitment 2026"
                                         required
-                                        className={titleInvalid ? 'field-invalid' : titleValid ? 'field-valid' : ''}
-                                        aria-invalid={titleInvalid || undefined}
+                                        className={showTitleError ? 'field-invalid' : titleValid ? 'field-valid' : ''}
+                                        aria-invalid={showTitleError || undefined}
                                     />
-                                    {titleInvalid && (
+                                    {showTitleError && (
                                         <span className="field-error">Title must be at least 10 characters.</span>
                                     )}
                                     <div className="field-meta">
@@ -3844,12 +3646,13 @@ export function AdminPage() {
                                         type="text"
                                         value={formData.organization}
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, organization: true }))}
                                         placeholder="e.g. UPPRPB"
                                         required
-                                        className={organizationMissing ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
-                                        aria-invalid={organizationMissing || undefined}
+                                        className={showOrganizationError ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
+                                        aria-invalid={showOrganizationError || undefined}
                                     />
-                                    {organizationMissing && (
+                                    {showOrganizationError && (
                                         <span className="field-error">Organization is required.</span>
                                     )}
                                     {organizationValid && (touchedFields.organization || submitAttempted) && (
@@ -3897,17 +3700,32 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.totalPosts}
                                         onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
+                                        min={0}
+                                        step={1}
+                                        inputMode="numeric"
                                         placeholder="e.g. 32679 (numbers only)"
                                     />
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="detailed-deadline">Last Date to Apply</label>
-                                    <input
+                                    <DatePicker
                                         id="detailed-deadline"
-                                        type="date"
-                                        value={formData.deadline}
-                                        onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                                        selected={parseDateOnly(formData.deadline)}
+                                        onChange={(date) => {
+                                            setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
+                                            setTouchedFields((prev) => ({ ...prev, deadline: true }));
+                                        }}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, deadline: true }))}
+                                        placeholderText="Select deadline"
+                                        className={`admin-datepicker-input ${showDeadlineWarning ? 'field-warning' : ''}`}
+                                        calendarClassName="admin-datepicker-calendar"
+                                        popperClassName="admin-datepicker-popper"
+                                        dateFormat="dd MMM yyyy"
+                                        aria-describedby="detailed-deadline-hint"
                                     />
+                                    {showDeadlineWarning && (
+                                        <span id="detailed-deadline-hint" className="field-error" role="alert">Deadline is in the past.</span>
+                                    )}
                                 </div>
                             </div>
                             <div className="form-row two-col">
@@ -3918,6 +3736,9 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.salaryMin}
                                         onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                        min={0}
+                                        step={1}
+                                        inputMode="numeric"
                                         placeholder="e.g. 25000"
                                     />
                                 </div>
@@ -3928,6 +3749,9 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.salaryMax}
                                         onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                        min={0}
+                                        step={1}
+                                        inputMode="numeric"
                                         placeholder="e.g. 55000"
                                     />
                                 </div>
@@ -3977,15 +3801,32 @@ export function AdminPage() {
                                             <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
                                         )}
                                     </label>
-                                    <input
+                                    <DatePicker
                                         id="detailed-publish-at"
-                                        type="datetime-local"
-                                        value={formData.publishAt}
-                                        onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
+                                        selected={parseDateTime(formData.publishAt)}
+                                        onChange={(date) => {
+                                            setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
+                                            setTouchedFields((prev) => ({ ...prev, publishAt: true }));
+                                        }}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, publishAt: true }))}
+                                        placeholderText="Select date & time"
+                                        className={`admin-datepicker-input ${showPublishAtError ? 'field-invalid' : ''}`}
+                                        calendarClassName="admin-datepicker-calendar"
+                                        popperClassName="admin-datepicker-popper"
+                                        dateFormat="dd MMM yyyy, h:mm aa"
+                                        showTimeSelect
+                                        timeIntervals={15}
                                         disabled={formData.status !== 'scheduled'}
+                                        aria-describedby="detailed-publish-hint"
                                     />
                                     {formData.status !== 'scheduled' && (
                                         <p className="field-hint">Enabled only when Status is Scheduled.</p>
+                                    )}
+                                    {formData.status === 'scheduled' && (
+                                        <p className="field-hint">Time zone: {timeZoneLabel}</p>
+                                    )}
+                                    {showPublishAtError && (
+                                        <span id="detailed-publish-hint" className="field-error" role="alert">Publish time is required for scheduled posts.</span>
                                     )}
                                 </div>
                             </div>
@@ -4417,6 +4258,9 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.totalPosts}
                                         onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
+                                        min={0}
+                                        step={1}
+                                        inputMode="numeric"
                                         placeholder="e.g. 32679 (numbers only)"
                                     />
                                 </div>
@@ -4473,6 +4317,9 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.salaryMin}
                                         onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                        min={0}
+                                        step={1}
+                                        inputMode="numeric"
                                         placeholder="e.g. 25000"
                                     />
                                 </div>
@@ -4483,6 +4330,9 @@ export function AdminPage() {
                                         type="number"
                                         value={formData.salaryMax}
                                         onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                        min={0}
+                                        step={1}
+                                        inputMode="numeric"
                                         placeholder="e.g. 55000"
                                     />
                                 </div>

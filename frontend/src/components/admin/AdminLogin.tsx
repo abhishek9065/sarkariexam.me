@@ -46,7 +46,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
     const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({ score: 0, requirements: { length: false, uppercase: false, lowercase: false, number: false, special: false } });
     const [twoFactorCode, setTwoFactorCode] = useState('');
     const [qrCodeData, setQrCodeData] = useState<{qrCode: string; secret: string} | null>(null);
-    const [require2FA, setRequire2FA] = useState(false);
+    const [, setRequire2FA] = useState(false);
     const [sessionInfo, setSessionInfo] = useState<{ip: string; device: string; location?: string} | null>(null);
     
     // Captcha state (Simple math challenge for demo)
@@ -118,6 +118,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                 }, 2000);
             }
         } catch (error) {
+            console.error(error);
             setFormErrors({ general: 'Failed to send reset email. Please try again.' });
             setForgotLoading(false);
         } finally {
@@ -134,6 +135,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
             setQrCodeData(result);
             setView('setup2fa');
         } catch (error) {
+            console.error(error);
             setFormErrors({ general: 'Failed to setup 2FA. Please try again.' });
         }
     };
@@ -154,6 +156,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                 setTwoFactorCode('');
             }
         } catch (error) {
+            console.error(error);
             setFormErrors({ general: 'Failed to verify 2FA code. Please try again.' });
         }
     };

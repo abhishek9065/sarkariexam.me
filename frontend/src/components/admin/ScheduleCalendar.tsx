@@ -40,9 +40,6 @@ export function ScheduleCalendar<T extends ScheduledItem>({ items, onItemClick, 
 
         // First day of the month
         const firstDay = new Date(year, month, 1);
-        // Last day of the month
-        const lastDay = new Date(year, month + 1, 0);
-
         // Start from the Sunday of the week containing the first day
         const startDate = new Date(firstDay);
         startDate.setDate(startDate.getDate() - firstDay.getDay());

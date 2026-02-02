@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav } from '../components';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContextStore';
 import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS } from '../utils';
 import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';

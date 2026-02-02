@@ -1,6 +1,6 @@
 import type { ContentType } from '../../types';
 import { FEATURED_ITEMS } from '../../utils/constants';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContextStore';
 import { prefetchRoute } from '../../utils/prefetch';
 
 interface FeaturedGridProps {

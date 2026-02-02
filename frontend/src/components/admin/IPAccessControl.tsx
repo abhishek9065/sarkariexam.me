@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './IPAccessControl.css';
 
 export interface IPRule {
@@ -54,7 +54,6 @@ export function IPAccessControl({
         isActive: true,
         priority: 100
     });
-    const [selectedRule, setSelectedRule] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'allow' | 'block'>('all');
     const [sortBy, setSortBy] = useState<'priority' | 'createdAt' | 'hitCount'>('priority');
 
@@ -454,4 +453,4 @@ export function IPAccessControl({
     );
 }
 
-export default IPAccessControl;"
+export default IPAccessControl;

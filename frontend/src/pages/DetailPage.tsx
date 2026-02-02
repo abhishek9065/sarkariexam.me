@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons } from '../components';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../context/LanguageContextStore';
 import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';

@@ -94,12 +94,12 @@ interface PopularAnnouncement {
 
 // CSS-based Donut Chart using conic-gradient
 const TYPE_COLORS: Record<string, string> = {
-    job: '#2563EB',
-    result: '#10B981',
-    'admit-card': '#8B5CF6',
+    job: '#38BDF8',
+    result: '#34D399',
+    'admit-card': '#2DD4BF',
     'answer-key': '#F59E0B',
-    syllabus: '#EC4899',
-    admission: '#06B6D4',
+    syllabus: '#FB7185',
+    admission: '#F97316',
 };
 
 function DonutChart({ data, total }: { data: { type: string; count: number }[]; total: number }) {
@@ -135,6 +135,13 @@ const buildLinePath = (values: number[], width: number, height: number) => {
             return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
         })
         .join(' ');
+};
+
+const formatShortDate = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short' }).format(date);
 };
 
 function TrendChart({
@@ -238,8 +245,19 @@ export function AnalyticsDashboard({
     }, [rollups, showZeroTrend]);
     const maxViews = Math.max(1, ...trendRows.map((item) => item.views ?? 0));
     const maxSearches = Math.max(1, ...trendRows.map((item) => item.searches ?? 0));
-    const viewsLast7 = rollups.slice(-7).reduce((sum, item) => sum + (item.views ?? 0), 0);
-    const prev7Views = rollups.slice(0, Math.max(0, rollups.length - 7)).reduce((sum, item) => sum + (item.views ?? 0), 0);
+    const recentRollups = rollups.slice(-14);
+    const last7Rollups = recentRollups.slice(-7);
+    const prev7Rollups = recentRollups.slice(0, Math.max(0, recentRollups.length - 7));
+    const viewsLast7 = last7Rollups.reduce((sum, item) => sum + (item.views ?? 0), 0);
+    const prev7Views = prev7Rollups.reduce((sum, item) => sum + (item.views ?? 0), 0);
+    const searchesLast7 = last7Rollups.reduce((sum, item) => sum + (item.searches ?? 0), 0);
+    const prev7Searches = prev7Rollups.reduce((sum, item) => sum + (item.searches ?? 0), 0);
+    const viewsDeltaPct = prev7Views > 0
+        ? Math.round(((viewsLast7 - prev7Views) / prev7Views) * 100)
+        : null;
+    const searchesDeltaPct = prev7Searches > 0
+        ? Math.round(((searchesLast7 - prev7Searches) / prev7Searches) * 100)
+        : null;
 
     const loadAnalytics = useCallback(async (options?: { silent?: boolean; forceFresh?: boolean }) => {
         if (options?.silent) {
@@ -507,6 +525,11 @@ export function AnalyticsDashboard({
     const listingCoverage = insights?.listingCoverage ?? 0;
     const funnelDropTone = (insights?.funnelDropRate ?? 0) >= 80 ? 'bad' : (insights?.funnelDropRate ?? 0) >= 60 ? 'warn' : 'good';
     const trendTone = viewTrendDirection === 'up' ? 'good' : viewTrendDirection === 'down' ? 'bad' : 'warn';
+    const totalTypeCount = sortedTypeBreakdown.reduce((sum, item) => sum + item.count, 0);
+    const viewsDeltaTone = viewsDeltaPct === null ? 'flat' : viewsDeltaPct >= 0 ? 'up' : 'down';
+    const searchesDeltaTone = searchesDeltaPct === null ? 'flat' : searchesDeltaPct >= 0 ? 'up' : 'down';
+    const trendListRows = trendRows.slice(-10).reverse();
+    const popularItems = popular.slice(0, 8);
     const funnel = analytics.funnel;
     const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
     const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
@@ -634,11 +657,22 @@ export function AnalyticsDashboard({
                     <div className="kpi-label">Views last 7 days</div>
                     <div className="kpi-value">{formatMetric(viewsLast7)}</div>
                     <div className="kpi-sub">Highlights recent demand</div>
+                    <div className={`kpi-delta ${viewsDeltaTone}`}>
+                        {viewsDeltaPct === null ? 'No prior 7d data' : `${viewsDeltaPct > 0 ? '+' : ''}${viewsDeltaPct}% vs prev 7d`}
+                    </div>
                 </div>
                 <div className={`kpi-card ${ctrTone}`}>
                     <div className="kpi-label">CTR last 30 days</div>
                     <div className="kpi-value">{ctr}%</div>
                     <div className="kpi-sub">Card clicks / listing views</div>
+                </div>
+                <div className="kpi-card">
+                    <div className="kpi-label">Searches last 7 days</div>
+                    <div className="kpi-value">{formatMetric(searchesLast7)}</div>
+                    <div className="kpi-sub">Keyword interest trend</div>
+                    <div className={`kpi-delta ${searchesDeltaTone}`}>
+                        {searchesDeltaPct === null ? 'No prior 7d data' : `${searchesDeltaPct > 0 ? '+' : ''}${searchesDeltaPct}% vs prev 7d`}
+                    </div>
                 </div>
             </div>
             {/* Quick Actions */}
@@ -648,6 +682,62 @@ export function AnalyticsDashboard({
                 onViewExpiring={onOpenList}
                 onViewPending={onOpenList}
             />
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Weekly Trend</h3>
+                        <p className="analytics-subtitle">Views and searches across the last {rangeDays} days.</p>
+                    </div>
+                    {zeroTrendCount > 0 && (
+                        <div className="trend-toggle">
+                            <button
+                                type="button"
+                                className="admin-btn secondary small"
+                                onClick={() => setShowZeroTrend((prev) => !prev)}
+                            >
+                                {showZeroTrend ? 'Hide zero days' : `Show zero days (${zeroTrendCount})`}
+                            </button>
+                        </div>
+                    )}
+                </div>
+                {trendRows.length === 0 ? (
+                    <div className="empty-state">No rollup data yet. Publish a few announcements to start tracking trends.</div>
+                ) : (
+                    <>
+                        <div className="trend-chart-wrap">
+                            <TrendChart data={trendRows.map((item) => ({
+                                date: item.date,
+                                views: item.views ?? 0,
+                                searches: item.searches ?? 0,
+                            }))} />
+                            <div className="trend-legend">
+                                <span className="legend-item views">Views</span>
+                                <span className="legend-item searches">Searches</span>
+                            </div>
+                        </div>
+                        <div className="trend-list">
+                            {trendListRows.map((item) => (
+                                <div key={item.date} className="trend-row">
+                                    <div className="trend-date">{formatShortDate(item.date)}</div>
+                                    <div className="trend-bars" aria-hidden="true">
+                                        <span
+                                            className="trend-bar views"
+                                            style={{ width: `${Math.min(100, Math.round(((item.views ?? 0) / maxViews) * 100))}%` }}
+                                        />
+                                        <span
+                                            className="trend-bar searches"
+                                            style={{ width: `${Math.min(100, Math.round(((item.searches ?? 0) / maxSearches) * 100))}%` }}
+                                        />
+                                    </div>
+                                    <div className="trend-values">
+                                        {formatMetric(item.views)} / {formatMetric(item.searches)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card views">
@@ -757,6 +847,63 @@ export function AnalyticsDashboard({
             <div className="analytics-section">
                 <div className="analytics-section-header">
                     <div>
+                        <h3>Content Mix</h3>
+                        <p className="analytics-subtitle">Distribution of announcements by type and top categories.</p>
+                    </div>
+                </div>
+                {totalTypeCount === 0 ? (
+                    <div className="empty-state">No content breakdown yet. Create announcements to see distribution.</div>
+                ) : (
+                    <>
+                        <div className="chart-container">
+                            <div className="donut-chart">
+                                <DonutChart data={sortedTypeBreakdown} total={totalTypeCount} />
+                                <div className="donut-center">
+                                    <div className="donut-value">{formatMetric(totalTypeCount)}</div>
+                                    <div className="donut-label">Total posts</div>
+                                </div>
+                            </div>
+                            <div className="type-breakdown">
+                                {sortedTypeBreakdown.map((item) => {
+                                    const share = totalTypeCount > 0 ? Math.round((item.count / totalTypeCount) * 100) : 0;
+                                    return (
+                                        <div key={item.type} className="breakdown-item">
+                                            <span className={`type-badge ${item.type}`}>{item.type}</span>
+                                            <div className="breakdown-bar" aria-hidden="true">
+                                                <span
+                                                    className="breakdown-fill"
+                                                    style={{
+                                                        width: `${share}%`,
+                                                        background: TYPE_COLORS[item.type] || 'var(--border-light)',
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="breakdown-count">{formatMetric(item.count)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="analytics-hint">Higher coverage means more content variety. Aim for balanced distribution across types.</div>
+                        <div className="category-chips">
+                            {sortedCategories.length === 0 ? (
+                                <span className="digest-chip">No categories tracked yet</span>
+                            ) : (
+                                sortedCategories.map((item) => (
+                                    <span key={item.category} className="category-chip">
+                                        {item.category}
+                                        <span className="category-count">{formatMetric(item.count)}</span>
+                                    </span>
+                                ))
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
                         <h3>Top Searches</h3>
                         <p className="analytics-subtitle">Most frequent search terms in the last {engagementWindow} days.</p>
                     </div>
@@ -782,6 +929,87 @@ export function AnalyticsDashboard({
                     </table>
                 )}
                 <p className="analytics-hint">Search terms are normalized (lowercase) and capped at 80 characters.</p>
+            </div>
+
+            <div className="analytics-section">
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Popular Announcements</h3>
+                        <p className="analytics-subtitle">Top viewed announcements in the last {rangeDays} days.</p>
+                    </div>
+                    <button
+                        className="admin-btn secondary small"
+                        onClick={onOpenList}
+                        type="button"
+                    >
+                        Open content list
+                    </button>
+                </div>
+                {popularItems.length === 0 ? (
+                    <div className="empty-state">No popular announcements yet. Views will appear after traffic arrives.</div>
+                ) : (
+                    <table className="analytics-table popular-table">
+                        <thead>
+                            <tr>
+                                <th>Announcement</th>
+                                <th className="numeric">Views</th>
+                                <th>Status</th>
+                                <th className="numeric">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {popularItems.map((item) => (
+                                <tr key={item.id}>
+                                    <td>
+                                        <div className="popular-title">
+                                            <span className={`type-badge ${item.type}`}>{item.type}</span>
+                                            <span>{item.title}</span>
+                                        </div>
+                                        <span className="popular-meta">{item.category || 'Uncategorized'}</span>
+                                    </td>
+                                    <td className="numeric">{formatMetric(item.viewCount)}</td>
+                                    <td>
+                                        <span className={`status-pill ${item.status === 'published' ? 'success' : item.status === 'archived' ? 'muted' : 'warning'}`}>
+                                            {item.status ?? 'published'}
+                                        </span>
+                                    </td>
+                                    <td className="numeric">
+                                        <div className="popular-actions">
+                                            <button
+                                                className="admin-btn secondary small"
+                                                type="button"
+                                                onClick={() => handlePopularView(item)}
+                                            >
+                                                View
+                                            </button>
+                                            <button
+                                                className="admin-btn secondary small"
+                                                type="button"
+                                                onClick={() => handlePopularEdit(item)}
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                className="admin-btn warning small"
+                                                type="button"
+                                                onClick={() => handlePopularUnpublish(item)}
+                                            >
+                                                Unpublish
+                                            </button>
+                                            <button
+                                                className="admin-btn info small"
+                                                type="button"
+                                                onClick={handlePopularBoost}
+                                            >
+                                                Boost
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
             <div className="analytics-section">

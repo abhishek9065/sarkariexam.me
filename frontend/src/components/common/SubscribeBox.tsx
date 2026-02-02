@@ -8,7 +8,6 @@ export function SubscribeBox() {
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [message, setMessage] = useState('');
-    const [validationErrors, setValidationErrors] = useState<string[]>([]);
     const [emailSuggestion, setEmailSuggestion] = useState('');
 
     const categoryOptions = [
@@ -37,7 +36,6 @@ export function SubscribeBox() {
             errors.push('Please select at least one notification type');
         }
 
-        setValidationErrors(errors);
         return errors.length === 0;
     };
 

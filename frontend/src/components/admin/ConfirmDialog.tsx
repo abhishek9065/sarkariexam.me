@@ -1,32 +1,6 @@
-import { useState, useCallback, createContext, useContext, ReactNode } from 'react';
+import { useState, useCallback, ReactNode } from 'react';
 import './ConfirmDialog.css';
-
-interface ConfirmDialogOptions {
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    variant?: 'danger' | 'warning' | 'info';
-}
-
-interface ConfirmDialogState extends ConfirmDialogOptions {
-    isOpen: boolean;
-    resolve: ((confirmed: boolean) => void) | null;
-}
-
-interface ConfirmDialogContextValue {
-    confirm: (options: ConfirmDialogOptions) => Promise<boolean>;
-}
-
-const ConfirmDialogContext = createContext<ConfirmDialogContextValue | null>(null);
-
-export function useConfirmDialog() {
-    const context = useContext(ConfirmDialogContext);
-    if (!context) {
-        throw new Error('useConfirmDialog must be used within ConfirmDialogProvider');
-    }
-    return context;
-}
+import { ConfirmDialogContext, type ConfirmDialogOptions, type ConfirmDialogState } from './ConfirmDialogContext';
 
 interface ConfirmDialogProviderProps {
     children: ReactNode;

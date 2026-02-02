@@ -28,6 +28,7 @@ interface AdminContentListProps {
     onView: (item: Announcement) => void;
     onDuplicate: (item: Announcement) => void;
     onExport: () => void;
+    onCreate?: () => void;
 
     // Selection
     selectedIds: Set<string>;
@@ -37,6 +38,8 @@ interface AdminContentListProps {
     lastUpdated: string | null;
     formatDateTime: (value?: string | null) => string;
     timeZoneLabel: string;
+    filterSummary?: string;
+    onClearFilters?: () => void;
 }
 
 export function AdminContentList({
@@ -60,12 +63,15 @@ export function AdminContentList({
     onView,
     onDuplicate,
     onExport,
+    onCreate,
     selectedIds,
     onSelectionChange,
     onBulkAction,
     lastUpdated,
     formatDateTime,
-    timeZoneLabel
+    timeZoneLabel,
+    filterSummary,
+    onClearFilters
 }: AdminContentListProps) {
 
     const toggleSelection = (id: string) => {
@@ -148,8 +154,13 @@ export function AdminContentList({
                     <button type="button" className="admin-btn secondary" onClick={onExport}>
                         Export CSV
                     </button>
-                    <button type="button" className="admin-btn primary" onClick={() => onEdit({} as any)}>New job</button>
-                    {/* Note: New Job button here might be better handled by parent calling setActiveTab('add') */}
+                    <button
+                        type="button"
+                        className="admin-btn primary"
+                        onClick={() => (onCreate ? onCreate() : onEdit({} as any))}
+                    >
+                        New job
+                    </button>
                 </div>
             </div>
 
@@ -199,6 +210,16 @@ export function AdminContentList({
                         <option value="views">Most Viewed</option>
                     </select>
                 </div>
+                {filterSummary && (
+                    <div className="filter-summary" role="status" aria-live="polite">
+                        <span>{filterSummary}</span>
+                        {onClearFilters && (
+                            <button type="button" className="filter-clear" onClick={onClearFilters}>
+                                Clear filters
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {selectedIds.size > 0 && (
@@ -224,7 +245,12 @@ export function AdminContentList({
 
             {items.length === 0 && !loading ? (
                 <div className="empty-state">
-                    No announcements found matching your filters.
+                    <div>No announcements found matching your filters.</div>
+                    {filterSummary && onClearFilters && (
+                        <button type="button" className="admin-btn secondary small" onClick={onClearFilters}>
+                            Clear filters
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="admin-table-wrapper">
@@ -236,6 +262,7 @@ export function AdminContentList({
                                         type="checkbox"
                                         checked={items.length > 0 && selectedIds.size === items.length}
                                         onChange={(e) => toggleSelectAll(e.target.checked)}
+                                        aria-label="Select all announcements"
                                     />
                                 </th>
                                 <th aria-sort={sortOption === 'newest' ? 'descending' : 'none'}>
@@ -265,6 +292,7 @@ export function AdminContentList({
                                                 type="checkbox"
                                                 checked={selectedIds.has(item.id)}
                                                 onChange={() => toggleSelection(item.id)}
+                                                aria-label={`Select ${item.title}`}
                                             />
                                         </td>
                                         <td>

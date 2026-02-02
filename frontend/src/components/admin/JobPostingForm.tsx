@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { JobTemplates, type JobTemplate } from './JobTemplates';
+import { JobTemplates } from './JobTemplates';
+import type { JobTemplate } from './JobTemplates.data';
 import './JobPostingForm.css';
 
 interface ImportantDate {
