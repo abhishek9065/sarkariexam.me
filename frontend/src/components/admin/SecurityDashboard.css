@@ -5,7 +5,7 @@
     margin: 0 auto;
     background: rgba(15, 23, 42, 0.95);
     border-radius: 16px;
-    border: 1px solid rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.1);
 }
 
 /* Header */
@@ -15,7 +15,7 @@
     align-items: flex-start;
     margin-bottom: 32px;
     padding-bottom: 20px;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+    border-bottom: 1px solid rgba(76, 201, 240, 0.1);
 }
 
 .header-title h2 {
@@ -39,7 +39,7 @@
 
 .timeframe-select {
     padding: 8px 12px;
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    border: 1px solid rgba(76, 201, 240, 0.3);
     border-radius: 6px;
     background: rgba(30, 41, 59, 0.5);
     color: var(--text-primary);
@@ -50,7 +50,7 @@
 .timeframe-select:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1);
+    box-shadow: 0 0 0 2px rgba(76, 201, 240, 0.1);
 }
 
 .auto-refresh-toggle {
@@ -66,7 +66,7 @@
 .auto-refresh-toggle input[type="checkbox"] {
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(96, 165, 250, 0.3);
+    border: 2px solid rgba(76, 201, 240, 0.3);
     border-radius: 3px;
     background: transparent;
     cursor: pointer;
@@ -78,9 +78,9 @@
     align-items: center;
     gap: 8px;
     padding: 10px 16px;
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    border: 1px solid rgba(76, 201, 240, 0.3);
     border-radius: 8px;
-    background: rgba(96, 165, 250, 0.1);
+    background: rgba(76, 201, 240, 0.1);
     color: var(--primary-color);
     font-size: 14px;
     font-weight: 500;
@@ -89,8 +89,8 @@
 }
 
 .refresh-btn:hover:not(:disabled) {
-    background: rgba(96, 165, 250, 0.2);
-    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(76, 201, 240, 0.2);
+    border-color: rgba(76, 201, 240, 0.5);
     transform: translateY(-1px);
 }
 
@@ -113,7 +113,7 @@
     padding: 24px;
     background: rgba(30, 41, 59, 0.3);
     border-radius: 16px;
-    border: 1px solid rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.1);
 }
 
 .risk-main {
@@ -215,8 +215,8 @@
 
 .scan-btn {
     padding: 10px 20px;
-    background: rgba(96, 165, 250, 0.1);
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    background: rgba(76, 201, 240, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.3);
     color: var(--primary-color);
     border-radius: 8px;
     font-size: 14px;
@@ -226,8 +226,8 @@
 }
 
 .scan-btn:hover:not(:disabled) {
-    background: rgba(96, 165, 250, 0.2);
-    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(76, 201, 240, 0.2);
+    border-color: rgba(76, 201, 240, 0.5);
     transform: translateY(-1px);
 }
 
@@ -242,20 +242,20 @@
 .metric-card {
     padding: 20px;
     background: rgba(30, 41, 59, 0.5);
-    border: 1px solid rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.1);
     border-radius: 12px;
     transition: all 0.3s ease;
 }
 
 .metric-card:hover {
     background: rgba(30, 41, 59, 0.7);
-    border-color: rgba(96, 165, 250, 0.2);
+    border-color: rgba(76, 201, 240, 0.2);
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
 }
 
 .metric-card.sessions {
-    border-left: 4px solid #60a5fa;
+    border-left: 4px solid var(--accent-blue);
 }
 
 .metric-card.authentication {
@@ -276,9 +276,9 @@
 .metric-icon {
     font-size: 20px;
     padding: 8px;
-    background: rgba(96, 165, 250, 0.1);
+    background: rgba(76, 201, 240, 0.1);
     border-radius: 8px;
-    border: 1px solid rgba(96, 165, 250, 0.2);
+    border: 1px solid rgba(76, 201, 240, 0.2);
 }
 
 .metric-header h4 {
@@ -369,8 +369,8 @@
 
 .show-all-btn {
     padding: 6px 12px;
-    background: rgba(96, 165, 250, 0.1);
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    background: rgba(76, 201, 240, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.3);
     color: var(--primary-color);
     border-radius: 6px;
     font-size: 12px;
@@ -380,8 +380,8 @@
 }
 
 .show-all-btn:hover {
-    background: rgba(96, 165, 250, 0.2);
-    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(76, 201, 240, 0.2);
+    border-color: rgba(76, 201, 240, 0.5);
 }
 
 .no-alerts {
@@ -420,7 +420,7 @@
 .alert-card {
     padding: 16px 20px;
     background: rgba(30, 41, 59, 0.5);
-    border: 1px solid rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.1);
     border-radius: 12px;
     display: flex;
     justify-content: space-between;
@@ -430,7 +430,7 @@
 
 .alert-card:hover {
     background: rgba(30, 41, 59, 0.7);
-    border-color: rgba(96, 165, 250, 0.2);
+    border-color: rgba(76, 201, 240, 0.2);
     transform: translateY(-1px);
 }
 
@@ -574,14 +574,14 @@
     text-align: center;
     padding: 40px 20px;
     background: rgba(30, 41, 59, 0.3);
-    border: 1px solid rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.1);
     border-radius: 12px;
     color: var(--text-secondary);
 }
 
 .activity-list {
     background: rgba(30, 41, 59, 0.3);
-    border: 1px solid rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(76, 201, 240, 0.1);
     border-radius: 12px;
     overflow: hidden;
 }
@@ -591,8 +591,8 @@
     grid-template-columns: 1fr 120px 140px 120px 100px;
     gap: 16px;
     padding: 12px 16px;
-    background: rgba(96, 165, 250, 0.1);
-    border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+    background: rgba(76, 201, 240, 0.1);
+    border-bottom: 1px solid rgba(76, 201, 240, 0.2);
     font-size: 12px;
     font-weight: 600;
     color: var(--primary-color);
@@ -605,13 +605,13 @@
     grid-template-columns: 1fr 120px 140px 120px 100px;
     gap: 16px;
     padding: 12px 16px;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.05);
+    border-bottom: 1px solid rgba(76, 201, 240, 0.05);
     font-size: 13px;
     transition: all 0.3s ease;
 }
 
 .activity-row:hover {
-    background: rgba(96, 165, 250, 0.05);
+    background: rgba(76, 201, 240, 0.05);
 }
 
 .activity-row.failure {
@@ -637,10 +637,10 @@
     font-family: monospace;
     font-weight: 600;
     color: var(--text-primary);
-    background: rgba(96, 165, 250, 0.1);
+    background: rgba(76, 201, 240, 0.1);
     padding: 2px 6px;
     border-radius: 4px;
-    border: 1px solid rgba(96, 165, 250, 0.2);
+    border: 1px solid rgba(76, 201, 240, 0.2);
 }
 
 .activity-time {
