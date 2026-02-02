@@ -570,6 +570,38 @@
     }
 }
 
+.job-datepicker-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-primary);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.job-datepicker-calendar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+}
+
+.job-datepicker-calendar .react-datepicker__header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.job-datepicker-calendar .react-datepicker__day,
+.job-datepicker-calendar .react-datepicker__day-name {
+    color: var(--text-primary);
+}
+
+.job-datepicker-calendar .react-datepicker__day--selected,
+.job-datepicker-calendar .react-datepicker__day--keyboard-selected {
+    background: var(--accent-blue);
+    color: #fff;
+}
+
 /* Dark Mode */
 [data-theme="dark"] .job-posting-form {
     background: #1e293b;

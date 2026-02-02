@@ -124,6 +124,58 @@
   }
 }
 
+.admin-shell.collapsed {
+  grid-template-columns: 90px minmax(0, 1fr);
+}
+
+.admin-shell.collapsed .admin-nav {
+  padding: var(--space-3);
+}
+
+.admin-shell.collapsed .admin-nav-subtitle,
+.admin-shell.collapsed .admin-nav-group-title,
+.admin-shell.collapsed .admin-nav-meta,
+.admin-shell.collapsed .admin-nav-title {
+  display: none;
+}
+
+.admin-shell.collapsed .admin-sidebar-card,
+.admin-shell.collapsed .admin-help-panel {
+  display: none;
+}
+
+.admin-shell.collapsed .admin-nav-button {
+  justify-content: center;
+}
+
+.admin-shell.collapsed .nav-label,
+.admin-shell.collapsed .nav-trailing {
+  display: none;
+}
+
+.admin-shell.collapsed .nav-short {
+  display: inline-flex;
+}
+
+.admin-shell.nav-open .admin-sidebar {
+  transform: translateX(0);
+}
+
+.admin-nav-backdrop {
+  display: none;
+  background: transparent;
+  border: none;
+}
+
+.admin-shell.nav-open .admin-nav-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 35;
+  border: none;
+}
+
 .admin-context {
   display: flex;
   align-items: center;
@@ -133,6 +185,34 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-primary);
   background: var(--bg-card);
+}
+
+.admin-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.breadcrumb-sep {
+  opacity: 0.6;
+}
+
+.admin-context-meta {
+  margin-top: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-context-pill {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 .admin-context-info h3 {
@@ -153,6 +233,24 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   justify-content: flex-end;
+}
+
+.admin-nav-toggle {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-nav-toggle:hover {
+  border-color: rgba(96, 165, 250, 0.5);
+  color: var(--text-primary);
 }
 
 .admin-hero-main {
@@ -210,9 +308,10 @@
 
 .metric-label {
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  text-transform: none;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
+  font-weight: 600;
 }
 
 .metric-value {
@@ -347,10 +446,31 @@
   gap: var(--space-3);
 }
 
+.admin-nav-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-sidebar-toggle {
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-sidebar-toggle:hover {
+  border-color: rgba(96, 165, 250, 0.5);
+  color: var(--text-primary);
+}
+
 .admin-nav-title {
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+  text-transform: none;
+  letter-spacing: 0.12em;
   color: var(--text-muted);
   font-weight: 700;
 }
@@ -369,8 +489,8 @@
 
 .admin-nav-group-title {
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  text-transform: none;
+  letter-spacing: 0.1em;
   color: var(--text-muted);
 }
 
@@ -396,6 +516,32 @@
   cursor: pointer;
 }
 
+.nav-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav-short {
+  display: none;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.4);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nav-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .admin-nav-button:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
@@ -411,6 +557,18 @@
 
 .admin-nav-button:focus-visible {
   outline: 2px solid rgba(96, 165, 250, 0.8);
+  outline-offset: 2px;
+}
+
+.admin-btn:focus-visible,
+.admin-search:focus-visible,
+.admin-select:focus-visible,
+.admin-datepicker-input:focus-visible,
+.page-btn:focus-visible,
+.action-btn:focus-visible,
+.admin-nav-toggle:focus-visible,
+.admin-sidebar-toggle:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.7);
   outline-offset: 2px;
 }
 
@@ -601,6 +759,25 @@
   font-size: 13px;
 }
 
+.admin-timezone-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: inline-flex;
+  gap: 6px;
+}
+
+.admin-setting {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-setting-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 .admin-help-panel {
   display: flex;
   flex-direction: column;
@@ -697,6 +874,55 @@
   min-width: 150px;
 }
 
+.admin-datepicker-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.admin-container .react-datepicker {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.admin-container .react-datepicker__header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.admin-container .react-datepicker__current-month,
+.admin-container .react-datepicker__day-name,
+.admin-container .react-datepicker__time-name {
+  color: var(--text-secondary);
+}
+
+.admin-container .react-datepicker__day,
+.admin-container .react-datepicker__time-list-item {
+  color: var(--text-primary);
+}
+
+.admin-container .react-datepicker__day--selected,
+.admin-container .react-datepicker__day--keyboard-selected,
+.admin-container .react-datepicker__time-list-item--selected {
+  background: var(--accent-blue);
+  color: #fff;
+}
+
+.admin-container .react-datepicker__day:hover,
+.admin-container .react-datepicker__time-list-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.admin-container .react-datepicker__triangle {
+  color: var(--bg-card);
+}
+
 .admin-toggle {
   display: inline-flex;
   gap: var(--space-2);
@@ -724,6 +950,16 @@
 .field-invalid {
   border-color: rgba(248, 113, 113, 0.7) !important;
   box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.25);
+}
+
+.field-warning {
+  border-color: rgba(245, 158, 11, 0.7) !important;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2);
+}
+
+.field-required {
+  color: var(--accent-red);
+  margin-left: 4px;
 }
 
 .field-valid {
@@ -757,6 +993,10 @@
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.field-count {
+  font-variant-numeric: tabular-nums;
 }
 
 .field-status.ok {
@@ -955,6 +1195,32 @@
   padding: 12px 16px;
 }
 
+.admin-table th.th-checkbox,
+.admin-table td.td-checkbox {
+  width: 44px;
+  text-align: center;
+}
+
+.table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.table-sort .sort-indicator {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.table-sort.active .sort-indicator {
+  color: var(--accent-blue);
+}
 .admin-table input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -966,8 +1232,8 @@
   background: var(--bg-secondary);
   color: var(--text-muted);
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: none;
+  letter-spacing: 0.04em;
 }
 
 .admin-table .numeric {
@@ -1029,7 +1295,34 @@
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  position: relative;
   transition: all var(--transition-fast);
+}
+
+.action-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: var(--shadow-sm);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  z-index: 5;
+}
+
+.action-btn:hover::after,
+.action-btn:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .action-btn:hover {
@@ -1337,10 +1630,29 @@
   flex-wrap: wrap;
 }
 
+.bulk-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .bulk-count {
   font-size: 12px;
   color: var(--text-secondary);
   font-weight: 600;
+}
+
+.bulk-clear {
+  border: none;
+  background: none;
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bulk-clear:hover {
+  text-decoration: underline;
 }
 
 .bulk-buttons {
@@ -1679,8 +1991,8 @@
 }
 
 .qa-panel {
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: rgba(96, 165, 250, 0.08);
   color: var(--text-secondary);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
@@ -1690,7 +2002,7 @@
 .qa-panel h4 {
   margin: 0 0 8px;
   font-size: 13px;
-  color: var(--accent-yellow);
+  color: var(--accent-blue);
 }
 
 .qa-panel ul {
@@ -1753,7 +2065,33 @@
   }
 
   .admin-sidebar {
-    position: static;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(90vw, 320px);
+    transform: translateX(-110%);
+    z-index: 40;
+    padding-bottom: var(--space-6);
+    overflow-y: auto;
+  }
+
+  .admin-shell.collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell.collapsed .nav-label,
+  .admin-shell.collapsed .nav-trailing {
+    display: inline-flex;
+  }
+
+  .admin-shell.collapsed .nav-short {
+    display: none;
+  }
+
+  .admin-shell.collapsed .admin-sidebar-card,
+  .admin-shell.collapsed .admin-help-panel {
+    display: flex;
   }
 
   .admin-context {
@@ -1764,6 +2102,10 @@
   .admin-context-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .admin-nav-toggle {
+    display: inline-flex;
   }
 
   .admin-list-meta {

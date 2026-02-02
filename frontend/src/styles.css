@@ -1,6 +1,6 @@
 /* ============================================
    SARKARIEXAMS.ME - UI VERSION 3
-   Fully Dark Theme | Cohesive Design
+   Cohesive Design System
    ============================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap');
@@ -10,6 +10,7 @@
   --font-body: 'Manrope', 'Segoe UI', sans-serif;
   --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
   --font-scale: 1;
+  --color-scheme: dark;
 
   /* Backgrounds */
   --bg-primary: #0b1020;
@@ -82,6 +83,38 @@
   --bg-hover: var(--bg-card-hover);
 }
 
+/* Light theme overrides */
+[data-theme="light"] {
+  --color-scheme: light;
+
+  --bg-primary: #f8fafc;
+  --bg-secondary: #eef2f7;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-input: #f8fafc;
+  --bg-glass: rgba(255, 255, 255, 0.7);
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+
+  --accent-blue: #2563eb;
+  --accent-blue-hover: #1d4ed8;
+  --accent-green: #16a34a;
+  --accent-yellow: #d97706;
+  --accent-red: #dc2626;
+  --accent-purple: #0891b2;
+  --accent-cyan: #0891b2;
+
+  --border-primary: #e2e8f0;
+  --border-light: #cbd5e1;
+  --border-color: #e2e8f0;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 14px 32px rgba(15, 23, 42, 0.12);
+}
+
 /* ============ RESET & BASE ============ */
 *,
 *::before,
@@ -106,7 +139,14 @@ body {
   font-size: calc(15px * var(--font-scale));
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  color-scheme: dark;
+  color-scheme: var(--color-scheme);
+}
+
+[data-theme="light"] body {
+  background:
+    radial-gradient(1200px 600px at 12% -10%, rgba(37, 99, 235, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, rgba(14, 165, 233, 0.08), transparent 60%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 55%, #e2e8f0 100%);
 }
 
 a {
@@ -2221,7 +2261,7 @@ button {
   text-transform: uppercase;
 }
 
-/* Light mode disabled - always dark theme */
+/* Light mode support */
 
 /* ============ UI REFRESH ============ */
 h1, h2, h3, h4, h5, h6,
@@ -3543,14 +3583,19 @@ button.stat-card:hover .stat-action {
 }
 
 .accessibility-toggle {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-primary);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 18px;
   box-shadow: var(--shadow-lg);
+}
+
+.accessibility-toggle:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.8);
+  outline-offset: 2px;
 }
 
 .accessibility-card {

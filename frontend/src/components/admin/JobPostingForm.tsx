@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import DatePicker from 'react-datepicker';
 import { JobTemplates, type JobTemplate } from './JobTemplates';
 import './JobPostingForm.css';
 
@@ -275,7 +276,16 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
         { id: 'links' as TabType, label: '🔗 Links & FAQs', icon: '🔗' },
     ];
 
-    const formatDateInput = (date: Date) => date.toISOString().slice(0, 10);
+    const formatDateInput = (date: Date) => {
+        const pad = (num: number) => String(num).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const parseDateInput = (value?: string) => {
+        if (!value) return null;
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    };
 
     const formatSavedTime = (timestamp: number) => {
         const diffMs = Date.now() - timestamp;
@@ -518,18 +528,22 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                                             title={validation.dateErrors[index]?.name ? 'Event name is required' : 'Looks good'}
                                             onChange={(e) => updateImportantDate(index, 'name', e.target.value)}
                                         />
-                                        <input
-                                            type="date"
-                                            value={date.date}
+                                        <DatePicker
+                                            selected={parseDateInput(date.date)}
+                                            onChange={(selected) => updateImportantDate(index, 'date', selected ? formatDateInput(selected) : '')}
                                             className={[
+                                                'job-datepicker-input',
                                                 (showValidation || date.name.trim() || date.date)
                                                     ? (validation.dateErrors[index]?.date ? 'field-invalid' : 'field-valid')
                                                     : '',
                                                 isPastDate ? 'date-past' : '',
                                             ].filter(Boolean).join(' ')}
+                                            calendarClassName="job-datepicker-calendar"
+                                            popperClassName="job-datepicker-popper"
+                                            placeholderText="Select date"
+                                            dateFormat="dd MMM yyyy"
                                             aria-invalid={((showValidation || date.name.trim() || date.date) && validation.dateErrors[index]?.date) || undefined}
                                             title={validation.dateErrors[index]?.date ? 'Date is required' : 'Looks good'}
-                                            onChange={(e) => updateImportantDate(index, 'date', e.target.value)}
                                         />
                                         {isPastDate && <span className="date-flag">Past</span>}
                                         <div className="date-presets">
@@ -625,13 +639,19 @@ export function JobPostingForm({ initialData, onSubmit, onPreview, onCancel, isD
                                 </div>
                                 <div className="form-group">
                                     <label>As on Date</label>
-                                    <input
-                                        type="date"
-                                        value={jobDetails.ageLimits.asOnDate}
-                                        className={(showValidation || jobDetails.ageLimits.asOnDate)
-                                            ? (validation.ageErrors.asOnDate ? 'field-invalid' : 'field-valid')
-                                            : ''}
-                                        onChange={(e) => updateField('ageLimits.asOnDate', e.target.value)}
+                                    <DatePicker
+                                        selected={parseDateInput(jobDetails.ageLimits.asOnDate)}
+                                        onChange={(selected) => updateField('ageLimits.asOnDate', selected ? formatDateInput(selected) : '')}
+                                        className={[
+                                            'job-datepicker-input',
+                                            (showValidation || jobDetails.ageLimits.asOnDate)
+                                                ? (validation.ageErrors.asOnDate ? 'field-invalid' : 'field-valid')
+                                                : '',
+                                        ].filter(Boolean).join(' ')}
+                                        calendarClassName="job-datepicker-calendar"
+                                        popperClassName="job-datepicker-popper"
+                                        placeholderText="Select date"
+                                        dateFormat="dd MMM yyyy"
                                     />
                                     <div className="date-presets">
                                         <button type="button" className="preset-btn" onClick={() => applyAgeDatePreset(0)}>Today</button>

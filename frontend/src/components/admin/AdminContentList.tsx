@@ -1,8 +1,7 @@
-import { useMemo } from 'react';
 import { Announcement, AnnouncementStatus, ContentType } from '../../types';
 import { CONTENT_TYPES, STATUS_OPTIONS } from './constants';
 import { CopyButton } from './CopyButton';
-import { formatDateTime, formatNumber } from '../../utils/formatters';
+import { formatNumber } from '../../utils/formatters';
 
 interface AdminContentListProps {
     items: Announcement[];
@@ -36,6 +35,8 @@ interface AdminContentListProps {
     onBulkAction: (action: string) => void;
 
     lastUpdated: string | null;
+    formatDateTime: (value?: string | null) => string;
+    timeZoneLabel: string;
 }
 
 export function AdminContentList({
@@ -62,7 +63,9 @@ export function AdminContentList({
     selectedIds,
     onSelectionChange,
     onBulkAction,
-    lastUpdated
+    lastUpdated,
+    formatDateTime,
+    timeZoneLabel
 }: AdminContentListProps) {
 
     const toggleSelection = (id: string) => {
@@ -108,11 +111,25 @@ export function AdminContentList({
         }
     };
 
+    const renderSortButton = (label: string, sortKey: 'newest' | 'updated' | 'deadline' | 'views') => {
+        const isActive = sortOption === sortKey;
+        return (
+            <button
+                type="button"
+                className={`table-sort ${isActive ? 'active' : ''}`}
+                onClick={() => onSortChange(sortKey)}
+                aria-label={`Sort by ${label}`}
+            >
+                <span>{label}</span>
+                <span className="sort-indicator">{isActive ? '▲' : '⇅'}</span>
+            </button>
+        );
+    };
+
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Not updated yet';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'Not updated yet';
-        return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const formatted = formatDateTime(value);
+        return formatted === '-' ? 'Not updated yet' : formatted;
     };
 
     return (
@@ -121,6 +138,7 @@ export function AdminContentList({
                 <div>
                     <h3>Content manager</h3>
                     <p className="admin-subtitle">Manage all job postings, results, and other announcements.</p>
+                    <span className="admin-timezone-note">Times shown in {timeZoneLabel}</span>
                 </div>
                 <div className="admin-list-actions">
                     <span className="admin-updated">Updated {formatLastUpdated(lastUpdated)}</span>
@@ -185,7 +203,16 @@ export function AdminContentList({
 
             {selectedIds.size > 0 && (
                 <div className="admin-bulk-actions">
-                    <span className="bulk-count">{selectedIds.size} selected</span>
+                    <div className="bulk-info">
+                        <span className="bulk-count">{selectedIds.size} selected</span>
+                        <button
+                            type="button"
+                            className="bulk-clear"
+                            onClick={() => onSelectionChange(new Set())}
+                        >
+                            Clear selection
+                        </button>
+                    </div>
                     <div className="bulk-buttons">
                         <button type="button" className="admin-btn success small" onClick={() => onBulkAction('approve')}>Approve</button>
                         <button type="button" className="admin-btn warning small" onClick={() => onBulkAction('reject')}>Reject</button>
@@ -211,10 +238,17 @@ export function AdminContentList({
                                         onChange={(e) => toggleSelectAll(e.target.checked)}
                                     />
                                 </th>
-                                <th>Title / Organization</th>
+                                <th aria-sort={sortOption === 'newest' ? 'descending' : 'none'}>
+                                    {renderSortButton('Title / Organization', 'newest')}
+                                </th>
                                 <th>Type</th>
                                 <th>Status</th>
-                                <th>Views</th>
+                                <th aria-sort={sortOption === 'updated' ? 'descending' : 'none'}>
+                                    {renderSortButton('Updated', 'updated')}
+                                </th>
+                                <th aria-sort={sortOption === 'views' ? 'descending' : 'none'}>
+                                    {renderSortButton('Views', 'views')}
+                                </th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -257,19 +291,22 @@ export function AdminContentList({
                                                 )}
                                             </div>
                                         </td>
+                                        <td>
+                                            <span className="cell-muted">{formatDateTime(item.updatedAt || item.postedAt)}</span>
+                                        </td>
                                         <td>{formatNumber(item.viewCount)}</td>
                                         <td>
                                             <div className="row-actions">
-                                                <button type="button" className="action-btn" title="View" aria-label="View announcement" onClick={() => onView(item)}>
+                                                <button type="button" className="action-btn" title="View" data-tooltip="View" aria-label="View announcement" onClick={() => onView(item)}>
                                                     👁
                                                 </button>
-                                                <button type="button" className="action-btn" title="Edit" aria-label="Edit announcement" onClick={() => onEdit(item)}>
+                                                <button type="button" className="action-btn" title="Edit" data-tooltip="Edit" aria-label="Edit announcement" onClick={() => onEdit(item)}>
                                                     ✎
                                                 </button>
-                                                <button type="button" className="action-btn" title="Duplicate" aria-label="Duplicate announcement" onClick={() => onDuplicate(item)}>
+                                                <button type="button" className="action-btn" title="Duplicate" data-tooltip="Duplicate" aria-label="Duplicate announcement" onClick={() => onDuplicate(item)}>
                                                     📋
                                                 </button>
-                                                <button type="button" className="action-btn danger" title="Delete" aria-label="Delete announcement" onClick={() => onDelete(item.id, item.title)}>
+                                                <button type="button" className="action-btn danger" title="Delete" data-tooltip="Delete" aria-label="Delete announcement" onClick={() => onDelete(item.id, item.title)}>
                                                     🗑
                                                 </button>
                                             </div>

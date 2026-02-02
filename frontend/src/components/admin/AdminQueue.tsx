@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Announcement } from '../../types';
 import { ScheduleCalendar } from './ScheduleCalendar';
-import { formatDateTime } from '../../utils/formatters';
 
 interface AdminQueueProps {
     items: Announcement[];
@@ -10,6 +9,10 @@ interface AdminQueueProps {
         upcoming24h: number;
         nextPublish?: string;
     };
+    formatDateTime: (value?: string | null) => string;
+    formatDate: (value?: string | null) => string;
+    formatTime: (value?: string | null) => string;
+    timeZoneLabel: string;
     onEdit: (item: Announcement) => void;
     onReschedule: (itemId: string, newDate: Date) => void;
     onPublishNow: (id: string) => void;
@@ -24,6 +27,10 @@ interface AdminQueueProps {
 export function AdminQueue({
     items,
     stats,
+    formatDateTime,
+    formatDate,
+    formatTime,
+    timeZoneLabel,
     onEdit,
     onReschedule,
     onPublishNow,
@@ -38,9 +45,8 @@ export function AdminQueue({
 
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Not updated yet';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'Not updated yet';
-        return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const formatted = formatTime(value);
+        return formatted === '-' ? 'Not updated yet' : formatted;
     };
 
     return (
@@ -49,6 +55,7 @@ export function AdminQueue({
                 <div>
                     <h3>Scheduled queue</h3>
                     <p className="admin-subtitle">Review upcoming scheduled announcements and publish now if needed.</p>
+                    <span className="admin-timezone-note">Times shown in {timeZoneLabel}</span>
                 </div>
                 <div className="admin-list-actions">
                     <span className="admin-updated">{formatLastUpdated(lastUpdated)}</span>
@@ -128,12 +135,8 @@ export function AdminQueue({
                                             <span className="org-text">{item.organization}</span>
                                         </div>
                                     </td>
-                                    <td>{new Date(item.publishAt || '').toLocaleDateString('en-IN', {
-                                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
-                                    })}</td>
-                                    <td>{new Date(item.publishAt || '').toLocaleTimeString('en-IN', {
-                                        hour: '2-digit', minute: '2-digit'
-                                    })}</td>
+                                    <td>{formatDate(item.publishAt)}</td>
+                                    <td>{formatTime(item.publishAt)}</td>
                                     <td>
                                         <span className="status-badge info">Scheduled</span>
                                     </td>

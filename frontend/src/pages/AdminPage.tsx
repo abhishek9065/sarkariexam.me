@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DatePicker from 'react-datepicker';
 import { useNavigate } from 'react-router-dom';
 import { AnalyticsDashboard } from '../components/admin/AnalyticsDashboard';
 import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingForm';
@@ -14,6 +15,7 @@ import { AdminContentList } from '../components/admin/AdminContentList';
 import { AdminQueue } from '../components/admin/AdminQueue';
 import { ScheduleCalendar } from '../components/admin/ScheduleCalendar';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
+import { useTheme } from '../context/ThemeContext';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
@@ -166,6 +168,10 @@ const LIST_SORT_OPTIONS: { value: 'newest' | 'updated' | 'deadline' | 'views'; l
 
 const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
 const ADMIN_USER_STORAGE_KEY = 'adminUserProfile';
+const ADMIN_TIMEZONE_KEY = 'adminTimezoneMode';
+const ADMIN_SIDEBAR_KEY = 'adminSidebarCollapsed';
+
+type TimeZoneMode = 'local' | 'ist' | 'utc';
 
 type ListFilterState = {
     query?: string;
@@ -265,6 +271,25 @@ const loadAdminUser = (): AdminUserProfile | null => {
     }
 };
 
+const loadTimeZoneMode = (): TimeZoneMode => {
+    try {
+        const raw = localStorage.getItem(ADMIN_TIMEZONE_KEY);
+        if (raw === 'local' || raw === 'ist' || raw === 'utc') return raw;
+    } catch {
+        // ignore
+    }
+    return 'local';
+};
+
+const loadSidebarCollapsed = (): boolean => {
+    try {
+        const raw = localStorage.getItem(ADMIN_SIDEBAR_KEY);
+        return raw === '1';
+    } catch {
+        return false;
+    }
+};
+
 
 const STATUS_OPTIONS: { value: AnnouncementStatus; label: string }[] = [
     { value: 'draft', label: 'Draft' },
@@ -318,6 +343,19 @@ export function AdminPage() {
         notifyWarning,
         notifyInfo,
     } = useAdminNotifications();
+
+    const { themeMode, setThemeMode } = useTheme();
+    const [timeZoneMode, setTimeZoneMode] = useState<TimeZoneMode>(() => loadTimeZoneMode());
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => loadSidebarCollapsed());
+    const [isNavOpen, setIsNavOpen] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
+    const [touchedFields, setTouchedFields] = useState({
+        title: false,
+        organization: false,
+        deadline: false,
+        publishAt: false,
+        externalLink: false,
+    });
     
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
@@ -424,6 +462,21 @@ export function AdminPage() {
     const heroActiveJobs = overview?.activeJobs ?? 0;
     const heroNewThisWeek = overview?.newThisWeek ?? 0;
     const heroExpiringSoon = overview?.expiringSoon ?? 0;
+    const timeZoneId = timeZoneMode === 'local' ? undefined : timeZoneMode === 'ist' ? 'Asia/Kolkata' : 'UTC';
+    const timeZoneLabel = timeZoneMode === 'local' ? 'Local' : timeZoneMode === 'ist' ? 'IST' : 'UTC';
+
+    useEffect(() => {
+        localStorage.setItem(ADMIN_TIMEZONE_KEY, timeZoneMode);
+    }, [timeZoneMode]);
+
+    useEffect(() => {
+        localStorage.setItem(ADMIN_SIDEBAR_KEY, isSidebarCollapsed ? '1' : '0');
+    }, [isSidebarCollapsed]);
+
+    const handleNavSelect = useCallback((tab: AdminTab) => {
+        setActiveAdminTab(tab);
+        setIsNavOpen(false);
+    }, []);
     const pushToast = useCallback((message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
         setToasts((prev) => [...prev, { id, message, tone }]);
@@ -1070,8 +1123,16 @@ export function AdminPage() {
             difficulty: item.difficulty || '',
             cutoffMarks: item.cutoffMarks || '',
             status: item.status ?? 'published',
-            publishAt: formatDateTimeInput(item.publishAt),
+            publishAt: item.publishAt ?? '',
         });
+        setTouchedFields({
+            title: false,
+            organization: false,
+            deadline: false,
+            publishAt: false,
+            externalLink: false,
+        });
+        setSubmitAttempted(false);
         setEditingId(item.id);
 
         // Load jobDetails if available for detailed editing
@@ -1105,6 +1166,14 @@ export function AdminPage() {
             status: 'draft',
             publishAt: '',
         });
+        setTouchedFields({
+            title: false,
+            organization: false,
+            deadline: false,
+            publishAt: false,
+            externalLink: false,
+        });
+        setSubmitAttempted(false);
         const hasDetails = item.jobDetails && Object.keys(item.jobDetails).length > 0;
         setJobDetails(hasDetails ? item.jobDetails ?? null : null);
         setEditingId(null);
@@ -1118,7 +1187,7 @@ export function AdminPage() {
         const item = scheduledAnnouncements.find(i => i.id === itemId);
         if (!item) return;
 
-        if (!window.confirm(`Reschedule "${item.title}" to ${newDate.toLocaleDateString()}?`)) {
+        if (!window.confirm(`Reschedule "${item.title}" to ${formatDate(newDate)}?`)) {
             return;
         }
 
@@ -1148,7 +1217,7 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Failed to reschedule.'));
             } else {
-                setMessage(`Rescheduled to ${newDate.toLocaleDateString()}`);
+                setMessage(`Rescheduled to ${formatDate(newDate)}`);
                 refreshAdminSummary();
             }
         } catch (error) {
@@ -1166,6 +1235,14 @@ export function AdminPage() {
         setEditingId(null);
         setShowPreview(false);
         setPreviewData(null);
+        setTouchedFields({
+            title: false,
+            organization: false,
+            deadline: false,
+            publishAt: false,
+            externalLink: false,
+        });
+        setSubmitAttempted(false);
         setActiveAdminTab(mode);
         setMessage('');
     };
@@ -1818,6 +1895,7 @@ export function AdminPage() {
     // Handle form submit (create or update announcement)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmitAttempted(true);
         setMessage('Processing...');
         
         // Show processing notification
@@ -1833,6 +1911,12 @@ export function AdminPage() {
             setMessage('Not authenticated. Please log in again.');
             setIsLoggedIn(false);
             notifyError('Authentication Required', 'Please log in again to save changes.');
+            return;
+        }
+
+        if (titleInvalid || organizationMissing || (formData.status === 'scheduled' && !formData.publishAt)) {
+            setMessage('Please fix the highlighted fields before saving.');
+            notifyWarning('Missing required details', 'Complete the required fields to continue.', 4000);
             return;
         }
 
@@ -1874,6 +1958,14 @@ export function AdminPage() {
                 );
 
                 setFormData({ ...DEFAULT_FORM_DATA });
+                setTouchedFields({
+                    title: false,
+                    organization: false,
+                    deadline: false,
+                    publishAt: false,
+                    externalLink: false,
+                });
+                setSubmitAttempted(false);
 
                 setEditingId(null);
 
@@ -2018,7 +2110,7 @@ export function AdminPage() {
         }).length;
         const nextPublish = scheduledAnnouncements[0]?.publishAt;
         return { overdue, upcoming24h, nextPublish };
-    }, [scheduledAnnouncements]);
+    }, [scheduledAnnouncements, timeZoneId]);
 
     const pendingTotal = pendingSlaStats.pendingTotal;
     const scheduledTotal = scheduledAnnouncements.length;
@@ -2059,6 +2151,16 @@ export function AdminPage() {
     const titleProgress = Math.min(100, Math.round((titleLength / 50) * 100));
     const titleValid = titleLength >= 10;
     const organizationValid = !organizationMissing;
+    const externalLinkInvalid = !!formData.externalLink && !isValidUrl(formData.externalLink);
+    const deadlineDate = parseDateOnly(formData.deadline) ?? undefined;
+    const deadlineInPast = !!deadlineDate && deadlineDate.getTime() < Date.now();
+    const showTitleError = (touchedFields.title || submitAttempted) && titleInvalid;
+    const showOrganizationError = (touchedFields.organization || submitAttempted) && organizationMissing;
+    const showExternalLinkError = (touchedFields.externalLink || submitAttempted) && externalLinkInvalid;
+    const showPublishAtError = (touchedFields.publishAt || submitAttempted)
+        && formData.status === 'scheduled'
+        && !formData.publishAt;
+    const showDeadlineWarning = (touchedFields.deadline || submitAttempted) && deadlineInPast;
 
     const scheduleCalendar = useMemo(() => {
         const start = new Date();
@@ -2070,7 +2172,12 @@ export function AdminPage() {
             const items = scheduledAnnouncements.filter((item) => getDateKey(item.publishAt) === key);
             return {
                 key,
-                label: day.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' }),
+                label: new Intl.DateTimeFormat('en-IN', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: 'short',
+                    timeZone: timeZoneId,
+                }).format(day),
                 items,
             };
         });
@@ -2222,8 +2329,8 @@ export function AdminPage() {
             warnings.push('Scheduled posts need a publish time.');
         }
         if (formData.deadline) {
-            const deadlineTime = new Date(formData.deadline).getTime();
-            if (!Number.isNaN(deadlineTime) && deadlineTime < Date.now()) {
+            const deadlineDate = parseDateOnly(formData.deadline);
+            if (deadlineDate && deadlineDate.getTime() < Date.now()) {
                 warnings.push('Deadline is in the past.');
             }
         }
@@ -2244,28 +2351,45 @@ export function AdminPage() {
         return 'warning';
     };
 
-    const formatDate = (value?: string) => {
-        if (!value) return 'N/A';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'N/A';
-        return date.toLocaleDateString('en-IN', {
+    const toDate = (value?: string | Date | null) => {
+        if (!value) return null;
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    };
+
+    const formatDate = (value?: string | Date | null) => {
+        const date = toDate(value);
+        if (!date) return 'N/A';
+        return new Intl.DateTimeFormat('en-IN', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
-        });
+            timeZone: timeZoneId,
+        }).format(date);
     };
 
-    const formatDateTime = (value?: string) => {
-        if (!value) return '-';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '-';
-        return date.toLocaleString('en-IN', {
+    const formatTime = (value?: string | Date | null) => {
+        const date = toDate(value);
+        if (!date) return '-';
+        return new Intl.DateTimeFormat('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: timeZoneId,
+        }).format(date);
+    };
+
+    const formatDateTime = (value?: string | Date | null) => {
+        const date = toDate(value);
+        if (!date) return '-';
+        return new Intl.DateTimeFormat('en-IN', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-        });
+            timeZone: timeZoneId,
+        }).format(date);
     };
 
     const renderDateCell = (value?: string) => {
@@ -2280,18 +2404,29 @@ export function AdminPage() {
         return date.toISOString().slice(0, 10);
     }
 
-    const formatDateTimeInput = (value?: string) => {
-        if (!value) return '';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '';
-        const pad = (num: number) => String(num).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const parseDateOnly = (value?: string) => {
+        if (!value) return null;
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
     };
 
-    const normalizeDateTime = (value?: string) => {
-        if (!value) return undefined;
+    const parseDateTime = (value?: string) => {
+        if (!value) return null;
         const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return value;
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    };
+
+    const formatDateInput = (date: Date) => {
+        const pad = (num: number) => String(num).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+
+    const normalizeDateTime = (value?: string | Date) => {
+        if (!value) return undefined;
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return value instanceof Date ? value.toISOString() : value;
         return date.toISOString();
     };
 
@@ -2367,6 +2502,10 @@ export function AdminPage() {
         setSelectedIds(new Set());
         setReviewBulkNote('');
         setReviewScheduleAt('');
+    }, [activeAdminTab]);
+
+    useEffect(() => {
+        setIsNavOpen(false);
     }, [activeAdminTab]);
 
     useEffect(() => {
@@ -2544,17 +2683,6 @@ export function AdminPage() {
                             <p className="admin-subtitle">Monitor content health, QA, and growth signals in one place.</p>
                         </div>
                         <div className="admin-hero-actions">
-                            <div className="admin-quick-actions">
-                                <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
-                                    New job post
-                                </button>
-                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('review')}>
-                                    Review queue
-                                </button>
-                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('analytics')}>
-                                    Analytics
-                                </button>
-                            </div>
                             <details className="admin-user-menu">
                                 <summary className="admin-user-trigger">
                                     <span className="admin-avatar">
@@ -2602,7 +2730,7 @@ export function AdminPage() {
                         </div>
                     </div>
                 </div>
-                <div className="admin-shell">
+                <div className={`admin-shell ${isSidebarCollapsed ? 'collapsed' : ''} ${isNavOpen ? 'nav-open' : ''}`}>
                     <aside className="admin-sidebar">
                         <div className="admin-nav">
                             <div className="admin-nav-header">
@@ -2610,23 +2738,43 @@ export function AdminPage() {
                                     <span className="admin-nav-title">Navigation</span>
                                     <span className="admin-nav-subtitle">Admin workspace</span>
                                 </div>
-                                <span className="admin-nav-pill">{adminUser?.role ?? 'admin'}</span>
+                                <div className="admin-nav-header-actions">
+                                    <span className="admin-nav-pill">{adminUser?.role ?? 'admin'}</span>
+                                    <button
+                                        type="button"
+                                        className="admin-sidebar-toggle"
+                                        aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                                        aria-pressed={isSidebarCollapsed}
+                                        onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                                    >
+                                        {isSidebarCollapsed ? '››' : '‹‹'}
+                                    </button>
+                                </div>
                             </div>
                             <div className="admin-nav-group">
                                 <span className="admin-nav-group-title">Overview</span>
                                 <div className="admin-nav-list">
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'analytics' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('analytics')}
+                                        onClick={() => handleNavSelect('analytics')}
+                                        aria-label="Analytics"
+                                        title="Analytics"
                                     >
-                                        <span>Analytics</span>
-                                        {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
+                                        <span className="nav-label">Analytics</span>
+                                        <span className="nav-short">AN</span>
+                                        <span className="nav-trailing">
+                                            {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
+                                        </span>
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'users' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('users')}
+                                        onClick={() => handleNavSelect('users')}
+                                        aria-label="Users"
+                                        title="Users"
                                     >
-                                        <span>Users</span>
+                                        <span className="nav-label">Users</span>
+                                        <span className="nav-short">US</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                 </div>
                             </div>
@@ -2635,45 +2783,71 @@ export function AdminPage() {
                                 <div className="admin-nav-list">
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'list' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('list')}
+                                        onClick={() => handleNavSelect('list')}
+                                        aria-label="All announcements"
+                                        title="All announcements"
                                     >
-                                        <span>All Announcements</span>
+                                        <span className="nav-label">All Announcements</span>
+                                        <span className="nav-short">LI</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'review' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('review')}
+                                        onClick={() => handleNavSelect('review')}
+                                        aria-label="Review queue"
+                                        title="Review queue"
                                     >
-                                        <span>Review Queue</span>
-                                        {pendingTotal > 0 && (
-                                            <span className="admin-nav-count warning">{formatNumber(pendingTotal, '0')}</span>
-                                        )}
+                                        <span className="nav-label">Review Queue</span>
+                                        <span className="nav-short">RV</span>
+                                        <span className="nav-trailing">
+                                            {pendingTotal > 0 && (
+                                                <span className="admin-nav-count warning">{formatNumber(pendingTotal, '0')}</span>
+                                            )}
+                                        </span>
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'add' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('add')}
+                                        onClick={() => handleNavSelect('add')}
+                                        aria-label="Quick add"
+                                        title="Quick add"
                                     >
-                                        <span>Quick Add</span>
+                                        <span className="nav-label">Quick Add</span>
+                                        <span className="nav-short">QA</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'detailed' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('detailed')}
+                                        onClick={() => handleNavSelect('detailed')}
+                                        aria-label="Detailed post"
+                                        title="Detailed post"
                                     >
-                                        <span>Detailed Post</span>
+                                        <span className="nav-label">Detailed Post</span>
+                                        <span className="nav-short">DP</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'bulk' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('bulk')}
+                                        onClick={() => handleNavSelect('bulk')}
+                                        aria-label="Bulk import"
+                                        title="Bulk import"
                                     >
-                                        <span>Bulk Import</span>
+                                        <span className="nav-label">Bulk Import</span>
+                                        <span className="nav-short">BI</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'queue' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('queue')}
+                                        onClick={() => handleNavSelect('queue')}
+                                        aria-label="Schedule queue"
+                                        title="Schedule queue"
                                     >
-                                        <span>Schedule Queue</span>
-                                        {scheduledTotal > 0 && (
-                                            <span className="admin-nav-count info">{formatNumber(scheduledTotal, '0')}</span>
-                                        )}
+                                        <span className="nav-label">Schedule Queue</span>
+                                        <span className="nav-short">SQ</span>
+                                        <span className="nav-trailing">
+                                            {scheduledTotal > 0 && (
+                                                <span className="admin-nav-count info">{formatNumber(scheduledTotal, '0')}</span>
+                                            )}
+                                        </span>
                                     </button>
                                 </div>
                             </div>
@@ -2682,21 +2856,33 @@ export function AdminPage() {
                                 <div className="admin-nav-list">
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'community' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('community')}
+                                        onClick={() => handleNavSelect('community')}
+                                        aria-label="Community"
+                                        title="Community"
                                     >
-                                        <span>Community</span>
+                                        <span className="nav-label">Community</span>
+                                        <span className="nav-short">CM</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'errors' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('errors')}
+                                        onClick={() => handleNavSelect('errors')}
+                                        aria-label="Error reports"
+                                        title="Error reports"
                                     >
-                                        <span>Error Reports</span>
+                                        <span className="nav-label">Error Reports</span>
+                                        <span className="nav-short">ER</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'audit' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('audit')}
+                                        onClick={() => handleNavSelect('audit')}
+                                        aria-label="Audit log"
+                                        title="Audit log"
                                     >
-                                        <span>Audit Log</span>
+                                        <span className="nav-label">Audit Log</span>
+                                        <span className="nav-short">AL</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                 </div>
                             </div>
@@ -2705,9 +2891,13 @@ export function AdminPage() {
                                 <div className="admin-nav-list">
                                     <button
                                         className={`admin-nav-button ${activeAdminTab === 'security' ? 'active' : ''}`}
-                                        onClick={() => setActiveAdminTab('security')}
+                                        onClick={() => handleNavSelect('security')}
+                                        aria-label="Security"
+                                        title="Security"
                                     >
-                                        <span>Security</span>
+                                        <span className="nav-label">Security</span>
+                                        <span className="nav-short">SC</span>
+                                        <span className="nav-trailing" />
                                     </button>
                                 </div>
                             </div>
@@ -2751,6 +2941,45 @@ export function AdminPage() {
                             </div>
                         </div>
 
+                        <div className="admin-sidebar-card admin-settings-card">
+                            <div>
+                                <span className="admin-ops-title">Workspace settings</span>
+                                <span className="admin-ops-subtitle">Theme and time zone preferences</span>
+                            </div>
+                            <div className="admin-setting">
+                                <span className="admin-setting-label">Theme</span>
+                                <div className="admin-toggle">
+                                    <button
+                                        type="button"
+                                        className={`admin-btn secondary small ${themeMode === 'dark' ? 'active' : ''}`}
+                                        onClick={() => setThemeMode('dark')}
+                                    >
+                                        Dark
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`admin-btn secondary small ${themeMode === 'light' ? 'active' : ''}`}
+                                        onClick={() => setThemeMode('light')}
+                                    >
+                                        Light
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="admin-setting">
+                                <label className="admin-setting-label" htmlFor="admin-timezone-select">Time zone</label>
+                                <select
+                                    id="admin-timezone-select"
+                                    className="admin-select"
+                                    value={timeZoneMode}
+                                    onChange={(e) => setTimeZoneMode(e.target.value as TimeZoneMode)}
+                                >
+                                    <option value="local">Local</option>
+                                    <option value="ist">IST (Asia/Kolkata)</option>
+                                    <option value="utc">UTC</option>
+                                </select>
+                            </div>
+                        </div>
+
                         <div className="admin-help-panel">
                             <div>
                                 <h3>Workflow tips</h3>
@@ -2769,24 +2998,48 @@ export function AdminPage() {
                             </div>
                         </div>
                     </aside>
+                    <button
+                        type="button"
+                        className="admin-nav-backdrop"
+                        aria-hidden="true"
+                        onClick={() => setIsNavOpen(false)}
+                    />
 
                     <section className="admin-workspace">
                         {message && <div className="admin-banner" role="status">{message}</div>}
 
                         <div className="admin-context">
                             <div className="admin-context-info">
+                                <div className="admin-breadcrumbs">
+                                    <span>Admin</span>
+                                    <span className="breadcrumb-sep">/</span>
+                                    <span>{activeTabMeta.label}</span>
+                                </div>
                                 <span className="admin-context-kicker">Active module</span>
                                 <h3>{activeTabMeta.label}</h3>
                                 <p className="admin-subtitle">{activeTabMeta.description}</p>
+                                <div className="admin-context-meta">
+                                    <span className="admin-context-pill">Timezone: {timeZoneLabel}</span>
+                                    <span className="admin-context-pill">Theme: {themeMode === 'dark' ? 'Dark' : 'Light'}</span>
+                                </div>
                             </div>
                             <div className="admin-context-actions">
+                                <button
+                                    type="button"
+                                    className="admin-nav-toggle"
+                                    onClick={() => setIsNavOpen((prev) => !prev)}
+                                    aria-label="Toggle navigation"
+                                    aria-expanded={isNavOpen}
+                                >
+                                    Menu
+                                </button>
                                 <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
                                     New job post
                                 </button>
-                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>
+                                <button className="admin-btn secondary" onClick={() => handleNavSelect('list')}>
                                     Manage listings
                                 </button>
-                                <button className="admin-btn secondary" onClick={() => setActiveAdminTab('review')}>
+                                <button className="admin-btn secondary" onClick={() => handleNavSelect('review')}>
                                     Review queue
                                 </button>
                             </div>
@@ -3258,6 +3511,8 @@ export function AdminPage() {
                             }
                         }}
                         lastUpdated={listUpdatedAt}
+                        formatDateTime={formatDateTime}
+                        timeZoneLabel={timeZoneLabel}
                     />
                 ) : activeAdminTab === 'review' ? (
                     <div className="admin-list">
@@ -3529,6 +3784,10 @@ export function AdminPage() {
                     <AdminQueue
                         items={scheduledAnnouncements}
                         stats={scheduledStats}
+                        formatDateTime={formatDateTime}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                        timeZoneLabel={timeZoneLabel}
                         onEdit={handleEdit}
                         onReschedule={handleReschedule}
                         onPublishNow={(id) => handleApprove(id, '')}
@@ -3568,7 +3827,9 @@ export function AdminPage() {
                                     )}
                                     <div className="field-meta">
                                         <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
-                                            {titleValid ? '✓ Looks good' : 'Needs 10+ characters'}
+                                            {(formData.title.trim().length > 0 || submitAttempted)
+                                                ? (titleValid ? '✓ Looks good' : 'Needs 10+ characters')
+                                                : 'Start typing to validate'}
                                         </span>
                                         <span className="field-count">{titleLength}/50</span>
                                     </div>
@@ -3591,7 +3852,7 @@ export function AdminPage() {
                                     {organizationMissing && (
                                         <span className="field-error">Organization is required.</span>
                                     )}
-                                    {organizationValid && (
+                                    {organizationValid && (touchedFields.organization || submitAttempted) && (
                                         <span className="field-status ok">✓ Looks good</span>
                                     )}
                                 </div>
@@ -4051,19 +4312,23 @@ export function AdminPage() {
                         <form onSubmit={handleSubmit} className="admin-form">
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label htmlFor="quick-title">Title *</label>
+                                    <label htmlFor="quick-title">
+                                        Title <span className="field-required">*</span>
+                                    </label>
                                     <input
                                         id="quick-title"
                                         type="text"
                                         value={formData.title}
                                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
                                         placeholder="e.g. SSC CGL 2025 Recruitment"
                                         required
-                                        className={titleInvalid ? 'field-invalid' : titleValid ? 'field-valid' : ''}
-                                        aria-invalid={titleInvalid || undefined}
+                                        className={showTitleError ? 'field-invalid' : titleValid ? 'field-valid' : ''}
+                                        aria-invalid={showTitleError || undefined}
+                                        aria-describedby="quick-title-error"
                                     />
-                                    {titleInvalid && (
-                                        <span className="field-error">Title must be at least 10 characters.</span>
+                                    {showTitleError && (
+                                        <span id="quick-title-error" className="field-error" role="alert">Title must be at least 10 characters.</span>
                                     )}
                                     <div className="field-meta">
                                         <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
@@ -4113,18 +4378,22 @@ export function AdminPage() {
                             {/* Rest of form fields - simplified for brevity, assume similar to original */}
                             <div className="form-row two-col">
                                 <div className="form-group">
-                                    <label htmlFor="quick-organization">Organization *</label>
+                                    <label htmlFor="quick-organization">
+                                        Organization <span className="field-required">*</span>
+                                    </label>
                                     <input
                                         id="quick-organization"
                                         type="text"
                                         value={formData.organization}
                                         onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, organization: true }))}
                                         required
-                                        className={organizationMissing ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
-                                        aria-invalid={organizationMissing || undefined}
+                                        className={showOrganizationError ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
+                                        aria-invalid={showOrganizationError || undefined}
+                                        aria-describedby="quick-organization-error"
                                     />
-                                    {organizationMissing && (
-                                        <span className="field-error">Organization is required.</span>
+                                    {showOrganizationError && (
+                                        <span id="quick-organization-error" className="field-error" role="alert">Organization is required.</span>
                                     )}
                                     {organizationValid && (
                                         <span className="field-status ok">✓ Looks good</span>
@@ -4153,12 +4422,24 @@ export function AdminPage() {
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="quick-deadline">Last Date</label>
-                                    <input
+                                    <DatePicker
                                         id="quick-deadline"
-                                        type="date"
-                                        value={formData.deadline}
-                                        onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                                        selected={parseDateOnly(formData.deadline)}
+                                        onChange={(date) => {
+                                            setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
+                                            setTouchedFields((prev) => ({ ...prev, deadline: true }));
+                                        }}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, deadline: true }))}
+                                        placeholderText="Select deadline"
+                                        className={`admin-datepicker-input ${showDeadlineWarning ? 'field-warning' : ''}`}
+                                        calendarClassName="admin-datepicker-calendar"
+                                        popperClassName="admin-datepicker-popper"
+                                        dateFormat="dd MMM yyyy"
+                                        aria-describedby="quick-deadline-hint"
                                     />
+                                    {showDeadlineWarning && (
+                                        <span id="quick-deadline-hint" className="field-error" role="alert">Deadline is in the past.</span>
+                                    )}
                                 </div>
                             </div>
 
@@ -4251,7 +4532,14 @@ export function AdminPage() {
                                         type="url"
                                         value={formData.externalLink}
                                         onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, externalLink: true }))}
+                                        className={showExternalLinkError ? 'field-invalid' : ''}
+                                        aria-invalid={showExternalLinkError || undefined}
+                                        aria-describedby="quick-external-link-error"
                                     />
+                                    {showExternalLinkError && (
+                                        <span id="quick-external-link-error" className="field-error" role="alert">Enter a valid URL starting with http or https.</span>
+                                    )}
                                 </div>
                             </div>
 
@@ -4275,15 +4563,32 @@ export function AdminPage() {
                                             <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
                                         )}
                                     </label>
-                                    <input
+                                    <DatePicker
                                         id="quick-publish-at"
-                                        type="datetime-local"
-                                        value={formData.publishAt}
-                                        onChange={(e) => setFormData({ ...formData, publishAt: e.target.value })}
+                                        selected={parseDateTime(formData.publishAt)}
+                                        onChange={(date) => {
+                                            setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
+                                            setTouchedFields((prev) => ({ ...prev, publishAt: true }));
+                                        }}
+                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, publishAt: true }))}
+                                        placeholderText="Select date & time"
+                                        className={`admin-datepicker-input ${showPublishAtError ? 'field-invalid' : ''}`}
+                                        calendarClassName="admin-datepicker-calendar"
+                                        popperClassName="admin-datepicker-popper"
+                                        dateFormat="dd MMM yyyy, h:mm aa"
+                                        showTimeSelect
+                                        timeIntervals={15}
                                         disabled={formData.status !== 'scheduled'}
+                                        aria-describedby="quick-publish-hint"
                                     />
                                     {formData.status !== 'scheduled' && (
                                         <p className="field-hint">Enabled only when Status is Scheduled.</p>
+                                    )}
+                                    {formData.status === 'scheduled' && (
+                                        <p className="field-hint">Time zone: {timeZoneLabel}</p>
+                                    )}
+                                    {showPublishAtError && (
+                                        <span id="quick-publish-hint" className="field-error" role="alert">Publish time is required for scheduled posts.</span>
                                     )}
                                 </div>
                             </div>
@@ -4399,7 +4704,7 @@ export function AdminPage() {
                                         )}
                                         {previewData.formData.deadline && (
                                             <span style={{ background: 'rgba(244, 67, 54, 0.3)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.85rem' }}>
-                                                Deadline: {new Date(previewData.formData.deadline).toLocaleDateString()}
+                                                Deadline: {formatDate(previewData.formData.deadline)}
                                             </span>
                                         )}
                                     </div>

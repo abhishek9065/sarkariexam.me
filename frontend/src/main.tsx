@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register';
 
 import App from './AppRouter';
 import { initErrorMonitoring } from './utils/errorMonitoring';
+import 'react-datepicker/dist/react-datepicker.css';
 import './styles.css';
 
 const recoverFromStaleServiceWorker = () => {

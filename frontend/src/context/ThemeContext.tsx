@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-export type Theme = 'dark'; // Always dark
-export type ThemeMode = 'dark'; // Always dark
+export type Theme = 'dark' | 'light';
+export type ThemeMode = Theme;
 
 interface ThemeContextType {
     theme: Theme;
@@ -20,20 +20,22 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    // Always dark theme - no light mode
-    const [themeMode] = useState<ThemeMode>('dark');
-    const [theme] = useState<Theme>('dark');
+    const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+        if (typeof window === 'undefined') return 'dark';
+        const stored = window.localStorage.getItem('themeMode') as ThemeMode | null;
+        if (stored === 'light' || stored === 'dark') return stored;
+        return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    });
+    const theme = useMemo(() => themeMode, [themeMode]);
 
     useEffect(() => {
-        // Always set dark theme
-        document.documentElement.setAttribute('data-theme', 'dark');
-        // Clear any old theme preference
-        localStorage.removeItem('themeMode');
-    }, []);
+        document.documentElement.setAttribute('data-theme', themeMode);
+        localStorage.setItem('themeMode', themeMode);
+    }, [themeMode]);
 
-    // No-op functions since we only support dark mode
-    const toggleTheme = () => { };
-    const setThemeMode = () => { };
+    const toggleTheme = () => {
+        setThemeMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    };
 
     return (
         <ThemeContext.Provider value={{ theme, themeMode, toggleTheme, setThemeMode }}>
