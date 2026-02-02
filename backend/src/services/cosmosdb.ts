@@ -93,7 +93,6 @@ export async function connectToDatabase(): Promise<Db> {
             return db;
         } catch (error) {
             console.error(`[CosmosDB] Connection attempt ${attempt} failed:`, error);
-            connectionRetries = attempt;
             
             // Clean up failed connection
             if (client) {
