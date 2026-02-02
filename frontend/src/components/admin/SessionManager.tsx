@@ -329,7 +329,15 @@ export function SessionManager({
                 </div>
             )}
 
-            {otherSessions.length === 0 && (
+            {sessions.length === 0 && !loading && (
+                <div className="no-other-sessions">
+                    <div className="no-sessions-icon">🔒</div>
+                    <h3>No sessions found</h3>
+                    <p>We could not detect any active admin sessions yet.</p>
+                </div>
+            )}
+
+            {sessions.length > 0 && otherSessions.length === 0 && currentSession && (
                 <div className="no-other-sessions">
                     <div className="no-sessions-icon">🔒</div>
                     <h3>Only Current Session Active</h3>

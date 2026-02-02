@@ -129,6 +129,7 @@ export interface JwtPayload {
   role: UserRole;
   twoFactorVerified?: boolean;
   twoFactorSetup?: boolean;
+  sessionId?: string;
 }
 
 export interface Bookmark {

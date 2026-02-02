@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DatePicker from 'react-datepicker';
-import { AnalyticsDashboard } from '../components/admin/AnalyticsDashboard';
-import { JobPostingForm, type JobDetails } from '../components/admin/JobPostingForm';
+import type { JobDetails } from '../components/admin/JobPostingForm';
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
-import { SecurityLogsTable } from '../components/admin/SecurityLogsTable';
 import { ConfirmDialogProvider } from '../components/admin/ConfirmDialog';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AuthLoadingIndicator } from '../components/admin/AuthLoadingIndicator';
 import { AdminNotificationSystem } from '../components/admin/AdminNotification';
 import { useAdminNotifications } from '../components/admin/useAdminNotifications';
-import { AdminContentList } from '../components/admin/AdminContentList';
-import { AdminQueue } from '../components/admin/AdminQueue';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { useTheme } from '../context/ThemeContext';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
@@ -20,6 +16,25 @@ import { adminRequest } from '../utils/adminRequest';
 import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
+
+const AnalyticsDashboard = lazy(() =>
+    import('../components/admin/AnalyticsDashboard').then((module) => ({ default: module.AnalyticsDashboard }))
+);
+const JobPostingForm = lazy(() =>
+    import('../components/admin/JobPostingForm').then((module) => ({ default: module.JobPostingForm }))
+);
+const SecurityLogsTable = lazy(() =>
+    import('../components/admin/SecurityLogsTable').then((module) => ({ default: module.SecurityLogsTable }))
+);
+const AdminContentList = lazy(() =>
+    import('../components/admin/AdminContentList').then((module) => ({ default: module.AdminContentList }))
+);
+const AdminQueue = lazy(() =>
+    import('../components/admin/AdminQueue').then((module) => ({ default: module.AdminQueue }))
+);
+const SessionManager = lazy(() =>
+    import('../components/admin/SessionManager').then((module) => ({ default: module.SessionManager }))
+);
 
 type DashboardOverview = {
     totalAnnouncements: number;
@@ -134,6 +149,30 @@ type ErrorReport = {
     userEmail?: string | null;
     resolvedAt?: string | null;
     resolvedBy?: string | null;
+};
+
+type AdminSession = {
+    id: string;
+    userId: string;
+    email?: string;
+    ip: string;
+    userAgent: string;
+    device: string;
+    browser: string;
+    os: string;
+    lastActivity: string;
+    loginTime: string;
+    expiresAt?: string | null;
+    isCurrentSession: boolean;
+    isActive: boolean;
+    riskScore: 'low' | 'medium' | 'high';
+    actions: string[];
+};
+
+type BackupCodesStatus = {
+    total: number;
+    remaining: number;
+    updatedAt: string | null;
 };
 
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
@@ -438,6 +477,12 @@ export function AdminPage() {
     const [errorReportStatusFilter, setErrorReportStatusFilter] = useState<ErrorReportStatus | 'all'>('new');
     const [errorReportNotes, setErrorReportNotes] = useState<Record<string, string>>({});
     const [errorReportQuery, setErrorReportQuery] = useState('');
+    const [sessions, setSessions] = useState<AdminSession[]>([]);
+    const [sessionsLoading, setSessionsLoading] = useState(false);
+    const [sessionsError, setSessionsError] = useState<string | null>(null);
+    const [backupCodesStatus, setBackupCodesStatus] = useState<BackupCodesStatus | null>(null);
+    const [backupCodesLoading, setBackupCodesLoading] = useState(false);
+    const [backupCodesModal, setBackupCodesModal] = useState<{ codes: string[]; generatedAt: string } | null>(null);
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -451,6 +496,9 @@ export function AdminPage() {
     const heroExpiringSoon = overview?.expiringSoon ?? 0;
     const timeZoneId = timeZoneMode === 'local' ? undefined : timeZoneMode === 'ist' ? 'Asia/Kolkata' : 'UTC';
     const timeZoneLabel = timeZoneMode === 'local' ? 'Local' : timeZoneMode === 'ist' ? 'IST' : 'UTC';
+    const currentSession = useMemo(() => sessions.find((session) => session.isCurrentSession), [sessions]);
+    const activeSessionCount = useMemo(() => sessions.filter((session) => session.isActive).length, [sessions]);
+    const highRiskSessionCount = useMemo(() => sessions.filter((session) => session.riskScore === 'high').length, [sessions]);
 
     useEffect(() => {
         localStorage.setItem(ADMIN_TIMEZONE_KEY, timeZoneMode);
@@ -476,6 +524,10 @@ export function AdminPage() {
         setIsLoggedIn(false);
         setAdminUser(null);
         setAdminSetupToken(null);
+        setSessions([]);
+        setSessionsError(null);
+        setBackupCodesStatus(null);
+        setBackupCodesModal(null);
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
@@ -842,6 +894,145 @@ export function AdminPage() {
             setAdminSummaryError('Failed to load admin summary.');
         } finally {
             setAdminSummaryLoading(false);
+        }
+    };
+
+    const refreshSessions = async () => {
+        if (!isLoggedIn) return;
+        setSessionsLoading(true);
+        setSessionsError(null);
+        try {
+            const res = await adminFetch(`${apiBase}/api/admin/sessions`);
+            if (!res.ok) {
+                if (res.status === 401 || res.status === 403) {
+                    handleUnauthorized();
+                    return;
+                }
+                const errorBody = await res.json().catch(() => ({}));
+                setSessionsError(getApiErrorMessage(errorBody, 'Failed to load sessions.'));
+                setSessions([]);
+                return;
+            }
+            const payload = await res.json();
+            setSessions(payload.data ?? []);
+        } catch (error) {
+            console.error(error);
+            setSessionsError('Failed to load sessions.');
+            setSessions([]);
+        } finally {
+            setSessionsLoading(false);
+        }
+    };
+
+    const terminateSession = async (sessionId: string) => {
+        const res = await adminFetch(`${apiBase}/api/admin/sessions/terminate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+        });
+        if (res.status === 401 || res.status === 403) {
+            handleUnauthorized();
+            return;
+        }
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            pushToast(getApiErrorMessage(errorBody, 'Failed to terminate session.'), 'error');
+            return;
+        }
+        pushToast('Session terminated.', 'success');
+        refreshSessions();
+    };
+
+    const terminateOtherSessions = async () => {
+        const res = await adminFetch(`${apiBase}/api/admin/sessions/terminate-others`, {
+            method: 'POST',
+        });
+        if (res.status === 401 || res.status === 403) {
+            handleUnauthorized();
+            return;
+        }
+        if (!res.ok) {
+            const errorBody = await res.json().catch(() => ({}));
+            pushToast(getApiErrorMessage(errorBody, 'Failed to terminate other sessions.'), 'error');
+            return;
+        }
+        pushToast('Other sessions terminated.', 'success');
+        refreshSessions();
+    };
+
+    const refreshBackupCodesStatus = async () => {
+        if (!isLoggedIn) return;
+        try {
+            const res = await adminFetch(`${apiBase}/api/auth/admin/2fa/backup-codes/status`);
+            if (res.status === 401 || res.status === 403) {
+                return;
+            }
+            if (!res.ok) {
+                setBackupCodesStatus(null);
+                return;
+            }
+            const payload = await res.json();
+            setBackupCodesStatus(payload.data ?? null);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const generateBackupCodes = async () => {
+        setBackupCodesLoading(true);
+        try {
+            const res = await adminFetch(`${apiBase}/api/auth/admin/2fa/backup-codes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+            if (res.status === 401 || res.status === 403) {
+                handleUnauthorized();
+                return;
+            }
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                pushToast(getApiErrorMessage(errorBody, 'Failed to generate backup codes.'), 'error');
+                return;
+            }
+            const payload = await res.json();
+            const codes = payload.data?.codes ?? [];
+            if (codes.length) {
+                setBackupCodesModal({ codes, generatedAt: payload.data?.generatedAt ?? new Date().toISOString() });
+                pushToast('Backup codes generated.', 'success');
+                refreshBackupCodesStatus();
+            }
+        } catch (error) {
+            console.error(error);
+            pushToast('Failed to generate backup codes.', 'error');
+        } finally {
+            setBackupCodesLoading(false);
+        }
+    };
+
+    const downloadBackupCodes = (codes: string[]) => {
+        const content = [
+            'SarkariExams Admin Backup Codes',
+            `Generated: ${new Date().toLocaleString()}`,
+            '',
+            ...codes,
+        ].join('\n');
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `sarkariexams-backup-codes-${new Date().toISOString().split('T')[0]}.txt`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+    };
+
+    const copyBackupCodes = async (codes: string[]) => {
+        try {
+            await navigator.clipboard.writeText(codes.join('\n'));
+            pushToast('Backup codes copied to clipboard.', 'success');
+        } catch (error) {
+            console.error(error);
+            pushToast('Failed to copy backup codes.', 'error');
         }
     };
 
@@ -2307,6 +2498,8 @@ export function AdminPage() {
         refreshDashboard();
         refreshActiveUsers();
         refreshAdminSummary();
+        refreshSessions();
+        refreshBackupCodesStatus();
     }, [isLoggedIn]);
 
     useEffect(() => {
@@ -2327,6 +2520,10 @@ export function AdminPage() {
         }
         if (activeAdminTab === 'errors') {
             refreshErrorReports();
+        }
+        if (activeAdminTab === 'security') {
+            refreshSessions();
+            refreshBackupCodesStatus();
         }
     }, [activeAdminTab, isLoggedIn]);
 
@@ -2481,7 +2678,7 @@ export function AdminPage() {
                                             authError.location = errorResult?.location;
                                             throw authError;
                                         }
-                                        if (errorCode === 'invalid_totp') {
+                                        if (errorCode === 'invalid_totp' || errorCode === 'invalid_backup_code') {
                                             setMessage('');
                                             const authError: any = new Error(errorCode);
                                             authError.code = errorCode;
@@ -2498,7 +2695,7 @@ export function AdminPage() {
                                     }
                                 } catch (error) {
                                     const authError = error as any;
-                                    if (authError?.code === 'two_factor_required' || authError?.code === 'two_factor_setup_required' || authError?.code === 'invalid_totp') {
+                                    if (authError?.code === 'two_factor_required' || authError?.code === 'two_factor_setup_required' || authError?.code === 'invalid_totp' || authError?.code === 'invalid_backup_code') {
                                         throw authError;
                                     }
                                     console.error(error);
@@ -2527,6 +2724,9 @@ export function AdminPage() {
 
     return (
         <div className="admin-page">
+            <a className="skip-link" href="#admin-main">
+                Skip to main content
+            </a>
             <AdminNotificationSystem 
                 notifications={notifications} 
                 onRemove={removeNotification} 
@@ -2544,6 +2744,31 @@ export function AdminPage() {
                 {rateLimitRemaining && (
                     <div className="admin-banner warning" role="status">
                         Rate limited. Retry in {rateLimitRemaining}s.
+                    </div>
+                )}
+                {currentSession && (
+                    <div className="admin-banner info with-actions" role="status">
+                        <div className="admin-banner-content">
+                            <strong>Secure session active</strong>
+                            <span>{currentSession.device} • {currentSession.browser}</span>
+                            <span>IP: {currentSession.ip}</span>
+                            <span>{formatLastUpdated(currentSession.lastActivity, 'Last active')}</span>
+                        </div>
+                        <div className="admin-banner-actions">
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => handleNavSelect('security')}
+                            >
+                                View sessions
+                            </button>
+                            <button
+                                className="admin-btn ghost small"
+                                onClick={refreshSessions}
+                                disabled={sessionsLoading}
+                            >
+                                {sessionsLoading ? 'Refreshing…' : 'Refresh'}
+                            </button>
+                        </div>
                     </div>
                 )}
                 <div className="admin-hero">
@@ -2630,6 +2855,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('analytics')}
                                         aria-label="Analytics"
                                         title="Analytics"
+                                        aria-current={activeAdminTab === 'analytics' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Analytics</span>
                                         <span className="nav-short">AN</span>
@@ -2642,6 +2868,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('users')}
                                         aria-label="Users"
                                         title="Users"
+                                        aria-current={activeAdminTab === 'users' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Users</span>
                                         <span className="nav-short">US</span>
@@ -2657,6 +2884,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('list')}
                                         aria-label="All announcements"
                                         title="All announcements"
+                                        aria-current={activeAdminTab === 'list' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">All Announcements</span>
                                         <span className="nav-short">LI</span>
@@ -2667,6 +2895,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('review')}
                                         aria-label="Review queue"
                                         title="Review queue"
+                                        aria-current={activeAdminTab === 'review' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Review Queue</span>
                                         <span className="nav-short">RV</span>
@@ -2681,6 +2910,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('add')}
                                         aria-label="Quick add"
                                         title="Quick add"
+                                        aria-current={activeAdminTab === 'add' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Quick Add</span>
                                         <span className="nav-short">QA</span>
@@ -2691,6 +2921,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('detailed')}
                                         aria-label="Detailed post"
                                         title="Detailed post"
+                                        aria-current={activeAdminTab === 'detailed' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Detailed Post</span>
                                         <span className="nav-short">DP</span>
@@ -2701,6 +2932,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('bulk')}
                                         aria-label="Bulk import"
                                         title="Bulk import"
+                                        aria-current={activeAdminTab === 'bulk' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Bulk Import</span>
                                         <span className="nav-short">BI</span>
@@ -2711,6 +2943,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('queue')}
                                         aria-label="Schedule queue"
                                         title="Schedule queue"
+                                        aria-current={activeAdminTab === 'queue' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Schedule Queue</span>
                                         <span className="nav-short">SQ</span>
@@ -2730,6 +2963,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('community')}
                                         aria-label="Community"
                                         title="Community"
+                                        aria-current={activeAdminTab === 'community' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Community</span>
                                         <span className="nav-short">CM</span>
@@ -2740,6 +2974,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('errors')}
                                         aria-label="Error reports"
                                         title="Error reports"
+                                        aria-current={activeAdminTab === 'errors' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Error Reports</span>
                                         <span className="nav-short">ER</span>
@@ -2750,6 +2985,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('audit')}
                                         aria-label="Audit log"
                                         title="Audit log"
+                                        aria-current={activeAdminTab === 'audit' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Audit Log</span>
                                         <span className="nav-short">AL</span>
@@ -2765,6 +3001,7 @@ export function AdminPage() {
                                         onClick={() => handleNavSelect('security')}
                                         aria-label="Security"
                                         title="Security"
+                                        aria-current={activeAdminTab === 'security' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Security</span>
                                         <span className="nav-short">SC</span>
@@ -2876,7 +3113,7 @@ export function AdminPage() {
                         onClick={() => setIsNavOpen(false)}
                     />
 
-                    <section className="admin-workspace">
+                    <section className="admin-workspace" id="admin-main" role="main" tabIndex={-1}>
                         {message && <div className="admin-banner" role="status">{message}</div>}
 
                         <div className="admin-context">
@@ -2923,12 +3160,14 @@ export function AdminPage() {
                         </div>
 
                         {activeAdminTab === 'analytics' ? (
-                    <AnalyticsDashboard
-                        onEditById={handleEditById}
-                        onOpenList={() => setActiveAdminTab('list')}
-                        onUnauthorized={handleUnauthorized}
-                        onLoadingChange={setAnalyticsLoading}
-                    />
+                    <Suspense fallback={<div className="admin-loading">Loading analytics...</div>}>
+                        <AnalyticsDashboard
+                            onEditById={handleEditById}
+                            onOpenList={() => setActiveAdminTab('list')}
+                            onUnauthorized={handleUnauthorized}
+                            onLoadingChange={setAnalyticsLoading}
+                        />
+                    </Suspense>
                 ) : activeAdminTab === 'users' ? (
                     <div className="admin-users">
                         <div className="admin-list-header">
@@ -3348,52 +3587,54 @@ export function AdminPage() {
                         )}
                     </div>
                 ) : activeAdminTab === 'list' ? (
-                    <AdminContentList
-                        items={pagedAnnouncements}
-                        loading={listLoading}
-                        total={listTotal}
-                        page={listPage}
-                        totalPages={totalPages}
-                        onPageChange={setListPage}
-                        searchQuery={listQuery}
-                        onSearchChange={setListQuery}
-                        typeFilter={listTypeFilter}
-                        onTypeFilterChange={setListTypeFilter}
-                        statusFilter={listStatusFilter}
-                        onStatusFilterChange={setListStatusFilter}
-                        sortOption={listSort}
-                        onSortChange={setListSort}
-                        onRefresh={refreshListData}
-                        onEdit={handleEdit}
-                        onDelete={(id) => handleDelete(id)}
-                        onView={handleView}
-                        onDuplicate={handleDuplicate}
-                        onExport={() => {
-                            const params = new URLSearchParams();
-                            if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
-                            if (listTypeFilter !== 'all') params.set('type', listTypeFilter);
-                            params.set('includeInactive', 'true');
-                            downloadCsv(`/api/admin/announcements/export/csv?${params.toString()}`, `admin-announcements-${new Date().toISOString().split('T')[0]}.csv`);
-                        }}
-                        onCreate={() => handleQuickCreate('job', 'add')}
-                        selectedIds={selectedIds}
-                        onSelectionChange={setSelectedIds}
-                        onBulkAction={(action) => {
-                            if (action === 'approve') handleBulkUpdate({ status: 'published' });
-                            else if (action === 'reject') handleBulkUpdate({ status: 'pending' });
-                            else if (action === 'archive') handleBulkUpdate({ status: 'archived' });
-                            else if (action === 'delete') {
-                                if (window.confirm('Are you sure you want to move selected items to Draft?')) {
-                                    handleBulkUpdate({ status: 'draft' });
+                    <Suspense fallback={<div className="admin-loading">Loading listings...</div>}>
+                        <AdminContentList
+                            items={pagedAnnouncements}
+                            loading={listLoading}
+                            total={listTotal}
+                            page={listPage}
+                            totalPages={totalPages}
+                            onPageChange={setListPage}
+                            searchQuery={listQuery}
+                            onSearchChange={setListQuery}
+                            typeFilter={listTypeFilter}
+                            onTypeFilterChange={setListTypeFilter}
+                            statusFilter={listStatusFilter}
+                            onStatusFilterChange={setListStatusFilter}
+                            sortOption={listSort}
+                            onSortChange={setListSort}
+                            onRefresh={refreshListData}
+                            onEdit={handleEdit}
+                            onDelete={(id) => handleDelete(id)}
+                            onView={handleView}
+                            onDuplicate={handleDuplicate}
+                            onExport={() => {
+                                const params = new URLSearchParams();
+                                if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
+                                if (listTypeFilter !== 'all') params.set('type', listTypeFilter);
+                                params.set('includeInactive', 'true');
+                                downloadCsv(`/api/admin/announcements/export/csv?${params.toString()}`, `admin-announcements-${new Date().toISOString().split('T')[0]}.csv`);
+                            }}
+                            onCreate={() => handleQuickCreate('job', 'add')}
+                            selectedIds={selectedIds}
+                            onSelectionChange={setSelectedIds}
+                            onBulkAction={(action) => {
+                                if (action === 'approve') handleBulkUpdate({ status: 'published' });
+                                else if (action === 'reject') handleBulkUpdate({ status: 'pending' });
+                                else if (action === 'archive') handleBulkUpdate({ status: 'archived' });
+                                else if (action === 'delete') {
+                                    if (window.confirm('Are you sure you want to move selected items to Draft?')) {
+                                        handleBulkUpdate({ status: 'draft' });
+                                    }
                                 }
-                            }
-                        }}
-                        lastUpdated={listUpdatedAt}
-                        formatDateTime={formatDateTime}
-                        timeZoneLabel={timeZoneLabel}
-                        filterSummary={listFilterSummary}
-                        onClearFilters={handleClearListFilters}
-                    />
+                            }}
+                            lastUpdated={listUpdatedAt}
+                            formatDateTime={formatDateTime}
+                            timeZoneLabel={timeZoneLabel}
+                            filterSummary={listFilterSummary}
+                            onClearFilters={handleClearListFilters}
+                        />
+                    </Suspense>
                 ) : activeAdminTab === 'review' ? (
                     <div className="admin-list">
                         <div className="admin-list-header">
@@ -3661,23 +3902,25 @@ export function AdminPage() {
                         )}
                     </div>
                 ) : activeAdminTab === 'queue' ? (
-                    <AdminQueue
-                        items={scheduledAnnouncements}
-                        stats={scheduledStats}
-                        formatDateTime={formatDateTime}
-                        formatDate={formatDate}
-                        formatTime={formatTime}
-                        timeZoneLabel={timeZoneLabel}
-                        onEdit={handleEdit}
-                        onReschedule={handleReschedule}
-                        onPublishNow={(id) => handleApprove(id, '')}
-                        onReject={(id) => handleReject(id, '')}
-                        onRefresh={refreshData}
-                        onExport={() => { }}
-                        onNewJob={() => handleQuickCreate('job', 'add')}
-                        lastUpdated={listUpdatedAt}
-                        loading={listLoading}
-                    />
+                    <Suspense fallback={<div className="admin-loading">Loading schedule queue...</div>}>
+                        <AdminQueue
+                            items={scheduledAnnouncements}
+                            stats={scheduledStats}
+                            formatDateTime={formatDateTime}
+                            formatDate={formatDate}
+                            formatTime={formatTime}
+                            timeZoneLabel={timeZoneLabel}
+                            onEdit={handleEdit}
+                            onReschedule={handleReschedule}
+                            onPublishNow={(id) => handleApprove(id, '')}
+                            onReject={(id) => handleReject(id, '')}
+                            onRefresh={refreshData}
+                            onExport={() => { }}
+                            onNewJob={() => handleQuickCreate('job', 'add')}
+                            lastUpdated={listUpdatedAt}
+                            loading={listLoading}
+                        />
+                    </Suspense>
                 ) : activeAdminTab === 'detailed' ? (
 
                     <div className="admin-form-container">
@@ -3931,36 +4174,37 @@ export function AdminPage() {
                         )}
 
                         {/* Job Details Form */}
-                        <JobPostingForm
-                            initialData={jobDetails || undefined}
-                            isDisabled={titleInvalid || organizationMissing}
-                            onSubmit={async (details) => {
-                                if (!isLoggedIn) {
-                                    setMessage('Not authenticated');
-                                    return;
-                                }
+                        <Suspense fallback={<div className="admin-loading">Loading job form...</div>}>
+                            <JobPostingForm
+                                initialData={jobDetails || undefined}
+                                isDisabled={titleInvalid || organizationMissing}
+                                onSubmit={async (details) => {
+                                    if (!isLoggedIn) {
+                                        setMessage('Not authenticated');
+                                        return;
+                                    }
 
-                                if (!formData.title || !formData.organization) {
-                                    setMessage('Please fill in Title and Organization in Basic Information');
-                                    return;
-                                }
+                                    if (!formData.title || !formData.organization) {
+                                        setMessage('Please fill in Title and Organization in Basic Information');
+                                        return;
+                                    }
 
-                                setMessage(editingId ? 'Updating...' : 'Saving...');
-                                try {
-                                    const url = editingId
-                                        ? `${apiBase}/api/admin/announcements/${editingId}`
-                                        : `${apiBase}/api/admin/announcements`;
-                                    const method = editingId ? 'PUT' : 'POST';
-                                    const payload = {
-                                        ...formData,
-                                        totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
-                                        salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
-                                        salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
-                                        difficulty: formData.difficulty || undefined,
-                                        cutoffMarks: formData.cutoffMarks || undefined,
-                                        publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
-                                        jobDetails: details,
-                                    };
+                                    setMessage(editingId ? 'Updating...' : 'Saving...');
+                                    try {
+                                        const url = editingId
+                                            ? `${apiBase}/api/admin/announcements/${editingId}`
+                                            : `${apiBase}/api/admin/announcements`;
+                                        const method = editingId ? 'PUT' : 'POST';
+                                        const payload = {
+                                            ...formData,
+                                            totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
+                                            salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
+                                            salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
+                                            difficulty: formData.difficulty || undefined,
+                                            cutoffMarks: formData.cutoffMarks || undefined,
+                                            publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
+                                            jobDetails: details,
+                                        };
 
                                     const response = await adminFetch(url, {
                                         method,
@@ -4009,6 +4253,7 @@ export function AdminPage() {
                                 setShowPreview(true);
                             }}
                         />
+                        </Suspense>
                     </div>
                 ) : activeAdminTab === 'bulk' ? (
                     <div className="admin-form-container">
@@ -4226,7 +4471,111 @@ export function AdminPage() {
                         )}
                     </div>
                 ) : activeAdminTab === 'security' ? (
-                    <SecurityLogsTable onUnauthorized={handleUnauthorized} />
+                    <div className="admin-security">
+                        <div className="admin-security-grid">
+                            <div className="admin-security-card">
+                                <div className="security-card-header">
+                                    <div>
+                                        <h4>Two-factor recovery</h4>
+                                        <p className="admin-subtitle">Generate backup codes for account recovery.</p>
+                                    </div>
+                                    <span className="security-card-pill">
+                                        {backupCodesStatus
+                                            ? `${backupCodesStatus.remaining}/${backupCodesStatus.total} remaining`
+                                            : 'Not generated'}
+                                    </span>
+                                </div>
+                                <div className="security-card-body">
+                                    <div className="security-stat">
+                                        <span className="stat-label">Backup codes remaining</span>
+                                        <span className="stat-value">{backupCodesStatus?.remaining ?? 0}</span>
+                                    </div>
+                                    <div className="security-stat">
+                                        <span className="stat-label">Last generated</span>
+                                        <span className="stat-value">
+                                            {backupCodesStatus?.updatedAt ? formatDateTime(backupCodesStatus.updatedAt) : 'Not generated'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="security-card-actions">
+                                    <button
+                                        className="admin-btn primary small"
+                                        onClick={generateBackupCodes}
+                                        disabled={backupCodesLoading}
+                                    >
+                                        {backupCodesLoading ? 'Generating…' : 'Generate backup codes'}
+                                    </button>
+                                    <button
+                                        className="admin-btn secondary small"
+                                        onClick={refreshBackupCodesStatus}
+                                        disabled={backupCodesLoading}
+                                    >
+                                        Refresh status
+                                    </button>
+                                </div>
+                                <p className="security-card-note">
+                                    Generate a new set to invalidate old codes and store them somewhere safe.
+                                </p>
+                            </div>
+
+                            <div className="admin-security-card">
+                                <div className="security-card-header">
+                                    <div>
+                                        <h4>Session health</h4>
+                                        <p className="admin-subtitle">Monitor active sessions and risk signals.</p>
+                                    </div>
+                                    <span className="security-card-pill">{sessions.length} total</span>
+                                </div>
+                                <div className="security-card-body">
+                                    <div className="security-stat">
+                                        <span className="stat-label">Active now</span>
+                                        <span className="stat-value">{activeSessionCount}</span>
+                                    </div>
+                                    <div className="security-stat">
+                                        <span className="stat-label">High risk</span>
+                                        <span className="stat-value">{highRiskSessionCount}</span>
+                                    </div>
+                                </div>
+                                <div className="security-card-actions">
+                                    <button
+                                        className="admin-btn secondary small"
+                                        onClick={refreshSessions}
+                                        disabled={sessionsLoading}
+                                    >
+                                        {sessionsLoading ? 'Refreshing…' : 'Refresh sessions'}
+                                    </button>
+                                    {sessions.length > 1 && (
+                                        <button
+                                            className="admin-btn warning small"
+                                            onClick={terminateOtherSessions}
+                                            disabled={sessionsLoading}
+                                        >
+                                            End other sessions
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="security-card-note">
+                                    Terminate unknown sessions immediately if you see unfamiliar devices.
+                                </p>
+                            </div>
+                        </div>
+
+                        {sessionsError && <div className="admin-error">{sessionsError}</div>}
+
+                        <Suspense fallback={<div className="admin-loading">Loading sessions...</div>}>
+                            <SessionManager
+                                sessions={sessions}
+                                onTerminateSession={terminateSession}
+                                onTerminateAllOther={terminateOtherSessions}
+                                onRefresh={refreshSessions}
+                                loading={sessionsLoading}
+                            />
+                        </Suspense>
+
+                        <Suspense fallback={<div className="admin-loading">Loading security logs...</div>}>
+                            <SecurityLogsTable onUnauthorized={handleUnauthorized} />
+                        </Suspense>
+                    </div>
                 ) : (
                     <div className="admin-form-container">
                         <form onSubmit={handleSubmit} className="admin-form">
@@ -4563,7 +4912,14 @@ export function AdminPage() {
                         overflow: 'auto',
                         padding: '20px'
                     }}>
-                        <div className="preview-modal" onClick={(e) => e.stopPropagation()} style={{
+                        <div
+                            className="preview-modal"
+                            onClick={(e) => e.stopPropagation()}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="preview-title"
+                            aria-describedby="preview-desc"
+                            style={{
                             maxWidth: '1000px',
                             margin: '0 auto',
                             background: 'var(--bg-primary, white)',
@@ -4579,8 +4935,8 @@ export function AdminPage() {
                                 alignItems: 'center'
                             }}>
                                 <div>
-                                    <h2 style={{ margin: 0 }}>Preview Mode</h2>
-                                    <p style={{ margin: '5px 0 0', opacity: 0.9 }}>This is how your job posting will appear</p>
+                                    <h2 id="preview-title" style={{ margin: 0 }}>Preview Mode</h2>
+                                    <p id="preview-desc" style={{ margin: '5px 0 0', opacity: 0.9 }}>This is how your job posting will appear</p>
                                 </div>
                                 <button onClick={() => setShowPreview(false)} style={{
                                     background: 'rgba(255,255,255,0.2)',
@@ -4728,11 +5084,18 @@ export function AdminPage() {
 
             {versionTarget && (
                 <div className="admin-modal-overlay" onClick={() => setVersionTarget(null)}>
-                    <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+                    <div
+                        className="admin-modal"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="version-history-title"
+                        aria-describedby="version-history-desc"
+                    >
                         <div className="admin-modal-header">
                             <div>
-                                <h3>Version history</h3>
-                                <p className="admin-subtitle">{versionTarget.title}</p>
+                                <h3 id="version-history-title">Version history</h3>
+                                <p id="version-history-desc" className="admin-subtitle">{versionTarget.title}</p>
                             </div>
                             <button className="admin-btn secondary small" onClick={() => setVersionTarget(null)}>Close</button>
                         </div>
@@ -4758,6 +5121,50 @@ export function AdminPage() {
                             ) : (
                                 <div className="empty-state">No version history yet. Edits create snapshots for review.</div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {backupCodesModal && (
+                <div className="admin-modal-overlay" onClick={() => setBackupCodesModal(null)}>
+                    <div
+                        className="admin-modal"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="backup-codes-title"
+                        aria-describedby="backup-codes-desc"
+                    >
+                        <div className="admin-modal-header">
+                            <div>
+                                <h3 id="backup-codes-title">Backup codes</h3>
+                                <p id="backup-codes-desc" className="admin-subtitle">
+                                    Save these codes securely. Each code can be used once.
+                                </p>
+                            </div>
+                            <button className="admin-btn secondary small" onClick={() => setBackupCodesModal(null)}>Close</button>
+                        </div>
+                        <div className="admin-modal-body">
+                            <div className="backup-codes-meta">
+                                Generated: {formatDateTime(backupCodesModal.generatedAt)}
+                            </div>
+                            <div className="backup-codes-grid">
+                                {backupCodesModal.codes.map((code) => (
+                                    <div key={code} className="backup-code-chip">{code}</div>
+                                ))}
+                            </div>
+                            <div className="backup-codes-actions">
+                                <button className="admin-btn secondary" onClick={() => copyBackupCodes(backupCodesModal.codes)}>
+                                    Copy codes
+                                </button>
+                                <button className="admin-btn primary" onClick={() => downloadBackupCodes(backupCodesModal.codes)}>
+                                    Download .txt
+                                </button>
+                            </div>
+                            <p className="security-card-note">
+                                Generating a new set invalidates all previous backup codes.
+                            </p>
                         </div>
                     </div>
                 </div>

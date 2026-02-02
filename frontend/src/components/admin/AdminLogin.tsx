@@ -45,6 +45,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
     const [forgotLoading, setForgotLoading] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({ score: 0, requirements: { length: false, uppercase: false, lowercase: false, number: false, special: false } });
     const [twoFactorCode, setTwoFactorCode] = useState('');
+    const [twoFactorMode, setTwoFactorMode] = useState<'totp' | 'backup'>('totp');
     const [qrCodeData, setQrCodeData] = useState<{qrCode: string; secret: string} | null>(null);
     const [, setRequire2FA] = useState(false);
     const [sessionInfo, setSessionInfo] = useState<{ip: string; device: string; location?: string} | null>(null);
@@ -168,6 +169,14 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
         setCaptchaAnswer('');
     };
 
+    const normalizeBackupCode = (value: string) => value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const formatBackupCodeInput = (value: string) => {
+        const normalized = normalizeBackupCode(value).slice(0, 8);
+        if (normalized.length <= 4) return normalized;
+        return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+    };
+    const isValidBackupCode = (value: string) => normalizeBackupCode(value).length >= 8;
+
     // Validate form inputs in real-time
     useEffect(() => {
         const errors: FormErrors = {};
@@ -191,9 +200,11 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
         setFormErrors(errors);
         const basicValid = email.length > 0 && password.length >= 6 && !errors.email && !errors.password;
         const captchaValid = showCaptcha ? parseInt(captchaAnswer) === captchaChallenge.a : true;
-        const twoFAValid = view === '2fa' ? twoFactorCode.length === 6 : true;
+        const twoFAValid = view === '2fa'
+            ? (twoFactorMode === 'totp' ? /^\d{6}$/.test(twoFactorCode) : isValidBackupCode(twoFactorCode))
+            : true;
         setIsFormValid(basicValid && captchaValid && twoFAValid);
-    }, [email, password, touched, captchaAnswer, showCaptcha, captchaChallenge, twoFactorCode, view]);
+    }, [email, password, touched, captchaAnswer, showCaptcha, captchaChallenge, twoFactorCode, twoFactorMode, view]);
 
     // Handle loading timeout
     useEffect(() => {
@@ -252,7 +263,9 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
             if (errorCode.includes('2fa_required') || errorCode.includes('two_factor_required')) {
                 setRequire2FA(true);
                 setView('2fa');
+                setTwoFactorMode('totp');
                 setFormErrors({});
+                setTwoFactorCode('');
                 // Get session info for security display
                 setSessionInfo({
                     ip: error?.clientIP || 'Unknown',
@@ -267,6 +280,9 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                 setFormErrors({ general: 'Invalid email or password. Please check your credentials.' });
             } else if (errorMessage.includes('invalid_2fa') || errorMessage.includes('invalid_totp')) {
                 setFormErrors({ general: 'Invalid 2FA code. Please check your authenticator app.' });
+                setTwoFactorCode('');
+            } else if (errorMessage.includes('invalid_backup_code')) {
+                setFormErrors({ general: 'Invalid backup code. Please try another code from your list.' });
                 setTwoFactorCode('');
             } else if (errorMessage.includes('locked') || errorMessage.includes('blocked')) {
                 setFormErrors({ general: 'Account temporarily locked due to too many failed attempts.' });
@@ -673,7 +689,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                             <span className="security-text">Two-Factor Authentication</span>
                         </div>
                         <h2>Security Verification</h2>
-                        <p className="login-subtitle">Enter the 6-digit code from your authenticator app</p>
+                        <p className="login-subtitle">Enter your authenticator code or use a backup code</p>
                     </div>
 
                     {sessionInfo && (
@@ -704,9 +720,34 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                             </div>
                         )}
 
+                        <div className="two-factor-toggle">
+                            <button
+                                type="button"
+                                className={`toggle-btn ${twoFactorMode === 'totp' ? 'active' : ''}`}
+                                onClick={() => {
+                                    setTwoFactorMode('totp');
+                                    setTwoFactorCode('');
+                                }}
+                                disabled={loading}
+                            >
+                                Authenticator code
+                            </button>
+                            <button
+                                type="button"
+                                className={`toggle-btn ${twoFactorMode === 'backup' ? 'active' : ''}`}
+                                onClick={() => {
+                                    setTwoFactorMode('backup');
+                                    setTwoFactorCode('');
+                                }}
+                                disabled={loading}
+                            >
+                                Backup code
+                            </button>
+                        </div>
+
                         <div className="form-group">
                             <label htmlFor="totp-code" className="form-label">
-                                Authentication Code
+                                {twoFactorMode === 'totp' ? 'Authentication Code' : 'Backup Code'}
                                 <span className="required" aria-hidden="true">*</span>
                             </label>
                             <div className="totp-input-wrapper">
@@ -715,23 +756,27 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                                     type="text"
                                     value={twoFactorCode}
                                     onChange={(e) => {
-                                        const value = e.target.value.replace(/[^0-9]/g, '').substring(0, 6);
+                                        const value = twoFactorMode === 'totp'
+                                            ? e.target.value.replace(/[^0-9]/g, '').substring(0, 6)
+                                            : formatBackupCodeInput(e.target.value);
                                         setTwoFactorCode(value);
                                         setFormErrors({});
                                     }}
-                                    placeholder="000000"
-                                    maxLength={6}
+                                    placeholder={twoFactorMode === 'totp' ? '000000' : 'XXXX-XXXX'}
+                                    maxLength={twoFactorMode === 'totp' ? 6 : 9}
                                     required
                                     disabled={loading}
-                                    autoComplete="one-time-code"
-                                    className="totp-input"
-                                    pattern="[0-9]{6}"
-                                    inputMode="numeric"
+                                    autoComplete={twoFactorMode === 'totp' ? 'one-time-code' : 'off'}
+                                    className={`totp-input ${twoFactorMode === 'backup' ? 'backup-code' : ''}`}
+                                    pattern={twoFactorMode === 'totp' ? '[0-9]{6}' : '[A-Za-z0-9-]{6,9}'}
+                                    inputMode={twoFactorMode === 'totp' ? 'numeric' : 'text'}
                                 />
-                                <span className="totp-icon">📱</span>
+                                <span className="totp-icon">{twoFactorMode === 'totp' ? '📱' : '🔑'}</span>
                             </div>
                             <div className="totp-help">
-                                Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.)
+                                {twoFactorMode === 'totp'
+                                    ? 'Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.)'
+                                    : 'Enter one of your saved 8-character backup codes (e.g., ABCD-1234).'}
                             </div>
                         </div>
 
@@ -739,7 +784,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                             <button 
                                 type="submit" 
                                 className="login-btn"
-                                disabled={loading || twoFactorCode.length !== 6}
+                                disabled={loading || (twoFactorMode === 'totp' ? !/^\d{6}$/.test(twoFactorCode) : !isValidBackupCode(twoFactorCode))}
                             >
                                 {loading ? (
                                     <>
@@ -760,6 +805,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                                 onClick={() => {
                                     setView('login');
                                     setTwoFactorCode('');
+                                    setTwoFactorMode('totp');
                                     setRequire2FA(false);
                                     setSessionInfo(null);
                                 }}

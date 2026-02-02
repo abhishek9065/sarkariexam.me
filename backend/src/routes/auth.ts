@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
@@ -12,9 +13,11 @@ import {
 } from '../middleware/security.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
+import { createAdminSession, terminateAdminSession } from '../services/adminSessions.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { JwtPayload } from '../types.js';
 import { decryptSecret, encryptSecret } from '../utils/crypto.js';
+import { generateBackupCodes, hashBackupCode, normalizeBackupCode } from '../utils/backupCodes.js';
 import { generateTotpSecret, verifyTotpCode } from '../utils/totp.js';
 
 const router = express.Router();
@@ -189,7 +192,7 @@ router.post('/register', async (req, res) => {
 const loginSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z.string(),
-  twoFactorCode: z.string().regex(/^\d{6}$/).optional(),
+  twoFactorCode: z.string().trim().min(6).max(20).optional(),
 });
 
 const twoFactorSetupSchema = z.object({
@@ -200,6 +203,34 @@ const twoFactorVerifySchema = z.object({
   code: z.string().regex(/^\d{6}$/),
   setupToken: z.string().optional(),
 });
+
+const backupCodesSchema = z.object({
+  setupToken: z.string().optional(),
+});
+
+const isTotpCode = (value?: string): boolean => {
+  if (!value) return false;
+  return /^\d{6}$/.test(value.trim());
+};
+
+const consumeBackupCode = async (user: any, rawCode: string): Promise<boolean> => {
+  if (!rawCode) return false;
+  const normalized = normalizeBackupCode(rawCode);
+  if (normalized.length < 8) return false;
+  const codeHash = hashBackupCode(normalized);
+  const existing = (user?.twoFactorBackupCodes ?? []).map((item: any) => ({
+    codeHash: item.codeHash,
+    usedAt: item.usedAt ? new Date(item.usedAt) : null,
+  }));
+  const matchIndex = existing.findIndex((item: any) => item.codeHash === codeHash && !item.usedAt);
+  if (matchIndex === -1) return false;
+  const updated = existing.map((item: any, index: number) => {
+    if (index !== matchIndex) return item;
+    return { ...item, usedAt: new Date() };
+  });
+  await UserModelMongo.update(user.id, { twoFactorBackupCodes: updated });
+  return true;
+};
 
 router.post('/login', bruteForceProtection, async (req, res) => {
   const clientIP = getClientIP(req);
@@ -257,6 +288,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     }
 
     let twoFactorVerified = false;
+    let twoFactorMethod: 'totp' | 'backup' | null = null;
     if (user.role === 'admin' && config.adminRequire2FA) {
       const authUser = await UserModelMongo.findByIdWithSecrets(user.id);
       const twoFactorEnabled = authUser?.twoFactorEnabled ?? false;
@@ -277,30 +309,55 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         });
       }
 
-      const encryptedSecret = authUser?.twoFactorSecret;
-      const secret = encryptedSecret ? decryptSecret(encryptedSecret) : null;
-      if (!secret) {
-        const setupToken = createAdminSetupToken(user);
-        return res.status(403).json({
-          error: 'two_factor_setup_required',
-          message: 'Two-factor setup required',
-          setupToken,
-        });
-      }
-
-      const isValidTotp = verifyTotpCode(secret, validated.twoFactorCode);
-      if (!isValidTotp) {
-        if (bruteForceBlocked) {
-          return res.status(429).json({
-            error: 'Too many failed login attempts',
-            message: `Please try again in ${waitMinutes} minutes`,
+      const providedCode = validated.twoFactorCode.trim();
+      if (isTotpCode(providedCode)) {
+        const encryptedSecret = authUser?.twoFactorSecret;
+        const secret = encryptedSecret ? decryptSecret(encryptedSecret) : null;
+        if (!secret) {
+          const setupToken = createAdminSetupToken(user);
+          return res.status(403).json({
+            error: 'two_factor_setup_required',
+            message: 'Two-factor setup required',
+            setupToken,
           });
         }
-        await recordFailedLoginWithEmail(clientIP, validated.email);
-        return res.status(401).json({ error: 'invalid_totp', message: 'Invalid authentication code' });
-      }
 
-      twoFactorVerified = true;
+        const isValidTotp = verifyTotpCode(secret, providedCode);
+        if (!isValidTotp) {
+          if (bruteForceBlocked) {
+            return res.status(429).json({
+              error: 'Too many failed login attempts',
+              message: `Please try again in ${waitMinutes} minutes`,
+            });
+          }
+          await recordFailedLoginWithEmail(clientIP, validated.email);
+          return res.status(401).json({ error: 'invalid_totp', message: 'Invalid authentication code' });
+        }
+
+        twoFactorVerified = true;
+        twoFactorMethod = 'totp';
+      } else {
+        const backupValid = await consumeBackupCode(authUser, providedCode);
+        if (!backupValid) {
+          if (bruteForceBlocked) {
+            return res.status(429).json({
+              error: 'Too many failed login attempts',
+              message: `Please try again in ${waitMinutes} minutes`,
+            });
+          }
+          await recordFailedLoginWithEmail(clientIP, validated.email);
+          return res.status(401).json({ error: 'invalid_backup_code', message: 'Invalid backup code' });
+        }
+
+        twoFactorVerified = true;
+        twoFactorMethod = 'backup';
+        SecurityLogger.log({
+          ip_address: clientIP,
+          event_type: 'admin_backup_code_used',
+          endpoint: '/api/auth/login',
+          metadata: { email: user.email }
+        });
+      }
     }
 
     await clearFailedLoginsWithEmail(clientIP, validated.email);
@@ -308,11 +365,13 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     const expiresIn = (user.role === 'admin'
       ? config.adminJwtExpiry
       : config.jwtExpiry) as SignOptions['expiresIn'];
+    const sessionId = user.role === 'admin' ? crypto.randomUUID() : undefined;
     const payload: JwtPayload = {
       userId: user.id,
       email: user.email,
       role: user.role,
       ...(twoFactorVerified ? { twoFactorVerified: true } : {}),
+      ...(sessionId ? { sessionId } : {}),
     };
     const token = jwt.sign(
       payload,
@@ -321,6 +380,21 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     );
     if (user.role === 'admin') {
       setAuthCookie(res, token, expiresIn, { name: ADMIN_AUTH_COOKIE_NAME, sameSite: 'strict' });
+      const expiresAtMs = expiryToMs(expiresIn);
+      createAdminSession({
+        sessionId: sessionId ?? undefined,
+        userId: user.id,
+        email: user.email,
+        ip: clientIP,
+        userAgent: req.headers['user-agent']?.toString() || 'Unknown',
+        expiresAt: expiresAtMs ? new Date(Date.now() + expiresAtMs) : null,
+      });
+      SecurityLogger.log({
+        ip_address: clientIP,
+        event_type: 'admin_login_success',
+        endpoint: '/api/auth/login',
+        metadata: { email: user.email, method: twoFactorMethod ?? 'password' }
+      });
     } else {
       setAuthCookie(res, token, expiresIn);
     }
@@ -464,12 +538,119 @@ router.post('/admin/2fa/verify', async (req, res) => {
   }
 });
 
+router.post('/admin/2fa/backup-codes', async (req, res) => {
+  try {
+    const validated = backupCodesSchema.parse(req.body ?? {});
+    const context = await getAdminAuthContext(req, validated.setupToken);
+    if (!context) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { user, decoded } = context;
+    if (config.adminRequire2FA && !decoded.twoFactorVerified) {
+      return res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
+    }
+
+    if (config.adminEnforceHttps) {
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const isSecure = req.secure || forwardedProto === 'https';
+      if (!isSecure) {
+        return res.status(403).json({ error: 'HTTPS required for admin access' });
+      }
+    }
+
+    const clientIP = getClientIP(req);
+    if (config.adminIpAllowlist.length > 0 && !config.adminIpAllowlist.includes(clientIP)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (!isAdminEmailAllowed(user.email)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ error: 'two_factor_required', message: 'Enable two-factor before creating backup codes' });
+    }
+
+    const codes = generateBackupCodes();
+    const hashed = codes.map((code) => ({ codeHash: hashBackupCode(code), usedAt: null }));
+    await UserModelMongo.update(user.id, {
+      twoFactorBackupCodes: hashed,
+      twoFactorBackupCodesUpdatedAt: new Date(),
+    });
+
+    SecurityLogger.log({
+      ip_address: clientIP,
+      event_type: 'admin_backup_code_generated',
+      endpoint: '/api/auth/admin/2fa/backup-codes',
+      metadata: { email: user.email, count: codes.length }
+    });
+
+    return res.json({
+      data: {
+        codes,
+        generatedAt: new Date().toISOString(),
+        total: codes.length,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+    console.error('[Auth] Backup code error:', error);
+    return res.status(500).json({ error: 'Failed to generate backup codes' });
+  }
+});
+
+router.get('/admin/2fa/backup-codes/status', async (req, res) => {
+  try {
+    const context = await getAdminAuthContext(req);
+    if (!context) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { user, decoded } = context;
+    if (config.adminRequire2FA && !decoded.twoFactorVerified) {
+      return res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
+    }
+
+    const clientIP = getClientIP(req);
+    if (config.adminIpAllowlist.length > 0 && !config.adminIpAllowlist.includes(clientIP)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (!isAdminEmailAllowed(user.email)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    const total = user.twoFactorBackupCodes?.length ?? 0;
+    const remaining = user.twoFactorBackupCodes?.filter((code) => !code.usedAt).length ?? 0;
+
+    return res.json({
+      data: {
+        total,
+        remaining,
+        updatedAt: user.twoFactorBackupCodesUpdatedAt ?? null,
+      },
+    });
+  } catch (error) {
+    console.error('[Auth] Backup code status error:', error);
+    return res.status(500).json({ error: 'Failed to load backup code status' });
+  }
+});
+
 router.post('/logout', async (req, res) => {
   const { headerToken, cookieToken, adminCookieToken } = getAuthTokens(req);
   const tokens = [headerToken, cookieToken, adminCookieToken].filter(Boolean) as string[];
 
   if (tokens.length > 0) {
     await Promise.all(tokens.map((token) => blacklistToken(token)));
+    tokens.forEach((token) => {
+      const decoded = jwt.decode(token) as { sessionId?: string } | null;
+      if (decoded?.sessionId) {
+        terminateAdminSession(decoded.sessionId);
+      }
+    });
     console.log(`[Auth] Logout from ${getClientIP(req)}`);
   }
 

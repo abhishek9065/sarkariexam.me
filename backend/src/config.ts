@@ -76,6 +76,7 @@ const getDbConnectionString = (): string => {
 
 const databaseUrl = getDbConnectionString();
 const jwtSecret = getRequiredEnv('JWT_SECRET', 'dev-secret');
+const adminBackupCodeSalt = process.env.ADMIN_BACKUP_CODE_SALT ?? jwtSecret;
 
 const defaultCorsOrigins = [
   'http://localhost:5173',
@@ -108,6 +109,9 @@ const adminJwtExpiry = process.env.ADMIN_JWT_EXPIRY ?? '6h';
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
 validateSecret('ADMIN_SETUP_KEY', adminSetupKey, ['setup-admin-123', 'change-me', 'admin-setup']);
 validateSecret('TOTP_ENCRYPTION_KEY', totpEncryptionKey, ['dev-totp-key', 'change-me', 'secret']);
+if (process.env.ADMIN_BACKUP_CODE_SALT) {
+  validateSecret('ADMIN_BACKUP_CODE_SALT', adminBackupCodeSalt, ['change-me', 'admin-backup-salt', 'backup-salt']);
+}
 
 if (isProduction && adminEmailAllowlist.length === 0 && adminDomainAllowlist.length === 0) {
   throw new Error('SECURITY ERROR: ADMIN_EMAIL_ALLOWLIST or ADMIN_DOMAIN_ALLOWLIST is required in production.');
@@ -134,6 +138,7 @@ export const config = {
   adminSetupTokenExpiry,
   totpIssuer,
   totpEncryptionKey,
+  adminBackupCodeSalt,
   jwtIssuer,
   jwtAudience,
   jwtExpiry,

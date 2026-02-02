@@ -47,6 +47,15 @@
   flex-wrap: wrap;
 }
 
+.analytics-freshness {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(76, 201, 240, 0.25);
+  background: rgba(12, 19, 36, 0.55);
+}
+
 .range-toggle {
   display: flex;
   gap: 6px;
@@ -396,6 +405,33 @@
   margin: 0;
 }
 
+.analytics-preview {
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.04), rgba(12, 19, 36, 0.7));
+  box-shadow: var(--shadow-sm);
+}
+
+.analytics-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.analytics-preview-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-family: var(--font-display);
+}
+
+.analytics-preview-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .analytics-hint {
   margin-top: var(--space-2);
   font-size: 12px;
@@ -709,6 +745,18 @@
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.trend-area {
+  opacity: 0.35;
+}
+
+.trend-area.views {
+  fill: rgba(76, 201, 240, 0.35);
+}
+
+.trend-area.searches {
+  fill: rgba(52, 211, 153, 0.25);
 }
 
 .trend-line.views {

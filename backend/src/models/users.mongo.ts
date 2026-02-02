@@ -20,6 +20,8 @@ interface UserDoc extends Document {
     twoFactorSecret?: string | null;
     twoFactorTempSecret?: string | null;
     twoFactorVerifiedAt?: Date | null;
+    twoFactorBackupCodes?: Array<{ codeHash: string; usedAt?: Date | null }>;
+    twoFactorBackupCodesUpdatedAt?: Date | null;
 }
 
 export interface User {
@@ -37,6 +39,8 @@ export interface UserAuth extends User {
     twoFactorSecret?: string;
     twoFactorTempSecret?: string;
     twoFactorVerifiedAt?: string;
+    twoFactorBackupCodes?: Array<{ codeHash: string; usedAt?: string | null }>;
+    twoFactorBackupCodesUpdatedAt?: string | null;
 }
 
 /**
@@ -174,6 +178,8 @@ export class UserModelMongo {
         twoFactorSecret: string | null;
         twoFactorTempSecret: string | null;
         twoFactorVerifiedAt: Date | null;
+        twoFactorBackupCodes: Array<{ codeHash: string; usedAt?: Date | null }>;
+        twoFactorBackupCodesUpdatedAt: Date | null;
     }>): Promise<User | null> {
         if (!ObjectId.isValid(id)) return null;
 
@@ -189,6 +195,10 @@ export class UserModelMongo {
             if (data.twoFactorSecret !== undefined) updateData.twoFactorSecret = data.twoFactorSecret ?? null;
             if (data.twoFactorTempSecret !== undefined) updateData.twoFactorTempSecret = data.twoFactorTempSecret ?? null;
             if (data.twoFactorVerifiedAt !== undefined) updateData.twoFactorVerifiedAt = data.twoFactorVerifiedAt ?? null;
+            if (data.twoFactorBackupCodes !== undefined) updateData.twoFactorBackupCodes = data.twoFactorBackupCodes;
+            if (data.twoFactorBackupCodesUpdatedAt !== undefined) {
+                updateData.twoFactorBackupCodesUpdatedAt = data.twoFactorBackupCodesUpdatedAt ?? null;
+            }
 
             await this.collection.updateOne(
                 { _id: new ObjectId(id) },
@@ -274,6 +284,11 @@ export class UserModelMongo {
             twoFactorSecret: doc.twoFactorSecret,
             twoFactorTempSecret: doc.twoFactorTempSecret,
             twoFactorVerifiedAt: doc.twoFactorVerifiedAt?.toISOString(),
+            twoFactorBackupCodes: doc.twoFactorBackupCodes?.map((item) => ({
+                codeHash: item.codeHash,
+                usedAt: item.usedAt ? item.usedAt.toISOString() : null,
+            })),
+            twoFactorBackupCodesUpdatedAt: doc.twoFactorBackupCodesUpdatedAt?.toISOString() ?? null,
         };
     }
 }

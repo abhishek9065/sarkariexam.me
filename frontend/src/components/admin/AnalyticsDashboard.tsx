@@ -137,6 +137,23 @@ const buildLinePath = (values: number[], width: number, height: number) => {
         .join(' ');
 };
 
+const buildAreaPath = (values: number[], width: number, height: number) => {
+    if (values.length === 0) return '';
+    const max = Math.max(1, ...values);
+    const step = values.length > 1 ? width / (values.length - 1) : 0;
+    const points = values.map((value, index) => {
+        const x = values.length > 1 ? index * step : width / 2;
+        const y = height - (value / max) * height;
+        return { x, y };
+    });
+    const path = points
+        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+        .join(' ');
+    const last = points[points.length - 1];
+    const first = points[0];
+    return `${path} L ${last.x.toFixed(2)} ${height} L ${first.x.toFixed(2)} ${height} Z`;
+};
+
 const formatShortDate = (value?: string) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -158,9 +175,13 @@ function TrendChart({
     const searchValues = data.map((item) => item.searches ?? 0);
     const viewsPath = buildLinePath(viewValues, width, height);
     const searchesPath = buildLinePath(searchValues, width, height);
+    const viewsArea = buildAreaPath(viewValues, width, height);
+    const searchesArea = buildAreaPath(searchValues, width, height);
 
     return (
         <svg className="trend-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Views and searches trend">
+            <path className="trend-area views" d={viewsArea} />
+            <path className="trend-area searches" d={searchesArea} />
             <path className="trend-line views" d={viewsPath} />
             <path className="trend-line searches" d={searchesPath} />
         </svg>
@@ -191,6 +212,7 @@ export function AnalyticsDashboard({
     const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
     const [rangeDays, setRangeDays] = useState(30);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const [showExportPreview, setShowExportPreview] = useState(false);
     const [numberLocale, setNumberLocale] = useState(() => {
         if (typeof window === 'undefined') return 'en-IN';
         try {
@@ -232,6 +254,10 @@ export function AnalyticsDashboard({
     }, [categoryBreakdown]);
 
     const rollups = analytics?.dailyRollups ?? [];
+    const previewRows = useMemo(() => {
+        if (!rollups.length) return [];
+        return [...rollups].slice(-5).reverse();
+    }, [rollups]);
     const formatMetric = useCallback((value: number | null | undefined, fallback = '0') => {
         return formatNumber(typeof value === 'number' ? value : undefined, fallback, numberLocale);
     }, [numberLocale]);
@@ -597,12 +623,14 @@ export function AnalyticsDashboard({
         if (diffMs < 24 * 60 * 60 * 1000) return `Rollup updated ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
         return `Rollup updated ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
     };
+    const rollupFreshness = formatLastUpdated(analytics.rollupLastUpdatedAt ?? null);
 
     return (
         <div className={`analytics-dashboard ${refreshing ? 'refreshing' : ''}`}>
             <div className="analytics-actions">
                 <div className="analytics-actions-left">
                     <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                    <span className="analytics-freshness">{rollupFreshness}</span>
                     <div className="range-toggle">
                         {[7, 30, 90].map((days) => (
                             <button
@@ -645,12 +673,52 @@ export function AnalyticsDashboard({
                 >
                     {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
+                <button
+                    className="admin-btn secondary"
+                    onClick={() => setShowExportPreview((prev) => !prev)}
+                >
+                    {showExportPreview ? 'Hide preview' : 'Preview export'}
+                </button>
                 <button className="admin-btn secondary" onClick={handleExport} disabled={exporting}>
                     {exporting ? 'Exporting...' : 'Export CSV'}
                 </button>
             </div>
             {actionMessage && (
                 <div className="analytics-note" role="status">{actionMessage}</div>
+            )}
+            {showExportPreview && (
+                <div className="analytics-preview">
+                    <div className="analytics-preview-header">
+                        <h4>Export preview</h4>
+                        <span className="analytics-preview-meta">Showing the latest {previewRows.length} rollups</span>
+                    </div>
+                    {previewRows.length === 0 ? (
+                        <div className="empty-state">No rollup data yet. Generate traffic to preview exports.</div>
+                    ) : (
+                        <table className="analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th className="numeric">Views</th>
+                                    <th className="numeric">Searches</th>
+                                    <th className="numeric">Listing views</th>
+                                    <th className="numeric">Card clicks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {previewRows.map((row) => (
+                                    <tr key={row.date}>
+                                        <td>{formatShortDate(row.date)}</td>
+                                        <td className="numeric">{formatMetric(row.views)}</td>
+                                        <td className="numeric">{formatMetric(row.searches)}</td>
+                                        <td className="numeric">{formatMetric(row.listingViews)}</td>
+                                        <td className="numeric">{formatMetric(row.cardClicks)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
             )}
             <div className="kpi-grid">
                 <div className="kpi-card">

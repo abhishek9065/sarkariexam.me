@@ -4,6 +4,7 @@ import jwt, { VerifyOptions } from 'jsonwebtoken';
 import { config } from '../config.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { hasPermission, type Permission } from '../services/rbac.js';
+import { touchAdminSession } from '../services/adminSessions.js';
 import RedisCache from '../services/redis.js';
 import { JwtPayload } from '../types.js';
 
@@ -86,6 +87,18 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       }
       // Update decoded with latest user data to prevent stale role issues
       decoded.role = user.role;
+    }
+
+    if (decoded.role === 'admin' && decoded.sessionId) {
+      const exp = (decoded as any).exp;
+      const expiresAt = exp ? new Date(exp * 1000) : null;
+      touchAdminSession(decoded.sessionId, {
+        userId: decoded.userId,
+        email: decoded.email,
+        ip: req.ip,
+        userAgent: req.headers['user-agent']?.toString() || 'Unknown',
+        expiresAt,
+      }, req.originalUrl);
     }
     
     req.user = decoded;

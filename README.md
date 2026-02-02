@@ -73,6 +73,15 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000,https://sarkariexams.me
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=200
 AUTH_RATE_LIMIT_MAX=20
+
+# Admin security (recommended in production)
+ADMIN_SETUP_KEY=change-this-strong-key
+ADMIN_REQUIRE_2FA=true
+ADMIN_EMAIL_ALLOWLIST=admin@example.com
+ADMIN_DOMAIN_ALLOWLIST=example.com
+ADMIN_ENFORCE_HTTPS=true
+TOTP_ENCRYPTION_KEY=change-this-strong-encryption-key
+ADMIN_BACKUP_CODE_SALT=change-this-backup-salt
 ```
 
 ### Frontend (.env)
@@ -111,6 +120,15 @@ npx playwright test
 
 # Run with UI
 npx playwright test --ui
+```
+
+Admin smoke tests (optional) read credentials from environment variables:
+```
+ADMIN_TEST_EMAIL=admin@example.com
+ADMIN_TEST_PASSWORD=your-password
+# Optional when 2FA is enforced:
+ADMIN_TEST_TOTP=123456
+ADMIN_TEST_BACKUP_CODE=ABCD-1234
 ```
 
 ## 🚀 Deployment

@@ -66,6 +66,22 @@ The output will be in the `dist` directory.
 *   **Lint:** `npm run lint`
 *   **Type Check:** `npx tsc --noEmit`
 
+### E2E Tests (Playwright)
+
+```bash
+npx playwright install
+npx playwright test
+```
+
+Admin smoke tests can be enabled by setting:
+```
+ADMIN_TEST_EMAIL=admin@example.com
+ADMIN_TEST_PASSWORD=your-password
+ADMIN_TEST_TOTP=123456
+# or use a backup code:
+ADMIN_TEST_BACKUP_CODE=ABCD-1234
+```
+
 ## Data Handling
 
 The application is designed to fetch data from a backend API. It includes a **mock data fallback** mechanism (`src/utils/mockData.ts`) that activates if the backend is unreachable, allowing for isolated frontend development and testing.

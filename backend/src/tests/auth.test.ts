@@ -42,6 +42,7 @@ vi.mock('../config.js', () => ({
     adminSetupKey: 'setup-admin-123',
     totpIssuer: 'SarkariExams Admin',
     totpEncryptionKey: 'test-totp-key',
+    adminBackupCodeSalt: 'backup-salt',
     jwtIssuer: '',
     jwtAudience: '',
     corsOrigins: ['http://localhost:3000'],

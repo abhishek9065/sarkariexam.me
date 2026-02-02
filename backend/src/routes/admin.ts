@@ -9,6 +9,7 @@ import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit
 import { getDailyRollups } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
 import { SecurityLogger } from '../services/securityLogger.js';
+import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = Router();
@@ -25,6 +26,9 @@ interface SubscriptionDoc {
 }
 
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
+const sessionIdSchema = z.object({
+    sessionId: z.string().min(8),
+});
 const dateField = z
     .string()
     .datetime()
@@ -312,6 +316,94 @@ router.get('/security/logs', requirePermission('security:read'), async (req, res
     } catch (error) {
         console.error('Security logs error:', error);
         return res.status(500).json({ error: 'Failed to load security logs' });
+    }
+});
+
+/**
+ * GET /api/admin/sessions
+ * List active admin sessions.
+ */
+router.get('/sessions', requirePermission('security:read'), async (req, res) => {
+    try {
+        const currentSessionId = req.user?.sessionId;
+        const sessions = listAdminSessions().map((record) => mapSessionForClient(record, currentSessionId));
+        return res.json({
+            data: sessions,
+            meta: { total: sessions.length },
+        });
+    } catch (error) {
+        console.error('Admin sessions error:', error);
+        return res.status(500).json({ error: 'Failed to load sessions' });
+    }
+});
+
+/**
+ * GET /api/admin/session
+ * Get current admin session details.
+ */
+router.get('/session', requirePermission('security:read'), async (req, res) => {
+    try {
+        const session = getAdminSession(req.user?.sessionId);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        return res.json({ data: mapSessionForClient(session, req.user?.sessionId) });
+    } catch (error) {
+        console.error('Admin session error:', error);
+        return res.status(500).json({ error: 'Failed to load session' });
+    }
+});
+
+/**
+ * POST /api/admin/sessions/terminate
+ * Terminate a specific session.
+ */
+router.post('/sessions/terminate', requirePermission('security:read'), async (req, res) => {
+    try {
+        const parsed = sessionIdSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { sessionId } = parsed.data;
+        const removed = terminateAdminSession(sessionId);
+        if (!removed) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+        SecurityLogger.log({
+            ip_address: req.ip,
+            event_type: 'admin_session_terminated',
+            endpoint: '/api/admin/sessions/terminate',
+            metadata: { sessionId, admin: req.user?.email }
+        });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Terminate session error:', error);
+        return res.status(500).json({ error: 'Failed to terminate session' });
+    }
+});
+
+/**
+ * POST /api/admin/sessions/terminate-others
+ * Terminate all other sessions for the current admin.
+ */
+router.post('/sessions/terminate-others', requirePermission('security:read'), async (req, res) => {
+    try {
+        if (!req.user?.userId) {
+            return res.status(400).json({ error: 'Missing user context' });
+        }
+        const removed = terminateOtherSessions(req.user.userId, req.user.sessionId);
+        if (removed > 0) {
+            SecurityLogger.log({
+                ip_address: req.ip,
+                event_type: 'admin_session_terminated',
+                endpoint: '/api/admin/sessions/terminate-others',
+                metadata: { removed, admin: req.user?.email }
+            });
+        }
+        return res.json({ success: true, removed });
+    } catch (error) {
+        console.error('Terminate sessions error:', error);
+        return res.status(500).json({ error: 'Failed to terminate sessions' });
     }
 });
 
