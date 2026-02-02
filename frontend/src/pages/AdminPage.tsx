@@ -2553,18 +2553,18 @@ export function AdminPage() {
 
     if (!isLoggedIn) {
         return (
-            <>
-                <AdminNotificationSystem 
-                    notifications={notifications} 
-                    onRemove={removeNotification} 
+            <div className="admin-page">
+                <AdminNotificationSystem
+                    notifications={notifications}
+                    onRemove={removeNotification}
                 />
-                
+
                 {loginLoading && (
-                    <AuthLoadingIndicator 
+                    <AuthLoadingIndicator
                         message="Verifying admin credentials..."
                     />
                 )}
-                
+
                 <div className="admin-container">
                     <div className="toast-stack">
                         {toasts.map((toast) => (
@@ -2650,12 +2650,12 @@ export function AdminPage() {
                         />
                     </div>
                 </div>
-            </>
+            </div>
         );
     }
 
     return (
-        <>
+        <div className="admin-page">
             <AdminNotificationSystem 
                 notifications={notifications} 
                 onRemove={removeNotification} 
@@ -3802,7 +3802,7 @@ export function AdminPage() {
 
                     <div className="admin-form-container">
                         <h3>Detailed Job Posting</h3>
-                        <p style={{ color: '#666', marginBottom: '15px' }}>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
                             Create a comprehensive job posting with all details like UP Police example.
                         </p>
 
@@ -4093,7 +4093,7 @@ export function AdminPage() {
                 ) : activeAdminTab === 'bulk' ? (
                     <div className="admin-form-container">
                         <h3>Bulk Import Announcements</h3>
-                        <p style={{ color: '#666', marginBottom: '15px' }}>Paste JSON array of announcements below. Required fields: title, type, category, organization.</p>
+                        <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Paste JSON array of announcements below. Required fields: title, type, category, organization.</p>
                         <textarea
                             value={bulkJson}
                             onChange={(e) => setBulkJson(e.target.value)}
@@ -4114,7 +4114,7 @@ export function AdminPage() {
                                 fontFamily: 'monospace',
                                 fontSize: '0.9rem',
                                 padding: '15px',
-                                border: '1px solid #ddd',
+                                border: '1px solid var(--border-primary)',
                                 borderRadius: '8px',
                                 marginBottom: '15px'
                             }}
@@ -4642,7 +4642,7 @@ export function AdminPage() {
                             overflow: 'hidden'
                         }}>
                             <div className="preview-header" style={{
-                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                background: 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%)',
                                 color: 'white',
                                 padding: '20px',
                                 display: 'flex',
@@ -4667,7 +4667,7 @@ export function AdminPage() {
                             </div>
                             <div className="preview-content" style={{ padding: '20px' }}>
                                 <div style={{
-                                    background: 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%)',
+                                    background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.95) 0%, rgba(45, 212, 191, 0.85) 100%)',
                                     color: 'white',
                                     padding: '25px',
                                     borderRadius: '12px',
@@ -4715,14 +4715,14 @@ export function AdminPage() {
                             </div>
                             <div className="preview-footer" style={{
                                 padding: '20px',
-                                borderTop: '1px solid #eee',
+                                borderTop: '1px solid var(--border-primary)',
                                 display: 'flex',
                                 justifyContent: 'center',
                                 gap: '15px'
                             }}>
                                 <button onClick={() => setShowPreview(false)} style={{
-                                    background: '#f5f5f5',
-                                    border: '1px solid #ddd',
+                                    background: 'var(--bg-secondary)',
+                                    border: '1px solid var(--border-primary)',
                                     padding: '12px 30px',
                                     borderRadius: '8px',
                                     cursor: 'pointer',
@@ -4779,7 +4779,7 @@ export function AdminPage() {
                                         setMessage('Error publishing');
                                     }
                                 }} style={{
-                                    background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                                    background: 'linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%)',
                                     color: 'white',
                                     border: 'none',
                                     padding: '12px 30px',
@@ -4833,7 +4833,7 @@ export function AdminPage() {
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
 }
 

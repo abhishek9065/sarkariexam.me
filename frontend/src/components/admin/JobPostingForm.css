@@ -21,7 +21,7 @@
     border-radius: 10px;
     border: 1px solid rgba(239, 68, 68, 0.4);
     background: rgba(239, 68, 68, 0.12);
-    color: #fca5a5;
+    color: var(--accent-red);
     font-size: 13px;
     margin-bottom: 16px;
 }
@@ -42,7 +42,7 @@
 .form-note.warn {
     border-color: rgba(245, 158, 11, 0.4);
     background: rgba(245, 158, 11, 0.1);
-    color: #fbbf24;
+    color: var(--accent-yellow);
 }
 
 .save-dot {
@@ -53,13 +53,13 @@
 }
 
 .save-dot.saving {
-    background: #22c55e;
-    box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+    background: var(--accent-green);
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
     animation: pulse 1s infinite;
 }
 
 .save-dot.saved {
-    background: rgba(96, 165, 250, 0.9);
+    background: rgba(56, 189, 248, 0.9);
 }
 
 .form-progress {
@@ -82,7 +82,7 @@
 .progress-bar span {
     display: block;
     height: 100%;
-    background: linear-gradient(90deg, #22c55e, #6366f1);
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
 }
 
 .form-tabs {
@@ -110,14 +110,14 @@
 }
 
 .tab-btn.active {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
     color: white;
 }
 
 .tab-check {
     margin-left: 6px;
     font-size: 11px;
-    color: #22c55e;
+    color: var(--accent-green);
 }
 
 .form-content {
@@ -178,18 +178,18 @@
 }
 
 .field-invalid {
-    border-color: #ef4444 !important;
+    border-color: var(--accent-red) !important;
 }
 
 .field-valid {
-    border-color: #22c55e !important;
+    border-color: var(--accent-green) !important;
 }
 
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
     outline: none;
-    border-color: #6366f1;
+    border-color: var(--accent-blue);
 }
 
 .form-group textarea {
@@ -236,7 +236,7 @@
 
 .list-row input:focus {
     outline: none;
-    border-color: #6366f1;
+    border-color: var(--accent-blue);
 }
 
 .list-row select {
@@ -255,7 +255,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #6366f1;
+    background: var(--accent-blue);
     color: white;
     border-radius: 50%;
     font-size: 12px;
@@ -269,7 +269,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ef4444;
+    background: var(--accent-red);
     color: white;
     border: none;
     border-radius: 8px;
@@ -295,14 +295,14 @@
 }
 
 .preset-btn:hover {
-    border-color: #6366f1;
+    border-color: var(--accent-blue);
     color: var(--text-primary);
 }
 
 .date-flag {
     font-size: 11px;
-    color: #fca5a5;
-    background: rgba(248, 113, 113, 0.2);
+    color: var(--accent-red);
+    background: rgba(251, 113, 133, 0.2);
     padding: 4px 8px;
     border-radius: 999px;
 }
@@ -312,7 +312,7 @@
 }
 
 .remove-btn:hover {
-    background: #dc2626;
+    background: #e11d48;
 }
 
 .add-btn {
@@ -321,7 +321,7 @@
     background: transparent;
     border: 2px dashed var(--border-color);
     border-radius: 8px;
-    color: #6366f1;
+    color: var(--accent-blue);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -334,8 +334,8 @@
 }
 
 .add-btn:hover {
-    background: rgba(99, 102, 241, 0.1);
-    border-color: #6366f1;
+    background: rgba(56, 189, 248, 0.12);
+    border-color: var(--accent-blue);
 }
 
 /* Vacancy Table */
@@ -377,7 +377,7 @@
 
 .vacancy-row input:focus {
     outline: none;
-    border-color: #6366f1;
+    border-color: var(--accent-blue);
 }
 
 .vacancy-row .total-field {
@@ -389,7 +389,7 @@
     text-align: right;
     font-size: 16px;
     padding: 12px;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
     color: white;
     border-radius: 8px;
     margin-top: 12px;
@@ -458,7 +458,7 @@
 
 .btn-primary {
     padding: 12px 24px;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
     color: white;
     border: none;
     border-radius: 8px;
@@ -470,7 +470,7 @@
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.35);
 }
 
 .btn-secondary {
@@ -497,7 +497,7 @@
     padding: 12px 24px;
     background: transparent;
     color: var(--text-primary);
-    border: 1px solid rgba(99, 102, 241, 0.6);
+    border: 1px solid rgba(56, 189, 248, 0.6);
     border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
@@ -506,7 +506,7 @@
 }
 
 .btn-outline:hover {
-    background: rgba(99, 102, 241, 0.12);
+    background: rgba(56, 189, 248, 0.12);
 }
 
 .btn-primary:disabled,
@@ -519,7 +519,7 @@
 
 .form-disabled-note {
     font-size: 12px;
-    color: #fbbf24;
+    color: var(--accent-yellow);
     margin-left: auto;
 }
 
@@ -604,29 +604,29 @@
 
 /* Dark Mode */
 [data-theme="dark"] .job-posting-form {
-    background: #1e293b;
+    background: var(--bg-card);
 }
 
 [data-theme="dark"] .dynamic-list,
 [data-theme="dark"] .vacancy-table,
 [data-theme="dark"] .faq-list {
-    background: #334155;
+    background: var(--bg-secondary);
 }
 
 [data-theme="dark"] .list-row input,
 [data-theme="dark"] .vacancy-row input,
 [data-theme="dark"] .faq-item input,
 [data-theme="dark"] .faq-item textarea {
-    background: #1e293b;
-    border-color: #475569;
+    background: var(--bg-input);
+    border-color: var(--border-primary);
 }
 
 [data-theme="dark"] .add-btn {
-    border-color: #475569;
+    border-color: var(--border-primary);
 }
 
 [data-theme="dark"] .add-btn:hover {
-    background: rgba(99, 102, 241, 0.2);
+    background: rgba(56, 189, 248, 0.18);
 }
 
 @keyframes pulse {
