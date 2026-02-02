@@ -14,6 +14,15 @@ import { SecurityLogger } from '../services/securityLogger.js';
 const MAX_FAILED_ATTEMPTS = 5;
 const BLOCK_DURATION_SEC = 15 * 60; // 15 minutes
 
+const normalizeEmail = (email?: string): string | null => {
+    if (!email) return null;
+    const trimmed = email.trim().toLowerCase();
+    return trimmed.length > 0 ? trimmed : null;
+};
+
+const buildIpKey = (ip: string) => `bf:ip:${ip}`;
+const buildEmailKey = (email: string) => `bf:email:${email}`;
+
 /**
  * Helmet security headers configuration
  */
@@ -53,12 +62,13 @@ export const securityHeaders = helmet({
  */
 export async function bruteForceProtection(req: Request, res: Response, next: NextFunction) {
     const ip = getClientIP(req);
-    const key = `bf:${ip}`;
+    const email = normalizeEmail((req.body as any)?.email);
+    const keys = [buildIpKey(ip), email ? buildEmailKey(email) : null].filter(Boolean) as string[];
 
     try {
-        const record = await RedisCache.get(key);
+        const records = await Promise.all(keys.map((key) => RedisCache.get(key)));
         
-        if (record && record.count >= MAX_FAILED_ATTEMPTS) {
+        if (records.some((record) => record && record.count >= MAX_FAILED_ATTEMPTS)) {
             // Mark as blocked but allow handler to verify correct credentials.
             const waitTime = Math.ceil(BLOCK_DURATION_SEC / 60);
             (req as any).bruteForceBlocked = true;
@@ -75,18 +85,29 @@ export async function bruteForceProtection(req: Request, res: Response, next: Ne
  * Record failed login attempt
  */
 export async function recordFailedLogin(ip: string): Promise<void> {
-    const key = `bf:${ip}`;
+    await recordFailedLoginWithEmail(ip);
+}
+
+export async function recordFailedLoginWithEmail(ip: string, email?: string): Promise<void> {
+    const normalizedEmail = normalizeEmail(email);
+    const keys = [buildIpKey(ip), normalizedEmail ? buildEmailKey(normalizedEmail) : null].filter(Boolean) as string[];
     try {
-        const record = await RedisCache.get(key);
-        
-        if (!record) {
-            await RedisCache.set(key, { count: 1 }, BLOCK_DURATION_SEC);
-        } else {
-            const newCount = record.count + 1;
-            await RedisCache.set(key, { count: newCount }, BLOCK_DURATION_SEC);
+        for (const key of keys) {
+            const record = await RedisCache.get(key);
             
-            if (newCount >= MAX_FAILED_ATTEMPTS) {
-                console.log(`[SECURITY] IP ${ip} blocked for 15 minutes due to failed login attempts`);
+            if (!record) {
+                await RedisCache.set(key, { count: 1 }, BLOCK_DURATION_SEC);
+            } else {
+                const newCount = record.count + 1;
+                await RedisCache.set(key, { count: newCount }, BLOCK_DURATION_SEC);
+                
+                if (newCount >= MAX_FAILED_ATTEMPTS) {
+                    if (key.startsWith('bf:ip:')) {
+                        console.log(`[SECURITY] IP ${ip} blocked for 15 minutes due to failed login attempts`);
+                    } else if (normalizedEmail) {
+                        console.log(`[SECURITY] Account ${normalizedEmail} blocked for 15 minutes due to failed login attempts`);
+                    }
+                }
             }
         }
     } catch (err) {
@@ -98,8 +119,13 @@ export async function recordFailedLogin(ip: string): Promise<void> {
  * Clear failed login record on successful login
  */
 export async function clearFailedLogins(ip: string): Promise<void> {
-    const key = `bf:${ip}`;
-    await RedisCache.del(key);
+    await clearFailedLoginsWithEmail(ip);
+}
+
+export async function clearFailedLoginsWithEmail(ip: string, email?: string): Promise<void> {
+    const normalizedEmail = normalizeEmail(email);
+    const keys = [buildIpKey(ip), normalizedEmail ? buildEmailKey(normalizedEmail) : null].filter(Boolean) as string[];
+    await Promise.all(keys.map((key) => RedisCache.del(key)));
 }
 
 /**

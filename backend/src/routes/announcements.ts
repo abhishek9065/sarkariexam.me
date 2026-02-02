@@ -425,7 +425,7 @@ router.get(
       const filters = parseResult.data;
       
       // Sanitize search query to prevent injection attacks
-      const sanitizedQuery = filters.q.replace(/[<>\"'&$]/g, '').trim();
+      const sanitizedQuery = filters.q.replace(/[<>"'&$]/g, '').trim();
       if (sanitizedQuery.length < 2) {
         return res.status(400).json({ 
           error: 'Search query too short',

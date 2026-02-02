@@ -411,6 +411,7 @@ export function AdminPage() {
         end: '',
     });
     const [loginLoading, setLoginLoading] = useState(false);
+    const [adminSetupToken, setAdminSetupToken] = useState<string | null>(null);
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [pendingEditId, setPendingEditId] = useState<string | null>(null);
@@ -474,6 +475,7 @@ export function AdminPage() {
     const clearAdminSession = useCallback(() => {
         setIsLoggedIn(false);
         setAdminUser(null);
+        setAdminSetupToken(null);
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
@@ -628,6 +630,54 @@ export function AdminPage() {
             clearAdminSession();
         }
     }, [clearAdminSession]);
+
+    const handleEnable2FA = useCallback(async () => {
+        const response = await adminRequest(`${apiBase}/api/auth/admin/2fa/setup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            maxRetries: 0,
+            body: JSON.stringify(adminSetupToken ? { setupToken: adminSetupToken } : {}),
+        });
+
+        if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({}));
+            throw new Error(getApiErrorMessage(errorResult, 'Failed to setup 2FA.'));
+        }
+
+        const result = await response.json();
+        const qrCode = result.data?.qrCode;
+        const secret = result.data?.secret;
+
+        if (!qrCode || !secret) {
+            throw new Error('2FA setup failed. Please try again.');
+        }
+
+        return { qrCode, secret };
+    }, [adminSetupToken]);
+
+    const handleVerify2FA = useCallback(async (code: string) => {
+        const response = await adminRequest(`${apiBase}/api/auth/admin/2fa/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            maxRetries: 0,
+            body: JSON.stringify({
+                code,
+                ...(adminSetupToken ? { setupToken: adminSetupToken } : {}),
+            }),
+        });
+
+        if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({}));
+            const errorCode = errorResult?.error || errorResult?.code;
+            if (errorCode === 'invalid_totp') {
+                return false;
+            }
+            throw new Error(getApiErrorMessage(errorResult, 'Failed to verify 2FA.'));
+        }
+
+        setAdminSetupToken(null);
+        return true;
+    }, [adminSetupToken]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
     const [message, setMessage] = useState('');
@@ -2368,7 +2418,7 @@ export function AdminPage() {
                     </div>
                     <div className="admin-login-box-wrapper">
                         <AdminLogin
-                            onLogin={async (email, password) => {
+                            onLogin={async (email, password, twoFactorCode) => {
                                 setMessage('Authenticating...');
                                 setLoginLoading(true);
                                 
@@ -2377,7 +2427,11 @@ export function AdminPage() {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         maxRetries: 0,
-                                        body: JSON.stringify({ email, password }),
+                                        body: JSON.stringify({
+                                            email,
+                                            password,
+                                            ...(twoFactorCode ? { twoFactorCode } : {}),
+                                        }),
                                     });
 
                                     if (response.ok) {
@@ -2391,6 +2445,7 @@ export function AdminPage() {
                                             };
                                             setAdminUser(profile);
                                             localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
+                                            setAdminSetupToken(null);
                                             setIsLoggedIn(true);
                                             setMessage('');
                                             
@@ -2414,6 +2469,24 @@ export function AdminPage() {
                                         }
                                     } else {
                                         const errorResult = await response.json().catch(() => ({}));
+                                        const errorCode = errorResult?.error || errorResult?.code;
+                                        if (errorCode === 'two_factor_required' || errorCode === 'two_factor_setup_required') {
+                                            if (errorCode === 'two_factor_setup_required' && errorResult?.setupToken) {
+                                                setAdminSetupToken(errorResult.setupToken);
+                                            }
+                                            setMessage('');
+                                            const authError: any = new Error(errorCode);
+                                            authError.code = errorCode;
+                                            authError.clientIP = errorResult?.clientIP;
+                                            authError.location = errorResult?.location;
+                                            throw authError;
+                                        }
+                                        if (errorCode === 'invalid_totp') {
+                                            setMessage('');
+                                            const authError: any = new Error(errorCode);
+                                            authError.code = errorCode;
+                                            throw authError;
+                                        }
                                         const errorMsg = getApiErrorMessage(errorResult, 'Invalid credentials.');
                                         setMessage(errorMsg);
                                         
@@ -2424,6 +2497,10 @@ export function AdminPage() {
                                         );
                                     }
                                 } catch (error) {
+                                    const authError = error as any;
+                                    if (authError?.code === 'two_factor_required' || authError?.code === 'two_factor_setup_required' || authError?.code === 'invalid_totp') {
+                                        throw authError;
+                                    }
                                     console.error(error);
                                     const errorMsg = 'Connection failed. Please check your network and try again.';
                                     setMessage(errorMsg);
@@ -2439,6 +2516,8 @@ export function AdminPage() {
                             }}
                             loading={loginLoading}
                             error={message}
+                            onEnable2FA={handleEnable2FA}
+                            onVerify2FA={handleVerify2FA}
                         />
                     </div>
                 </div>

@@ -16,6 +16,10 @@ interface UserDoc extends Document {
     createdAt: Date;
     updatedAt: Date;
     lastLogin?: Date;
+    twoFactorEnabled?: boolean;
+    twoFactorSecret?: string | null;
+    twoFactorTempSecret?: string | null;
+    twoFactorVerifiedAt?: Date | null;
 }
 
 export interface User {
@@ -26,6 +30,13 @@ export interface User {
     isActive: boolean;
     createdAt: string;
     lastLogin?: string;
+    twoFactorEnabled?: boolean;
+}
+
+export interface UserAuth extends User {
+    twoFactorSecret?: string;
+    twoFactorTempSecret?: string;
+    twoFactorVerifiedAt?: string;
 }
 
 /**
@@ -64,6 +75,20 @@ export class UserModelMongo {
     }
 
     /**
+     * Find user by ID with 2FA secrets (auth-only).
+     */
+    static async findByIdWithSecrets(id: string): Promise<UserAuth | null> {
+        try {
+            if (!ObjectId.isValid(id)) return null;
+            const doc = await this.collection.findOne({ _id: new ObjectId(id) });
+            return doc ? this.docToUserAuth(doc) : null;
+        } catch (error) {
+            console.error('[MongoDB] findByIdWithSecrets error:', error);
+            return null;
+        }
+    }
+
+    /**
      * Create new user
      */
     static async create(data: {
@@ -84,6 +109,7 @@ export class UserModelMongo {
                 isActive: true,
                 createdAt: now,
                 updatedAt: now,
+                twoFactorEnabled: false,
             };
 
             const result = await this.collection.insertOne(doc as UserDoc);
@@ -144,6 +170,10 @@ export class UserModelMongo {
         password: string;
         role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
         isActive: boolean;
+        twoFactorEnabled: boolean;
+        twoFactorSecret: string | null;
+        twoFactorTempSecret: string | null;
+        twoFactorVerifiedAt: Date | null;
     }>): Promise<User | null> {
         if (!ObjectId.isValid(id)) return null;
 
@@ -155,6 +185,10 @@ export class UserModelMongo {
             if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 10);
             if (data.role) updateData.role = data.role;
             if (data.isActive !== undefined) updateData.isActive = data.isActive;
+            if (data.twoFactorEnabled !== undefined) updateData.twoFactorEnabled = data.twoFactorEnabled;
+            if (data.twoFactorSecret !== undefined) updateData.twoFactorSecret = data.twoFactorSecret ?? null;
+            if (data.twoFactorTempSecret !== undefined) updateData.twoFactorTempSecret = data.twoFactorTempSecret ?? null;
+            if (data.twoFactorVerifiedAt !== undefined) updateData.twoFactorVerifiedAt = data.twoFactorVerifiedAt ?? null;
 
             await this.collection.updateOne(
                 { _id: new ObjectId(id) },
@@ -223,6 +257,23 @@ export class UserModelMongo {
             isActive: doc.isActive,
             createdAt: doc.createdAt?.toISOString(),
             lastLogin: doc.lastLogin?.toISOString(),
+            twoFactorEnabled: doc.twoFactorEnabled ?? false,
+        };
+    }
+
+    private static docToUserAuth(doc: WithId<UserDoc>): UserAuth {
+        return {
+            id: doc._id.toString(),
+            email: doc.email,
+            username: doc.username,
+            role: doc.role,
+            isActive: doc.isActive,
+            createdAt: doc.createdAt?.toISOString(),
+            lastLogin: doc.lastLogin?.toISOString(),
+            twoFactorEnabled: doc.twoFactorEnabled ?? false,
+            twoFactorSecret: doc.twoFactorSecret,
+            twoFactorTempSecret: doc.twoFactorTempSecret,
+            twoFactorVerifiedAt: doc.twoFactorVerifiedAt?.toISOString(),
         };
     }
 }

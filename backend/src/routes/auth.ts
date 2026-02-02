@@ -3,16 +3,19 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { config } from '../config.js';
-import { AUTH_COOKIE_NAME, blacklistToken, isTokenBlacklisted } from '../middleware/auth.js';
+import { ADMIN_AUTH_COOKIE_NAME, AUTH_COOKIE_NAME, blacklistToken, isTokenBlacklisted } from '../middleware/auth.js';
 import {
   bruteForceProtection,
-  recordFailedLogin,
-  clearFailedLogins,
+  recordFailedLoginWithEmail,
+  clearFailedLoginsWithEmail,
   getClientIP
 } from '../middleware/security.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { SecurityLogger } from '../services/securityLogger.js';
+import { JwtPayload } from '../types.js';
+import { decryptSecret, encryptSecret } from '../utils/crypto.js';
+import { generateTotpSecret, verifyTotpCode } from '../utils/totp.js';
 
 const router = express.Router();
 
@@ -54,15 +57,76 @@ const expiryToMs = (expiresIn: SignOptions['expiresIn']): number | undefined => 
   return amount * multiplier;
 };
 
-const setAuthCookie = (res: express.Response, token: string, expiresIn: SignOptions['expiresIn']) => {
+const setAuthCookie = (
+  res: express.Response,
+  token: string,
+  expiresIn: SignOptions['expiresIn'],
+  options?: { name?: string; sameSite?: 'lax' | 'strict' | 'none' }
+) => {
   const maxAge = expiryToMs(expiresIn);
-  res.cookie(AUTH_COOKIE_NAME, token, {
+  const cookieName = options?.name ?? AUTH_COOKIE_NAME;
+  const sameSite = options?.sameSite ?? 'lax';
+  res.cookie(cookieName, token, {
     httpOnly: true,
     secure: config.isProduction,
-    sameSite: 'lax',
+    sameSite,
     path: '/',
     ...(maxAge ? { maxAge } : {}),
   });
+};
+
+const getBearerToken = (req: express.Request): string | undefined => {
+  const authHeader = req.headers['authorization'];
+  return authHeader ? authHeader.split(' ')[1] : undefined;
+};
+
+const getAuthTokens = (req: express.Request) => {
+  const headerToken = getBearerToken(req);
+  const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
+  const adminCookieToken = (req as any).cookies?.[ADMIN_AUTH_COOKIE_NAME];
+  return { headerToken, cookieToken, adminCookieToken, token: headerToken || adminCookieToken || cookieToken };
+};
+
+const verifyJwtToken = (token: string): JwtPayload => {
+  const verifyOptions: jwt.VerifyOptions = {};
+  if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
+  if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
+  return jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
+};
+
+const createAdminSetupToken = (user: { id: string; email: string; role: string }) => {
+  return jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      twoFactorSetup: true,
+    },
+    config.jwtSecret,
+    buildJwtOptions(config.adminSetupTokenExpiry as SignOptions['expiresIn'])
+  );
+};
+
+const getAdminAuthContext = async (req: express.Request, setupToken?: string) => {
+  const headerToken = getBearerToken(req);
+  const adminCookieToken = (req as any).cookies?.[ADMIN_AUTH_COOKIE_NAME];
+  const token = headerToken || adminCookieToken || setupToken;
+  if (!token) return null;
+
+  if (await isTokenBlacklisted(token)) return null;
+
+  let decoded: JwtPayload;
+  try {
+    decoded = verifyJwtToken(token);
+  } catch {
+    return null;
+  }
+  if (decoded.role !== 'admin') return null;
+
+  const user = await UserModelMongo.findByIdWithSecrets(decoded.userId);
+  if (!user || !user.isActive || user.role !== 'admin') return null;
+
+  return { user, decoded };
 };
 
 const isAdminEmailAllowed = (email: string): boolean => {
@@ -88,18 +152,11 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'Email already registered. Please log in.' });
     }
 
-    // Determine user role based on admin allowlist
-    let userRole: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user' = 'user';
-    if (isAdminEmailAllowed(validated.email)) {
-      userRole = 'admin';
-      console.log(`[Auth] Admin registration: ${validated.email}`);
-    }
-
     const user = await UserModelMongo.create({
       email: validated.email,
       username: validated.name,
       password: validated.password,
-      role: userRole
+      role: 'user'
     });
 
     const token = jwt.sign(
@@ -132,6 +189,16 @@ router.post('/register', async (req, res) => {
 const loginSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z.string(),
+  twoFactorCode: z.string().regex(/^\d{6}$/).optional(),
+});
+
+const twoFactorSetupSchema = z.object({
+  setupToken: z.string().optional(),
+});
+
+const twoFactorVerifySchema = z.object({
+  code: z.string().regex(/^\d{6}$/),
+  setupToken: z.string().optional(),
 });
 
 router.post('/login', bruteForceProtection, async (req, res) => {
@@ -150,11 +217,9 @@ router.post('/login', bruteForceProtection, async (req, res) => {
           message: `Please try again in ${waitMinutes} minutes`,
         });
       }
-      await recordFailedLogin(clientIP);
+      await recordFailedLoginWithEmail(clientIP, validated.email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
-    await clearFailedLogins(clientIP);
 
     if (user.role === 'admin') {
       if (config.adminEnforceHttps) {
@@ -191,24 +256,84 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       }
     }
 
+    let twoFactorVerified = false;
+    if (user.role === 'admin' && config.adminRequire2FA) {
+      const authUser = await UserModelMongo.findByIdWithSecrets(user.id);
+      const twoFactorEnabled = authUser?.twoFactorEnabled ?? false;
+
+      if (!twoFactorEnabled) {
+        const setupToken = createAdminSetupToken(user);
+        return res.status(403).json({
+          error: 'two_factor_setup_required',
+          message: 'Two-factor setup required',
+          setupToken,
+        });
+      }
+
+      if (!validated.twoFactorCode) {
+        return res.status(403).json({
+          error: 'two_factor_required',
+          message: 'Two-factor authentication required',
+        });
+      }
+
+      const encryptedSecret = authUser?.twoFactorSecret;
+      const secret = encryptedSecret ? decryptSecret(encryptedSecret) : null;
+      if (!secret) {
+        const setupToken = createAdminSetupToken(user);
+        return res.status(403).json({
+          error: 'two_factor_setup_required',
+          message: 'Two-factor setup required',
+          setupToken,
+        });
+      }
+
+      const isValidTotp = verifyTotpCode(secret, validated.twoFactorCode);
+      if (!isValidTotp) {
+        if (bruteForceBlocked) {
+          return res.status(429).json({
+            error: 'Too many failed login attempts',
+            message: `Please try again in ${waitMinutes} minutes`,
+          });
+        }
+        await recordFailedLoginWithEmail(clientIP, validated.email);
+        return res.status(401).json({ error: 'invalid_totp', message: 'Invalid authentication code' });
+      }
+
+      twoFactorVerified = true;
+    }
+
+    await clearFailedLoginsWithEmail(clientIP, validated.email);
+
     const expiresIn = (user.role === 'admin'
       ? config.adminJwtExpiry
       : config.jwtExpiry) as SignOptions['expiresIn'];
+    const payload: JwtPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      ...(twoFactorVerified ? { twoFactorVerified: true } : {}),
+    };
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
+      payload,
       config.jwtSecret,
       buildJwtOptions(expiresIn)
     );
-    setAuthCookie(res, token, expiresIn);
+    if (user.role === 'admin') {
+      setAuthCookie(res, token, expiresIn, { name: ADMIN_AUTH_COOKIE_NAME, sameSite: 'strict' });
+    } else {
+      setAuthCookie(res, token, expiresIn);
+    }
 
     console.log(`[Auth] Login success: ${user.email} from ${clientIP}`);
 
-    return res.json({
-      data: {
-        user: { id: user.id, email: user.email, name: user.username, role: user.role },
-        token
-      }
-    });
+    const responseData: { user: { id: string; email: string; name: string; role: string }; token?: string } = {
+      user: { id: user.id, email: user.email, name: user.username, role: user.role },
+    };
+    if (user.role !== 'admin') {
+      responseData.token = token;
+    }
+    return res.json({ data: responseData });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.flatten() });
@@ -218,14 +343,133 @@ router.post('/login', bruteForceProtection, async (req, res) => {
   }
 });
 
-router.post('/logout', async (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const headerToken = authHeader && authHeader.split(' ')[1];
-  const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
-  const token = headerToken || cookieToken;
+router.post('/admin/2fa/setup', async (req, res) => {
+  try {
+    const validated = twoFactorSetupSchema.parse(req.body ?? {});
+    const context = await getAdminAuthContext(req, validated.setupToken);
+    if (!context) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
 
-  if (token) {
-    await blacklistToken(token);
+    const { user, decoded } = context;
+    const isSetupToken = decoded.twoFactorSetup === true;
+    const isVerified = decoded.twoFactorVerified === true;
+
+    if (config.adminRequire2FA && !isSetupToken && !isVerified) {
+      return res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
+    }
+
+    if (config.adminEnforceHttps) {
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const isSecure = req.secure || forwardedProto === 'https';
+      if (!isSecure) {
+        return res.status(403).json({ error: 'HTTPS required for admin access' });
+      }
+    }
+
+    const clientIP = getClientIP(req);
+    if (config.adminIpAllowlist.length > 0 && !config.adminIpAllowlist.includes(clientIP)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (!isAdminEmailAllowed(user.email)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (user.twoFactorEnabled) {
+      return res.status(409).json({ error: 'two_factor_already_enabled', message: 'Two-factor already enabled' });
+    }
+
+    const { secret, qrCode } = await generateTotpSecret(user.email);
+    await UserModelMongo.update(user.id, {
+      twoFactorTempSecret: encryptSecret(secret),
+      twoFactorEnabled: false,
+    });
+
+    return res.json({ data: { qrCode, secret } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+    console.error('[Auth] 2FA setup error:', error);
+    return res.status(500).json({ error: 'Two-factor setup failed' });
+  }
+});
+
+router.post('/admin/2fa/verify', async (req, res) => {
+  try {
+    const validated = twoFactorVerifySchema.parse(req.body);
+    const context = await getAdminAuthContext(req, validated.setupToken);
+    if (!context) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { user, decoded } = context;
+    const isSetupToken = decoded.twoFactorSetup === true;
+    const isVerified = decoded.twoFactorVerified === true;
+
+    if (config.adminRequire2FA && !isSetupToken && !isVerified) {
+      return res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
+    }
+
+    if (config.adminEnforceHttps) {
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const isSecure = req.secure || forwardedProto === 'https';
+      if (!isSecure) {
+        return res.status(403).json({ error: 'HTTPS required for admin access' });
+      }
+    }
+
+    const clientIP = getClientIP(req);
+    if (config.adminIpAllowlist.length > 0 && !config.adminIpAllowlist.includes(clientIP)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (!isAdminEmailAllowed(user.email)) {
+      return res.status(403).json({ error: 'Admin access restricted' });
+    }
+
+    if (user.twoFactorEnabled && !user.twoFactorTempSecret) {
+      return res.status(409).json({ error: 'two_factor_already_enabled', message: 'Two-factor already enabled' });
+    }
+
+    if (!user.twoFactorTempSecret) {
+      return res.status(400).json({ error: 'two_factor_setup_required', message: 'Two-factor setup required' });
+    }
+
+    const tempSecret = decryptSecret(user.twoFactorTempSecret);
+    if (!tempSecret) {
+      return res.status(400).json({ error: 'two_factor_setup_required', message: 'Two-factor setup required' });
+    }
+
+    const isValid = verifyTotpCode(tempSecret, validated.code);
+    if (!isValid) {
+      return res.status(400).json({ error: 'invalid_totp', message: 'Invalid authentication code' });
+    }
+
+    await UserModelMongo.update(user.id, {
+      twoFactorEnabled: true,
+      twoFactorSecret: encryptSecret(tempSecret),
+      twoFactorTempSecret: null,
+      twoFactorVerifiedAt: new Date(),
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+    console.error('[Auth] 2FA verify error:', error);
+    return res.status(500).json({ error: 'Two-factor verification failed' });
+  }
+});
+
+router.post('/logout', async (req, res) => {
+  const { headerToken, cookieToken, adminCookieToken } = getAuthTokens(req);
+  const tokens = [headerToken, cookieToken, adminCookieToken].filter(Boolean) as string[];
+
+  if (tokens.length > 0) {
+    await Promise.all(tokens.map((token) => blacklistToken(token)));
     console.log(`[Auth] Logout from ${getClientIP(req)}`);
   }
 
@@ -235,16 +479,19 @@ router.post('/logout', async (req, res) => {
     sameSite: 'lax',
     path: '/',
   });
+  res.clearCookie(ADMIN_AUTH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'strict',
+    path: '/',
+  });
 
   return res.json({ message: 'Logged out successfully' });
 });
 
 router.get('/me', async (req, res) => {
   try {
-    const authHeader = req.headers['authorization'];
-    const headerToken = authHeader && authHeader.split(' ')[1];
-    const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
-    const token = headerToken || cookieToken;
+    const { token } = getAuthTokens(req);
     
     if (!token) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -255,11 +502,10 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'Session expired' });
     }
 
-    const verifyOptions: jwt.VerifyOptions = {};
-    if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
-    if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
-    
-    const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as { userId: string; role?: string };
+    const decoded = verifyJwtToken(token);
+    if (decoded.twoFactorSetup) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     const user = await UserModelMongo.findById(decoded.userId);
     
     if (!user || !user.isActive) {
@@ -273,6 +519,14 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ 
         error: 'Admin privileges revoked',
         code: 'PRIVILEGES_REVOKED'
+      });
+    }
+
+    if (user.role === 'admin' && config.adminRequire2FA && !decoded.twoFactorVerified) {
+      return res.status(403).json({
+        error: 'two_factor_required',
+        code: 'TWO_FACTOR_REQUIRED',
+        message: 'Two-factor authentication required',
       });
     }
 

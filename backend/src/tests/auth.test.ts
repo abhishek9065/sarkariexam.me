@@ -1,17 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import request from 'supertest';
-import express from 'express';
 import cookieParser from 'cookie-parser';
-import authRouter from '../routes/auth.js';
+import express from 'express';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { UserModelMongo } from '../models/users.mongo.js';
+import authRouter from '../routes/auth.js';
 
 // Mock dependencies
 vi.mock('../models/users.mongo.js');
 vi.mock('../middleware/security.js', () => ({
   bruteForceProtection: (req: any, res: any, next: any) => next(),
   getClientIP: () => '127.0.0.1',
-  recordFailedLogin: vi.fn(),
-  clearFailedLogins: vi.fn(),
+  recordFailedLoginWithEmail: vi.fn(),
+  clearFailedLoginsWithEmail: vi.fn(),
   validateContentType: (req: any, res: any, next: any) => next(),
   sanitizeRequestBody: (req: any, res: any, next: any) => next(),
 }));
@@ -29,11 +30,20 @@ vi.mock('../config.js', () => ({
   config: {
     jwtSecret: 'test-secret',
     jwtExpiry: '1h',
+    adminJwtExpiry: '6h',
     isProduction: false,
     adminIpAllowlist: [],
     adminEmailAllowlist: [],
     adminDomainAllowlist: [],
     adminEnforceHttps: false,
+    adminRequire2FA: false,
+    adminSetupTokenExpiry: '15m',
+    adminAuthCookieName: 'admin_auth_token',
+    adminSetupKey: 'setup-admin-123',
+    totpIssuer: 'SarkariExams Admin',
+    totpEncryptionKey: 'test-totp-key',
+    jwtIssuer: '',
+    jwtAudience: '',
     corsOrigins: ['http://localhost:3000'],
   },
 }));

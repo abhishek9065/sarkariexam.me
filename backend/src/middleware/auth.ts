@@ -2,12 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import jwt, { VerifyOptions } from 'jsonwebtoken';
 
 import { config } from '../config.js';
+import { UserModelMongo } from '../models/users.mongo.js';
 import { hasPermission, type Permission } from '../services/rbac.js';
 import RedisCache from '../services/redis.js';
 import { JwtPayload } from '../types.js';
-import { UserModelMongo } from '../models/users.mongo.js';
 
 export const AUTH_COOKIE_NAME = 'auth_token';
+export const ADMIN_AUTH_COOKIE_NAME = config.adminAuthCookieName;
 
 // Extend Express Request type to include user
 declare global {
@@ -19,12 +20,25 @@ declare global {
   }
 }
 
-// Token Blacklist TTL (24 hours in seconds)
+// Token Blacklist TTL fallback (24 hours in seconds)
 const BLACKLIST_TTL = 24 * 60 * 60;
+
+const getTokenTtlSeconds = (token: string): number => {
+  try {
+    const decoded = jwt.decode(token) as { exp?: number } | null;
+    if (!decoded?.exp) return BLACKLIST_TTL;
+    const now = Math.floor(Date.now() / 1000);
+    const ttl = decoded.exp - now;
+    return ttl > 0 ? ttl : 0;
+  } catch {
+    return BLACKLIST_TTL;
+  }
+};
 
 export async function blacklistToken(token: string): Promise<void> {
   // Use the token as the key with a 'bl:' prefix
-  await RedisCache.set(`bl:${token}`, '1', BLACKLIST_TTL);
+  const ttl = getTokenTtlSeconds(token);
+  await RedisCache.set(`bl:${token}`, '1', ttl || BLACKLIST_TTL);
 }
 
 export async function isTokenBlacklisted(token: string): Promise<boolean> {
@@ -39,7 +53,8 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   const authHeader = req.headers['authorization'];
   const headerToken = authHeader && authHeader.split(' ')[1];
   const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
-  const token = headerToken || cookieToken;
+  const adminCookieToken = (req as any).cookies?.[ADMIN_AUTH_COOKIE_NAME];
+  const token = headerToken || adminCookieToken || cookieToken;
 
   if (!token) {
     res.status(401).json({ error: 'Access token required' });
@@ -57,6 +72,10 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
     if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
     const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
+    if (decoded.twoFactorSetup) {
+      res.status(401).json({ error: 'Invalid session' });
+      return;
+    }
     
     // Validate user still exists and is active
     if (decoded.userId) {
@@ -103,6 +122,10 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 
 export function requirePermission(permission: Permission) {
   return (req: Request, res: Response, next: NextFunction): void => {
+    if (req.user?.role === 'admin' && config.adminRequire2FA && !req.user?.twoFactorVerified) {
+      res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
+      return;
+    }
     if (!hasPermission(req.user?.role, permission)) {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
@@ -115,7 +138,8 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   const authHeader = req.headers['authorization'];
   const headerToken = authHeader && authHeader.split(' ')[1];
   const cookieToken = (req as any).cookies?.[AUTH_COOKIE_NAME];
-  const token = headerToken || cookieToken;
+  const adminCookieToken = (req as any).cookies?.[ADMIN_AUTH_COOKIE_NAME];
+  const token = headerToken || adminCookieToken || cookieToken;
 
   if (!token) {
     next();
@@ -132,6 +156,10 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
     if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
     const decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
+    if (decoded.twoFactorSetup) {
+      next();
+      return;
+    }
     req.user = decoded;
   } catch {
     // Invalid token is ignored for optional auth

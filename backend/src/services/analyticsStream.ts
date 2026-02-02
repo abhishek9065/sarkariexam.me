@@ -4,7 +4,7 @@ import jwt, { VerifyOptions } from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
 
 import { config } from '../config.js';
-import { AUTH_COOKIE_NAME } from '../middleware/auth.js';
+import { ADMIN_AUTH_COOKIE_NAME, AUTH_COOKIE_NAME } from '../middleware/auth.js';
 import { getClientIP } from '../middleware/security.js';
 
 import { getAnalyticsOverview } from './analyticsOverview.js';
@@ -32,8 +32,9 @@ export function startAnalyticsWebSocket(server: Server) {
         try {
             const url = new URL(req.url || '', 'http://localhost');
             const tokenParam = url.searchParams.get('token');
-            const cookieToken = getCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
-            const token = tokenParam || cookieToken;
+            const adminCookie = getCookieValue(req.headers.cookie, ADMIN_AUTH_COOKIE_NAME);
+            const userCookie = getCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
+            const token = tokenParam || adminCookie || userCookie;
             const daysParam = parseInt(url.searchParams.get('days') || '', 10);
             const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
             if (!token) {
@@ -76,6 +77,16 @@ export function startAnalyticsWebSocket(server: Server) {
                 decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as any;
             } catch {
                 socket.close(1008, 'Invalid token');
+                return;
+            }
+
+            if (decoded?.twoFactorSetup) {
+                socket.close(1008, 'Invalid token');
+                return;
+            }
+
+            if (decoded?.role === 'admin' && config.adminRequire2FA && !decoded?.twoFactorVerified) {
+                socket.close(1008, 'Two-factor authentication required');
                 return;
             }
 

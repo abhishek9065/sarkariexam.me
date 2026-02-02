@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
 
 import { config } from '../config.js';
 import { UserModelMongo } from '../models/users.mongo.js';
@@ -38,7 +37,7 @@ router.post('/setup', async (req, res) => {
     const { email, password, name, setupKey } = parseResult.data;
 
     // Verify setup key
-    const expectedSetupKey = process.env.ADMIN_SETUP_KEY || 'setup-admin-123';
+    const expectedSetupKey = config.adminSetupKey;
     if (setupKey !== expectedSetupKey) {
       SecurityLogger.log({
         ip_address: req.ip,
@@ -63,7 +62,7 @@ router.post('/setup', async (req, res) => {
     }
 
     // Verify email is in admin allowlist (if configured)
-    if (config.adminEmailAllowlist.length > 0) {
+    if (config.adminEmailAllowlist.length > 0 || config.adminDomainAllowlist.length > 0) {
       const isAllowed = config.adminEmailAllowlist.includes(email);
       const domainAllowed = config.adminDomainAllowlist.some((domain) => {
         const normalized = domain.startsWith('@') ? domain.slice(1) : domain;

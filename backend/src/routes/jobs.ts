@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
+import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
 const router = Router();
 

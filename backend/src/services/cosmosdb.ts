@@ -8,7 +8,6 @@ import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 let client: MongoClient | null = null;
 let db: Db | null = null;
 let isConnecting = false;
-let connectionRetries = 0;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
 
@@ -68,7 +67,6 @@ export async function connectToDatabase(): Promise<Db> {
             await db.admin().ping();
 
             console.log('[CosmosDB] Connected successfully to:', databaseName);
-            connectionRetries = 0;
             isConnecting = false;
 
             // Create indexes

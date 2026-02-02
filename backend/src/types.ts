@@ -127,6 +127,8 @@ export interface JwtPayload {
   userId: string;
   email: string;
   role: UserRole;
+  twoFactorVerified?: boolean;
+  twoFactorSetup?: boolean;
 }
 
 export interface Bookmark {

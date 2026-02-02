@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+
+import { ErrorTracking } from '../services/errorTracking.js';
 import { AppError } from '../utils/AppError.js';
 import logger from '../utils/logger.js';
-import { ErrorTracking } from '../services/errorTracking.js';
 
 export const errorHandler = (
   err: Error,

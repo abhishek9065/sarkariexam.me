@@ -1,17 +1,17 @@
-import http from 'http';
-import compression from 'compression';
-import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
+import http from 'http';
 import path from 'path';
 
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
-
+import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config.js';
 import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
+import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { responseTimeLogger, getPerformanceStats } from './middleware/responseTime.js';
 import {
@@ -22,8 +22,8 @@ import {
   enforceAdminHttps,
   enforceAdminIpAllowlist
 } from './middleware/security.js';
-import adminRouter from './routes/admin.js';
 import adminSetupRouter from './routes/admin-setup.js';
+import adminRouter from './routes/admin.js';
 import analyticsRouter from './routes/analytics.js';
 import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
@@ -41,7 +41,6 @@ import { startAnalyticsWebSocket } from './services/analyticsStream.js';
 import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import logger from './utils/logger.js';
-import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 const startedAt = Date.now();

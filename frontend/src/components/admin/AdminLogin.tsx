@@ -241,7 +241,15 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
             
             // Check if 2FA is required
             const errorMessage = error?.message || 'Authentication failed';
-            if (errorMessage.includes('2fa_required') || errorMessage.includes('two_factor_required')) {
+            const errorCode = error?.code || errorMessage;
+            if (errorCode.includes('two_factor_setup_required')) {
+                setView('setup2fa');
+                setFormErrors({});
+                setTwoFactorCode('');
+                setQrCodeData(null);
+                return;
+            }
+            if (errorCode.includes('2fa_required') || errorCode.includes('two_factor_required')) {
                 setRequire2FA(true);
                 setView('2fa');
                 setFormErrors({});

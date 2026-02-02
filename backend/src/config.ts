@@ -30,17 +30,6 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
 };
 
 /**
- * Get environment variable with optional fallback.
- */
-const _getEnv = (key: string, fallback?: string): string => {
-  const value = process.env[key] ?? fallback;
-  if (!value) {
-    throw new Error(`Missing required env var: ${key}`);
-  }
-  return value;
-};
-
-/**
  * Get required environment variable (no fallback allowed in production).
  */
 const getRequiredEnv = (key: string, devFallback?: string): string => {
@@ -104,6 +93,12 @@ const adminIpAllowlist = parseCsv(process.env.ADMIN_IP_ALLOWLIST);
 const adminEmailAllowlist = parseCsv(process.env.ADMIN_EMAIL_ALLOWLIST);
 const adminDomainAllowlist = parseCsv(process.env.ADMIN_DOMAIN_ALLOWLIST);
 const adminEnforceHttps = parseBoolean(process.env.ADMIN_ENFORCE_HTTPS, isProduction);
+const adminSetupKey = getRequiredEnv('ADMIN_SETUP_KEY', isProduction ? undefined : 'setup-admin-123');
+const adminRequire2FA = parseBoolean(process.env.ADMIN_REQUIRE_2FA, isProduction);
+const adminAuthCookieName = process.env.ADMIN_AUTH_COOKIE_NAME ?? 'admin_auth_token';
+const adminSetupTokenExpiry = process.env.ADMIN_SETUP_TOKEN_EXPIRY ?? '15m';
+const totpIssuer = process.env.TOTP_ISSUER ?? 'SarkariExams Admin';
+const totpEncryptionKey = getRequiredEnv('TOTP_ENCRYPTION_KEY', isProduction ? undefined : 'dev-totp-key');
 const jwtIssuer = process.env.JWT_ISSUER ?? '';
 const jwtAudience = process.env.JWT_AUDIENCE ?? '';
 const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
@@ -111,6 +106,12 @@ const adminJwtExpiry = process.env.ADMIN_JWT_EXPIRY ?? '6h';
 
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
+validateSecret('ADMIN_SETUP_KEY', adminSetupKey, ['setup-admin-123', 'change-me', 'admin-setup']);
+validateSecret('TOTP_ENCRYPTION_KEY', totpEncryptionKey, ['dev-totp-key', 'change-me', 'secret']);
+
+if (isProduction && adminEmailAllowlist.length === 0 && adminDomainAllowlist.length === 0) {
+  throw new Error('SECURITY ERROR: ADMIN_EMAIL_ALLOWLIST or ADMIN_DOMAIN_ALLOWLIST is required in production.');
+}
 
 export const config = {
   port: Number(process.env.PORT ?? 5000),
@@ -127,6 +128,12 @@ export const config = {
   adminEmailAllowlist,
   adminDomainAllowlist,
   adminEnforceHttps,
+  adminSetupKey,
+  adminRequire2FA,
+  adminAuthCookieName,
+  adminSetupTokenExpiry,
+  totpIssuer,
+  totpEncryptionKey,
   jwtIssuer,
   jwtAudience,
   jwtExpiry,
