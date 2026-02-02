@@ -2142,6 +2142,25 @@ export function AdminPage() {
         },
     ];
 
+    const parseDateOnly = (value?: string) => {
+        if (!value) return null;
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    };
+
+    const parseDateTime = (value?: string) => {
+        if (!value) return null;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    };
+
+    const formatDateInput = (date: Date) => {
+        const pad = (num: number) => String(num).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+
     const formWarnings = useMemo(() => getFormWarnings(), [formData]);
     const titleMissing = !formData.title.trim();
     const titleTooShort = formData.title.trim().length > 0 && formData.title.trim().length < 10;
@@ -2403,25 +2422,6 @@ export function AdminPage() {
         if (Number.isNaN(date.getTime())) return '';
         return date.toISOString().slice(0, 10);
     }
-
-    const parseDateOnly = (value?: string) => {
-        if (!value) return null;
-        const date = new Date(`${value}T00:00:00`);
-        if (Number.isNaN(date.getTime())) return null;
-        return date;
-    };
-
-    const parseDateTime = (value?: string) => {
-        if (!value) return null;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return date;
-    };
-
-    const formatDateInput = (date: Date) => {
-        const pad = (num: number) => String(num).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-    };
 
     const normalizeDateTime = (value?: string | Date) => {
         if (!value) return undefined;
