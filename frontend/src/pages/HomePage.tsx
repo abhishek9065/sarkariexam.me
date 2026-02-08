@@ -197,6 +197,27 @@ export function HomePage() {
             .slice(0, 4),
         [data]
     );
+    const intelligenceMetrics = useMemo(() => {
+        const today = new Date().toDateString();
+        let totalViews = 0;
+        let sourceReady = 0;
+        let freshToday = 0;
+        let highIntent = 0;
+
+        for (const item of data) {
+            totalViews += item.viewCount ?? 0;
+            if (item.externalLink && /^https?:\/\//i.test(item.externalLink)) sourceReady += 1;
+            if (item.postedAt && new Date(item.postedAt).toDateString() === today) freshToday += 1;
+            if ((item.viewCount ?? 0) >= 1200) highIntent += 1;
+        }
+
+        return {
+            totalViews,
+            sourceReady,
+            freshToday,
+            highIntent,
+        };
+    }, [data]);
 
     // Handle item click - navigate to SEO-friendly URL
     const handleItemClick = (item: Announcement) => {
@@ -357,6 +378,50 @@ export function HomePage() {
                                 </ul>
                             )}
                         </article>
+                    </div>
+                </section>
+
+                <section className="sr-v2-edge" aria-labelledby="v2-edge-heading">
+                    <div className="sr-v2-edge-header">
+                        <h2 id="v2-edge-heading">Exam Decision Layer</h2>
+                        <p>Built for speed, trust, and conversion from discovery to action.</p>
+                    </div>
+                    <div className="sr-v2-edge-grid">
+                        <article className="sr-v2-edge-card">
+                            <h3>Deadline Radar</h3>
+                            <strong>{formatNumber(closingSoonItems.length)}</strong>
+                            <p>Announcements closing within 7 days are surfaced with urgency.</p>
+                            <button className="btn btn-secondary" onClick={() => navigate('/jobs')}>
+                                Open Priority Jobs
+                            </button>
+                        </article>
+                        <article className="sr-v2-edge-card">
+                            <h3>Verified Source Coverage</h3>
+                            <strong>{formatNumber(intelligenceMetrics.sourceReady)}</strong>
+                            <p>Listings with direct official links for safer, faster application flow.</p>
+                            <button className="btn btn-secondary" onClick={() => navigate('/results')}>
+                                View Trusted Updates
+                            </button>
+                        </article>
+                        <article className="sr-v2-edge-card">
+                            <h3>Fresh Today</h3>
+                            <strong>{formatNumber(intelligenceMetrics.freshToday)}</strong>
+                            <p>Same-day additions so users do not miss newly released opportunities.</p>
+                            <button className="btn btn-secondary" onClick={() => handleCategoryClick('job')}>
+                                Browse Fresh Listings
+                            </button>
+                        </article>
+                        <article className="sr-v2-edge-card">
+                            <h3>Smart Retention</h3>
+                            <strong>{formatNumber(intelligenceMetrics.highIntent)}</strong>
+                            <p>High-demand listings with profile recommendations and saved workflows.</p>
+                            <button className="btn btn-secondary" onClick={() => isAuthenticated ? navigate('/profile') : setShowAuthModal(true)}>
+                                {isAuthenticated ? 'Open My Profile' : 'Enable Smart Feed'}
+                            </button>
+                        </article>
+                    </div>
+                    <div className="sr-v2-edge-footnote">
+                        <span>Total tracked listing views: {formatNumber(intelligenceMetrics.totalViews)}</span>
                     </div>
                 </section>
 

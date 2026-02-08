@@ -13,6 +13,8 @@ interface CategoryPageProps {
     type: ContentType;
 }
 
+type QuickMode = 'all' | 'fresh' | 'closing' | 'high-posts' | 'trending';
+
 const CATEGORY_TITLES: Record<ContentType, string> = {
     'job': 'Latest Government Jobs',
     'result': 'Latest Results',
@@ -43,6 +45,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<FilterState>(() => buildDefaultFilters(type));
     const [filtersPanelVersion, setFiltersPanelVersion] = useState(0);
+    const [quickMode, setQuickMode] = useState<QuickMode>('all');
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const [saveSearchMessage, setSaveSearchMessage] = useState('');
@@ -124,6 +127,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
 
     useEffect(() => {
         setFilters((prev) => ({ ...prev, type }));
+        setQuickMode('all');
     }, [type]);
 
     useEffect(() => {
@@ -233,6 +237,53 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 return items;
         }
     }, [data, filters]);
+    const quickModeCounts = useMemo(() => {
+        const fresh = visibleData.filter((item) => {
+            if (!item.postedAt) return false;
+            const postedAt = new Date(item.postedAt).getTime();
+            if (Number.isNaN(postedAt)) return false;
+            const ageMs = Date.now() - postedAt;
+            return ageMs <= 3 * 24 * 60 * 60 * 1000;
+        }).length;
+        const closing = visibleData.filter((item) => {
+            if (!item.deadline) return false;
+            const days = getDaysRemaining(item.deadline);
+            return days !== null && days >= 0 && days <= 7;
+        }).length;
+        const highPosts = visibleData.filter((item) => (item.totalPosts ?? 0) >= 500).length;
+        const trending = visibleData.filter((item) => (item.viewCount ?? 0) >= 1200).length;
+        return {
+            all: visibleData.length,
+            fresh,
+            closing,
+            'high-posts': highPosts,
+            trending,
+        };
+    }, [visibleData]);
+    const quickFilteredData = useMemo(() => {
+        switch (quickMode) {
+            case 'fresh':
+                return visibleData.filter((item) => {
+                    if (!item.postedAt) return false;
+                    const postedAt = new Date(item.postedAt).getTime();
+                    if (Number.isNaN(postedAt)) return false;
+                    const ageMs = Date.now() - postedAt;
+                    return ageMs <= 3 * 24 * 60 * 60 * 1000;
+                });
+            case 'closing':
+                return visibleData.filter((item) => {
+                    if (!item.deadline) return false;
+                    const days = getDaysRemaining(item.deadline);
+                    return days !== null && days >= 0 && days <= 7;
+                });
+            case 'high-posts':
+                return visibleData.filter((item) => (item.totalPosts ?? 0) >= 500);
+            case 'trending':
+                return visibleData.filter((item) => (item.viewCount ?? 0) >= 1200);
+            default:
+                return visibleData;
+        }
+    }, [quickMode, visibleData]);
 
     const handleLoadMore = useCallback(async () => {
         if (!hasMore || loadingMore) return;
@@ -307,11 +358,11 @@ export function CategoryPage({ type }: CategoryPageProps) {
         Boolean(filters.minAge),
         Boolean(filters.maxAge),
     ]).filter(Boolean).length, [filters]);
-    const closingSoonCount = useMemo(() => visibleData.filter((item) => {
+    const closingSoonCount = useMemo(() => quickFilteredData.filter((item) => {
         if (!item.deadline) return false;
         const days = getDaysRemaining(item.deadline);
         return days !== null && days >= 0 && days <= 7;
-    }).length, [visibleData]);
+    }).length, [quickFilteredData]);
     const activeFilterLabels = useMemo(() => {
         const labels: string[] = [];
         if (filters.keyword) labels.push(`Keyword: ${filters.keyword}`);
@@ -390,6 +441,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const handleResetFilters = () => {
         const nextFilters = buildDefaultFilters(type);
         setFilters(nextFilters);
+        setQuickMode('all');
         setSaveSearchMessage('');
         setError(null);
         setFiltersPanelVersion((prev) => prev + 1);
@@ -435,7 +487,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 <section className="sr-v2-category-intro" aria-label="Category insights">
                     <div className="sr-v2-category-intro-item">
                         <span className="sr-v2-intro-label">Showing</span>
-                        <strong>{formatNumber(visibleData.length)}</strong>
+                        <strong>{formatNumber(quickFilteredData.length)}</strong>
                         <small>results</small>
                     </div>
                     <div className="sr-v2-category-intro-item">
@@ -448,6 +500,48 @@ export function CategoryPage({ type }: CategoryPageProps) {
                         <strong>{closingSoonCount}</strong>
                         <small>alerts</small>
                     </div>
+                </section>
+                <section className="sr-v2-quick-modes" aria-label="Smart views">
+                    <button
+                        type="button"
+                        className={`sr-v2-quick-mode-chip ${quickMode === 'all' ? 'active' : ''}`}
+                        onClick={() => setQuickMode('all')}
+                    >
+                        All
+                        <small>{formatNumber(quickModeCounts.all)}</small>
+                    </button>
+                    <button
+                        type="button"
+                        className={`sr-v2-quick-mode-chip ${quickMode === 'fresh' ? 'active' : ''}`}
+                        onClick={() => setQuickMode('fresh')}
+                    >
+                        Fresh 72h
+                        <small>{formatNumber(quickModeCounts.fresh)}</small>
+                    </button>
+                    <button
+                        type="button"
+                        className={`sr-v2-quick-mode-chip ${quickMode === 'closing' ? 'active' : ''}`}
+                        onClick={() => setQuickMode('closing')}
+                    >
+                        Closing Soon
+                        <small>{formatNumber(quickModeCounts.closing)}</small>
+                    </button>
+                    <button
+                        type="button"
+                        className={`sr-v2-quick-mode-chip ${quickMode === 'high-posts' ? 'active' : ''}`}
+                        onClick={() => setQuickMode('high-posts')}
+                    >
+                        High Vacancy
+                        <small>{formatNumber(quickModeCounts['high-posts'])}</small>
+                    </button>
+                    <button
+                        type="button"
+                        className={`sr-v2-quick-mode-chip ${quickMode === 'trending' ? 'active' : ''}`}
+                        onClick={() => setQuickMode('trending')}
+                    >
+                        Trending
+                        <small>{formatNumber(quickModeCounts.trending)}</small>
+                    </button>
                 </section>
                 {activeFilterLabels.length > 0 && (
                     <section className="sr-v2-filter-summary" aria-label="Active filters">
@@ -471,7 +565,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                             ]}
                         />
                         <h1 className="category-title">{CATEGORY_TITLES[type]}</h1>
-                        <p className="category-subtitle" aria-live="polite">{visibleData.length} {t('category.listings')}</p>
+                        <p className="category-subtitle" aria-live="polite">{quickFilteredData.length} {t('category.listings')}</p>
                     </div>
                     <div className="category-controls sticky-filters">
                         <SearchFilters
@@ -507,8 +601,8 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 ) : (
                     <>
                         <div className="category-list">
-                            {visibleData.length > 0 ? (
-                                visibleData.map(item => (
+                            {quickFilteredData.length > 0 ? (
+                                quickFilteredData.map(item => (
                                     <div
                                         key={item.id}
                                         className="category-item"

@@ -8,6 +8,9 @@ interface AdminLoginProps {
     onResetPassword?: (email: string, password: string, token: string) => Promise<void>;
     onEnable2FA?: () => Promise<{ qrCode: string; secret: string }>;
     onVerify2FA?: (code: string) => Promise<boolean>;
+    onAdminSetup?: (payload: { name: string; email: string; password: string; setupKey: string }) => Promise<{ email: string }>;
+    adminSetupRequired?: boolean;
+    allowSetup2FA?: boolean;
     loading?: boolean;
     error?: string;
 }
@@ -31,7 +34,18 @@ interface PasswordStrength {
     };
 }
 
-export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnable2FA, onVerify2FA, loading = false, error }: AdminLoginProps) {
+export function AdminLogin({
+    onLogin,
+    onForgotPassword,
+    onResetPassword,
+    onEnable2FA,
+    onVerify2FA,
+    onAdminSetup,
+    adminSetupRequired = false,
+    allowSetup2FA = false,
+    loading = false,
+    error,
+}: AdminLoginProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isCapsLockOn, setIsCapsLockOn] = useState(false);
@@ -41,7 +55,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
     const [isFormValid, setIsFormValid] = useState(false);
     const [attemptCount, setAttemptCount] = useState(0);
     const [rememberMe, setRememberMe] = useState(false);
-    const [view, setView] = useState<'login' | 'forgot' | 'reset' | 'success' | '2fa' | 'setup2fa'>('login');
+    const [view, setView] = useState<'login' | 'forgot' | 'reset' | 'success' | '2fa' | 'setup2fa' | 'setupAdmin'>('login');
     const [forgotEmail, setForgotEmail] = useState('');
     const [forgotSent, setForgotSent] = useState(false);
     const [forgotLoading, setForgotLoading] = useState(false);
@@ -51,6 +65,12 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
     const [resetConfirmPassword, setResetConfirmPassword] = useState('');
     const [resetLoading, setResetLoading] = useState(false);
     const [resetSuccess, setResetSuccess] = useState(false);
+    const [setupName, setSetupName] = useState('');
+    const [setupEmail, setSetupEmail] = useState('');
+    const [setupPassword, setSetupPassword] = useState('');
+    const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
+    const [setupKey, setSetupKey] = useState('');
+    const [setupLoading, setSetupLoading] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({ score: 0, requirements: { length: false, uppercase: false, lowercase: false, number: false, special: false } });
     const [twoFactorCode, setTwoFactorCode] = useState('');
     const [twoFactorMode, setTwoFactorMode] = useState<'totp' | 'backup'>('totp');
@@ -100,6 +120,11 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
         setForgotEmail(emailParam);
         setView('reset');
     }, []);
+
+    useEffect(() => {
+        if (!adminSetupRequired) return;
+        setView('setupAdmin');
+    }, [adminSetupRequired]);
 
     useEffect(() => {
         if (!error) return;
@@ -221,6 +246,61 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
             setFormErrors({ general: message });
         } finally {
             setResetLoading(false);
+        }
+    };
+
+    const handleAdminSetupSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!onAdminSetup) {
+            setFormErrors({ general: 'Admin setup is not available right now.' });
+            return;
+        }
+
+        const normalizedEmail = setupEmail.trim().toLowerCase();
+        if (!setupName.trim()) {
+            setFormErrors({ general: 'Admin name is required.' });
+            return;
+        }
+        if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            setFormErrors({ general: 'A valid admin email is required.' });
+            return;
+        }
+        if (setupPassword !== setupConfirmPassword) {
+            setFormErrors({ general: 'Passwords do not match.' });
+            return;
+        }
+        const setupStrength = calculatePasswordStrength(setupPassword);
+        if (setupStrength.score < 5) {
+            setFormErrors({ general: 'Use at least 8 characters with uppercase, lowercase, number, and special character.' });
+            return;
+        }
+        if (!setupKey.trim()) {
+            setFormErrors({ general: 'Admin setup key is required.' });
+            return;
+        }
+
+        setSetupLoading(true);
+        try {
+            const result = await onAdminSetup({
+                name: setupName.trim(),
+                email: normalizedEmail,
+                password: setupPassword,
+                setupKey: setupKey.trim(),
+            });
+            setEmail(result.email);
+            setPassword('');
+            setTouched({ email: true, password: false });
+            setView('login');
+            setFormErrors({ general: 'Admin account created. Sign in with your credentials.' });
+            setSetupName('');
+            setSetupEmail('');
+            setSetupPassword('');
+            setSetupConfirmPassword('');
+            setSetupKey('');
+        } catch (setupError: any) {
+            setFormErrors({ general: setupError?.message || 'Failed to create admin account.' });
+        } finally {
+            setSetupLoading(false);
         }
     };
 
@@ -564,7 +644,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                                     Use a different email
                                 </button>
                             )}
-                            {onEnable2FA && (
+                            {onEnable2FA && allowSetup2FA && (
                                 <button 
                                     type="button" 
                                     className="setup-2fa-link" 
@@ -574,6 +654,17 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                                     title="Enhance security with 2FA"
                                 >
                                     🛡️ Setup 2FA
+                                </button>
+                            )}
+                            {adminSetupRequired && onAdminSetup && (
+                                <button
+                                    type="button"
+                                    className="setup-2fa-link"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit', color: '#f59e0b' }}
+                                    onClick={() => setView('setupAdmin')}
+                                    disabled={loading}
+                                >
+                                    Create first admin account
                                 </button>
                             )}
                         </div>
@@ -1162,6 +1253,159 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                             </form>
                         </div>
                     )}
+                </div>
+            )}
+
+            {view === 'setupAdmin' && (
+                <div className="forgot-password-view">
+                    <div className="login-header">
+                        <h2>Create First Admin</h2>
+                        <p className="login-subtitle">Set up the initial admin account for this portal.</p>
+                    </div>
+
+                    <form onSubmit={handleAdminSetupSubmit} className="forgot-form">
+                        {(formErrors.general || error) && (
+                            <div className="login-error" role="alert">
+                                <span className="error-icon">⚠️</span>
+                                <div>{formErrors.general || error}</div>
+                            </div>
+                        )}
+
+                        <div className="form-group">
+                            <label htmlFor="setup-name" className="form-label">Full Name</label>
+                            <div className="input-wrapper">
+                                <input
+                                    id="setup-name"
+                                    type="text"
+                                    value={setupName}
+                                    onChange={(e) => {
+                                        setSetupName(e.target.value);
+                                        setFormErrors({});
+                                    }}
+                                    placeholder="Portal Administrator"
+                                    required
+                                    disabled={setupLoading}
+                                    className="form-input"
+                                />
+                                <span className="input-icon">👤</span>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="setup-email" className="form-label">Email Address</label>
+                            <div className="input-wrapper">
+                                <input
+                                    id="setup-email"
+                                    type="email"
+                                    value={setupEmail}
+                                    onChange={(e) => {
+                                        setSetupEmail(e.target.value);
+                                        setFormErrors({});
+                                    }}
+                                    placeholder="admin@example.com"
+                                    required
+                                    disabled={setupLoading}
+                                    className="form-input"
+                                />
+                                <span className="input-icon">📧</span>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="setup-password" className="form-label">Password</label>
+                            <div className="input-wrapper password-wrapper">
+                                <input
+                                    id="setup-password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={setupPassword}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setSetupPassword(value);
+                                        setPasswordStrength(calculatePasswordStrength(value));
+                                        setFormErrors({});
+                                    }}
+                                    required
+                                    disabled={setupLoading}
+                                    className="form-input"
+                                    autoComplete="new-password"
+                                />
+                                <button
+                                    type="button"
+                                    className="password-toggle"
+                                    onClick={togglePasswordVisibility}
+                                    disabled={setupLoading}
+                                >
+                                    {showPassword ? '🙈' : '👁️'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="setup-confirm-password" className="form-label">Confirm Password</label>
+                            <div className="input-wrapper">
+                                <input
+                                    id="setup-confirm-password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={setupConfirmPassword}
+                                    onChange={(e) => {
+                                        setSetupConfirmPassword(e.target.value);
+                                        setFormErrors({});
+                                    }}
+                                    required
+                                    disabled={setupLoading}
+                                    className="form-input"
+                                    autoComplete="new-password"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="setup-key" className="form-label">Setup Key</label>
+                            <div className="input-wrapper">
+                                <input
+                                    id="setup-key"
+                                    type="password"
+                                    value={setupKey}
+                                    onChange={(e) => {
+                                        setSetupKey(e.target.value);
+                                        setFormErrors({});
+                                    }}
+                                    required
+                                    disabled={setupLoading}
+                                    className="form-input"
+                                    autoComplete="off"
+                                />
+                                <span className="input-icon">🗝️</span>
+                            </div>
+                        </div>
+
+                        <div className="forgot-actions">
+                            <button type="submit" className="login-btn" disabled={setupLoading}>
+                                {setupLoading ? (
+                                    <>
+                                        <span className="loading-spinner"></span>
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="login-icon">🚀</span>
+                                        Create Admin Account
+                                    </>
+                                )}
+                            </button>
+
+                            {!adminSetupRequired && (
+                                <button
+                                    type="button"
+                                    className="back-to-login-btn"
+                                    onClick={() => setView('login')}
+                                    disabled={setupLoading}
+                                >
+                                    ← Back to Login
+                                </button>
+                            )}
+                        </div>
+                    </form>
                 </div>
             )}
             </div>

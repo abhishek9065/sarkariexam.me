@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons, ScrollToTop } from '../components';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +32,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [offlineSaved, setOfflineSaved] = useState(false);
     const [copyLinkStatus, setCopyLinkStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [applyChecklist, setApplyChecklist] = useState<Record<string, boolean>>({});
     const copyLinkTimerRef = useRef<number | null>(null);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
@@ -152,6 +153,43 @@ export function DetailPage({ type: _type }: DetailPageProps) {
         if (max) return `Up to ₹${fmt(max)}`;
         return null;
     };
+    const checklistItems = useMemo(() => {
+        const base = [
+            { id: 'official', label: 'Open official notification and verify exact eligibility criteria.' },
+            { id: 'documents', label: 'Prepare required documents (photo, signature, certificates, ID proof).' },
+            { id: 'timeline', label: 'Add last date and exam timeline to your personal calendar.' },
+            { id: 'alerts', label: 'Enable profile alerts for admit card/result follow-ups.' },
+        ];
+        if (item?.type === 'job') {
+            base.splice(2, 0, { id: 'fee', label: 'Confirm fee/payment mode and keep transaction receipt.' });
+        }
+        if (item?.type === 'result') {
+            base.push({ id: 'record', label: 'Download and save result PDF for future verification.' });
+        }
+        if (item?.type === 'admit-card') {
+            base.push({ id: 'exam-kit', label: 'Cross-check exam center, reporting time, and required carry items.' });
+        }
+        return base;
+    }, [item?.type]);
+    const checklistCompletedCount = useMemo(
+        () => checklistItems.reduce((count, entry) => count + (applyChecklist[entry.id] ? 1 : 0), 0),
+        [applyChecklist, checklistItems]
+    );
+    const checklistProgress = checklistItems.length > 0
+        ? Math.round((checklistCompletedCount / checklistItems.length) * 100)
+        : 0;
+
+    const handleChecklistToggle = (id: string) => {
+        setApplyChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const handleChecklistReset = () => {
+        const resetState: Record<string, boolean> = {};
+        for (const entry of checklistItems) {
+            resetState[entry.id] = false;
+        }
+        setApplyChecklist(resetState);
+    };
 
     useEffect(() => {
         if (!slug) return;
@@ -216,6 +254,41 @@ export function DetailPage({ type: _type }: DetailPageProps) {
         const saved = getOfflineItem(slug);
         setOfflineSaved(Boolean(saved));
     }, [slug]);
+
+    useEffect(() => {
+        if (!item?.slug) return;
+        const storageKey = `apply-checklist:${item.slug}`;
+        const defaultState: Record<string, boolean> = {};
+        for (const entry of checklistItems) {
+            defaultState[entry.id] = false;
+        }
+
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (!raw) {
+                setApplyChecklist(defaultState);
+                return;
+            }
+            const parsed = JSON.parse(raw) as Record<string, boolean>;
+            const mergedState: Record<string, boolean> = {};
+            for (const entry of checklistItems) {
+                mergedState[entry.id] = Boolean(parsed[entry.id]);
+            }
+            setApplyChecklist(mergedState);
+        } catch {
+            setApplyChecklist(defaultState);
+        }
+    }, [item?.slug, checklistItems]);
+
+    useEffect(() => {
+        if (!item?.slug) return;
+        const storageKey = `apply-checklist:${item.slug}`;
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(applyChecklist));
+        } catch {
+            // ignore storage write failures
+        }
+    }, [applyChecklist, item?.slug]);
 
     useEffect(() => () => {
         if (copyLinkTimerRef.current) {
@@ -423,6 +496,38 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                 {item.deadline && ` Last date: ${formatDate(item.deadline)}.`}
                             </p>
                         </div>
+
+                        <section className="sr-v2-readiness" aria-labelledby="apply-readiness-heading">
+                            <div className="sr-v2-readiness-header">
+                                <div>
+                                    <h3 id="apply-readiness-heading">Apply Readiness Checklist</h3>
+                                    <p>Complete each step to reduce application mistakes and missed deadlines.</p>
+                                </div>
+                                <span className="sr-v2-readiness-score">{checklistCompletedCount}/{checklistItems.length}</span>
+                            </div>
+                            <div className="sr-v2-readiness-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={checklistProgress}>
+                                <span style={{ width: `${checklistProgress}%` }} />
+                            </div>
+                            <ul className="sr-v2-readiness-list">
+                                {checklistItems.map((entry) => (
+                                    <li key={entry.id}>
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(applyChecklist[entry.id])}
+                                                onChange={() => handleChecklistToggle(entry.id)}
+                                            />
+                                            <span>{entry.label}</span>
+                                        </label>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="sr-v2-readiness-actions">
+                                <button type="button" className="btn btn-secondary" onClick={handleChecklistReset}>
+                                    Reset checklist
+                                </button>
+                            </div>
+                        </section>
 
                         {/* Tables Grid */}
                         <div id="detail-important-dates" className="detail-tables-grid">

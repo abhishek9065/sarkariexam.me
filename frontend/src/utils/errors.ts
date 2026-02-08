@@ -1,6 +1,7 @@
 type ErrorPayload = {
     error?: unknown;
     message?: unknown;
+    details?: unknown;
 };
 
 const cleanText = (value: string): string => value.trim();
@@ -34,6 +35,17 @@ export function getApiErrorMessage(payload: unknown, fallback: string): string {
             ? Object.values(errorObj.fieldErrors).flat().filter(Boolean)
             : [];
         const derived = joinParts([...formErrors, ...fieldErrors].filter(Boolean));
+        if (derived) return derived;
+    }
+
+    if (data.details && typeof data.details === 'object') {
+        const detailValues = Object.values(data.details as Record<string, unknown>)
+            .flatMap((value) => {
+                if (Array.isArray(value)) return value;
+                return [value];
+            })
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+        const derived = joinParts(detailValues);
         if (derived) return derived;
     }
 

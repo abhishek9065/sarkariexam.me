@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { z } from 'zod';
 
 import { config } from '../config.js';
@@ -20,12 +20,25 @@ const adminSetupSchema = z.object({
   setupKey: z.string().min(1, 'Setup key required')
 });
 
+const isDatabaseConfigured = () => Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+
+const sendDatabaseUnavailable = (res: Response) => {
+  return res.status(503).json({
+    error: 'database_unavailable',
+    message: 'Admin setup requires a configured MongoDB connection.'
+  });
+};
+
 /**
  * POST /api/auth/admin/setup
  * Initial admin account creation (only works if no admins exist)
  */
 router.post('/setup', async (req, res) => {
   try {
+    if (!isDatabaseConfigured()) {
+      return sendDatabaseUnavailable(res);
+    }
+
     const parseResult = adminSetupSchema.safeParse(req.body);
     if (!parseResult.success) {
       return res.status(400).json({ 
@@ -49,15 +62,12 @@ router.post('/setup', async (req, res) => {
     }
 
     // Check if any admins already exist
-    const existingAdmins = await UserModelMongo.findAll({ 
-      role: 'admin',
-      limit: 1 
-    });
-    
-    if (existingAdmins && existingAdmins.length > 0) {
+    const hasAdminPortalUser = await UserModelMongo.hasAdminPortalUser();
+
+    if (hasAdminPortalUser) {
       return res.status(409).json({ 
         error: 'Admin setup already completed',
-        message: 'An admin account already exists. Use regular login or contact existing admin.'
+        message: 'An admin portal account already exists. Use regular login or contact an existing admin.'
       });
     }
 
@@ -140,12 +150,12 @@ router.post('/setup', async (req, res) => {
  */
 router.get('/setup-status', async (req, res) => {
   try {
-    const existingAdmins = await UserModelMongo.findAll({ 
-      role: 'admin',
-      limit: 1 
-    });
-    
-    const needsSetup = !existingAdmins || existingAdmins.length === 0;
+    if (!isDatabaseConfigured()) {
+      return sendDatabaseUnavailable(res);
+    }
+
+    const hasAdminPortalUser = await UserModelMongo.hasAdminPortalUser();
+    const needsSetup = !hasAdminPortalUser;
     
     return res.json({
       needsSetup,

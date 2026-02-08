@@ -162,6 +162,19 @@ const adminApprovalResolveSchema = z.object({
     reason: z.string().max(500).optional().or(z.literal('')),
 });
 
+const mapApprovalResolveFailure = (reason?: string) => {
+    if (reason === 'not_found') {
+        return { status: 404, code: 'approval_not_found' };
+    }
+    if (reason === 'self_approval_forbidden') {
+        return { status: 403, code: 'self_approval_forbidden' };
+    }
+    if (reason?.startsWith('invalid_status:')) {
+        return { status: 409, code: 'approval_invalid_status' };
+    }
+    return { status: 400, code: 'approval_invalid' };
+};
+
 const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Date | undefined => {
     if (!value) return undefined;
     const trimmed = value.trim();
@@ -549,6 +562,12 @@ router.post('/sessions/terminate', requirePermission('security:read'), requireAd
             return res.status(400).json({ error: parsed.error.flatten() });
         }
         const { sessionId } = parsed.data;
+        if (sessionId === req.user?.sessionId) {
+            return res.status(400).json({
+                error: 'cannot_terminate_current_session',
+                message: 'Current session cannot be terminated from this endpoint.',
+            });
+        }
         const removed = terminateAdminSession(sessionId);
         if (!removed) {
             return res.status(404).json({ error: 'Session not found' });
@@ -633,8 +652,10 @@ router.post('/approvals/:id/approve', requirePermission('announcements:approve')
             note: parsed.data.note,
         });
         if (!approved.ok) {
-            return res.status(400).json({
+            const failure = mapApprovalResolveFailure(approved.reason);
+            return res.status(failure.status).json({
                 error: 'approval_failed',
+                code: failure.code,
                 reason: approved.reason,
             });
         }
@@ -672,8 +693,10 @@ router.post('/approvals/:id/reject', requirePermission('announcements:approve'),
             reason: parsed.data.reason || parsed.data.note,
         });
         if (!rejected.ok) {
-            return res.status(400).json({
+            const failure = mapApprovalResolveFailure(rejected.reason);
+            return res.status(failure.status).json({
                 error: 'approval_reject_failed',
+                code: failure.code,
                 reason: rejected.reason,
             });
         }

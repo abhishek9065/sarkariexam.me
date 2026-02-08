@@ -321,6 +321,19 @@ export class UserModelMongo {
         }
     }
 
+    static async hasAdminPortalUser(): Promise<boolean> {
+        try {
+            const doc = await this.collection.findOne(
+                { role: { $in: ['admin', 'editor', 'reviewer', 'viewer'] } },
+                { projection: { _id: 1 } }
+            );
+            return Boolean(doc);
+        } catch (error) {
+            console.error('[MongoDB] hasAdminPortalUser error:', error);
+            throw error;
+        }
+    }
+
     private static docToUserAuth(doc: WithId<UserDoc>): UserAuth {
         return {
             id: doc._id.toString(),

@@ -8,6 +8,12 @@ const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 type ToastTone = 'success' | 'error' | 'info';
 
+type AdminApprovalExecutionItem = AdminApprovalItem & {
+    endpoint?: string;
+    method?: string;
+    payload?: Record<string, unknown>;
+};
+
 type UseAdminApprovalsInput = {
     isLoggedIn: boolean;
     adminFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -32,6 +38,49 @@ export function useAdminApprovals(input: UseAdminApprovalsInput) {
     const [approvals, setApprovals] = useState<AdminApprovalItem[]>([]);
     const [approvalsLoading, setApprovalsLoading] = useState(false);
     const [approvalsError, setApprovalsError] = useState<string | null>(null);
+
+    const executeApprovedAction = useCallback(async (approval: AdminApprovalExecutionItem) => {
+        const endpoint = typeof approval.endpoint === 'string' ? approval.endpoint : '';
+        if (!endpoint.startsWith('/api/admin/')) {
+            return { attempted: false as const, response: null };
+        }
+
+        const method = typeof approval.method === 'string' ? approval.method.toUpperCase() : 'POST';
+        const payload = approval.payload && typeof approval.payload === 'object'
+            ? approval.payload
+            : {};
+
+        let body: Record<string, unknown> | undefined;
+        if (approval.actionType === 'announcement_publish') {
+            const note = typeof payload.note === 'string' ? payload.note : undefined;
+            body = note ? { note } : {};
+        } else if (approval.actionType === 'announcement_bulk_publish' && endpoint.endsWith('/announcements/bulk-approve')) {
+            const note = typeof payload.note === 'string' ? payload.note : undefined;
+            body = note ? { ids: approval.targetIds, note } : { ids: approval.targetIds };
+        } else if (approval.actionType === 'announcement_bulk_publish' && endpoint.endsWith('/announcements/bulk')) {
+            body = { ids: approval.targetIds, data: payload };
+        } else if (approval.actionType !== 'announcement_delete') {
+            body = Object.keys(payload).length > 0 ? payload : undefined;
+        }
+
+        const response = await withStepUp('Confirm your password and 2FA to execute approved request.', async (stepUpToken) => {
+            const headers: Record<string, string> = {
+                'X-Admin-Step-Up-Token': stepUpToken,
+                'X-Admin-Approval-Id': approval.id,
+            };
+            const requestInit: RequestInit = {
+                method,
+                headers,
+            };
+            if (method !== 'GET' && method !== 'HEAD' && body !== undefined) {
+                headers['Content-Type'] = 'application/json';
+                requestInit.body = JSON.stringify(body);
+            }
+            return adminFetch(`${apiBase}${endpoint}`, requestInit);
+        });
+
+        return { attempted: true as const, response };
+    }, [adminFetch, withStepUp]);
 
     const refreshApprovals = useCallback(async (status: AdminApprovalStatus | 'all' = 'pending') => {
         if (!isLoggedIn) return;
@@ -90,7 +139,33 @@ export function useAdminApprovals(input: UseAdminApprovalsInput) {
                 setMessage(getApiErrorMessage(errorBody, 'Failed to approve workflow item.'));
                 return;
             }
-            setMessage('Approval granted.');
+
+            const payload = await response.json().catch(() => ({}));
+            const approval = payload?.data as AdminApprovalExecutionItem | undefined;
+            const canExecute =
+                approval?.status === 'approved'
+                && typeof approval?.endpoint === 'string'
+                && typeof approval?.method === 'string';
+
+            if (canExecute && approval) {
+                const execution = await executeApprovedAction(approval);
+                if (execution.attempted && execution.response) {
+                    if (!execution.response.ok) {
+                        const executionError = await execution.response.json().catch(() => ({}));
+                        setMessage(`Approval granted, execution failed: ${getApiErrorMessage(executionError, 'Please retry the action.')}`);
+                        pushToast('Approval granted, but execution needs retry.', 'info');
+                        refreshApprovals('pending');
+                        return;
+                    }
+
+                    setMessage('Approval granted and action executed.');
+                    pushToast('Request approved and executed.', 'success');
+                    refreshApprovals('pending');
+                    return;
+                }
+            }
+
+            setMessage('Approval granted. Action is ready for execution.');
             pushToast('Request approved.', 'success');
             refreshApprovals('pending');
         } catch (error: any) {
@@ -98,7 +173,7 @@ export function useAdminApprovals(input: UseAdminApprovalsInput) {
             console.error(error);
             setMessage('Failed to approve request.');
         }
-    }, [adminFetch, pushToast, refreshApprovals, setMessage, withStepUp]);
+    }, [adminFetch, executeApprovedAction, pushToast, refreshApprovals, setMessage, withStepUp]);
 
     const rejectWorkflowItem = useCallback(async (approvalId: string) => {
         try {

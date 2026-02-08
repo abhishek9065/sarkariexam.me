@@ -362,6 +362,7 @@ export function AdminPage() {
     });
     const [loginLoading, setLoginLoading] = useState(false);
     const [adminSetupToken, setAdminSetupToken] = useState<string | null>(null);
+    const [adminSetupRequired, setAdminSetupRequired] = useState(false);
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [message, setMessage] = useState('');
@@ -668,12 +669,41 @@ export function AdminPage() {
             setAdminUser(profile);
             localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
             setIsLoggedIn(true);
+            setAdminSetupRequired(false);
+            setMessage('');
             await refreshPermissionRegistry();
         } catch (error) {
             console.error('Session check failed:', error);
             clearAdminSession();
         }
     }, [clearAdminSession, refreshPermissionRegistry]);
+
+    const checkAdminSetupStatus = useCallback(async () => {
+        if (isLoggedIn) {
+            setAdminSetupRequired(false);
+            return;
+        }
+        try {
+            const response = await adminRequest(`${apiBase}/api/auth/admin/setup-status`, {
+                maxRetries: 0,
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const setupError = getApiErrorMessage(payload, 'Unable to verify admin setup status.');
+                setAdminSetupRequired(false);
+                if (payload?.error === 'database_unavailable') {
+                    setMessage(setupError);
+                }
+                return;
+            }
+            setAdminSetupRequired(Boolean(payload?.needsSetup));
+            if (payload?.needsSetup) {
+                setMessage('No admin account found. Create the first admin account to continue.');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }, [isLoggedIn]);
 
     const handleEnable2FA = useCallback(async () => {
         const response = await adminRequest(`${apiBase}/api/auth/admin/2fa/setup`, {
@@ -748,6 +778,28 @@ export function AdminPage() {
             throw new Error(getApiErrorMessage(errorResult, 'Failed to reset password.'));
         }
         notifySuccess('Password updated', 'Your admin password has been reset. Please sign in with the new password.', 3000);
+    }, [notifySuccess]);
+
+    const handleAdminSetup = useCallback(async (payload: {
+        name: string;
+        email: string;
+        password: string;
+        setupKey: string;
+    }) => {
+        const response = await adminRequest(`${apiBase}/api/auth/admin/setup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            maxRetries: 0,
+            body: JSON.stringify(payload),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(getApiErrorMessage(body, 'Failed to create admin account.'));
+        }
+        setAdminSetupRequired(false);
+        setMessage('Admin account created. Sign in with your new credentials.');
+        notifySuccess('Admin account created', 'Use the same email and password to sign in.', 4000);
+        return { email: payload.email };
     }, [notifySuccess]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
@@ -2581,6 +2633,10 @@ export function AdminPage() {
     }, [checkSession]);
 
     useEffect(() => {
+        checkAdminSetupStatus();
+    }, [checkAdminSetupStatus]);
+
+    useEffect(() => {
         if (!isLoggedIn) return;
         refreshData();
         refreshDashboard();
@@ -2824,6 +2880,9 @@ export function AdminPage() {
                             onResetPassword={handleResetPasswordRequest}
                             onEnable2FA={handleEnable2FA}
                             onVerify2FA={handleVerify2FA}
+                            onAdminSetup={handleAdminSetup}
+                            adminSetupRequired={adminSetupRequired}
+                            allowSetup2FA={Boolean(adminSetupToken)}
                         />
                     </div>
                 </div>
