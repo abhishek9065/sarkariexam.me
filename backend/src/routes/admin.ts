@@ -147,6 +147,16 @@ const adminApprovalsQuerySchema = z.object({
     offset: z.coerce.number().int().min(0).default(0),
 });
 
+const securityLogsQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+    eventType: z.string().trim().min(1).max(80).optional(),
+    ip: z.string().trim().min(1).max(120).optional(),
+    endpoint: z.string().trim().min(1).max(500).optional(),
+    start: z.string().trim().optional(),
+    end: z.string().trim().optional(),
+});
+
 const adminApprovalResolveSchema = z.object({
     note: z.string().max(500).optional().or(z.literal('')),
     reason: z.string().max(500).optional().or(z.literal('')),
@@ -399,9 +409,28 @@ router.get('/stats', async (_req, res) => {
  */
 router.get('/security', requirePermission('security:read'), async (req, res) => {
     try {
-        const limit = Math.min(200, parseInt(req.query.limit as string) || 20);
-        const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
-        const logs = await SecurityLogger.getRecentLogsPaged(limit, offset);
+        const parsed = securityLogsQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { limit, offset, eventType, ip, endpoint, start, end } = parsed.data;
+        const startDate = parseDateParam(start, 'start');
+        const endDate = parseDateParam(end, 'end');
+
+        if (start && !startDate) {
+            return res.status(400).json({ error: 'Invalid start date' });
+        }
+        if (end && !endDate) {
+            return res.status(400).json({ error: 'Invalid end date' });
+        }
+
+        const logs = await SecurityLogger.getRecentLogsPaged(limit, offset, {
+            eventType,
+            ipAddress: ip,
+            endpoint,
+            start: startDate,
+            end: endDate,
+        });
         return res.json({
             data: logs.data,
             meta: {
@@ -409,6 +438,13 @@ router.get('/security', requirePermission('security:read'), async (req, res) => 
                 limit,
                 offset,
                 source: logs.source,
+                filters: {
+                    eventType: eventType || null,
+                    ip: ip || null,
+                    endpoint: endpoint || null,
+                    start: startDate?.toISOString() ?? null,
+                    end: endDate?.toISOString() ?? null,
+                },
             },
         });
     } catch (error) {
@@ -423,9 +459,28 @@ router.get('/security', requirePermission('security:read'), async (req, res) => 
  */
 router.get('/security/logs', requirePermission('security:read'), async (req, res) => {
     try {
-        const limit = Math.min(200, parseInt(req.query.limit as string) || 20);
-        const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
-        const logs = await SecurityLogger.getRecentLogsPaged(limit, offset);
+        const parsed = securityLogsQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { limit, offset, eventType, ip, endpoint, start, end } = parsed.data;
+        const startDate = parseDateParam(start, 'start');
+        const endDate = parseDateParam(end, 'end');
+
+        if (start && !startDate) {
+            return res.status(400).json({ error: 'Invalid start date' });
+        }
+        if (end && !endDate) {
+            return res.status(400).json({ error: 'Invalid end date' });
+        }
+
+        const logs = await SecurityLogger.getRecentLogsPaged(limit, offset, {
+            eventType,
+            ipAddress: ip,
+            endpoint,
+            start: startDate,
+            end: endDate,
+        });
         return res.json({
             data: logs.data,
             meta: {
@@ -433,6 +488,13 @@ router.get('/security/logs', requirePermission('security:read'), async (req, res
                 limit,
                 offset,
                 source: logs.source,
+                filters: {
+                    eventType: eventType || null,
+                    ip: ip || null,
+                    endpoint: endpoint || null,
+                    start: startDate?.toISOString() ?? null,
+                    end: endDate?.toISOString() ?? null,
+                },
             },
         });
     } catch (error) {

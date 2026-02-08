@@ -265,6 +265,22 @@ const formatRetryMessage = (retryAfterSeconds: number) => {
   return `Too many attempts. Retry in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
 };
 
+const sendAuthThrottleResponse = (
+  res: express.Response,
+  retryAfterSeconds: number,
+  overrides?: Record<string, unknown>
+) => {
+  const retryAfter = Math.max(1, Math.ceil(retryAfterSeconds));
+  res.setHeader('Retry-After', String(retryAfter));
+  return res.status(429).json({
+    error: 'too_many_attempts',
+    code: 'AUTH_THROTTLED',
+    message: formatRetryMessage(retryAfter),
+    retryAfter,
+    ...(overrides ?? {}),
+  });
+};
+
 const shouldAlertForAbuse = (scope: 'admin_login' | 'admin_forgot_password' | 'admin_reset_password' | 'admin_step_up', count: number) => {
   if (scope === 'admin_login' && count >= 8) return true;
   if (scope === 'admin_step_up' && count >= 6) return true;
@@ -318,12 +334,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       email: validated.email,
     });
     if (abuseStatus.blocked) {
-      return res.status(429).json({
-        error: 'too_many_attempts',
-        code: 'AUTH_THROTTLED',
-        message: formatRetryMessage(abuseStatus.retryAfterSeconds),
-        retryAfter: abuseStatus.retryAfterSeconds,
-      });
+      return sendAuthThrottleResponse(res, abuseStatus.retryAfterSeconds);
     }
 
     const user = await UserModelMongo.verifyPassword(validated.email, validated.password);
@@ -355,12 +366,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         });
       }
       if (failure.retryAfterSeconds > 0) {
-        return res.status(429).json({
-          error: 'too_many_attempts',
-          code: 'AUTH_THROTTLED',
-          message: formatRetryMessage(failure.retryAfterSeconds),
-          retryAfter: failure.retryAfterSeconds,
-        });
+        return sendAuthThrottleResponse(res, failure.retryAfterSeconds);
       }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -445,12 +451,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
             email: validated.email,
           });
           if (failure.retryAfterSeconds > 0) {
-            return res.status(429).json({
-              error: 'too_many_attempts',
-              code: 'AUTH_THROTTLED',
-              message: formatRetryMessage(failure.retryAfterSeconds),
-              retryAfter: failure.retryAfterSeconds,
-            });
+            return sendAuthThrottleResponse(res, failure.retryAfterSeconds);
           }
           return res.status(401).json({ error: 'invalid_totp', message: 'Invalid authentication code' });
         }
@@ -466,12 +467,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
             email: validated.email,
           });
           if (failure.retryAfterSeconds > 0) {
-            return res.status(429).json({
-              error: 'too_many_attempts',
-              code: 'AUTH_THROTTLED',
-              message: formatRetryMessage(failure.retryAfterSeconds),
-              retryAfter: failure.retryAfterSeconds,
-            });
+            return sendAuthThrottleResponse(res, failure.retryAfterSeconds);
           }
           return res.status(401).json({ error: 'invalid_backup_code', message: 'Invalid backup code' });
         }
@@ -585,10 +581,8 @@ router.post('/admin/forgot-password', async (req, res) => {
       email: validated.email,
     });
     if (abuseStatus.blocked) {
-      return res.status(429).json({
-        ...genericResponse,
-        code: 'AUTH_THROTTLED',
-        retryAfter: abuseStatus.retryAfterSeconds,
+      return sendAuthThrottleResponse(res, abuseStatus.retryAfterSeconds, {
+        message: genericResponse.message,
       });
     }
 
@@ -655,12 +649,7 @@ router.post('/admin/reset-password', async (req, res) => {
       email: validated.email,
     });
     if (abuseStatus.blocked) {
-      return res.status(429).json({
-        error: 'too_many_attempts',
-        code: 'AUTH_THROTTLED',
-        message: formatRetryMessage(abuseStatus.retryAfterSeconds),
-        retryAfter: abuseStatus.retryAfterSeconds,
-      });
+      return sendAuthThrottleResponse(res, abuseStatus.retryAfterSeconds);
     }
 
     const user = await UserModelMongo.findByEmail(validated.email);
@@ -776,12 +765,7 @@ router.post('/admin/step-up', async (req, res) => {
       email: validated.email,
     });
     if (abuseStatus.blocked) {
-      return res.status(429).json({
-        error: 'too_many_attempts',
-        code: 'AUTH_THROTTLED',
-        message: formatRetryMessage(abuseStatus.retryAfterSeconds),
-        retryAfter: abuseStatus.retryAfterSeconds,
-      });
+      return sendAuthThrottleResponse(res, abuseStatus.retryAfterSeconds);
     }
 
     const context = await getAdminAuthContext(req);
@@ -808,12 +792,7 @@ router.post('/admin/step-up', async (req, res) => {
         metadata: { email: validated.email, reason: 'invalid_password', count: failure.count },
       });
       if (failure.retryAfterSeconds > 0) {
-        return res.status(429).json({
-          error: 'too_many_attempts',
-          code: 'AUTH_THROTTLED',
-          message: formatRetryMessage(failure.retryAfterSeconds),
-          retryAfter: failure.retryAfterSeconds,
-        });
+        return sendAuthThrottleResponse(res, failure.retryAfterSeconds);
       }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -841,12 +820,7 @@ router.post('/admin/step-up', async (req, res) => {
             metadata: { email: validated.email, reason: 'invalid_totp', count: failure.count },
           });
           if (failure.retryAfterSeconds > 0) {
-            return res.status(429).json({
-              error: 'too_many_attempts',
-              code: 'AUTH_THROTTLED',
-              message: formatRetryMessage(failure.retryAfterSeconds),
-              retryAfter: failure.retryAfterSeconds,
-            });
+            return sendAuthThrottleResponse(res, failure.retryAfterSeconds);
           }
           return res.status(401).json({ error: 'invalid_totp', message: 'Invalid authentication code' });
         }
@@ -865,12 +839,7 @@ router.post('/admin/step-up', async (req, res) => {
             metadata: { email: validated.email, reason: 'invalid_backup_code', count: failure.count },
           });
           if (failure.retryAfterSeconds > 0) {
-            return res.status(429).json({
-              error: 'too_many_attempts',
-              code: 'AUTH_THROTTLED',
-              message: formatRetryMessage(failure.retryAfterSeconds),
-              retryAfter: failure.retryAfterSeconds,
-            });
+            return sendAuthThrottleResponse(res, failure.retryAfterSeconds);
           }
           return res.status(401).json({ error: 'invalid_backup_code', message: 'Invalid backup code' });
         }

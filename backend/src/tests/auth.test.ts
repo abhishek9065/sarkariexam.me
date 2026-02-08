@@ -206,6 +206,7 @@ describe('Auth Routes', () => {
       expect(throttled.body.error).toBe('too_many_attempts');
       expect(throttled.body.code).toBe('AUTH_THROTTLED');
       expect(throttled.body.retryAfter).toBeGreaterThan(0);
+      expect(Number(throttled.headers['retry-after'])).toBe(throttled.body.retryAfter);
     });
   });
 
@@ -239,6 +240,7 @@ describe('Auth Routes', () => {
       expect(throttled.status).toBe(429);
       expect(throttled.body.code).toBe('AUTH_THROTTLED');
       expect(throttled.body.retryAfter).toBeGreaterThan(0);
+      expect(Number(throttled.headers['retry-after'])).toBe(throttled.body.retryAfter);
     });
   });
 
@@ -337,6 +339,7 @@ describe('Auth Routes', () => {
       expect(throttled.body.error).toBe('too_many_attempts');
       expect(throttled.body.code).toBe('AUTH_THROTTLED');
       expect(throttled.body.retryAfter).toBeGreaterThan(0);
+      expect(Number(throttled.headers['retry-after'])).toBe(throttled.body.retryAfter);
     });
   });
 
@@ -422,6 +425,7 @@ describe('Auth Routes', () => {
       expect(throttled.body.error).toBe('too_many_attempts');
       expect(throttled.body.code).toBe('AUTH_THROTTLED');
       expect(throttled.body.retryAfter).toBeGreaterThan(0);
+      expect(Number(throttled.headers['retry-after'])).toBe(throttled.body.retryAfter);
     });
   });
 });

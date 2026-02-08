@@ -46,12 +46,65 @@ interface SecurityLogDoc extends SecurityEvent {
     created_at: Date;
 }
 
+export interface SecurityLogFilters {
+    eventType?: string;
+    ipAddress?: string;
+    endpoint?: string;
+    start?: Date;
+    end?: Date;
+}
+
 // In-memory store for security logs
 const securityLogs: StoredEvent[] = [];
 const MAX_LOGS = 1000;
 let eventCounter = 0;
 const securityLogRetentionMs = config.securityLogRetentionHours * 60 * 60 * 1000;
 const securityLogDbRetentionMs = config.securityLogDbRetentionDays * 24 * 60 * 60 * 1000;
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const toCaseInsensitiveRegex = (value: string) => ({ $regex: escapeRegex(value), $options: 'i' });
+
+const applyMemoryFilters = (logs: StoredEvent[], filters: SecurityLogFilters): StoredEvent[] => {
+    const eventType = filters.eventType?.trim();
+    const ipAddress = filters.ipAddress?.trim().toLowerCase();
+    const endpoint = filters.endpoint?.trim().toLowerCase();
+    const startMs = filters.start?.getTime();
+    const endMs = filters.end?.getTime();
+
+    return logs.filter((log) => {
+        if (eventType && log.event_type !== eventType) return false;
+        if (ipAddress && !String(log.ip_address || '').toLowerCase().includes(ipAddress)) return false;
+        if (endpoint && !String(log.endpoint || '').toLowerCase().includes(endpoint)) return false;
+        const createdAtMs = log.created_at.getTime();
+        if (Number.isFinite(startMs) && createdAtMs < (startMs as number)) return false;
+        if (Number.isFinite(endMs) && createdAtMs > (endMs as number)) return false;
+        return true;
+    });
+};
+
+const buildDbQuery = (filters: SecurityLogFilters): Record<string, any> => {
+    const query: Record<string, any> = {};
+    const eventType = filters.eventType?.trim();
+    const ipAddress = filters.ipAddress?.trim();
+    const endpoint = filters.endpoint?.trim();
+
+    if (eventType) {
+        query.event_type = eventType;
+    }
+    if (ipAddress) {
+        query.ip_address = toCaseInsensitiveRegex(ipAddress);
+    }
+    if (endpoint) {
+        query.endpoint = toCaseInsensitiveRegex(endpoint);
+    }
+    if (filters.start || filters.end) {
+        query.created_at = {};
+        if (filters.start) query.created_at.$gte = filters.start;
+        if (filters.end) query.created_at.$lte = filters.end;
+    }
+
+    return query;
+};
 
 const mapDocToStoredEvent = (doc: SecurityLogDoc & { _id?: ObjectId }): StoredEvent => ({
     id: Number(doc.id ?? 0),
@@ -112,22 +165,26 @@ export class SecurityLogger {
         return securityLogs.length;
     }
 
-    static async getRecentLogsPaged(limit = 50, offset = 0): Promise<{
+    static async getRecentLogsPaged(limit = 50, offset = 0, filters: SecurityLogFilters = {}): Promise<{
         data: StoredEvent[];
         total: number;
         source: 'database' | 'memory';
     }> {
+        const normalizedLimit = Math.max(1, limit);
+        const normalizedOffset = Math.max(0, offset);
+
         if (config.securityLogPersistenceEnabled) {
             try {
                 const collection = await getCollectionAsync<SecurityLogDoc>('security_logs');
+                const query = buildDbQuery(filters);
                 const [docs, total] = await Promise.all([
                     collection
-                        .find({})
+                        .find(query)
                         .sort({ created_at: -1 })
-                        .skip(Math.max(0, offset))
-                        .limit(Math.max(1, limit))
+                        .skip(normalizedOffset)
+                        .limit(normalizedLimit)
                         .toArray(),
-                    collection.countDocuments({}),
+                    collection.countDocuments(query),
                 ]);
                 return {
                     data: docs.map((doc) => mapDocToStoredEvent(doc as SecurityLogDoc)),
@@ -139,9 +196,10 @@ export class SecurityLogger {
             }
         }
 
+        const filtered = applyMemoryFilters(securityLogs, filters);
         return {
-            data: SecurityLogger.getRecentLogs(limit, offset),
-            total: SecurityLogger.getTotalLogs(),
+            data: filtered.slice(normalizedOffset, normalizedOffset + normalizedLimit),
+            total: filtered.length,
             source: 'memory',
         };
     }
