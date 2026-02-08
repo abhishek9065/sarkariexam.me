@@ -1,16 +1,27 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { authenticateToken, requirePermission } from '../middleware/auth.js';
+import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
+import {
+    approveAdminApprovalRequest,
+    createAdminApprovalRequest,
+    listAdminApprovalRequests,
+    markAdminApprovalExecuted,
+    rejectAdminApprovalRequest,
+    validateApprovalForExecution,
+    type AdminApprovalActionType,
+} from '../services/adminApprovals.js';
 import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
 import { getDailyRollups } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
+import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
+import { config } from '../config.js';
 
 const router = Router();
 
@@ -130,6 +141,17 @@ const adminSummaryQuerySchema = z.object({
     includeInactive: z.coerce.boolean().optional(),
 });
 
+const adminApprovalsQuerySchema = z.object({
+    status: z.enum(['pending', 'approved', 'rejected', 'executed', 'expired', 'all']).optional().default('pending'),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+});
+
+const adminApprovalResolveSchema = z.object({
+    note: z.string().max(500).optional().or(z.literal('')),
+    reason: z.string().max(500).optional().or(z.literal('')),
+});
+
 const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Date | undefined => {
     if (!value) return undefined;
     const trimmed = value.trim();
@@ -150,6 +172,96 @@ const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Da
     }
 
     return parsed;
+};
+
+const getEndpointPath = (url: string) => url.split('?')[0];
+
+const requireDualApproval = async (
+    req: any,
+    res: any,
+    input: {
+        actionType: AdminApprovalActionType;
+        targetIds: string[];
+        payload?: Record<string, any>;
+        note?: string;
+    }
+): Promise<{ allowed: boolean; approvalId?: string }> => {
+    if (!config.adminDualApprovalRequired) {
+        return { allowed: true };
+    }
+
+    const endpoint = getEndpointPath(req.originalUrl || req.url || '');
+    const approvalIdHeader = req.get('x-admin-approval-id');
+    const payload = input.payload ?? {};
+
+    if (!approvalIdHeader) {
+        const approval = await createAdminApprovalRequest({
+            actionType: input.actionType,
+            endpoint,
+            method: req.method,
+            targetIds: input.targetIds,
+            payload,
+            note: input.note,
+            requestedBy: {
+                userId: req.user?.userId ?? 'unknown',
+                email: req.user?.email ?? 'unknown',
+                role: req.user?.role,
+            },
+        });
+        SecurityLogger.log({
+            ip_address: req.ip,
+            event_type: 'admin_approval_requested',
+            endpoint,
+            metadata: {
+                approvalId: approval.id,
+                actionType: input.actionType,
+                requestedBy: req.user?.email,
+            },
+        });
+        res.status(202).json({
+            requiresApproval: true,
+            approvalId: approval.id,
+            message: 'Action queued for secondary approval.',
+            data: approval,
+        });
+        return { allowed: false };
+    }
+
+    const validation = await validateApprovalForExecution({
+        id: approvalIdHeader,
+        actionType: input.actionType,
+        endpoint,
+        method: req.method,
+        targetIds: input.targetIds,
+        payload,
+    });
+    if (!validation.ok) {
+        res.status(409).json({
+            error: 'approval_invalid',
+            reason: validation.reason,
+            message: 'Approval is missing, expired, or does not match this action.',
+        });
+        return { allowed: false };
+    }
+
+    return { allowed: true, approvalId: approvalIdHeader };
+};
+
+const finalizeApprovalExecution = async (req: any, approvalId?: string) => {
+    if (!approvalId) return;
+    await markAdminApprovalExecuted({
+        id: approvalId,
+        executedBy: {
+            userId: req.user?.userId ?? 'unknown',
+            email: req.user?.email ?? 'unknown',
+        },
+    });
+    SecurityLogger.log({
+        ip_address: req.ip,
+        event_type: 'admin_approval_executed',
+        endpoint: getEndpointPath(req.originalUrl || req.url || ''),
+        metadata: { approvalId, actor: req.user?.email },
+    });
 };
 // All admin dashboard routes require admin-level read access
 router.use(authenticateToken, requirePermission('admin:read'));
@@ -358,7 +470,7 @@ router.get('/session', requirePermission('security:read'), async (req, res) => {
  * POST /api/admin/sessions/terminate
  * Terminate a specific session.
  */
-router.post('/sessions/terminate', requirePermission('security:read'), async (req, res) => {
+router.post('/sessions/terminate', requirePermission('security:read'), requireAdminStepUp, async (req, res) => {
     try {
         const parsed = sessionIdSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -386,7 +498,7 @@ router.post('/sessions/terminate', requirePermission('security:read'), async (re
  * POST /api/admin/sessions/terminate-others
  * Terminate all other sessions for the current admin.
  */
-router.post('/sessions/terminate-others', requirePermission('security:read'), async (req, res) => {
+router.post('/sessions/terminate-others', requirePermission('security:read'), requireAdminStepUp, async (req, res) => {
     try {
         if (!req.user?.userId) {
             return res.status(400).json({ error: 'Missing user context' });
@@ -404,6 +516,105 @@ router.post('/sessions/terminate-others', requirePermission('security:read'), as
     } catch (error) {
         console.error('Terminate sessions error:', error);
         return res.status(500).json({ error: 'Failed to terminate sessions' });
+    }
+});
+
+/**
+ * GET /api/admin/approvals
+ * List approval workflow items.
+ */
+router.get('/approvals', requirePermission('announcements:approve'), async (req, res) => {
+    try {
+        const parsed = adminApprovalsQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { status, limit, offset } = parsed.data;
+        const result = await listAdminApprovalRequests({ status, limit, offset });
+        return res.json({
+            data: result.data,
+            meta: { total: result.total, limit, offset },
+        });
+    } catch (error) {
+        console.error('Admin approvals list error:', error);
+        return res.status(500).json({ error: 'Failed to load approvals' });
+    }
+});
+
+/**
+ * POST /api/admin/approvals/:id/approve
+ * Approve a pending high-risk action.
+ */
+router.post('/approvals/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
+    try {
+        const parsed = adminApprovalResolveSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const approved = await approveAdminApprovalRequest({
+            id: req.params.id,
+            approvedBy: {
+                userId: req.user?.userId ?? 'unknown',
+                email: req.user?.email ?? 'unknown',
+            },
+            note: parsed.data.note,
+        });
+        if (!approved.ok) {
+            return res.status(400).json({
+                error: 'approval_failed',
+                reason: approved.reason,
+            });
+        }
+
+        SecurityLogger.log({
+            ip_address: req.ip,
+            event_type: 'admin_approval_approved',
+            endpoint: '/api/admin/approvals/:id/approve',
+            metadata: { approvalId: req.params.id, approvedBy: req.user?.email },
+        });
+        return res.json({ data: approved.approval });
+    } catch (error) {
+        console.error('Admin approval approve error:', error);
+        return res.status(500).json({ error: 'Failed to approve request' });
+    }
+});
+
+/**
+ * POST /api/admin/approvals/:id/reject
+ * Reject a pending high-risk action.
+ */
+router.post('/approvals/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
+    try {
+        const parsed = adminApprovalResolveSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const rejected = await rejectAdminApprovalRequest({
+            id: req.params.id,
+            rejectedBy: {
+                userId: req.user?.userId ?? 'unknown',
+                email: req.user?.email ?? 'unknown',
+            },
+            reason: parsed.data.reason || parsed.data.note,
+        });
+        if (!rejected.ok) {
+            return res.status(400).json({
+                error: 'approval_reject_failed',
+                reason: rejected.reason,
+            });
+        }
+        SecurityLogger.log({
+            ip_address: req.ip,
+            event_type: 'admin_approval_rejected',
+            endpoint: '/api/admin/approvals/:id/reject',
+            metadata: { approvalId: req.params.id, rejectedBy: req.user?.email },
+        });
+        return res.json({ data: rejected.approval });
+    } catch (error) {
+        console.error('Admin approval reject error:', error);
+        return res.status(500).json({ error: 'Failed to reject request' });
     }
 });
 
@@ -631,7 +842,7 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
  * POST /api/admin/announcements/bulk
  * Bulk update announcements
  */
-router.post('/announcements/bulk', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+router.post('/announcements/bulk', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parseResult = bulkUpdateSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -642,6 +853,21 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), ide
             ids: string[];
             data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
         };
+        if (data.status === 'published' && !hasPermission(req.user?.role as any, 'announcements:approve')) {
+            return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
+        }
+        let approvalId: string | undefined;
+        if (data.status === 'published') {
+            const approvalGate = await requireDualApproval(req, res, {
+                actionType: 'announcement_bulk_publish',
+                targetIds: ids,
+                payload: data,
+                note: typeof (data as any).note === 'string' ? (data as any).note : undefined,
+            });
+            if (!approvalGate.allowed) return;
+            approvalId = approvalGate.approvalId;
+        }
+
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
         recordAdminAudit({
@@ -650,6 +876,7 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), ide
             metadata: { count: ids.length, status: data.status },
         }).catch(console.error);
 
+        await finalizeApprovalExecution(req, approvalId);
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk update error:', error);
@@ -661,7 +888,7 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), ide
  * POST /api/admin/announcements/bulk-approve
  * Bulk approve announcements
  */
-router.post('/announcements/bulk-approve', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
+router.post('/announcements/bulk-approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -669,6 +896,14 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
         }
 
         const { ids, note } = parseResult.data;
+        const approvalGate = await requireDualApproval(req, res, {
+            actionType: 'announcement_bulk_publish',
+            targetIds: ids,
+            payload: { note: note?.trim() || undefined },
+            note,
+        });
+        if (!approvalGate.allowed) return;
+
         const now = new Date().toISOString();
         const data = {
             status: 'published' as const,
@@ -687,6 +922,7 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
             metadata: { count: ids.length },
         }).catch(console.error);
 
+        await finalizeApprovalExecution(req, approvalGate.approvalId);
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk approve error:', error);
@@ -698,7 +934,7 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
  * POST /api/admin/announcements/bulk-reject
  * Bulk reject announcements
  */
-router.post('/announcements/bulk-reject', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
+router.post('/announcements/bulk-reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -771,10 +1007,18 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
  * POST /api/admin/announcements/:id/approve
  * Approve and publish an announcement
  */
-router.post('/announcements/:id/approve', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
+router.post('/announcements/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
-        const now = new Date().toISOString();
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
+        const approvalGate = await requireDualApproval(req, res, {
+            actionType: 'announcement_publish',
+            targetIds: [req.params.id],
+            payload: { note },
+            note,
+        });
+        if (!approvalGate.allowed) return;
+
+        const now = new Date().toISOString();
         const announcement = await AnnouncementModelMongo.update(
             req.params.id,
             {
@@ -796,6 +1040,7 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
             userId: req.user?.userId,
             note,
         }).catch(console.error);
+        await finalizeApprovalExecution(req, approvalGate.approvalId);
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Approve announcement error:', error);
@@ -807,7 +1052,7 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
  * POST /api/admin/announcements/:id/reject
  * Reject an announcement back to draft
  */
-router.post('/announcements/:id/reject', requirePermission('announcements:approve'), idempotency(), async (req, res) => {
+router.post('/announcements/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
         const announcement = await AnnouncementModelMongo.update(
@@ -841,8 +1086,15 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
  * DELETE /api/admin/announcements/:id
  * Delete announcement
  */
-router.delete('/announcements/:id', requirePermission('announcements:delete'), idempotency(), async (req, res) => {
+router.delete('/announcements/:id', requirePermission('announcements:delete'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
+        const approvalGate = await requireDualApproval(req, res, {
+            actionType: 'announcement_delete',
+            targetIds: [req.params.id],
+            payload: {},
+        });
+        if (!approvalGate.allowed) return;
+
         const deleted = await AnnouncementModelMongo.delete(req.params.id);
         if (!deleted) {
             return res.status(404).json({ error: 'Announcement not found' });
@@ -852,6 +1104,7 @@ router.delete('/announcements/:id', requirePermission('announcements:delete'), i
             announcementId: req.params.id,
             userId: req.user?.userId,
         }).catch(console.error);
+        await finalizeApprovalExecution(req, approvalGate.approvalId);
         return res.json({ message: 'Announcement deleted' });
     } catch (error) {
         console.error('Delete announcement error:', error);

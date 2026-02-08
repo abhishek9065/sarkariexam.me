@@ -104,6 +104,18 @@ const jwtIssuer = process.env.JWT_ISSUER ?? '';
 const jwtAudience = process.env.JWT_AUDIENCE ?? '';
 const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
 const adminJwtExpiry = process.env.ADMIN_JWT_EXPIRY ?? '6h';
+const passwordHistoryLimit = Math.max(1, parseNumber(process.env.PASSWORD_HISTORY_LIMIT, 5));
+const passwordBreachCheckEnabled = parseBoolean(process.env.PASSWORD_BREACH_CHECK_ENABLED, true);
+const passwordBreachCheckTimeoutMs = Math.max(500, parseNumber(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS, 2500));
+const adminSessionIdleTimeoutMinutes = Math.max(5, parseNumber(process.env.ADMIN_SESSION_IDLE_TIMEOUT_MINUTES, 30));
+const adminSessionAbsoluteTimeoutHours = Math.max(1, parseNumber(process.env.ADMIN_SESSION_ABSOLUTE_TIMEOUT_HOURS, 12));
+const adminStepUpTtlSeconds = Math.max(60, parseNumber(process.env.ADMIN_STEP_UP_TTL_SECONDS, 10 * 60));
+const adminDualApprovalRequired = parseBoolean(process.env.ADMIN_DUAL_APPROVAL_REQUIRED, true);
+const adminApprovalExpiryMinutes = Math.max(5, parseNumber(process.env.ADMIN_APPROVAL_EXPIRY_MINUTES, 30));
+const adminApprovalRetentionDays = Math.max(1, parseNumber(process.env.ADMIN_APPROVAL_RETENTION_DAYS, 30));
+const adminApprovalCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.ADMIN_APPROVAL_CLEANUP_INTERVAL_MINUTES, 60));
+const adminSecurityAlertEmail = process.env.ADMIN_SECURITY_ALERT_EMAIL ?? '';
+const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24));
 
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
@@ -143,6 +155,18 @@ export const config = {
   jwtAudience,
   jwtExpiry,
   adminJwtExpiry,
+  passwordHistoryLimit,
+  passwordBreachCheckEnabled,
+  passwordBreachCheckTimeoutMs,
+  adminSessionIdleTimeoutMinutes,
+  adminSessionAbsoluteTimeoutHours,
+  adminStepUpTtlSeconds,
+  adminDualApprovalRequired,
+  adminApprovalExpiryMinutes,
+  adminApprovalRetentionDays,
+  adminApprovalCleanupIntervalMinutes,
+  adminSecurityAlertEmail,
+  securityLogRetentionHours,
 
   // Cosmos DB specific
   cosmosDbName: process.env.COSMOS_DATABASE_NAME || 'sarkari_db',

@@ -1,4 +1,5 @@
 import type { UserRole } from '../types.js';
+import { ADMIN_ROLE_PERMISSIONS } from './adminPermissions.js';
 
 export type Permission =
     | 'admin:read'
@@ -12,26 +13,7 @@ export type Permission =
     | 'security:read';
 
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-    admin: ['*'],
-    editor: [
-        'admin:read',
-        'admin:write',
-        'analytics:read',
-        'announcements:read',
-        'announcements:write',
-    ],
-    reviewer: [
-        'admin:read',
-        'analytics:read',
-        'announcements:read',
-        'announcements:approve',
-        'audit:read',
-    ],
-    viewer: [
-        'admin:read',
-        'analytics:read',
-        'announcements:read',
-    ],
+    ...ADMIN_ROLE_PERMISSIONS,
     user: [],
 };
 

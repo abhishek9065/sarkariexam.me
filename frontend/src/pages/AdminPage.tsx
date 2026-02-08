@@ -6,13 +6,27 @@ import { ConfirmDialogProvider } from '../components/admin/ConfirmDialog';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AuthLoadingIndicator } from '../components/admin/AuthLoadingIndicator';
 import { AdminNotificationSystem } from '../components/admin/AdminNotification';
+import { AdminStepUpDialog } from '../components/admin/AdminStepUpDialog';
 import { useAdminNotifications } from '../components/admin/useAdminNotifications';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { useTheme } from '../context/ThemeContext';
+import type { AdminApprovalItem, AdminApprovalStatus } from '../components/admin/AdminApprovalsPanel';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
 import { adminRequest } from '../utils/adminRequest';
+import {
+    ADMIN_TAB_META,
+    DEFAULT_PERMISSION_REGISTRY,
+    getFirstAccessibleTab,
+    hasAdminPermission,
+    isAdminPortalRole,
+    parsePermissionRegistry,
+    type AdminPermissionRegistry,
+    type AdminPortalRole,
+    type AdminTab,
+} from './admin/adminAccess';
+import { useStepUpAuth } from './admin/useStepUpAuth';
 import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -34,6 +48,9 @@ const AdminQueue = lazy(() =>
 );
 const SessionManager = lazy(() =>
     import('../components/admin/SessionManager').then((module) => ({ default: module.SessionManager }))
+);
+const AdminApprovalsPanel = lazy(() =>
+    import('../components/admin/AdminApprovalsPanel').then((module) => ({ default: module.AdminApprovalsPanel }))
 );
 
 type DashboardOverview = {
@@ -222,72 +239,7 @@ const loadListFilters = (): ListFilterState | null => {
 type AdminUserProfile = {
     name?: string;
     email?: string;
-    role?: string;
-};
-
-type AdminTab =
-    | 'analytics'
-    | 'list'
-    | 'review'
-    | 'add'
-    | 'detailed'
-    | 'bulk'
-    | 'queue'
-    | 'security'
-    | 'users'
-    | 'audit'
-    | 'community'
-    | 'errors';
-
-const ADMIN_TAB_META: Record<AdminTab, { label: string; description: string }> = {
-    analytics: {
-        label: 'Analytics Command Center',
-        description: 'Track traffic, conversions, and listing performance in real time.',
-    },
-    list: {
-        label: 'All Announcements',
-        description: 'Filter, audit, and edit every listing across categories.',
-    },
-    review: {
-        label: 'Review Queue',
-        description: 'Triage pending posts, QA alerts, and approvals in one pipeline.',
-    },
-    add: {
-        label: 'Quick Add',
-        description: 'Publish fast updates with lightweight form controls.',
-    },
-    detailed: {
-        label: 'Detailed Post',
-        description: 'Craft full listings with structured details, eligibility, and links.',
-    },
-    bulk: {
-        label: 'Bulk Import',
-        description: 'Apply bulk updates, scheduling, and status changes safely.',
-    },
-    queue: {
-        label: 'Schedule Queue',
-        description: 'Monitor scheduled releases and publish time-sensitive notices.',
-    },
-    users: {
-        label: 'User Insights',
-        description: 'Understand subscriber growth, activity, and cohorts.',
-    },
-    community: {
-        label: 'Community Moderation',
-        description: 'Resolve flags, forums, QA, and study group activity.',
-    },
-    errors: {
-        label: 'Error Reports',
-        description: 'Review client error logs and respond quickly to regressions.',
-    },
-    audit: {
-        label: 'Audit Log',
-        description: 'Trace admin actions for accountability and compliance.',
-    },
-    security: {
-        label: 'Security Center',
-        description: 'Manage access policies, sessions, and risk alerts.',
-    },
+    role?: AdminPortalRole;
 };
 
 const loadAdminUser = (): AdminUserProfile | null => {
@@ -389,6 +341,11 @@ export function AdminPage() {
     const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('analytics');
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
     const [adminUser, setAdminUser] = useState<AdminUserProfile | null>(() => loadAdminUser());
+    const adminRole = useMemo<AdminPortalRole | undefined>(
+        () => (isAdminPortalRole(adminUser?.role) ? adminUser.role : undefined),
+        [adminUser?.role]
+    );
+    const [permissionRegistry, setPermissionRegistry] = useState<AdminPermissionRegistry>(DEFAULT_PERMISSION_REGISTRY);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [listAnnouncements, setListAnnouncements] = useState<Announcement[]>([]);
     const [listTotal, setListTotal] = useState(0);
@@ -483,6 +440,19 @@ export function AdminPage() {
     const [backupCodesStatus, setBackupCodesStatus] = useState<BackupCodesStatus | null>(null);
     const [backupCodesLoading, setBackupCodesLoading] = useState(false);
     const [backupCodesModal, setBackupCodesModal] = useState<{ codes: string[]; generatedAt: string } | null>(null);
+    const [approvals, setApprovals] = useState<AdminApprovalItem[]>([]);
+    const [approvalsLoading, setApprovalsLoading] = useState(false);
+    const [approvalsError, setApprovalsError] = useState<string | null>(null);
+    const {
+        stepUpOpen,
+        stepUpReason,
+        stepUpError,
+        stepUpLoading,
+        closeStepUpDialog,
+        handleStepUpSubmit,
+        withStepUp,
+        clearStepUpState,
+    } = useStepUpAuth(adminUser?.email);
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -499,6 +469,14 @@ export function AdminPage() {
     const currentSession = useMemo(() => sessions.find((session) => session.isCurrentSession), [sessions]);
     const activeSessionCount = useMemo(() => sessions.filter((session) => session.isActive).length, [sessions]);
     const highRiskSessionCount = useMemo(() => sessions.filter((session) => session.riskScore === 'high').length, [sessions]);
+    const pendingApprovalsCount = useMemo(
+        () => approvals.filter((approval) => approval.status === 'pending').length,
+        [approvals]
+    );
+    const canAccessTab = useCallback(
+        (tab: AdminTab) => hasAdminPermission(adminRole, permissionRegistry.tabs[tab], permissionRegistry.roles),
+        [adminRole, permissionRegistry]
+    );
 
     useEffect(() => {
         localStorage.setItem(ADMIN_TIMEZONE_KEY, timeZoneMode);
@@ -508,10 +486,6 @@ export function AdminPage() {
         localStorage.setItem(ADMIN_SIDEBAR_KEY, isSidebarCollapsed ? '1' : '0');
     }, [isSidebarCollapsed]);
 
-    const handleNavSelect = useCallback((tab: AdminTab) => {
-        setActiveAdminTab(tab);
-        setIsNavOpen(false);
-    }, []);
     const pushToast = useCallback((message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
         setToasts((prev) => [...prev, { id, message, tone }]);
@@ -519,19 +493,44 @@ export function AdminPage() {
             setToasts((prev) => prev.filter((toast) => toast.id !== id));
         }, 3000);
     }, []);
+    const handleNavSelect = useCallback((tab: AdminTab) => {
+        if (!canAccessTab(tab)) {
+            const denialMessage = 'You do not have permission to open this section.';
+            setMessage(denialMessage);
+            pushToast(denialMessage, 'error');
+            setIsNavOpen(false);
+            return;
+        }
+        setActiveAdminTab(tab);
+        setIsNavOpen(false);
+    }, [canAccessTab, pushToast]);
+
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        if (canAccessTab(activeAdminTab)) return;
+        const fallbackTab = getFirstAccessibleTab(adminRole, permissionRegistry.tabs, permissionRegistry.roles);
+        setActiveAdminTab(fallbackTab);
+        const denialMessage = 'Redirected to an allowed section for your role.';
+        setMessage(denialMessage);
+        pushToast(denialMessage, 'info');
+    }, [activeAdminTab, adminRole, canAccessTab, isLoggedIn, permissionRegistry.roles, permissionRegistry.tabs, pushToast]);
 
     const clearAdminSession = useCallback(() => {
         setIsLoggedIn(false);
         setAdminUser(null);
         setAdminSetupToken(null);
+        setPermissionRegistry(DEFAULT_PERMISSION_REGISTRY);
         setSessions([]);
         setSessionsError(null);
         setBackupCodesStatus(null);
         setBackupCodesModal(null);
+        setApprovals([]);
+        setApprovalsError(null);
+        clearStepUpState();
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
-    }, []);
+    }, [clearStepUpState]);
 
     // Keyboard shortcuts for admin panel
     const keyboardShortcuts: KeyboardShortcut[] = useMemo(() => [
@@ -539,7 +538,7 @@ export function AdminPage() {
             key: 'n',
             ctrl: true,
             handler: () => {
-                if (isLoggedIn) {
+                if (isLoggedIn && canAccessTab('add')) {
                     setActiveAdminTab('add');
                     setFormData({ ...DEFAULT_FORM_DATA });
                     setEditingId(null);
@@ -551,7 +550,7 @@ export function AdminPage() {
             key: 'Escape',
             handler: () => {
                 // Go back to dashboard on Escape
-                if (activeAdminTab !== 'analytics') {
+                if (activeAdminTab !== 'analytics' && canAccessTab('analytics')) {
                     setActiveAdminTab('analytics');
                 }
             },
@@ -561,11 +560,11 @@ export function AdminPage() {
             key: 'l',
             ctrl: true,
             handler: () => {
-                if (isLoggedIn) setActiveAdminTab('list');
+                if (isLoggedIn && canAccessTab('list')) setActiveAdminTab('list');
             },
             description: 'Go to list view',
         },
-    ], [isLoggedIn, activeAdminTab]);
+    ], [isLoggedIn, activeAdminTab, canAccessTab]);
 
     useKeyboardShortcuts(keyboardShortcuts, isLoggedIn);
 
@@ -600,11 +599,15 @@ export function AdminPage() {
                 setMessage(message);
             },
         });
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
             handleUnauthorized();
+        } else if (response.status === 403) {
+            const denialMessage = 'Insufficient permissions for this action.';
+            setMessage(denialMessage);
+            pushToast(denialMessage, 'error');
         }
         return response;
-    }, [handleUnauthorized]);
+    }, [handleUnauthorized, pushToast]);
 
     useEffect(() => {
         if (!rateLimitUntil) {
@@ -654,6 +657,112 @@ export function AdminPage() {
         );
     }, [clearAdminSession, pushToast, notifyInfo, notifySuccess, notifyWarning]);
 
+    const refreshPermissionRegistry = useCallback(async () => {
+        const response = await adminRequest(`${apiBase}/api/auth/admin/permissions`, {
+            maxRetries: 0,
+        });
+        if (!response.ok) {
+            setPermissionRegistry(DEFAULT_PERMISSION_REGISTRY);
+            return;
+        }
+        const payload = await response.json().catch(() => ({}));
+        setPermissionRegistry(parsePermissionRegistry(payload.data));
+    }, []);
+
+    const refreshApprovals = useCallback(async (status: AdminApprovalStatus | 'all' = 'pending') => {
+        if (!isLoggedIn) return;
+        setApprovalsLoading(true);
+        setApprovalsError(null);
+        try {
+            const params = new URLSearchParams({
+                status,
+                limit: '50',
+                offset: '0',
+            });
+            const response = await adminFetch(`${apiBase}/api/admin/approvals?${params.toString()}`);
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setApprovalsError(getApiErrorMessage(errorBody, 'Failed to load approvals.'));
+                return;
+            }
+            const payload = await response.json();
+            setApprovals(payload.data ?? []);
+        } catch (error) {
+            console.error(error);
+            setApprovalsError('Failed to load approvals.');
+        } finally {
+            setApprovalsLoading(false);
+        }
+    }, [adminFetch, isLoggedIn]);
+
+    const handleApprovalRequiredResponse = useCallback(async (response: Response, actionLabel: string) => {
+        if (response.status !== 202) return false;
+        const payload = await response.json().catch(() => ({}));
+        if (!payload?.requiresApproval) return false;
+        const infoMessage = payload?.message || `${actionLabel} queued for secondary approval.`;
+        setMessage(infoMessage);
+        pushToast(infoMessage, 'info');
+        refreshApprovals();
+        if (canAccessTab('approvals')) {
+            setActiveAdminTab('approvals');
+        }
+        return true;
+    }, [canAccessTab, pushToast, refreshApprovals]);
+
+    const approveWorkflowItem = useCallback(async (approvalId: string) => {
+        try {
+            const response = await withStepUp('Confirm your password and 2FA to approve this request.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/approvals/${approvalId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({}),
+                });
+            });
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to approve workflow item.'));
+                return;
+            }
+            setMessage('Approval granted.');
+            pushToast('Request approved.', 'success');
+            refreshApprovals('pending');
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
+            console.error(error);
+            setMessage('Failed to approve request.');
+        }
+    }, [adminFetch, pushToast, refreshApprovals, withStepUp]);
+
+    const rejectWorkflowItem = useCallback(async (approvalId: string) => {
+        try {
+            const response = await withStepUp('Confirm your password and 2FA to reject this request.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/approvals/${approvalId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({ reason: 'Rejected from admin console.' }),
+                });
+            });
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                setMessage(getApiErrorMessage(errorBody, 'Failed to reject workflow item.'));
+                return;
+            }
+            setMessage('Approval rejected.');
+            pushToast('Request rejected.', 'info');
+            refreshApprovals('pending');
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
+            console.error(error);
+            setMessage('Failed to reject request.');
+        }
+    }, [adminFetch, pushToast, refreshApprovals, withStepUp]);
+
     const checkSession = useCallback(async () => {
         try {
             const response = await adminRequest(`${apiBase}/api/auth/me`, {
@@ -665,23 +774,24 @@ export function AdminPage() {
             }
             const payload = await response.json();
             const userData = payload.data?.user;
-            if (userData?.role !== 'admin') {
+            if (!isAdminPortalRole(userData?.role)) {
                 clearAdminSession();
                 return;
             }
             const profile: AdminUserProfile = {
                 name: userData?.name || 'Admin',
                 email: userData?.email,
-                role: userData?.role,
+                role: userData?.role as AdminPortalRole,
             };
             setAdminUser(profile);
             localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
             setIsLoggedIn(true);
+            await refreshPermissionRegistry();
         } catch (error) {
             console.error('Session check failed:', error);
             clearAdminSession();
         }
-    }, [clearAdminSession]);
+    }, [clearAdminSession, refreshPermissionRegistry]);
 
     const handleEnable2FA = useCallback(async () => {
         const response = await adminRequest(`${apiBase}/api/auth/admin/2fa/setup`, {
@@ -730,6 +840,33 @@ export function AdminPage() {
         setAdminSetupToken(null);
         return true;
     }, [adminSetupToken]);
+
+    const handleForgotPasswordRequest = useCallback(async (email: string) => {
+        const response = await adminRequest(`${apiBase}/api/auth/admin/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            maxRetries: 0,
+            body: JSON.stringify({ email }),
+        });
+        if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({}));
+            throw new Error(getApiErrorMessage(errorResult, 'Failed to request password reset.'));
+        }
+    }, []);
+
+    const handleResetPasswordRequest = useCallback(async (email: string, password: string, token: string) => {
+        const response = await adminRequest(`${apiBase}/api/auth/admin/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            maxRetries: 0,
+            body: JSON.stringify({ email, password, token }),
+        });
+        if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({}));
+            throw new Error(getApiErrorMessage(errorResult, 'Failed to reset password.'));
+        }
+        notifySuccess('Password updated', 'Your admin password has been reset. Please sign in with the new password.', 3000);
+    }, [notifySuccess]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
     const [message, setMessage] = useState('');
@@ -904,7 +1041,7 @@ export function AdminPage() {
         try {
             const res = await adminFetch(`${apiBase}/api/admin/sessions`);
             if (!res.ok) {
-                if (res.status === 401 || res.status === 403) {
+                if (res.status === 401) {
                     handleUnauthorized();
                     return;
                 }
@@ -925,39 +1062,61 @@ export function AdminPage() {
     };
 
     const terminateSession = async (sessionId: string) => {
-        const res = await adminFetch(`${apiBase}/api/admin/sessions/terminate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId }),
-        });
-        if (res.status === 401 || res.status === 403) {
-            handleUnauthorized();
-            return;
+        try {
+            const res = await withStepUp('Confirm your password and 2FA before terminating sessions.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/sessions/terminate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({ sessionId }),
+                });
+            });
+            if (res.status === 401) {
+                handleUnauthorized();
+                return;
+            }
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                pushToast(getApiErrorMessage(errorBody, 'Failed to terminate session.'), 'error');
+                return;
+            }
+            pushToast('Session terminated.', 'success');
+            refreshSessions();
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
+            console.error(error);
+            pushToast('Failed to terminate session.', 'error');
         }
-        if (!res.ok) {
-            const errorBody = await res.json().catch(() => ({}));
-            pushToast(getApiErrorMessage(errorBody, 'Failed to terminate session.'), 'error');
-            return;
-        }
-        pushToast('Session terminated.', 'success');
-        refreshSessions();
     };
 
     const terminateOtherSessions = async () => {
-        const res = await adminFetch(`${apiBase}/api/admin/sessions/terminate-others`, {
-            method: 'POST',
-        });
-        if (res.status === 401 || res.status === 403) {
-            handleUnauthorized();
-            return;
+        try {
+            const res = await withStepUp('Confirm your password and 2FA to terminate other sessions.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/sessions/terminate-others`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                });
+            });
+            if (res.status === 401) {
+                handleUnauthorized();
+                return;
+            }
+            if (!res.ok) {
+                const errorBody = await res.json().catch(() => ({}));
+                pushToast(getApiErrorMessage(errorBody, 'Failed to terminate other sessions.'), 'error');
+                return;
+            }
+            pushToast('Other sessions terminated.', 'success');
+            refreshSessions();
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
+            console.error(error);
+            pushToast('Failed to terminate other sessions.', 'error');
         }
-        if (!res.ok) {
-            const errorBody = await res.json().catch(() => ({}));
-            pushToast(getApiErrorMessage(errorBody, 'Failed to terminate other sessions.'), 'error');
-            return;
-        }
-        pushToast('Other sessions terminated.', 'success');
-        refreshSessions();
     };
 
     const refreshBackupCodesStatus = async () => {
@@ -986,7 +1145,7 @@ export function AdminPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
             });
-            if (res.status === 401 || res.status === 403) {
+            if (res.status === 401) {
                 handleUnauthorized();
                 return;
             }
@@ -1215,9 +1374,19 @@ export function AdminPage() {
         notifyInfo('Deleting...', 'Removing announcement from the system.', 2000);
         
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
-                method: 'DELETE',
+            const response = await withStepUp('Confirm your password and 2FA before deleting announcements.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                });
             });
+            const queuedForApproval = await handleApprovalRequiredResponse(response, 'Delete request');
+            if (queuedForApproval) {
+                notifyInfo('Approval required', 'Delete is queued for a second admin approval.', 4000);
+                return;
+            }
 
             if (response.ok) {
                 setMessage('Deleted successfully');
@@ -1234,7 +1403,11 @@ export function AdminPage() {
                 setMessage(errorMsg);
                 notifyError('Delete Failed', errorMsg);
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') {
+                setMessage('Delete cancelled.');
+                return;
+            }
             console.error(error);
             const errorMsg = 'Error deleting announcement';
             setMessage(errorMsg);
@@ -1532,13 +1705,19 @@ export function AdminPage() {
         if (!isLoggedIn) return;
         updateMutating(id, true);
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ note }),
+            const response = await withStepUp('Confirm your password and 2FA before publishing announcements.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/${id}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({ note }),
+                });
             });
+            const queuedForApproval = await handleApprovalRequiredResponse(response, 'Publish request');
+            if (queuedForApproval) return;
+
             if (response.ok) {
                 setMessage('Announcement approved and published.');
                 setReviewNotes((prev) => {
@@ -1552,7 +1731,8 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Failed to approve announcement.'));
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
             console.error(error);
             setMessage('Error approving announcement.');
         } finally {
@@ -1576,12 +1756,15 @@ export function AdminPage() {
         if (!isLoggedIn) return;
         updateMutating(id, true);
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ note }),
+            const response = await withStepUp('Confirm your password and 2FA before rejecting announcements.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/${id}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({ note }),
+                });
             });
             if (response.ok) {
                 setMessage('Announcement moved back to draft.');
@@ -1596,7 +1779,8 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Failed to reject announcement.'));
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
             console.error(error);
             setMessage('Error rejecting announcement.');
         } finally {
@@ -1727,16 +1911,24 @@ export function AdminPage() {
 
         setBulkLoading(true);
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ids: Array.from(selectedIds),
-                    data: payload,
-                }),
+            const response = await withStepUp('Confirm your password and 2FA before bulk updates.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({
+                        ids: Array.from(selectedIds),
+                        data: payload,
+                    }),
+                });
             });
+            const queuedForApproval = await handleApprovalRequiredResponse(
+                response,
+                payload.status === 'published' ? 'Bulk publish request' : 'Bulk update request'
+            );
+            if (queuedForApproval) return;
 
             if (response.ok) {
                 setMessage('Bulk update complete.');
@@ -1750,7 +1942,8 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Bulk update failed.'));
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
             console.error(error);
             setMessage('Error applying bulk update.');
         } finally {
@@ -1770,16 +1963,21 @@ export function AdminPage() {
 
         setReviewLoading(true);
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk-approve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ids: Array.from(selectedIds),
-                    note: reviewBulkNote.trim() || undefined,
-                }),
+            const response = await withStepUp('Confirm your password and 2FA before bulk publish.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/bulk-approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({
+                        ids: Array.from(selectedIds),
+                        note: reviewBulkNote.trim() || undefined,
+                    }),
+                });
             });
+            const queuedForApproval = await handleApprovalRequiredResponse(response, 'Bulk publish request');
+            if (queuedForApproval) return;
 
             if (response.ok) {
                 setMessage('Bulk approve complete.');
@@ -1792,7 +1990,8 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Bulk approve failed.'));
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
             console.error(error);
             setMessage('Error approving announcements.');
         } finally {
@@ -1812,15 +2011,18 @@ export function AdminPage() {
 
         setReviewLoading(true);
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk-reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ids: Array.from(selectedIds),
-                    note: reviewBulkNote.trim() || undefined,
-                }),
+            const response = await withStepUp('Confirm your password and 2FA before bulk rejection.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/bulk-reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
+                    },
+                    body: JSON.stringify({
+                        ids: Array.from(selectedIds),
+                        note: reviewBulkNote.trim() || undefined,
+                    }),
+                });
             });
 
             if (response.ok) {
@@ -1834,7 +2036,8 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Bulk reject failed.'));
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
             console.error(error);
             setMessage('Error rejecting announcements.');
         } finally {
@@ -1858,19 +2061,22 @@ export function AdminPage() {
 
         setReviewLoading(true);
         try {
-            const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ids: Array.from(selectedIds),
-                    data: {
-                        status: 'scheduled',
-                        publishAt: normalizeDateTime(reviewScheduleAt),
-                        note: reviewBulkNote.trim() || undefined,
+            const response = await withStepUp('Confirm your password and 2FA before bulk scheduling.', async (stepUpToken) => {
+                return adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Step-Up-Token': stepUpToken,
                     },
-                }),
+                    body: JSON.stringify({
+                        ids: Array.from(selectedIds),
+                        data: {
+                            status: 'scheduled',
+                            publishAt: normalizeDateTime(reviewScheduleAt),
+                            note: reviewBulkNote.trim() || undefined,
+                        },
+                    }),
+                });
             });
 
             if (response.ok) {
@@ -1885,7 +2091,8 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Bulk schedule failed.'));
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message === 'Step-up cancelled') return;
             console.error(error);
             setMessage('Error scheduling announcements.');
         } finally {
@@ -2500,7 +2707,8 @@ export function AdminPage() {
         refreshAdminSummary();
         refreshSessions();
         refreshBackupCodesStatus();
-    }, [isLoggedIn]);
+        refreshApprovals('pending');
+    }, [isLoggedIn, refreshApprovals]);
 
     useEffect(() => {
         if (!isLoggedIn) return;
@@ -2524,8 +2732,12 @@ export function AdminPage() {
         if (activeAdminTab === 'security') {
             refreshSessions();
             refreshBackupCodesStatus();
+            refreshApprovals('pending');
         }
-    }, [activeAdminTab, isLoggedIn]);
+        if (activeAdminTab === 'approvals') {
+            refreshApprovals('pending');
+        }
+    }, [activeAdminTab, isLoggedIn, refreshApprovals]);
 
     useEffect(() => {
         if (!isLoggedIn || activeAdminTab !== 'errors') return;
@@ -2634,17 +2846,18 @@ export function AdminPage() {
                                     if (response.ok) {
                                         const result = await response.json();
                                         const userData = result.data?.user || result.user;
-                                        if (userData?.role === 'admin') {
+                                        if (isAdminPortalRole(userData?.role)) {
                                             const profile: AdminUserProfile = {
                                                 name: userData?.name || userData?.username || 'Admin',
                                                 email: userData?.email || email,
-                                                role: userData?.role,
+                                                role: userData?.role as AdminPortalRole,
                                             };
                                             setAdminUser(profile);
                                             localStorage.setItem(ADMIN_USER_STORAGE_KEY, JSON.stringify(profile));
                                             setAdminSetupToken(null);
                                             setIsLoggedIn(true);
                                             setMessage('');
+                                            await refreshPermissionRegistry();
                                             
                                             // Enhanced success notification
                                             notifySuccess(
@@ -2657,10 +2870,10 @@ export function AdminPage() {
                                             refreshData();
                                             refreshDashboard();
                                         } else {
-                                            setMessage('Access denied. Admin role required.');
+                                            setMessage('Access denied. Admin portal role required.');
                                             notifyError(
                                                 'Access Denied',
-                                                'Admin privileges required to access this portal.',
+                                                'This account cannot access the admin portal.',
                                                 5000
                                             );
                                         }
@@ -2713,6 +2926,8 @@ export function AdminPage() {
                             }}
                             loading={loginLoading}
                             error={message}
+                            onForgotPassword={handleForgotPasswordRequest}
+                            onResetPassword={handleResetPasswordRequest}
                             onEnable2FA={handleEnable2FA}
                             onVerify2FA={handleVerify2FA}
                         />
@@ -3006,6 +3221,21 @@ export function AdminPage() {
                                         <span className="nav-label">Security</span>
                                         <span className="nav-short">SC</span>
                                         <span className="nav-trailing" />
+                                    </button>
+                                    <button
+                                        className={`admin-nav-button ${activeAdminTab === 'approvals' ? 'active' : ''}`}
+                                        onClick={() => handleNavSelect('approvals')}
+                                        aria-label="Approvals"
+                                        title="Approvals"
+                                        aria-current={activeAdminTab === 'approvals' ? 'page' : undefined}
+                                    >
+                                        <span className="nav-label">Approvals</span>
+                                        <span className="nav-short">AP</span>
+                                        <span className="nav-trailing">
+                                            {pendingApprovalsCount > 0 && (
+                                                <span className="admin-nav-count warning">{formatNumber(pendingApprovalsCount, '0')}</span>
+                                            )}
+                                        </span>
                                     </button>
                                 </div>
                             </div>
@@ -4470,6 +4700,20 @@ export function AdminPage() {
                             </>
                         )}
                     </div>
+                ) : activeAdminTab === 'approvals' ? (
+                    <div className="admin-approvals">
+                        {approvalsError && <div className="admin-error">{approvalsError}</div>}
+                        <Suspense fallback={<div className="admin-loading">Loading approvals...</div>}>
+                            <AdminApprovalsPanel
+                                approvals={approvals}
+                                loading={approvalsLoading}
+                                currentUserEmail={adminUser?.email}
+                                onRefresh={() => refreshApprovals('pending')}
+                                onApprove={approveWorkflowItem}
+                                onReject={rejectWorkflowItem}
+                            />
+                        </Suspense>
+                    </div>
                 ) : activeAdminTab === 'security' ? (
                     <div className="admin-security">
                         <div className="admin-security-grid">
@@ -5169,6 +5413,14 @@ export function AdminPage() {
                     </div>
                 </div>
             )}
+            <AdminStepUpDialog
+                open={stepUpOpen}
+                reason={stepUpReason}
+                loading={stepUpLoading}
+                error={stepUpError}
+                onClose={() => closeStepUpDialog(null)}
+                onSubmit={handleStepUpSubmit}
+            />
         </div>
     );
 }

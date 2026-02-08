@@ -5,6 +5,7 @@ import { LazyImage } from '../ui/LazyImage';
 interface AdminLoginProps {
     onLogin: (email: string, pass: string, twoFactorCode?: string) => Promise<void>;
     onForgotPassword?: (email: string) => Promise<void>;
+    onResetPassword?: (email: string, password: string, token: string) => Promise<void>;
     onEnable2FA?: () => Promise<{ qrCode: string; secret: string }>;
     onVerify2FA?: (code: string) => Promise<boolean>;
     loading?: boolean;
@@ -30,7 +31,7 @@ interface PasswordStrength {
     };
 }
 
-export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA, loading = false, error }: AdminLoginProps) {
+export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnable2FA, onVerify2FA, loading = false, error }: AdminLoginProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -39,10 +40,16 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
     const [isFormValid, setIsFormValid] = useState(false);
     const [attemptCount, setAttemptCount] = useState(0);
     const [rememberMe, setRememberMe] = useState(false);
-    const [view, setView] = useState<'login' | 'forgot' | 'success' | '2fa' | 'setup2fa'>('login');
+    const [view, setView] = useState<'login' | 'forgot' | 'reset' | 'success' | '2fa' | 'setup2fa'>('login');
     const [forgotEmail, setForgotEmail] = useState('');
     const [forgotSent, setForgotSent] = useState(false);
     const [forgotLoading, setForgotLoading] = useState(false);
+    const [resetToken, setResetToken] = useState('');
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetPassword, setResetPassword] = useState('');
+    const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+    const [resetLoading, setResetLoading] = useState(false);
+    const [resetSuccess, setResetSuccess] = useState(false);
     const [passwordStrength, setPasswordStrength] = useState<PasswordStrength>({ score: 0, requirements: { length: false, uppercase: false, lowercase: false, number: false, special: false } });
     const [twoFactorCode, setTwoFactorCode] = useState('');
     const [twoFactorMode, setTwoFactorMode] = useState<'totp' | 'backup'>('totp');
@@ -76,6 +83,20 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
             }
         }
         generateCaptcha();
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const mode = params.get('mode');
+        const token = params.get('token');
+        const emailParam = params.get('email');
+        if (mode !== 'reset-password' || !token || !emailParam) return;
+
+        setResetToken(token);
+        setResetEmail(emailParam);
+        setForgotEmail(emailParam);
+        setView('reset');
     }, []);
 
     // Generate new captcha
@@ -124,6 +145,58 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
             setForgotLoading(false);
         } finally {
             if (onForgotPassword) setForgotLoading(false);
+        }
+    };
+
+    const clearResetQueryParams = () => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete('mode');
+        url.searchParams.delete('token');
+        url.searchParams.delete('email');
+        const nextSearch = url.searchParams.toString();
+        const nextPath = `${url.pathname}${nextSearch ? `?${nextSearch}` : ''}${url.hash}`;
+        window.history.replaceState({}, '', nextPath);
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmedEmail = resetEmail.trim().toLowerCase();
+        if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            setFormErrors({ general: 'Invalid reset link. Please request a new reset email.' });
+            return;
+        }
+        if (!resetToken.trim()) {
+            setFormErrors({ general: 'Invalid reset link. Please request a new reset email.' });
+            return;
+        }
+        if (resetPassword !== resetConfirmPassword) {
+            setFormErrors({ general: 'Passwords do not match.' });
+            return;
+        }
+        const nextStrength = calculatePasswordStrength(resetPassword);
+        if (nextStrength.score < 5) {
+            setFormErrors({ general: 'Use at least 8 characters with uppercase, lowercase, number, and special character.' });
+            return;
+        }
+
+        setResetLoading(true);
+        try {
+            if (onResetPassword) {
+                await onResetPassword(trimmedEmail, resetPassword, resetToken);
+            } else {
+                await new Promise((resolve) => setTimeout(resolve, 600));
+            }
+            setResetSuccess(true);
+            setFormErrors({});
+            setResetPassword('');
+            setResetConfirmPassword('');
+            clearResetQueryParams();
+        } catch (resetError: any) {
+            const message = resetError?.message || 'Failed to reset password. Please request a new reset link.';
+            setFormErrors({ general: message });
+        } finally {
+            setResetLoading(false);
         }
     };
 
@@ -294,70 +367,9 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
         }
     };
 
-    const handleForgotSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!forgotEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)) {
-             setFormErrors(prev => ({ ...prev, email: 'Valid email required' }));
-             return;
-        }
-        // Simulate sending logic
-        setForgotSent(true);
-    };
-
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
     };
-
-    if (view === 'forgot') {
-        return (
-            <div className="admin-login-container">
-                <div className="admin-login-card">
-                    <div className="login-header">
-                        <h2>Reset Password</h2>
-                        <p className="login-subtitle">Enter your admin email to receive reset instructions</p>
-                    </div>
-
-                    {!forgotSent ? (
-                        <form onSubmit={handleForgotSubmit} className="admin-login-form">
-                             <div className="form-group">
-                                <label htmlFor="forgot-email" className="form-label">Email Address</label>
-                                <div className="input-wrapper">
-                                    <input 
-                                        id="forgot-email"
-                                        type="email" 
-                                        className="form-input"
-                                        value={forgotEmail}
-                                        onChange={(e) => setForgotEmail(e.target.value)}
-                                        placeholder="admin@example.com"
-                                        required
-                                    />
-                                    <span className="input-icon">📧</span>
-                                </div>
-                            </div>
-                            <button type="submit" className="login-btn">Send Reset Link</button>
-                            <div className="login-footer">
-                                <button type="button" onClick={() => setView('login')} className="back-link">
-                                    <span className="back-icon">←</span> Back to Login
-                                </button>
-                            </div>
-                        </form>
-                    ) : (
-                        <div className="admin-login-form">
-                            <div className="login-error" style={{ background: 'rgba(34, 197, 94, 0.1)', borderColor: '#22c55e', color: '#22c55e' }}>
-                                <span className="error-icon">✅</span>
-                                If an account exists for <b>{forgotEmail}</b>, you will receive reset instructions shortly.
-                            </div>
-                            <div className="login-footer">
-                                <button type="button" onClick={() => { setView('login'); setForgotSent(false); }} className="back-link">
-                                    <span className="back-icon">←</span> Return to Login
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="admin-login-container">
@@ -674,6 +686,153 @@ export function AdminLogin({ onLogin, onForgotPassword, onEnable2FA, onVerify2FA
                                     onClick={() => setView('login')}
                                 >
                                     Back to Login
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {view === 'reset' && (
+                <div className="forgot-password-view">
+                    <div className="login-header">
+                        <h2>Set New Password</h2>
+                        <p className="login-subtitle">Create a strong new password for your admin account.</p>
+                    </div>
+
+                    {!resetSuccess ? (
+                        <form onSubmit={handleResetPassword} className="forgot-form">
+                            {formErrors.general && (
+                                <div className="login-error" role="alert">
+                                    <span className="error-icon">⚠️</span>
+                                    <div>{formErrors.general}</div>
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label htmlFor="reset-email" className="form-label">Email Address</label>
+                                <div className="input-wrapper">
+                                    <input
+                                        id="reset-email"
+                                        type="email"
+                                        value={resetEmail}
+                                        readOnly
+                                        className="form-input"
+                                    />
+                                    <span className="input-icon">📧</span>
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="reset-password" className="form-label">
+                                    New Password
+                                    <span className="required" aria-hidden="true">*</span>
+                                </label>
+                                <div className="input-wrapper">
+                                    <input
+                                        id="reset-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={resetPassword}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setResetPassword(value);
+                                            setPasswordStrength(calculatePasswordStrength(value));
+                                            setFormErrors({});
+                                        }}
+                                        autoComplete="new-password"
+                                        className="form-input"
+                                        required
+                                        disabled={resetLoading}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="password-toggle"
+                                        onClick={togglePasswordVisibility}
+                                        disabled={resetLoading}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="reset-confirm-password" className="form-label">
+                                    Confirm Password
+                                    <span className="required" aria-hidden="true">*</span>
+                                </label>
+                                <div className="input-wrapper">
+                                    <input
+                                        id="reset-confirm-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={resetConfirmPassword}
+                                        onChange={(e) => {
+                                            setResetConfirmPassword(e.target.value);
+                                            setFormErrors({});
+                                        }}
+                                        autoComplete="new-password"
+                                        className="form-input"
+                                        required
+                                        disabled={resetLoading}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="password-strength">
+                                <div className="strength-indicator">
+                                    <div className={`strength-bar strength-${passwordStrength.score}`}>
+                                        <span style={{ width: `${(passwordStrength.score / 5) * 100}%` }}></span>
+                                    </div>
+                                    <span className="strength-text">
+                                        {passwordStrength.score <= 2 ? 'Weak' : passwordStrength.score <= 4 ? 'Good' : 'Strong'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="forgot-actions">
+                                <button type="submit" className="login-btn" disabled={resetLoading}>
+                                    {resetLoading ? (
+                                        <>
+                                            <span className="loading-spinner"></span>
+                                            Resetting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="login-icon">🔐</span>
+                                            Reset Password
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="back-to-login-btn"
+                                    onClick={() => {
+                                        setView('login');
+                                        setFormErrors({});
+                                        clearResetQueryParams();
+                                    }}
+                                    disabled={resetLoading}
+                                >
+                                    ← Back to Login
+                                </button>
+                            </div>
+                        </form>
+                    ) : (
+                        <div className="forgot-success">
+                            <div className="success-icon">✅</div>
+                            <h3>Password Updated</h3>
+                            <p>Your password has been reset successfully.</p>
+                            <div className="forgot-actions">
+                                <button
+                                    type="button"
+                                    className="login-btn"
+                                    onClick={() => {
+                                        setView('login');
+                                        setResetSuccess(false);
+                                        setFormErrors({});
+                                    }}
+                                >
+                                    Continue to Login
                                 </button>
                             </div>
                         </div>

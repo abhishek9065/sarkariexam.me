@@ -1,7 +1,11 @@
 import crypto from 'crypto';
 
+import { config } from '../config.js';
+
 const SESSION_INACTIVE_WINDOW_MS = 30 * 60 * 1000;
 const MAX_ACTIONS = 5;
+const ADMIN_SESSION_IDLE_TIMEOUT_MS = config.adminSessionIdleTimeoutMinutes * 60 * 1000;
+const ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS = config.adminSessionAbsoluteTimeoutHours * 60 * 60 * 1000;
 
 export type AdminSessionRecord = {
   id: string;
@@ -65,7 +69,10 @@ const computeRiskScore = (record: AdminSessionRecord): 'low' | 'medium' | 'high'
 const cleanupExpiredSessions = () => {
   const now = Date.now();
   for (const [id, record] of sessions.entries()) {
-    if (record.expiresAt && record.expiresAt.getTime() < now) {
+    const tokenExpired = record.expiresAt && record.expiresAt.getTime() < now;
+    const idleExpired = now - record.lastSeen.getTime() > ADMIN_SESSION_IDLE_TIMEOUT_MS;
+    const absoluteExpired = now - record.createdAt.getTime() > ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS;
+    if (tokenExpired || idleExpired || absoluteExpired) {
       sessions.delete(id);
     }
   }
@@ -130,6 +137,50 @@ export const listAdminSessions = (userId?: string): AdminSessionRecord[] => {
   const records = Array.from(sessions.values());
   const filtered = userId ? records.filter((session) => session.userId === userId) : records;
   return filtered.sort((a, b) => b.lastSeen.getTime() - a.lastSeen.getTime());
+};
+
+export const validateAdminSession = (
+  sessionId?: string | null
+): { valid: boolean; reason?: 'session_not_found' | 'session_expired' | 'session_idle_timeout' | 'session_absolute_timeout' } => {
+  if (!sessionId) return { valid: false, reason: 'session_not_found' };
+  cleanupExpiredSessions();
+  const record = sessions.get(sessionId);
+  if (!record) return { valid: false, reason: 'session_not_found' };
+
+  const now = Date.now();
+  if (record.expiresAt && record.expiresAt.getTime() <= now) {
+    sessions.delete(sessionId);
+    return { valid: false, reason: 'session_expired' };
+  }
+  if (now - record.lastSeen.getTime() > ADMIN_SESSION_IDLE_TIMEOUT_MS) {
+    sessions.delete(sessionId);
+    return { valid: false, reason: 'session_idle_timeout' };
+  }
+  if (now - record.createdAt.getTime() > ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS) {
+    sessions.delete(sessionId);
+    return { valid: false, reason: 'session_absolute_timeout' };
+  }
+
+  return { valid: true };
+};
+
+export const isNewDeviceForUser = (input: {
+  userId: string;
+  ip: string;
+  userAgent: string;
+}): boolean => {
+  cleanupExpiredSessions();
+  const device = getDeviceLabel(input.userAgent || 'Unknown');
+  const browser = getBrowserLabel(input.userAgent || 'Unknown');
+  const os = getOsLabel(input.userAgent || 'Unknown');
+  const userSessions = listAdminSessions(input.userId);
+  if (userSessions.length === 0) return false;
+  return !userSessions.some((session) =>
+    session.ip === input.ip &&
+    session.device === device &&
+    session.browser === browser &&
+    session.os === os
+  );
 };
 
 export const getAdminSession = (sessionId?: string | null): AdminSessionRecord | null => {

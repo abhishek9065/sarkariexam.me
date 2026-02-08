@@ -10,7 +10,7 @@ import './styles.css';
 const HomePage = lazy(() => import('./pages/HomePage').then((mod) => ({ default: mod.HomePage })));
 const CategoryPage = lazy(() => import('./pages/CategoryPage').then((mod) => ({ default: mod.CategoryPage })));
 const DetailPage = lazy(() => import('./pages/DetailPage').then((mod) => ({ default: mod.DetailPage })));
-const AdminPage = lazy(() => import('./pages/AdminPage').then((mod) => ({ default: mod.AdminPage })));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 const StaticPage = lazy(() => import('./pages/StaticPages').then((mod) => ({ default: mod.StaticPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((mod) => ({ default: mod.ProfilePage })));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage').then((mod) => ({ default: mod.BookmarksPage })));
@@ -46,7 +46,14 @@ function AppRoutes() {
                     <Route path="/syllabus/:slug" element={<DetailPage type="syllabus" />} />
 
                     {/* Admin Page */}
-                    <Route path="/admin" element={<AdminPage />} />
+                    <Route
+                        path="/admin"
+                        element={
+                            <Suspense fallback={<div className="app"><main className="main-content"><SkeletonLoader /></main></div>}>
+                                <AdminPage />
+                            </Suspense>
+                        }
+                    />
 
                     {/* Profile Page */}
                     <Route path="/profile" element={<ProfilePage />} />

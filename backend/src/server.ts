@@ -38,6 +38,7 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import supportRouter from './routes/support.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
+import { scheduleAdminApprovalsCleanup } from './services/adminApprovals.js';
 import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import logger from './utils/logger.js';
@@ -106,7 +107,14 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'X-Admin-Step-Up-Token',
+    'X-Admin-Approval-Id',
+    'Idempotency-Key',
+  ]
 }));
 
 // Body parsing
@@ -235,7 +243,6 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/bulk', bulkRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/support', supportRouter);
-app.use('/api/community', communityRouter);
 
 // 404 handler for API routes
 app.use('/api/*', (_req, res) => {
@@ -259,6 +266,7 @@ export async function startServer() {
       await scheduleAnalyticsRollups().catch(error => {
         logger.error({ err: error }, '[Analytics] Rollup init failed');
       });
+      scheduleAdminApprovalsCleanup();
     } else {
       logger.info('[Server] No MongoDB configured, using fallback data');
     }

@@ -11,6 +11,7 @@ interface UserDoc extends Document {
     email: string;
     username: string;
     passwordHash: string;
+    passwordHistory?: Array<{ hash: string; changedAt: Date }>;
     role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'user';
     isActive: boolean;
     createdAt: Date;
@@ -109,6 +110,7 @@ export class UserModelMongo {
                 email: data.email.toLowerCase(),
                 username: data.username,
                 passwordHash,
+                passwordHistory: [],
                 role: data.role || 'user',
                 isActive: true,
                 createdAt: now,
@@ -185,10 +187,25 @@ export class UserModelMongo {
 
         try {
             const updateData: Partial<UserDoc> = { updatedAt: new Date() };
+            const objectId = new ObjectId(id);
+            let existingDoc: WithId<UserDoc> | null = null;
+            if (data.password) {
+                existingDoc = await this.collection.findOne({ _id: objectId });
+                if (!existingDoc) return null;
+            }
 
             if (data.username) updateData.username = data.username;
             if (data.email) updateData.email = data.email.toLowerCase();
-            if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 10);
+            if (data.password) {
+                const nextHash = await bcrypt.hash(data.password, 10);
+                const existingHistory = existingDoc?.passwordHistory ?? [];
+                const nextHistory = [
+                    { hash: existingDoc?.passwordHash as string, changedAt: new Date() },
+                    ...existingHistory,
+                ].slice(0, 10);
+                updateData.passwordHash = nextHash;
+                updateData.passwordHistory = nextHistory;
+            }
             if (data.role) updateData.role = data.role;
             if (data.isActive !== undefined) updateData.isActive = data.isActive;
             if (data.twoFactorEnabled !== undefined) updateData.twoFactorEnabled = data.twoFactorEnabled;
@@ -201,7 +218,7 @@ export class UserModelMongo {
             }
 
             await this.collection.updateOne(
-                { _id: new ObjectId(id) },
+                { _id: objectId },
                 { $set: updateData }
             );
 
@@ -269,6 +286,39 @@ export class UserModelMongo {
             lastLogin: doc.lastLogin?.toISOString(),
             twoFactorEnabled: doc.twoFactorEnabled ?? false,
         };
+    }
+
+    static async verifyPasswordById(id: string, password: string): Promise<boolean> {
+        if (!ObjectId.isValid(id)) return false;
+        try {
+            const doc = await this.collection.findOne({ _id: new ObjectId(id), isActive: true });
+            if (!doc) return false;
+            return bcrypt.compare(password, doc.passwordHash);
+        } catch (error) {
+            console.error('[MongoDB] verifyPasswordById error:', error);
+            return false;
+        }
+    }
+
+    static async isPasswordReused(id: string, password: string, historyDepth = 5): Promise<boolean> {
+        if (!ObjectId.isValid(id)) return false;
+        try {
+            const doc = await this.collection.findOne({ _id: new ObjectId(id) });
+            if (!doc) return false;
+
+            const matchesCurrent = await bcrypt.compare(password, doc.passwordHash);
+            if (matchesCurrent) return true;
+
+            const history = (doc.passwordHistory ?? []).slice(0, Math.max(1, historyDepth));
+            for (const entry of history) {
+                const reused = await bcrypt.compare(password, entry.hash);
+                if (reused) return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('[MongoDB] isPasswordReused error:', error);
+            return false;
+        }
     }
 
     private static docToUserAuth(doc: WithId<UserDoc>): UserAuth {

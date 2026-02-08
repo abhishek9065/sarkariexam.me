@@ -182,6 +182,7 @@ async function createIndexes(): Promise<void> {
         const communityGroups = database.collection('community_groups');
         const communityFlags = database.collection('community_flags');
         const errorReports = database.collection('error_reports');
+        const adminApprovalRequests = database.collection('admin_approval_requests');
 
         // Announcements indexes
         await announcements.createIndex({ slug: 1 }, { unique: true });
@@ -231,6 +232,9 @@ async function createIndexes(): Promise<void> {
         await adminAuditLogs.createIndex({ createdAt: -1 });
         await adminAuditLogs.createIndex({ action: 1, createdAt: -1 });
         await adminAuditLogs.createIndex({ announcementId: 1 });
+        await adminApprovalRequests.createIndex({ status: 1, requestedAt: -1 });
+        await adminApprovalRequests.createIndex({ expiresAt: 1 });
+        await adminApprovalRequests.createIndex({ requestHash: 1, status: 1 });
 
         // User notifications
         await userNotifications.createIndex({ userId: 1, createdAt: -1 });

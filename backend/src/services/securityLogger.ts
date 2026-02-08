@@ -1,3 +1,5 @@
+import { config } from '../config.js';
+
 /**
  * Security Logger Service
  * Logs security events in-memory (no database required)
@@ -15,7 +17,18 @@ export interface SecurityEvent {
       | 'admin_login_success'
       | 'admin_backup_code_generated'
       | 'admin_backup_code_used'
-      | 'admin_session_terminated';
+      | 'admin_session_terminated'
+      | 'admin_step_up_success'
+      | 'admin_step_up_failed'
+      | 'admin_approval_requested'
+      | 'admin_approval_approved'
+      | 'admin_approval_rejected'
+      | 'admin_approval_executed'
+      | 'admin_security_alert'
+      | 'admin_login_new_device'
+      | 'admin_password_reset_requested'
+      | 'admin_password_reset_failed'
+      | 'admin_password_reset_completed';
     endpoint: string;
     metadata?: any;
 }
@@ -29,6 +42,7 @@ interface StoredEvent extends SecurityEvent {
 const securityLogs: StoredEvent[] = [];
 const MAX_LOGS = 1000;
 let eventCounter = 0;
+const securityLogRetentionMs = config.securityLogRetentionHours * 60 * 60 * 1000;
 
 export class SecurityLogger {
     static log(event: SecurityEvent): void {
@@ -71,4 +85,7 @@ export class SecurityLogger {
 }
 
 // Auto-cleanup old logs every hour
-setInterval(() => SecurityLogger.clearOldLogs(), 60 * 60 * 1000);
+const securityLogCleanupTimer = setInterval(() => {
+    SecurityLogger.clearOldLogs(securityLogRetentionMs);
+}, 60 * 60 * 1000);
+securityLogCleanupTimer.unref?.();

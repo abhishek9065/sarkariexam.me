@@ -22,6 +22,140 @@ export const isEmailConfigured = (): boolean => {
   return isConfigured;
 };
 
+export const sendAdminPasswordResetEmail = async (
+  email: string,
+  resetUrl: string,
+  expiresInMinutes: number
+): Promise<boolean> => {
+  if (!isConfigured) {
+    console.log('SendGrid not configured, skipping admin password reset email');
+    return false;
+  }
+
+  try {
+    await sgMail.send({
+      to: email,
+      from: config.emailFrom || 'noreply@sarkariresult.com',
+      subject: '🔐 SarkariExams Admin Password Reset',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #1a365d; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f9f9f9; }
+            .button { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>SarkariExams Admin Security</h1>
+            </div>
+            <div class="content">
+              <h2>Password reset requested</h2>
+              <p>We received a request to reset your admin password.</p>
+              <p>This reset link expires in <strong>${expiresInMinutes} minutes</strong>.</p>
+              <a href="${resetUrl}" class="button">Reset password</a>
+              <p>If you did not request this, you can ignore this message.</p>
+            </div>
+            <div class="footer">
+              <p>© SarkariExams</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to send admin password reset email:', error);
+    return false;
+  }
+};
+
+export const sendAdminNewDeviceLoginEmail = async (options: {
+  email: string;
+  ip: string;
+  device: string;
+  browser: string;
+  os: string;
+  timestamp: string;
+}): Promise<boolean> => {
+  if (!isConfigured) {
+    return false;
+  }
+
+  try {
+    await sgMail.send({
+      to: options.email,
+      from: config.emailFrom || 'noreply@sarkariresult.com',
+      subject: '🚨 New admin device login detected',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+          <h2>SarkariExams admin security alert</h2>
+          <p>A new admin login was detected for your account.</p>
+          <ul>
+            <li><strong>Time:</strong> ${new Date(options.timestamp).toLocaleString('en-IN')}</li>
+            <li><strong>IP:</strong> ${options.ip}</li>
+            <li><strong>Device:</strong> ${options.device}</li>
+            <li><strong>Browser:</strong> ${options.browser}</li>
+            <li><strong>OS:</strong> ${options.os}</li>
+          </ul>
+          <p>If this was not you, rotate your password and terminate active sessions immediately.</p>
+        </body>
+        </html>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to send admin new-device alert email:', error);
+    return false;
+  }
+};
+
+export const sendAdminSecurityAlertEmail = async (options: {
+  email: string;
+  title: string;
+  message: string;
+  metadata?: Record<string, any>;
+}): Promise<boolean> => {
+  if (!isConfigured) {
+    return false;
+  }
+
+  const metadataRows = Object.entries(options.metadata ?? {})
+    .map(([key, value]) => `<li><strong>${key}:</strong> ${String(value)}</li>`)
+    .join('');
+
+  try {
+    await sgMail.send({
+      to: options.email,
+      from: config.emailFrom || 'noreply@sarkariresult.com',
+      subject: `⚠️ ${options.title}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+          <h2>${options.title}</h2>
+          <p>${options.message}</p>
+          ${metadataRows ? `<ul>${metadataRows}</ul>` : ''}
+        </body>
+        </html>
+      `,
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to send admin security alert email:', error);
+    return false;
+  }
+};
+
 /**
  * Send verification email to new subscriber
  */

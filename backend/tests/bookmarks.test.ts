@@ -8,7 +8,7 @@ const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip :
 
 async function createUserToken() {
     const email = `bookmark-${Date.now()}@example.com`;
-    const password = 'StrongPass1!';
+    const password = `Strong!${Date.now()}Aa`;
 
     const registerRes = await request(app)
         .post('/api/auth/register')

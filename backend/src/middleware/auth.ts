@@ -3,8 +3,10 @@ import jwt, { VerifyOptions } from 'jsonwebtoken';
 
 import { config } from '../config.js';
 import { UserModelMongo } from '../models/users.mongo.js';
+import { validateAdminStepUpToken, ADMIN_STEP_UP_HEADER } from '../services/adminStepUp.js';
+import { isAdminPortalRole } from '../services/adminPermissions.js';
 import { hasPermission, type Permission } from '../services/rbac.js';
-import { touchAdminSession } from '../services/adminSessions.js';
+import { touchAdminSession, validateAdminSession } from '../services/adminSessions.js';
 import RedisCache from '../services/redis.js';
 import { JwtPayload } from '../types.js';
 
@@ -17,6 +19,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: JwtPayload;
+      adminStepUp?: { verifiedAt: string; jti?: string };
     }
   }
 }
@@ -89,7 +92,16 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       decoded.role = user.role;
     }
 
-    if (decoded.role === 'admin' && decoded.sessionId) {
+    if (isAdminPortalRole(decoded.role) && decoded.sessionId) {
+      const sessionValidation = validateAdminSession(decoded.sessionId);
+      if (!sessionValidation.valid) {
+        res.status(401).json({
+          error: 'session_invalid',
+          code: sessionValidation.reason,
+          message: 'Admin session expired. Please sign in again.',
+        });
+        return;
+      }
       const exp = (decoded as any).exp;
       const expiresAt = exp ? new Date(exp * 1000) : null;
       touchAdminSession(decoded.sessionId, {
@@ -135,7 +147,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 
 export function requirePermission(permission: Permission) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (req.user?.role === 'admin' && config.adminRequire2FA && !req.user?.twoFactorVerified) {
+    if (isAdminPortalRole(req.user?.role) && config.adminRequire2FA && !req.user?.twoFactorVerified) {
       res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
       return;
     }
@@ -179,4 +191,46 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
   }
 
   next();
+}
+
+export function requireAdminStepUp(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user?.userId || !isAdminPortalRole(req.user.role)) {
+    res.status(403).json({ error: 'admin_access_required' });
+    return;
+  }
+
+  const stepUpToken =
+    req.get(ADMIN_STEP_UP_HEADER) ||
+    req.get('x-admin-step-up') ||
+    req.get('x-step-up-token');
+
+  if (!stepUpToken) {
+    res.status(403).json({
+      error: 'step_up_required',
+      code: 'STEP_UP_REQUIRED',
+      message: 'Fresh password and 2FA verification required for this action.',
+    });
+    return;
+  }
+
+  validateAdminStepUpToken(stepUpToken, req.user.userId)
+    .then((result) => {
+      if (!result.valid) {
+        res.status(403).json({
+          error: 'step_up_invalid',
+          code: result.reason ?? 'STEP_UP_INVALID',
+          message: 'Step-up verification expired. Please verify again.',
+        });
+        return;
+      }
+      req.adminStepUp = {
+        verifiedAt: new Date().toISOString(),
+        jti: result.payload?.jti,
+      };
+      next();
+    })
+    .catch((error) => {
+      console.error('[Auth] Step-up verification error:', error);
+      res.status(500).json({ error: 'step_up_verification_failed' });
+    });
 }
