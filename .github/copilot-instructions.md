@@ -1,105 +1,72 @@
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
-- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+# Sarkari Result - Copilot Instructions
 
-- [x] Clarify Project Requirements
-	<!-- Assumed full-stack TypeScript (Node/Express + PostgreSQL) API with React + Vite frontend per user request for SarkariResult-like app. -->
+## Project Overview
 
-- [ ] Scaffold the Project
-	<!--
-	Ensure that the previous step has been marked as completed.
-	Call project setup tool with projectType parameter.
-	Run scaffolding command to create project files and folders.
-	Use '.' as the working directory.
-	If no appropriate projectType is available, search documentation using available tools.
-	Otherwise, create the project structure manually using available file creation tools.
-	-->
+This is a full-stack government jobs portal (Sarkari Result) built with TypeScript. It aggregates job listings, exam results, admit cards, and answer keys for Indian government positions.
 
-- [ ] Customize the Project
-	<!--
-	Verify that all previous steps have been completed successfully and you have marked the step as completed.
-	Develop a plan to modify codebase according to user requirements.
-	Apply modifications using appropriate tools and user-provided references.
-	Skip this step for "Hello World" projects.
-	-->
+## Architecture
 
-- [ ] Install Required Extensions
-	<!-- ONLY install extensions provided mentioned in the get_project_setup_info. Skip this step otherwise and mark as completed. -->
+- **Frontend**: React 18 + TypeScript + Vite (in `frontend/`)
+- **Backend**: Node.js 20 + Express + TypeScript (in `backend/`)
+- **Database**: MongoDB for local development; Azure Cosmos DB (MongoDB API) in production
+- **Reverse Proxy**: Nginx (in `nginx/`)
+- **Deployment**: Docker + Docker Compose on DigitalOcean
 
-- [ ] Compile the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Install any missing dependencies.
-	Run diagnostics and resolve any issues.
-	Check for markdown files in project folder for relevant instructions on how to do this.
-	-->
+## Development Commands
 
-- [ ] Create and Run Task
-	<!--
-	Verify that all previous steps have been completed.
-	Check https://code.visualstudio.com/docs/debugtest/tasks to determine if the project needs a task. If so, use the create_and_run_task to create and launch a task based on package.json, README.md, and project structure.
-	Skip this step otherwise.
-	 -->
+### Backend (`cd backend`)
+- `npm run dev` — Start dev server with hot reload (tsx watch)
+- `npm run build` — Compile TypeScript to `dist/`
+- `npm start` — Run production server
+- `npm run lint` — Run ESLint
+- `npm test` — Run unit tests (Vitest)
 
-- [ ] Launch the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Prompt user for debug mode, launch only if confirmed.
-	 -->
+### Frontend (`cd frontend`)
+- `npm run dev` — Start Vite dev server (port 5173)
+- `npm run build` — Production build to `dist/`
+- `npm run preview` — Preview production build
+- `npm run lint` — Run ESLint
+- `npm run test:e2e` — Run Playwright E2E tests
+- `npm run test:e2e:admin` — Run admin-specific E2E tests
 
-- [ ] Ensure Documentation is Complete
-	<!--
-	Verify that all previous steps have been completed.
-	Verify that README.md and the copilot-instructions.md file in the .github directory exists and contains current project information.
-	Clean up the copilot-instructions.md file in the .github directory by removing all HTML comments.
-	 -->
+## Key Directories
 
-<!--
-## Execution Guidelines
-PROGRESS TRACKING:
-- If any tools are available to manage the above todo list, use it to track progress through this checklist.
-- After completing each step, mark it complete and add a summary.
-- Read current todo list status before starting each new step.
+```
+backend/src/
+├── routes/        # Express route handlers (auth, jobs, admin, etc.)
+├── models/        # MongoDB document schemas and mock data
+├── middleware/     # Auth, security, rate limiting, caching, CSRF
+├── services/      # Business logic (DB, email, analytics, RBAC, audit)
+└── tests/         # Vitest unit tests
 
-COMMUNICATION RULES:
-- Avoid verbose explanations or printing full command outputs.
-- If a step is skipped, state that briefly (e.g. "No extensions needed").
-- Do not explain project structure unless asked.
-- Keep explanations concise and focused.
+frontend/src/
+├── pages/         # Page components (Home, Detail, Admin, etc.)
+├── components/    # UI components organized by category
+├── context/       # React Context providers (Auth, Theme, Language)
+├── hooks/         # Custom hooks for data fetching and UI logic
+└── tests/         # Playwright E2E test specs
+```
 
-DEVELOPMENT RULES:
-- Use '.' as the working directory unless user specifies otherwise.
-- Avoid adding media or external links unless explicitly requested.
-- Use placeholders only with a note that they should be replaced.
-- If a feature is assumed but not confirmed, prompt the user for clarification before including it.
-- If you are working on a VS Code extension, use the VS Code API tool with a query to find relevant VS Code API references and samples related to that query.
+## Coding Conventions
 
-FOLDER CREATION RULES:
-- Always use the current directory as the project root.
-- If you are running any terminal commands, use the '.' argument to ensure that the current working directory is used ALWAYS.
-- Do not create a new folder unless the user explicitly requests it besides a .vscode folder for a tasks.json file.
-- If any of the scaffolding commands mention that the folder name is not correct, let the user know to create a new folder with the correct name and then reopen it again in vscode.
+- Use TypeScript for all source files (both frontend and backend).
+- Use Zod for request validation in backend routes.
+- Use React Query (TanStack) for data fetching on the frontend.
+- Use React Context for global state (auth, theme, language).
+- Follow existing ESLint configurations in each workspace.
+- Backend API routes are prefixed with `/api/`.
+- Use environment variables for all secrets and configuration (see `.env.example`).
 
-EXTENSION INSTALLATION RULES:
-- Only install extension specified by the get_project_setup_info tool. DO NOT INSTALL any other extensions.
+## Testing
 
-PROJECT CONTENT RULES:
-- If the user has not specified project details, assume they want a "Hello World" project as a starting point.
-- Avoid adding links of any type (URLs, files, folders, etc.) or integrations that are not explicitly required.
-- Avoid generating images, videos, or any other media files unless explicitly requested.
-- If you need to use any media assets as placeholders, let the user know that these are placeholders and should be replaced with the actual assets later.
-- Ensure all generated components serve a clear purpose within the user's requested workflow.
-- If a feature is assumed but not confirmed, prompt the user for clarification before including it.
-- If you are working on a VS Code extension, use the VS Code API tool with a query to find relevant VS Code API references and samples related to that query.
+- **Backend**: Vitest for unit/integration tests in `backend/src/tests/` and `backend/tests/`.
+- **Frontend**: Playwright for E2E tests in `frontend/tests/`.
+- CI runs backend build + tests, frontend build, and Playwright smoke tests on PRs.
 
-TASK COMPLETION RULES:
-- Your task is complete when:
-  - Project is successfully scaffolded and compiled without errors
-  - copilot-instructions.md file in the .github directory exists in the project
-  - README.md file exists and is up to date
-  - User is provided with clear instructions to debug/launch the project
+## Security Considerations
 
-Before starting a new task in the above plan, update progress in the plan.
--->
-- Work through each checklist item systematically.
-- Keep communication concise and focused.
-- Follow development best practices.
+- Admin routes require JWT + optional 2FA (TOTP).
+- Rate limiting is applied to auth and admin endpoints.
+- CSRF protection is enabled for state-changing requests.
+- Helmet middleware sets security headers.
+- Admin features include dual-approval workflows, step-up authentication, and audit logging.
