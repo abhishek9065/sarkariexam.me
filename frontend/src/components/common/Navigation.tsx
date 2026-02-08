@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { NAV_ITEMS, PATHS, type PageType, type TabType } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContextStore';
@@ -20,6 +20,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
     const { user } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
+    const location = useLocation();
     const isAdmin = user?.role === 'admin';
 
     const handleNavClick = (item: typeof NAV_ITEMS[0]) => {
@@ -35,13 +36,29 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
         setMobileMenuOpen(false); // Close menu after selection
     };
 
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [location.pathname]);
+
+    useEffect(() => {
+        const onEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setMobileMenuOpen(false);
+            }
+        };
+        window.addEventListener('keydown', onEscape);
+        return () => window.removeEventListener('keydown', onEscape);
+    }, []);
+
     return (
-        <nav className="main-nav">
+        <nav className="main-nav v2-shell-nav" aria-label="Primary">
             {/* Hamburger Menu Button - Only visible on mobile */}
             <button
-                className="hamburger-btn"
+                className="hamburger-btn v2-shell-hamburger"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 aria-label="Toggle navigation menu"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="primary-nav-links"
             >
                 <span className={`hamburger-icon ${mobileMenuOpen ? 'open' : ''}`}>
                     <span></span>
@@ -51,7 +68,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
             </button>
 
             {/* Navigation Container */}
-            <div className={`nav-container ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+            <div id="primary-nav-links" className={`nav-container v2-shell-nav-container ${mobileMenuOpen ? 'mobile-open' : ''}`}>
                 {NAV_ITEMS.map((item) => {
                     if (item.type === 'bookmarks' && !isAuthenticated) return null;
                     const isActive = activeTab === item.type;
@@ -61,9 +78,10 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                     return (
                         <button
                             key={item.label}
-                            className={`nav-link ${isActive ? 'active' : ''}`}
+                            className={`nav-link v2-shell-nav-link ${isActive ? 'active' : ''}`}
                             onClick={() => handleNavClick(item)}
                             onMouseEnter={() => prefetchRoute(item.type)}
+                            onFocus={() => prefetchRoute(item.type)}
                             aria-current={isActive ? 'page' : undefined}
                             aria-label={label}
                         >
@@ -72,7 +90,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                     );
                 })}
                 <button 
-                    className="nav-search" 
+                    className="nav-search v2-shell-nav-search" 
                     onClick={() => { setShowSearch(true); setMobileMenuOpen(false); }}
                     aria-label="Search"
                 >
@@ -81,7 +99,7 @@ export function Navigation({ activeTab, setShowSearch, setCurrentPage, isAuthent
                 </button>
                 {isAdmin && (
                     <button 
-                        className="nav-link admin-link" 
+                        className="nav-link admin-link v2-shell-admin-link" 
                         onClick={() => { setCurrentPage('admin'); setMobileMenuOpen(false); }}
                         aria-label="Admin panel"
                     >

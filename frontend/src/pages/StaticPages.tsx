@@ -1,6 +1,7 @@
 import { Header, Footer } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import './V2.css';
 
 interface StaticPageProps {
     type: 'about' | 'contact' | 'privacy' | 'disclaimer';
@@ -243,11 +244,19 @@ export function StaticPage({ type }: StaticPageProps) {
     const { user, token, logout, isAuthenticated } = useAuth();
     const navigate = useNavigate();
     const content = STATIC_CONTENT[type];
+    const handlePageNavigation = (page: string) => {
+        if (page === 'home') navigate('/');
+        else if (page === 'admin') navigate('/admin');
+        else navigate('/' + page);
+    };
 
     return (
-        <div className="app">
+        <div className="app sr-v2-static">
+            <a className="sr-v2-skip-link" href="#static-main">
+                Skip to page content
+            </a>
             <Header
-                setCurrentPage={(page) => page === 'admin' ? navigate('/admin') : navigate('/' + page)}
+                setCurrentPage={handlePageNavigation}
                 user={user}
                 token={token}
                 isAuthenticated={isAuthenticated}
@@ -256,7 +265,7 @@ export function StaticPage({ type }: StaticPageProps) {
                 onProfileClick={() => navigate('/profile')}
             />
             
-            <main className="main-content">
+            <main id="static-main" className="main-content sr-v2-main">
                 <div className="static-page">
                     <button 
                         className="back-btn" 
@@ -266,20 +275,20 @@ export function StaticPage({ type }: StaticPageProps) {
                         ← Back to Home
                     </button>
                     
-                    <article className="static-content">
+                    <article className="static-content sr-v2-static-content">
                         <header className="static-header">
                             <h1>{content.title}</h1>
                         </header>
                         
                         <div 
-                            className="static-body" 
+                            className="static-body sr-v2-static-body" 
                             dangerouslySetInnerHTML={{ __html: content.content }}
                         />
                     </article>
                 </div>
             </main>
             
-            <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <Footer setCurrentPage={handlePageNavigation} />
         </div>
     );
 }

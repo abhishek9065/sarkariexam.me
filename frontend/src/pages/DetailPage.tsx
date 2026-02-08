@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons } from '../components';
+import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons, ScrollToTop } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
 import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
+import './V2.css';
 
 interface DetailPageProps {
     type: ContentType;
@@ -30,12 +31,19 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const [error, setError] = useState<string | null>(null);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [offlineSaved, setOfflineSaved] = useState(false);
+    const [copyLinkStatus, setCopyLinkStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const copyLinkTimerRef = useRef<number | null>(null);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
     const { t } = useLanguage();
 
     const offlineKey = 'offline-announcements';
     const LOAD_TIMEOUT_MS = 8000;
+    const handlePageNavigation = (page: string) => {
+        if (page === 'home') navigate('/');
+        else if (page === 'admin') navigate('/admin');
+        else navigate('/' + page);
+    };
 
     const getOfflineItem = (slugValue: string) => {
         try {
@@ -101,6 +109,39 @@ export function DetailPage({ type: _type }: DetailPageProps) {
         utterance.lang = 'en-IN';
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
+    };
+
+    const scheduleCopyStatusReset = (status: 'success' | 'error') => {
+        if (copyLinkTimerRef.current) {
+            window.clearTimeout(copyLinkTimerRef.current);
+        }
+        setCopyLinkStatus(status);
+        copyLinkTimerRef.current = window.setTimeout(() => {
+            setCopyLinkStatus('idle');
+            copyLinkTimerRef.current = null;
+        }, 2400);
+    };
+
+    const handleCopyLink = async () => {
+        try {
+            const url = window.location.href;
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = url;
+                textarea.setAttribute('readonly', 'true');
+                textarea.style.position = 'absolute';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                textarea.remove();
+            }
+            scheduleCopyStatusReset('success');
+        } catch {
+            scheduleCopyStatusReset('error');
+        }
     };
 
     const formatSalaryRange = (min?: number | null, max?: number | null) => {
@@ -176,10 +217,16 @@ export function DetailPage({ type: _type }: DetailPageProps) {
         setOfflineSaved(Boolean(saved));
     }, [slug]);
 
+    useEffect(() => () => {
+        if (copyLinkTimerRef.current) {
+            window.clearTimeout(copyLinkTimerRef.current);
+        }
+    }, []);
+
     if (loading) {
         return (
-            <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+            <div className="app sr-v2-detail">
+                <Header setCurrentPage={handlePageNavigation} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
                 <main className="main-content"><SkeletonLoader /></main>
             </div>
         );
@@ -187,8 +234,8 @@ export function DetailPage({ type: _type }: DetailPageProps) {
 
     if (error) {
         return (
-            <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+            <div className="app sr-v2-detail">
+                <Header setCurrentPage={handlePageNavigation} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
                 <main className="main-content">
                     <ErrorState message={error} onRetry={() => navigate(0)} />
                 </main>
@@ -198,8 +245,8 @@ export function DetailPage({ type: _type }: DetailPageProps) {
 
     if (!item) {
         return (
-            <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
+            <div className="app sr-v2-detail">
+                <Header setCurrentPage={handlePageNavigation} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} onProfileClick={() => navigate('/profile')} />
                 <main className="main-content">
                     <h1>{t('detail.notFoundTitle')}</h1>
                     <p>{t('detail.notFoundBody')}</p>
@@ -213,89 +260,74 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const selectionModes = SELECTION_MODES[item.type] || SELECTION_MODES['job'];
     const daysRemaining = getDaysRemaining(item.deadline ?? undefined);
     const externalLink = item.externalLink && /^https?:\/\//i.test(item.externalLink) ? item.externalLink : undefined;
-
-    // Type-specific FAQs
-    const getFaqs = () => {
-        const base = [
-            { 
-                q: `What is the eligibility criteria for ${item.title}?`, 
-                a: `Eligibility includes age limits (usually 18-35 years), educational qualifications (as specified in notification), and category-wise relaxations. Always check the official notification for exact requirements.` 
-            },
-            { 
-                q: 'How to apply online?', 
-                a: 'Visit the official website through "Apply Here" link below → Register with valid details → Fill application form → Upload documents → Pay application fee → Submit form → Take printout of confirmation page.' 
-            },
-            { 
-                q: 'What are the application fees?', 
-                a: 'Fees vary by category: General/OBC candidates typically pay ₹100-₹1000, SC/ST/PWD candidates often get fee exemption. Check official notification for exact amounts.' 
-            },
-            { 
-                q: 'What documents are required?', 
-                a: 'Typically required: Recent photograph (passport size), signature, educational certificates, caste certificate (if applicable), age proof, experience certificates (if required). All documents should be in prescribed format and size.' 
-            },
-            { 
-                q: 'When will results be declared?', 
-                a: 'Result dates will be announced separately. Usually declared 30-90 days after exam completion.' 
-            },
-        ];
-        
-        if (item.type === 'admit-card') {
-            base.push({ 
-                q: 'How to download admit card?', 
-                a: 'Visit official website → Click on admit card link → Enter registration number and date of birth → Download and print admit card. Ensure all details are correct.' 
-            });
-        }
-        
-        if (item.type === 'result') {
-            base.push({ 
-                q: 'How to check results?', 
-                a: 'Go to official result website → Enter roll number/application number → Click submit → View/download result. Take printout for future reference.' 
-            });
-        }
-        
-        return base;
-    };
+    const faqs = [
+        {
+            q: `What is the eligibility criteria for ${item.title}?`,
+            a: 'Eligibility usually includes age limit, education level, and category-based relaxations. Verify exact rules from the official notification.'
+        },
+        {
+            q: 'How to apply online?',
+            a: 'Open the official link, register with valid details, fill the form, upload required documents, pay fee (if applicable), and keep the final acknowledgement.'
+        },
+        {
+            q: 'What documents are typically required?',
+            a: 'Recent photo, signature, educational certificates, category certificate (if applicable), and identity/address proof in the specified file format.'
+        },
+        {
+            q: 'When will results be announced?',
+            a: 'Result timelines vary by board and exam cycle. Keep checking the official portal and this page for updates.'
+        },
+        ...(item.type === 'admit-card'
+            ? [{
+                q: 'How to download admit card?',
+                a: 'Use registration details on the official admit-card portal, then download and print the hall ticket after checking all fields.'
+            }]
+            : []),
+        ...(item.type === 'result'
+            ? [{
+                q: 'How to check results?',
+                a: 'Open the official result link, enter the required credentials, and download or print the result for records.'
+            }]
+            : []),
+    ];
 
     const handleRelatedClick = (relatedItem: Announcement) => {
         navigate(`/${relatedItem.type}/${relatedItem.slug}`);
     };
 
     return (
-        <div className="app">            <SEO 
+        <div className="app sr-v2-detail">
+            <a className="sr-v2-skip-link" href="#detail-main">
+                Skip to announcement details
+            </a>
+            <SEO
                 title={item?.title || 'Loading...'}
                 description={item ? `${item.title} - ${item.organization || 'Government'} | Apply online, check eligibility, important dates` : undefined}
                 announcement={item || undefined}
                 canonicalUrl={`https://sarkariexams.me/${item?.type}/${item?.slug}`}
-            />            <Header 
-                setCurrentPage={(page) => {
-                    if (page === 'home') navigate('/');
-                    else if (page === 'admin') navigate('/admin');
-                    else navigate('/' + page);
-                }} 
-                user={user} 
-                token={token} 
-                isAuthenticated={isAuthenticated} 
-                onLogin={() => { }} 
-                onLogout={logout} 
-                onProfileClick={() => navigate('/profile')} 
+            />
+            <Header
+                setCurrentPage={handlePageNavigation}
+                user={user}
+                token={token}
+                isAuthenticated={isAuthenticated}
+                onLogin={() => { }}
+                onLogout={logout}
+                onProfileClick={() => navigate('/profile')}
             />
             <Navigation
                 activeTab={item.type as TabType}
                 setActiveTab={() => { }}
                 setShowSearch={() => { }}
                 goBack={() => navigate(-1)}
-                setCurrentPage={(page) => {
-                    if (page === 'home') navigate('/');
-                    else if (page === 'admin') navigate('/admin');
-                    else navigate('/' + page);
-                }}
+                setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => { }}
             />
 
-            <main className="main-content">
+            <main id="detail-main" className="main-content sr-v2-main">
                 <div className="page-with-sidebar">
-                    <div className="detail-page enhanced-detail">
+                    <div className="detail-page enhanced-detail sr-v2-detail-panel">
                         <Breadcrumbs
                             items={[
                                 { label: TYPE_TITLES[item.type], path: PATHS[item.type] },
@@ -337,8 +369,36 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                 >
                                     Listen
                                 </button>
+                                <button
+                                    className={`offline-save-btn ${copyLinkStatus === 'success' ? 'saved' : ''}`}
+                                    onClick={handleCopyLink}
+                                >
+                                    {copyLinkStatus === 'success'
+                                        ? 'Link Copied'
+                                        : copyLinkStatus === 'error'
+                                            ? 'Copy Failed'
+                                            : 'Copy Link'}
+                                </button>
                             </div>
+                            <span className="sr-v2-copy-status" role="status" aria-live="polite">
+                                {copyLinkStatus === 'success'
+                                    ? 'Announcement link copied.'
+                                    : copyLinkStatus === 'error'
+                                        ? 'Unable to copy the link.'
+                                        : ''}
+                            </span>
                         </div>
+                        <section className="sr-v2-trust-rail" aria-label="Trust checklist">
+                            <span>Verified Source Workflow</span>
+                            <span>Daily Update Monitoring</span>
+                            <span>Official Link First Policy</span>
+                        </section>
+                        <nav className="sr-v2-detail-jump-links" aria-label="Jump to detail sections">
+                            <a href="#detail-important-dates">Important Dates</a>
+                            <a href="#detail-eligibility">Eligibility</a>
+                            <a href="#detail-links">Important Links</a>
+                            <a href="#detail-faq">FAQ</a>
+                        </nav>
 
                         {/* Countdown */}
                         {daysRemaining !== null && (
@@ -365,7 +425,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                         </div>
 
                         {/* Tables Grid */}
-                        <div className="detail-tables-grid">
+                        <div id="detail-important-dates" className="detail-tables-grid">
                             <table className="detail-table dates-table">
                                 <thead><tr><th colSpan={2}>📅 Important Dates</th></tr></thead>
                                 <tbody>
@@ -383,7 +443,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                             </table>
                         </div>
 
-                        <div className="job-details-grid">
+                        <div id="detail-eligibility" className="job-details-grid">
                             <div className="detail-section">
                                 <h3>Eligibility Criteria</h3>
                                 <div className="eligibility-info">
@@ -457,7 +517,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                         </div>
 
                         {/* Important Links */}
-                        <table className="links-table enhanced">
+                        <table id="detail-links" className="links-table enhanced">
                             <thead><tr><th colSpan={2}>🔗 Important Links</th></tr></thead>
                             <tbody>
                                 <tr>
@@ -489,9 +549,9 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                         />
 
                         {/* FAQ */}
-                        <div className="faq-section">
+                        <div id="detail-faq" className="faq-section">
                             <h3>❓ FAQ</h3>
-                            {getFaqs().map((faq, idx) => (
+                            {faqs.map((faq, idx) => (
                                 <div key={idx} className={`faq-item ${openFaq === idx ? 'open' : ''}`}>
                                     <button className="faq-question" onClick={() => setOpenFaq(openFaq === idx ? null : idx)}>
                                         <span>Q: {faq.q}</span>
@@ -509,14 +569,15 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                 <ul>
                                     {relatedItems.map(r => (
                                         <li key={r.id}>
-                                            <a
-                                                href="#"
-                                                onClick={(e) => { e.preventDefault(); handleRelatedClick(r); }}
+                                            <button
+                                                type="button"
+                                                className="related-link-btn"
+                                                onClick={() => handleRelatedClick(r)}
                                                 onMouseEnter={() => prefetchAnnouncementDetail(r.slug)}
                                                 onFocus={() => prefetchAnnouncementDetail(r.slug)}
                                             >
                                                 {r.title}
-                                            </a>
+                                            </button>
                                         </li>
                                     ))}
                                 </ul>
@@ -535,6 +596,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                 else navigate('/' + page);
             }} />
             <MobileNav />
+            <ScrollToTop />
         </div>
     );
 }

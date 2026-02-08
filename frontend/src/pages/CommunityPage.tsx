@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, MobileNav } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/constants';
 import { fetchJson } from '../utils/http';
 import type { TabType } from '../utils/constants';
+import { formatNumber } from '../utils/formatters';
 import './CommunityPage.css';
+import './V2.css';
 
 type ForumPost = {
     id: string;
@@ -60,6 +62,11 @@ const saveItems = <T,>(key: string, items: T[]) => {
 export function CommunityPage() {
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
+    const handlePageNavigation = (page: string) => {
+        if (page === 'home') navigate('/');
+        else if (page === 'admin') navigate('/admin');
+        else navigate('/' + page);
+    };
     const [activeTab, setActiveTab] = useState<'forums' | 'qa' | 'groups'>('forums');
     const [forums, setForums] = useState<ForumPost[]>(() => loadItems(STORAGE_KEYS.forums, []));
     const [qaThreads, setQaThreads] = useState<QaThread[]>(() => loadItems(STORAGE_KEYS.qa, []));
@@ -67,6 +74,9 @@ export function CommunityPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const forumTitleRef = useRef<HTMLInputElement | null>(null);
+    const qaQuestionRef = useRef<HTMLTextAreaElement | null>(null);
+    const groupNameRef = useRef<HTMLInputElement | null>(null);
 
     const [forumDraft, setForumDraft] = useState({ title: '', content: '', category: 'General' });
     const [qaDraft, setQaDraft] = useState({ question: '' });
@@ -125,6 +135,15 @@ export function CommunityPage() {
         const origin = window.location.origin;
         return encodeURIComponent(`${origin}/community`);
     }, []);
+    const communityPulse = useMemo(() => {
+        const totalConversations = forums.length + qaThreads.length;
+        return {
+            totalConversations,
+            forums: forums.length,
+            questions: qaThreads.length,
+            groups: groups.length,
+        };
+    }, [forums.length, groups.length, qaThreads.length]);
 
     const shareToWhatsApp = (text: string) => {
         const url = `https://wa.me/?text=${encodeURIComponent(text)}%20${shareBase}`;
@@ -262,9 +281,12 @@ export function CommunityPage() {
     };
 
     return (
-        <div className="app">
+        <div className="app sr-v2-community">
+            <a className="sr-v2-skip-link" href="#community-main">
+                Skip to community content
+            </a>
             <Header
-                setCurrentPage={(page) => navigate('/' + page)}
+                setCurrentPage={handlePageNavigation}
                 user={user}
                 token={token}
                 isAuthenticated={isAuthenticated}
@@ -277,54 +299,116 @@ export function CommunityPage() {
                 setActiveTab={() => { }}
                 setShowSearch={() => { }}
                 goBack={() => navigate(-1)}
-                setCurrentPage={(page) => navigate('/' + page)}
+                setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => { }}
             />
 
-            <main className="main-content">
-                <div className="community-hero">
+            <main id="community-main" className="main-content sr-v2-main">
+                <div className="community-hero sr-v2-community-hero">
                     <div>
                         <h1>Community Hub</h1>
                         <p>Discuss exams, share tips, and build study groups with other aspirants.</p>
                     </div>
                     <div className="community-actions">
-                        <button className="btn btn-secondary" onClick={() => shareToWhatsApp('Join SarkariExams community!')}>
+                        <button type="button" className="btn btn-secondary" onClick={() => shareToWhatsApp('Join SarkariExams community!')}>
                             Share on WhatsApp
                         </button>
-                        <button className="btn btn-secondary" onClick={() => shareToTelegram('Join SarkariExams community!')}>
+                        <button type="button" className="btn btn-secondary" onClick={() => shareToTelegram('Join SarkariExams community!')}>
                             Share on Telegram
                         </button>
                     </div>
                 </div>
 
-                <div className="community-tabs">
-                    <button className={activeTab === 'forums' ? 'active' : ''} onClick={() => setActiveTab('forums')}>
+                <section className="sr-v2-community-pulse" aria-label="Community pulse">
+                    <div className="sr-v2-community-pulse-item">
+                        <span className="sr-v2-intro-label">Conversations</span>
+                        <strong>{formatNumber(communityPulse.totalConversations)}</strong>
+                        <small>Forums and Q&A threads</small>
+                    </div>
+                    <div className="sr-v2-community-pulse-item">
+                        <span className="sr-v2-intro-label">Forums</span>
+                        <strong>{formatNumber(communityPulse.forums)}</strong>
+                        <small>Peer discussions and strategy threads</small>
+                    </div>
+                    <div className="sr-v2-community-pulse-item">
+                        <span className="sr-v2-intro-label">Open Questions</span>
+                        <strong>{formatNumber(communityPulse.questions)}</strong>
+                        <small>Community Q&A updates</small>
+                    </div>
+                    <div className="sr-v2-community-pulse-item">
+                        <span className="sr-v2-intro-label">Study Groups</span>
+                        <strong>{formatNumber(communityPulse.groups)}</strong>
+                        <small>Collaborative exam prep circles</small>
+                    </div>
+                </section>
+
+                <div className="community-tabs sr-v2-community-tabs" role="tablist" aria-label="Community sections">
+                    <button
+                        id="community-tab-forums"
+                        role="tab"
+                        aria-selected={activeTab === 'forums'}
+                        aria-controls="community-panel-forums"
+                        tabIndex={activeTab === 'forums' ? 0 : -1}
+                        className={activeTab === 'forums' ? 'active' : ''}
+                        onClick={() => setActiveTab('forums')}
+                        type="button"
+                    >
                         Forums
                     </button>
-                    <button className={activeTab === 'qa' ? 'active' : ''} onClick={() => setActiveTab('qa')}>
+                    <button
+                        id="community-tab-qa"
+                        role="tab"
+                        aria-selected={activeTab === 'qa'}
+                        aria-controls="community-panel-qa"
+                        tabIndex={activeTab === 'qa' ? 0 : -1}
+                        className={activeTab === 'qa' ? 'active' : ''}
+                        onClick={() => setActiveTab('qa')}
+                        type="button"
+                    >
                         Q&amp;A
                     </button>
-                    <button className={activeTab === 'groups' ? 'active' : ''} onClick={() => setActiveTab('groups')}>
+                    <button
+                        id="community-tab-groups"
+                        role="tab"
+                        aria-selected={activeTab === 'groups'}
+                        aria-controls="community-panel-groups"
+                        tabIndex={activeTab === 'groups' ? 0 : -1}
+                        className={activeTab === 'groups' ? 'active' : ''}
+                        onClick={() => setActiveTab('groups')}
+                        type="button"
+                    >
                         Study Groups
                     </button>
                 </div>
-                {loading && <div className="community-status">Loading community updates...</div>}
-                {error && <div className="community-status error">{error}</div>}
-                {actionMessage && <div className="community-status success">{actionMessage}</div>}
+                <div className="sr-v2-community-status-stack" aria-live="polite" aria-atomic="true">
+                    {loading && <div className="community-status" role="status">Loading community updates...</div>}
+                    {error && <div className="community-status error" role="alert">{error}</div>}
+                    {actionMessage && <div className="community-status success" role="status">{actionMessage}</div>}
+                </div>
 
                 {activeTab === 'forums' && (
-                    <section className="community-section">
+                    <section
+                        id="community-panel-forums"
+                        role="tabpanel"
+                        aria-labelledby="community-tab-forums"
+                        className="community-section sr-v2-community-section"
+                    >
                         <div className="community-card">
                             <h2>Start a discussion</h2>
                             <form onSubmit={handleAddForum} className="community-form">
+                                <label htmlFor="forum-title" className="sr-v2-field-label">Discussion title</label>
                                 <input
+                                    id="forum-title"
+                                    ref={forumTitleRef}
                                     type="text"
                                     placeholder="Title"
                                     value={forumDraft.title}
                                     onChange={(e) => setForumDraft({ ...forumDraft, title: e.target.value })}
                                 />
+                                <label htmlFor="forum-category" className="sr-v2-field-label">Category</label>
                                 <select
+                                    id="forum-category"
                                     value={forumDraft.category}
                                     onChange={(e) => setForumDraft({ ...forumDraft, category: e.target.value })}
                                 >
@@ -334,7 +418,9 @@ export function CommunityPage() {
                                     <option>Form Filling</option>
                                     <option>Admit Cards</option>
                                 </select>
+                                <label htmlFor="forum-content" className="sr-v2-field-label">Message</label>
                                 <textarea
+                                    id="forum-content"
                                     rows={4}
                                     placeholder="Share your question or tips..."
                                     value={forumDraft.content}
@@ -346,7 +432,14 @@ export function CommunityPage() {
 
                         <div className="community-list">
                             {forums.length === 0 ? (
-                                <div className="empty-state">No posts yet. Start the first discussion!</div>
+                                <div className="empty-state sr-v2-empty-state">
+                                    <p>No posts yet. Start the first discussion!</p>
+                                    <div className="sr-v2-empty-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={() => forumTitleRef.current?.focus()}>
+                                            Create first post
+                                        </button>
+                                    </div>
+                                </div>
                             ) : (
                                 forums.map((post) => (
                                     <div key={post.id} className="community-item">
@@ -376,11 +469,19 @@ export function CommunityPage() {
                 )}
 
                 {activeTab === 'qa' && (
-                    <section className="community-section">
+                    <section
+                        id="community-panel-qa"
+                        role="tabpanel"
+                        aria-labelledby="community-tab-qa"
+                        className="community-section sr-v2-community-section"
+                    >
                         <div className="community-card">
                             <h2>Ask a question</h2>
                             <form onSubmit={handleAddQuestion} className="community-form">
+                                <label htmlFor="qa-question" className="sr-v2-field-label">Question</label>
                                 <textarea
+                                    id="qa-question"
+                                    ref={qaQuestionRef}
                                     rows={3}
                                     placeholder="Type your exam/application question..."
                                     value={qaDraft.question}
@@ -392,7 +493,14 @@ export function CommunityPage() {
 
                         <div className="community-list">
                             {qaThreads.length === 0 ? (
-                                <div className="empty-state">No questions yet. Be the first to ask!</div>
+                                <div className="empty-state sr-v2-empty-state">
+                                    <p>No questions yet. Be the first to ask!</p>
+                                    <div className="sr-v2-empty-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={() => qaQuestionRef.current?.focus()}>
+                                            Ask first question
+                                        </button>
+                                    </div>
+                                </div>
                             ) : (
                                 qaThreads.map((thread) => (
                                     <div key={thread.id} className="community-item">
@@ -421,23 +529,35 @@ export function CommunityPage() {
                 )}
 
                 {activeTab === 'groups' && (
-                    <section className="community-section">
+                    <section
+                        id="community-panel-groups"
+                        role="tabpanel"
+                        aria-labelledby="community-tab-groups"
+                        className="community-section sr-v2-community-section"
+                    >
                         <div className="community-card">
                             <h2>Create a study group</h2>
                             <form onSubmit={handleAddGroup} className="community-form">
+                                <label htmlFor="group-name" className="sr-v2-field-label">Group name</label>
                                 <input
+                                    id="group-name"
+                                    ref={groupNameRef}
                                     type="text"
                                     placeholder="Group name"
                                     value={groupDraft.name}
                                     onChange={(e) => setGroupDraft({ ...groupDraft, name: e.target.value })}
                                 />
+                                <label htmlFor="group-topic" className="sr-v2-field-label">Topic</label>
                                 <input
+                                    id="group-topic"
                                     type="text"
                                     placeholder="Topic (e.g., SSC CGL Tier 1)"
                                     value={groupDraft.topic}
                                     onChange={(e) => setGroupDraft({ ...groupDraft, topic: e.target.value })}
                                 />
+                                <label htmlFor="group-language" className="sr-v2-field-label">Language</label>
                                 <select
+                                    id="group-language"
                                     value={groupDraft.language}
                                     onChange={(e) => setGroupDraft({ ...groupDraft, language: e.target.value })}
                                 >
@@ -446,7 +566,9 @@ export function CommunityPage() {
                                     <option>Bhojpuri</option>
                                     <option>Maithili</option>
                                 </select>
+                                <label htmlFor="group-link" className="sr-v2-field-label">Invite link</label>
                                 <input
+                                    id="group-link"
                                     type="url"
                                     placeholder="Invite link (optional)"
                                     value={groupDraft.link}
@@ -458,7 +580,14 @@ export function CommunityPage() {
 
                         <div className="community-list">
                             {groups.length === 0 ? (
-                                <div className="empty-state">No study groups yet. Create the first one!</div>
+                                <div className="empty-state sr-v2-empty-state">
+                                    <p>No study groups yet. Create the first one!</p>
+                                    <div className="sr-v2-empty-actions">
+                                        <button type="button" className="btn btn-secondary" onClick={() => groupNameRef.current?.focus()}>
+                                            Create study group
+                                        </button>
+                                    </div>
+                                </div>
                             ) : (
                                 groups.map((group) => (
                                     <div key={group.id} className="community-item">
@@ -492,7 +621,7 @@ export function CommunityPage() {
                 )}
             </main>
 
-            <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <Footer setCurrentPage={handlePageNavigation} />
             <MobileNav onShowAuth={() => { }} />
         </div>
     );

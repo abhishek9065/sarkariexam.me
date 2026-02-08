@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DeadlineCountdown } from '../components/ui/DeadlineCountdown';
 import { QuickActionsBar } from '../components/ui/QuickActionsBar';
+import './V2.css';
 
 /**
  * Comprehensive Job Detail Page - UP Police Constable 2026
@@ -8,6 +9,7 @@ import { QuickActionsBar } from '../components/ui/QuickActionsBar';
  */
 export function UPPoliceJobDetail() {
     const [activeFaq, setActiveFaq] = useState<number | null>(null);
+    const toggleFaq = (index: number) => setActiveFaq((current) => (current === index ? null : index));
 
     // Job Data
     const job = {
@@ -107,9 +109,9 @@ export function UPPoliceJobDetail() {
     };
 
     return (
-        <div className="job-detail-page">
+        <div className="job-detail-page sr-v2-up-police">
             {/* Header */}
-            <div className="job-header">
+            <div className="job-header sr-v2-up-police-header">
                 <div className="job-badge">🚔 UP Police</div>
                 <h1>{job.title}</h1>
                 <p className="job-org">{job.organization}</p>
@@ -129,7 +131,7 @@ export function UPPoliceJobDetail() {
             />
 
             {/* Important Dates */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header maroon">📅 Important Dates</h2>
                 <table className="info-table">
                     <tbody>
@@ -144,7 +146,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Application Fee */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header blue">💰 Application Fee</h2>
                 <table className="info-table">
                     <tbody>
@@ -159,7 +161,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Age Limit */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header green">👤 Age Limits (As on {ageLimit.cutoffDate})</h2>
                 <div className="age-box">
                     <div className="age-main">
@@ -193,7 +195,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Category-wise Vacancy */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header orange">📊 Category-wise Vacancy Details</h2>
                 <table className="info-table vacancy-table">
                     <thead>
@@ -224,7 +226,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Eligibility */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header purple">📚 Eligibility Criteria</h2>
                 <ul className="eligibility-list">
                     <li><strong>Nationality:</strong> Indian Citizen</li>
@@ -236,7 +238,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Salary */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header teal">💵 UP Police Constable Salary 2026</h2>
                 <div className="salary-box">
                     <div className="salary-item">
@@ -255,7 +257,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Physical Eligibility */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header red">🏃 Physical Eligibility 2026</h2>
                 <div className="physical-grid">
                     <div className="physical-card male">
@@ -280,7 +282,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Exam Pattern */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header indigo">📝 Exam Pattern 2026</h2>
                 <table className="info-table exam-table">
                     <thead>
@@ -311,7 +313,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Selection Process */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header cyan">🎯 Selection Process</h2>
                 <div className="selection-steps">
                     {selectionProcess.map((item) => (
@@ -327,7 +329,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* How to Apply */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header pink">📝 How to Apply Online?</h2>
                 <ol className="apply-steps">
                     <li>Visit the official website: <a href={job.officialWebsite} target="_blank" rel="noopener">{job.officialWebsite}</a></li>
@@ -341,7 +343,7 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* Important Links */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header dark">🔗 Important Links</h2>
                 <table className="links-table">
                     <tbody>
@@ -362,21 +364,31 @@ export function UPPoliceJobDetail() {
             </section>
 
             {/* FAQs */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header gray">❓ Frequently Asked Questions (FAQs)</h2>
                 <div className="faq-list">
                     {faqs.map((faq, i) => (
-                        <div
-                            key={i}
-                            className={`faq-item ${activeFaq === i ? 'active' : ''}`}
-                            onClick={() => setActiveFaq(activeFaq === i ? null : i)}
-                        >
-                            <div className="faq-question">
+                        <div key={i} className={`faq-item ${activeFaq === i ? 'active' : ''}`}>
+                            <button
+                                type="button"
+                                className="faq-question sr-v2-faq-trigger"
+                                onClick={() => toggleFaq(i)}
+                                aria-expanded={activeFaq === i}
+                                aria-controls={`up-police-faq-panel-${i}`}
+                                id={`up-police-faq-trigger-${i}`}
+                            >
                                 <span>{faq.q}</span>
                                 <span className="faq-toggle">{activeFaq === i ? '−' : '+'}</span>
-                            </div>
+                            </button>
                             {activeFaq === i && (
-                                <div className="faq-answer">{faq.a}</div>
+                                <div
+                                    id={`up-police-faq-panel-${i}`}
+                                    role="region"
+                                    aria-labelledby={`up-police-faq-trigger-${i}`}
+                                    className="faq-answer sr-v2-faq-panel"
+                                >
+                                    {faq.a}
+                                </div>
                             )}
                         </div>
                     ))}

@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import './V2.css';
 
 const pages = {
   about: {
@@ -126,10 +127,10 @@ export function StaticPage({ page: pageProp }: StaticPageProps) {
   const page = pages[pageKey];
 
   return (
-    <div className="static-page">
-      <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
+    <div className="static-page sr-v2-static-legacy">
+      <button className="back-btn sr-v2-static-back" onClick={() => navigate(-1)}>← Back</button>
       <h1 className="page-title">{page.title}</h1>
-      <div className="static-content" dangerouslySetInnerHTML={{ __html: page.content }} />
+      <div className="static-content sr-v2-static-content" dangerouslySetInnerHTML={{ __html: page.content }} />
     </div>
   );
 }

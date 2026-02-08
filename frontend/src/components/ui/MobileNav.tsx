@@ -27,9 +27,9 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
     };
 
     return (
-        <nav className="mobile-bottom-nav">
+        <nav className="mobile-bottom-nav v2-shell-mobile-nav">
             <button
-                className={`nav-btn ${isActive('/') ? 'active' : ''}`}
+                className={`nav-btn v2-shell-mobile-nav-btn ${isActive('/') ? 'active' : ''}`}
                 onClick={() => handleNavigation('/')}
             >
                 <span className="nav-icon">🏠</span>
@@ -37,7 +37,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
             </button>
 
             <button
-                className={`nav-btn ${isActive('/jobs') ? 'active' : ''}`}
+                className={`nav-btn v2-shell-mobile-nav-btn ${isActive('/jobs') ? 'active' : ''}`}
                 onClick={() => handleNavigation('/jobs')}
             >
                 <span className="nav-icon">💼</span>
@@ -45,7 +45,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
             </button>
 
             <button
-                className={`nav-btn ${isActive('/results') ? 'active' : ''}`}
+                className={`nav-btn v2-shell-mobile-nav-btn ${isActive('/results') ? 'active' : ''}`}
                 onClick={() => handleNavigation('/results')}
             >
                 <span className="nav-icon">📊</span>
@@ -53,7 +53,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
             </button>
 
             <button
-                className={`nav-btn ${isActive('/admit-card') ? 'active' : ''}`}
+                className={`nav-btn v2-shell-mobile-nav-btn ${isActive('/admit-card') ? 'active' : ''}`}
                 onClick={() => handleNavigation('/admit-card')}
             >
                 <span className="nav-icon">🎫</span>
@@ -61,7 +61,7 @@ export function MobileNav({ onShowAuth }: MobileNavProps) {
             </button>
 
             <button
-                className={`nav-btn ${isActive('/profile') ? 'active' : ''}`}
+                className={`nav-btn v2-shell-mobile-nav-btn ${isActive('/profile') ? 'active' : ''}`}
                 onClick={() => handleNavigation('/profile')}
             >
                 <span className="nav-icon">{isAuthenticated ? '👤' : '🔐'}</span>

@@ -6,6 +6,7 @@ import { BookmarkButton } from '../components/ui/BookmarkButton';
 import { SEOHead } from '../components/seo/SEOHead';
 import { formatNumber } from '../utils/formatters';
 import type { Announcement } from '../types';
+import './V2.css';
 
 interface UniversalJobDetailProps {
     item: Announcement;
@@ -27,6 +28,7 @@ export function UniversalJobDetail({
     onLoginRequired
 }: UniversalJobDetailProps) {
     const [activeFaq, setActiveFaq] = useState<number | null>(null);
+    const toggleFaq = (index: number) => setActiveFaq((current) => (current === index ? null : index));
 
     // Format Date
     const formatDate = (dateString?: string) => {
@@ -79,7 +81,7 @@ export function UniversalJobDetail({
     ];
 
     return (
-        <div className="job-detail-page">
+        <div className="job-detail-page sr-v2-universal-detail">
             {/* SEO Meta Tags & Structured Data */}
             <SEOHead
                 title={`${job.title} - ${job.organization}`}
@@ -99,7 +101,7 @@ export function UniversalJobDetail({
             />
 
             {/* Header */}
-            <div className="job-header">
+            <div className="job-header sr-v2-universal-header">
                 <div className="job-badge">{item.type.toUpperCase()}</div>
                 <h1>{job.title}</h1>
                 <p className="job-org">{job.organization}</p>
@@ -137,7 +139,7 @@ export function UniversalJobDetail({
                     {/* Fallback to basic layout */}
 
                     {/* Important Dates */}
-                    <section className="detail-section">
+                    <section className="detail-section sr-v2-universal-section">
                         <h2 className="section-header maroon">📅 Important Dates</h2>
                         <table className="info-table">
                             <tbody>
@@ -153,7 +155,7 @@ export function UniversalJobDetail({
 
                     {/* Application Fee */}
                     {fees.length > 0 && (
-                        <section className="detail-section">
+                        <section className="detail-section sr-v2-universal-section">
                             <h2 className="section-header blue">💰 Application Fee</h2>
                             <table className="info-table">
                                 <tbody>
@@ -170,7 +172,7 @@ export function UniversalJobDetail({
 
                     {/* Age Limit */}
                     {ageLimit.length > 0 && (
-                        <section className="detail-section">
+                        <section className="detail-section sr-v2-universal-section">
                             <h2 className="section-header green">👤 Age Limit</h2>
                             <div className="age-box">
                                 {ageLimit.map((a, i) => (
@@ -187,7 +189,7 @@ export function UniversalJobDetail({
 
             {/* Vacancy Details */}
             {vacancy.length > 0 && (
-                <section className="detail-section">
+                <section className="detail-section sr-v2-universal-section">
                     <h2 className="section-header orange">📊 Vacancy Details</h2>
                     <table className="info-table vacancy-table">
                         <thead>
@@ -210,14 +212,14 @@ export function UniversalJobDetail({
 
             {/* Description / Content */}
             {item.content && (
-                <section className="detail-section">
+                <section className="detail-section sr-v2-universal-section">
                     <h2 className="section-header purple">📝 Details</h2>
                     <div className="job-content" dangerouslySetInnerHTML={{ __html: item.content }} />
                 </section>
             )}
 
             {/* Important Links */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header dark">🔗 Important Links</h2>
                 <table className="links-table">
                     <tbody>
@@ -256,21 +258,31 @@ export function UniversalJobDetail({
             </section>
 
             {/* FAQs */}
-            <section className="detail-section">
+            <section className="detail-section sr-v2-universal-section">
                 <h2 className="section-header gray">❓ Frequently Asked Questions (FAQs)</h2>
                 <div className="faq-list">
                     {faqs.map((faq, i) => (
-                        <div
-                            key={i}
-                            className={`faq-item ${activeFaq === i ? 'active' : ''}`}
-                            onClick={() => setActiveFaq(activeFaq === i ? null : i)}
-                        >
-                            <div className="faq-question">
+                        <div key={i} className={`faq-item ${activeFaq === i ? 'active' : ''}`}>
+                            <button
+                                type="button"
+                                className="faq-question sr-v2-faq-trigger"
+                                onClick={() => toggleFaq(i)}
+                                aria-expanded={activeFaq === i}
+                                aria-controls={`universal-faq-panel-${i}`}
+                                id={`universal-faq-trigger-${i}`}
+                            >
                                 <span>{faq.q}</span>
                                 <span className="faq-toggle">{activeFaq === i ? '−' : '+'}</span>
-                            </div>
+                            </button>
                             {activeFaq === i && (
-                                <div className="faq-answer">{faq.a}</div>
+                                <div
+                                    id={`universal-faq-panel-${i}`}
+                                    role="region"
+                                    aria-labelledby={`universal-faq-trigger-${i}`}
+                                    className="faq-answer sr-v2-faq-panel"
+                                >
+                                    {faq.a}
+                                </div>
                             )}
                         </div>
                     ))}

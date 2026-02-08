@@ -5,6 +5,7 @@ import { API_BASE } from '../utils';
 import { formatNumber } from '../utils/formatters';
 import { adminRequest } from '../utils/adminRequest';
 import './AdminDashboard.css';
+import './V2.css';
 
 interface DashboardStats {
     totalAnnouncements: number;
@@ -108,16 +109,16 @@ export function AdminDashboard() {
 
     if (loading) {
         return (
-            <div className="admin-dashboard">
-                <div className="loading-spinner">Loading dashboard...</div>
+            <div className="admin-dashboard sr-v2-admin-dashboard">
+                <div className="loading-spinner" role="status" aria-live="polite">Loading dashboard...</div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="admin-dashboard">
-                <div className="error-message">{error}</div>
+            <div className="admin-dashboard sr-v2-admin-dashboard">
+                <div className="error-message" role="alert">{error}</div>
             </div>
         );
     }
@@ -140,8 +141,11 @@ export function AdminDashboard() {
     );
 
     return (
-        <div className="admin-dashboard">
-            <header className="dashboard-header">
+        <div className="admin-dashboard sr-v2-admin-dashboard">
+            <a className="sr-v2-skip-link" href="#admin-dashboard-main">
+                Skip to dashboard content
+            </a>
+            <header className="dashboard-header sr-v2-admin-dashboard-header">
                 <h1>📊 Admin Dashboard</h1>
                 <div className="header-actions">
                     <button onClick={() => navigate('/admin')} className="btn-secondary">
@@ -150,29 +154,52 @@ export function AdminDashboard() {
                 </div>
             </header>
 
-            <nav className="dashboard-tabs">
+            <nav className="dashboard-tabs sr-v2-admin-dashboard-tabs" role="tablist" aria-label="Dashboard sections">
                 <button
+                    id="dashboard-tab-overview"
+                    role="tab"
+                    aria-selected={activeTab === 'overview'}
+                    aria-controls="admin-dashboard-main"
+                    tabIndex={activeTab === 'overview' ? 0 : -1}
                     className={activeTab === 'overview' ? 'active' : ''}
                     onClick={() => setActiveTab('overview')}
+                    type="button"
                 >
                     📈 Overview
                 </button>
                 <button
+                    id="dashboard-tab-content"
+                    role="tab"
+                    aria-selected={activeTab === 'content'}
+                    aria-controls="admin-dashboard-main"
+                    tabIndex={activeTab === 'content' ? 0 : -1}
                     className={activeTab === 'content' ? 'active' : ''}
                     onClick={() => setActiveTab('content')}
+                    type="button"
                 >
                     📝 Content
                 </button>
                 <button
+                    id="dashboard-tab-users"
+                    role="tab"
+                    aria-selected={activeTab === 'users'}
+                    aria-controls="admin-dashboard-main"
+                    tabIndex={activeTab === 'users' ? 0 : -1}
                     className={activeTab === 'users' ? 'active' : ''}
                     onClick={() => setActiveTab('users')}
+                    type="button"
                 >
                     👥 Users
                 </button>
             </nav>
 
             {activeTab === 'overview' && data && (
-                <div className="dashboard-grid">
+                <main
+                    id="admin-dashboard-main"
+                    className="dashboard-grid"
+                    role="tabpanel"
+                    aria-labelledby="dashboard-tab-overview"
+                >
                     {/* Stats Cards */}
                     <div className="stats-row">
                         <div className="stat-card primary">
@@ -311,19 +338,29 @@ export function AdminDashboard() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </main>
             )}
 
             {activeTab === 'content' && (
-                <div className="content-management">
+                <section
+                    id="admin-dashboard-main"
+                    className="content-management"
+                    role="tabpanel"
+                    aria-labelledby="dashboard-tab-content"
+                >
                     <p className="coming-soon">Content management features coming soon...</p>
-                </div>
+                </section>
             )}
 
             {activeTab === 'users' && (
-                <div className="user-management">
+                <section
+                    id="admin-dashboard-main"
+                    className="user-management"
+                    role="tabpanel"
+                    aria-labelledby="dashboard-tab-users"
+                >
                     <p className="coming-soon">User management features coming soon...</p>
-                </div>
+                </section>
             )}
         </div>
     );

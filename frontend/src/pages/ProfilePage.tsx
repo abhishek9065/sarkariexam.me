@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Header, Navigation, Footer, SkeletonLoader, MobileNav } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, MobileNav, ScrollToTop } from '../components';
 import { API_BASE } from '../utils';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
+import { formatNumber } from '../utils/formatters';
 import type { TabType } from '../utils/constants';
 import type { Announcement, ContentType } from '../types';
 import './ProfilePage.css';
+import './V2.css';
 
 interface UserProfile {
     id: string;
@@ -145,6 +147,11 @@ export function ProfilePage() {
     const [digestPreview, setDigestPreview] = useState<DigestPreview | null>(null);
     const [alertWindowDays, setAlertWindowDays] = useState(7);
     const [alertLimit, setAlertLimit] = useState(6);
+    const handlePageNavigation = (page: string) => {
+        if (page === 'home') navigate('/');
+        else if (page === 'admin') navigate('/admin');
+        else navigate('/' + page);
+    };
 
     const resetSavedSearchForm = () => {
         setSavedSearchForm({ ...DEFAULT_SAVED_SEARCH });
@@ -505,29 +512,49 @@ export function ProfilePage() {
         }
     };
 
+    const profileMetrics = useMemo(() => {
+        const selectedPreferences =
+            (profile?.preferredCategories?.length ?? 0) +
+            (profile?.preferredQualifications?.length ?? 0) +
+            (profile?.preferredLocations?.length ?? 0) +
+            (profile?.preferredOrganizations?.length ?? 0);
+        const activeSavedSearches = savedSearches.filter((search) => search.notificationsEnabled).length;
+        const alertMatches = (alerts?.savedSearches?.reduce((count, search) => count + search.totalMatches, 0) ?? 0) + (alerts?.preferences?.totalMatches ?? 0);
+        return {
+            selectedPreferences,
+            activeSavedSearches,
+            alertMatches,
+            recommendationCount: recommendations.length,
+            digestPreviewCount: digestPreview?.preview.length ?? 0,
+        };
+    }, [alerts, digestPreview?.preview.length, profile, recommendations.length, savedSearches]);
+
     if (loading) {
         return (
-            <div className="app">
-                <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
-                <main className="main-content"><SkeletonLoader /></main>
+            <div className="app sr-v2-profile">
+                <Header setCurrentPage={handlePageNavigation} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
+                <main className="main-content sr-v2-main"><SkeletonLoader /></main>
             </div>
         );
     }
 
     return (
-        <div className="app">
-            <Header setCurrentPage={(page) => navigate('/' + page)} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
+        <div className="app sr-v2-profile">
+            <a className="sr-v2-skip-link" href="#profile-main">
+                Skip to profile content
+            </a>
+            <Header setCurrentPage={handlePageNavigation} user={user} token={token} isAuthenticated={isAuthenticated} onLogin={() => { }} onLogout={logout} />
             <Navigation
                 activeTab={'profile' as TabType}
                 setActiveTab={() => { }}
                 setShowSearch={() => { }}
                 goBack={() => navigate(-1)}
-                setCurrentPage={(page) => navigate('/' + page)}
+                setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => { }}
             />
 
-            <main className="main-content">
+            <main id="profile-main" className="main-content sr-v2-main">
                 <div className="profile-page">
                     <div className="profile-header">
                         <div className="profile-avatar">
@@ -539,6 +566,29 @@ export function ProfilePage() {
                             {profile?.profileComplete && <span className="badge complete">Profile Complete</span>}
                         </div>
                     </div>
+
+                    <section className="sr-v2-profile-intro" aria-label="Profile insights">
+                        <div className="sr-v2-profile-intro-item">
+                            <span className="sr-v2-intro-label">Profile Status</span>
+                            <strong>{profile?.profileComplete ? 'Complete' : 'In Progress'}</strong>
+                            <small>{profile?.profileComplete ? 'Preferences tuned for better recommendations' : 'Add preferences to improve relevance'}</small>
+                        </div>
+                        <div className="sr-v2-profile-intro-item">
+                            <span className="sr-v2-intro-label">Preference Signals</span>
+                            <strong>{formatNumber(profileMetrics.selectedPreferences)}</strong>
+                            <small>Categories, locations, qualifications, organizations</small>
+                        </div>
+                        <div className="sr-v2-profile-intro-item">
+                            <span className="sr-v2-intro-label">Active Search Alerts</span>
+                            <strong>{formatNumber(profileMetrics.activeSavedSearches)}</strong>
+                            <small>{formatNumber(savedSearches.length)} saved searches configured</small>
+                        </div>
+                        <div className="sr-v2-profile-intro-item">
+                            <span className="sr-v2-intro-label">Live Match Flow</span>
+                            <strong>{formatNumber(profileMetrics.alertMatches || profileMetrics.recommendationCount)}</strong>
+                            <small>{profileMetrics.alertMatches > 0 ? `Alerts in current window (${profileMetrics.digestPreviewCount} digest preview)` : 'Recommendations ready for you'}</small>
+                        </div>
+                    </section>
 
                     <div className="profile-tabs">
                         <button
@@ -1130,8 +1180,9 @@ export function ProfilePage() {
                 </div>
             </main>
 
-            <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <Footer setCurrentPage={handlePageNavigation} />
             <MobileNav onShowAuth={() => {}} />
+            <ScrollToTop />
         </div>
     );
 }

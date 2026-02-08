@@ -20,12 +20,12 @@ export function Footer({ setCurrentPage }: FooterProps) {
     const academicYear = getAcademicYearLabel();
 
     return (
-        <footer className="site-footer">
-            <div className="disclaimer-banner">
+        <footer className="site-footer v2-shell-footer">
+            <div className="disclaimer-banner v2-shell-disclaimer">
                 <p><strong>{t('footer.disclaimerTitle')}</strong> SarkariExams.me is an independent informational website. We are not affiliated with any government organization or official recruitment agency. All information is collected from publicly available sources.</p>
             </div>
-            <div className="footer-content">
-                <div className="footer-section">
+            <div className="footer-content v2-shell-footer-content">
+                <div className="footer-section v2-shell-footer-section">
                     <h4>{t('footer.company')}</h4>
                     <p className="company-info">SarkariExams.me<br/>Independent Job Information Portal</p>
                     <button onClick={(e) => { e.preventDefault(); setCurrentPage('about'); }} className="footer-link">{t('footer.about')}</button>
@@ -33,7 +33,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
                     <button onClick={(e) => { e.preventDefault(); setCurrentPage('privacy'); }} className="footer-link">{t('footer.privacy')}</button>
                     <button onClick={(e) => { e.preventDefault(); setCurrentPage('disclaimer'); }} className="footer-link">{t('footer.disclaimer')}</button>
                 </div>
-                <div className="footer-section">
+                <div className="footer-section v2-shell-footer-section">
                     <h4>{t('footer.sources')}</h4>
                     <p className="verification-info">All job notifications are aggregated from:</p>
                     <ul className="source-list">
@@ -43,7 +43,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
                         <li>Official examination boards</li>
                     </ul>
                 </div>
-                <div className="footer-section">
+                <div className="footer-section v2-shell-footer-section">
                     <h4>{t('footer.quickAccess')}</h4>
                     <button onClick={() => navigate('/jobs')} className="footer-link">{t('footer.latestJobs')}</button>
                     <button onClick={() => navigate('/results')} className="footer-link">{t('footer.results')}</button>
@@ -51,7 +51,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
                     <button onClick={() => navigate('/answer-key')} className="footer-link">{t('footer.answer')}</button>
                 </div>
             </div>
-            <div className="footer-bottom">
+            <div className="footer-bottom v2-shell-footer-bottom">
                 <p>© {academicYear} SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: {lastUpdated}</p>
                 <p className="legal-notice">⚠️ {t('footer.legalNotice')}</p>
             </div>

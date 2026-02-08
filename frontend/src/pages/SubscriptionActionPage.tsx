@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Navigation, Footer } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/constants';
+import './V2.css';
 
 type SubscriptionAction = 'verify' | 'unsubscribe';
 
@@ -10,6 +11,11 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user, token, logout, isAuthenticated } = useAuth();
+    const handlePageNavigation = (page: string) => {
+        if (page === 'home') navigate('/');
+        else if (page === 'admin') navigate('/admin');
+        else navigate('/' + page);
+    };
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');
 
@@ -61,9 +67,12 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
             : 'Unsubscribed';
 
     return (
-        <div className="app">
+        <div className="app sr-v2-subscription">
+            <a className="sr-v2-skip-link" href="#subscription-main">
+                Skip to subscription status
+            </a>
             <Header
-                setCurrentPage={(page) => navigate('/' + page)}
+                setCurrentPage={handlePageNavigation}
                 user={user}
                 token={token}
                 isAuthenticated={isAuthenticated}
@@ -74,31 +83,31 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
             <Navigation
                 activeTab={undefined}
                 setShowSearch={() => { }}
-                setCurrentPage={(page) => navigate('/' + page)}
+                setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => { }}
             />
 
-            <main className="main-content">
+            <main id="subscription-main" className="main-content sr-v2-main">
                 <div className="static-page">
-                    <button className="back-btn" onClick={() => navigate('/')}>Back</button>
+                    <button className="back-btn sr-v2-static-back" onClick={() => navigate('/')}>Back</button>
                     <h1>{title}</h1>
-                    <div className="static-content">
+                    <div className="static-content sr-v2-subscription-card">
                         {status === 'loading' ? (
-                            <p>Processing your request...</p>
+                            <p role="status" aria-live="polite">Processing your request...</p>
                         ) : (
-                            <p>{message}</p>
+                            <p role={status === 'error' ? 'alert' : 'status'}>{message}</p>
                         )}
                         {status !== 'loading' && (
-                            <div style={{ textAlign: 'center', marginTop: '24px' }}>
-                                <button className="admin-btn primary" onClick={() => navigate('/')}>Go Home</button>
+                            <div className="sr-v2-subscription-actions">
+                                <button className="admin-btn primary v2-shell-login" onClick={() => navigate('/')}>Go Home</button>
                             </div>
                         )}
                     </div>
                 </div>
             </main>
 
-            <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <Footer setCurrentPage={handlePageNavigation} />
         </div>
     );
 }

@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection, ExamCalendar, ErrorState, MobileNav } from '../components';
+import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection, ExamCalendar, ErrorState, MobileNav, ScrollToTop } from '../components';
 import { AuthModal } from '../components/modals/AuthModal';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
-import { SECTIONS, type TabType, API_BASE } from '../utils';
+import { SECTIONS, type TabType, API_BASE, formatDate, formatNumber, getDaysRemaining } from '../utils';
 import { fetchAnnouncements } from '../utils/api';
 import { fetchJson } from '../utils/http';
+import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { Announcement, ContentType } from '../types';
+import './V2.css';
 
 export function HomePage() {
     const [data, setData] = useState<Announcement[]>([]);
@@ -180,6 +182,21 @@ export function HomePage() {
         admitCards: getByType('admit-card').length,
         total: data.length
     };
+    const spotlightItems = useMemo(
+        () => [...data]
+            .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+            .slice(0, 4),
+        [data]
+    );
+    const closingSoonItems = useMemo(
+        () => data
+            .filter((item) => {
+                const daysLeft = getDaysRemaining(item.deadline ?? undefined);
+                return daysLeft !== null && daysLeft >= 0 && daysLeft <= 7;
+            })
+            .slice(0, 4),
+        [data]
+    );
 
     // Handle item click - navigate to SEO-friendly URL
     const handleItemClick = (item: Announcement) => {
@@ -210,14 +227,19 @@ export function HomePage() {
         }
     };
 
+    const handlePageNavigation = (page: string) => {
+        if (page === 'home') navigate('/');
+        else if (page === 'admin') navigate('/admin');
+        else navigate('/' + page);
+    };
+
     return (
-        <div className="app">
+        <div className="app sr-v2-home">
+            <a className="sr-v2-skip-link" href="#home-main">
+                Skip to main content
+            </a>
             <Header
-                setCurrentPage={(page) => {
-                    if (page === 'home') navigate('/');
-                    else if (page === 'admin') navigate('/admin');
-                    else navigate('/' + page);
-                }}
+                setCurrentPage={handlePageNavigation}
                 user={user}
                 token={token}
                 isAuthenticated={isAuthenticated}
@@ -230,22 +252,18 @@ export function HomePage() {
                 setActiveTab={setActiveTab}
                 setShowSearch={() => { }}
                 goBack={() => { }}
-                setCurrentPage={(page) => {
-                    if (page === 'home') navigate('/');
-                    else if (page === 'admin') navigate('/admin');
-                    else navigate('/' + page);
-                }}
+                setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => setShowAuthModal(true)}
             />
             <Marquee />
 
-            <main className="main-content">
-                <section className="hero">
+            <main id="home-main" className="main-content sr-v2-main">
+                <section className="hero sr-v2-hero">
                     <div className="hero-content">
-                        <p className="hero-eyebrow">{t('hero.eyebrow')}</p>
-                        <h2 className="hero-title">{t('hero.title')}</h2>
-                        <p className="hero-subtitle">{t('hero.subtitle')}</p>
+                        <p className="hero-eyebrow sr-v2-eyebrow">{t('hero.eyebrow')}</p>
+                        <h2 className="hero-title sr-v2-title">{t('hero.title')}</h2>
+                        <p className="hero-subtitle sr-v2-subtitle">{t('hero.subtitle')}</p>
                         <div className="hero-actions">
                             <button className="btn btn-primary" onClick={() => handleCategoryClick('job')} aria-label="Browse available government jobs">
                                 {t('hero.browseJobs')}
@@ -269,20 +287,79 @@ export function HomePage() {
                             </button>
                         </div>
                     </div>
-                    <div className="hero-panel">
-                        <div className="hero-panel-card">
-                            <h3>How We Help</h3>
-                            <ul className="hero-list">
-                                <li>Aggregate information from official sources</li>
-                                <li>Organize notifications by category and date</li>
-                                <li>Provide quick access and bookmark features</li>
-                                <li>Always direct to original sources for applications</li>
-                            </ul>
+                    <div className="hero-panel sr-v2-hero-panel" aria-label="Platform pulse">
+                        <div className="sr-v2-metric-card">
+                            <span className="sr-v2-metric-label">Live Listings</span>
+                            <strong className="sr-v2-metric-value">{formatNumber(stats.total)}</strong>
+                        </div>
+                        <div className="sr-v2-metric-card">
+                            <span className="sr-v2-metric-label">Active Jobs</span>
+                            <strong className="sr-v2-metric-value">{formatNumber(stats.jobs)}</strong>
+                        </div>
+                        <div className="sr-v2-metric-card">
+                            <span className="sr-v2-metric-label">Fresh Results</span>
+                            <strong className="sr-v2-metric-value">{formatNumber(stats.results)}</strong>
+                        </div>
+                        <div className="sr-v2-metric-card">
+                            <span className="sr-v2-metric-label">Admit Cards</span>
+                            <strong className="sr-v2-metric-value">{formatNumber(stats.admitCards)}</strong>
                         </div>
                     </div>
                 </section>
 
-                {/* Source Information */}
+                <section className="sr-v2-intel" aria-labelledby="v2-intel-heading">
+                    <div className="sr-v2-intel-header">
+                        <h2 id="v2-intel-heading">Live Exam Intel</h2>
+                        <p>Fast picks from the latest stream. Open any card to view full details.</p>
+                    </div>
+                    <div className="sr-v2-intel-grid">
+                        <article className="sr-v2-intel-card">
+                            <h3>Most Viewed Alerts</h3>
+                            {spotlightItems.length === 0 ? (
+                                <p className="sr-v2-empty">No listings yet.</p>
+                            ) : (
+                                <ul className="sr-v2-intel-list">
+                                    {spotlightItems.map((item) => (
+                                        <li key={`spotlight-${item.id}`}>
+                                            <button
+                                                className="sr-v2-intel-link"
+                                                onClick={() => handleItemClick(item)}
+                                                onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
+                                                onFocus={() => prefetchAnnouncementDetail(item.slug)}
+                                            >
+                                                <span>{item.title}</span>
+                                                <small>Views: {formatNumber(item.viewCount ?? undefined)}</small>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </article>
+                        <article className="sr-v2-intel-card">
+                            <h3>Closing This Week</h3>
+                            {closingSoonItems.length === 0 ? (
+                                <p className="sr-v2-empty">No deadlines in the next 7 days.</p>
+                            ) : (
+                                <ul className="sr-v2-intel-list">
+                                    {closingSoonItems.map((item) => (
+                                        <li key={`closing-${item.id}`}>
+                                            <button
+                                                className="sr-v2-intel-link"
+                                                onClick={() => handleItemClick(item)}
+                                                onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
+                                                onFocus={() => prefetchAnnouncementDetail(item.slug)}
+                                            >
+                                                <span>{item.title}</span>
+                                                <small>Last date: {item.deadline ? formatDate(item.deadline) : 'Not set'}</small>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </article>
+                    </div>
+                </section>
+
                 <SocialButtons />
 
                 {/* Statistics with clickable counters */}
@@ -373,12 +450,10 @@ export function HomePage() {
                 <SubscribeBox />
             </main>
 
-            <Footer setCurrentPage={(page) => {
-                if (page === 'home') navigate('/');
-                else navigate('/' + page);
-            }} />
+            <Footer setCurrentPage={handlePageNavigation} />
             <AuthModal show={showAuthModal} onClose={() => setShowAuthModal(false)} />
             <MobileNav onShowAuth={() => setShowAuthModal(true)} />
+            <ScrollToTop />
             
             {/* Cookie Consent Banner */}
             {showCookieConsent && (

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav, ScrollToTop } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
 import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS } from '../utils';
 import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { Announcement, ContentType } from '../types';
+import './V2.css';
 
 interface CategoryPageProps {
     type: ContentType;
@@ -21,24 +22,27 @@ const CATEGORY_TITLES: Record<ContentType, string> = {
     'syllabus': 'Syllabus'
 };
 
+const buildDefaultFilters = (type: ContentType): FilterState => ({
+    keyword: '',
+    type,
+    location: '',
+    qualification: '',
+    categories: [],
+    organizations: [],
+    minSalary: '',
+    maxSalary: '',
+    minAge: '',
+    maxAge: '',
+    sortBy: 'latest',
+});
+
 export function CategoryPage({ type }: CategoryPageProps) {
     const [data, setData] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [filters, setFilters] = useState<FilterState>({
-        keyword: '',
-        type,
-        location: '',
-        qualification: '',
-        categories: [],
-        organizations: [],
-        minSalary: '',
-        maxSalary: '',
-        minAge: '',
-        maxAge: '',
-        sortBy: 'latest',
-    });
+    const [filters, setFilters] = useState<FilterState>(() => buildDefaultFilters(type));
+    const [filtersPanelVersion, setFiltersPanelVersion] = useState(0);
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const [saveSearchMessage, setSaveSearchMessage] = useState('');
@@ -292,6 +296,37 @@ export function CategoryPage({ type }: CategoryPageProps) {
         filters.minAge ||
         filters.maxAge
     );
+    const activeFilterCount = useMemo(() => ([
+        Boolean(filters.keyword),
+        Boolean(filters.location),
+        Boolean(filters.qualification),
+        filters.categories.length > 0,
+        filters.organizations.length > 0,
+        Boolean(filters.minSalary),
+        Boolean(filters.maxSalary),
+        Boolean(filters.minAge),
+        Boolean(filters.maxAge),
+    ]).filter(Boolean).length, [filters]);
+    const closingSoonCount = useMemo(() => visibleData.filter((item) => {
+        if (!item.deadline) return false;
+        const days = getDaysRemaining(item.deadline);
+        return days !== null && days >= 0 && days <= 7;
+    }).length, [visibleData]);
+    const activeFilterLabels = useMemo(() => {
+        const labels: string[] = [];
+        if (filters.keyword) labels.push(`Keyword: ${filters.keyword}`);
+        if (filters.location) labels.push(`Location: ${filters.location}`);
+        if (filters.qualification) labels.push(`Qualification: ${filters.qualification}`);
+        if (filters.categories.length) labels.push(`Categories: ${filters.categories.join(', ')}`);
+        if (filters.organizations.length) labels.push(`Organizations: ${filters.organizations.join(', ')}`);
+        if (filters.minSalary || filters.maxSalary) {
+            labels.push(`Salary: ${filters.minSalary || 'Any'} - ${filters.maxSalary || 'Any'}`);
+        }
+        if (filters.minAge || filters.maxAge) {
+            labels.push(`Age: ${filters.minAge || 'Any'} - ${filters.maxAge || 'Any'}`);
+        }
+        return labels;
+    }, [filters]);
 
     const formatSalaryRange = (min?: number | null, max?: number | null) => {
         if (!min && !max) return null;
@@ -352,8 +387,24 @@ export function CategoryPage({ type }: CategoryPageProps) {
         }
     };
 
+    const handleResetFilters = () => {
+        const nextFilters = buildDefaultFilters(type);
+        setFilters(nextFilters);
+        setSaveSearchMessage('');
+        setError(null);
+        setFiltersPanelVersion((prev) => prev + 1);
+        try {
+            localStorage.removeItem(`filters:category-${type}`);
+        } catch {
+            // Ignore storage access issues.
+        }
+    };
+
     return (
-        <div className="app">
+        <div className="app sr-v2-category">
+            <a className="sr-v2-skip-link" href="#category-main">
+                Skip to listings
+            </a>
             <Header
                 setCurrentPage={(page) => navigate('/' + page)}
                 user={user}
@@ -380,7 +431,38 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 onShowAuth={() => setShowAuthModal(true)}
             />
 
-            <main className="main-content">
+            <main id="category-main" className="main-content sr-v2-main">
+                <section className="sr-v2-category-intro" aria-label="Category insights">
+                    <div className="sr-v2-category-intro-item">
+                        <span className="sr-v2-intro-label">Showing</span>
+                        <strong>{formatNumber(visibleData.length)}</strong>
+                        <small>results</small>
+                    </div>
+                    <div className="sr-v2-category-intro-item">
+                        <span className="sr-v2-intro-label">Active Filters</span>
+                        <strong>{activeFilterCount}</strong>
+                        <small>{activeFilterCount === 1 ? 'filter' : 'filters'}</small>
+                    </div>
+                    <div className="sr-v2-category-intro-item">
+                        <span className="sr-v2-intro-label">Closing in 7 Days</span>
+                        <strong>{closingSoonCount}</strong>
+                        <small>alerts</small>
+                    </div>
+                </section>
+                {activeFilterLabels.length > 0 && (
+                    <section className="sr-v2-filter-summary" aria-label="Active filters">
+                        <div className="sr-v2-filter-chip-list">
+                            {activeFilterLabels.map((label, index) => (
+                                <span key={`${label}-${index}`} className="sr-v2-filter-chip">
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                        <button type="button" className="btn btn-secondary sr-v2-filter-reset" onClick={handleResetFilters}>
+                            Reset filters
+                        </button>
+                    </section>
+                )}
                 <div className="category-header">
                     <div>
                         <Breadcrumbs
@@ -389,10 +471,11 @@ export function CategoryPage({ type }: CategoryPageProps) {
                             ]}
                         />
                         <h1 className="category-title">{CATEGORY_TITLES[type]}</h1>
-                        <p className="category-subtitle">{visibleData.length} {t('category.listings')}</p>
+                        <p className="category-subtitle" aria-live="polite">{visibleData.length} {t('category.listings')}</p>
                     </div>
                     <div className="category-controls sticky-filters">
                         <SearchFilters
+                            key={`category-filters-${type}-${filtersPanelVersion}`}
                             onFilterChange={handleFilterChange}
                             showTypeFilter
                             initialType={type}
@@ -430,7 +513,17 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                         key={item.id}
                                         className="category-item"
                                         onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
+                                        onFocus={() => prefetchAnnouncementDetail(item.slug)}
                                         onClick={() => handleItemClick(item)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                handleItemClick(item);
+                                            }
+                                        }}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`Open listing: ${item.title}`}
                                     >
                                         <div className="item-title">{item.title}</div>
                                         <div className="item-meta">
@@ -482,7 +575,19 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                     </div>
                                 ))
                             ) : (
-                                <p className="no-data">{hasSaveCriteria ? t('category.noMatches') : t('section.noItems')}</p>
+                                <div className="sr-v2-empty-state">
+                                    <p className="no-data">{hasSaveCriteria ? t('category.noMatches') : t('section.noItems')}</p>
+                                    <div className="sr-v2-empty-actions">
+                                        {activeFilterCount > 0 && (
+                                            <button type="button" className="btn btn-secondary" onClick={handleResetFilters}>
+                                                Clear filters
+                                            </button>
+                                        )}
+                                        <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
+                                            Back to homepage
+                                        </button>
+                                    </div>
+                                </div>
                             )}
                         </div>
                         {hasMore && (
@@ -499,6 +604,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
 
             <Footer setCurrentPage={(page) => navigate('/' + page)} />
             <MobileNav onShowAuth={() => setShowAuthModal(true)} />
+            <ScrollToTop />
         </div>
     );
 }

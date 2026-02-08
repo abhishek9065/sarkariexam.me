@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import './AdminLogin.css';
 import { LazyImage } from '../ui/LazyImage';
 
@@ -34,6 +34,7 @@ interface PasswordStrength {
 export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnable2FA, onVerify2FA, loading = false, error }: AdminLoginProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isCapsLockOn, setIsCapsLockOn] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [formErrors, setFormErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState({ email: false, password: false });
@@ -65,6 +66,7 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
     // Loading timeout ref
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isTimedOut, setIsTimedOut] = useState(false);
+    const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
     // Load saved email
     useEffect(() => {
@@ -99,6 +101,24 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
         setView('reset');
     }, []);
 
+    useEffect(() => {
+        if (!error) return;
+        const match = error.match(/retry\s+in\s+(\d+)\s*s?/i);
+        if (!match) return;
+        const seconds = Number(match[1]);
+        if (Number.isFinite(seconds) && seconds > 0) {
+            setLockoutSeconds(Math.ceil(seconds));
+        }
+    }, [error]);
+
+    useEffect(() => {
+        if (lockoutSeconds <= 0) return;
+        const timer = window.setInterval(() => {
+            setLockoutSeconds((previous) => (previous <= 1 ? 0 : previous - 1));
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [lockoutSeconds]);
+
     // Generate new captcha
     // Calculate password strength
     const calculatePasswordStrength = (password: string): PasswordStrength => {
@@ -117,6 +137,10 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
     const handlePasswordChange = (value: string) => {
         setPassword(value);
         setPasswordStrength(calculatePasswordStrength(value));
+    };
+
+    const handlePasswordKeyboardState = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+        setIsCapsLockOn(event.getModifierState('CapsLock'));
     };
 
     // Handle forgot password submission
@@ -303,6 +327,11 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
             return;
         }
 
+        if (lockoutSeconds > 0) {
+            setFormErrors({ general: `Too many attempts. Retry in ${lockoutSeconds}s.` });
+            return;
+        }
+
         if (rememberMe) {
             localStorage.setItem('admin_email', email);
             localStorage.setItem('admin_remember', 'true');
@@ -437,6 +466,8 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                                 value={password}
                                 onChange={(e) => handlePasswordChange(e.target.value)}
                                 onBlur={() => setTouched(prev => ({ ...prev, password: true }))}
+                                onKeyDown={handlePasswordKeyboardState}
+                                onKeyUp={handlePasswordKeyboardState}
                                 placeholder="Enter your password"
                                 required
                                 disabled={loading}
@@ -456,6 +487,11 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                             </button>
                         </div>
                         {formErrors.password && <div id="password-error" className="field-error">{formErrors.password}</div>}
+                        {isCapsLockOn && (
+                            <div className="caps-lock-warning" role="status" aria-live="polite">
+                                Caps Lock is on.
+                            </div>
+                        )}
                         
                         {/* Password Strength Indicator */}
                         {password && (
@@ -502,7 +538,12 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                                 type="button" 
                                 className="forgot-password-link" 
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit', marginRight: '12px' }}
-                                onClick={() => setView('forgot')}
+                                onClick={() => {
+                                    if (!forgotEmail && email) {
+                                        setForgotEmail(email);
+                                    }
+                                    setView('forgot');
+                                }}
                                 disabled={loading}
                             >
                                 Forgot Password?
@@ -559,12 +600,17 @@ export function AdminLogin({ onLogin, onForgotPassword, onResetPassword, onEnabl
                     <button 
                         type="submit" 
                         className={`login-btn ${!isFormValid ? 'disabled' : ''}`}
-                        disabled={loading || !isFormValid}
+                        disabled={loading || !isFormValid || lockoutSeconds > 0}
                     >
                         {loading ? (
                             <>
                                 <span className="loading-spinner"></span>
                                 Authenticating...
+                            </>
+                        ) : lockoutSeconds > 0 ? (
+                            <>
+                                <span className="login-icon">⏳</span>
+                                Retry in {lockoutSeconds}s
                             </>
                         ) : (
                             <>

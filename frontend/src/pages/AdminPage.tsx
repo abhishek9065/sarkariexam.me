@@ -41,6 +41,7 @@ import {
 import { useAdminApprovals } from './admin/useAdminApprovals';
 import { useStepUpAuth } from './admin/useStepUpAuth';
 import './AdminPage.css';
+import './V2.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
@@ -2684,7 +2685,7 @@ export function AdminPage() {
 
     if (!isLoggedIn) {
         return (
-            <div className="admin-page">
+            <div className="admin-page sr-v2-admin">
                 <AdminNotificationSystem
                     notifications={notifications}
                     onRemove={removeNotification}
@@ -2777,6 +2778,19 @@ export function AdminPage() {
                                             authError.code = errorCode;
                                             throw authError;
                                         }
+                                        if (errorCode === 'AUTH_THROTTLED' || errorCode === 'too_many_attempts') {
+                                            const retryAfter = Number(errorResult?.retryAfter ?? response.headers.get('Retry-After') ?? 0);
+                                            const throttleMessage = Number.isFinite(retryAfter) && retryAfter > 0
+                                                ? `Too many attempts. Retry in ${Math.ceil(retryAfter)}s.`
+                                                : 'Too many attempts. Please wait and try again.';
+                                            setMessage(throttleMessage);
+                                            notifyError(
+                                                'Too Many Attempts',
+                                                throttleMessage,
+                                                5000
+                                            );
+                                            return;
+                                        }
                                         const errorMsg = getApiErrorMessage(errorResult, 'Invalid credentials.');
                                         setMessage(errorMsg);
                                         
@@ -2818,7 +2832,7 @@ export function AdminPage() {
     }
 
     return (
-        <div className="admin-page">
+        <div className="admin-page sr-v2-admin">
             <a className="skip-link" href="#admin-main">
                 Skip to main content
             </a>
