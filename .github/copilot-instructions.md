@@ -43,8 +43,9 @@ frontend/src/
 ├── pages/         # Page components (Home, Detail, Admin, etc.)
 ├── components/    # UI components organized by category
 ├── context/       # React Context providers (Auth, Theme, Language)
-├── hooks/         # Custom hooks for data fetching and UI logic
-└── tests/         # Playwright E2E test specs
+└── hooks/         # Custom hooks for data fetching and UI logic
+
+frontend/tests/     # Playwright E2E test specs
 ```
 
 ## Coding Conventions
