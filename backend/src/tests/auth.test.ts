@@ -82,6 +82,17 @@ describe('Auth Routes', () => {
     await RedisCache.invalidatePattern('auth:');
   });
 
+  describe('GET /auth/csrf', () => {
+    it('returns csrf token and sets csrf cookie', async () => {
+      const res = await request(app).get('/auth/csrf');
+
+      expect(res.status).toBe(200);
+      expect(typeof res.body.data?.csrfToken).toBe('string');
+      expect(res.body.data.csrfToken.length).toBeGreaterThan(20);
+      expect(res.headers['set-cookie']?.some((cookie: string) => cookie.startsWith('csrf_token='))).toBe(true);
+    });
+  });
+
   describe('POST /auth/register', () => {
     it('should register a new user successfully', async () => {
       const mockUser = {

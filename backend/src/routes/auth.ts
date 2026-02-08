@@ -31,6 +31,16 @@ import { generateTotpSecret, verifyTotpCode } from '../utils/totp.js';
 
 const router = express.Router();
 
+router.get('/csrf', (req, res) => {
+  const csrfToken = ensureCsrfCookie(req, res);
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    data: {
+      csrfToken,
+    },
+  });
+});
+
 // Password strength requirements
 const passwordSchema = z.string()
   .min(8, 'Password must be at least 8 characters')

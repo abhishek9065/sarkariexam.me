@@ -8,6 +8,9 @@ type RequestInitWithRetry = RequestInit & {
 const queue: Array<() => void> = [];
 let active = 0;
 const MAX_CONCURRENT = 3;
+const CSRF_COOKIE_NAME = 'csrf_token';
+let csrfTokenCache: string | null = null;
+let csrfRefreshPromise: Promise<string | null> | null = null;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -30,6 +33,81 @@ const getCookieValue = (name: string): string | null => {
   return null;
 };
 
+const resolveRequestUrl = (input: RequestInput): string => {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+};
+
+const getCsrfEndpoint = (input: RequestInput): string => {
+  const requestUrl = resolveRequestUrl(input);
+  const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+  const parsed = new URL(requestUrl, fallbackOrigin);
+  return `${parsed.origin}/api/auth/csrf`;
+};
+
+const readCsrfTokenFromPayload = (payload: any): string | null => {
+  if (!payload || typeof payload !== 'object') return null;
+  const direct = typeof payload.csrfToken === 'string' ? payload.csrfToken : null;
+  if (direct) return direct;
+  const nested = payload.data && typeof payload.data === 'object' && typeof payload.data.csrfToken === 'string'
+    ? payload.data.csrfToken
+    : null;
+  return nested;
+};
+
+const fetchCsrfToken = async (
+  input: RequestInput,
+  options?: { forceRefresh?: boolean }
+): Promise<string | null> => {
+  if (!options?.forceRefresh) {
+    const cookieToken = getCookieValue(CSRF_COOKIE_NAME);
+    if (cookieToken) {
+      csrfTokenCache = cookieToken;
+      return cookieToken;
+    }
+    if (csrfTokenCache) {
+      return csrfTokenCache;
+    }
+  }
+
+  if (csrfRefreshPromise) {
+    return csrfRefreshPromise;
+  }
+
+  const csrfEndpoint = getCsrfEndpoint(input);
+  csrfRefreshPromise = (async () => {
+    try {
+      const response = await fetch(csrfEndpoint, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        return getCookieValue(CSRF_COOKIE_NAME) ?? csrfTokenCache;
+      }
+      const payload = await response.json().catch(() => null);
+      const token = readCsrfTokenFromPayload(payload) ?? getCookieValue(CSRF_COOKIE_NAME);
+      if (token) {
+        csrfTokenCache = token;
+      }
+      return token ?? null;
+    } catch {
+      return getCookieValue(CSRF_COOKIE_NAME) ?? csrfTokenCache;
+    } finally {
+      csrfRefreshPromise = null;
+    }
+  })();
+
+  return csrfRefreshPromise;
+};
+
+const isCsrfInvalidResponse = async (response: Response): Promise<boolean> => {
+  if (response.status !== 403) return false;
+  const payload = await response.clone().json().catch(() => null);
+  return payload?.error === 'csrf_invalid';
+};
+
 const getRetryDelay = (response: Response, attempt: number) => {
   const retryAfter = response.headers.get('Retry-After');
   if (retryAfter) {
@@ -45,6 +123,8 @@ export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {
       active += 1;
       const { maxRetries = 2, timeoutMs = 20000, onRateLimit, ...fetchInit } = init;
       let attempt = 0;
+      let csrfRetryAttempted = false;
+      let forcedCsrfToken: string | null = null;
 
       while (true) {
         const controller = !fetchInit.signal ? new AbortController() : null;
@@ -53,11 +133,21 @@ export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {
           : null;
         try {
           const method = (fetchInit.method ?? 'GET').toUpperCase();
+          const isMutating = method !== 'GET' && method !== 'HEAD';
           const headers = new Headers(fetchInit.headers ?? {});
-          if (method !== 'GET' && method !== 'HEAD') {
-            const csrfToken = getCookieValue('csrf_token');
-            if (csrfToken && !headers.has('X-CSRF-Token')) {
-              headers.set('X-CSRF-Token', csrfToken);
+
+          if (isMutating) {
+            if (forcedCsrfToken) {
+              headers.set('X-CSRF-Token', forcedCsrfToken);
+            } else if (!headers.has('X-CSRF-Token')) {
+              let csrfToken = getCookieValue(CSRF_COOKIE_NAME) ?? csrfTokenCache;
+              if (!csrfToken) {
+                csrfToken = await fetchCsrfToken(input);
+              }
+              if (csrfToken) {
+                csrfTokenCache = csrfToken;
+                headers.set('X-CSRF-Token', csrfToken);
+              }
             }
           }
 
@@ -69,6 +159,15 @@ export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {
           });
           if (timeout) {
             window.clearTimeout(timeout);
+          }
+
+          if (isMutating && !csrfRetryAttempted && await isCsrfInvalidResponse(response)) {
+            csrfRetryAttempted = true;
+            const refreshedToken = await fetchCsrfToken(input, { forceRefresh: true });
+            if (refreshedToken) {
+              forcedCsrfToken = refreshedToken;
+              continue;
+            }
           }
 
           if (response.status === 429 && attempt < maxRetries) {
