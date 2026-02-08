@@ -43,6 +43,16 @@ const getCsrfEndpoint = (input: RequestInput): string => {
   const requestUrl = resolveRequestUrl(input);
   const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
   const parsed = new URL(requestUrl, fallbackOrigin);
+  const path = parsed.pathname || '';
+  const apiPrefixIndex = path.indexOf('/api/');
+  if (apiPrefixIndex >= 0) {
+    const prefix = path.slice(0, apiPrefixIndex);
+    return `${parsed.origin}${prefix}/api/auth/csrf`;
+  }
+  if (path.endsWith('/api')) {
+    const prefix = path.slice(0, -4);
+    return `${parsed.origin}${prefix}/api/auth/csrf`;
+  }
   return `${parsed.origin}/api/auth/csrf`;
 };
 
