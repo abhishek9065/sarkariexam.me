@@ -83,6 +83,8 @@ export function CategoryPage({ type }: CategoryPageProps) {
             organization: filters.organizations.length ? filters.organizations : undefined,
             salaryMin: filters.minSalary ? Number(filters.minSalary) : undefined,
             salaryMax: filters.maxSalary ? Number(filters.maxSalary) : undefined,
+            ageMin: filters.minAge ? Number(filters.minAge) : undefined,
+            ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
             sort: apiSort,
         })
             .then(response => {
@@ -129,12 +131,17 @@ export function CategoryPage({ type }: CategoryPageProps) {
     useEffect(() => {
         let mounted = true;
         const runWhenIdle = (callback: () => void, timeout = 800) => {
-            if ('requestIdleCallback' in window) {
-                const id = (window as any).requestIdleCallback(callback, { timeout });
-                return () => (window as any).cancelIdleCallback(id);
+            const idleWindow = window as Window & {
+                requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+                cancelIdleCallback?: (id: number) => void;
+            };
+
+            if (typeof idleWindow.requestIdleCallback === 'function' && typeof idleWindow.cancelIdleCallback === 'function') {
+                const id = idleWindow.requestIdleCallback(callback, { timeout });
+                return () => idleWindow.cancelIdleCallback?.(id);
             }
-            const timer = window.setTimeout(callback, timeout);
-            return () => window.clearTimeout(timer);
+            const timer = setTimeout(callback, timeout);
+            return () => clearTimeout(timer);
         };
         const loadMeta = async () => {
             const [categories, organizations] = await Promise.all([
@@ -183,10 +190,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
             const category = item.category?.toLowerCase() || '';
             const location = item.location?.toLowerCase() || '';
             const qualification = item.minQualification?.toLowerCase() || '';
-            const tags = (item.tags || []).map((tag) => {
-                if (typeof tag === 'string') return tag.toLowerCase();
-                return (tag?.name || '').toLowerCase();
-            }).filter(Boolean);
+            const tags = (item.tags || []).map((tag) => tag.name.toLowerCase()).filter(Boolean);
 
             let score = 0;
             if (title.includes(keyword)) score += 6;
@@ -246,6 +250,8 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 organization: filters.organizations.length ? filters.organizations : undefined,
                 salaryMin: filters.minSalary ? Number(filters.minSalary) : undefined,
                 salaryMax: filters.maxSalary ? Number(filters.maxSalary) : undefined,
+                ageMin: filters.minAge ? Number(filters.minAge) : undefined,
+                ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
                 sort: apiSort,
             });
             setData(prev => [...prev, ...response.data] as Announcement[]);
@@ -282,7 +288,9 @@ export function CategoryPage({ type }: CategoryPageProps) {
         filters.categories.length ||
         filters.organizations.length ||
         filters.minSalary ||
-        filters.maxSalary
+        filters.maxSalary ||
+        filters.minAge ||
+        filters.maxAge
     );
 
     const formatSalaryRange = (min?: number | null, max?: number | null) => {
@@ -318,6 +326,8 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 qualification: filters.qualification || undefined,
                 salaryMin: filters.minSalary ? Number(filters.minSalary) : undefined,
                 salaryMax: filters.maxSalary ? Number(filters.maxSalary) : undefined,
+                ageMin: filters.minAge ? Number(filters.minAge) : undefined,
+                ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
             }
         };
 

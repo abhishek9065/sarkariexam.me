@@ -177,11 +177,11 @@ export function ProfilePage() {
     };
 
     const formatSalaryRange = (min?: number | null, max?: number | null) => {
-        if (min === undefined && max === undefined) return null;
+        if (min == null && max == null) return null;
         const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
-        if (min !== undefined && max !== undefined) return `₹${fmt(min)} - ₹${fmt(max)}`;
-        if (min !== undefined) return `₹${fmt(min)}+`;
-        if (max !== undefined) return `Up to ₹${fmt(max)}`;
+        if (min != null && max != null) return `₹${fmt(min)} - ₹${fmt(max)}`;
+        if (min != null) return `₹${fmt(min)}+`;
+        if (max != null) return `Up to ₹${fmt(max)}`;
         return null;
     };
 

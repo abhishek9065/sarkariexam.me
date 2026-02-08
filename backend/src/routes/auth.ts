@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { config } from '../config.js';
 import { ADMIN_AUTH_COOKIE_NAME, AUTH_COOKIE_NAME, blacklistToken, isTokenBlacklisted } from '../middleware/auth.js';
+import { clearCsrfCookie, ensureCsrfCookie, setCsrfCookie } from '../middleware/csrf.js';
 import {
   bruteForceProtection,
   clearFailedLoginsWithEmail,
@@ -88,6 +89,7 @@ const setAuthCookie = (
     path: '/',
     ...(maxAge ? { maxAge } : {}),
   });
+  setCsrfCookie(res);
 };
 
 const getBearerToken = (req: express.Request): string | undefined => {
@@ -1155,6 +1157,7 @@ router.post('/logout', async (req, res) => {
     sameSite: 'strict',
     path: '/',
   });
+  clearCsrfCookie(res);
 
   return res.json({ message: 'Logged out successfully' });
 });
@@ -1199,6 +1202,8 @@ router.get('/me', async (req, res) => {
         message: 'Two-factor authentication required',
       });
     }
+
+    ensureCsrfCookie(req, res);
 
     return res.json({
       data: { 

@@ -6,6 +6,8 @@ interface StaticPageProps {
     type: 'about' | 'contact' | 'privacy' | 'disclaimer';
 }
 
+const POLICY_UPDATED_DATE = 'February 8, 2026';
+
 const STATIC_CONTENT = {
     about: {
         title: 'About SarkariExams.me',
@@ -36,7 +38,7 @@ const STATIC_CONTENT = {
                 <li>Educational board and university notifications</li>
             </ul>
             
-            <p>Last updated: January 2025</p>
+            <p>Last updated: ${POLICY_UPDATED_DATE}</p>
         `
     },
     contact: {
@@ -86,7 +88,7 @@ const STATIC_CONTENT = {
         title: 'Privacy Policy',
         content: `
             <h2>Privacy Policy</h2>
-            <p><strong>Effective Date:</strong> January 2025</p>
+            <p><strong>Effective Date:</strong> ${POLICY_UPDATED_DATE}</p>
             
             <h3>Information We Collect</h3>
             
@@ -232,7 +234,7 @@ const STATIC_CONTENT = {
             
             <p><em>By using this website, you acknowledge that you have read and understood these disclaimers.</em></p>
             
-            <p><strong>Last Updated:</strong> January 2025</p>
+            <p><strong>Last Updated:</strong> ${POLICY_UPDATED_DATE}</p>
         `
     }
 };

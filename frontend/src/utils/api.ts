@@ -16,10 +16,27 @@ interface AnnouncementCardQuery {
     qualification?: string;
     salaryMin?: number;
     salaryMax?: number;
+    ageMin?: number;
+    ageMax?: number;
     sort?: 'newest' | 'oldest' | 'deadline' | 'views';
     limit?: number;
     cursor?: string | null;
     prefetch?: boolean;
+}
+
+function cardToAnnouncement(card: AnnouncementCard): Announcement {
+    return {
+        ...card,
+        location: card.location ?? undefined,
+        minQualification: card.minQualification ?? undefined,
+        ageLimit: card.ageLimit ?? undefined,
+        salaryMin: card.salaryMin ?? undefined,
+        salaryMax: card.salaryMax ?? undefined,
+        difficulty: card.difficulty ?? undefined,
+        cutoffMarks: card.cutoffMarks ?? undefined,
+        deadline: card.deadline ?? undefined,
+        totalPosts: card.totalPosts ?? undefined,
+    };
 }
 
 // Fetch a single page of announcement cards (cursor-based)
@@ -42,6 +59,8 @@ export async function fetchAnnouncementCardsPage(
         if (query.qualification) params.set('qualification', query.qualification);
         if (query.salaryMin !== undefined) params.set('salaryMin', String(query.salaryMin));
         if (query.salaryMax !== undefined) params.set('salaryMax', String(query.salaryMax));
+        if (query.ageMin !== undefined) params.set('ageMin', String(query.ageMin));
+        if (query.ageMax !== undefined) params.set('ageMax', String(query.ageMax));
         if (query.sort) params.set('sort', query.sort);
         if (query.limit) params.set('limit', String(query.limit));
         if (query.cursor) params.set('cursor', query.cursor);
@@ -83,8 +102,8 @@ export async function fetchAnnouncementCardsPage(
     }
 }
 
-async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): Promise<AnnouncementCard[]> {
-    const items: AnnouncementCard[] = [];
+async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): Promise<Announcement[]> {
+    const items: Announcement[] = [];
     let cursor: string | null = null;
     const pageSize = Math.min(50, maxItems);
 
@@ -95,7 +114,7 @@ async function fetchCardPages(query: AnnouncementCardQuery, maxItems: number): P
             cursor,
         });
 
-        items.push(...page.data);
+        items.push(...page.data.map(cardToAnnouncement));
 
         if (!page.hasMore || !page.nextCursor) {
             break;

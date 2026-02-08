@@ -73,7 +73,11 @@ export function NotificationPrompt() {
             const perm = await Notification.requestPermission();
             setPermission(perm);
             setShowPrompt(false);
-            setStoredDismissed('permanent');
+            if (perm === 'granted' || perm === 'denied') {
+                setStoredDismissed('permanent');
+            } else {
+                setStoredDismissed(String(Date.now()));
+            }
 
             if (perm === 'granted') {
                 // Subscribe to push notifications
@@ -116,7 +120,7 @@ export function NotificationPrompt() {
 
     const handleDismiss = () => {
         setShowPrompt(false);
-        setStoredDismissed('permanent');
+        setStoredDismissed(String(Date.now()));
     };
 
     if (!showPrompt || permission !== 'default') return null;

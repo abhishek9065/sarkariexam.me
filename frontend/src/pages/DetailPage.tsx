@@ -212,6 +212,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const labels = TYPE_LABELS[item.type] || TYPE_LABELS['job'];
     const selectionModes = SELECTION_MODES[item.type] || SELECTION_MODES['job'];
     const daysRemaining = getDaysRemaining(item.deadline ?? undefined);
+    const externalLink = item.externalLink && /^https?:\/\//i.test(item.externalLink) ? item.externalLink : undefined;
 
     // Type-specific FAQs
     const getFaqs = () => {
@@ -461,11 +462,23 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                             <tbody>
                                 <tr>
                                     <td><strong>{labels.action}</strong></td>
-                                    <td><a href={item.externalLink || '#'} target="_blank" rel="noreferrer" className="link-btn apply">Click Here</a></td>
+                                    <td>
+                                        {externalLink ? (
+                                            <a href={externalLink} target="_blank" rel="noreferrer" className="link-btn apply">Click Here</a>
+                                        ) : (
+                                            <span className="link-btn link-btn-disabled">Not Available</span>
+                                        )}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td><strong>Official Website</strong></td>
-                                    <td><a href={item.externalLink || '#'} target="_blank" rel="noreferrer" className="link-btn website">Click Here</a></td>
+                                    <td>
+                                        {externalLink ? (
+                                            <a href={externalLink} target="_blank" rel="noreferrer" className="link-btn website">Click Here</a>
+                                        ) : (
+                                            <span className="link-btn link-btn-disabled">Not Available</span>
+                                        )}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>

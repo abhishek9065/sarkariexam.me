@@ -30,6 +30,22 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
 };
 
 /**
+ * Parse JSON object with fallback.
+ */
+const parseJsonObject = (value: string | undefined): Record<string, any> => {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, any>;
+    }
+  } catch (error) {
+    console.warn('[CONFIG] Warning: Failed to parse JSON object env var', error);
+  }
+  return {};
+};
+
+/**
  * Get required environment variable (no fallback allowed in production).
  */
 const getRequiredEnv = (key: string, devFallback?: string): string => {
@@ -114,8 +130,12 @@ const adminDualApprovalRequired = parseBoolean(process.env.ADMIN_DUAL_APPROVAL_R
 const adminApprovalExpiryMinutes = Math.max(5, parseNumber(process.env.ADMIN_APPROVAL_EXPIRY_MINUTES, 30));
 const adminApprovalRetentionDays = Math.max(1, parseNumber(process.env.ADMIN_APPROVAL_RETENTION_DAYS, 30));
 const adminApprovalCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.ADMIN_APPROVAL_CLEANUP_INTERVAL_MINUTES, 60));
+const adminApprovalPolicyMatrix = parseJsonObject(process.env.ADMIN_APPROVAL_POLICY_MATRIX);
 const adminSecurityAlertEmail = process.env.ADMIN_SECURITY_ALERT_EMAIL ?? '';
 const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24));
+const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
+const securityLogDbRetentionDays = Math.max(1, parseNumber(process.env.SECURITY_LOG_DB_RETENTION_DAYS, 30));
+const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SECURITY_LOG_CLEANUP_INTERVAL_MINUTES, 60));
 
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
@@ -165,8 +185,12 @@ export const config = {
   adminApprovalExpiryMinutes,
   adminApprovalRetentionDays,
   adminApprovalCleanupIntervalMinutes,
+  adminApprovalPolicyMatrix,
   adminSecurityAlertEmail,
   securityLogRetentionHours,
+  securityLogPersistenceEnabled,
+  securityLogDbRetentionDays,
+  securityLogCleanupIntervalMinutes,
 
   // Cosmos DB specific
   cosmosDbName: process.env.COSMOS_DATABASE_NAME || 'sarkari_db',

@@ -11,6 +11,7 @@ import swaggerUi from 'swagger-ui-express';
 import { config } from './config.js';
 import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
+import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { responseTimeLogger, getPerformanceStats } from './middleware/responseTime.js';
@@ -113,6 +114,7 @@ app.use(cors({
     'X-Requested-With',
     'X-Admin-Step-Up-Token',
     'X-Admin-Approval-Id',
+    'X-CSRF-Token',
     'Idempotency-Key',
   ]
 }));
@@ -229,10 +231,10 @@ app.get('/api/performance', authenticateToken, requirePermission('admin:read'), 
 });
 
 // Core Routes (MongoDB-based)
-app.use('/api/auth', authRouter);
-app.use('/api/auth/admin', adminSetupRouter);
+app.use('/api/auth', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), authRouter);
+app.use('/api/auth/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminSetupRouter);
 app.use('/api/announcements', announcementsRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/graphql', graphqlRouter);
 app.use('/api/bookmarks', bookmarksRouter);

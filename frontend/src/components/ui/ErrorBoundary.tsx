@@ -19,14 +19,15 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren, Erro
 
     componentDidCatch(error: Error, info: React.ErrorInfo) {
         const errorId = this.state.errorId ?? this.createErrorId();
+        const componentStack = info.componentStack ?? undefined;
         if (!this.state.errorId) {
             this.setState({ errorId });
         }
         if (!this.state.stack || !this.state.componentStack) {
-            this.setState({ stack: error.stack, componentStack: info.componentStack });
+            this.setState({ stack: error.stack, componentStack });
         }
         console.error('[ErrorBoundary]', errorId, error, info);
-        captureError(error, { componentStack: info.componentStack }, errorId);
+        captureError(error, { componentStack }, errorId);
     }
 
     handleRetry = () => {

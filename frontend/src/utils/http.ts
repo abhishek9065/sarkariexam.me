@@ -38,7 +38,7 @@ export async function fetchJson<T>(
     let lastError: unknown;
 
     while (attempt <= retries) {
-        const { signal, cleanup } = withTimeout(options.signal, timeoutMs);
+        const { signal, cleanup } = withTimeout(options.signal ?? undefined, timeoutMs);
         try {
             const response = await fetch(url, { ...options, signal });
             cleanup();

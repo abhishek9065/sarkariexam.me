@@ -12,15 +12,24 @@ interface HeaderProps {
     onProfileClick?: () => void;
 }
 
+function getAcademicYearLabel(date = new Date()): string {
+    const month = date.getMonth(); // 0-based
+    const year = date.getFullYear();
+    const startYear = month >= 3 ? year : year - 1;
+    const endYearShort = String(startYear + 1).slice(-2);
+    return `${startYear}-${endYearShort}`;
+}
+
 export function Header({ setCurrentPage, user, token, isAuthenticated, onLogin, onLogout, onProfileClick }: HeaderProps) {
     const displayName = user?.name || user?.email || 'Account';
+    const academicYear = getAcademicYearLabel();
 
     return (
         <header className="site-header">
             <div className="header-inner">
                 <h1 className="site-title" onClick={() => setCurrentPage('home')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage('home')}>
                     ⚡ SarkariExams.me
-                    <small className="year-indicator">2025-26</small>
+                    <small className="year-indicator">{academicYear}</small>
                 </h1>
                 <div className="header-controls">
                     <LanguageSwitcher />

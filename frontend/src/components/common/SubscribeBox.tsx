@@ -32,10 +32,6 @@ export function SubscribeBox() {
             errors.push('You must accept the privacy policy to subscribe');
         }
 
-        if (categories.length === 0) {
-            errors.push('Please select at least one notification type');
-        }
-
         return errors.length === 0;
     };
 
@@ -86,7 +82,6 @@ export function SubscribeBox() {
 
         setStatus('loading');
         setMessage('');
-        setValidationErrors([]);
 
         try {
             const controller = new AbortController();
@@ -154,6 +149,21 @@ export function SubscribeBox() {
                     ))}
                     <p id="category-hint" className="category-hint">If no categories are selected, you'll receive notifications for all types.</p>
                 </fieldset>
+
+                <div className="privacy-consent">
+                    <label className="privacy-checkbox">
+                        <input
+                            type="checkbox"
+                            checked={privacyAccepted}
+                            onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                            disabled={status === 'loading'}
+                            required
+                        />
+                        <span className="privacy-text">
+                            I agree to the <a href="/privacy" className="privacy-link">Privacy Policy</a>.
+                        </span>
+                    </label>
+                </div>
 
                 <div className="subscribe-input-row">
                     <label htmlFor="email-input" className="email-label">Email address:</label>

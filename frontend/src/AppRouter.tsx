@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { QueryProvider } from './context/QueryProvider';
 import { OnboardingModal } from './components/modals/OnboardingModal';
-import { ErrorBoundary, SkeletonLoader, AccessibilityPanel, NotificationPrompt } from './components';
+import { ErrorBoundary, SkeletonLoader, AccessibilityPanel, NotificationPrompt, LegacyRedirect, PWAInstallPrompt } from './components';
 import './styles.css';
 
 const HomePage = lazy(() => import('./pages/HomePage').then((mod) => ({ default: mod.HomePage })));
@@ -19,15 +20,23 @@ const CommunityPage = lazy(() => import('./pages/CommunityPage').then((mod) => (
 
 function AppRoutes() {
     const location = useLocation();
-    const showNotificationPrompt = !location.pathname.startsWith('/admin');
+    const showUserPrompts = !location.pathname.startsWith('/admin');
+    const searchParams = new URLSearchParams(location.search);
+    const isLegacyQuery = searchParams.has('item') || searchParams.has('tab');
 
     return (
         <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<div className="app"><main className="main-content"><SkeletonLoader /></main></div>}>
-                {showNotificationPrompt && <NotificationPrompt />}
+                {showUserPrompts && (
+                    <>
+                        <NotificationPrompt />
+                        <PWAInstallPrompt />
+                    </>
+                )}
                 <Routes location={location}>
                     {/* Home Page */}
-                    <Route path="/" element={<HomePage />} />
+                    <Route path="/" element={isLegacyQuery ? <LegacyRedirect /> : <HomePage />} />
+                    <Route path="/home" element={<HomePage />} />
 
                     {/* Category Pages with SEO-friendly URLs */}
                     <Route path="/jobs" element={<CategoryPage type="job" />} />
@@ -74,8 +83,8 @@ function AppRoutes() {
                     <Route path="/privacy" element={<StaticPage type="privacy" />} />
                     <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
 
-                    {/* Fallback - redirect old ?item= URLs */}
-                    <Route path="*" element={<HomePage />} />
+                    {/* Fallback - legacy and unknown URLs */}
+                    <Route path="*" element={<LegacyRedirect />} />
                 </Routes>
             </Suspense>
         </ErrorBoundary>
@@ -84,16 +93,18 @@ function AppRoutes() {
 
 export default function App() {
     return (
-        <BrowserRouter>
-            <AuthProvider>
-                <ThemeProvider>
-                    <LanguageProvider>
-                        <OnboardingModal />
-                        <AppRoutes />
-                        <AccessibilityPanel />
-                    </LanguageProvider>
-                </ThemeProvider>
-            </AuthProvider>
-        </BrowserRouter>
+        <QueryProvider>
+            <BrowserRouter>
+                <AuthProvider>
+                    <ThemeProvider>
+                        <LanguageProvider>
+                            <OnboardingModal />
+                            <AppRoutes />
+                            <AccessibilityPanel />
+                        </LanguageProvider>
+                    </ThemeProvider>
+                </AuthProvider>
+            </BrowserRouter>
+        </QueryProvider>
     );
 }

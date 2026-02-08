@@ -14,6 +14,7 @@ import {
     validateApprovalForExecution,
     type AdminApprovalActionType,
 } from '../services/adminApprovals.js';
+import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
 import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
 import { getDailyRollups } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
@@ -21,7 +22,6 @@ import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { ContentType, CreateAnnouncementDto } from '../types.js';
-import { config } from '../config.js';
 
 const router = Router();
 
@@ -186,7 +186,14 @@ const requireDualApproval = async (
         note?: string;
     }
 ): Promise<{ allowed: boolean; approvalId?: string }> => {
-    if (!config.adminDualApprovalRequired) {
+    const policyEvaluation = evaluateAdminApprovalRequirement({
+        actionType: input.actionType,
+        actorRole: req.user?.role,
+        targetIds: input.targetIds,
+        payload: input.payload,
+    });
+
+    if (!policyEvaluation.required) {
         return { allowed: true };
     }
 
@@ -216,6 +223,7 @@ const requireDualApproval = async (
                 approvalId: approval.id,
                 actionType: input.actionType,
                 requestedBy: req.user?.email,
+                risk: policyEvaluation.risk,
             },
         });
         res.status(202).json({
@@ -393,13 +401,14 @@ router.get('/security', requirePermission('security:read'), async (req, res) => 
     try {
         const limit = Math.min(200, parseInt(req.query.limit as string) || 20);
         const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
-        const logs = SecurityLogger.getRecentLogs(limit, offset);
+        const logs = await SecurityLogger.getRecentLogsPaged(limit, offset);
         return res.json({
-            data: logs,
+            data: logs.data,
             meta: {
-                total: SecurityLogger.getTotalLogs(),
+                total: logs.total,
                 limit,
                 offset,
+                source: logs.source,
             },
         });
     } catch (error) {
@@ -416,13 +425,14 @@ router.get('/security/logs', requirePermission('security:read'), async (req, res
     try {
         const limit = Math.min(200, parseInt(req.query.limit as string) || 20);
         const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
-        const logs = SecurityLogger.getRecentLogs(limit, offset);
+        const logs = await SecurityLogger.getRecentLogsPaged(limit, offset);
         return res.json({
-            data: logs,
+            data: logs.data,
             meta: {
-                total: SecurityLogger.getTotalLogs(),
+                total: logs.total,
                 limit,
                 offset,
+                source: logs.source,
             },
         });
     } catch (error) {

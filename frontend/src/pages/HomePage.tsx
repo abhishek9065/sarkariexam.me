@@ -43,7 +43,11 @@ export function HomePage() {
         try {
             return localStorage.getItem(cookieConsentKey);
         } catch {
-            return sessionStorage.getItem(cookieConsentKey);
+            try {
+                return sessionStorage.getItem(cookieConsentKey);
+            } catch {
+                return null;
+            }
         }
     };
 
@@ -52,17 +56,26 @@ export function HomePage() {
         try {
             localStorage.setItem(cookieConsentKey, value);
         } catch {
-            sessionStorage.setItem(cookieConsentKey, value);
+            try {
+                sessionStorage.setItem(cookieConsentKey, value);
+            } catch {
+                // Ignore storage write errors; cookie already carries consent.
+            }
         }
     };
 
     const runWhenIdle = (callback: () => void, timeout = 1200) => {
-        if ('requestIdleCallback' in window) {
-            const id = (window as any).requestIdleCallback(callback, { timeout });
-            return () => (window as any).cancelIdleCallback(id);
+        const idleWindow = window as Window & {
+            requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+            cancelIdleCallback?: (id: number) => void;
+        };
+
+        if (typeof idleWindow.requestIdleCallback === 'function' && typeof idleWindow.cancelIdleCallback === 'function') {
+            const id = idleWindow.requestIdleCallback(callback, { timeout });
+            return () => idleWindow.cancelIdleCallback?.(id);
         }
-        const timer = window.setTimeout(callback, timeout);
-        return () => window.clearTimeout(timer);
+        const timer = setTimeout(callback, timeout);
+        return () => clearTimeout(timer);
     };
 
     // Check for cookie consent

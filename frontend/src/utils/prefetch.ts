@@ -2,7 +2,9 @@ import type { TabType } from './constants';
 import type { ContentType } from '../types';
 import { fetchAnnouncementBySlug, fetchAnnouncementCardsPage } from './api';
 
-const prefetchers: Partial<Record<TabType, () => Promise<unknown>>> = {
+type PrefetchableTabType = Exclude<TabType, undefined>;
+
+const prefetchers: Record<PrefetchableTabType, () => Promise<unknown>> = {
     job: () => import('../pages/CategoryPage'),
     result: () => import('../pages/CategoryPage'),
     'admit-card': () => import('../pages/CategoryPage'),

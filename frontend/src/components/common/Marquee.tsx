@@ -1,4 +1,14 @@
+function getAcademicYearLabel(date = new Date()): string {
+    const month = date.getMonth(); // 0-based
+    const year = date.getFullYear();
+    const startYear = month >= 3 ? year : year - 1;
+    const endYearShort = String(startYear + 1).slice(-2);
+    return `${startYear}-${endYearShort}`;
+}
+
 export function Marquee() {
+    const academicYear = getAcademicYearLabel();
+
     return (
         <div className="marquee-container" role="banner" aria-label="Latest updates ticker">
             <span className="live-badge" aria-label="Live updates">
@@ -7,11 +17,11 @@ export function Marquee() {
             </span>
             <div className="marquee-track">
                 <div className="marquee-content">
-                    <span className="marquee-item">🎓 SarkariExams.me - Academic Year 2025-26</span>
-                    <span className="marquee-item">📋 UPSC CSE 2025 Final Result - Check Official Website</span>
-                    <span className="marquee-item">🏦 SSC CHSL 2024 Tier 1 Result - Check Official Website</span>
-                    <span className="marquee-item">🚂 Railway RRB Group D 2024 Results - Check Official Website</span>
-                    <span className="marquee-item">💼 Banking PO/Clerk 2024 Admit Cards - Check Official Website</span>
+                    <span className="marquee-item">🎓 SarkariExams.me - Academic Year {academicYear}</span>
+                    <span className="marquee-item">📋 Latest UPSC and SSC notifications updated from official sources</span>
+                    <span className="marquee-item">🚂 Railway and Banking updates are refreshed regularly</span>
+                    <span className="marquee-item">🎫 Admit cards, answer keys, and results listed category-wise</span>
+                    <span className="marquee-item">⚠️ Verify eligibility and deadlines on official websites before applying</span>
                 </div>
             </div>
         </div>

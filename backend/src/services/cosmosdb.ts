@@ -219,8 +219,9 @@ async function createIndexes(): Promise<void> {
         await savedSearches.createIndex({ userId: 1, createdAt: -1 });
 
         // Security logs indexes
-        await securityLogs.createIndex({ createdAt: -1 });
-        await securityLogs.createIndex({ ipAddress: 1 });
+        await securityLogs.createIndex({ created_at: -1 });
+        await securityLogs.createIndex({ ip_address: 1 });
+        await securityLogs.createIndex({ event_type: 1, created_at: -1 });
 
         // Analytics indexes
         await analyticsEvents.createIndex({ createdAt: -1 });

@@ -43,15 +43,16 @@ export function UniversalJobDetail({
     };
 
     // Dynamic Data Mapping
+    const externalLink = item.externalLink && /^https?:\/\//i.test(item.externalLink) ? item.externalLink : undefined;
     const job = {
         title: item.title,
         organization: item.organization || 'Government of India',
         postName: item.category || 'Various Posts',
-        totalPosts: item.totalPosts || 'N/A',
+        totalPosts: item.totalPosts ?? undefined,
         applyStart: item.postedAt,
         applyEnd: item.deadline ?? undefined,
         examDate: 'As per Schedule',
-        link: item.externalLink || '#',
+        link: externalLink,
     };
 
     // Important Dates
@@ -82,7 +83,7 @@ export function UniversalJobDetail({
             {/* SEO Meta Tags & Structured Data */}
             <SEOHead
                 title={`${job.title} - ${job.organization}`}
-                description={`Apply for ${job.title} at ${job.organization}. Total ${formatNumber(job.totalPosts ?? undefined, String(job.totalPosts ?? 'N/A'))} vacancies. Last date: ${formatDate(item.deadline ?? undefined)}.`}
+                description={`Apply for ${job.title} at ${job.organization}. Total ${formatNumber(job.totalPosts, 'N/A')} vacancies. Last date: ${formatDate(item.deadline ?? undefined)}.`}
                 canonicalUrl={`https://www.sarkariexams.me/${item.type}/${item.slug}`}
                 ogType="article"
                 keywords={[item.type, item.category, item.organization, 'sarkari result', 'government jobs']}
@@ -103,7 +104,7 @@ export function UniversalJobDetail({
                 <h1>{job.title}</h1>
                 <p className="job-org">{job.organization}</p>
                 <div className="job-highlight">
-                    <span className="posts-count">👥 {formatNumber(job.totalPosts ?? undefined, String(job.totalPosts ?? 'N/A'))} Posts</span>
+                    <span className="posts-count">👥 {formatNumber(job.totalPosts, 'N/A')} Posts</span>
                     <span className="post-name">📋 {job.postName}</span>
                     {onToggleBookmark && (
                         <BookmarkButton
@@ -222,15 +223,33 @@ export function UniversalJobDetail({
                     <tbody>
                         <tr>
                             <td><strong>Apply Online / View Result</strong></td>
-                            <td><a href={job.link} target="_blank" rel="noopener" className="link-btn green">Click Here</a></td>
+                            <td>
+                                {job.link ? (
+                                    <a href={job.link} target="_blank" rel="noopener" className="link-btn green">Click Here</a>
+                                ) : (
+                                    <span className="link-btn link-btn-disabled">Not Available</span>
+                                )}
+                            </td>
                         </tr>
                         <tr>
                             <td><strong>Download Notification</strong></td>
-                            <td><a href={job.link} target="_blank" rel="noopener" className="link-btn blue">Click Here</a></td>
+                            <td>
+                                {job.link ? (
+                                    <a href={job.link} target="_blank" rel="noopener" className="link-btn blue">Click Here</a>
+                                ) : (
+                                    <span className="link-btn link-btn-disabled">Not Available</span>
+                                )}
+                            </td>
                         </tr>
                         <tr>
                             <td><strong>Official Website</strong></td>
-                            <td><a href="#" target="_blank" rel="noopener" className="link-btn orange">Click Here</a></td>
+                            <td>
+                                {job.link ? (
+                                    <a href={job.link} target="_blank" rel="noopener" className="link-btn orange">Click Here</a>
+                                ) : (
+                                    <span className="link-btn link-btn-disabled">Not Available</span>
+                                )}
+                            </td>
                         </tr>
                     </tbody>
                 </table>

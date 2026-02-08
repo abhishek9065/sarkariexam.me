@@ -14,7 +14,7 @@ import { AnalyticsDashboard } from './components/admin/AnalyticsDashboard';
 
 // Page types
 // Page types
-type PageType = 'home' | 'admin' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'up-police-2026';
+type PageType = 'home' | 'admin' | 'about' | 'contact' | 'privacy' | 'disclaimer' | 'up-police-2026' | 'community';
 type TabType = ContentType | 'bookmarks' | 'profile' | undefined;
 
 // Navigation menu items

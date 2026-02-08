@@ -21,11 +21,11 @@ export const NAV_ITEMS = [
 
 // Featured items on homepage
 export const FEATURED_ITEMS = [
-    { title: 'UPSC CSE 2024', subtitle: 'Final Result Out', color: 'purple', type: 'result' as ContentType },
-    { title: 'SSC CHSL 2024', subtitle: 'Tier 1 Result', color: 'blue', type: 'result' as ContentType },
-    { title: 'Railway RRB 2024', subtitle: 'Multiple Posts', color: 'red', type: 'job' as ContentType },
-    { title: 'Bank PO 2024', subtitle: 'Admit Card Available', color: 'orange', type: 'admit-card' as ContentType },
-    { title: 'State PSC Updates', subtitle: 'Various States', color: 'green', type: 'job' as ContentType },
+    { title: 'UPSC Civil Services', subtitle: 'Official Updates', color: 'purple', type: 'result' as ContentType },
+    { title: 'SSC Notifications', subtitle: 'Latest Announcements', color: 'blue', type: 'result' as ContentType },
+    { title: 'Railway Recruitment', subtitle: 'Ongoing Openings', color: 'red', type: 'job' as ContentType },
+    { title: 'Banking Exams', subtitle: 'Admit Cards & Results', color: 'orange', type: 'admit-card' as ContentType },
+    { title: 'State PSC Updates', subtitle: 'State-wise Notices', color: 'green', type: 'job' as ContentType },
 ];
 
 // Content sections

@@ -10,7 +10,6 @@ import { AdminStepUpDialog } from '../components/admin/AdminStepUpDialog';
 import { useAdminNotifications } from '../components/admin/useAdminNotifications';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { useTheme } from '../context/ThemeContext';
-import type { AdminApprovalItem, AdminApprovalStatus } from '../components/admin/AdminApprovalsPanel';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
@@ -26,6 +25,20 @@ import {
     type AdminPortalRole,
     type AdminTab,
 } from './admin/adminAccess';
+import {
+    ADMIN_SIDEBAR_KEY,
+    ADMIN_TIMEZONE_KEY,
+    ADMIN_USER_STORAGE_KEY,
+    LIST_FILTER_STORAGE_KEY,
+    loadAdminUser,
+    loadListFilters,
+    loadSidebarCollapsed,
+    loadTimeZoneMode,
+    type AdminUserProfile,
+    type ListFilterState,
+    type TimeZoneMode,
+} from './admin/adminStorage';
+import { useAdminApprovals } from './admin/useAdminApprovals';
 import { useStepUpAuth } from './admin/useStepUpAuth';
 import './AdminPage.css';
 
@@ -212,66 +225,6 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string; icon: string }> = 
     { value: 'Police', label: 'Police', icon: '🚓' },
 ];
 
-const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
-const ADMIN_USER_STORAGE_KEY = 'adminUserProfile';
-const ADMIN_TIMEZONE_KEY = 'adminTimezoneMode';
-const ADMIN_SIDEBAR_KEY = 'adminSidebarCollapsed';
-
-type TimeZoneMode = 'local' | 'ist' | 'utc';
-
-type ListFilterState = {
-    query?: string;
-    type?: ContentType | 'all';
-    status?: AnnouncementStatus | 'all';
-    sort?: 'newest' | 'updated' | 'deadline' | 'views';
-};
-
-const loadListFilters = (): ListFilterState | null => {
-    try {
-        const raw = localStorage.getItem(LIST_FILTER_STORAGE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as ListFilterState;
-    } catch {
-        return null;
-    }
-};
-
-type AdminUserProfile = {
-    name?: string;
-    email?: string;
-    role?: AdminPortalRole;
-};
-
-const loadAdminUser = (): AdminUserProfile | null => {
-    try {
-        const raw = localStorage.getItem(ADMIN_USER_STORAGE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as AdminUserProfile;
-    } catch {
-        return null;
-    }
-};
-
-const loadTimeZoneMode = (): TimeZoneMode => {
-    try {
-        const raw = localStorage.getItem(ADMIN_TIMEZONE_KEY);
-        if (raw === 'local' || raw === 'ist' || raw === 'utc') return raw;
-    } catch {
-        // ignore
-    }
-    return 'local';
-};
-
-const loadSidebarCollapsed = (): boolean => {
-    try {
-        const raw = localStorage.getItem(ADMIN_SIDEBAR_KEY);
-        return raw === '1';
-    } catch {
-        return false;
-    }
-};
-
-
 const STATUS_OPTIONS: { value: AnnouncementStatus; label: string }[] = [
     { value: 'draft', label: 'Draft' },
     { value: 'pending', label: 'Pending Review' },
@@ -410,6 +363,7 @@ export function AdminPage() {
     const [adminSetupToken, setAdminSetupToken] = useState<string | null>(null);
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [message, setMessage] = useState('');
     const [pendingEditId, setPendingEditId] = useState<string | null>(null);
     const listRequestInFlight = useRef(false);
     const listLastFetchAt = useRef(0);
@@ -440,9 +394,6 @@ export function AdminPage() {
     const [backupCodesStatus, setBackupCodesStatus] = useState<BackupCodesStatus | null>(null);
     const [backupCodesLoading, setBackupCodesLoading] = useState(false);
     const [backupCodesModal, setBackupCodesModal] = useState<{ codes: string[]; generatedAt: string } | null>(null);
-    const [approvals, setApprovals] = useState<AdminApprovalItem[]>([]);
-    const [approvalsLoading, setApprovalsLoading] = useState(false);
-    const [approvalsError, setApprovalsError] = useState<string | null>(null);
     const {
         stepUpOpen,
         stepUpReason,
@@ -469,10 +420,6 @@ export function AdminPage() {
     const currentSession = useMemo(() => sessions.find((session) => session.isCurrentSession), [sessions]);
     const activeSessionCount = useMemo(() => sessions.filter((session) => session.isActive).length, [sessions]);
     const highRiskSessionCount = useMemo(() => sessions.filter((session) => session.riskScore === 'high').length, [sessions]);
-    const pendingApprovalsCount = useMemo(
-        () => approvals.filter((approval) => approval.status === 'pending').length,
-        [approvals]
-    );
     const canAccessTab = useCallback(
         (tab: AdminTab) => hasAdminPermission(adminRole, permissionRegistry.tabs[tab], permissionRegistry.roles),
         [adminRole, permissionRegistry]
@@ -524,8 +471,6 @@ export function AdminPage() {
         setSessionsError(null);
         setBackupCodesStatus(null);
         setBackupCodesModal(null);
-        setApprovals([]);
-        setApprovalsError(null);
         clearStepUpState();
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
@@ -628,6 +573,36 @@ export function AdminPage() {
         return () => window.clearInterval(timer);
     }, [rateLimitUntil]);
 
+    const {
+        approvals,
+        approvalsLoading,
+        approvalsError,
+        refreshApprovals,
+        handleApprovalRequiredResponse,
+        approveWorkflowItem,
+        rejectWorkflowItem,
+        clearApprovalsState,
+    } = useAdminApprovals({
+        isLoggedIn,
+        adminFetch,
+        withStepUp,
+        canAccessTab,
+        setActiveAdminTab,
+        setMessage,
+        pushToast,
+    });
+
+    const pendingApprovalsCount = useMemo(
+        () => approvals.filter((approval) => approval.status === 'pending').length,
+        [approvals]
+    );
+
+    useEffect(() => {
+        if (!isLoggedIn) {
+            clearApprovalsState();
+        }
+    }, [clearApprovalsState, isLoggedIn]);
+
     const handleLogout = useCallback(async () => {
         setMessage('');
         
@@ -668,100 +643,6 @@ export function AdminPage() {
         const payload = await response.json().catch(() => ({}));
         setPermissionRegistry(parsePermissionRegistry(payload.data));
     }, []);
-
-    const refreshApprovals = useCallback(async (status: AdminApprovalStatus | 'all' = 'pending') => {
-        if (!isLoggedIn) return;
-        setApprovalsLoading(true);
-        setApprovalsError(null);
-        try {
-            const params = new URLSearchParams({
-                status,
-                limit: '50',
-                offset: '0',
-            });
-            const response = await adminFetch(`${apiBase}/api/admin/approvals?${params.toString()}`);
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                setApprovalsError(getApiErrorMessage(errorBody, 'Failed to load approvals.'));
-                return;
-            }
-            const payload = await response.json();
-            setApprovals(payload.data ?? []);
-        } catch (error) {
-            console.error(error);
-            setApprovalsError('Failed to load approvals.');
-        } finally {
-            setApprovalsLoading(false);
-        }
-    }, [adminFetch, isLoggedIn]);
-
-    const handleApprovalRequiredResponse = useCallback(async (response: Response, actionLabel: string) => {
-        if (response.status !== 202) return false;
-        const payload = await response.json().catch(() => ({}));
-        if (!payload?.requiresApproval) return false;
-        const infoMessage = payload?.message || `${actionLabel} queued for secondary approval.`;
-        setMessage(infoMessage);
-        pushToast(infoMessage, 'info');
-        refreshApprovals();
-        if (canAccessTab('approvals')) {
-            setActiveAdminTab('approvals');
-        }
-        return true;
-    }, [canAccessTab, pushToast, refreshApprovals]);
-
-    const approveWorkflowItem = useCallback(async (approvalId: string) => {
-        try {
-            const response = await withStepUp('Confirm your password and 2FA to approve this request.', async (stepUpToken) => {
-                return adminFetch(`${apiBase}/api/admin/approvals/${approvalId}/approve`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Step-Up-Token': stepUpToken,
-                    },
-                    body: JSON.stringify({}),
-                });
-            });
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorBody, 'Failed to approve workflow item.'));
-                return;
-            }
-            setMessage('Approval granted.');
-            pushToast('Request approved.', 'success');
-            refreshApprovals('pending');
-        } catch (error: any) {
-            if (error?.message === 'Step-up cancelled') return;
-            console.error(error);
-            setMessage('Failed to approve request.');
-        }
-    }, [adminFetch, pushToast, refreshApprovals, withStepUp]);
-
-    const rejectWorkflowItem = useCallback(async (approvalId: string) => {
-        try {
-            const response = await withStepUp('Confirm your password and 2FA to reject this request.', async (stepUpToken) => {
-                return adminFetch(`${apiBase}/api/admin/approvals/${approvalId}/reject`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Step-Up-Token': stepUpToken,
-                    },
-                    body: JSON.stringify({ reason: 'Rejected from admin console.' }),
-                });
-            });
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({}));
-                setMessage(getApiErrorMessage(errorBody, 'Failed to reject workflow item.'));
-                return;
-            }
-            setMessage('Approval rejected.');
-            pushToast('Request rejected.', 'info');
-            refreshApprovals('pending');
-        } catch (error: any) {
-            if (error?.message === 'Step-up cancelled') return;
-            console.error(error);
-            setMessage('Failed to reject request.');
-        }
-    }, [adminFetch, pushToast, refreshApprovals, withStepUp]);
 
     const checkSession = useCallback(async () => {
         try {
@@ -869,7 +750,6 @@ export function AdminPage() {
     }, [notifySuccess]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
-    const [message, setMessage] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [bulkJson, setBulkJson] = useState('');
 
@@ -4263,7 +4143,7 @@ export function AdminPage() {
                                     <DatePicker
                                         id="detailed-deadline"
                                         selected={parseDateOnly(formData.deadline)}
-                                        onChange={(date) => {
+                                        onChange={(date: Date | null) => {
                                             setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
                                             setTouchedFields((prev) => ({ ...prev, deadline: true }));
                                         }}
@@ -4356,7 +4236,7 @@ export function AdminPage() {
                                     <DatePicker
                                         id="detailed-publish-at"
                                         selected={parseDateTime(formData.publishAt)}
-                                        onChange={(date) => {
+                                        onChange={(date: Date | null) => {
                                             setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
                                             setTouchedFields((prev) => ({ ...prev, publishAt: true }));
                                         }}
@@ -4941,7 +4821,7 @@ export function AdminPage() {
                                     <DatePicker
                                         id="quick-deadline"
                                         selected={parseDateOnly(formData.deadline)}
-                                        onChange={(date) => {
+                                        onChange={(date: Date | null) => {
                                             setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
                                             setTouchedFields((prev) => ({ ...prev, deadline: true }));
                                         }}
@@ -5088,7 +4968,7 @@ export function AdminPage() {
                                     <DatePicker
                                         id="quick-publish-at"
                                         selected={parseDateTime(formData.publishAt)}
-                                        onChange={(date) => {
+                                        onChange={(date: Date | null) => {
                                             setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
                                             setTouchedFields((prev) => ({ ...prev, publishAt: true }));
                                         }}

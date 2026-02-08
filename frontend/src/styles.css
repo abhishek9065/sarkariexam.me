@@ -1615,6 +1615,15 @@ button {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
+.link-btn.link-btn-disabled {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-primary);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .link-btn.green {
   background: linear-gradient(135deg, var(--accent-green), #059669);
 }
@@ -3340,6 +3349,30 @@ html[data-contrast='high'] {
   background: rgba(96, 165, 250, 0.08);
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--accent-blue);
+}
+
+.privacy-consent {
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.privacy-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.privacy-checkbox input[type="checkbox"] {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
+}
+
+.privacy-link {
+  color: var(--accent-blue);
+  text-decoration: underline;
 }
 
 .visually-hidden {

@@ -5,10 +5,19 @@ interface FooterProps {
     setCurrentPage: (page: string) => void;
 }
 
+function getAcademicYearLabel(date = new Date()): string {
+    const month = date.getMonth(); // 0-based
+    const year = date.getFullYear();
+    const startYear = month >= 3 ? year : year - 1;
+    const endYearShort = String(startYear + 1).slice(-2);
+    return `${startYear}-${endYearShort}`;
+}
+
 export function Footer({ setCurrentPage }: FooterProps) {
     const navigate = useNavigate();
     const { t } = useLanguage();
     const lastUpdated = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const academicYear = getAcademicYearLabel();
 
     return (
         <footer className="site-footer">
@@ -43,7 +52,7 @@ export function Footer({ setCurrentPage }: FooterProps) {
                 </div>
             </div>
             <div className="footer-bottom">
-                <p>© 2025-26 SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: {lastUpdated}</p>
+                <p>© {academicYear} SarkariExams.me | <span className="version">Version 1.2.1</span> | Last Updated: {lastUpdated}</p>
                 <p className="legal-notice">⚠️ {t('footer.legalNotice')}</p>
             </div>
         </footer>

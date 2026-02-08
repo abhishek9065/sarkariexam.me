@@ -17,6 +17,19 @@ const next = () => {
   if (task) task();
 };
 
+const getCookieValue = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const encodedName = `${encodeURIComponent(name)}=`;
+  const parts = document.cookie.split(';');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(encodedName)) {
+      return decodeURIComponent(trimmed.substring(encodedName.length));
+    }
+  }
+  return null;
+};
+
 const getRetryDelay = (response: Response, attempt: number) => {
   const retryAfter = response.headers.get('Retry-After');
   if (retryAfter) {
@@ -39,9 +52,19 @@ export const adminRequest = (input: RequestInput, init: RequestInitWithRetry = {
           ? window.setTimeout(() => controller.abort(), timeoutMs)
           : null;
         try {
+          const method = (fetchInit.method ?? 'GET').toUpperCase();
+          const headers = new Headers(fetchInit.headers ?? {});
+          if (method !== 'GET' && method !== 'HEAD') {
+            const csrfToken = getCookieValue('csrf_token');
+            if (csrfToken && !headers.has('X-CSRF-Token')) {
+              headers.set('X-CSRF-Token', csrfToken);
+            }
+          }
+
           const response = await fetch(input, {
             credentials: 'include',
             ...fetchInit,
+            headers,
             signal: controller?.signal ?? fetchInit.signal,
           });
           if (timeout) {
