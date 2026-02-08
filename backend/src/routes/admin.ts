@@ -3,11 +3,13 @@ import { z } from 'zod';
 
 import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
+import { getAdminSloSnapshot } from '../middleware/responseTime.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
 import {
     approveAdminApprovalRequest,
     createAdminApprovalRequest,
+    getAdminApprovalWorkflowSummary,
     listAdminApprovalRequests,
     markAdminApprovalExecuted,
     rejectAdminApprovalRequest,
@@ -15,9 +17,9 @@ import {
     type AdminApprovalActionType,
 } from '../services/adminApprovals.js';
 import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
-import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
+import { getAdminAuditLogsPaged, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
 import { getDailyRollups } from '../services/analytics.js';
-import { getCollection } from '../services/cosmosdb.js';
+import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
@@ -115,11 +117,19 @@ const adminListQuerySchema = z.object({
 const bulkUpdateSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
     data: adminAnnouncementPartialSchema,
+    dryRun: z.coerce.boolean().optional().default(false),
 });
 
 const bulkReviewSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
     note: z.string().max(500).optional().or(z.literal('')),
+    dryRun: z.coerce.boolean().optional().default(false),
+});
+
+const rollbackSchema = z.object({
+    version: z.coerce.number().int().min(1).optional(),
+    note: z.string().max(500).optional().or(z.literal('')),
+    dryRun: z.coerce.boolean().optional().default(false),
 });
 
 const auditQuerySchema = z.object({
@@ -139,6 +149,12 @@ const adminExportQuerySchema = z.object({
 
 const adminSummaryQuerySchema = z.object({
     includeInactive: z.coerce.boolean().optional(),
+});
+
+const workflowOverviewQuerySchema = z.object({
+    includeInactive: z.coerce.boolean().optional(),
+    staleLimit: z.coerce.number().int().min(1).max(50).optional().default(10),
+    dueSoonMinutes: z.coerce.number().int().min(1).max(180).optional().default(30),
 });
 
 const adminApprovalsQuerySchema = z.object({
@@ -198,6 +214,143 @@ const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Da
 };
 
 const getEndpointPath = (url: string) => url.split('?')[0];
+
+const normalizeComparable = (value: unknown) => {
+    if (value === undefined || value === null || value === '') return null;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime()) && value.includes('T')) {
+            return parsed.toISOString();
+        }
+    }
+    if (Array.isArray(value)) {
+        return value.map((item) => normalizeComparable(item));
+    }
+    if (typeof value === 'object') {
+        const obj = value as Record<string, unknown>;
+        return Object.keys(obj)
+            .sort()
+            .reduce<Record<string, unknown>>((acc, key) => {
+                acc[key] = normalizeComparable(obj[key]);
+                return acc;
+            }, {});
+    }
+    return value;
+};
+
+const buildBulkPreview = (
+    items: Array<{ id: string; title?: string; status?: string; publishAt?: string; isActive?: boolean; [key: string]: any }>,
+    patch: Record<string, unknown>
+) => {
+    const previewRows = items.map((item) => {
+        const beforeState: Record<string, unknown> = {};
+        const afterState: Record<string, unknown> = {};
+        const changedFields: string[] = [];
+
+        for (const [field, value] of Object.entries(patch)) {
+            const before = normalizeComparable(item[field]);
+            const after = normalizeComparable(value);
+            beforeState[field] = before;
+            afterState[field] = after;
+            if (JSON.stringify(before) !== JSON.stringify(after)) {
+                changedFields.push(field);
+            }
+        }
+
+        return {
+            id: item.id,
+            title: item.title ?? '',
+            changedFields,
+            before: beforeState,
+            after: afterState,
+        };
+    });
+
+    const totalChanges = previewRows.reduce((sum, row) => sum + row.changedFields.length, 0);
+    return {
+        totalTargets: items.length,
+        totalChanges,
+        rows: previewRows,
+    };
+};
+
+const mapSnapshotToAnnouncementUpdate = (snapshot: any): Partial<CreateAnnouncementDto> & { isActive?: boolean; note?: string } => {
+    const tags = Array.isArray(snapshot?.tags)
+        ? snapshot.tags
+            .map((tag: any) => (typeof tag === 'string' ? tag : tag?.name))
+            .filter((tag: any): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+        : undefined;
+
+    const importantDates = Array.isArray(snapshot?.importantDates)
+        ? snapshot.importantDates.map((entry: any) => ({
+            eventName: entry?.eventName,
+            eventDate: entry?.eventDate,
+            description: entry?.description,
+        }))
+        : undefined;
+
+    return {
+        title: snapshot?.title,
+        type: snapshot?.type,
+        category: snapshot?.category,
+        organization: snapshot?.organization,
+        content: snapshot?.content,
+        externalLink: snapshot?.externalLink,
+        location: snapshot?.location,
+        deadline: snapshot?.deadline,
+        minQualification: snapshot?.minQualification,
+        ageLimit: snapshot?.ageLimit,
+        applicationFee: snapshot?.applicationFee,
+        salaryMin: snapshot?.salaryMin,
+        salaryMax: snapshot?.salaryMax,
+        difficulty: snapshot?.difficulty,
+        cutoffMarks: snapshot?.cutoffMarks,
+        totalPosts: snapshot?.totalPosts,
+        status: snapshot?.status,
+        publishAt: snapshot?.publishAt,
+        approvedAt: snapshot?.approvedAt,
+        approvedBy: snapshot?.approvedBy,
+        tags,
+        importantDates,
+        jobDetails: snapshot?.jobDetails,
+        isActive: snapshot?.isActive,
+    };
+};
+
+const sanitizePatch = (patch: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+
+const buildDryRunPreview = async (
+    ids: string[],
+    patch: Record<string, unknown>
+): Promise<{ preview: ReturnType<typeof buildBulkPreview>; missingIds: string[] }> => {
+    const docs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+    const docMap = new Map<string, Record<string, unknown>>(
+        docs.map((doc: any) => [doc?._id?.toString?.() ?? '', doc as Record<string, unknown>])
+    );
+
+    const targets = ids
+        .map((id) => {
+            const doc = docMap.get(id);
+            if (!doc) return null;
+            const row: Record<string, unknown> = {
+                id,
+                title: (doc.title as string | undefined) ?? '',
+            };
+            for (const key of Object.keys(patch)) {
+                row[key] = doc[key];
+            }
+            return row;
+        })
+        .filter((row): row is Record<string, unknown> & { id: string; title: string } => row !== null);
+
+    const missingIds = ids.filter((id) => !docMap.has(id));
+    return {
+        preview: buildBulkPreview(targets, patch),
+        missingIds,
+    };
+};
 
 const requireDualApproval = async (
     req: any,
@@ -379,6 +532,74 @@ router.get('/dashboard', async (_req, res) => {
     } catch (error) {
         console.error('Dashboard error:', error);
         return res.status(500).json({ error: 'Failed to load dashboard' });
+    }
+});
+
+/**
+ * GET /api/admin/slo
+ * Get admin API SLO snapshot with synthetic dependency checks.
+ */
+router.get('/slo', async (_req, res) => {
+    try {
+        const slo = getAdminSloSnapshot({
+            windowMinutes: 15,
+            p95TargetMs: 1200,
+            errorRateTargetPct: 1,
+        });
+        const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+        const dbHealthy = dbConfigured ? await healthCheck() : null;
+
+        return res.json({
+            data: {
+                ...slo,
+                synthetic: {
+                    dbConfigured,
+                    dbHealthy,
+                    status: !dbConfigured ? 'not_configured' : dbHealthy ? 'ok' : 'degraded',
+                },
+            },
+        });
+    } catch (error) {
+        console.error('SLO snapshot error:', error);
+        return res.status(500).json({ error: 'Failed to load SLO snapshot' });
+    }
+});
+
+/**
+ * GET /api/admin/workflow/overview
+ * Workflow engine overview for review queues, approvals, and sessions.
+ */
+router.get('/workflow/overview', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = workflowOverviewQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const { includeInactive, staleLimit, dueSoonMinutes } = parsed.data;
+        const [pendingSla, approvals, sessions] = await Promise.all([
+            AnnouncementModelMongo.getPendingSlaSummary({
+                includeInactive: includeInactive ?? true,
+                staleLimit,
+            }),
+            getAdminApprovalWorkflowSummary({ dueSoonMinutes }),
+            Promise.resolve(listAdminSessions()),
+        ]);
+
+        return res.json({
+            data: {
+                reviewQueue: pendingSla,
+                approvals,
+                sessions: {
+                    total: sessions.length,
+                    active: sessions.filter((session) => Date.now() - session.lastSeen.getTime() < 30 * 60 * 1000).length,
+                    uniqueAdmins: new Set(sessions.map((session) => session.userId)).size,
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Workflow overview error:', error);
+        return res.status(500).json({ error: 'Failed to load workflow overview' });
     }
 });
 
@@ -759,6 +980,21 @@ router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
 });
 
 /**
+ * GET /api/admin/audit-log/integrity
+ * Verify immutable audit ledger chain integrity.
+ */
+router.get('/audit-log/integrity', requirePermission('audit:read'), async (req, res) => {
+    try {
+        const limit = Math.min(100_000, Math.max(100, Number(req.query.limit) || 5000));
+        const result = await verifyAdminAuditLedger(limit);
+        return res.json({ data: result });
+    } catch (error) {
+        console.error('Audit ledger verification error:', error);
+        return res.status(500).json({ error: 'Failed to verify audit ledger' });
+    }
+});
+
+/**
  * GET /api/admin/announcements
  * Get all announcements for admin management
  */
@@ -944,13 +1180,27 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, data } = parseResult.data as unknown as {
+        const { ids, data, dryRun } = parseResult.data as unknown as {
             ids: string[];
             data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
+            dryRun: boolean;
         };
+        const patch = sanitizePatch(data as unknown as Record<string, unknown>);
         if (data.status === 'published' && !hasPermission(req.user?.role as any, 'announcements:approve')) {
             return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
         }
+
+        if (dryRun) {
+            const { preview, missingIds } = await buildDryRunPreview(ids, patch);
+            return res.json({
+                data: {
+                    dryRun: true,
+                    preview,
+                    missingIds,
+                },
+            });
+        }
+
         let approvalId: string | undefined;
         if (data.status === 'published') {
             const approvalGate = await requireDualApproval(req, res, {
@@ -990,7 +1240,27 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, note } = parseResult.data;
+        const { ids, note, dryRun } = parseResult.data;
+        const now = new Date().toISOString();
+        const data = sanitizePatch({
+            status: 'published',
+            publishAt: now,
+            approvedAt: now,
+            approvedBy: req.user?.userId,
+            note: note?.trim() || undefined,
+        });
+
+        if (dryRun) {
+            const { preview, missingIds } = await buildDryRunPreview(ids, data);
+            return res.json({
+                data: {
+                    dryRun: true,
+                    preview,
+                    missingIds,
+                },
+            });
+        }
+
         const approvalGate = await requireDualApproval(req, res, {
             actionType: 'announcement_bulk_publish',
             targetIds: ids,
@@ -999,8 +1269,7 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
         });
         if (!approvalGate.allowed) return;
 
-        const now = new Date().toISOString();
-        const data = {
+        const updateData = {
             status: 'published' as const,
             publishAt: now,
             approvedAt: now,
@@ -1008,7 +1277,7 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
             note: note?.trim() || undefined,
         };
 
-        const updates = ids.map(id => ({ id, data }));
+        const updates = ids.map(id => ({ id, data: updateData }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
         recordAdminAudit({
             action: 'bulk_approve',
@@ -1036,13 +1305,24 @@ router.post('/announcements/bulk-reject', requirePermission('announcements:appro
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, note } = parseResult.data;
-        const data = {
+        const { ids, note, dryRun } = parseResult.data;
+        const data = sanitizePatch({
             status: 'draft' as const,
             approvedAt: '',
             approvedBy: '',
             note: note?.trim() || undefined,
-        };
+        });
+
+        if (dryRun) {
+            const { preview, missingIds } = await buildDryRunPreview(ids, data);
+            return res.json({
+                data: {
+                    dryRun: true,
+                    preview,
+                    missingIds,
+                },
+            });
+        }
 
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
@@ -1174,6 +1454,85 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
     } catch (error) {
         console.error('Reject announcement error:', error);
         return res.status(500).json({ error: 'Failed to reject announcement' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/:id/rollback
+ * Roll back announcement to a prior version snapshot.
+ */
+router.post('/announcements/:id/rollback', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const parsed = rollbackSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const { version, note, dryRun } = parsed.data;
+        const announcement = await AnnouncementModelMongo.findById(req.params.id);
+        if (!announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        const targetVersion = version
+            ? announcement.versions?.find((entry) => entry.version === version)
+            : announcement.versions?.[0];
+
+        if (!targetVersion) {
+            return res.status(409).json({
+                error: 'rollback_not_available',
+                message: 'No matching historical version was found for rollback.',
+            });
+        }
+
+        const rollbackData = mapSnapshotToAnnouncementUpdate(targetVersion.snapshot);
+        rollbackData.note = note?.trim() || `Rollback to version ${targetVersion.version}`;
+        const patch = sanitizePatch(rollbackData as unknown as Record<string, unknown>);
+
+        if (dryRun) {
+            const preview = buildBulkPreview(
+                [{
+                    ...(announcement as unknown as Record<string, unknown>),
+                    id: announcement.id,
+                    title: announcement.title,
+                }],
+                patch
+            );
+            return res.json({
+                data: {
+                    dryRun: true,
+                    currentVersion: announcement.version,
+                    targetVersion: targetVersion.version,
+                    preview,
+                },
+            });
+        }
+
+        const updated = await AnnouncementModelMongo.update(
+            req.params.id,
+            rollbackData as Partial<CreateAnnouncementDto> & { note?: string },
+            req.user?.userId
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        recordAdminAudit({
+            action: 'rollback',
+            announcementId: updated.id,
+            title: updated.title,
+            userId: req.user?.userId,
+            note: rollbackData.note,
+            metadata: {
+                fromVersion: announcement.version,
+                toVersion: targetVersion.version,
+            },
+        }).catch(console.error);
+
+        return res.json({ data: updated });
+    } catch (error) {
+        console.error('Rollback announcement error:', error);
+        return res.status(500).json({ error: 'Failed to rollback announcement' });
     }
 });
 

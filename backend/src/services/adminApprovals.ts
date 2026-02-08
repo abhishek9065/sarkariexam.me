@@ -63,6 +63,14 @@ export interface AdminApprovalRequest {
   executedByEmail?: string;
 }
 
+export interface AdminApprovalWorkflowSummary {
+  totals: Record<AdminApprovalStatus, number>;
+  pending: number;
+  approvedPendingExecution: number;
+  overdue: number;
+  dueSoon: number;
+}
+
 const approvalsCollection = () => getCollection<AdminApprovalDoc>('admin_approval_requests');
 let cleanupIntervalRef: NodeJS.Timeout | null = null;
 
@@ -212,6 +220,52 @@ export const listAdminApprovalRequests = async (options?: {
 
   const mapped = await Promise.all(docs.map((doc) => markExpiredIfNeeded(mapDoc(doc as any))));
   return { data: mapped, total };
+};
+
+export const getAdminApprovalWorkflowSummary = async (options?: {
+  dueSoonMinutes?: number;
+}): Promise<AdminApprovalWorkflowSummary> => {
+  const dueSoonMinutes = Math.max(1, options?.dueSoonMinutes ?? 30);
+  const now = new Date();
+  const dueSoonAt = new Date(now.getTime() + dueSoonMinutes * 60 * 1000);
+
+  const [statusRows, overdue, dueSoon] = await Promise.all([
+    approvalsCollection()
+      .aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ])
+      .toArray(),
+    approvalsCollection().countDocuments({
+      status: { $in: ['pending', 'approved'] },
+      expiresAt: { $lte: now },
+    }),
+    approvalsCollection().countDocuments({
+      status: 'pending',
+      expiresAt: { $gt: now, $lte: dueSoonAt },
+    }),
+  ]);
+
+  const totals: Record<AdminApprovalStatus, number> = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    executed: 0,
+    expired: 0,
+  };
+  for (const row of statusRows) {
+    const status = row._id as AdminApprovalStatus;
+    if (status in totals) {
+      totals[status] = row.count ?? 0;
+    }
+  }
+
+  return {
+    totals,
+    pending: totals.pending,
+    approvedPendingExecution: totals.approved,
+    overdue,
+    dueSoon,
+  };
 };
 
 export const approveAdminApprovalRequest = async (input: {

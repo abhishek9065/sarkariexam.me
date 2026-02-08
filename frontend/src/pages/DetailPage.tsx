@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons, ScrollToTop } from '../components';
+import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
 import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
@@ -33,13 +34,14 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const [offlineSaved, setOfflineSaved] = useState(false);
     const [copyLinkStatus, setCopyLinkStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [applyChecklist, setApplyChecklist] = useState<Record<string, boolean>>({});
+    const [showSearchModal, setShowSearchModal] = useState(false);
     const copyLinkTimerRef = useRef<number | null>(null);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
     const { t } = useLanguage();
 
     const offlineKey = 'offline-announcements';
-    const LOAD_TIMEOUT_MS = 8000;
+    const LOAD_TIMEOUT_MS = 3000;
     const handlePageNavigation = (page: string) => {
         if (page === 'home') navigate('/');
         else if (page === 'admin') navigate('/admin');
@@ -391,7 +393,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
             <Navigation
                 activeTab={item.type as TabType}
                 setActiveTab={() => { }}
-                setShowSearch={() => { }}
+                setShowSearch={() => setShowSearchModal(true)}
                 goBack={() => navigate(-1)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
@@ -700,6 +702,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                 if (page === 'home') navigate('/');
                 else navigate('/' + page);
             }} />
+            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
             <MobileNav />
             <ScrollToTop />
         </div>

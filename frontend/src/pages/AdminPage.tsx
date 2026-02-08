@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import DatePicker from 'react-datepicker';
 import type { JobDetails } from '../components/admin/JobPostingForm';
 import { JobDetailsRenderer } from '../components/details/JobDetailsRenderer';
@@ -206,6 +206,14 @@ type BackupCodesStatus = {
     updatedAt: string | null;
 };
 
+type AdminCommand = {
+    id: string;
+    label: string;
+    description: string;
+    keywords?: string;
+    run: () => void;
+};
+
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
     { value: 'job', label: 'Latest Jobs' },
     { value: 'admit-card', label: 'Admit Cards' },
@@ -406,6 +414,10 @@ export function AdminPage() {
         withStepUp,
         clearStepUpState,
     } = useStepUpAuth(adminUser?.email);
+    const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+    const [commandPaletteQuery, setCommandPaletteQuery] = useState('');
+    const [commandPaletteCursor, setCommandPaletteCursor] = useState(0);
+    const commandPaletteInputRef = useRef<HTMLInputElement | null>(null);
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -435,6 +447,14 @@ export function AdminPage() {
         localStorage.setItem(ADMIN_SIDEBAR_KEY, isSidebarCollapsed ? '1' : '0');
     }, [isSidebarCollapsed]);
 
+    useEffect(() => {
+        if (!commandPaletteOpen) return;
+        const timer = window.setTimeout(() => {
+            commandPaletteInputRef.current?.focus();
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [commandPaletteOpen]);
+
     const pushToast = useCallback((message: string, tone: ToastTone = 'info') => {
         const id = `${Date.now()}-${Math.random()}`;
         setToasts((prev) => [...prev, { id, message, tone }]);
@@ -453,6 +473,19 @@ export function AdminPage() {
         setActiveAdminTab(tab);
         setIsNavOpen(false);
     }, [canAccessTab, pushToast]);
+
+    const closeCommandPalette = useCallback(() => {
+        setCommandPaletteOpen(false);
+        setCommandPaletteQuery('');
+        setCommandPaletteCursor(0);
+    }, []);
+
+    const openCommandPalette = useCallback(() => {
+        if (!isLoggedIn) return;
+        setCommandPaletteOpen(true);
+        setCommandPaletteQuery('');
+        setCommandPaletteCursor(0);
+    }, [isLoggedIn]);
 
     useEffect(() => {
         if (!isLoggedIn) return;
@@ -473,6 +506,9 @@ export function AdminPage() {
         setSessionsError(null);
         setBackupCodesStatus(null);
         setBackupCodesModal(null);
+        setCommandPaletteOpen(false);
+        setCommandPaletteQuery('');
+        setCommandPaletteCursor(0);
         clearStepUpState();
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
@@ -481,6 +517,19 @@ export function AdminPage() {
 
     // Keyboard shortcuts for admin panel
     const keyboardShortcuts: KeyboardShortcut[] = useMemo(() => [
+        {
+            key: 'k',
+            ctrl: true,
+            handler: () => {
+                if (!isLoggedIn) return;
+                if (commandPaletteOpen) {
+                    closeCommandPalette();
+                } else {
+                    openCommandPalette();
+                }
+            },
+            description: 'Open command palette',
+        },
         {
             key: 'n',
             ctrl: true,
@@ -496,6 +545,10 @@ export function AdminPage() {
         {
             key: 'Escape',
             handler: () => {
+                if (commandPaletteOpen) {
+                    closeCommandPalette();
+                    return;
+                }
                 // Go back to dashboard on Escape
                 if (activeAdminTab !== 'analytics' && canAccessTab('analytics')) {
                     setActiveAdminTab('analytics');
@@ -511,7 +564,7 @@ export function AdminPage() {
             },
             description: 'Go to list view',
         },
-    ], [isLoggedIn, activeAdminTab, canAccessTab]);
+    ], [isLoggedIn, commandPaletteOpen, closeCommandPalette, openCommandPalette, activeAdminTab, canAccessTab]);
 
     useKeyboardShortcuts(keyboardShortcuts, isLoggedIn);
 
@@ -2354,6 +2407,184 @@ export function AdminPage() {
     const pendingTotal = pendingSlaStats.pendingTotal;
     const scheduledTotal = scheduledAnnouncements.length;
     const activeTabMeta = ADMIN_TAB_META[activeAdminTab];
+    const commandPaletteCommands = useMemo<AdminCommand[]>(() => {
+        if (!isLoggedIn) return [];
+
+        const tabOrder: AdminTab[] = [
+            'analytics',
+            'users',
+            'list',
+            'review',
+            'add',
+            'detailed',
+            'bulk',
+            'queue',
+            'community',
+            'errors',
+            'audit',
+            'security',
+            'approvals',
+        ];
+
+        const tabCommands = tabOrder
+            .filter((tab) => canAccessTab(tab))
+            .map((tab) => ({
+                id: `tab-${tab}`,
+                label: `Go to ${ADMIN_TAB_META[tab].label}`,
+                description: ADMIN_TAB_META[tab].description,
+                keywords: `${tab} navigation`,
+                run: () => handleNavSelect(tab),
+            }));
+
+        const actionCommands: AdminCommand[] = [
+            {
+                id: 'refresh-admin-data',
+                label: 'Refresh admin workspace data',
+                description: 'Reload dashboards, listing data, and summary counters.',
+                keywords: 'refresh dashboard list summary reload',
+                run: () => {
+                    void refreshData();
+                    void refreshDashboard();
+                    void refreshAdminSummary();
+                },
+            },
+            {
+                id: 'refresh-approvals',
+                label: 'Refresh approval queue',
+                description: 'Reload pending dual-approval workflow requests.',
+                keywords: 'approval queue pending refresh',
+                run: () => {
+                    void refreshApprovals('pending');
+                    if (canAccessTab('approvals')) {
+                        handleNavSelect('approvals');
+                    }
+                },
+            },
+            {
+                id: 'refresh-sessions',
+                label: 'Refresh active sessions',
+                description: 'Pull latest admin session inventory and activity.',
+                keywords: 'session security refresh',
+                run: () => {
+                    void refreshSessions();
+                    if (canAccessTab('security')) {
+                        handleNavSelect('security');
+                    }
+                },
+            },
+            {
+                id: 'refresh-audit',
+                label: 'Refresh audit log',
+                description: 'Reload latest audit trail entries from page one.',
+                keywords: 'audit log refresh',
+                run: () => {
+                    void refreshAuditLogs(1);
+                    if (canAccessTab('audit')) {
+                        handleNavSelect('audit');
+                    }
+                },
+            },
+        ];
+
+        if (selectedIds.size > 0) {
+            actionCommands.push({
+                id: 'clear-selection',
+                label: `Clear selected announcements (${selectedIds.size})`,
+                description: 'Drop current row selections before taking new actions.',
+                keywords: 'selection clear rows reset',
+                run: clearSelection,
+            });
+        }
+
+        if (sessions.length > 1 && canAccessTab('security')) {
+            actionCommands.push({
+                id: 'terminate-other-sessions',
+                label: 'Terminate other admin sessions',
+                description: 'Require step-up auth and revoke every session except current.',
+                keywords: 'security session terminate revoke',
+                run: () => {
+                    void terminateOtherSessions();
+                },
+            });
+        }
+
+        return [...actionCommands, ...tabCommands];
+    }, [
+        canAccessTab,
+        clearSelection,
+        handleNavSelect,
+        isLoggedIn,
+        refreshAdminSummary,
+        refreshApprovals,
+        refreshAuditLogs,
+        refreshDashboard,
+        refreshData,
+        refreshSessions,
+        selectedIds.size,
+        sessions.length,
+        terminateOtherSessions,
+    ]);
+    const filteredCommandPaletteCommands = useMemo(() => {
+        const query = commandPaletteQuery.trim().toLowerCase();
+        if (!query) return commandPaletteCommands;
+        return commandPaletteCommands.filter((command) => {
+            const haystack = `${command.label} ${command.description} ${command.keywords ?? ''}`.toLowerCase();
+            return haystack.includes(query);
+        });
+    }, [commandPaletteCommands, commandPaletteQuery]);
+    const activeCommandPaletteCommand = filteredCommandPaletteCommands[commandPaletteCursor] ?? null;
+
+    useEffect(() => {
+        if (!commandPaletteOpen) return;
+        setCommandPaletteCursor(0);
+    }, [commandPaletteOpen, commandPaletteQuery]);
+
+    useEffect(() => {
+        setCommandPaletteCursor((current) => {
+            if (filteredCommandPaletteCommands.length === 0) return 0;
+            return Math.min(current, filteredCommandPaletteCommands.length - 1);
+        });
+    }, [filteredCommandPaletteCommands.length]);
+
+    const runCommandPaletteCommand = useCallback((command?: AdminCommand | null) => {
+        if (!command) return;
+        closeCommandPalette();
+        command.run();
+    }, [closeCommandPalette]);
+
+    const handleCommandPaletteKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setCommandPaletteCursor((current) => {
+                if (filteredCommandPaletteCommands.length === 0) return 0;
+                return Math.min(current + 1, filteredCommandPaletteCommands.length - 1);
+            });
+            return;
+        }
+
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setCommandPaletteCursor((current) => Math.max(current - 1, 0));
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            runCommandPaletteCommand(activeCommandPaletteCommand);
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeCommandPalette();
+        }
+    }, [
+        activeCommandPaletteCommand,
+        closeCommandPalette,
+        filteredCommandPaletteCommands.length,
+        runCommandPaletteCommand,
+    ]);
+
     const opsPulse = [
         {
             label: 'Pending review',
@@ -2947,6 +3178,15 @@ export function AdminPage() {
                             <p className="admin-subtitle">Monitor content health, QA, and growth signals in one place.</p>
                         </div>
                         <div className="admin-hero-actions">
+                            <button
+                                type="button"
+                                className="admin-btn secondary small admin-command-trigger"
+                                onClick={openCommandPalette}
+                                title="Open command palette (Ctrl/Cmd + K)"
+                                aria-label="Open command palette"
+                            >
+                                <span aria-hidden="true">⌘</span> Command
+                            </button>
                             <details className="admin-user-menu">
                                 <summary className="admin-user-trigger">
                                     <span className="admin-avatar">
@@ -5097,6 +5337,66 @@ export function AdminPage() {
                     </section>
                 </div>
             </div>
+
+            {commandPaletteOpen && (
+                <div className="admin-command-overlay" onClick={closeCommandPalette}>
+                    <div
+                        className="admin-command-palette"
+                        onClick={(event) => event.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="admin-command-title"
+                        aria-describedby="admin-command-description"
+                    >
+                        <div className="admin-command-head">
+                            <div>
+                                <h3 id="admin-command-title">Command Palette</h3>
+                                <p id="admin-command-description">Jump to any admin section or run high-frequency actions.</p>
+                            </div>
+                            <button
+                                type="button"
+                                className="admin-btn secondary small"
+                                onClick={closeCommandPalette}
+                            >
+                                Esc
+                            </button>
+                        </div>
+                        <div className="admin-command-search-wrap">
+                            <input
+                                ref={commandPaletteInputRef}
+                                type="text"
+                                value={commandPaletteQuery}
+                                onChange={(event) => setCommandPaletteQuery(event.target.value)}
+                                onKeyDown={handleCommandPaletteKeyDown}
+                                className="admin-command-search"
+                                placeholder="Search commands (e.g. review, audit, refresh)"
+                                aria-label="Search admin commands"
+                            />
+                            <span className="admin-command-shortcut">Ctrl/Cmd + K</span>
+                        </div>
+                        <div className="admin-command-results" role="listbox" aria-label="Admin commands">
+                            {filteredCommandPaletteCommands.length === 0 ? (
+                                <div className="admin-command-empty">No command found for “{commandPaletteQuery.trim()}”.</div>
+                            ) : (
+                                filteredCommandPaletteCommands.slice(0, 12).map((command, index) => (
+                                    <button
+                                        key={command.id}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={index === commandPaletteCursor}
+                                        className={`admin-command-option ${index === commandPaletteCursor ? 'active' : ''}`}
+                                        onMouseEnter={() => setCommandPaletteCursor(index)}
+                                        onClick={() => runCommandPaletteCommand(command)}
+                                    >
+                                        <span className="admin-command-label">{command.label}</span>
+                                        <span className="admin-command-meta">{command.description}</span>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Preview Modal */}
             {

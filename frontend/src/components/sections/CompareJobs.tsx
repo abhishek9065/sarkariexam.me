@@ -6,9 +6,10 @@ import { formatDate } from '../../utils/formatters';
 interface CompareJobsProps {
     announcements: Announcement[];
     onClose: () => void;
+    onOpenAnnouncement?: (item: Announcement) => void;
 }
 
-export function CompareJobs({ announcements, onClose }: CompareJobsProps) {
+export function CompareJobs({ announcements, onClose, onOpenAnnouncement }: CompareJobsProps) {
     const [selectedItems, setSelectedItems] = useState<Announcement[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -33,13 +34,28 @@ export function CompareJobs({ announcements, onClose }: CompareJobsProps) {
         setSelectedItems(selectedItems.filter(i => i.id !== id));
     };
 
+    const clearSelection = () => {
+        setSelectedItems([]);
+    };
+
+    const handleOpenAnnouncement = (item: Announcement) => {
+        if (onOpenAnnouncement) {
+            onOpenAnnouncement(item);
+            return;
+        }
+        window.location.href = `/${item.type}/${item.slug}`;
+    };
+
     return (
         <div className="compare-jobs-modal">
             <div className="compare-overlay" onClick={onClose} />
             <div className="compare-content">
                 <div className="compare-header">
                     <h2>⚖️ Compare Jobs</h2>
-                    <button className="close-btn" onClick={onClose}>✕</button>
+                    <div className="compare-header-actions">
+                        <span className="compare-count">{selectedItems.length}/3 selected</span>
+                        <button className="close-btn" onClick={onClose}>✕</button>
+                    </div>
                 </div>
 
                 <div className="compare-body">
@@ -55,16 +71,22 @@ export function CompareJobs({ announcements, onClose }: CompareJobsProps) {
                         />
                         <div className="compare-list">
                             {filteredItems.slice(0, 10).map(item => (
-                                <div
+                                <button
                                     key={item.id}
                                     className={`compare-item ${selectedItems.find(i => i.id === item.id) ? 'selected' : ''}`}
                                     onClick={() => addToCompare(item)}
+                                    type="button"
                                 >
                                     <span className="item-title">{item.title}</span>
                                     <span className="item-org">{item.organization}</span>
-                                </div>
+                                </button>
                             ))}
                         </div>
+                        {selectedItems.length > 0 && (
+                            <button type="button" className="clear-selection-btn" onClick={clearSelection}>
+                                Clear selection
+                            </button>
+                        )}
                     </div>
 
                     {/* Comparison Table */}
@@ -125,6 +147,20 @@ export function CompareJobs({ announcements, onClose }: CompareJobsProps) {
                                         <td><strong>Location</strong></td>
                                         {selectedItems.map(item => (
                                             <td key={item.id}>{item.location || 'All India'}</td>
+                                        ))}
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Actions</strong></td>
+                                        {selectedItems.map(item => (
+                                            <td key={item.id}>
+                                                <button
+                                                    type="button"
+                                                    className="open-detail-btn"
+                                                    onClick={() => handleOpenAnnouncement(item)}
+                                                >
+                                                    View Details
+                                                </button>
+                                            </td>
                                         ))}
                                     </tr>
                                 </tbody>

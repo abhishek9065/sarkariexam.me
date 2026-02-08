@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, MobileNav } from '../components';
+import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/constants';
 import { fetchJson } from '../utils/http';
@@ -74,6 +75,7 @@ export function CommunityPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const [showSearchModal, setShowSearchModal] = useState(false);
     const forumTitleRef = useRef<HTMLInputElement | null>(null);
     const qaQuestionRef = useRef<HTMLTextAreaElement | null>(null);
     const groupNameRef = useRef<HTMLInputElement | null>(null);
@@ -297,7 +299,7 @@ export function CommunityPage() {
             <Navigation
                 activeTab={'community' as TabType}
                 setActiveTab={() => { }}
-                setShowSearch={() => { }}
+                setShowSearch={() => setShowSearchModal(true)}
                 goBack={() => navigate(-1)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
@@ -622,6 +624,7 @@ export function CommunityPage() {
             </main>
 
             <Footer setCurrentPage={handlePageNavigation} />
+            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
             <MobileNav onShowAuth={() => { }} />
         </div>
     );

@@ -2,6 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, BookmarkButton, ExportButtons, SearchBox, ScrollToTop } from '../components';
 import { AuthModal } from '../components/modals/AuthModal';
+import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
 import { useAuth } from '../context/AuthContext';
 import { useBookmarks } from '../hooks/useData';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
@@ -15,6 +16,7 @@ export function BookmarksPage() {
     const { user, token, logout, isAuthenticated } = useAuth();
     const { bookmarks, toggleBookmark, isBookmarked, loading } = useBookmarks();
     const [showAuthModal, setShowAuthModal] = useState(false);
+    const [showSearchModal, setShowSearchModal] = useState(false);
     const [query, setQuery] = useState('');
     const handlePageNavigation = (page: string) => {
         if (page === 'home') navigate('/');
@@ -60,7 +62,7 @@ export function BookmarksPage() {
             />
             <Navigation
                 activeTab={'bookmarks'}
-                setShowSearch={() => { }}
+                setShowSearch={() => setShowSearchModal(true)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => setShowAuthModal(true)}
@@ -176,6 +178,7 @@ export function BookmarksPage() {
 
             <Footer setCurrentPage={handlePageNavigation} />
             <AuthModal show={showAuthModal} onClose={() => setShowAuthModal(false)} />
+            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
             <ScrollToTop />
         </div>
     );

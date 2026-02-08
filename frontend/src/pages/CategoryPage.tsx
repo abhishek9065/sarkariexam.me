@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav, ScrollToTop } from '../components';
+import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
 import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS } from '../utils';
@@ -45,6 +46,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<FilterState>(() => buildDefaultFilters(type));
     const [filtersPanelVersion, setFiltersPanelVersion] = useState(0);
+    const [showSearchModal, setShowSearchModal] = useState(false);
     const [quickMode, setQuickMode] = useState<QuickMode>('all');
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
@@ -56,7 +58,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const { user, logout, isAuthenticated, token } = useAuth();
     const [, setShowAuthModal] = useState(false);
     const { t } = useLanguage();
-    const LOAD_TIMEOUT_MS = 8000;
+    const LOAD_TIMEOUT_MS = 3000;
 
     useEffect(() => {
         let isActive = true;
@@ -476,7 +478,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                         navigate(`/${tab === 'job' ? 'jobs' : tab === 'result' ? 'results' : tab}`);
                     }
                 }}
-                setShowSearch={() => { /* No-op - search not implemented on category pages */ }}
+                setShowSearch={() => setShowSearchModal(true)}
                 goBack={() => navigate('/')}
                 setCurrentPage={(page) => navigate('/' + page)}
                 isAuthenticated={isAuthenticated}
@@ -697,6 +699,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
             </main>
 
             <Footer setCurrentPage={(page) => navigate('/' + page)} />
+            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
             <MobileNav onShowAuth={() => setShowAuthModal(true)} />
             <ScrollToTop />
         </div>

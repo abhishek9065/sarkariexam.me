@@ -17,6 +17,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage').then((mod) => ({ de
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage').then((mod) => ({ default: mod.BookmarksPage })));
 const SubscriptionActionPage = lazy(() => import('./pages/SubscriptionActionPage').then((mod) => ({ default: mod.SubscriptionActionPage })));
 const CommunityPage = lazy(() => import('./pages/CommunityPage').then((mod) => ({ default: mod.CommunityPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((mod) => ({ default: mod.NotFoundPage })));
 
 function AppRoutes() {
     const location = useLocation();
@@ -42,16 +43,24 @@ function AppRoutes() {
                     <Route path="/jobs" element={<CategoryPage type="job" />} />
                     <Route path="/results" element={<CategoryPage type="result" />} />
                     <Route path="/admit-card" element={<CategoryPage type="admit-card" />} />
+                    <Route path="/admit-cards" element={<CategoryPage type="admit-card" />} />
                     <Route path="/answer-key" element={<CategoryPage type="answer-key" />} />
+                    <Route path="/answer-keys" element={<CategoryPage type="answer-key" />} />
                     <Route path="/admission" element={<CategoryPage type="admission" />} />
+                    <Route path="/admissions" element={<CategoryPage type="admission" />} />
                     <Route path="/syllabus" element={<CategoryPage type="syllabus" />} />
 
                     {/* Detail Pages with SEO-friendly URLs */}
                     <Route path="/job/:slug" element={<DetailPage type="job" />} />
+                    <Route path="/jobs/:slug" element={<DetailPage type="job" />} />
                     <Route path="/result/:slug" element={<DetailPage type="result" />} />
+                    <Route path="/results/:slug" element={<DetailPage type="result" />} />
                     <Route path="/admit-card/:slug" element={<DetailPage type="admit-card" />} />
+                    <Route path="/admit-cards/:slug" element={<DetailPage type="admit-card" />} />
                     <Route path="/answer-key/:slug" element={<DetailPage type="answer-key" />} />
+                    <Route path="/answer-keys/:slug" element={<DetailPage type="answer-key" />} />
                     <Route path="/admission/:slug" element={<DetailPage type="admission" />} />
+                    <Route path="/admissions/:slug" element={<DetailPage type="admission" />} />
                     <Route path="/syllabus/:slug" element={<DetailPage type="syllabus" />} />
 
                     {/* Admin Page */}
@@ -83,8 +92,8 @@ function AppRoutes() {
                     <Route path="/privacy" element={<StaticPage type="privacy" />} />
                     <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
 
-                    {/* Fallback - legacy and unknown URLs */}
-                    <Route path="*" element={<LegacyRedirect />} />
+                    {/* Fallback */}
+                    <Route path="*" element={<NotFoundPage />} />
                 </Routes>
             </Suspense>
         </ErrorBoundary>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Navigation, Footer } from '../components';
+import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/constants';
 import './V2.css';
@@ -18,6 +19,7 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
     };
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');
+    const [showSearchModal, setShowSearchModal] = useState(false);
 
     useEffect(() => {
         const token = searchParams.get('token');
@@ -82,7 +84,7 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
             />
             <Navigation
                 activeTab={undefined}
-                setShowSearch={() => { }}
+                setShowSearch={() => setShowSearchModal(true)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
                 onShowAuth={() => { }}
@@ -108,6 +110,7 @@ export function SubscriptionActionPage({ action }: { action: SubscriptionAction 
             </main>
 
             <Footer setCurrentPage={handlePageNavigation} />
+            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
         </div>
     );
 }

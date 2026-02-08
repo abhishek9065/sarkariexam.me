@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Header, Navigation, Footer, SkeletonLoader, MobileNav, ScrollToTop } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, MobileNav, ScrollToTop, CompareJobs } from '../components';
+import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
 import { API_BASE } from '../utils';
+import { fetchAnnouncementsByType } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { formatNumber } from '../utils/formatters';
 import type { TabType } from '../utils/constants';
@@ -147,6 +149,10 @@ export function ProfilePage() {
     const [digestPreview, setDigestPreview] = useState<DigestPreview | null>(null);
     const [alertWindowDays, setAlertWindowDays] = useState(7);
     const [alertLimit, setAlertLimit] = useState(6);
+    const [showSearchModal, setShowSearchModal] = useState(false);
+    const [showCompareJobs, setShowCompareJobs] = useState(false);
+    const [compareJobPool, setCompareJobPool] = useState<Announcement[]>([]);
+    const [comparePoolLoading, setComparePoolLoading] = useState(false);
     const handlePageNavigation = (page: string) => {
         if (page === 'home') navigate('/');
         else if (page === 'admin') navigate('/admin');
@@ -332,6 +338,42 @@ export function ProfilePage() {
             fetchDigestPreview(alertWindowDays, alertLimit);
         }
     }, [activeSection, token]);
+
+    useEffect(() => {
+        let active = true;
+        const recommendationJobs = recommendations.filter((item) => item.type === 'job');
+
+        if (recommendationJobs.length >= 8) {
+            setCompareJobPool(recommendationJobs);
+            setComparePoolLoading(false);
+            return () => {
+                active = false;
+            };
+        }
+
+        setComparePoolLoading(true);
+        fetchAnnouncementsByType('job', 40)
+            .then((jobs) => {
+                if (!active) return;
+                const deduped = new Map<string, Announcement>();
+                [...recommendationJobs, ...jobs].forEach((job) => {
+                    deduped.set(String(job.id), job);
+                });
+                setCompareJobPool(Array.from(deduped.values()));
+            })
+            .catch((error) => {
+                console.error('Failed to load compare jobs pool:', error);
+                if (!active) return;
+                setCompareJobPool(recommendationJobs);
+            })
+            .finally(() => {
+                if (active) setComparePoolLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [recommendations]);
 
     // Update profile
     const saveProfile = async (updates: Partial<UserProfile>) => {
@@ -528,6 +570,17 @@ export function ProfilePage() {
             digestPreviewCount: digestPreview?.preview.length ?? 0,
         };
     }, [alerts, digestPreview?.preview.length, profile, recommendations.length, savedSearches]);
+    const profileDashboard = useMemo(() => {
+        const recommendationScore = Math.min(100, Math.round((profileMetrics.recommendationCount / 10) * 100));
+        const alertCoverageScore = Math.min(100, Math.round((profileMetrics.alertMatches / 12) * 100));
+        const notificationReadiness = profile?.emailNotifications || profile?.pushNotifications;
+        return {
+            recommendationScore,
+            alertCoverageScore,
+            notificationReadiness,
+            compareReadyCount: compareJobPool.length,
+        };
+    }, [compareJobPool.length, profile?.emailNotifications, profile?.pushNotifications, profileMetrics.alertMatches, profileMetrics.recommendationCount]);
 
     if (loading) {
         return (
@@ -547,7 +600,7 @@ export function ProfilePage() {
             <Navigation
                 activeTab={'profile' as TabType}
                 setActiveTab={() => { }}
-                setShowSearch={() => { }}
+                setShowSearch={() => setShowSearchModal(true)}
                 goBack={() => navigate(-1)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
@@ -588,6 +641,67 @@ export function ProfilePage() {
                             <strong>{formatNumber(profileMetrics.alertMatches || profileMetrics.recommendationCount)}</strong>
                             <small>{profileMetrics.alertMatches > 0 ? `Alerts in current window (${profileMetrics.digestPreviewCount} digest preview)` : 'Recommendations ready for you'}</small>
                         </div>
+                    </section>
+
+                    <section className="sr-v2-profile-widgets" aria-labelledby="profile-widgets-heading">
+                        <div className="sr-v2-profile-widgets-head">
+                            <h2 id="profile-widgets-heading">Personalized Dashboard Widgets</h2>
+                            <p>Fast controls for recommendations, alerts, saved searches, and compare mode.</p>
+                        </div>
+                        <div className="sr-v2-profile-widgets-grid">
+                            <article className="sr-v2-profile-widget-card">
+                                <h3>Recommendation Score</h3>
+                                <strong>{profileDashboard.recommendationScore}%</strong>
+                                <p>{profileMetrics.recommendationCount} recommendations currently matched to your profile.</p>
+                                <button type="button" className="btn btn-secondary" onClick={() => setActiveSection('recommendations')}>
+                                    Open Recommendations
+                                </button>
+                            </article>
+                            <article className="sr-v2-profile-widget-card">
+                                <h3>Alert Coverage</h3>
+                                <strong>{profileDashboard.alertCoverageScore}%</strong>
+                                <p>{profileMetrics.alertMatches} active alert matches in your current window.</p>
+                                <button type="button" className="btn btn-secondary" onClick={() => setActiveSection('alerts')}>
+                                    Open Alerts
+                                </button>
+                            </article>
+                            <article className="sr-v2-profile-widget-card">
+                                <h3>Saved Search Engine</h3>
+                                <strong>{formatNumber(profileMetrics.activeSavedSearches)}</strong>
+                                <p>{profileDashboard.notificationReadiness ? 'Notifications enabled' : 'Notifications disabled'} for your account.</p>
+                                <button type="button" className="btn btn-secondary" onClick={() => setActiveSection('saved')}>
+                                    Manage Searches
+                                </button>
+                            </article>
+                            <article className="sr-v2-profile-widget-card">
+                                <h3>Compare Jobs Pool</h3>
+                                <strong>{comparePoolLoading ? 'Loading...' : formatNumber(profileDashboard.compareReadyCount)}</strong>
+                                <p>Ready-to-compare roles from your recommendations and latest listings.</p>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowCompareJobs(true)}>
+                                    Launch Compare Jobs
+                                </button>
+                            </article>
+                        </div>
+                        {recommendations.length > 0 && (
+                            <div className="sr-v2-profile-widget-list">
+                                <h3>Top Recommendation Snapshot</h3>
+                                <ul>
+                                    {recommendations.slice(0, 3).map((rec) => (
+                                        <li key={`profile-widget-rec-${rec.id}`}>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/${rec.type}/${rec.slug}`)}
+                                                onMouseEnter={() => prefetchAnnouncementDetail(rec.slug)}
+                                                onFocus={() => prefetchAnnouncementDetail(rec.slug)}
+                                            >
+                                                <span>{rec.title}</span>
+                                                <small>{rec.organization || 'Official source'}</small>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </section>
 
                     <div className="profile-tabs">
@@ -699,8 +813,15 @@ export function ProfilePage() {
 
                     {activeSection === 'recommendations' && (
                         <div className="profile-section">
-                            <h2>Recommended Jobs For You</h2>
-                            <p className="section-hint">Based on your preferences</p>
+                            <div className="sr-v2-profile-recommendations-head">
+                                <div>
+                                    <h2>Recommended Jobs For You</h2>
+                                    <p className="section-hint">Based on your preferences</p>
+                                </div>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowCompareJobs(true)}>
+                                    Compare Jobs
+                                </button>
+                            </div>
 
                             {recommendations.length === 0 ? (
                                 <div className="empty-state">
@@ -1181,6 +1302,17 @@ export function ProfilePage() {
             </main>
 
             <Footer setCurrentPage={handlePageNavigation} />
+            {showCompareJobs && (
+                <CompareJobs
+                    announcements={compareJobPool.length > 0 ? compareJobPool : recommendations}
+                    onClose={() => setShowCompareJobs(false)}
+                    onOpenAnnouncement={(item) => {
+                        setShowCompareJobs(false);
+                        navigate(`/${item.type}/${item.slug}`);
+                    }}
+                />
+            )}
+            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
             <MobileNav onShowAuth={() => {}} />
             <ScrollToTop />
         </div>
