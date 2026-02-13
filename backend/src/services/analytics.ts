@@ -742,6 +742,82 @@ export async function getDeepLinkAttribution(days: number = DEFAULT_ROLLUP_DAYS)
     };
 }
 
+export async function getPushSubscriptionStats(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
+    attempts: number;
+    successes: number;
+    failures: number;
+    bySource: Array<{ source: string; attempts: number; successes: number; failures: number }>;
+}> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) {
+        return { attempts: 0, successes: 0, failures: 0, bySource: [] };
+    }
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    const pushTypes: AnalyticsEventType[] = [
+        'push_subscribe_attempt',
+        'push_subscribe_success',
+        'push_subscribe_failure',
+    ];
+
+    try {
+        const rows = await events.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: start },
+                    type: { $in: pushTypes },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        source: { $ifNull: ['$metadata.source', 'unknown'] },
+                        type: '$type',
+                    },
+                    count: { $sum: 1 },
+                },
+            },
+        ]).toArray();
+
+        const bySourceMap = new Map<string, { source: string; attempts: number; successes: number; failures: number }>();
+        let attempts = 0;
+        let successes = 0;
+        let failures = 0;
+
+        for (const row of rows) {
+            const source = String((row as any)._id?.source ?? 'unknown');
+            const type = (row as any)._id?.type as AnalyticsEventType | undefined;
+            const count = Number((row as any).count ?? 0);
+            if (!type || !Number.isFinite(count) || count <= 0) continue;
+
+            const bucket = bySourceMap.get(source) ?? { source, attempts: 0, successes: 0, failures: 0 };
+            if (type === 'push_subscribe_attempt') {
+                bucket.attempts += count;
+                attempts += count;
+            } else if (type === 'push_subscribe_success') {
+                bucket.successes += count;
+                successes += count;
+            } else if (type === 'push_subscribe_failure') {
+                bucket.failures += count;
+                failures += count;
+            }
+            bySourceMap.set(source, bucket);
+        }
+
+        const bySource = Array.from(bySourceMap.values())
+            .sort((a, b) => (b.successes + b.attempts) - (a.successes + a.attempts))
+            .slice(0, 12);
+
+        return { attempts, successes, failures, bySource };
+    } catch (error) {
+        console.error('[Analytics] Failed to load push subscription stats:', error);
+        return { attempts: 0, successes: 0, failures: 0, bySource: [] };
+    }
+}
+
 export async function scheduleAnalyticsRollups(options?: { days?: number; intervalMs?: number }): Promise<void> {
     if (rollupInterval) return;
 

@@ -8,6 +8,7 @@ import {
     getDeepLinkAttribution,
     getTopSearches,
     getFunnelAttributionSplit,
+    getPushSubscriptionStats,
 } from './analytics.js';
 import { getCollection } from './cosmosdb.js';
 
@@ -45,6 +46,7 @@ export async function getAnalyticsOverview(
         deepLinkAttribution,
         topSearches,
         funnelSplit,
+        pushSubscriptionStats,
         totalEmailSubscribers,
         totalPushSubscribers,
     ] = await Promise.all([
@@ -56,6 +58,7 @@ export async function getAnalyticsOverview(
         getDeepLinkAttribution(clampedDays),
         getTopSearches(clampedDays, 12),
         getFunnelAttributionSplit(clampedDays),
+        getPushSubscriptionStats(clampedDays),
         (async () => {
             try {
                 const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
@@ -152,6 +155,15 @@ export async function getAnalyticsOverview(
         totalFilterApplies: rollupSummary.filterApplies,
         totalDigestClicks: rollupSummary.digestClicks,
         totalDeepLinkClicks: rollupSummary.deepLinkClicks,
+        pushConversion: {
+            attempts: pushSubscriptionStats.attempts,
+            successes: pushSubscriptionStats.successes,
+            failures: pushSubscriptionStats.failures,
+            successRate: pushSubscriptionStats.attempts > 0
+                ? roundToOneDecimal((pushSubscriptionStats.successes / pushSubscriptionStats.attempts) * 100)
+                : 0,
+            bySource: pushSubscriptionStats.bySource,
+        },
         engagementWindowDays: rollupSummary.days,
         rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
         dailyRollups,
