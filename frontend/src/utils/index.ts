@@ -3,3 +3,4 @@ export { fetchAnnouncements, fetchAnnouncementsByType, fetchAnnouncementBySlug, 
 export { API_BASE, NAV_ITEMS, FEATURED_ITEMS, SECTIONS, TYPE_LABELS, SELECTION_MODES, PATHS } from './constants';
 export type { PageType, TabType } from './constants';
 export { getApiErrorMessage } from './errors';
+export { hydrateFeatureFlags, isFeatureEnabled, getFeatureFlags } from './featureFlags';

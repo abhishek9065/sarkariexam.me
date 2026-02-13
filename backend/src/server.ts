@@ -163,11 +163,23 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    meta: {
+      featureFlags: config.featureFlags,
+    },
+  });
 });
 
 app.get('/api/healthz', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    meta: {
+      featureFlags: config.featureFlags,
+    },
+  });
 });
 
 app.get('/api/health/deep', async (_req, res) => {

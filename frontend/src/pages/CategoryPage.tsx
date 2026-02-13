@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav, ScrollToTop } from '../components';
+import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav, ScrollToTop, CompareJobs } from '../components';
+import { SearchOverlay } from '../components/modals/SearchOverlay';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
-import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS } from '../utils';
+import { useApplicationTracker } from '../hooks/useApplicationTracker';
+import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS, isFeatureEnabled } from '../utils';
 import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import type { Announcement, ContentType } from '../types';
@@ -51,11 +53,17 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const [saveSearchMessage, setSaveSearchMessage] = useState('');
     const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
     const [organizationOptions, setOrganizationOptions] = useState<string[]>([]);
+    const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+    const [showCompareModal, setShowCompareModal] = useState(false);
+    const [compareSelection, setCompareSelection] = useState<Announcement[]>([]);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const navigate = useNavigate();
     const { user, logout, isAuthenticated, token } = useAuth();
+    const { items: trackedApplications } = useApplicationTracker();
     const [, setShowAuthModal] = useState(false);
     const { t } = useLanguage();
+    const searchOverlayEnabled = isFeatureEnabled('search_overlay_v2');
+    const compareEnabled = isFeatureEnabled('compare_jobs_v2');
     const LOAD_TIMEOUT_MS = 8000;
 
     useEffect(() => {
@@ -284,6 +292,56 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 return visibleData;
         }
     }, [quickMode, visibleData]);
+    const trackedAnnouncementSeeds = useMemo<Announcement[]>(
+        () => trackedApplications.map((item) => ({
+            id: item.id,
+            title: item.title,
+            slug: item.slug,
+            type: item.type,
+            category: 'Tracked',
+            organization: item.organization || 'Government',
+            deadline: item.deadline || undefined,
+            postedAt: item.trackedAt,
+            updatedAt: item.updatedAt,
+            isActive: true,
+            viewCount: 0,
+        })),
+        [trackedApplications]
+    );
+    const comparePool = useMemo(() => {
+        const map = new Map<string, Announcement>();
+        for (const item of [...quickFilteredData, ...trackedAnnouncementSeeds]) {
+            if (item.type !== 'job') continue;
+            const key = item.id || item.slug;
+            if (!key || map.has(key)) continue;
+            map.set(key, item);
+        }
+        return Array.from(map.values());
+    }, [quickFilteredData, trackedAnnouncementSeeds]);
+
+    const addToCompare = (item: Announcement) => {
+        if (!compareEnabled || item.type !== 'job') return;
+        setCompareSelection((prev) => {
+            const key = item.id || item.slug;
+            if (!key) return prev;
+            if (prev.some((entry) => (entry.id || entry.slug) === key)) return prev;
+            if (prev.length >= 3) return prev;
+            return [...prev, item];
+        });
+        setShowCompareModal(true);
+    };
+
+    const handleOverlayCategorySearch = (filter: 'all' | 'job' | 'result' | 'admit-card', query: string) => {
+        const basePath = filter === 'all'
+            ? '/jobs'
+            : filter === 'job'
+                ? '/jobs'
+                : filter === 'result'
+                    ? '/results'
+                    : '/admit-card';
+        const params = new URLSearchParams({ search: query });
+        navigate(`${basePath}?${params.toString()}`);
+    };
 
     const handleLoadMore = useCallback(async () => {
         if (!hasMore || loadingMore) return;
@@ -476,7 +534,9 @@ export function CategoryPage({ type }: CategoryPageProps) {
                         navigate(`/${tab === 'job' ? 'jobs' : tab === 'result' ? 'results' : tab}`);
                     }
                 }}
-                setShowSearch={() => { /* No-op - search not implemented on category pages */ }}
+                setShowSearch={(show) => {
+                    if (searchOverlayEnabled) setShowSearchOverlay(show);
+                }}
                 goBack={() => navigate('/')}
                 setCurrentPage={(page) => navigate('/' + page)}
                 isAuthenticated={isAuthenticated}
@@ -566,6 +626,16 @@ export function CategoryPage({ type }: CategoryPageProps) {
                         />
                         <h1 className="category-title">{CATEGORY_TITLES[type]}</h1>
                         <p className="category-subtitle" aria-live="polite">{quickFilteredData.length} {t('category.listings')}</p>
+                        {compareEnabled && type === 'job' && (
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => setShowCompareModal(true)}
+                                disabled={comparePool.length === 0}
+                            >
+                                Compare Jobs
+                            </button>
+                        )}
                     </div>
                     <div className="category-controls sticky-filters">
                         <SearchFilters
@@ -665,6 +735,19 @@ export function CategoryPage({ type }: CategoryPageProps) {
                                         <div className="item-meta secondary">
                                             <span className="posted">Posted: {formatDate(item.postedAt)}</span>
                                             <span className="views">👁️ {formatNumber(item.viewCount ?? undefined)}</span>
+                                            {compareEnabled && item.type === 'job' && (
+                                                <button
+                                                    type="button"
+                                                    className="sr-mini-compare"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        addToCompare(item);
+                                                    }}
+                                                    aria-label={`Add ${item.title} to compare`}
+                                                >
+                                                    Compare
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -699,6 +782,28 @@ export function CategoryPage({ type }: CategoryPageProps) {
             <Footer setCurrentPage={(page) => navigate('/' + page)} />
             <MobileNav onShowAuth={() => setShowAuthModal(true)} />
             <ScrollToTop />
+
+            {searchOverlayEnabled && (
+                <SearchOverlay
+                    open={showSearchOverlay}
+                    onClose={() => setShowSearchOverlay(false)}
+                    onOpenDetail={(itemType, slug) => navigate(`/${itemType}/${slug}?source=search-overlay`)}
+                    onOpenCategory={handleOverlayCategorySearch}
+                />
+            )}
+
+            {compareEnabled && showCompareModal && (
+                <CompareJobs
+                    announcements={comparePool}
+                    selected={compareSelection}
+                    onSelectionChange={setCompareSelection}
+                    onViewJob={(item) => {
+                        setShowCompareModal(false);
+                        handleItemClick(item);
+                    }}
+                    onClose={() => setShowCompareModal(false)}
+                />
+            )}
         </div>
     );
 }

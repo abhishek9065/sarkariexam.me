@@ -5,7 +5,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
-import { ContentType } from '../types.js';
+import { ContentType, TrackerStatus } from '../types.js';
 
 interface UserProfileDoc {
     userId: string;
@@ -60,10 +60,43 @@ interface NotificationDoc {
     readAt?: Date | null;
 }
 
+interface TrackedApplicationDoc {
+    userId: string;
+    announcementId?: string;
+    slug: string;
+    type: ContentType;
+    title: string;
+    organization?: string;
+    deadline?: Date | null;
+    status: TrackerStatus;
+    notes?: string;
+    reminderAt?: Date | null;
+    trackedAt: Date;
+    updatedAt: Date;
+}
+
+interface DashboardWidgetPayload {
+    trackedCounts: Record<TrackerStatus | 'total', number>;
+    upcomingDeadlines: Array<{
+        id: string;
+        slug: string;
+        title: string;
+        type: ContentType;
+        deadline: string;
+        status: TrackerStatus;
+        daysRemaining: number;
+    }>;
+    recommendationCount: number;
+    savedSearchMatches: number;
+    generatedAt: string;
+    windowDays: number;
+}
+
 const router = Router();
 const collection = () => getCollection<UserProfileDoc>('user_profiles');
 const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searches');
 const notificationsCollection = () => getCollection<NotificationDoc>('user_notifications');
+const trackedApplicationsCollection = () => getCollection<TrackedApplicationDoc>('tracked_applications');
 
 const profileUpdateSchema = z.object({
     preferredCategories: z.array(z.string()).optional(),
@@ -138,6 +171,35 @@ const savedSearchUpdateSchema = savedSearchBaseSchema.partial().superRefine((dat
     }
 });
 
+const trackerStatusSchema = z.enum(['saved', 'applied', 'admit-card', 'exam', 'result'] as [TrackerStatus, ...TrackerStatus[]]);
+
+const trackedApplicationCreateSchema = z.object({
+    announcementId: z.string().trim().max(80).optional(),
+    slug: z.string().trim().min(1).max(220),
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]),
+    title: z.string().trim().min(3).max(300),
+    organization: z.string().trim().max(200).optional(),
+    deadline: z.string().trim().optional().nullable(),
+    status: trackerStatusSchema.default('saved'),
+    notes: z.string().trim().max(2000).optional(),
+    reminderAt: z.string().trim().optional().nullable(),
+});
+
+const trackedApplicationPatchSchema = z.object({
+    status: trackerStatusSchema.optional(),
+    notes: z.string().trim().max(2000).optional(),
+    reminderAt: z.string().trim().optional().nullable(),
+});
+
+const trackedApplicationImportItemSchema = trackedApplicationCreateSchema.extend({
+    trackedAt: z.string().trim().optional(),
+    updatedAt: z.string().trim().optional(),
+});
+
+const trackedApplicationImportSchema = z.object({
+    items: z.array(trackedApplicationImportItemSchema).max(300),
+});
+
 const QUALIFICATIONS = [
     '10th Pass',
     '12th Pass',
@@ -180,6 +242,28 @@ function formatSavedSearch(doc: any) {
 function formatNotification(doc: any) {
     const { _id, ...rest } = doc;
     return { id: _id?.toString?.() || _id, ...rest };
+}
+
+function parseOptionalDate(value?: string | null): Date | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) return undefined;
+    return date;
+}
+
+function formatTrackedApplication(doc: any) {
+    const { _id, ...rest } = doc;
+    return {
+        id: _id?.toString?.() || _id,
+        ...rest,
+        deadline: rest.deadline ? new Date(rest.deadline).toISOString() : null,
+        reminderAt: rest.reminderAt ? new Date(rest.reminderAt).toISOString() : null,
+        trackedAt: rest.trackedAt ? new Date(rest.trackedAt).toISOString() : null,
+        updatedAt: rest.updatedAt ? new Date(rest.updatedAt).toISOString() : null,
+    };
 }
 
 function cleanFilterValue(value?: string) {
@@ -373,6 +457,25 @@ async function getPreferenceAlerts(profile: UserProfileDoc, sinceMs: number, lim
         }));
 
     return { matches, totalMatches: matches.length };
+}
+
+function createTrackedCounts(items: TrackedApplicationDoc[]): Record<TrackerStatus | 'total', number> {
+    const counts: Record<TrackerStatus | 'total', number> = {
+        saved: 0,
+        applied: 0,
+        'admit-card': 0,
+        exam: 0,
+        result: 0,
+        total: items.length,
+    };
+
+    for (const item of items) {
+        if (item.status in counts) {
+            counts[item.status as TrackerStatus] += 1;
+        }
+    }
+
+    return counts;
 }
 
 // Get profile
@@ -752,6 +855,278 @@ router.post('/notifications/read', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Notifications read error:', error);
         return res.status(500).json({ error: 'Failed to update notifications' });
+    }
+});
+
+// Tracked applications
+router.get('/tracked-applications', authenticateToken, async (req, res) => {
+    try {
+        const docs = await trackedApplicationsCollection()
+            .find({ userId: req.user!.userId })
+            .sort({ updatedAt: -1 })
+            .toArray();
+
+        return res.json({ data: docs.map(formatTrackedApplication) });
+    } catch (error) {
+        console.error('Tracked applications fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load tracked applications' });
+    }
+});
+
+router.post('/tracked-applications', authenticateToken, async (req, res) => {
+    const parseResult = trackedApplicationCreateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    const input = parseResult.data;
+    const deadline = parseOptionalDate(input.deadline);
+    const reminderAt = parseOptionalDate(input.reminderAt);
+    if (input.deadline !== undefined && input.deadline !== null && deadline === undefined) {
+        return res.status(400).json({ error: 'Invalid deadline value' });
+    }
+    if (input.reminderAt !== undefined && input.reminderAt !== null && reminderAt === undefined) {
+        return res.status(400).json({ error: 'Invalid reminderAt value' });
+    }
+
+    try {
+        const now = new Date();
+        const updateDoc: Partial<TrackedApplicationDoc> & { userId: string; slug: string; type: ContentType; title: string; status: TrackerStatus; updatedAt: Date } = {
+            userId: req.user!.userId,
+            slug: input.slug,
+            type: input.type,
+            title: input.title,
+            status: input.status,
+            updatedAt: now,
+        };
+        if (input.announcementId !== undefined) updateDoc.announcementId = input.announcementId || undefined;
+        if (input.organization !== undefined) updateDoc.organization = input.organization?.trim() || undefined;
+        if (input.notes !== undefined) updateDoc.notes = input.notes?.trim() || undefined;
+        if (input.deadline !== undefined) updateDoc.deadline = deadline === undefined ? null : deadline;
+        if (input.reminderAt !== undefined) updateDoc.reminderAt = reminderAt === undefined ? null : reminderAt;
+
+        const result = await trackedApplicationsCollection().findOneAndUpdate(
+            { userId: req.user!.userId, slug: input.slug },
+            {
+                $set: updateDoc,
+                $setOnInsert: {
+                    trackedAt: now,
+                },
+            },
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        const doc = result && typeof result === 'object' && 'value' in result
+            ? (result as any).value
+            : result;
+
+        if (!doc) {
+            return res.status(500).json({ error: 'Failed to save tracked application' });
+        }
+
+        return res.status(201).json({ data: formatTrackedApplication(doc) });
+    } catch (error) {
+        console.error('Tracked applications create error:', error);
+        return res.status(500).json({ error: 'Failed to track application' });
+    }
+});
+
+router.patch('/tracked-applications/:id', authenticateToken, async (req, res) => {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid tracked application id' });
+    }
+
+    const parseResult = trackedApplicationPatchSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    const update: Partial<TrackedApplicationDoc> = {};
+    if (parseResult.data.status !== undefined) {
+        update.status = parseResult.data.status;
+    }
+    if (parseResult.data.notes !== undefined) {
+        update.notes = parseResult.data.notes.trim() || undefined;
+    }
+    if (parseResult.data.reminderAt !== undefined) {
+        const reminderAt = parseOptionalDate(parseResult.data.reminderAt);
+        if (parseResult.data.reminderAt !== null && reminderAt === undefined) {
+            return res.status(400).json({ error: 'Invalid reminderAt value' });
+        }
+        update.reminderAt = reminderAt === undefined ? null : reminderAt;
+    }
+    update.updatedAt = new Date();
+
+    try {
+        const result = await trackedApplicationsCollection().findOneAndUpdate(
+            { _id: toObjectId(req.params.id), userId: req.user!.userId },
+            { $set: update },
+            { returnDocument: 'after' }
+        );
+
+        const doc = result && typeof result === 'object' && 'value' in result
+            ? (result as any).value
+            : result;
+
+        if (!doc) {
+            return res.status(404).json({ error: 'Tracked application not found' });
+        }
+
+        return res.json({ data: formatTrackedApplication(doc) });
+    } catch (error) {
+        console.error('Tracked applications patch error:', error);
+        return res.status(500).json({ error: 'Failed to update tracked application' });
+    }
+});
+
+router.delete('/tracked-applications/:id', authenticateToken, async (req, res) => {
+    if (!isValidObjectId(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid tracked application id' });
+    }
+
+    try {
+        const deleted = await trackedApplicationsCollection().deleteOne({
+            _id: toObjectId(req.params.id),
+            userId: req.user!.userId,
+        });
+
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ error: 'Tracked application not found' });
+        }
+
+        return res.json({ message: 'Tracked application removed' });
+    } catch (error) {
+        console.error('Tracked applications delete error:', error);
+        return res.status(500).json({ error: 'Failed to delete tracked application' });
+    }
+});
+
+router.post('/tracked-applications/import', authenticateToken, async (req, res) => {
+    const parseResult = trackedApplicationImportSchema.safeParse(req.body);
+    if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    const seenSlugs = new Set<string>();
+    const now = new Date();
+    let skipped = 0;
+    const operations = [];
+
+    for (const item of parseResult.data.items) {
+        const slug = item.slug.trim();
+        if (!slug || seenSlugs.has(slug)) {
+            skipped += 1;
+            continue;
+        }
+        seenSlugs.add(slug);
+
+        const deadline = parseOptionalDate(item.deadline);
+        if (item.deadline !== undefined && item.deadline !== null && deadline === undefined) {
+            skipped += 1;
+            continue;
+        }
+        const reminderAt = parseOptionalDate(item.reminderAt);
+        if (item.reminderAt !== undefined && item.reminderAt !== null && reminderAt === undefined) {
+            skipped += 1;
+            continue;
+        }
+        const trackedAt = parseOptionalDate(item.trackedAt) ?? now;
+        const updatedAt = parseOptionalDate(item.updatedAt) ?? now;
+
+        operations.push({
+            updateOne: {
+                filter: { userId: req.user!.userId, slug },
+                update: {
+                    $set: {
+                        userId: req.user!.userId,
+                        announcementId: item.announcementId || undefined,
+                        slug,
+                        type: item.type,
+                        title: item.title,
+                        organization: item.organization?.trim() || undefined,
+                        deadline: deadline === undefined ? null : deadline,
+                        status: item.status,
+                        notes: item.notes?.trim() || undefined,
+                        reminderAt: reminderAt === undefined ? null : reminderAt,
+                        updatedAt: updatedAt || now,
+                    },
+                    $setOnInsert: {
+                        trackedAt: trackedAt || now,
+                    },
+                },
+                upsert: true,
+            },
+        });
+    }
+
+    if (operations.length === 0) {
+        return res.json({ imported: 0, skipped });
+    }
+
+    try {
+        await trackedApplicationsCollection().bulkWrite(operations, { ordered: false });
+        return res.json({ imported: operations.length, skipped });
+    } catch (error) {
+        console.error('Tracked applications import error:', error);
+        return res.status(500).json({ error: 'Failed to import tracked applications' });
+    }
+});
+
+router.get('/widgets', authenticateToken, async (req, res) => {
+    try {
+        const profile = await getOrCreateProfile(req.user!.userId);
+        const windowDays = Math.min(30, Math.max(1, parseInt(req.query.windowDays as string, 10) || profile.alertWindowDays || 7));
+        const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+
+        const [trackedItems, searches, preferenceAlerts] = await Promise.all([
+            trackedApplicationsCollection().find({ userId: req.user!.userId }).sort({ updatedAt: -1 }).toArray(),
+            savedSearchesCollection().find({ userId: req.user!.userId }).toArray(),
+            getPreferenceAlerts(profile, sinceMs, 24),
+        ]);
+
+        const trackedCounts = createTrackedCounts(trackedItems);
+
+        const nowMs = Date.now();
+        const deadlineWindowMs = nowMs + windowDays * 24 * 60 * 60 * 1000;
+        const upcomingDeadlines = trackedItems
+            .filter((item) => item.deadline)
+            .map((item) => {
+                const deadlineMs = new Date(item.deadline as Date).getTime();
+                return { item, deadlineMs };
+            })
+            .filter((entry) => Number.isFinite(entry.deadlineMs) && entry.deadlineMs >= nowMs && entry.deadlineMs <= deadlineWindowMs)
+            .sort((a, b) => a.deadlineMs - b.deadlineMs)
+            .slice(0, 8)
+            .map((entry) => ({
+                id: (entry.item as any)._id?.toString?.() || '',
+                slug: entry.item.slug,
+                title: entry.item.title,
+                type: entry.item.type,
+                deadline: new Date(entry.deadlineMs).toISOString(),
+                status: entry.item.status,
+                daysRemaining: Math.max(0, Math.ceil((entry.deadlineMs - nowMs) / (24 * 60 * 60 * 1000))),
+            }));
+
+        const savedSearchMatches = (await Promise.all(
+            searches.map(async (search) => {
+                const result = await buildSavedSearchMatches(search, sinceMs, 12);
+                return result.totalMatches;
+            })
+        )).reduce((sum, count) => sum + count, 0);
+
+        const payload: DashboardWidgetPayload = {
+            trackedCounts,
+            upcomingDeadlines,
+            recommendationCount: preferenceAlerts.totalMatches,
+            savedSearchMatches,
+            generatedAt: new Date().toISOString(),
+            windowDays,
+        };
+
+        return res.json({ data: payload });
+    } catch (error) {
+        console.error('Widgets fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load dashboard widgets' });
     }
 });
 

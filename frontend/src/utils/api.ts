@@ -1,7 +1,15 @@
 import { API_BASE } from './constants';
 import { filterMockAnnouncements, findMockBySlug } from './mockData';
 import { fetchJson } from './http';
-import type { Announcement, AnnouncementCard, ContentType } from '../types';
+import type {
+    Announcement,
+    AnnouncementCard,
+    ContentType,
+    DashboardWidgetPayload,
+    SearchSuggestion,
+    TrackedApplication,
+    TrackerStatus,
+} from '../types';
 import type { paths } from '../types/api';
 
 type AnnouncementCardsResponse =
@@ -198,6 +206,144 @@ export async function fetchAnnouncementOrganizations(): Promise<string[]> {
         console.warn('Failed to fetch organizations:', error);
         return [];
     }
+}
+
+export async function fetchSearchSuggestions(query: string, options?: {
+    type?: ContentType;
+    limit?: number;
+}): Promise<SearchSuggestion[]> {
+    const params = new URLSearchParams();
+    params.set('q', query);
+    if (options?.type) params.set('type', options.type);
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+
+    try {
+        const body = await fetchJson<{ data: SearchSuggestion[] }>(
+            `${API_BASE}/api/announcements/search/suggest?${params.toString()}`,
+            {},
+            { timeoutMs: 4000, retries: 1 }
+        );
+        return Array.isArray(body.data) ? body.data : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchTrackedApplications(token: string): Promise<TrackedApplication[]> {
+    const body = await fetchJson<{ data: TrackedApplication[] }>(
+        `${API_BASE}/api/profile/tracked-applications`,
+        {
+            headers: { Authorization: `Bearer ${token}` },
+        },
+        { timeoutMs: 6000, retries: 1 }
+    );
+    return Array.isArray(body.data) ? body.data : [];
+}
+
+export async function createTrackedApplication(
+    token: string,
+    payload: {
+        announcementId?: string;
+        slug: string;
+        type: ContentType;
+        title: string;
+        organization?: string;
+        deadline?: string | null;
+        status: TrackerStatus;
+        notes?: string;
+        reminderAt?: string | null;
+    }
+): Promise<TrackedApplication> {
+    const body = await fetchJson<{ data: TrackedApplication }>(
+        `${API_BASE}/api/profile/tracked-applications`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        },
+        { timeoutMs: 7000, retries: 1 }
+    );
+    return body.data;
+}
+
+export async function updateTrackedApplication(
+    token: string,
+    id: string,
+    payload: {
+        status?: TrackerStatus;
+        notes?: string;
+        reminderAt?: string | null;
+    }
+): Promise<TrackedApplication> {
+    const body = await fetchJson<{ data: TrackedApplication }>(
+        `${API_BASE}/api/profile/tracked-applications/${id}`,
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        },
+        { timeoutMs: 7000, retries: 1 }
+    );
+    return body.data;
+}
+
+export async function deleteTrackedApplication(token: string, id: string): Promise<void> {
+    await fetchJson<{ message: string }>(
+        `${API_BASE}/api/profile/tracked-applications/${id}`,
+        {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        },
+        { timeoutMs: 6000, retries: 1 }
+    );
+}
+
+export async function importTrackedApplications(
+    token: string,
+    items: Array<{
+        announcementId?: string;
+        slug: string;
+        type: ContentType;
+        title: string;
+        organization?: string;
+        deadline?: string | null;
+        status: TrackerStatus;
+        notes?: string;
+        reminderAt?: string | null;
+        trackedAt?: string;
+        updatedAt?: string;
+    }>
+): Promise<{ imported: number; skipped: number }> {
+    return fetchJson<{ imported: number; skipped: number }>(
+        `${API_BASE}/api/profile/tracked-applications/import`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ items }),
+        },
+        { timeoutMs: 8000, retries: 1 }
+    );
+}
+
+export async function fetchDashboardWidgets(token: string, windowDays = 7): Promise<DashboardWidgetPayload> {
+    const params = new URLSearchParams({ windowDays: String(windowDays) });
+    const body = await fetchJson<{ data: DashboardWidgetPayload }>(
+        `${API_BASE}/api/profile/widgets?${params.toString()}`,
+        {
+            headers: { Authorization: `Bearer ${token}` },
+        },
+        { timeoutMs: 6000, retries: 1 }
+    );
+    return body.data;
 }
 
 // Fetch user bookmarks

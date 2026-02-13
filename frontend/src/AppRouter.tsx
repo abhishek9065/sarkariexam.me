@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
@@ -6,6 +6,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { QueryProvider } from './context/QueryProvider';
 import { OnboardingModal } from './components/modals/OnboardingModal';
 import { ErrorBoundary, SkeletonLoader, AccessibilityPanel, NotificationPrompt, LegacyRedirect, PWAInstallPrompt } from './components';
+import { hydrateFeatureFlags } from './utils/featureFlags';
 import './styles.css';
 
 const HomePage = lazy(() => import('./pages/HomePage').then((mod) => ({ default: mod.HomePage })));
@@ -23,6 +24,10 @@ function AppRoutes() {
     const showUserPrompts = !location.pathname.startsWith('/admin');
     const searchParams = new URLSearchParams(location.search);
     const isLegacyQuery = searchParams.has('item') || searchParams.has('tab');
+
+    useEffect(() => {
+        void hydrateFeatureFlags();
+    }, []);
 
     return (
         <ErrorBoundary key={location.pathname}>

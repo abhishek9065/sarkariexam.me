@@ -16,6 +16,9 @@ export { FeaturedGrid } from './cards/FeaturedGrid';
 export { ExamCalendar } from './sections/ExamCalendar';
 export { JobAlerts } from './sections/JobAlerts';
 export { CompareJobs } from './sections/CompareJobs';
+export { HomeDenseBlocks } from './sections/HomeDenseBlocks';
+export { TrendingRail } from './sections/TrendingRail';
+export { ProfileWidgets } from './sections/ProfileWidgets';
 
 // Admin
 export { AnalyticsDashboard } from './admin/AnalyticsDashboard';

@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection, ExamCalendar, ErrorState, MobileNav, ScrollToTop } from '../components';
+import { Header, Navigation, Footer, Marquee, FeaturedGrid, SectionTable, SkeletonLoader, SocialButtons, SubscribeBox, StatsSection, ExamCalendar, ErrorState, MobileNav, ScrollToTop, CompareJobs, HomeDenseBlocks, TrendingRail, ProfileWidgets } from '../components';
 import { AuthModal } from '../components/modals/AuthModal';
+import { SearchOverlay } from '../components/modals/SearchOverlay';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
-import { SECTIONS, type TabType, API_BASE, formatDate, formatNumber, getDaysRemaining } from '../utils';
-import { fetchAnnouncements } from '../utils/api';
+import { SECTIONS, type TabType, API_BASE, formatDate, formatNumber, getDaysRemaining, isFeatureEnabled } from '../utils';
+import { fetchAnnouncements, fetchDashboardWidgets } from '../utils/api';
 import { fetchJson } from '../utils/http';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
-import type { Announcement, ContentType } from '../types';
+import { useApplicationTracker } from '../hooks/useApplicationTracker';
+import type { Announcement, ContentType, DashboardWidgetPayload } from '../types';
 import './V2.css';
 
 export function HomePage() {
@@ -20,10 +22,19 @@ export function HomePage() {
     const [recommendations, setRecommendations] = useState<Announcement[]>([]);
     const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
     const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+    const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+    const [showCompareModal, setShowCompareModal] = useState(false);
+    const [compareSelection, setCompareSelection] = useState<Announcement[]>([]);
+    const [widgetsLoading, setWidgetsLoading] = useState(false);
+    const [widgets, setWidgets] = useState<DashboardWidgetPayload | null>(null);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
     const [showAuthModal, setShowAuthModal] = useState(false);
     const { t } = useLanguage();
+    const { items: trackedApplications } = useApplicationTracker();
+    const searchOverlayEnabled = isFeatureEnabled('search_overlay_v2');
+    const compareEnabled = isFeatureEnabled('compare_jobs_v2');
+    const widgetsEnabled = isFeatureEnabled('dashboard_widgets_v2');
     const LOAD_TIMEOUT_MS = 8000;
     const cookieConsentKey = 'cookieConsent';
 
@@ -174,6 +185,39 @@ export function HomePage() {
         return () => cancel();
     }, [token, data, loading]);
 
+    useEffect(() => {
+        if (!widgetsEnabled) {
+            setWidgets(null);
+            return;
+        }
+        if (!token) {
+            setWidgets(null);
+            setWidgetsLoading(false);
+            return;
+        }
+
+        let active = true;
+        setWidgetsLoading(true);
+        fetchDashboardWidgets(token, 7)
+            .then((payload) => {
+                if (!active) return;
+                setWidgets(payload);
+            })
+            .catch((error) => {
+                console.error('Failed to fetch home widgets:', error);
+                if (!active) return;
+                setWidgets(null);
+            })
+            .finally(() => {
+                if (!active) return;
+                setWidgetsLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [token, widgetsEnabled]);
+
     // Get data by type for section display
     const getByType = (type: ContentType) => data.filter(item => item.type === type);
     const stats = {
@@ -218,6 +262,51 @@ export function HomePage() {
             highIntent,
         };
     }, [data]);
+    const trendingRailItems = useMemo(
+        () => [...data]
+            .filter((item) => item.type === 'job' || item.type === 'result' || item.type === 'admit-card')
+            .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+            .slice(0, 12),
+        [data]
+    );
+    const trackedAnnouncementSeeds = useMemo<Announcement[]>(
+        () => trackedApplications.map((item) => ({
+            id: item.id,
+            title: item.title,
+            slug: item.slug,
+            type: item.type,
+            category: 'Tracked',
+            organization: item.organization || 'Government',
+            deadline: item.deadline || undefined,
+            postedAt: item.trackedAt,
+            updatedAt: item.updatedAt,
+            isActive: true,
+            viewCount: 0,
+        })),
+        [trackedApplications]
+    );
+    const comparePool = useMemo(() => {
+        const map = new Map<string, Announcement>();
+        for (const item of [...data, ...recommendations, ...trackedAnnouncementSeeds]) {
+            const key = item.id || item.slug;
+            if (!key || map.has(key)) continue;
+            if (item.type !== 'job') continue;
+            map.set(key, item);
+        }
+        return Array.from(map.values());
+    }, [data, recommendations, trackedAnnouncementSeeds]);
+
+    const addToCompare = (item: Announcement) => {
+        if (!compareEnabled || item.type !== 'job') return;
+        setCompareSelection((prev) => {
+            const key = item.id || item.slug;
+            if (!key) return prev;
+            if (prev.some((entry) => (entry.id || entry.slug) === key)) return prev;
+            if (prev.length >= 3) return prev;
+            return [...prev, item];
+        });
+        setShowCompareModal(true);
+    };
 
     // Handle item click - navigate to SEO-friendly URL
     const handleItemClick = (item: Announcement) => {
@@ -254,6 +343,18 @@ export function HomePage() {
         else navigate('/' + page);
     };
 
+    const handleOverlayCategorySearch = (filter: 'all' | 'job' | 'result' | 'admit-card', query: string) => {
+        const basePath = filter === 'all'
+            ? '/jobs'
+            : filter === 'job'
+                ? '/jobs'
+                : filter === 'result'
+                    ? '/results'
+                    : '/admit-card';
+        const params = new URLSearchParams({ search: query });
+        navigate(`${basePath}?${params.toString()}`);
+    };
+
     return (
         <div className="app sr-v2-home">
             <a className="sr-v2-skip-link" href="#home-main">
@@ -271,7 +372,9 @@ export function HomePage() {
             <Navigation
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                setShowSearch={() => { }}
+                setShowSearch={(show) => {
+                    if (searchOverlayEnabled) setShowSearchOverlay(show);
+                }}
                 goBack={() => { }}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
@@ -327,6 +430,36 @@ export function HomePage() {
                         </div>
                     </div>
                 </section>
+
+                <HomeDenseBlocks
+                    data={data}
+                    onItemClick={handleItemClick}
+                    onOpenCategory={(type) => handleCategoryClick(type)}
+                    compareEnabled={compareEnabled}
+                    onAddCompare={addToCompare}
+                />
+
+                <TrendingRail
+                    title="Trending Exams and Notifications"
+                    items={trendingRailItems}
+                    onItemClick={handleItemClick}
+                />
+
+                {widgetsEnabled && (
+                    <ProfileWidgets
+                        isAuthenticated={isAuthenticated}
+                        loading={widgetsLoading}
+                        widgets={widgets}
+                        fallbackItems={spotlightItems}
+                        onOpenTracker={() => isAuthenticated ? navigate('/profile?section=tracker') : setShowAuthModal(true)}
+                        onOpenRecommendations={() => isAuthenticated ? navigate('/profile?section=recommendations') : setShowAuthModal(true)}
+                        onOpenSaved={() => isAuthenticated ? navigate('/profile?section=saved') : setShowAuthModal(true)}
+                        onOpenCompare={() => {
+                            if (compareEnabled) setShowCompareModal(true);
+                        }}
+                        onOpenItem={(slug, type) => navigate(`/${type}/${slug}`)}
+                    />
+                )}
 
                 <section className="sr-v2-intel" aria-labelledby="v2-intel-heading">
                     <div className="sr-v2-intel-header">
@@ -495,6 +628,16 @@ export function HomePage() {
                         <div className="sections-header">
                             <h2 className="sections-title">Jobs For You</h2>
                             <p className="sections-subtitle">Personalized based on your profile preferences</p>
+                            {compareEnabled && (
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setShowCompareModal(true)}
+                                    disabled={comparePool.length === 0}
+                                >
+                                    Compare Jobs
+                                </button>
+                            )}
                         </div>
                         {recommendationsLoading ? (
                             <p className="no-data">Loading personalized suggestions...</p>
@@ -548,6 +691,28 @@ export function HomePage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {searchOverlayEnabled && (
+                <SearchOverlay
+                    open={showSearchOverlay}
+                    onClose={() => setShowSearchOverlay(false)}
+                    onOpenDetail={(type, slug) => navigate(`/${type}/${slug}?source=search-overlay`)}
+                    onOpenCategory={handleOverlayCategorySearch}
+                />
+            )}
+
+            {compareEnabled && showCompareModal && (
+                <CompareJobs
+                    announcements={comparePool}
+                    selected={compareSelection}
+                    onSelectionChange={setCompareSelection}
+                    onViewJob={(item) => {
+                        setShowCompareModal(false);
+                        handleItemClick(item);
+                    }}
+                    onClose={() => setShowCompareModal(false)}
+                />
             )}
         </div>
     );

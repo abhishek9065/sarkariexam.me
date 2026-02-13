@@ -9,9 +9,11 @@ interface SectionTableProps {
     onViewMore?: () => void;
     onItemClick: (item: Announcement) => void;
     fullWidth?: boolean;
+    compact?: boolean;
+    limit?: number;
 }
 
-export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth }: SectionTableProps) {
+export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth, compact = false, limit = 10 }: SectionTableProps) {
     const { t } = useLanguage();
     const formatShortDate = (date: string | undefined) => {
         if (!date) return '';
@@ -33,12 +35,12 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth 
     };
 
     return (
-        <div className="section-table" style={fullWidth ? { gridColumn: '1 / -1' } : undefined}>
+        <div className={`section-table ${compact ? 'section-table-compact' : ''}`} style={fullWidth ? { gridColumn: '1 / -1' } : undefined}>
             <div className="section-table-header">{title}</div>
             <div className="section-table-content">
                 <ul>
                     {items.length > 0 ? (
-                        items.slice(0, 10).map((item) => (
+                        items.slice(0, limit).map((item) => (
                             <li key={item.id} className="section-item">
                                 <a
                                     href={`/${item.type}/${item.slug}`}

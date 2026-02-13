@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons, ScrollToTop } from '../components';
+import { Header, Navigation, Footer, SectionTable, SkeletonLoader, SEO, Breadcrumbs, ErrorState, MobileNav, ShareButtons, ScrollToTop, CompareJobs } from '../components';
+import { SearchOverlay } from '../components/modals/SearchOverlay';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContextStore';
-import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType } from '../utils';
+import { useApplicationTracker } from '../hooks/useApplicationTracker';
+import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType, isFeatureEnabled } from '../utils';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
 import type { Announcement, ContentType } from '../types';
@@ -33,10 +35,17 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const [offlineSaved, setOfflineSaved] = useState(false);
     const [copyLinkStatus, setCopyLinkStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [applyChecklist, setApplyChecklist] = useState<Record<string, boolean>>({});
+    const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+    const [showCompareModal, setShowCompareModal] = useState(false);
+    const [compareSelection, setCompareSelection] = useState<Announcement[]>([]);
     const copyLinkTimerRef = useRef<number | null>(null);
     const navigate = useNavigate();
     const { user, token, logout, isAuthenticated } = useAuth();
     const { t } = useLanguage();
+    const { items: trackedApplications, isTracked, trackAnnouncement, untrack, updateStatus, syncing: trackerSyncing } = useApplicationTracker();
+    const searchOverlayEnabled = isFeatureEnabled('search_overlay_v2');
+    const compareEnabled = isFeatureEnabled('compare_jobs_v2');
+    const trackerEnabled = isFeatureEnabled('tracker_api_v2');
 
     const offlineKey = 'offline-announcements';
     const LOAD_TIMEOUT_MS = 8000;
@@ -367,6 +376,41 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     const handleRelatedClick = (relatedItem: Announcement) => {
         navigate(`/${relatedItem.type}/${relatedItem.slug}`);
     };
+    const trackedRecord = useMemo(
+        () => item ? trackedApplications.find((entry) => entry.slug === item.slug) : undefined,
+        [item, trackedApplications]
+    );
+    const comparePool = useMemo(() => {
+        const map = new Map<string, Announcement>();
+        for (const entry of [item, ...relatedItems]) {
+            if (!entry || entry.type !== 'job') continue;
+            const key = entry.id || entry.slug;
+            if (!key || map.has(key)) continue;
+            map.set(key, entry);
+        }
+        return Array.from(map.values());
+    }, [item, relatedItems]);
+
+    const handleToggleTrack = async () => {
+        if (!item || !trackerEnabled) return;
+        if (isTracked(item.slug)) {
+            await untrack(item.slug);
+            return;
+        }
+        await trackAnnouncement(item, 'saved');
+    };
+
+    const handleOverlayCategorySearch = (filter: 'all' | 'job' | 'result' | 'admit-card', query: string) => {
+        const basePath = filter === 'all'
+            ? '/jobs'
+            : filter === 'job'
+                ? '/jobs'
+                : filter === 'result'
+                    ? '/results'
+                    : '/admit-card';
+        const params = new URLSearchParams({ search: query });
+        navigate(`${basePath}?${params.toString()}`);
+    };
 
     return (
         <div className="app sr-v2-detail">
@@ -391,7 +435,9 @@ export function DetailPage({ type: _type }: DetailPageProps) {
             <Navigation
                 activeTab={item.type as TabType}
                 setActiveTab={() => { }}
-                setShowSearch={() => { }}
+                setShowSearch={(show) => {
+                    if (searchOverlayEnabled) setShowSearchOverlay(show);
+                }}
                 goBack={() => navigate(-1)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
@@ -452,7 +498,52 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                                             ? 'Copy Failed'
                                             : 'Copy Link'}
                                 </button>
+                                {trackerEnabled && (
+                                    <button
+                                        className={`offline-save-btn ${isTracked(item.slug) ? 'saved' : ''}`}
+                                        onClick={() => void handleToggleTrack()}
+                                        disabled={trackerSyncing}
+                                    >
+                                        {isTracked(item.slug) ? 'Tracked' : 'Track'}
+                                    </button>
+                                )}
+                                {compareEnabled && item.type === 'job' && (
+                                    <button
+                                        className="offline-save-btn"
+                                        onClick={() => {
+                                            setCompareSelection((prev) => {
+                                                if (prev.some((entry) => (entry.id || entry.slug) === (item.id || item.slug))) {
+                                                    return prev;
+                                                }
+                                                if (prev.length >= 3) return prev;
+                                                return [...prev, item];
+                                            });
+                                            setShowCompareModal(true);
+                                        }}
+                                    >
+                                        Compare
+                                    </button>
+                                )}
                             </div>
+                            {trackerEnabled && trackedRecord && (
+                                <div className="sr-detail-tracker-status">
+                                    <label htmlFor="tracker-status-select">Tracked status</label>
+                                    <select
+                                        id="tracker-status-select"
+                                        value={trackedRecord.status}
+                                        onChange={(event) => {
+                                            void updateStatus(item.slug, event.target.value as typeof trackedRecord.status);
+                                        }}
+                                        disabled={trackerSyncing}
+                                    >
+                                        <option value="saved">Saved</option>
+                                        <option value="applied">Applied</option>
+                                        <option value="admit-card">Admit Card</option>
+                                        <option value="exam">Exam</option>
+                                        <option value="result">Result</option>
+                                    </select>
+                                </div>
+                            )}
                             <span className="sr-v2-copy-status" role="status" aria-live="polite">
                                 {copyLinkStatus === 'success'
                                     ? 'Announcement link copied.'
@@ -702,6 +793,28 @@ export function DetailPage({ type: _type }: DetailPageProps) {
             }} />
             <MobileNav />
             <ScrollToTop />
+
+            {searchOverlayEnabled && (
+                <SearchOverlay
+                    open={showSearchOverlay}
+                    onClose={() => setShowSearchOverlay(false)}
+                    onOpenDetail={(itemType, slug) => navigate(`/${itemType}/${slug}?source=search-overlay`)}
+                    onOpenCategory={handleOverlayCategorySearch}
+                />
+            )}
+
+            {compareEnabled && showCompareModal && (
+                <CompareJobs
+                    announcements={comparePool}
+                    selected={compareSelection}
+                    onSelectionChange={setCompareSelection}
+                    onViewJob={(selectedItem) => {
+                        setShowCompareModal(false);
+                        handleRelatedClick(selectedItem);
+                    }}
+                    onClose={() => setShowCompareModal(false)}
+                />
+            )}
         </div>
     );
 }

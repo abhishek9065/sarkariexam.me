@@ -53,3 +53,44 @@ export type User = Omit<components['schemas']['User'], 'role'> & {
 };
 
 export type AuthResponse = components['schemas']['AuthResponse']['data'];
+
+export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
+
+export interface TrackedApplication {
+  id: string;
+  announcementId?: string;
+  slug: string;
+  type: ContentType;
+  title: string;
+  organization?: string;
+  deadline?: string | null;
+  status: TrackerStatus;
+  notes?: string;
+  reminderAt?: string | null;
+  trackedAt: string;
+  updatedAt: string;
+}
+
+export interface SearchSuggestion {
+  title: string;
+  slug: string;
+  type: ContentType;
+  organization?: string;
+}
+
+export interface DashboardWidgetPayload {
+  trackedCounts: Record<TrackerStatus | 'total', number>;
+  upcomingDeadlines: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    type: ContentType;
+    deadline: string;
+    status: TrackerStatus;
+    daysRemaining: number;
+  }>;
+  recommendationCount: number;
+  savedSearchMatches: number;
+  generatedAt: string;
+  windowDays: number;
+}

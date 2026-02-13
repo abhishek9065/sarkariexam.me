@@ -54,6 +54,13 @@ const searchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
+const suggestQuerySchema = z.object({
+  q: z.string().trim().max(80).optional().default(''),
+  type: z
+    .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
 
 // Cursor-based pagination schema (v2)
 const cursorQuerySchema = z.object({
@@ -406,6 +413,81 @@ router.get(
     return res.status(500).json({ error: 'Failed to fetch tags' });
     }
 });
+
+// Search suggestions for global overlay
+router.get(
+  '/search/suggest',
+  cacheMiddleware({
+    ttl: 180,
+    keyGenerator: (req) => `search-suggest:q:${req.query.q || ''}:type:${req.query.type || 'all'}:limit:${req.query.limit || 8}`,
+  }),
+  cacheControl(60),
+  async (req, res) => {
+    try {
+      const parseResult = suggestQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: 'Invalid suggest parameters',
+          details: parseResult.error.flatten().fieldErrors,
+        });
+      }
+
+      const { q, type, limit } = parseResult.data;
+      const query = q.replace(/[<>"'&$]/g, '').trim();
+      const effectiveLimit = Math.min(20, Math.max(1, limit));
+
+      // For very short queries return trending suggestions by views.
+      if (query.length < 2) {
+        const trending = await AnnouncementModel.findListingCards({
+          type,
+          sort: 'views',
+          limit: effectiveLimit,
+        });
+        const data = trending.data.map((item) => ({
+          title: item.title,
+          slug: item.slug,
+          type: item.type as ContentType,
+          organization: item.organization || undefined,
+        }));
+        return res.json({ data });
+      }
+
+      const matches = await AnnouncementModel.findListingCards({
+        type,
+        search: query,
+        sort: 'views',
+        limit: Math.min(50, effectiveLimit * 3),
+      });
+
+      const deduped = new Map<string, { title: string; slug: string; type: ContentType; organization?: string }>();
+      for (const item of matches.data) {
+        if (!item.slug || deduped.has(item.slug)) continue;
+        deduped.set(item.slug, {
+          title: item.title,
+          slug: item.slug,
+          type: item.type as ContentType,
+          organization: item.organization || undefined,
+        });
+        if (deduped.size >= effectiveLimit) break;
+      }
+
+      recordAnalyticsEvent({
+        type: 'search',
+        metadata: {
+          query: normalizeSearchTerm(query),
+          queryLength: query.length,
+          type: type ?? null,
+          source: 'suggest',
+        },
+      }).catch(console.error);
+
+      return res.json({ data: Array.from(deduped.values()) });
+    } catch (error) {
+      console.error('Error fetching search suggestions:', error);
+      return res.status(500).json({ error: 'Failed to fetch search suggestions' });
+    }
+  }
+);
 
 // Search announcements (cached)
 router.get(

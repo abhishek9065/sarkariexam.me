@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Header, Navigation, Footer, SkeletonLoader, MobileNav, ScrollToTop } from '../components';
-import { API_BASE } from '../utils';
+import { Header, Navigation, Footer, SkeletonLoader, MobileNav, ScrollToTop, CompareJobs, ProfileWidgets } from '../components';
+import { SearchOverlay } from '../components/modals/SearchOverlay';
+import { useApplicationTracker } from '../hooks/useApplicationTracker';
+import { API_BASE, isFeatureEnabled } from '../utils';
+import { fetchDashboardWidgets } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { formatNumber } from '../utils/formatters';
 import type { TabType } from '../utils/constants';
-import type { Announcement, ContentType } from '../types';
+import type { Announcement, ContentType, DashboardWidgetPayload, TrackedApplication } from '../types';
 import './ProfilePage.css';
 import './V2.css';
 
@@ -128,13 +131,14 @@ const SEARCH_TYPES: Array<{ value: ContentType | ''; label: string }> = [
 
 export function ProfilePage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, token, isAuthenticated, logout } = useAuth();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [options, setOptions] = useState<ProfileOptions | null>(null);
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [activeSection, setActiveSection] = useState<'preferences' | 'notifications' | 'recommendations' | 'saved' | 'alerts'>('preferences');
+    const [activeSection, setActiveSection] = useState<'preferences' | 'notifications' | 'recommendations' | 'saved' | 'alerts' | 'tracker'>('preferences');
     const [savedSearchForm, setSavedSearchForm] = useState<SavedSearchFormState>({ ...DEFAULT_SAVED_SEARCH });
     const [savedSearchEditingId, setSavedSearchEditingId] = useState<string | null>(null);
     const [savedSearchError, setSavedSearchError] = useState<string | null>(null);
@@ -147,6 +151,16 @@ export function ProfilePage() {
     const [digestPreview, setDigestPreview] = useState<DigestPreview | null>(null);
     const [alertWindowDays, setAlertWindowDays] = useState(7);
     const [alertLimit, setAlertLimit] = useState(6);
+    const [widgetsLoading, setWidgetsLoading] = useState(false);
+    const [widgets, setWidgets] = useState<DashboardWidgetPayload | null>(null);
+    const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+    const [showCompareModal, setShowCompareModal] = useState(false);
+    const [compareSelection, setCompareSelection] = useState<Announcement[]>([]);
+    const { items: trackedApplications, updateStatus, untrack, syncing: trackerSyncing } = useApplicationTracker();
+    const searchOverlayEnabled = isFeatureEnabled('search_overlay_v2');
+    const compareEnabled = isFeatureEnabled('compare_jobs_v2');
+    const widgetsEnabled = isFeatureEnabled('dashboard_widgets_v2');
+    const trackerEnabled = isFeatureEnabled('tracker_api_v2');
     const handlePageNavigation = (page: string) => {
         if (page === 'home') navigate('/');
         else if (page === 'admin') navigate('/admin');
@@ -304,6 +318,15 @@ export function ProfilePage() {
     }, [isAuthenticated, token, navigate]);
 
     useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const section = params.get('section');
+        if (!section) return;
+        if (section === 'tracker' || section === 'saved' || section === 'alerts' || section === 'recommendations' || section === 'notifications' || section === 'preferences') {
+            setActiveSection(section);
+        }
+    }, [location.search]);
+
+    useEffect(() => {
         if (!profile) return;
         if (profile.alertWindowDays) {
             setAlertWindowDays(profile.alertWindowDays);
@@ -332,6 +355,38 @@ export function ProfilePage() {
             fetchDigestPreview(alertWindowDays, alertLimit);
         }
     }, [activeSection, token]);
+
+    useEffect(() => {
+        if (!widgetsEnabled) {
+            setWidgets(null);
+            return;
+        }
+        if (!token) {
+            setWidgets(null);
+            setWidgetsLoading(false);
+            return;
+        }
+        let active = true;
+        setWidgetsLoading(true);
+        fetchDashboardWidgets(token, alertWindowDays)
+            .then((payload) => {
+                if (!active) return;
+                setWidgets(payload);
+            })
+            .catch((error) => {
+                console.error('Failed to fetch profile widgets:', error);
+                if (!active) return;
+                setWidgets(null);
+            })
+            .finally(() => {
+                if (!active) return;
+                setWidgetsLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [alertWindowDays, token, widgetsEnabled]);
 
     // Update profile
     const saveProfile = async (updates: Partial<UserProfile>) => {
@@ -528,6 +583,56 @@ export function ProfilePage() {
             digestPreviewCount: digestPreview?.preview.length ?? 0,
         };
     }, [alerts, digestPreview?.preview.length, profile, recommendations.length, savedSearches]);
+    const trackerAnnouncements = useMemo<Announcement[]>(
+        () => trackedApplications.map((item: TrackedApplication) => ({
+            id: item.id,
+            title: item.title,
+            slug: item.slug,
+            type: item.type,
+            category: 'Tracked',
+            organization: item.organization || 'Government',
+            deadline: item.deadline || undefined,
+            postedAt: item.trackedAt,
+            updatedAt: item.updatedAt,
+            isActive: true,
+            viewCount: 0,
+        })),
+        [trackedApplications]
+    );
+    const comparePool = useMemo(() => {
+        const map = new Map<string, Announcement>();
+        for (const item of [...recommendations, ...trackerAnnouncements]) {
+            if (item.type !== 'job') continue;
+            const key = item.id || item.slug;
+            if (!key || map.has(key)) continue;
+            map.set(key, item);
+        }
+        return Array.from(map.values());
+    }, [recommendations, trackerAnnouncements]);
+
+    const addToCompare = (item: Announcement) => {
+        if (!compareEnabled || item.type !== 'job') return;
+        setCompareSelection((prev) => {
+            const key = item.id || item.slug;
+            if (!key) return prev;
+            if (prev.some((entry) => (entry.id || entry.slug) === key)) return prev;
+            if (prev.length >= 3) return prev;
+            return [...prev, item];
+        });
+        setShowCompareModal(true);
+    };
+
+    const handleOverlayCategorySearch = (filter: 'all' | 'job' | 'result' | 'admit-card', query: string) => {
+        const basePath = filter === 'all'
+            ? '/jobs'
+            : filter === 'job'
+                ? '/jobs'
+                : filter === 'result'
+                    ? '/results'
+                    : '/admit-card';
+        const params = new URLSearchParams({ search: query });
+        navigate(`${basePath}?${params.toString()}`);
+    };
 
     if (loading) {
         return (
@@ -547,7 +652,9 @@ export function ProfilePage() {
             <Navigation
                 activeTab={'profile' as TabType}
                 setActiveTab={() => { }}
-                setShowSearch={() => { }}
+                setShowSearch={(show) => {
+                    if (searchOverlayEnabled) setShowSearchOverlay(show);
+                }}
                 goBack={() => navigate(-1)}
                 setCurrentPage={handlePageNavigation}
                 isAuthenticated={isAuthenticated}
@@ -590,6 +697,22 @@ export function ProfilePage() {
                         </div>
                     </section>
 
+                    {widgetsEnabled && (
+                        <ProfileWidgets
+                            isAuthenticated={isAuthenticated}
+                            loading={widgetsLoading}
+                            widgets={widgets}
+                            fallbackItems={recommendations}
+                            onOpenTracker={() => setActiveSection('tracker')}
+                            onOpenRecommendations={() => setActiveSection('recommendations')}
+                            onOpenSaved={() => setActiveSection('saved')}
+                            onOpenCompare={() => {
+                                if (compareEnabled) setShowCompareModal(true);
+                            }}
+                            onOpenItem={(slug, itemType) => navigate(`/${itemType}/${slug}`)}
+                        />
+                    )}
+
                     <div className="profile-tabs">
                         <button
                             className={activeSection === 'preferences' ? 'active' : ''}
@@ -614,6 +737,12 @@ export function ProfilePage() {
                             onClick={() => setActiveSection('saved')}
                         >
                             Saved Searches
+                        </button>
+                        <button
+                            className={activeSection === 'tracker' ? 'active' : ''}
+                            onClick={() => setActiveSection('tracker')}
+                        >
+                            Tracker
                         </button>
                         <button
                             className={activeSection === 'alerts' ? 'active' : ''}
@@ -727,6 +856,86 @@ export function ProfilePage() {
                                             <div className="rec-meta">
                                                 <span>{rec.organization}</span>
                                                 {rec.totalPosts && <span>{rec.totalPosts} Posts</span>}
+                                            </div>
+                                            {compareEnabled && rec.type === 'job' && (
+                                                <div className="sr-rec-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="admin-btn secondary small"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            addToCompare(rec);
+                                                        }}
+                                                    >
+                                                        Add to compare
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeSection === 'tracker' && (
+                        <div className="profile-section">
+                            <div className="saved-search-header">
+                                <div>
+                                    <h2>Application Tracker</h2>
+                                    <p className="section-hint">Track each stage from saved to result with sync across devices.</p>
+                                </div>
+                            </div>
+
+                            {!trackerEnabled ? (
+                                <div className="empty-state">Tracker API is currently disabled.</div>
+                            ) : trackedApplications.length === 0 ? (
+                                <div className="empty-state">No tracked applications yet. Open any job detail and click Track.</div>
+                            ) : (
+                                <div className="saved-search-list">
+                                    {trackedApplications.map((entry) => (
+                                        <div key={entry.id} className="saved-search-card">
+                                            <div className="saved-search-card-header">
+                                                <div>
+                                                    <h3>{entry.title}</h3>
+                                                    <p className="saved-search-query">{entry.organization || 'Government'}</p>
+                                                    <div className="saved-search-meta">
+                                                        <span>Status: {entry.status}</span>
+                                                        {entry.deadline && <span>Deadline: {formatDate(entry.deadline)}</span>}
+                                                        <span>Updated: {formatDateTime(entry.updatedAt)}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="saved-search-actions">
+                                                    <button
+                                                        className="admin-btn secondary small"
+                                                        onClick={() => navigate(`/${entry.type}/${entry.slug}`)}
+                                                    >
+                                                        Open
+                                                    </button>
+                                                    <button
+                                                        className="admin-btn danger small"
+                                                        onClick={() => { void untrack(entry.slug); }}
+                                                        disabled={trackerSyncing}
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="saved-search-field">
+                                                <label>Status</label>
+                                                <select
+                                                    value={entry.status}
+                                                    onChange={(event) => {
+                                                        void updateStatus(entry.slug, event.target.value as TrackedApplication['status']);
+                                                    }}
+                                                    disabled={trackerSyncing}
+                                                >
+                                                    <option value="saved">Saved</option>
+                                                    <option value="applied">Applied</option>
+                                                    <option value="admit-card">Admit Card</option>
+                                                    <option value="exam">Exam</option>
+                                                    <option value="result">Result</option>
+                                                </select>
                                             </div>
                                         </div>
                                     ))}
@@ -1183,6 +1392,28 @@ export function ProfilePage() {
             <Footer setCurrentPage={handlePageNavigation} />
             <MobileNav onShowAuth={() => {}} />
             <ScrollToTop />
+
+            {searchOverlayEnabled && (
+                <SearchOverlay
+                    open={showSearchOverlay}
+                    onClose={() => setShowSearchOverlay(false)}
+                    onOpenDetail={(type, slug) => navigate(`/${type}/${slug}?source=search-overlay`)}
+                    onOpenCategory={handleOverlayCategorySearch}
+                />
+            )}
+
+            {compareEnabled && showCompareModal && (
+                <CompareJobs
+                    announcements={comparePool}
+                    selected={compareSelection}
+                    onSelectionChange={setCompareSelection}
+                    onViewJob={(item) => {
+                        setShowCompareModal(false);
+                        navigate(`/${item.type}/${item.slug}`);
+                    }}
+                    onClose={() => setShowCompareModal(false)}
+                />
+            )}
         </div>
     );
 }
