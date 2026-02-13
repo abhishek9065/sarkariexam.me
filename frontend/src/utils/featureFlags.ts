@@ -4,7 +4,11 @@ export type FeatureFlagKey =
     | 'search_overlay_v2'
     | 'compare_jobs_v2'
     | 'tracker_api_v2'
-    | 'dashboard_widgets_v2';
+    | 'dashboard_widgets_v2'
+    | 'frontend_public_v3_home'
+    | 'frontend_public_v3_category'
+    | 'frontend_public_v3_detail'
+    | 'frontend_public_v3_profile';
 
 export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
@@ -19,6 +23,10 @@ const defaults: FeatureFlags = {
     compare_jobs_v2: envFlag('VITE_FEATURE_COMPARE_JOBS_V2', true),
     tracker_api_v2: envFlag('VITE_FEATURE_TRACKER_API_V2', true),
     dashboard_widgets_v2: envFlag('VITE_FEATURE_DASHBOARD_WIDGETS_V2', true),
+    frontend_public_v3_home: envFlag('VITE_FEATURE_FRONTEND_PUBLIC_V3_HOME', true),
+    frontend_public_v3_category: envFlag('VITE_FEATURE_FRONTEND_PUBLIC_V3_CATEGORY', true),
+    frontend_public_v3_detail: envFlag('VITE_FEATURE_FRONTEND_PUBLIC_V3_DETAIL', true),
+    frontend_public_v3_profile: envFlag('VITE_FEATURE_FRONTEND_PUBLIC_V3_PROFILE', true),
 };
 
 let runtimeFlags: FeatureFlags = { ...defaults };
