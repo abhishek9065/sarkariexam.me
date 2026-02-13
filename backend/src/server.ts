@@ -43,6 +43,8 @@ import { scheduleAdminApprovalsCleanup } from './services/adminApprovals.js';
 import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
+import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
+import { scheduleTrackerReminders } from './services/trackerReminders.js';
 import logger from './utils/logger.js';
 
 const app = express();
@@ -283,6 +285,8 @@ export async function startServer() {
       });
       scheduleAdminApprovalsCleanup();
       scheduleDigestSender();
+      scheduleTrackerReminders();
+      scheduleSavedSearchAlerts();
     } else {
       logger.info('[Server] No MongoDB configured, using fallback data');
     }

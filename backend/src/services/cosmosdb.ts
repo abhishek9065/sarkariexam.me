@@ -178,6 +178,7 @@ async function createIndexes(): Promise<void> {
         const adminAuditLogs = database.collection('admin_audit_logs');
         const userNotifications = database.collection('user_notifications');
         const trackedApplications = database.collection('tracked_applications');
+        const reminderDispatchLogs = database.collection('reminder_dispatch_logs');
         const communityForums = database.collection('community_forums');
         const communityQa = database.collection('community_qa');
         const communityGroups = database.collection('community_groups');
@@ -221,6 +222,8 @@ async function createIndexes(): Promise<void> {
 
         // Saved searches indexes
         await savedSearches.createIndex({ userId: 1, createdAt: -1 });
+        await savedSearches.createIndex({ notificationsEnabled: 1, frequency: 1, lastNotifiedAt: 1 });
+        await savedSearches.createIndex({ userId: 1, notificationsEnabled: 1, frequency: 1, updatedAt: -1 });
 
         // Security logs indexes
         await securityLogs.createIndex({ created_at: -1 });
@@ -249,6 +252,10 @@ async function createIndexes(): Promise<void> {
         await trackedApplications.createIndex({ userId: 1, slug: 1 }, { unique: true });
         await trackedApplications.createIndex({ userId: 1, status: 1, updatedAt: -1 });
         await trackedApplications.createIndex({ userId: 1, deadline: 1 });
+
+        // Reminder dispatch logs
+        await reminderDispatchLogs.createIndex({ dedupeKey: 1 }, { unique: true });
+        await reminderDispatchLogs.createIndex({ sentAt: -1 });
 
         // Community collections
         await communityForums.createIndex({ createdAt: -1 });
