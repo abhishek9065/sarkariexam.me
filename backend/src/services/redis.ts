@@ -43,6 +43,10 @@ async function redisCommand(command: string[]): Promise<any> {
     }
 }
 
+const encodeValue = (value: any): string => (
+    typeof value === 'string' ? value : JSON.stringify(value)
+);
+
 /**
  * Get value from Redis cache
  * Falls back to memory cache if Redis unavailable
@@ -51,7 +55,7 @@ export async function get(key: string): Promise<any | null> {
     // Try Redis first
     if (isRedisConfigured) {
         const result = await redisCommand(['GET', key]);
-        if (result) {
+        if (result !== null && result !== undefined) {
             try {
                 return JSON.parse(result);
             } catch {
@@ -69,7 +73,7 @@ export async function get(key: string): Promise<any | null> {
  * Also sets in memory cache as backup
  */
 export async function set(key: string, value: any, ttlSeconds: number = 300): Promise<void> {
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+    const stringValue = encodeValue(value);
 
     // Try Redis first
     if (isRedisConfigured) {
@@ -88,6 +92,69 @@ export async function del(key: string): Promise<void> {
         await redisCommand(['DEL', key]);
     }
     deleteMemoryCache(key);
+}
+
+/**
+ * Set value only when key does not exist.
+ */
+export async function setIfNotExists(key: string, value: any, ttlSeconds: number = 300): Promise<boolean> {
+    const stringValue = encodeValue(value);
+
+    if (isRedisConfigured) {
+        const result = await redisCommand(['SET', key, stringValue, 'NX', 'EX', ttlSeconds.toString()]);
+        if (result === 'OK') {
+            setMemoryCache(key, value, ttlSeconds);
+            return true;
+        }
+        if (result !== null && result !== undefined) {
+            return false;
+        }
+    }
+
+    const existing = getMemoryCache(key);
+    if (existing !== null && existing !== undefined) {
+        return false;
+    }
+    setMemoryCache(key, value, ttlSeconds);
+    return true;
+}
+
+/**
+ * Increment a numeric key.
+ */
+export async function increment(key: string): Promise<number> {
+    if (isRedisConfigured) {
+        const result = await redisCommand(['INCR', key]);
+        const parsed = Number(result);
+        if (Number.isFinite(parsed)) {
+            setMemoryCache(key, parsed, 3600);
+            return parsed;
+        }
+    }
+
+    const current = getMemoryCache(key);
+    const nextValue = Number(current ?? 0) + 1;
+    setMemoryCache(key, nextValue, 3600);
+    return nextValue;
+}
+
+/**
+ * Update key expiration.
+ */
+export async function expire(key: string, ttlSeconds: number): Promise<void> {
+    if (ttlSeconds <= 0) {
+        await del(key);
+        return;
+    }
+
+    if (isRedisConfigured) {
+        await redisCommand(['EXPIRE', key, ttlSeconds.toString()]);
+    }
+
+    const existing = getMemoryCache(key);
+    if (existing !== null && existing !== undefined) {
+        setMemoryCache(key, existing, ttlSeconds);
+    }
 }
 
 /**
@@ -154,6 +221,9 @@ export const RedisCache = {
     get,
     set,
     del,
+    setIfNotExists,
+    increment,
+    expire,
     invalidatePattern,
     isAvailable,
     getOrFetch,

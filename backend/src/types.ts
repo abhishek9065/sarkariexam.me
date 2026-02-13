@@ -1,6 +1,7 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type UserRole = 'user' | 'viewer' | 'reviewer' | 'editor' | 'admin';
+export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
 
 export interface User {
   id: string;
@@ -137,4 +138,20 @@ export interface Bookmark {
   userId: string;
   announcementId: string;
   createdAt: Date;
+}
+
+export interface TrackedApplication {
+  id: string;
+  userId: string;
+  announcementId?: string;
+  slug: string;
+  type: ContentType;
+  title: string;
+  organization?: string;
+  deadline?: Date | null;
+  status: TrackerStatus;
+  notes?: string;
+  reminderAt?: Date | null;
+  trackedAt: Date;
+  updatedAt: Date;
 }

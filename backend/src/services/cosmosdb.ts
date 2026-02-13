@@ -177,6 +177,7 @@ async function createIndexes(): Promise<void> {
         const analyticsRollups = database.collection('analytics_rollups');
         const adminAuditLogs = database.collection('admin_audit_logs');
         const userNotifications = database.collection('user_notifications');
+        const trackedApplications = database.collection('tracked_applications');
         const communityForums = database.collection('community_forums');
         const communityQa = database.collection('community_qa');
         const communityGroups = database.collection('community_groups');
@@ -208,6 +209,9 @@ async function createIndexes(): Promise<void> {
         await subscriptions.createIndex({ email: 1 }, { unique: true });
         await subscriptions.createIndex({ verificationToken: 1 });
         await subscriptions.createIndex({ unsubscribeToken: 1 });
+        await subscriptions.createIndex({ isActive: 1, verified: 1, frequency: 1 });
+        await subscriptions.createIndex({ frequency: 1, lastDigestDailySentAt: 1 });
+        await subscriptions.createIndex({ frequency: 1, lastDigestWeeklySentAt: 1 });
 
         // Push subscriptions indexes
         await pushSubscriptions.createIndex({ endpoint: 1 }, { unique: true });
@@ -240,6 +244,11 @@ async function createIndexes(): Promise<void> {
         // User notifications
         await userNotifications.createIndex({ userId: 1, createdAt: -1 });
         await userNotifications.createIndex({ userId: 1, announcementId: 1, source: 1 }, { unique: true });
+
+        // Tracked applications
+        await trackedApplications.createIndex({ userId: 1, slug: 1 }, { unique: true });
+        await trackedApplications.createIndex({ userId: 1, status: 1, updatedAt: -1 });
+        await trackedApplications.createIndex({ userId: 1, deadline: 1 });
 
         // Community collections
         await communityForums.createIndex({ createdAt: -1 });

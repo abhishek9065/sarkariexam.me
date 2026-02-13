@@ -11,4 +11,5 @@ export {
     usePrefetchAnnouncement,
     queryKeys
 } from './useQueries';
+export { useApplicationTracker } from './useApplicationTracker';
 

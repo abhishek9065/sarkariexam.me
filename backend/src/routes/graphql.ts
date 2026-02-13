@@ -245,7 +245,7 @@ const root = {
         context: { user?: { role?: string } }
     ) => {
         ensurePermission(context.user?.role, 'admin:read');
-        return getActiveUsersStats(windowMinutes);
+        return await getActiveUsersStats(windowMinutes);
     },
 };
 

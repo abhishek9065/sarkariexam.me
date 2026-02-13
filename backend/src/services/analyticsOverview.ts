@@ -1,6 +1,15 @@
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
-import { getDailyRollups, getRollupSummary, getCtrByType, getDigestClickStats, getDeepLinkAttribution, getTopSearches } from './analytics.js';
+import {
+    getDailyRollups,
+    getRollupSummary,
+    getCtrByType,
+    getDigestClickStats,
+    getDeepLinkAttribution,
+    getTopSearches,
+    getFunnelAttributionSplit,
+    getPushSubscriptionStats,
+} from './analytics.js';
 import { getCollection } from './cosmosdb.js';
 
 interface SubscriptionDoc {
@@ -14,6 +23,7 @@ const MAX_DAYS = 90;
 const overviewCache = new Map<number, { data: any; expiresAt: number }>();
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+const roundToOneDecimal = (value: number) => Math.round(value * 10) / 10;
 
 export async function getAnalyticsOverview(
     days: number = 30,
@@ -35,6 +45,8 @@ export async function getAnalyticsOverview(
         digestClicks,
         deepLinkAttribution,
         topSearches,
+        funnelSplit,
+        pushSubscriptionStats,
         totalEmailSubscribers,
         totalPushSubscribers,
     ] = await Promise.all([
@@ -45,6 +57,8 @@ export async function getAnalyticsOverview(
         getDigestClickStats(clampedDays),
         getDeepLinkAttribution(clampedDays),
         getTopSearches(clampedDays, 12),
+        getFunnelAttributionSplit(clampedDays),
+        getPushSubscriptionStats(clampedDays),
         (async () => {
             try {
                 const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
@@ -81,11 +95,17 @@ export async function getAnalyticsOverview(
     const categoryBreakdown = Object.entries(byCategory).map(([category, count]) => ({ category, count }));
 
     const detailViewsRaw = rollupSummary.viewCount;
-    const detailViewsAdjusted = Math.min(detailViewsRaw, rollupSummary.cardClicks || detailViewsRaw);
-    const overageRatio = rollupSummary.cardClicks > 0
-        ? (detailViewsRaw - rollupSummary.cardClicks) / rollupSummary.cardClicks
+    const cardClicksInApp = funnelSplit.cardClicksInApp;
+    const detailViewsDirect = funnelSplit.detailViewsDirect;
+    const detailViewsUnattributed = funnelSplit.detailViewsUnattributed;
+    const detailViewsAdjusted = Math.min(detailViewsRaw, cardClicksInApp || detailViewsRaw);
+    const overageRatio = cardClicksInApp > 0
+        ? (detailViewsRaw - cardClicksInApp) / cardClicksInApp
         : 0;
-    const hasAnomaly = rollupSummary.cardClicks > 0 && detailViewsRaw > rollupSummary.cardClicks && overageRatio > 0.35;
+    const hasAnomaly = detailViewsRaw > 0
+        && detailViewsUnattributed > 0
+        && overageRatio > 0.35
+        && detailViewsUnattributed / detailViewsRaw > 0.2;
 
     const sortedTypes = [...typeBreakdown].sort((a, b) => b.count - a.count);
     const sortedCategories = [...categoryBreakdown].sort((a, b) => b.count - a.count);
@@ -102,13 +122,16 @@ export async function getAnalyticsOverview(
     const viewTrendDirection = viewTrendPct > 2 ? 'up' : viewTrendPct < -2 ? 'down' : 'flat';
 
     const clickThroughRate = rollupSummary.listingViews > 0
-        ? Math.round((rollupSummary.cardClicks / rollupSummary.listingViews) * 100)
+        ? Math.round((cardClicksInApp / rollupSummary.listingViews) * 100)
         : 0;
     const funnelDropRate = rollupSummary.listingViews > 0
-        ? Math.round(((rollupSummary.listingViews - rollupSummary.cardClicks) / rollupSummary.listingViews) * 100)
+        ? Math.round(((rollupSummary.listingViews - cardClicksInApp) / rollupSummary.listingViews) * 100)
         : 0;
-    const listingCoverage = totalViews > 0
-        ? Math.round((rollupSummary.listingViews / totalViews) * 100)
+    const listingCoverageWindowPct = rollupSummary.viewCount > 0
+        ? roundToOneDecimal((rollupSummary.listingViews / rollupSummary.viewCount) * 100)
+        : 0;
+    const listingCoverageAllTimePct = totalViews > 0
+        ? roundToOneDecimal((rollupSummary.listingViews / totalViews) * 100)
         : 0;
 
     const rollupAgeMinutes = rollupSummary.lastUpdatedAt
@@ -127,20 +150,34 @@ export async function getAnalyticsOverview(
         totalSubscriptionsUnsubscribed: rollupSummary.subscriptionsUnsubscribed,
         totalListingViews: rollupSummary.listingViews,
         totalCardClicks: rollupSummary.cardClicks,
+        totalCardClicksInApp: cardClicksInApp,
         totalCategoryClicks: rollupSummary.categoryClicks,
         totalFilterApplies: rollupSummary.filterApplies,
         totalDigestClicks: rollupSummary.digestClicks,
         totalDeepLinkClicks: rollupSummary.deepLinkClicks,
+        pushConversion: {
+            attempts: pushSubscriptionStats.attempts,
+            successes: pushSubscriptionStats.successes,
+            failures: pushSubscriptionStats.failures,
+            successRate: pushSubscriptionStats.attempts > 0
+                ? roundToOneDecimal((pushSubscriptionStats.successes / pushSubscriptionStats.attempts) * 100)
+                : 0,
+            bySource: pushSubscriptionStats.bySource,
+        },
         engagementWindowDays: rollupSummary.days,
         rollupLastUpdatedAt: rollupSummary.lastUpdatedAt,
         dailyRollups,
         topSearches,
         funnel: {
             listingViews: rollupSummary.listingViews,
-            cardClicks: rollupSummary.cardClicks,
+            cardClicks: cardClicksInApp,
+            cardClicksRaw: rollupSummary.cardClicks,
+            cardClicksInApp,
             detailViews: detailViewsAdjusted,
             detailViewsRaw,
             detailViewsAdjusted,
+            detailViewsDirect,
+            detailViewsUnattributed,
             hasAnomaly,
             bookmarkAdds: rollupSummary.bookmarkAdds,
             subscriptionsVerified: rollupSummary.subscriptionsVerified,
@@ -155,7 +192,9 @@ export async function getAnalyticsOverview(
             viewTrendDirection,
             clickThroughRate,
             funnelDropRate,
-            listingCoverage,
+            listingCoverage: listingCoverageWindowPct,
+            listingCoverageWindowPct,
+            listingCoverageAllTimePct,
             topType: sortedTypes[0]
                 ? { ...sortedTypes[0], share: totalAnnouncements ? Math.round((sortedTypes[0].count / totalAnnouncements) * 100) : 0 }
                 : null,

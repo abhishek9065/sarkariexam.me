@@ -1,11 +1,26 @@
 import { API_BASE } from './constants';
 import { filterMockAnnouncements, findMockBySlug } from './mockData';
 import { fetchJson } from './http';
-import type { Announcement, AnnouncementCard, ContentType } from '../types';
+import type {
+    Announcement,
+    AnnouncementCard,
+    ContentType,
+    DashboardWidgetPayload,
+    SearchSuggestion,
+    TrackedApplication,
+    TrackerStatus,
+} from '../types';
 import type { paths } from '../types/api';
 
 type AnnouncementCardsResponse =
     paths['/api/announcements/v3/cards']['get']['responses'][200]['content']['application/json'];
+
+const allowMockFallback = Boolean(import.meta.env.DEV);
+
+const createBackendUnavailableError = (operation: string, error: unknown) => {
+    const reason = error instanceof Error ? error.message : 'unknown error';
+    return new Error(`[API] ${operation} failed: ${reason}`);
+};
 
 interface AnnouncementCardQuery {
     type?: ContentType;
@@ -22,6 +37,7 @@ interface AnnouncementCardQuery {
     limit?: number;
     cursor?: string | null;
     prefetch?: boolean;
+    source?: string;
 }
 
 function cardToAnnouncement(card: AnnouncementCard): Announcement {
@@ -65,6 +81,7 @@ export async function fetchAnnouncementCardsPage(
         if (query.limit) params.set('limit', String(query.limit));
         if (query.cursor) params.set('cursor', query.cursor);
         if (query.prefetch) params.set('prefetch', '1');
+        if (query.source) params.set('source', query.source);
 
         const body = await fetchJson<AnnouncementCardsResponse>(
             `${API_BASE}/api/announcements/v3/cards?${params.toString()}`,
@@ -76,7 +93,11 @@ export async function fetchAnnouncementCardsPage(
         }
         return body;
     } catch (error) {
-        console.warn('Backend unavailable, using mock data:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncementCardsPage', error);
+        }
+
+        console.warn('Backend unavailable, using mock data (dev only):', error);
         // Fallback to mock data
         const mockData = filterMockAnnouncements({
             type: query.type,
@@ -131,7 +152,10 @@ export async function fetchAnnouncements(maxItems = 150): Promise<Announcement[]
     try {
         return await fetchCardPages({}, maxItems);
     } catch (error) {
-        console.warn('Using mock data for fetchAnnouncements:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncements', error);
+        }
+        console.warn('Using mock data for fetchAnnouncements (dev only):', error);
         return filterMockAnnouncements({ limit: maxItems });
     }
 }
@@ -141,7 +165,10 @@ export async function fetchAnnouncementsByType(type: ContentType, maxItems = 100
     try {
         return await fetchCardPages({ type }, maxItems);
     } catch (error) {
-        console.warn('Using mock data for fetchAnnouncementsByType:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncementsByType', error);
+        }
+        console.warn('Using mock data for fetchAnnouncementsByType (dev only):', error);
         return filterMockAnnouncements({ type, limit: maxItems });
     }
 }
@@ -164,7 +191,10 @@ export async function fetchAnnouncementBySlug(slug: string, query?: string | URL
         );
         return body.data;
     } catch (error) {
-        console.warn('Backend unavailable for slug fetch, using mock data:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncementBySlug', error);
+        }
+        console.warn('Backend unavailable for slug fetch, using mock data (dev only):', error);
         // Fallback to mock data
         return findMockBySlug(slug);
     }
@@ -200,6 +230,171 @@ export async function fetchAnnouncementOrganizations(): Promise<string[]> {
     }
 }
 
+export async function fetchSearchSuggestions(query: string, options?: {
+    type?: ContentType;
+    limit?: number;
+    source?: string;
+}): Promise<SearchSuggestion[]> {
+    const params = new URLSearchParams();
+    params.set('q', query);
+    if (options?.type) params.set('type', options.type);
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.source) params.set('source', options.source);
+
+    try {
+        const body = await fetchJson<{ data: SearchSuggestion[] }>(
+            `${API_BASE}/api/announcements/search/suggest?${params.toString()}`,
+            {},
+            { timeoutMs: 4000, retries: 1 }
+        );
+        return Array.isArray(body.data) ? body.data : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchTrendingSearchTerms(options?: {
+    days?: number;
+    limit?: number;
+}): Promise<Array<{ query: string; count: number }>> {
+    const params = new URLSearchParams();
+    if (options?.days !== undefined) params.set('days', String(options.days));
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+
+    const queryString = params.toString();
+    const path = queryString
+        ? `${API_BASE}/api/announcements/search/trending?${queryString}`
+        : `${API_BASE}/api/announcements/search/trending`;
+
+    try {
+        const body = await fetchJson<{ data: Array<{ query: string; count: number }> }>(
+            path,
+            {},
+            { timeoutMs: 4000, retries: 1 }
+        );
+        return Array.isArray(body.data) ? body.data : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchTrackedApplications(token: string): Promise<TrackedApplication[]> {
+    const body = await fetchJson<{ data: TrackedApplication[] }>(
+        `${API_BASE}/api/profile/tracked-applications`,
+        {
+            headers: { Authorization: `Bearer ${token}` },
+        },
+        { timeoutMs: 6000, retries: 1 }
+    );
+    return Array.isArray(body.data) ? body.data : [];
+}
+
+export async function createTrackedApplication(
+    token: string,
+    payload: {
+        announcementId?: string;
+        slug: string;
+        type: ContentType;
+        title: string;
+        organization?: string;
+        deadline?: string | null;
+        status: TrackerStatus;
+        notes?: string;
+        reminderAt?: string | null;
+    }
+): Promise<TrackedApplication> {
+    const body = await fetchJson<{ data: TrackedApplication }>(
+        `${API_BASE}/api/profile/tracked-applications`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        },
+        { timeoutMs: 7000, retries: 1 }
+    );
+    return body.data;
+}
+
+export async function updateTrackedApplication(
+    token: string,
+    id: string,
+    payload: {
+        status?: TrackerStatus;
+        notes?: string;
+        reminderAt?: string | null;
+    }
+): Promise<TrackedApplication> {
+    const body = await fetchJson<{ data: TrackedApplication }>(
+        `${API_BASE}/api/profile/tracked-applications/${id}`,
+        {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        },
+        { timeoutMs: 7000, retries: 1 }
+    );
+    return body.data;
+}
+
+export async function deleteTrackedApplication(token: string, id: string): Promise<void> {
+    await fetchJson<{ message: string }>(
+        `${API_BASE}/api/profile/tracked-applications/${id}`,
+        {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+        },
+        { timeoutMs: 6000, retries: 1 }
+    );
+}
+
+export async function importTrackedApplications(
+    token: string,
+    items: Array<{
+        announcementId?: string;
+        slug: string;
+        type: ContentType;
+        title: string;
+        organization?: string;
+        deadline?: string | null;
+        status: TrackerStatus;
+        notes?: string;
+        reminderAt?: string | null;
+        trackedAt?: string;
+        updatedAt?: string;
+    }>
+): Promise<{ imported: number; skipped: number }> {
+    return fetchJson<{ imported: number; skipped: number }>(
+        `${API_BASE}/api/profile/tracked-applications/import`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ items }),
+        },
+        { timeoutMs: 8000, retries: 1 }
+    );
+}
+
+export async function fetchDashboardWidgets(token: string, windowDays = 7): Promise<DashboardWidgetPayload> {
+    const params = new URLSearchParams({ windowDays: String(windowDays) });
+    const body = await fetchJson<{ data: DashboardWidgetPayload }>(
+        `${API_BASE}/api/profile/widgets?${params.toString()}`,
+        {
+            headers: { Authorization: `Bearer ${token}` },
+        },
+        { timeoutMs: 6000, retries: 1 }
+    );
+    return body.data;
+}
+
 // Fetch user bookmarks
 export async function fetchBookmarks(token: string): Promise<Announcement[]> {
     const response = await fetch(`${API_BASE}/api/bookmarks`, {
@@ -233,8 +428,8 @@ export async function removeBookmark(announcementId: string, token: string): Pro
 }
 
 // Subscribe to push notifications
-export async function subscribeToPush(subscription: PushSubscription): Promise<boolean> {
-    const response = await fetch(`${API_BASE}/api/push/subscribe`, {
+export async function subscribeToPush(subscription: PushSubscription, source = 'unknown'): Promise<boolean> {
+    const response = await fetch(`${API_BASE}/api/push/subscribe?source=${encodeURIComponent(source)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscription.toJSON())

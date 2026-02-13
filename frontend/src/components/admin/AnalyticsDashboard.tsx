@@ -42,9 +42,13 @@ interface AnalyticsData {
     funnel?: {
         listingViews: number;
         cardClicks: number;
+        cardClicksRaw?: number;
+        cardClicksInApp?: number;
         detailViews: number;
         detailViewsRaw?: number;
         detailViewsAdjusted?: number;
+        detailViewsDirect?: number;
+        detailViewsUnattributed?: number;
         hasAnomaly?: boolean;
         bookmarkAdds: number;
         subscriptionsVerified: number;
@@ -68,12 +72,26 @@ interface AnalyticsData {
         mediums: Array<{ medium: string; clicks: number }>;
         campaigns: Array<{ campaign: string; clicks: number }>;
     };
+    pushConversion?: {
+        attempts: number;
+        successes: number;
+        failures: number;
+        successRate: number;
+        bySource: Array<{
+            source: string;
+            attempts: number;
+            successes: number;
+            failures: number;
+        }>;
+    };
     insights?: {
         viewTrendPct: number;
         viewTrendDirection: 'up' | 'down' | 'flat' | string;
         clickThroughRate: number;
         funnelDropRate: number;
         listingCoverage: number;
+        listingCoverageWindowPct?: number;
+        listingCoverageAllTimePct?: number;
         topType?: { type: string; count: number; share?: number | null } | null;
         topCategory?: { category: string; count: number; share?: number | null } | null;
         anomaly?: boolean;
@@ -347,9 +365,13 @@ export function AnalyticsDashboard({
                     funnel: {
                         listingViews: 0,
                         cardClicks: 0,
+                        cardClicksRaw: 0,
+                        cardClicksInApp: 0,
                         detailViews: 0,
                         detailViewsRaw: 0,
                         detailViewsAdjusted: 0,
+                        detailViewsDirect: 0,
+                        detailViewsUnattributed: 0,
                         hasAnomaly: false,
                         bookmarkAdds: 0,
                         subscriptionsVerified: 0,
@@ -358,12 +380,15 @@ export function AnalyticsDashboard({
                     topSearches: [],
                     digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
                     deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
+                    pushConversion: { attempts: 0, successes: 0, failures: 0, successRate: 0, bySource: [] },
                     insights: {
                         viewTrendPct: 0,
                         viewTrendDirection: 'flat',
                         clickThroughRate: 0,
                         funnelDropRate: 0,
                         listingCoverage: 0,
+                        listingCoverageWindowPct: 0,
+                        listingCoverageAllTimePct: 0,
                         topType: null,
                         topCategory: null,
                         anomaly: false,
@@ -525,14 +550,24 @@ export function AnalyticsDashboard({
     const ctrByType = analytics.ctrByType ?? [];
     const digestClicks = analytics.digestClicks;
     const deepLinkAttribution = analytics.deepLinkAttribution;
+    const pushConversion = analytics.pushConversion;
     const topSearches = analytics.topSearches ?? [];
     const digestTotal = digestClicks?.total ?? 0;
     const deepLinkTotal = deepLinkAttribution?.total ?? 0;
+    const pushAttempts = pushConversion?.attempts ?? 0;
+    const pushSuccesses = pushConversion?.successes ?? 0;
+    const pushFailures = pushConversion?.failures ?? 0;
+    const pushSuccessRate = pushConversion?.successRate ?? 0;
     const digestNotConfigured = !digestClicks;
+    const pushNotConfigured = !pushConversion;
     const digestHasNoData = digestClicks && digestClicks.total === 0
         && digestClicks.variants.length === 0
         && digestClicks.frequencies.length === 0
         && digestClicks.campaigns.length === 0;
+    const pushHasNoData = pushConversion && pushConversion.attempts === 0
+        && pushConversion.successes === 0
+        && pushConversion.failures === 0
+        && pushConversion.bySource.length === 0;
     const deepLinkNotConfigured = !deepLinkAttribution;
     const deepLinkHasNoData = deepLinkAttribution && deepLinkAttribution.total === 0
         && deepLinkAttribution.sources.length === 0
@@ -548,7 +583,8 @@ export function AnalyticsDashboard({
             : 'Stable';
     const rollupAge = insights?.rollupAgeMinutes ?? null;
     const ctrTone = ctr >= 10 ? 'good' : ctr >= 5 ? 'warn' : 'bad';
-    const listingCoverage = insights?.listingCoverage ?? 0;
+    const listingCoverageWindowPct = insights?.listingCoverageWindowPct ?? insights?.listingCoverage ?? 0;
+    const listingCoverageAllTimePct = insights?.listingCoverageAllTimePct ?? 0;
     const funnelDropTone = (insights?.funnelDropRate ?? 0) >= 80 ? 'bad' : (insights?.funnelDropRate ?? 0) >= 60 ? 'warn' : 'good';
     const trendTone = viewTrendDirection === 'up' ? 'good' : viewTrendDirection === 'down' ? 'bad' : 'warn';
     const totalTypeCount = sortedTypeBreakdown.reduce((sum, item) => sum + item.count, 0);
@@ -557,34 +593,33 @@ export function AnalyticsDashboard({
     const trendListRows = trendRows.slice(-10).reverse();
     const popularItems = popular.slice(0, 8);
     const funnel = analytics.funnel;
+    const cardClicksInApp = funnel?.cardClicksInApp ?? funnel?.cardClicks ?? 0;
+    const detailViewsDirect = funnel?.detailViewsDirect ?? 0;
+    const detailViewsUnattributed = funnel?.detailViewsUnattributed ?? 0;
     const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
     const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
-    const hasAnomaly = funnel?.hasAnomaly ?? Boolean(
-        (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
-    );
-    const funnelHasDirectTraffic = Boolean(
-        (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
-    );
+    const hasAnomaly = funnel?.hasAnomaly ?? false;
+    const funnelHasDirectTraffic = detailViewsDirect > 0;
     const detailViewsLabel = hasAnomaly ? 'Detail views (capped)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
     const lowCtrThreshold = 5;
     const minViewsForCtrFlag = 20;
     const funnelSteps = [
         { label: 'Listing views', value: funnel?.listingViews ?? 0 },
         {
-            label: 'Card clicks',
-            value: funnel?.cardClicks ?? 0,
-            rate: funnel?.listingViews ? Math.round((funnel.cardClicks / funnel.listingViews) * 100) : 0
+            label: 'Card clicks (in-app)',
+            value: cardClicksInApp,
+            rate: funnel?.listingViews ? Math.round((cardClicksInApp / funnel.listingViews) * 100) : 0
         },
         {
             label: detailViewsLabel,
             value: adjustedDetailViews,
-            rate: funnel?.cardClicks ? Math.round((adjustedDetailViews / funnel.cardClicks) * 100) : 0,
+            rate: cardClicksInApp ? Math.round((adjustedDetailViews / cardClicksInApp) * 100) : 0,
             rateLabel: funnelHasDirectTraffic ? 'Includes direct traffic' : undefined,
         },
         {
             label: 'Bookmarks',
             value: funnel?.bookmarkAdds ?? 0,
-            rate: funnel?.detailViews ? Math.round((funnel.bookmarkAdds / funnel.detailViews) * 100) : 0
+            rate: adjustedDetailViews ? Math.round(((funnel?.bookmarkAdds ?? 0) / adjustedDetailViews) * 100) : 0
         },
         {
             label: 'Subscriptions verified',
@@ -593,20 +628,17 @@ export function AnalyticsDashboard({
         },
     ];
 
-    // Recalculate coverage if 0 but we have views
-    const calculatedCoverage = analytics.totalViews > 0 
-        ? Math.round((analytics.totalListingViews / analytics.totalViews) * 100) 
-        : 0;
-    const finalCoverage = (listingCoverage === 0 && analytics.totalListingViews > 0) 
-        ? calculatedCoverage 
-        : listingCoverage;
+    const hasListingViewEvents = analytics.totalListingViews > 0;
+    const finalCoverage = listingCoverageWindowPct;
+    const finalCoverageDisplay = finalCoverage.toFixed(1);
+    const allTimeCoverageDisplay = listingCoverageAllTimePct.toFixed(1);
     const finalCoverageTone = finalCoverage >= 25 ? 'good' : finalCoverage >= 10 ? 'warn' : 'bad';
-    const coverageMetaText = finalCoverage === 0
+    const coverageMetaText = !hasListingViewEvents
         ? 'No listing view events tracked. Verify listing pages fire view events.'
         : finalCoverage < 10
-            ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
-            : 'Listing views vs total views';
-    const showCoverageAction = finalCoverage === 0;
+            ? `Low window coverage (${finalCoverageDisplay}%). All-time coverage is ${allTimeCoverageDisplay}%.`
+            : `Window coverage ${finalCoverageDisplay}% | All-time ${allTimeCoverageDisplay}%`;
+    const showCoverageAction = !hasListingViewEvents;
 
     // Weekly trend anomaly check
     const isNewData = rollups.length <= 7 && prev7Views === 0;
@@ -1105,7 +1137,7 @@ export function AnalyticsDashboard({
                     </div>
                     <div className={`insight-card ${finalCoverageTone}`}>
                         <div className="insight-label">Tracking coverage</div>
-                        <div className="insight-value">{finalCoverage}%</div>
+                        <div className="insight-value">{finalCoverageDisplay}%</div>
                         <div className="insight-meta">{coverageMetaText}</div>
                         {showCoverageAction && (
                             <button
@@ -1176,15 +1208,15 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({formatMetric(rawDetailViews)}) exceed Card clicks ({formatMetric(funnel?.cardClicks)}).
+                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({formatMetric(rawDetailViews)}) exceed in-app card clicks ({formatMetric(cardClicksInApp)}).
                         <br />
                         The funnel uses the adjusted value ({formatMetric(adjustedDetailViews)}) to ensure percentages make sense.
-                        <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
+                        <div className="analytics-suggestion">Suggestion: investigate unattributed detail traffic ({formatMetric(detailViewsUnattributed)}) and source tagging drift.</div>
                     </div>
                 )}
                 {funnelHasDirectTraffic && !hasAnomaly && (
                     <p className="analytics-hint">
-                        Detail views include direct/SEO visits, so they may exceed card clicks.
+                        Detail views include direct traffic ({formatMetric(detailViewsDirect)}), so they may exceed in-app card clicks.
                     </p>
                 )}
             </div>
@@ -1320,6 +1352,76 @@ export function AnalyticsDashboard({
                                 onClick={() => setActionMessage('Digest setup: configure provider, enable digest campaigns, and record digest_click events.')}
                             >
                                 Set up digest emails
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className={`analytics-section ${pushNotConfigured || pushHasNoData ? 'section-muted' : ''}`}>
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Push Subscription Conversion</h3>
+                        <p className="analytics-subtitle">Attempt, success, and failure quality by source.</p>
+                    </div>
+                </div>
+                {pushConversion ? (
+                    <>
+                        <div className="digest-grid">
+                            <div className="digest-card">
+                                <div className="digest-label">Attempts</div>
+                                <div className="digest-value">{formatMetric(pushAttempts)}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Successes</div>
+                                <div className="digest-value">{formatMetric(pushSuccesses)}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Failures</div>
+                                <div className="digest-value">{formatMetric(pushFailures)}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Success rate</div>
+                                <div className="digest-value">{pushSuccessRate.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">By source</div>
+                            <div className="digest-chips">
+                                {pushConversion.bySource.length === 0 ? (
+                                    <span className="digest-chip">No source data</span>
+                                ) : (
+                                    pushConversion.bySource.map((item) => (
+                                        <span key={item.source} className="digest-chip">
+                                            {item.source}: {item.successes}/{item.attempts}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        {pushAttempts === 0 && (
+                            <div className="digest-note">No push subscription attempts recorded in the selected window.</div>
+                        )}
+                        {(pushHasNoData || pushNotConfigured) && (
+                            <div className="digest-cta">
+                                <button
+                                    className="admin-btn secondary small"
+                                    onClick={() => setActionMessage('Push conversion tracking: send source tags to /api/push/subscribe and record attempt/success/failure events.')}
+                                >
+                                    Configure push tracking
+                                </button>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="empty-state">
+                        Push conversion tracking not configured.
+                        <div className="digest-cta">
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => setActionMessage('Push conversion tracking: send source tags to /api/push/subscribe and record attempt/success/failure events.')}
+                            >
+                                Configure push tracking
                             </button>
                         </div>
                     </div>

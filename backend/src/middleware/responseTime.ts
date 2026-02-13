@@ -24,7 +24,9 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
 
     // Log when response finishes
     res.on('finish', () => {
-        recordActiveUser(req);
+        recordActiveUser(req).catch((error) => {
+            console.error('[ActiveUsers] Failed to record active user:', error);
+        });
         const [seconds, nanoseconds] = process.hrtime(startTime);
         const durationMs = Math.round((seconds * 1000) + (nanoseconds / 1000000));
 

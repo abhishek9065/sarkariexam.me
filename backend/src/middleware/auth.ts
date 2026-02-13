@@ -93,7 +93,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
     }
 
     if (isAdminPortalRole(decoded.role) && decoded.sessionId) {
-      const sessionValidation = validateAdminSession(decoded.sessionId);
+      const sessionValidation = await validateAdminSession(decoded.sessionId);
       if (!sessionValidation.valid) {
         res.status(401).json({
           error: 'session_invalid',
@@ -104,7 +104,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       }
       const exp = (decoded as any).exp;
       const expiresAt = exp ? new Date(exp * 1000) : null;
-      touchAdminSession(decoded.sessionId, {
+      await touchAdminSession(decoded.sessionId, {
         userId: decoded.userId,
         email: decoded.email,
         ip: req.ip,

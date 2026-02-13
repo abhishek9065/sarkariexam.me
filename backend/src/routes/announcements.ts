@@ -5,8 +5,10 @@ import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 import { cacheControl } from '../middleware/cacheControl.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
-import { recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
-import { bumpCacheVersion } from '../services/cacheVersion.js';
+import { getTopSearches, recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
+import { normalizeAttribution } from '../services/attribution.js';
+import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
+import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import { sendAnnouncementNotification } from '../services/telegram.js';
 import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 
@@ -54,6 +56,17 @@ const searchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
+const suggestQuerySchema = z.object({
+  q: z.string().trim().max(80).optional().default(''),
+  type: z
+    .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+const trendingSearchQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(30),
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
 
 // Cursor-based pagination schema (v2)
 const cursorQuerySchema = z.object({
@@ -74,17 +87,6 @@ const cursorQuerySchema = z.object({
     .regex(/^[a-fA-F0-9]{24}$/)
     .optional(), // Last seen ObjectId
 });
-
-const cacheGroupsToInvalidate = [
-  'announcements',
-  'trending',
-  'search',
-  'calendar',
-  'categories',
-  'organizations',
-  'tags',
-  'announcement',
-];
 
 const normalizeSearchTerm = (value?: string | null): string | null => {
   if (!value) return null;
@@ -115,15 +117,26 @@ const recordListingAnalytics = (req: express.Request, options: {
   organization?: string | null;
   location?: string | null;
   qualification?: string | null;
+  source?: string | null;
 }) => {
   if (isPrefetchRequest(req)) return;
   const normalizedSearch = normalizeSearchTerm(options.search);
+  const attribution = normalizeAttribution({
+    source: options.source ?? pickQueryValue(req.query.source),
+    utmSource: pickQueryValue(req.query.utm_source),
+    medium: pickQueryValue(req.query.medium),
+    utmMedium: pickQueryValue(req.query.utm_medium),
+    campaign: pickQueryValue(req.query.campaign),
+    utmCampaign: pickQueryValue(req.query.utm_campaign),
+  });
   recordAnalyticsEvent({
     type: 'listing_view',
     metadata: {
       count: options.count,
       type: options.type ?? null,
       category: options.category ?? null,
+      source: attribution.source,
+      sourceClass: attribution.sourceClass,
     },
   }).catch(console.error);
 
@@ -168,8 +181,10 @@ const recordListingAnalytics = (req: express.Request, options: {
       type: 'search',
       metadata: {
         query: normalizedSearch,
+        resultsCount: options.count,
         queryLength: options.search.length,
-        type: options.type ?? null,
+        typeFilter: options.type ?? null,
+        source: attribution.source ?? 'category_query',
       },
     }).catch(console.error);
   }
@@ -179,26 +194,23 @@ const recordAnnouncementAnalytics = (req: express.Request, announcement: Announc
   const announcementId = String(announcement.id);
   AnnouncementModel.incrementViewCount(announcementId).catch(console.error);
   recordAnnouncementView(announcementId).catch(console.error);
-
-  const source = pickQueryValue(req.query.source) || pickQueryValue(req.query.utm_source);
-  const medium = pickQueryValue(req.query.medium) || pickQueryValue(req.query.utm_medium);
-  const campaign = pickQueryValue(req.query.campaign) || pickQueryValue(req.query.utm_campaign);
-  const content = pickQueryValue(req.query.content) || pickQueryValue(req.query.utm_content);
-  const term = pickQueryValue(req.query.term) || pickQueryValue(req.query.utm_term);
-  const variant = pickQueryValue(req.query.variant) || pickQueryValue(req.query.ab);
-  const digestType = pickQueryValue(req.query.digest) || pickQueryValue(req.query.frequency);
-  const ref = pickQueryValue(req.query.ref);
-
-  const attribution = {
-    source: source ?? null,
-    medium: medium ?? null,
-    campaign: campaign ?? null,
-    content: content ?? null,
-    term: term ?? null,
-    variant: variant ?? null,
-    digestType: digestType ?? null,
-    ref: ref ?? null,
-  };
+  const attribution = normalizeAttribution({
+    source: pickQueryValue(req.query.source),
+    utmSource: pickQueryValue(req.query.utm_source),
+    medium: pickQueryValue(req.query.medium),
+    utmMedium: pickQueryValue(req.query.utm_medium),
+    campaign: pickQueryValue(req.query.campaign),
+    utmCampaign: pickQueryValue(req.query.utm_campaign),
+    content: pickQueryValue(req.query.content),
+    utmContent: pickQueryValue(req.query.utm_content),
+    term: pickQueryValue(req.query.term),
+    utmTerm: pickQueryValue(req.query.utm_term),
+    variant: pickQueryValue(req.query.variant),
+    ab: pickQueryValue(req.query.ab),
+    digest: pickQueryValue(req.query.digest),
+    frequency: pickQueryValue(req.query.frequency),
+    ref: pickQueryValue(req.query.ref),
+  });
 
   recordAnalyticsEvent({
     type: 'card_click',
@@ -206,6 +218,7 @@ const recordAnnouncementAnalytics = (req: express.Request, announcement: Announc
     metadata: {
       type: announcement.type,
       category: announcement.category ?? null,
+      sourceClass: attribution.sourceClass,
       ...attribution,
     },
   }).catch(console.error);
@@ -218,30 +231,25 @@ const recordAnnouncementAnalytics = (req: express.Request, announcement: Announc
       metadata: {
         type: announcement.type,
         category: announcement.category ?? null,
+        sourceClass: attribution.sourceClass,
         ...attribution,
       },
     }).catch(console.error);
   }
 
-  const sourceValue = (source || '').toLowerCase();
-  const campaignValue = (campaign || '').toLowerCase();
-  const isDigest = sourceValue === 'digest' || campaignValue.includes('digest') || Boolean(digestType);
-  if (isDigest) {
+  if (attribution.isDigest) {
     recordAnalyticsEvent({
       type: 'digest_click',
       announcementId,
       metadata: {
         type: announcement.type,
         category: announcement.category ?? null,
+        sourceClass: attribution.sourceClass,
         ...attribution,
       },
     }).catch(console.error);
   }
 };
-
-async function invalidateAnnouncementCaches(): Promise<void> {
-  await Promise.all(cacheGroupsToInvalidate.map(group => bumpCacheVersion(group)));
-}
 
 // Get all announcements - with caching (5 min server, 2 min browser)
 router.get('/', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcements }), cacheControl(120), async (req, res) => {
@@ -304,6 +312,7 @@ router.get(
       const organization = pickQueryValue(req.query.organization);
       const location = pickQueryValue(req.query.location);
       const qualification = pickQueryValue(req.query.qualification);
+      const source = pickQueryValue(req.query.source);
       const count = Array.isArray(cachedData?.data) ? cachedData.data.length : 0;
 
       recordListingAnalytics(req, {
@@ -314,6 +323,7 @@ router.get(
         organization,
         location,
         qualification,
+        source,
       });
     },
   }),
@@ -348,6 +358,7 @@ router.get(
       organization: filters.organization ?? null,
       location: filters.location ?? null,
       qualification: filters.qualification ?? null,
+      source: pickQueryValue(req.query.source) ?? null,
     });
 
     return res.json({
@@ -407,6 +418,141 @@ router.get(
     }
 });
 
+// Search suggestions for global overlay
+router.get(
+  '/search/suggest',
+  cacheMiddleware({
+    ttl: 180,
+    keyGenerator: (req) => `search-suggest:q:${req.query.q || ''}:type:${req.query.type || 'all'}:limit:${req.query.limit || 8}`,
+  }),
+  cacheControl(60),
+  async (req, res) => {
+    try {
+      const parseResult = suggestQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: 'Invalid suggest parameters',
+          details: parseResult.error.flatten().fieldErrors,
+        });
+      }
+
+      const { q, type, limit } = parseResult.data;
+      const query = q.replace(/[<>"'&$]/g, '').trim();
+      const effectiveLimit = Math.min(20, Math.max(1, limit));
+
+      // For very short queries prioritize query-frequency trends, then fall back to views.
+      if (query.length < 2) {
+        const topQueries = await getTopSearches(30, effectiveLimit);
+        if (topQueries.length > 0) {
+          const cards = await Promise.all(
+            topQueries.map((row) =>
+              AnnouncementModel.findListingCards({
+                type,
+                search: row.query,
+                sort: 'views',
+                limit: 1,
+              })
+            )
+          );
+
+          const dedupedBySlug = new Map<string, { title: string; slug: string; type: ContentType; organization?: string }>();
+          for (const result of cards) {
+            const first = result.data[0];
+            if (!first?.slug || dedupedBySlug.has(first.slug)) continue;
+            dedupedBySlug.set(first.slug, {
+              title: first.title,
+              slug: first.slug,
+              type: first.type as ContentType,
+              organization: first.organization || undefined,
+            });
+            if (dedupedBySlug.size >= effectiveLimit) break;
+          }
+
+          if (dedupedBySlug.size > 0) {
+            return res.json({ data: Array.from(dedupedBySlug.values()) });
+          }
+        }
+
+        const trending = await AnnouncementModel.findListingCards({
+          type,
+          sort: 'views',
+          limit: effectiveLimit,
+        });
+        const data = trending.data.map((item) => ({
+          title: item.title,
+          slug: item.slug,
+          type: item.type as ContentType,
+          organization: item.organization || undefined,
+        }));
+        return res.json({ data });
+      }
+
+      const matches = await AnnouncementModel.findListingCards({
+        type,
+        search: query,
+        sort: 'views',
+        limit: Math.min(50, effectiveLimit * 3),
+      });
+
+      const deduped = new Map<string, { title: string; slug: string; type: ContentType; organization?: string }>();
+      for (const item of matches.data) {
+        if (!item.slug || deduped.has(item.slug)) continue;
+        deduped.set(item.slug, {
+          title: item.title,
+          slug: item.slug,
+          type: item.type as ContentType,
+          organization: item.organization || undefined,
+        });
+        if (deduped.size >= effectiveLimit) break;
+      }
+
+      recordAnalyticsEvent({
+        type: 'search',
+        metadata: {
+          query: normalizeSearchTerm(query),
+          resultsCount: deduped.size,
+          queryLength: query.length,
+          typeFilter: type ?? null,
+          source: 'suggest',
+        },
+      }).catch(console.error);
+
+      return res.json({ data: Array.from(deduped.values()) });
+    } catch (error) {
+      console.error('Error fetching search suggestions:', error);
+      return res.status(500).json({ error: 'Failed to fetch search suggestions' });
+    }
+  }
+);
+
+// Top search terms (query-frequency driven trending chips)
+router.get(
+  '/search/trending',
+  cacheMiddleware({
+    ttl: 180,
+    keyGenerator: (req) => `search-trending:days:${req.query.days || 30}:limit:${req.query.limit || 8}`,
+  }),
+  cacheControl(60),
+  async (req, res) => {
+    try {
+      const parseResult = trendingSearchQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: 'Invalid trending parameters',
+          details: parseResult.error.flatten().fieldErrors,
+        });
+      }
+
+      const { days, limit } = parseResult.data;
+      const data = await getTopSearches(days, limit);
+      return res.json({ data });
+    } catch (error) {
+      console.error('Error fetching trending searches:', error);
+      return res.status(500).json({ error: 'Failed to fetch trending searches' });
+    }
+  }
+);
+
 // Search announcements (cached)
 router.get(
   '/search',
@@ -445,8 +591,10 @@ router.get(
         type: 'search',
         metadata: {
           query: normalizedQuery,
+          resultsCount: announcements.length,
           queryLength: filters.q.length,
-          type: filters.type ?? null,
+          typeFilter: filters.type ?? null,
+          source: pickQueryValue(req.query.source) ?? 'overlay_submit',
         },
       }).catch(console.error);
 
@@ -608,8 +756,11 @@ router.post('/', authenticateToken, requirePermission('announcements:write'), as
       console.error('Failed to send Telegram notification:', err);
     });
 
-    // Note: Push notifications and email subscriptions removed (PostgreSQL dependency)
-    // These can be re-implemented with MongoDB if needed
+    if (announcement.status === 'published' && announcement.isActive) {
+      dispatchAnnouncementToSubscribers(announcement, { frequency: 'instant' }).catch((err) => {
+        console.error('Failed to dispatch publish notifications:', err);
+      });
+    }
 
     await invalidateAnnouncementCaches().catch(err => {
       console.error('Failed to invalidate caches after create:', err);
@@ -630,6 +781,11 @@ router.patch('/:id', authenticateToken, requirePermission('announcements:write')
       return res.status(400).json({ error: 'Invalid announcement ID' });
     }
 
+    const existing = await AnnouncementModel.findById(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Announcement not found' });
+    }
+
     const updateSchema = createAnnouncementPartialSchema;
     const parseResult = updateSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -639,6 +795,12 @@ router.patch('/:id', authenticateToken, requirePermission('announcements:write')
     const announcement = await AnnouncementModel.update(id, parseResult.data as Partial<CreateAnnouncementDto>, req.user?.userId);
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
+    }
+
+    if (existing.status !== 'published' && announcement.status === 'published' && announcement.isActive) {
+      dispatchAnnouncementToSubscribers(announcement, { frequency: 'instant' }).catch((err) => {
+        console.error('Failed to dispatch publish notifications:', err);
+      });
     }
 
     await invalidateAnnouncementCaches().catch(err => {

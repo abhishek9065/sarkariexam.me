@@ -2,9 +2,11 @@ import { ObjectId } from 'mongodb';
 import { describe, expect, it } from 'vitest';
 
 import {
+  approveAdminApprovalRequest,
   cleanupOldAdminApprovals,
   createAdminApprovalRequest,
   getAdminApprovalRequest,
+  markAdminApprovalExecuted,
   validateApprovalForExecution,
 } from '../services/adminApprovals.js';
 import { getCollection } from '../services/cosmosdb.js';
@@ -12,6 +14,100 @@ import { getCollection } from '../services/cosmosdb.js';
 const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
 
 describeOrSkip('Admin approvals lifecycle', () => {
+  it('validates approved requests and rejects mismatched execution payload', async () => {
+    const approval = await createAdminApprovalRequest({
+      actionType: 'announcement_publish',
+      endpoint: '/api/admin/announcements/alpha/approve',
+      method: 'POST',
+      targetIds: ['alpha'],
+      payload: { status: 'published', note: 'initial' },
+      requestedBy: {
+        userId: 'requester-hash',
+        email: 'requester-hash@example.com',
+        role: 'editor',
+      },
+    });
+
+    const approved = await approveAdminApprovalRequest({
+      id: approval.id,
+      approvedBy: {
+        userId: 'reviewer-hash',
+        email: 'reviewer-hash@example.com',
+      },
+    });
+    expect(approved.ok).toBe(true);
+    expect(approved.approval?.status).toBe('approved');
+
+    const validExecution = await validateApprovalForExecution({
+      id: approval.id,
+      actionType: 'announcement_publish',
+      endpoint: '/api/admin/announcements/alpha/approve',
+      method: 'POST',
+      targetIds: ['alpha'],
+      payload: { status: 'published', note: 'initial' },
+    });
+    expect(validExecution.ok).toBe(true);
+
+    const mismatchedExecution = await validateApprovalForExecution({
+      id: approval.id,
+      actionType: 'announcement_publish',
+      endpoint: '/api/admin/announcements/alpha/approve',
+      method: 'POST',
+      targetIds: ['alpha'],
+      payload: { status: 'published', note: 'changed' },
+    });
+    expect(mismatchedExecution.ok).toBe(false);
+    expect(mismatchedExecution.reason).toBe('request_mismatch');
+  });
+
+  it('marks approved requests as executed and blocks re-validation', async () => {
+    const approval = await createAdminApprovalRequest({
+      actionType: 'announcement_delete',
+      endpoint: '/api/admin/announcements/to-delete',
+      method: 'DELETE',
+      targetIds: ['to-delete'],
+      payload: {},
+      requestedBy: {
+        userId: 'requester-exec',
+        email: 'requester-exec@example.com',
+        role: 'admin',
+      },
+    });
+
+    const approved = await approveAdminApprovalRequest({
+      id: approval.id,
+      approvedBy: {
+        userId: 'reviewer-exec',
+        email: 'reviewer-exec@example.com',
+      },
+    });
+    expect(approved.ok).toBe(true);
+    expect(approved.approval?.status).toBe('approved');
+
+    await markAdminApprovalExecuted({
+      id: approval.id,
+      executedBy: {
+        userId: 'executor-exec',
+        email: 'executor-exec@example.com',
+      },
+    });
+
+    const executed = await getAdminApprovalRequest(approval.id);
+    expect(executed?.status).toBe('executed');
+    expect(executed?.executedByUserId).toBe('executor-exec');
+
+    const validationAfterExecution = await validateApprovalForExecution({
+      id: approval.id,
+      actionType: 'announcement_delete',
+      endpoint: '/api/admin/announcements/to-delete',
+      method: 'DELETE',
+      targetIds: ['to-delete'],
+      payload: {},
+    });
+    expect(validationAfterExecution.ok).toBe(false);
+    expect(validationAfterExecution.reason).toBe('invalid_status:executed');
+  });
+
   it('marks expired pending approvals as expired when fetched', async () => {
     const approval = await createAdminApprovalRequest({
       actionType: 'announcement_publish',
