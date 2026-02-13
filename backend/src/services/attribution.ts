@@ -81,6 +81,8 @@ const SOURCE_ALIASES: Record<string, string> = {
   newsletter: 'email',
   mail: 'email',
   notification: 'push',
+  notification_prompt: 'push',
+  push_prompt: 'push',
   app: 'push',
   '(direct)': 'direct',
   none: 'direct',
@@ -223,4 +225,3 @@ export function normalizeAttribution(input: RawAttributionInput): NormalizedAttr
     isDigest: normalizedSource === 'digest' || Boolean(digestType),
   };
 }
-

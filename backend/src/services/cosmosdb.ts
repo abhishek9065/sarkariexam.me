@@ -209,6 +209,9 @@ async function createIndexes(): Promise<void> {
         await subscriptions.createIndex({ email: 1 }, { unique: true });
         await subscriptions.createIndex({ verificationToken: 1 });
         await subscriptions.createIndex({ unsubscribeToken: 1 });
+        await subscriptions.createIndex({ isActive: 1, verified: 1, frequency: 1 });
+        await subscriptions.createIndex({ frequency: 1, lastDigestDailySentAt: 1 });
+        await subscriptions.createIndex({ frequency: 1, lastDigestWeeklySentAt: 1 });
 
         // Push subscriptions indexes
         await pushSubscriptions.createIndex({ endpoint: 1 }, { unique: true });

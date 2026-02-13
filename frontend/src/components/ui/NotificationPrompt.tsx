@@ -14,6 +14,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 const dismissKey = 'notification_prompt_dismissed';
+const pushSource = 'notification_prompt';
 
 const getStoredDismissed = () => {
     try {
@@ -84,7 +85,7 @@ export function NotificationPrompt() {
                 const registration = await navigator.serviceWorker.ready;
 
                 // Get VAPID public key from backend
-                const response = await fetch(`${apiBase}/api/push/vapid-public-key`);
+                const response = await fetch(`${apiBase}/api/push/vapid-public-key?source=${encodeURIComponent(pushSource)}`);
 
                 // Check if VAPID keys are configured
                 if (!response.ok) {
@@ -105,7 +106,7 @@ export function NotificationPrompt() {
                 });
 
                 // Send subscription to backend
-                await fetch(`${apiBase}/api/push/subscribe`, {
+                await fetch(`${apiBase}/api/push/subscribe?source=${encodeURIComponent(pushSource)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(subscription.toJSON()),

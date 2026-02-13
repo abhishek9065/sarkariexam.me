@@ -72,6 +72,18 @@ interface AnalyticsData {
         mediums: Array<{ medium: string; clicks: number }>;
         campaigns: Array<{ campaign: string; clicks: number }>;
     };
+    pushConversion?: {
+        attempts: number;
+        successes: number;
+        failures: number;
+        successRate: number;
+        bySource: Array<{
+            source: string;
+            attempts: number;
+            successes: number;
+            failures: number;
+        }>;
+    };
     insights?: {
         viewTrendPct: number;
         viewTrendDirection: 'up' | 'down' | 'flat' | string;
@@ -368,6 +380,7 @@ export function AnalyticsDashboard({
                     topSearches: [],
                     digestClicks: { total: 0, variants: [], frequencies: [], campaigns: [] },
                     deepLinkAttribution: { total: 0, sources: [], mediums: [], campaigns: [] },
+                    pushConversion: { attempts: 0, successes: 0, failures: 0, successRate: 0, bySource: [] },
                     insights: {
                         viewTrendPct: 0,
                         viewTrendDirection: 'flat',
@@ -537,14 +550,24 @@ export function AnalyticsDashboard({
     const ctrByType = analytics.ctrByType ?? [];
     const digestClicks = analytics.digestClicks;
     const deepLinkAttribution = analytics.deepLinkAttribution;
+    const pushConversion = analytics.pushConversion;
     const topSearches = analytics.topSearches ?? [];
     const digestTotal = digestClicks?.total ?? 0;
     const deepLinkTotal = deepLinkAttribution?.total ?? 0;
+    const pushAttempts = pushConversion?.attempts ?? 0;
+    const pushSuccesses = pushConversion?.successes ?? 0;
+    const pushFailures = pushConversion?.failures ?? 0;
+    const pushSuccessRate = pushConversion?.successRate ?? 0;
     const digestNotConfigured = !digestClicks;
+    const pushNotConfigured = !pushConversion;
     const digestHasNoData = digestClicks && digestClicks.total === 0
         && digestClicks.variants.length === 0
         && digestClicks.frequencies.length === 0
         && digestClicks.campaigns.length === 0;
+    const pushHasNoData = pushConversion && pushConversion.attempts === 0
+        && pushConversion.successes === 0
+        && pushConversion.failures === 0
+        && pushConversion.bySource.length === 0;
     const deepLinkNotConfigured = !deepLinkAttribution;
     const deepLinkHasNoData = deepLinkAttribution && deepLinkAttribution.total === 0
         && deepLinkAttribution.sources.length === 0
@@ -1329,6 +1352,76 @@ export function AnalyticsDashboard({
                                 onClick={() => setActionMessage('Digest setup: configure provider, enable digest campaigns, and record digest_click events.')}
                             >
                                 Set up digest emails
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className={`analytics-section ${pushNotConfigured || pushHasNoData ? 'section-muted' : ''}`}>
+                <div className="analytics-section-header">
+                    <div>
+                        <h3>Push Subscription Conversion</h3>
+                        <p className="analytics-subtitle">Attempt, success, and failure quality by source.</p>
+                    </div>
+                </div>
+                {pushConversion ? (
+                    <>
+                        <div className="digest-grid">
+                            <div className="digest-card">
+                                <div className="digest-label">Attempts</div>
+                                <div className="digest-value">{formatMetric(pushAttempts)}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Successes</div>
+                                <div className="digest-value">{formatMetric(pushSuccesses)}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Failures</div>
+                                <div className="digest-value">{formatMetric(pushFailures)}</div>
+                            </div>
+                            <div className="digest-card">
+                                <div className="digest-label">Success rate</div>
+                                <div className="digest-value">{pushSuccessRate.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                        <div className="digest-card">
+                            <div className="digest-label">By source</div>
+                            <div className="digest-chips">
+                                {pushConversion.bySource.length === 0 ? (
+                                    <span className="digest-chip">No source data</span>
+                                ) : (
+                                    pushConversion.bySource.map((item) => (
+                                        <span key={item.source} className="digest-chip">
+                                            {item.source}: {item.successes}/{item.attempts}
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        {pushAttempts === 0 && (
+                            <div className="digest-note">No push subscription attempts recorded in the selected window.</div>
+                        )}
+                        {(pushHasNoData || pushNotConfigured) && (
+                            <div className="digest-cta">
+                                <button
+                                    className="admin-btn secondary small"
+                                    onClick={() => setActionMessage('Push conversion tracking: send source tags to /api/push/subscribe and record attempt/success/failure events.')}
+                                >
+                                    Configure push tracking
+                                </button>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="empty-state">
+                        Push conversion tracking not configured.
+                        <div className="digest-cta">
+                            <button
+                                className="admin-btn secondary small"
+                                onClick={() => setActionMessage('Push conversion tracking: send source tags to /api/push/subscribe and record attempt/success/failure events.')}
+                            >
+                                Configure push tracking
                             </button>
                         </div>
                     </div>

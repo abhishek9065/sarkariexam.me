@@ -138,7 +138,7 @@ async function listDueSubscribers(frequency: 'daily' | 'weekly', now: Date): Pro
             lastDigestDailySentAt: 1,
             lastDigestWeeklySentAt: 1,
         })
-        .toArray();
+        .toArray() as Promise<SubscriptionDoc[]>;
 }
 
 async function listCandidateAnnouncements(frequency: 'daily' | 'weekly', now: Date) {
@@ -251,4 +251,3 @@ export function stopDigestSender(): void {
     clearInterval(digestInterval);
     digestInterval = null;
 }
-

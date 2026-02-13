@@ -76,7 +76,7 @@ export async function dispatchAnnouncementToSubscribers(
                 unsubscribeToken: 1,
                 frequency: 1,
             })
-            .toArray();
+            .toArray() as SubscriptionDoc[];
     } catch (error) {
         console.error('[SubscriberDispatch] Failed to load subscriptions:', error);
         return { matched: 0, sent: 0, skipped: 0, frequency };
@@ -115,4 +115,3 @@ export async function dispatchAnnouncementToSubscribers(
         };
     }
 }
-

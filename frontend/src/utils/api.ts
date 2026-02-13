@@ -428,8 +428,8 @@ export async function removeBookmark(announcementId: string, token: string): Pro
 }
 
 // Subscribe to push notifications
-export async function subscribeToPush(subscription: PushSubscription): Promise<boolean> {
-    const response = await fetch(`${API_BASE}/api/push/subscribe`, {
+export async function subscribeToPush(subscription: PushSubscription, source = 'unknown'): Promise<boolean> {
+    const response = await fetch(`${API_BASE}/api/push/subscribe?source=${encodeURIComponent(source)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscription.toJSON())
