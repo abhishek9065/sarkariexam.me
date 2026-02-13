@@ -9,6 +9,7 @@ import { SECTIONS, type TabType, API_BASE, formatDate, formatNumber, getDaysRema
 import { fetchAnnouncements, fetchDashboardWidgets } from '../utils/api';
 import { fetchJson } from '../utils/http';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
+import { buildTrackedDetailPath } from '../utils/trackingLinks';
 import { useApplicationTracker } from '../hooks/useApplicationTracker';
 import type { Announcement, ContentType, DashboardWidgetPayload } from '../types';
 import './V2.css';
@@ -310,7 +311,7 @@ export function HomePage() {
 
     // Handle item click - navigate to SEO-friendly URL
     const handleItemClick = (item: Announcement) => {
-        navigate(`/${item.type}/${item.slug}`);
+        navigate(buildTrackedDetailPath(item.type, item.slug, 'home'));
     };
 
     // Navigate to category
@@ -351,7 +352,7 @@ export function HomePage() {
                 : filter === 'result'
                     ? '/results'
                     : '/admit-card';
-        const params = new URLSearchParams({ search: query });
+        const params = new URLSearchParams({ search: query, source: 'overlay_submit' });
         navigate(`${basePath}?${params.toString()}`);
     };
 
@@ -457,7 +458,7 @@ export function HomePage() {
                         onOpenCompare={() => {
                             if (compareEnabled) setShowCompareModal(true);
                         }}
-                        onOpenItem={(slug, type) => navigate(`/${type}/${slug}`)}
+                        onOpenItem={(slug, type) => navigate(buildTrackedDetailPath(type as ContentType, slug, 'home'))}
                     />
                 )}
 
@@ -615,6 +616,7 @@ export function HomePage() {
                                         title={section.title}
                                         items={items}
                                         onItemClick={handleItemClick}
+                                        detailSource="home"
                                         onViewMore={() => handleCategoryClick(section.type)}
                                     />
                                 );
@@ -644,7 +646,7 @@ export function HomePage() {
                         ) : recommendationsError ? (
                             <ErrorState message={recommendationsError} />
                         ) : recommendations.length > 0 ? (
-                            <SectionTable title="Recommended" items={recommendations} onItemClick={handleItemClick} />
+                            <SectionTable title="Recommended" items={recommendations} onItemClick={handleItemClick} detailSource="recommendations" />
                         ) : (
                             <p className="no-data">Update your profile preferences to see personalized suggestions.</p>
                         )}
@@ -697,7 +699,7 @@ export function HomePage() {
                 <SearchOverlay
                     open={showSearchOverlay}
                     onClose={() => setShowSearchOverlay(false)}
-                    onOpenDetail={(type, slug) => navigate(`/${type}/${slug}?source=search-overlay`)}
+                    onOpenDetail={(type, slug) => navigate(buildTrackedDetailPath(type, slug, 'search_overlay'))}
                     onOpenCategory={handleOverlayCategorySearch}
                 />
             )}

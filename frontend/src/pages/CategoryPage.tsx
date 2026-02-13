@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav, ScrollToTop, CompareJobs } from '../components';
 import { SearchOverlay } from '../components/modals/SearchOverlay';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +8,7 @@ import { useApplicationTracker } from '../hooks/useApplicationTracker';
 import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS, isFeatureEnabled } from '../utils';
 import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
+import { buildTrackedDetailPath } from '../utils/trackingLinks';
 import type { Announcement, ContentType } from '../types';
 import './V2.css';
 
@@ -58,6 +59,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const [compareSelection, setCompareSelection] = useState<Announcement[]>([]);
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout, isAuthenticated, token } = useAuth();
     const { items: trackedApplications } = useApplicationTracker();
     const [, setShowAuthModal] = useState(false);
@@ -65,6 +67,10 @@ export function CategoryPage({ type }: CategoryPageProps) {
     const searchOverlayEnabled = isFeatureEnabled('search_overlay_v2');
     const compareEnabled = isFeatureEnabled('compare_jobs_v2');
     const LOAD_TIMEOUT_MS = 8000;
+    const searchSource = useMemo(() => {
+        const value = new URLSearchParams(location.search).get('source');
+        return value === 'overlay_submit' ? value : undefined;
+    }, [location.search]);
 
     useEffect(() => {
         let isActive = true;
@@ -101,6 +107,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
             ageMin: filters.minAge ? Number(filters.minAge) : undefined,
             ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
             sort: apiSort,
+            source: filters.keyword ? (searchSource ?? 'category_query') : 'category',
         })
             .then(response => {
                 if (!isActive || didTimeout) return;
@@ -131,7 +138,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
             isActive = false;
             clearTimeout(timeoutId);
         };
-    }, [type, filters]);
+    }, [type, filters, searchSource]);
 
     useEffect(() => {
         setFilters((prev) => ({ ...prev, type }));
@@ -176,7 +183,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
     }, []);
 
     const handleItemClick = (item: Announcement) => {
-        navigate(`/${item.type}/${item.slug}`);
+        navigate(buildTrackedDetailPath(item.type, item.slug, 'category'));
     };
 
     const handleFilterChange = useCallback((nextFilters: FilterState) => {
@@ -339,7 +346,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 : filter === 'result'
                     ? '/results'
                     : '/admit-card';
-        const params = new URLSearchParams({ search: query });
+        const params = new URLSearchParams({ search: query, source: 'overlay_submit' });
         navigate(`${basePath}?${params.toString()}`);
     };
 
@@ -366,6 +373,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 ageMin: filters.minAge ? Number(filters.minAge) : undefined,
                 ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
                 sort: apiSort,
+                source: filters.keyword ? (searchSource ?? 'category_query') : 'category',
             });
             setData(prev => [...prev, ...response.data] as Announcement[]);
             setCursor(response.nextCursor ?? null);
@@ -376,7 +384,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
         } finally {
             setLoadingMore(false);
         }
-    }, [hasMore, loadingMore, filters, cursor, type]);
+    }, [hasMore, loadingMore, filters, cursor, type, searchSource]);
 
     useEffect(() => {
         const target = loadMoreRef.current;
@@ -787,7 +795,7 @@ export function CategoryPage({ type }: CategoryPageProps) {
                 <SearchOverlay
                     open={showSearchOverlay}
                     onClose={() => setShowSearchOverlay(false)}
-                    onOpenDetail={(itemType, slug) => navigate(`/${itemType}/${slug}?source=search-overlay`)}
+                    onOpenDetail={(itemType, slug) => navigate(buildTrackedDetailPath(itemType, slug, 'search_overlay'))}
                     onOpenCategory={handleOverlayCategorySearch}
                 />
             )}

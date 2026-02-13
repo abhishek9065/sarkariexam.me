@@ -8,6 +8,7 @@ import { API_BASE, isFeatureEnabled } from '../utils';
 import { fetchDashboardWidgets } from '../utils/api';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { formatNumber } from '../utils/formatters';
+import { buildTrackedDetailPath } from '../utils/trackingLinks';
 import type { TabType } from '../utils/constants';
 import type { Announcement, ContentType, DashboardWidgetPayload, TrackedApplication } from '../types';
 import './ProfilePage.css';
@@ -630,7 +631,7 @@ export function ProfilePage() {
                 : filter === 'result'
                     ? '/results'
                     : '/admit-card';
-        const params = new URLSearchParams({ search: query });
+        const params = new URLSearchParams({ search: query, source: 'overlay_submit' });
         navigate(`${basePath}?${params.toString()}`);
     };
 
@@ -709,7 +710,7 @@ export function ProfilePage() {
                             onOpenCompare={() => {
                                 if (compareEnabled) setShowCompareModal(true);
                             }}
-                            onOpenItem={(slug, itemType) => navigate(`/${itemType}/${slug}`)}
+                            onOpenItem={(slug, itemType) => navigate(buildTrackedDetailPath(itemType as ContentType, slug, 'profile'))}
                         />
                     )}
 
@@ -846,7 +847,7 @@ export function ProfilePage() {
                                         <div
                                             key={rec.id}
                                             className="recommendation-card"
-                                            onClick={() => navigate(`/${rec.type}/${rec.slug}`)}
+                                            onClick={() => navigate(buildTrackedDetailPath(rec.type, rec.slug, 'recommendations'))}
                                             onMouseEnter={() => prefetchAnnouncementDetail(rec.slug)}
                                         >
                                             <div className="match-score">
@@ -908,7 +909,7 @@ export function ProfilePage() {
                                                 <div className="saved-search-actions">
                                                     <button
                                                         className="admin-btn secondary small"
-                                                        onClick={() => navigate(`/${entry.type}/${entry.slug}`)}
+                                                        onClick={() => navigate(buildTrackedDetailPath(entry.type, entry.slug, 'tracker'))}
                                                     >
                                                         Open
                                                     </button>
@@ -1295,7 +1296,7 @@ export function ProfilePage() {
                                                                 <div
                                                                     key={match.id}
                                                                     className="alert-item"
-                                                                    onClick={() => navigate(`/${match.type}/${match.slug}`)}
+                                                                    onClick={() => navigate(buildTrackedDetailPath(match.type, match.slug, 'profile'))}
                                                                     onMouseEnter={() => prefetchAnnouncementDetail(match.slug)}
                                                                 >
                                                                     <div>
@@ -1332,7 +1333,7 @@ export function ProfilePage() {
                                                     <div
                                                         key={match.id}
                                                         className="alert-item"
-                                                        onClick={() => navigate(`/${match.type}/${match.slug}`)}
+                                                        onClick={() => navigate(buildTrackedDetailPath(match.type, match.slug, 'profile'))}
                                                         onMouseEnter={() => prefetchAnnouncementDetail(match.slug)}
                                                     >
                                                         <div>
@@ -1364,7 +1365,7 @@ export function ProfilePage() {
                                                         <div
                                                             key={item.id}
                                                             className="alert-item"
-                                                            onClick={() => navigate(`/${item.type}/${item.slug}`)}
+                                                            onClick={() => navigate(buildTrackedDetailPath(item.type, item.slug, 'profile'))}
                                                             onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
                                                         >
                                                             <div>
@@ -1397,7 +1398,7 @@ export function ProfilePage() {
                 <SearchOverlay
                     open={showSearchOverlay}
                     onClose={() => setShowSearchOverlay(false)}
-                    onOpenDetail={(type, slug) => navigate(`/${type}/${slug}?source=search-overlay`)}
+                    onOpenDetail={(type, slug) => navigate(buildTrackedDetailPath(type, slug, 'search_overlay'))}
                     onOpenCategory={handleOverlayCategorySearch}
                 />
             )}
@@ -1409,7 +1410,7 @@ export function ProfilePage() {
                     onSelectionChange={setCompareSelection}
                     onViewJob={(item) => {
                         setShowCompareModal(false);
-                        navigate(`/${item.type}/${item.slug}`);
+                        navigate(buildTrackedDetailPath(item.type, item.slug, 'profile'));
                     }}
                     onClose={() => setShowCompareModal(false)}
                 />

@@ -31,7 +31,7 @@ jobs:
         run: npm run build
 
       - name: Run backend tests
-        run: npm test
+        run: npm run test:ci
 
   frontend-build:
     name: Frontend Build

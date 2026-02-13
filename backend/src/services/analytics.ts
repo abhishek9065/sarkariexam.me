@@ -1,6 +1,7 @@
 import type { Collection } from 'mongodb';
 
 import { getCollection } from './cosmosdb.js';
+import { classifySource } from './attribution.js';
 
 export type AnalyticsEventType =
     | 'announcement_view'
@@ -18,7 +19,10 @@ export type AnalyticsEventType =
     | 'digest_preview'
     | 'alerts_view'
     | 'digest_click'
-    | 'deep_link_click';
+    | 'deep_link_click'
+    | 'push_subscribe_attempt'
+    | 'push_subscribe_success'
+    | 'push_subscribe_failure';
 
 interface AnalyticsEventDoc {
     type: AnalyticsEventType;
@@ -46,6 +50,9 @@ interface AnalyticsRollupDoc {
     digestClicks: number;
     deepLinkClicks: number;
     alertsViewed: number;
+    pushSubscribeAttempts: number;
+    pushSubscribeSuccesses: number;
+    pushSubscribeFailures: number;
     announcementCount: number;
     updatedAt: Date;
 }
@@ -135,6 +142,81 @@ export async function getTopSearches(days: number = DEFAULT_ROLLUP_DAYS, limit =
     }
 }
 
+export async function getFunnelAttributionSplit(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
+    totalCardClicks: number;
+    cardClicksInApp: number;
+    detailViewsDirect: number;
+    detailViewsUnattributed: number;
+}> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) {
+        return {
+            totalCardClicks: 0,
+            cardClicksInApp: 0,
+            detailViewsDirect: 0,
+            detailViewsUnattributed: 0,
+        };
+    }
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    try {
+        const rows = await events.aggregate([
+            {
+                $match: {
+                    type: 'card_click',
+                    createdAt: { $gte: start },
+                },
+            },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.source', '__none__'] },
+                    count: { $sum: 1 },
+                },
+            },
+        ]).toArray();
+
+        let totalCardClicks = 0;
+        let cardClicksInApp = 0;
+        let detailViewsDirect = 0;
+        let detailViewsUnattributed = 0;
+
+        for (const row of rows) {
+            const count = Number(row.count ?? 0);
+            if (!Number.isFinite(count) || count <= 0) continue;
+
+            totalCardClicks += count;
+
+            const source = row._id === '__none__' ? null : String(row._id);
+            const sourceClass = classifySource(source);
+            if (sourceClass === 'in_app') {
+                cardClicksInApp += count;
+            } else if (sourceClass === 'direct') {
+                detailViewsDirect += count;
+            } else {
+                detailViewsUnattributed += count;
+            }
+        }
+
+        return {
+            totalCardClicks,
+            cardClicksInApp,
+            detailViewsDirect,
+            detailViewsUnattributed,
+        };
+    } catch (error) {
+        console.error('[Analytics] Failed to load funnel attribution split:', error);
+        return {
+            totalCardClicks: 0,
+            cardClicksInApp: 0,
+            detailViewsDirect: 0,
+            detailViewsUnattributed: 0,
+        };
+    }
+}
+
 export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promise<void> {
     const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
     const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');
@@ -212,6 +294,9 @@ export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promi
                     digestClicks: counts.digest_click ?? 0,
                     deepLinkClicks: counts.deep_link_click ?? 0,
                     alertsViewed: counts.alerts_view ?? 0,
+                    pushSubscribeAttempts: counts.push_subscribe_attempt ?? 0,
+                    pushSubscribeSuccesses: counts.push_subscribe_success ?? 0,
+                    pushSubscribeFailures: counts.push_subscribe_failure ?? 0,
                     announcementCount: postMap.get(dateKey) ?? 0,
                     updatedAt: now,
                 }
@@ -300,6 +385,9 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
     digestClicks: number;
     deepLinkClicks: number;
     alertsViewed: number;
+    pushSubscribeAttempts: number;
+    pushSubscribeSuccesses: number;
+    pushSubscribeFailures: number;
 }> {
     const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');
     if (!rollups) {
@@ -322,6 +410,9 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
             digestClicks: 0,
             deepLinkClicks: 0,
             alertsViewed: 0,
+            pushSubscribeAttempts: 0,
+            pushSubscribeSuccesses: 0,
+            pushSubscribeFailures: 0,
         };
     }
 
@@ -355,6 +446,9 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
                 digestClicks: 0,
                 deepLinkClicks: 0,
                 alertsViewed: 0,
+                pushSubscribeAttempts: 0,
+                pushSubscribeSuccesses: 0,
+                pushSubscribeFailures: 0,
             };
         }
 
@@ -397,6 +491,9 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
                 digestClicks: getCount('digest_click'),
                 deepLinkClicks: getCount('deep_link_click'),
                 alertsViewed: getCount('alerts_view'),
+                pushSubscribeAttempts: getCount('push_subscribe_attempt'),
+                pushSubscribeSuccesses: getCount('push_subscribe_success'),
+                pushSubscribeFailures: getCount('push_subscribe_failure'),
             };
         } catch (error) {
             console.error('[Analytics] Rollup fallback failed:', error);
@@ -428,6 +525,9 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
             digestClicks: acc.digestClicks + (doc.digestClicks ?? 0),
             deepLinkClicks: acc.deepLinkClicks + (doc.deepLinkClicks ?? 0),
             alertsViewed: acc.alertsViewed + (doc.alertsViewed ?? 0),
+            pushSubscribeAttempts: acc.pushSubscribeAttempts + (doc.pushSubscribeAttempts ?? 0),
+            pushSubscribeSuccesses: acc.pushSubscribeSuccesses + (doc.pushSubscribeSuccesses ?? 0),
+            pushSubscribeFailures: acc.pushSubscribeFailures + (doc.pushSubscribeFailures ?? 0),
         };
     }, {
         days,
@@ -448,6 +548,9 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
         digestClicks: 0,
         deepLinkClicks: 0,
         alertsViewed: 0,
+        pushSubscribeAttempts: 0,
+        pushSubscribeSuccesses: 0,
+        pushSubscribeFailures: 0,
     });
 }
 

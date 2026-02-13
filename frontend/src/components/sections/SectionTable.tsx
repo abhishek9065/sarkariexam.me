@@ -2,6 +2,7 @@ import type { Announcement } from '../../types';
 import { useLanguage } from '../../context/LanguageContextStore';
 import { formatNumber } from '../../utils/formatters';
 import { prefetchAnnouncementDetail } from '../../utils/prefetch';
+import { buildTrackedDetailPath, type DetailSource } from '../../utils/trackingLinks';
 
 interface SectionTableProps {
     title: string;
@@ -11,9 +12,19 @@ interface SectionTableProps {
     fullWidth?: boolean;
     compact?: boolean;
     limit?: number;
+    detailSource?: DetailSource;
 }
 
-export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth, compact = false, limit = 10 }: SectionTableProps) {
+export function SectionTable({
+    title,
+    items,
+    onViewMore,
+    onItemClick,
+    fullWidth,
+    compact = false,
+    limit = 10,
+    detailSource = 'section_table',
+}: SectionTableProps) {
     const { t } = useLanguage();
     const formatShortDate = (date: string | undefined) => {
         if (!date) return '';
@@ -43,7 +54,7 @@ export function SectionTable({ title, items, onViewMore, onItemClick, fullWidth,
                         items.slice(0, limit).map((item) => (
                             <li key={item.id} className="section-item">
                                 <a
-                                    href={`/${item.type}/${item.slug}`}
+                                    href={buildTrackedDetailPath(item.type, item.slug, detailSource)}
                                     onClick={(e) => { e.preventDefault(); onItemClick(item); }}
                                     onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
                                     onFocus={() => prefetchAnnouncementDetail(item.slug)}

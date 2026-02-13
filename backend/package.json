@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:ci": "vitest run && npm run verify:openapi-parity",
+    "verify:openapi-parity": "tsx scripts/verify-openapi-parity.ts"
   },
   "engines": {
     "node": ">=20.x"

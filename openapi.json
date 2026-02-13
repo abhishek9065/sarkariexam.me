@@ -1068,6 +1068,64 @@
         }
       }
     },
+    "/api/announcements/search/suggest": {
+      "get": {
+        "summary": "GET /api/announcements/search/suggest",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsSearchSuggest",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/search/trending": {
+      "get": {
+        "summary": "GET /api/announcements/search/trending",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsSearchTrending",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/announcements/v2": {
       "get": {
         "summary": "GET /api/announcements/v2",
@@ -2766,6 +2824,196 @@
             }
           }
         ]
+      }
+    },
+    "/api/profile/tracked-applications": {
+      "get": {
+        "summary": "GET /api/profile/tracked-applications",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "getApiProfileTrackedApplications",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/profile/tracked-applications",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "postApiProfileTrackedApplications",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/tracked-applications/{id}": {
+      "patch": {
+        "summary": "PATCH /api/profile/tracked-applications/{id}",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "patchApiProfileTrackedApplicationsId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/profile/tracked-applications/{id}",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "deleteApiProfileTrackedApplicationsId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/profile/tracked-applications/import": {
+      "post": {
+        "summary": "POST /api/profile/tracked-applications/import",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "postApiProfileTrackedApplicationsImport",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/widgets": {
+      "get": {
+        "summary": "GET /api/profile/widgets",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "getApiProfileWidgets",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
       }
     },
     "/api/push/subscribe": {

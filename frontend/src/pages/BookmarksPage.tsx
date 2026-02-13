@@ -7,6 +7,7 @@ import { useBookmarks } from '../hooks/useData';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { formatNumber } from '../utils/formatters';
 import { getDaysRemaining } from '../utils';
+import { buildTrackedDetailPath } from '../utils/trackingLinks';
 import type { Announcement } from '../types';
 import './V2.css';
 
@@ -23,7 +24,7 @@ export function BookmarksPage() {
     };
 
     const handleItemClick = (item: Announcement) => {
-        navigate(`/${item.type}/${item.slug}`);
+        navigate(buildTrackedDetailPath(item.type, item.slug, 'bookmarks'));
     };
 
     const normalizedQuery = query.trim().toLowerCase();

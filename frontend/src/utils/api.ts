@@ -15,6 +15,13 @@ import type { paths } from '../types/api';
 type AnnouncementCardsResponse =
     paths['/api/announcements/v3/cards']['get']['responses'][200]['content']['application/json'];
 
+const allowMockFallback = Boolean(import.meta.env.DEV);
+
+const createBackendUnavailableError = (operation: string, error: unknown) => {
+    const reason = error instanceof Error ? error.message : 'unknown error';
+    return new Error(`[API] ${operation} failed: ${reason}`);
+};
+
 interface AnnouncementCardQuery {
     type?: ContentType;
     category?: string | string[];
@@ -30,6 +37,7 @@ interface AnnouncementCardQuery {
     limit?: number;
     cursor?: string | null;
     prefetch?: boolean;
+    source?: string;
 }
 
 function cardToAnnouncement(card: AnnouncementCard): Announcement {
@@ -73,6 +81,7 @@ export async function fetchAnnouncementCardsPage(
         if (query.limit) params.set('limit', String(query.limit));
         if (query.cursor) params.set('cursor', query.cursor);
         if (query.prefetch) params.set('prefetch', '1');
+        if (query.source) params.set('source', query.source);
 
         const body = await fetchJson<AnnouncementCardsResponse>(
             `${API_BASE}/api/announcements/v3/cards?${params.toString()}`,
@@ -84,7 +93,11 @@ export async function fetchAnnouncementCardsPage(
         }
         return body;
     } catch (error) {
-        console.warn('Backend unavailable, using mock data:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncementCardsPage', error);
+        }
+
+        console.warn('Backend unavailable, using mock data (dev only):', error);
         // Fallback to mock data
         const mockData = filterMockAnnouncements({
             type: query.type,
@@ -139,7 +152,10 @@ export async function fetchAnnouncements(maxItems = 150): Promise<Announcement[]
     try {
         return await fetchCardPages({}, maxItems);
     } catch (error) {
-        console.warn('Using mock data for fetchAnnouncements:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncements', error);
+        }
+        console.warn('Using mock data for fetchAnnouncements (dev only):', error);
         return filterMockAnnouncements({ limit: maxItems });
     }
 }
@@ -149,7 +165,10 @@ export async function fetchAnnouncementsByType(type: ContentType, maxItems = 100
     try {
         return await fetchCardPages({ type }, maxItems);
     } catch (error) {
-        console.warn('Using mock data for fetchAnnouncementsByType:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncementsByType', error);
+        }
+        console.warn('Using mock data for fetchAnnouncementsByType (dev only):', error);
         return filterMockAnnouncements({ type, limit: maxItems });
     }
 }
@@ -172,7 +191,10 @@ export async function fetchAnnouncementBySlug(slug: string, query?: string | URL
         );
         return body.data;
     } catch (error) {
-        console.warn('Backend unavailable for slug fetch, using mock data:', error);
+        if (!allowMockFallback) {
+            throw createBackendUnavailableError('fetchAnnouncementBySlug', error);
+        }
+        console.warn('Backend unavailable for slug fetch, using mock data (dev only):', error);
         // Fallback to mock data
         return findMockBySlug(slug);
     }
@@ -211,15 +233,42 @@ export async function fetchAnnouncementOrganizations(): Promise<string[]> {
 export async function fetchSearchSuggestions(query: string, options?: {
     type?: ContentType;
     limit?: number;
+    source?: string;
 }): Promise<SearchSuggestion[]> {
     const params = new URLSearchParams();
     params.set('q', query);
     if (options?.type) params.set('type', options.type);
     if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    if (options?.source) params.set('source', options.source);
 
     try {
         const body = await fetchJson<{ data: SearchSuggestion[] }>(
             `${API_BASE}/api/announcements/search/suggest?${params.toString()}`,
+            {},
+            { timeoutMs: 4000, retries: 1 }
+        );
+        return Array.isArray(body.data) ? body.data : [];
+    } catch {
+        return [];
+    }
+}
+
+export async function fetchTrendingSearchTerms(options?: {
+    days?: number;
+    limit?: number;
+}): Promise<Array<{ query: string; count: number }>> {
+    const params = new URLSearchParams();
+    if (options?.days !== undefined) params.set('days', String(options.days));
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+
+    const queryString = params.toString();
+    const path = queryString
+        ? `${API_BASE}/api/announcements/search/trending?${queryString}`
+        : `${API_BASE}/api/announcements/search/trending`;
+
+    try {
+        const body = await fetchJson<{ data: Array<{ query: string; count: number }> }>(
+            path,
             {},
             { timeoutMs: 4000, retries: 1 }
         );

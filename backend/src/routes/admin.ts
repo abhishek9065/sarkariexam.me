@@ -18,10 +18,12 @@ import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolic
 import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
 import { getDailyRollups } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
+import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
+import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
-import { ContentType, CreateAnnouncementDto } from '../types.js';
+import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = Router();
 
@@ -173,6 +175,29 @@ const mapApprovalResolveFailure = (reason?: string) => {
         return { status: 409, code: 'approval_invalid_status' };
     }
     return { status: 400, code: 'approval_invalid' };
+};
+
+const normalizeAnnouncementStatus = (status?: string | null) => status ?? 'published';
+
+const isPublishedStatus = (status?: string | null) => normalizeAnnouncementStatus(status) === 'published';
+
+const dispatchPublishNotifications = async (announcements: Announcement[]) => {
+    if (!announcements.length) return;
+
+    const publishable = announcements.filter(
+        (announcement) => announcement.status === 'published' && announcement.isActive
+    );
+    if (!publishable.length) return;
+
+    await Promise.allSettled(
+        publishable.map((announcement) => dispatchAnnouncementToSubscribers(announcement, { frequency: 'instant' }))
+    );
+};
+
+const dispatchPublishNotificationsByIds = async (ids: string[]) => {
+    if (!ids.length) return;
+    const announcements = await AnnouncementModelMongo.findByIds(ids);
+    await dispatchPublishNotifications(announcements);
 };
 
 const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Date | undefined => {
@@ -926,6 +951,12 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
             userId,
             metadata: { status: announcement.status },
         }).catch(console.error);
+        await dispatchPublishNotifications([announcement]).catch((err) => {
+            console.error('Failed to dispatch publish notifications after admin create:', err);
+        });
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin create:', err);
+        });
         return res.status(201).json({ data: announcement });
     } catch (error) {
         console.error('Create announcement error:', error);
@@ -948,11 +979,17 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
             ids: string[];
             data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
         };
+        let publishTransitionIds: string[] = [];
         if (data.status === 'published' && !hasPermission(req.user?.role as any, 'announcements:approve')) {
             return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
         }
         let approvalId: string | undefined;
         if (data.status === 'published') {
+            const existingDocs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+            publishTransitionIds = existingDocs
+                .filter((doc) => !isPublishedStatus(doc.status as any))
+                .map((doc) => doc._id?.toString())
+                .filter(Boolean);
             const approvalGate = await requireDualApproval(req, res, {
                 actionType: 'announcement_bulk_publish',
                 targetIds: ids,
@@ -972,6 +1009,12 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
         }).catch(console.error);
 
         await finalizeApprovalExecution(req, approvalId);
+        await dispatchPublishNotificationsByIds(publishTransitionIds).catch((err) => {
+            console.error('Failed to dispatch publish notifications after admin bulk update:', err);
+        });
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin bulk update:', err);
+        });
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk update error:', error);
@@ -991,6 +1034,11 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
         }
 
         const { ids, note } = parseResult.data;
+        const existingDocs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+        const publishTransitionIds = existingDocs
+            .filter((doc) => !isPublishedStatus(doc.status as any))
+            .map((doc) => doc._id?.toString())
+            .filter(Boolean);
         const approvalGate = await requireDualApproval(req, res, {
             actionType: 'announcement_bulk_publish',
             targetIds: ids,
@@ -1018,6 +1066,12 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
         }).catch(console.error);
 
         await finalizeApprovalExecution(req, approvalGate.approvalId);
+        await dispatchPublishNotificationsByIds(publishTransitionIds).catch((err) => {
+            console.error('Failed to dispatch publish notifications after admin bulk approve:', err);
+        });
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin bulk approve:', err);
+        });
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk approve error:', error);
@@ -1053,6 +1107,9 @@ router.post('/announcements/bulk-reject', requirePermission('announcements:appro
             metadata: { count: ids.length },
         }).catch(console.error);
 
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin bulk reject:', err);
+        });
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk reject error:', error);
@@ -1075,6 +1132,10 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
         const note = typeof (parseResult.data as any).note === 'string'
             ? (parseResult.data as any).note.trim() || undefined
             : undefined;
+        const existing = await AnnouncementModelMongo.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
         const announcement = await AnnouncementModelMongo.update(
             req.params.id,
             parseResult.data as unknown as Partial<CreateAnnouncementDto> & { note?: string },
@@ -1091,6 +1152,14 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
             note,
             metadata: { fields: Object.keys(parseResult.data) },
         }).catch(console.error);
+        if (existing.status !== 'published' && announcement.status === 'published' && announcement.isActive) {
+            await dispatchPublishNotifications([announcement]).catch((err) => {
+                console.error('Failed to dispatch publish notifications after admin update:', err);
+            });
+        }
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin update:', err);
+        });
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Update announcement error:', error);
@@ -1105,6 +1174,10 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
 router.post('/announcements/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
+        const existing = await AnnouncementModelMongo.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
         const approvalGate = await requireDualApproval(req, res, {
             actionType: 'announcement_publish',
             targetIds: [req.params.id],
@@ -1135,7 +1208,15 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
             userId: req.user?.userId,
             note,
         }).catch(console.error);
+        if (existing.status !== 'published' && announcement.status === 'published' && announcement.isActive) {
+            await dispatchPublishNotifications([announcement]).catch((err) => {
+                console.error('Failed to dispatch publish notifications after admin approve:', err);
+            });
+        }
         await finalizeApprovalExecution(req, approvalGate.approvalId);
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin approve:', err);
+        });
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Approve announcement error:', error);
@@ -1170,6 +1251,9 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
             userId: req.user?.userId,
             note,
         }).catch(console.error);
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin reject:', err);
+        });
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Reject announcement error:', error);
@@ -1200,6 +1284,9 @@ router.delete('/announcements/:id', requirePermission('announcements:delete'), r
             userId: req.user?.userId,
         }).catch(console.error);
         await finalizeApprovalExecution(req, approvalGate.approvalId);
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin delete:', err);
+        });
         return res.json({ message: 'Announcement deleted' });
     } catch (error) {
         console.error('Delete announcement error:', error);

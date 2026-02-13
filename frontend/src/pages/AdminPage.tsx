@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import type { Announcement, ContentType, AnnouncementStatus } from '../types';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
+import { buildTrackedDetailPath } from '../utils/trackingLinks';
 import { adminRequest } from '../utils/adminRequest';
 import {
     ADMIN_TAB_META,
@@ -1582,7 +1583,7 @@ export function AdminPage() {
 
     const handleView = (item: Announcement) => {
         if (!item.slug) return;
-        const url = `/${item.type}/${item.slug}`;
+        const url = buildTrackedDetailPath(item.type, item.slug, 'admin');
         window.open(url, '_blank', 'noopener,noreferrer');
     };
 

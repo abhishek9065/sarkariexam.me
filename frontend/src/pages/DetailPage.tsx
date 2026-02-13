@@ -8,6 +8,7 @@ import { useApplicationTracker } from '../hooks/useApplicationTracker';
 import { formatDate, formatNumber, getDaysRemaining, isExpired, isUrgent, TYPE_LABELS, SELECTION_MODES, PATHS, type TabType, isFeatureEnabled } from '../utils';
 import { prefetchAnnouncementDetail } from '../utils/prefetch';
 import { fetchAnnouncementBySlug, fetchAnnouncementsByType } from '../utils/api';
+import { buildTrackedDetailPath } from '../utils/trackingLinks';
 import type { Announcement, ContentType } from '../types';
 import './V2.css';
 
@@ -374,7 +375,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
     ];
 
     const handleRelatedClick = (relatedItem: Announcement) => {
-        navigate(`/${relatedItem.type}/${relatedItem.slug}`);
+        navigate(buildTrackedDetailPath(relatedItem.type, relatedItem.slug, 'related'));
     };
     const trackedRecord = useMemo(
         () => item ? trackedApplications.find((entry) => entry.slug === item.slug) : undefined,
@@ -408,7 +409,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                 : filter === 'result'
                     ? '/results'
                     : '/admit-card';
-        const params = new URLSearchParams({ search: query });
+        const params = new URLSearchParams({ search: query, source: 'overlay_submit' });
         navigate(`${basePath}?${params.toString()}`);
     };
 
@@ -782,7 +783,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                     </div>
 
                     <aside className="sidebar">
-                        <SectionTable title="Latest" items={relatedItems} onItemClick={handleRelatedClick} />
+                        <SectionTable title="Latest" items={relatedItems} onItemClick={handleRelatedClick} detailSource="related" />
                     </aside>
                 </div>
             </main>
@@ -798,7 +799,7 @@ export function DetailPage({ type: _type }: DetailPageProps) {
                 <SearchOverlay
                     open={showSearchOverlay}
                     onClose={() => setShowSearchOverlay(false)}
-                    onOpenDetail={(itemType, slug) => navigate(`/${itemType}/${slug}?source=search-overlay`)}
+                    onOpenDetail={(itemType, slug) => navigate(buildTrackedDetailPath(itemType, slug, 'search_overlay'))}
                     onOpenCategory={handleOverlayCategorySearch}
                 />
             )}

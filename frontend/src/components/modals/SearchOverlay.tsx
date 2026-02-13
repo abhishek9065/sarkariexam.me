@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchSearchSuggestions } from '../../utils/api';
+import { fetchSearchSuggestions, fetchTrendingSearchTerms } from '../../utils/api';
 import type { ContentType, SearchSuggestion } from '../../types';
 
 type SearchOverlayTypeFilter = 'all' | 'job' | 'result' | 'admit-card';
@@ -55,6 +55,7 @@ export function SearchOverlay({ open, onClose, onOpenDetail, onOpenCategory }: S
     const [error, setError] = useState<string | null>(null);
     const [activeIndex, setActiveIndex] = useState(-1);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [trendingQueries, setTrendingQueries] = useState<Array<{ query: string; count: number }>>([]);
     const inputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
@@ -64,6 +65,7 @@ export function SearchOverlay({ open, onClose, onOpenDetail, onOpenCategory }: S
         setActiveIndex(-1);
         setError(null);
         setSuggestions([]);
+        setTrendingQueries([]);
         const timer = window.setTimeout(() => inputRef.current?.focus(), 20);
         return () => window.clearTimeout(timer);
     }, [open]);
@@ -77,6 +79,7 @@ export function SearchOverlay({ open, onClose, onOpenDetail, onOpenCategory }: S
                 const data = await fetchSearchSuggestions(query, {
                     type: toBackendType(typeFilter),
                     limit: 10,
+                    source: 'suggest',
                 });
                 setSuggestions(data);
                 setActiveIndex(-1);
@@ -139,8 +142,28 @@ export function SearchOverlay({ open, onClose, onOpenDetail, onOpenCategory }: S
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [activeIndex, onClose, onOpenCategory, onOpenDetail, open, query, suggestions, typeFilter]);
 
+    useEffect(() => {
+        if (!open || query.trim().length > 0) return;
+        let active = true;
+        fetchTrendingSearchTerms({ days: 30, limit: 6 })
+            .then((rows) => {
+                if (!active) return;
+                setTrendingQueries(rows);
+            })
+            .catch(() => {
+                if (!active) return;
+                setTrendingQueries([]);
+            });
+        return () => {
+            active = false;
+        };
+    }, [open, query]);
+
     const showRecent = query.trim().length === 0 && recentSearches.length > 0;
-    const trendingSuggestions = useMemo(() => query.trim().length === 0 ? suggestions : [], [query, suggestions]);
+    const trendingSuggestions = useMemo(
+        () => (query.trim().length === 0 ? trendingQueries : []),
+        [query, trendingQueries]
+    );
 
     if (!open) return null;
 
@@ -214,16 +237,16 @@ export function SearchOverlay({ open, onClose, onOpenDetail, onOpenCategory }: S
                         <div className="sr-search-chip-list">
                             {trendingSuggestions.slice(0, 6).map((item) => (
                                 <button
-                                    key={`${item.slug}-trend`}
+                                    key={`${item.query}-trend`}
                                     type="button"
                                     className="sr-search-chip"
                                     onClick={() => {
-                                        storeRecentQuery(item.title);
-                                        onOpenDetail(item.type, item.slug);
+                                        storeRecentQuery(item.query);
+                                        onOpenCategory(typeFilter, item.query);
                                         onClose();
                                     }}
                                 >
-                                    {item.title}
+                                    {item.query}
                                 </button>
                             ))}
                         </div>

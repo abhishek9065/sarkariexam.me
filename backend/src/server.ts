@@ -41,6 +41,7 @@ import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
 import { scheduleAdminApprovalsCleanup } from './services/adminApprovals.js';
 import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
+import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import logger from './utils/logger.js';
 
@@ -281,6 +282,7 @@ export async function startServer() {
         logger.error({ err: error }, '[Analytics] Rollup init failed');
       });
       scheduleAdminApprovalsCleanup();
+      scheduleDigestSender();
     } else {
       logger.info('[Server] No MongoDB configured, using fallback data');
     }
