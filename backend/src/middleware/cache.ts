@@ -10,6 +10,17 @@ interface CacheOptions {
     onHit?: (req: Request, data: any) => void | Promise<void>;
 }
 
+const normalizeUrlKey = (urlValue: string): string => {
+    const url = new URL(urlValue, 'http://localhost');
+    const sortedParams = Array.from(url.searchParams.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&');
+
+    if (!sortedParams) return url.pathname;
+    return `${url.pathname}?${sortedParams}`;
+};
+
 /**
  * Cache middleware - caches GET responses
  * Uses Redis as primary cache, falls back to in-memory
@@ -24,32 +35,15 @@ export function cacheMiddleware(options: CacheOptions = {}) {
             return next();
         }
 
-        // Generate cache key with user context for personalized content
-        let baseKey = keyGenerator
+        const rawKey = keyGenerator
             ? keyGenerator(req)
-            : `${req.originalUrl || req.url}`;
-
-        // Include user ID for authenticated requests to prevent data leaks
-        if (req.user?.userId) {
-            baseKey = `user:${req.user.userId}:${baseKey}`;
-        }
-
-        // Normalize query parameters to prevent key variations
-        const url = new URL(req.originalUrl || req.url, 'http://localhost');
-        const sortedParams = Array.from(url.searchParams.entries())
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => `${key}=${value}`)
-            .join('&');
-        
-        if (sortedParams) {
-            baseKey = `${url.pathname}?${sortedParams}`;
-        } else {
-            baseKey = url.pathname;
-        }
-
-        const group = baseKey.split(':')[0] || baseKey;
+            : normalizeUrlKey(req.originalUrl || req.url);
+        const group = keyGenerator
+            ? (rawKey.split(':')[0] || 'default')
+            : (rawKey.split('?')[0] || 'default');
+        const userScope = req.user?.userId ? `user:${req.user.userId}` : 'public';
         const version = await getCacheVersion(group);
-        const cacheKey = `v${version}:${baseKey}`;
+        const cacheKey = `v${version}:${userScope}:${rawKey}`;
 
         // Check Redis first (if available), then memory
         let cachedData = await RedisCache.get(cacheKey);

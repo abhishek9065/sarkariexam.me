@@ -518,14 +518,14 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     );
     if (isAdminPortalUser) {
       const userAgent = req.headers['user-agent']?.toString() || 'Unknown';
-      const newDeviceLogin = isNewDeviceForUser({
+      const newDeviceLogin = await isNewDeviceForUser({
         userId: user.id,
         ip: clientIP,
         userAgent,
       });
       setAuthCookie(res, token, expiresIn, { name: ADMIN_AUTH_COOKIE_NAME, sameSite: 'strict' });
       const expiresAtMs = expiryToMs(expiresIn);
-      const session = createAdminSession({
+      const session = await createAdminSession({
         sessionId: sessionId ?? undefined,
         userId: user.id,
         email: user.email,
@@ -746,7 +746,7 @@ router.post('/admin/reset-password', async (req, res) => {
       email: validated.email,
     });
     await clearFailedLoginsWithEmail(clientIP, validated.email);
-    terminateOtherSessions(user.id);
+    await terminateOtherSessions(user.id);
 
     SecurityLogger.log({
       ip_address: clientIP,
@@ -1115,12 +1115,12 @@ router.post('/logout', async (req, res) => {
 
   if (tokens.length > 0) {
     await Promise.all(tokens.map((token) => blacklistToken(token)));
-    tokens.forEach((token) => {
+    await Promise.all(tokens.map(async (token) => {
       const decoded = jwt.decode(token) as { sessionId?: string } | null;
       if (decoded?.sessionId) {
-        terminateAdminSession(decoded.sessionId);
+        await terminateAdminSession(decoded.sessionId);
       }
-    });
+    }));
     console.log(`[Auth] Logout from ${getClientIP(req)}`);
   }
 

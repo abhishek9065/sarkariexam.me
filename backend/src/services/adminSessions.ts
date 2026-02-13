@@ -1,11 +1,16 @@
 import crypto from 'crypto';
 
 import { config } from '../config.js';
+import RedisCache from './redis.js';
 
 const SESSION_INACTIVE_WINDOW_MS = 30 * 60 * 1000;
 const MAX_ACTIONS = 5;
 const ADMIN_SESSION_IDLE_TIMEOUT_MS = config.adminSessionIdleTimeoutMinutes * 60 * 1000;
 const ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS = config.adminSessionAbsoluteTimeoutHours * 60 * 60 * 1000;
+const SESSION_INDEX_KEY = 'auth:admin_sessions:index';
+const USER_SESSION_INDEX_KEY_PREFIX = 'auth:admin_sessions:user:';
+const SESSION_KEY_PREFIX = 'auth:admin_session:';
+const INDEX_TTL_SECONDS = Math.max(24 * 60 * 60, Math.ceil(ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS / 1000) + (24 * 60 * 60));
 
 export type AdminSessionRecord = {
   id: string;
@@ -22,6 +27,12 @@ export type AdminSessionRecord = {
   actions: string[];
 };
 
+type SerializedAdminSessionRecord = Omit<AdminSessionRecord, 'createdAt' | 'lastSeen' | 'expiresAt'> & {
+  createdAt: string;
+  lastSeen: string;
+  expiresAt?: string | null;
+};
+
 type TouchPayload = {
   userId: string;
   email: string;
@@ -29,8 +40,6 @@ type TouchPayload = {
   userAgent: string;
   expiresAt?: Date | null;
 };
-
-const sessions = new Map<string, AdminSessionRecord>();
 
 const getDeviceLabel = (ua: string) => {
   if (/ipad|tablet/i.test(ua)) return 'Tablet';
@@ -66,20 +75,188 @@ const computeRiskScore = (record: AdminSessionRecord): 'low' | 'medium' | 'high'
   return 'low';
 };
 
-const cleanupExpiredSessions = () => {
+const getSessionKey = (sessionId: string) => `${SESSION_KEY_PREFIX}${sessionId}`;
+const getUserIndexKey = (userId: string) => `${USER_SESSION_INDEX_KEY_PREFIX}${userId}`;
+
+const readIndex = async (key: string): Promise<string[]> => {
+  const raw = await RedisCache.get(key);
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((value): value is string => typeof value === 'string' && value.length > 0);
+};
+
+const writeIndex = async (key: string, values: string[]): Promise<void> => {
+  const deduped = Array.from(new Set(values));
+  if (deduped.length === 0) {
+    await RedisCache.del(key);
+    return;
+  }
+  await RedisCache.set(key, deduped, INDEX_TTL_SECONDS);
+};
+
+const addToIndex = async (key: string, sessionId: string): Promise<void> => {
+  const current = await readIndex(key);
+  if (current.includes(sessionId)) {
+    await writeIndex(key, current);
+    return;
+  }
+  current.push(sessionId);
+  await writeIndex(key, current);
+};
+
+const removeFromIndex = async (key: string, sessionId: string): Promise<void> => {
+  const current = await readIndex(key);
+  if (current.length === 0) return;
+  const next = current.filter((value) => value !== sessionId);
+  if (next.length === current.length) {
+    await writeIndex(key, current);
+    return;
+  }
+  await writeIndex(key, next);
+};
+
+const serializeRecord = (record: AdminSessionRecord): SerializedAdminSessionRecord => ({
+  ...record,
+  createdAt: record.createdAt.toISOString(),
+  lastSeen: record.lastSeen.toISOString(),
+  expiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
+});
+
+const parseDate = (value: unknown): Date | null => {
+  if (!value || typeof value !== 'string') return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const deserializeRecord = (raw: any): AdminSessionRecord | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  if (typeof raw.id !== 'string' || typeof raw.userId !== 'string' || typeof raw.email !== 'string') {
+    return null;
+  }
+  const createdAt = parseDate(raw.createdAt);
+  const lastSeen = parseDate(raw.lastSeen);
+  if (!createdAt || !lastSeen) {
+    return null;
+  }
+  return {
+    id: raw.id,
+    userId: raw.userId,
+    email: raw.email,
+    ip: typeof raw.ip === 'string' ? raw.ip : 'unknown',
+    userAgent: typeof raw.userAgent === 'string' ? raw.userAgent : 'Unknown',
+    device: typeof raw.device === 'string' ? raw.device : 'Desktop',
+    browser: typeof raw.browser === 'string' ? raw.browser : 'Browser',
+    os: typeof raw.os === 'string' ? raw.os : 'OS',
+    createdAt,
+    lastSeen,
+    expiresAt: parseDate(raw.expiresAt),
+    actions: Array.isArray(raw.actions)
+      ? raw.actions.filter((action: unknown): action is string => typeof action === 'string').slice(0, MAX_ACTIONS)
+      : [],
+  };
+};
+
+const getSessionExpiryReason = (
+  record: AdminSessionRecord,
+  now: number = Date.now()
+): 'session_expired' | 'session_idle_timeout' | 'session_absolute_timeout' | null => {
+  if (record.expiresAt && record.expiresAt.getTime() <= now) {
+    return 'session_expired';
+  }
+  if (now - record.lastSeen.getTime() > ADMIN_SESSION_IDLE_TIMEOUT_MS) {
+    return 'session_idle_timeout';
+  }
+  if (now - record.createdAt.getTime() > ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS) {
+    return 'session_absolute_timeout';
+  }
+  return null;
+};
+
+const getSessionTtlSeconds = (record: AdminSessionRecord): number => {
   const now = Date.now();
-  for (const [id, record] of sessions.entries()) {
-    const tokenExpired = record.expiresAt && record.expiresAt.getTime() < now;
-    const idleExpired = now - record.lastSeen.getTime() > ADMIN_SESSION_IDLE_TIMEOUT_MS;
-    const absoluteExpired = now - record.createdAt.getTime() > ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS;
-    if (tokenExpired || idleExpired || absoluteExpired) {
-      sessions.delete(id);
-    }
+  const expiryCandidates = [
+    record.lastSeen.getTime() + ADMIN_SESSION_IDLE_TIMEOUT_MS,
+    record.createdAt.getTime() + ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS,
+  ];
+  if (record.expiresAt) {
+    expiryCandidates.push(record.expiresAt.getTime());
+  }
+  const expiresAt = Math.min(...expiryCandidates);
+  const ttlMs = expiresAt - now;
+  if (ttlMs <= 0) return 0;
+  return Math.max(1, Math.ceil(ttlMs / 1000));
+};
+
+const readSessionRecord = async (sessionId: string): Promise<AdminSessionRecord | null> => {
+  const raw = await RedisCache.get(getSessionKey(sessionId));
+  return deserializeRecord(raw);
+};
+
+const writeSessionRecord = async (record: AdminSessionRecord): Promise<boolean> => {
+  const ttlSeconds = getSessionTtlSeconds(record);
+  if (ttlSeconds <= 0) {
+    await RedisCache.del(getSessionKey(record.id));
+    return false;
+  }
+  await RedisCache.set(getSessionKey(record.id), serializeRecord(record), ttlSeconds);
+  return true;
+};
+
+const removeSessionRecord = async (sessionId: string, userIdHint?: string): Promise<void> => {
+  let userId = userIdHint;
+  if (!userId) {
+    const existing = await readSessionRecord(sessionId);
+    userId = existing?.userId;
+  }
+
+  await RedisCache.del(getSessionKey(sessionId));
+  await removeFromIndex(SESSION_INDEX_KEY, sessionId);
+  if (userId) {
+    await removeFromIndex(getUserIndexKey(userId), sessionId);
   }
 };
 
-export const createAdminSession = (payload: TouchPayload & { sessionId?: string }): AdminSessionRecord => {
-  cleanupExpiredSessions();
+const ensureSessionIndexed = async (record: AdminSessionRecord): Promise<void> => {
+  await Promise.all([
+    addToIndex(SESSION_INDEX_KEY, record.id),
+    addToIndex(getUserIndexKey(record.userId), record.id),
+  ]);
+};
+
+const cleanupSessionIfExpired = async (record: AdminSessionRecord): Promise<boolean> => {
+  const reason = getSessionExpiryReason(record);
+  if (!reason) return false;
+  await removeSessionRecord(record.id, record.userId);
+  return true;
+};
+
+const getSessionsFromIndex = async (indexKey: string, userIdHint?: string): Promise<AdminSessionRecord[]> => {
+  const sessionIds = await readIndex(indexKey);
+  if (sessionIds.length === 0) {
+    return [];
+  }
+
+  const records = await Promise.all(sessionIds.map(async (sessionId) => ({
+    sessionId,
+    record: await readSessionRecord(sessionId),
+  })));
+
+  const active: AdminSessionRecord[] = [];
+  for (const item of records) {
+    if (!item.record) {
+      await removeSessionRecord(item.sessionId, userIdHint);
+      continue;
+    }
+    const expired = await cleanupSessionIfExpired(item.record);
+    if (!expired) {
+      active.push(item.record);
+    }
+  }
+
+  return active.sort((a, b) => b.lastSeen.getTime() - a.lastSeen.getTime());
+};
+
+export const createAdminSession = async (payload: TouchPayload & { sessionId?: string }): Promise<AdminSessionRecord> => {
   const sessionId = payload.sessionId ?? crypto.randomUUID();
   const now = new Date();
   const userAgent = payload.userAgent || 'Unknown';
@@ -97,21 +274,23 @@ export const createAdminSession = (payload: TouchPayload & { sessionId?: string 
     expiresAt: payload.expiresAt ?? null,
     actions: [],
   };
-  sessions.set(sessionId, record);
+
+  await writeSessionRecord(record);
+  await ensureSessionIndexed(record);
   return record;
 };
 
-export const touchAdminSession = (
+export const touchAdminSession = async (
   sessionId: string,
   payload?: TouchPayload,
   action?: string
-): AdminSessionRecord | null => {
-  cleanupExpiredSessions();
-  const existing = sessions.get(sessionId);
+): Promise<AdminSessionRecord | null> => {
+  const existing = await getAdminSession(sessionId);
   if (!existing) {
     if (!payload) return null;
     return createAdminSession({ ...payload, sessionId });
   }
+
   existing.lastSeen = new Date();
   if (payload?.ip) existing.ip = payload.ip;
   if (payload?.userAgent) {
@@ -123,58 +302,61 @@ export const touchAdminSession = (
   if (payload?.expiresAt) {
     existing.expiresAt = payload.expiresAt;
   }
+
   const normalized = normalizeAction(action);
   if (normalized) {
     const next = [normalized, ...existing.actions.filter((item) => item !== normalized)].slice(0, MAX_ACTIONS);
     existing.actions = next;
   }
-  sessions.set(sessionId, existing);
+
+  const persisted = await writeSessionRecord(existing);
+  if (!persisted) {
+    await removeSessionRecord(existing.id, existing.userId);
+    return null;
+  }
+
+  await ensureSessionIndexed(existing);
   return existing;
 };
 
-export const listAdminSessions = (userId?: string): AdminSessionRecord[] => {
-  cleanupExpiredSessions();
-  const records = Array.from(sessions.values());
-  const filtered = userId ? records.filter((session) => session.userId === userId) : records;
-  return filtered.sort((a, b) => b.lastSeen.getTime() - a.lastSeen.getTime());
+export const listAdminSessions = async (userId?: string): Promise<AdminSessionRecord[]> => {
+  if (userId) {
+    return getSessionsFromIndex(getUserIndexKey(userId), userId);
+  }
+  return getSessionsFromIndex(SESSION_INDEX_KEY);
 };
 
-export const validateAdminSession = (
+export const validateAdminSession = async (
   sessionId?: string | null
-): { valid: boolean; reason?: 'session_not_found' | 'session_expired' | 'session_idle_timeout' | 'session_absolute_timeout' } => {
+): Promise<{ valid: boolean; reason?: 'session_not_found' | 'session_expired' | 'session_idle_timeout' | 'session_absolute_timeout' }> => {
   if (!sessionId) return { valid: false, reason: 'session_not_found' };
-  cleanupExpiredSessions();
-  const record = sessions.get(sessionId);
-  if (!record) return { valid: false, reason: 'session_not_found' };
 
-  const now = Date.now();
-  if (record.expiresAt && record.expiresAt.getTime() <= now) {
-    sessions.delete(sessionId);
-    return { valid: false, reason: 'session_expired' };
+  const record = await readSessionRecord(sessionId);
+  if (!record) {
+    await removeSessionRecord(sessionId);
+    return { valid: false, reason: 'session_not_found' };
   }
-  if (now - record.lastSeen.getTime() > ADMIN_SESSION_IDLE_TIMEOUT_MS) {
-    sessions.delete(sessionId);
-    return { valid: false, reason: 'session_idle_timeout' };
-  }
-  if (now - record.createdAt.getTime() > ADMIN_SESSION_ABSOLUTE_TIMEOUT_MS) {
-    sessions.delete(sessionId);
-    return { valid: false, reason: 'session_absolute_timeout' };
+
+  const reason = getSessionExpiryReason(record);
+  if (reason) {
+    await removeSessionRecord(sessionId, record.userId);
+    return { valid: false, reason };
   }
 
   return { valid: true };
 };
 
-export const isNewDeviceForUser = (input: {
+export const isNewDeviceForUser = async (input: {
   userId: string;
   ip: string;
   userAgent: string;
-}): boolean => {
-  cleanupExpiredSessions();
+}): Promise<boolean> => {
   const device = getDeviceLabel(input.userAgent || 'Unknown');
   const browser = getBrowserLabel(input.userAgent || 'Unknown');
   const os = getOsLabel(input.userAgent || 'Unknown');
-  const userSessions = listAdminSessions(input.userId);
+  const userSessions = await listAdminSessions(input.userId);
   if (userSessions.length === 0) return false;
+
   return !userSessions.some((session) =>
     session.ip === input.ip &&
     session.device === device &&
@@ -183,26 +365,42 @@ export const isNewDeviceForUser = (input: {
   );
 };
 
-export const getAdminSession = (sessionId?: string | null): AdminSessionRecord | null => {
+export const getAdminSession = async (sessionId?: string | null): Promise<AdminSessionRecord | null> => {
   if (!sessionId) return null;
-  cleanupExpiredSessions();
-  return sessions.get(sessionId) ?? null;
-};
-
-export const terminateAdminSession = (sessionId: string): boolean => {
-  cleanupExpiredSessions();
-  return sessions.delete(sessionId);
-};
-
-export const terminateOtherSessions = (userId: string, currentSessionId?: string | null): number => {
-  cleanupExpiredSessions();
-  let removed = 0;
-  for (const [id, record] of sessions.entries()) {
-    if (record.userId !== userId) continue;
-    if (currentSessionId && id === currentSessionId) continue;
-    sessions.delete(id);
-    removed += 1;
+  const record = await readSessionRecord(sessionId);
+  if (!record) {
+    await removeSessionRecord(sessionId);
+    return null;
   }
+  const expired = await cleanupSessionIfExpired(record);
+  if (expired) {
+    return null;
+  }
+  return record;
+};
+
+export const terminateAdminSession = async (sessionId: string): Promise<boolean> => {
+  const existing = await readSessionRecord(sessionId);
+  if (!existing) {
+    await removeSessionRecord(sessionId);
+    return false;
+  }
+  await removeSessionRecord(sessionId, existing.userId);
+  return true;
+};
+
+export const terminateOtherSessions = async (userId: string, currentSessionId?: string | null): Promise<number> => {
+  const sessions = await listAdminSessions(userId);
+  let removed = 0;
+
+  for (const record of sessions) {
+    if (currentSessionId && record.id === currentSessionId) continue;
+    const didRemove = await terminateAdminSession(record.id);
+    if (didRemove) {
+      removed += 1;
+    }
+  }
+
   return removed;
 };
 

@@ -1,17 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 
+import RedisCache from '../services/redis.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 
 import { getRealIp } from './cloudflare.js';
 
-/**
- * In-memory rate limiter
- * Simple and efficient for single-server deployments
- */
-
-// In-memory store for rate limiting
-const memoryStore = new Map<string, { count: number; resetTime: number }>();
-const MAX_STORE_SIZE = 10000; // Max distinct IPs to track
+const WINDOW_CACHE_TTL_BUFFER_SECONDS = 2;
 
 interface RateLimitOptions {
     windowMs?: number;  // Time window in milliseconds
@@ -19,32 +13,26 @@ interface RateLimitOptions {
     keyPrefix?: string;  // Prefix for rate limit key (e.g., 'api', 'auth')
 }
 
-/**
- * In-memory rate limit check
- */
-function checkRateLimitMemory(
+async function checkRateLimit(
     key: string,
     maxRequests: number,
     windowMs: number
-): { allowed: boolean; count: number; resetTime: number } {
+): Promise<{ allowed: boolean; count: number; resetTime: number }> {
     const now = Date.now();
-    const data = memoryStore.get(key);
+    const windowBucket = Math.floor(now / windowMs);
+    const resetTime = (windowBucket + 1) * windowMs;
+    const bucketKey = `${key}:${windowBucket}`;
 
-    if (!data || now > data.resetTime) {
-        // New window - limit memory usage
-        if (memoryStore.size >= MAX_STORE_SIZE) {
-            const firstKey = memoryStore.keys().next().value;
-            if (firstKey) memoryStore.delete(firstKey);
-        }
-        memoryStore.set(key, { count: 1, resetTime: now + windowMs });
-        return { allowed: true, count: 1, resetTime: now + windowMs };
+    const count = await RedisCache.increment(bucketKey);
+    if (count === 1) {
+        const ttlSeconds = Math.max(1, Math.ceil(windowMs / 1000) + WINDOW_CACHE_TTL_BUFFER_SECONDS);
+        await RedisCache.expire(bucketKey, ttlSeconds);
     }
 
-    data.count++;
     return {
-        allowed: data.count <= maxRequests,
-        count: data.count,
-        resetTime: data.resetTime
+        allowed: count <= maxRequests,
+        count,
+        resetTime,
     };
 }
 
@@ -60,7 +48,7 @@ export function rateLimit(options: RateLimitOptions = {}) {
         const clientIp = getRealIp(req);
         const key = `${keyPrefix}:${clientIp}`;
 
-        const result = checkRateLimitMemory(key, maxRequests, windowMs);
+        const result = await checkRateLimit(key, maxRequests, windowMs);
 
         // Set rate limit headers
         res.setHeader('X-RateLimit-Limit', maxRequests);
@@ -68,7 +56,7 @@ export function rateLimit(options: RateLimitOptions = {}) {
         res.setHeader('X-RateLimit-Reset', Math.ceil(result.resetTime / 1000));
 
         if (!result.allowed) {
-            const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
+            const retryAfter = Math.max(1, Math.ceil((result.resetTime - Date.now()) / 1000));
             SecurityLogger.log({
                 ip_address: clientIp,
                 event_type: 'rate_limit',
@@ -91,20 +79,5 @@ export function rateLimit(options: RateLimitOptions = {}) {
         next();
     };
 }
-
-/**
- * Cleanup expired records periodically
- */
-function cleanupExpiredRecords() {
-    const now = Date.now();
-    for (const [key, data] of memoryStore.entries()) {
-        if (now > data.resetTime) {
-            memoryStore.delete(key);
-        }
-    }
-}
-
-// Run cleanup every 5 minutes
-setInterval(cleanupExpiredRecords, 5 * 60 * 1000);
 
 export default rateLimit;

@@ -11,6 +11,1092 @@
     }
   ],
   "paths": {
+    "/": {
+      "get": {
+        "summary": "GET /",
+        "tags": [
+          "system"
+        ],
+        "operationId": "get",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/active-users": {
+      "get": {
+        "summary": "GET /api/admin/active-users",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminActiveUsers",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements": {
+      "get": {
+        "summary": "GET /api/admin/announcements",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminAnnouncements",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/admin/announcements",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncements",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/bulk": {
+      "post": {
+        "summary": "POST /api/admin/announcements/bulk",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncementsBulk",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/bulk-approve": {
+      "post": {
+        "summary": "POST /api/admin/announcements/bulk-approve",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncementsBulkApprove",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/bulk-reject": {
+      "post": {
+        "summary": "POST /api/admin/announcements/bulk-reject",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncementsBulkReject",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/export/csv": {
+      "get": {
+        "summary": "GET /api/admin/announcements/export/csv",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminAnnouncementsExportCsv",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/summary": {
+      "get": {
+        "summary": "GET /api/admin/announcements/summary",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminAnnouncementsSummary",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/{id}": {
+      "put": {
+        "summary": "PUT /api/admin/announcements/{id}",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "putApiAdminAnnouncementsId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/admin/announcements/{id}",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "deleteApiAdminAnnouncementsId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/announcements/{id}/approve": {
+      "post": {
+        "summary": "POST /api/admin/announcements/{id}/approve",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncementsIdApprove",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/announcements/{id}/reject": {
+      "post": {
+        "summary": "POST /api/admin/announcements/{id}/reject",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncementsIdReject",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/approvals": {
+      "get": {
+        "summary": "GET /api/admin/approvals",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminApprovals",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/approvals/{id}/approve": {
+      "post": {
+        "summary": "POST /api/admin/approvals/{id}/approve",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminApprovalsIdApprove",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/approvals/{id}/reject": {
+      "post": {
+        "summary": "POST /api/admin/approvals/{id}/reject",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminApprovalsIdReject",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/audit-log": {
+      "get": {
+        "summary": "GET /api/admin/audit-log",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminAuditLog",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/dashboard": {
+      "get": {
+        "summary": "GET /api/admin/dashboard",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminDashboard",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/security": {
+      "get": {
+        "summary": "GET /api/admin/security",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminSecurity",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/security/logs": {
+      "get": {
+        "summary": "GET /api/admin/security/logs",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminSecurityLogs",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/session": {
+      "get": {
+        "summary": "GET /api/admin/session",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminSession",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/sessions": {
+      "get": {
+        "summary": "GET /api/admin/sessions",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminSessions",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/sessions/terminate": {
+      "post": {
+        "summary": "POST /api/admin/sessions/terminate",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminSessionsTerminate",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/sessions/terminate-others": {
+      "post": {
+        "summary": "POST /api/admin/sessions/terminate-others",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminSessionsTerminateOthers",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "summary": "GET /api/admin/stats",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "getApiAdminStats",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/analytics/export/csv": {
+      "get": {
+        "summary": "GET /api/analytics/export/csv",
+        "tags": [
+          "analytics"
+        ],
+        "operationId": "getApiAnalyticsExportCsv",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/analytics/overview": {
+      "get": {
+        "summary": "GET /api/analytics/overview",
+        "tags": [
+          "analytics"
+        ],
+        "operationId": "getApiAnalyticsOverview",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/analytics/popular": {
+      "get": {
+        "summary": "GET /api/analytics/popular",
+        "tags": [
+          "analytics"
+        ],
+        "operationId": "getApiAnalyticsPopular",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements": {
+      "get": {
+        "summary": "List announcements",
+        "responses": {
+          "200": {
+            "description": "Announcements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/announcements",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "postApiAnnouncements",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/export/csv": {
+      "get": {
+        "summary": "GET /api/announcements/export/csv",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsExportCsv",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/meta/categories": {
+      "get": {
+        "summary": "GET /api/announcements/meta/categories",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsMetaCategories",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/meta/organizations": {
+      "get": {
+        "summary": "GET /api/announcements/meta/organizations",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsMetaOrganizations",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/meta/tags": {
+      "get": {
+        "summary": "GET /api/announcements/meta/tags",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsMetaTags",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/search": {
+      "get": {
+        "summary": "GET /api/announcements/search",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsSearch",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/announcements/v2": {
+      "get": {
+        "summary": "GET /api/announcements/v2",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "getApiAnnouncementsV2",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/announcements/v3/cards": {
       "get": {
         "summary": "List announcement cards",
@@ -117,21 +1203,80 @@
         }
       }
     },
-    "/api/announcements": {
-      "get": {
-        "summary": "List announcements",
+    "/api/announcements/{id}": {
+      "patch": {
+        "summary": "PATCH /api/announcements/{id}",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "patchApiAnnouncementsId",
         "responses": {
           "200": {
-            "description": "Announcements",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AnnouncementListResponse"
-                }
-              }
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
-        }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/announcements/{id}",
+        "tags": [
+          "announcements"
+        ],
+        "operationId": "deleteApiAnnouncementsId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/announcements/{slug}": {
@@ -161,29 +1306,321 @@
         }
       }
     },
-    "/api/auth/register": {
+    "/api/auth/admin/2fa/backup-codes": {
       "post": {
-        "summary": "Register",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
-              }
-            }
-          }
-        },
+        "summary": "POST /api/auth/admin/2fa/backup-codes",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthAdmin2faBackupCodes",
         "responses": {
-          "201": {
-            "description": "Auth response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
-                }
-              }
-            }
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/2fa/backup-codes/status": {
+      "get": {
+        "summary": "GET /api/auth/admin/2fa/backup-codes/status",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "getApiAuthAdmin2faBackupCodesStatus",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/2fa/setup": {
+      "post": {
+        "summary": "POST /api/auth/admin/2fa/setup",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthAdmin2faSetup",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/2fa/verify": {
+      "post": {
+        "summary": "POST /api/auth/admin/2fa/verify",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthAdmin2faVerify",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/forgot-password": {
+      "post": {
+        "summary": "POST /api/auth/admin/forgot-password",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthAdminForgotPassword",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/permissions": {
+      "get": {
+        "summary": "GET /api/auth/admin/permissions",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "getApiAuthAdminPermissions",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/reset-password": {
+      "post": {
+        "summary": "POST /api/auth/admin/reset-password",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthAdminResetPassword",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/setup": {
+      "post": {
+        "summary": "POST /api/auth/admin/setup",
+        "tags": [
+          "admin-setup"
+        ],
+        "operationId": "postApiAuthAdminSetup",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/setup-status": {
+      "get": {
+        "summary": "GET /api/auth/admin/setup-status",
+        "tags": [
+          "admin-setup"
+        ],
+        "operationId": "getApiAuthAdminSetupStatus",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/admin/step-up": {
+      "post": {
+        "summary": "POST /api/auth/admin/step-up",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthAdminStepUp",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/csrf": {
+      "get": {
+        "summary": "GET /api/auth/csrf",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "getApiAuthCsrf",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }
@@ -203,6 +1640,91 @@
         },
         "responses": {
           "200": {
+            "description": "Auth response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "POST /api/auth/logout",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "postApiAuthLogout",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "GET /api/auth/me",
+        "tags": [
+          "auth"
+        ],
+        "operationId": "getApiAuthMe",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": "Auth response",
             "content": {
               "application/json": {
@@ -301,149 +1823,38 @@
         }
       }
     },
-    "/api/subscriptions": {
+    "/api/bulk/import": {
       "post": {
-        "summary": "Create or update subscription",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubscriptionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Subscription response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/subscriptions/verify": {
-      "get": {
-        "summary": "Verify subscription",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
+        "summary": "POST /api/bulk/import",
+        "tags": [
+          "bulk"
         ],
+        "operationId": "postApiBulkImport",
         "responses": {
           "200": {
-            "description": "Verify response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
-                }
-              }
-            }
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }
     },
-    "/api/subscriptions/unsubscribe": {
+    "/api/community/flags": {
       "get": {
-        "summary": "Unsubscribe",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Unsubscribe response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/profile": {
-      "get": {
-        "summary": "Get profile",
-        "responses": {
-          "200": {
-            "description": "Profile",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "summary": "Update profile",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProfileUpdateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Profile",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/profile/options": {
-      "get": {
-        "summary": "Profile options",
-        "responses": {
-          "200": {
-            "description": "Options",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileOptionsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/profile/recommendations": {
-      "get": {
-        "summary": "Profile recommendations",
+        "summary": "List community flags",
         "parameters": [
           {
             "name": "limit",
@@ -453,15 +1864,90 @@
               "minimum": 1,
               "maximum": 50
             }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CommunityFlagStatus"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CommunityEntityType"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Recommendations",
+            "description": "Flags",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RecommendationListResponse"
+                  "$ref": "#/components/schemas/CommunityFlagListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Report abusive content",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityFlagCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityFlagResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/flags/{id}": {
+      "delete": {
+        "summary": "Resolve flag",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
                 }
               }
             }
@@ -534,6 +2020,95 @@
     "/api/community/forums/{id}": {
       "delete": {
         "summary": "Delete forum post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/groups": {
+      "get": {
+        "summary": "List study groups",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Study groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityGroupListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create study group",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityGroupCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Study group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/groups/{id}": {
+      "delete": {
+        "summary": "Delete study group",
         "parameters": [
           {
             "name": "id",
@@ -684,9 +2259,358 @@
         }
       }
     },
-    "/api/community/groups": {
+    "/api/graphql": {
+      "post": {
+        "summary": "POST /api/graphql",
+        "tags": [
+          "graphql"
+        ],
+        "operationId": "postApiGraphql",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/health": {
       "get": {
-        "summary": "List study groups",
+        "summary": "GET /api/health",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getApiHealth",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/health/deep": {
+      "get": {
+        "summary": "GET /api/health/deep",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getApiHealthDeep",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/healthz": {
+      "get": {
+        "summary": "GET /api/healthz",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getApiHealthz",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/jobs/match": {
+      "get": {
+        "summary": "GET /api/jobs/match",
+        "tags": [
+          "jobs"
+        ],
+        "operationId": "getApiJobsMatch",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/performance": {
+      "get": {
+        "summary": "GET /api/performance",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getApiPerformance",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile": {
+      "get": {
+        "summary": "Get profile",
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile/alerts": {
+      "get": {
+        "summary": "GET /api/profile/alerts",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "getApiProfileAlerts",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/digest-preview": {
+      "get": {
+        "summary": "GET /api/profile/digest-preview",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "getApiProfileDigestPreview",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/notifications": {
+      "get": {
+        "summary": "GET /api/profile/notifications",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "getApiProfileNotifications",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/notifications/read": {
+      "post": {
+        "summary": "POST /api/profile/notifications/read",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "postApiProfileNotificationsRead",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/options": {
+      "get": {
+        "summary": "Profile options",
+        "responses": {
+          "200": {
+            "description": "Options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOptionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile/recommendations": {
+      "get": {
+        "summary": "Profile recommendations",
         "parameters": [
           {
             "name": "limit",
@@ -696,49 +2620,15 @@
               "minimum": 1,
               "maximum": 50
             }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 500
-            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Study groups",
+            "description": "Recommendations",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommunityGroupListResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Create study group",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityGroupCreateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Study group",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommunityGroupResponse"
+                  "$ref": "#/components/schemas/RecommendationListResponse"
                 }
               }
             }
@@ -746,9 +2636,89 @@
         }
       }
     },
-    "/api/community/groups/{id}": {
-      "delete": {
-        "summary": "Delete study group",
+    "/api/profile/saved-searches": {
+      "get": {
+        "summary": "GET /api/profile/saved-searches",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "getApiProfileSavedSearches",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "summary": "POST /api/profile/saved-searches",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "postApiProfileSavedSearches",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/profile/saved-searches/{id}": {
+      "put": {
+        "summary": "PUT /api/profile/saved-searches/{id}",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "putApiProfileSavedSearchesId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
         "parameters": [
           {
             "name": "id",
@@ -758,10 +2728,147 @@
               "type": "string"
             }
           }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /api/profile/saved-searches/{id}",
+        "tags": [
+          "profile"
+        ],
+        "operationId": "deleteApiProfileSavedSearchesId",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/push/subscribe": {
+      "post": {
+        "summary": "POST /api/push/subscribe",
+        "tags": [
+          "push"
+        ],
+        "operationId": "postApiPushSubscribe",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/push/vapid-public-key": {
+      "get": {
+        "summary": "GET /api/push/vapid-public-key",
+        "tags": [
+          "push"
+        ],
+        "operationId": "getApiPushVapidPublicKey",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/subscriptions": {
+      "post": {
+        "summary": "Create or update subscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscriptions/unsubscribe": {
+      "get": {
+        "summary": "Unsubscribe",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
-            "description": "Deleted",
+            "description": "Unsubscribe response",
             "content": {
               "application/json": {
                 "schema": {
@@ -773,89 +2880,13 @@
         }
       }
     },
-    "/api/community/flags": {
+    "/api/subscriptions/verify": {
       "get": {
-        "summary": "List community flags",
+        "summary": "Verify subscription",
         "parameters": [
           {
-            "name": "limit",
+            "name": "token",
             "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 50
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 500
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/CommunityFlagStatus"
-            }
-          },
-          {
-            "name": "entityType",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/CommunityEntityType"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Flags",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommunityFlagListResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Report abusive content",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityFlagCreateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Flag",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommunityFlagResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/community/flags/{id}": {
-      "delete": {
-        "summary": "Resolve flag",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
             "required": true,
             "schema": {
               "type": "string"
@@ -864,7 +2895,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Resolved",
+            "description": "Verify response",
             "content": {
               "application/json": {
                 "schema": {
@@ -987,6 +3018,35 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "GET /metrics",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getMetrics",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }

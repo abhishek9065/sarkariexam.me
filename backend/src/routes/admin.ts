@@ -389,7 +389,7 @@ router.get('/dashboard', async (_req, res) => {
 router.get('/active-users', async (req, res) => {
     try {
         const windowMinutes = Math.min(120, parseInt(req.query.windowMinutes as string) || 15);
-        const stats = getActiveUsersStats(windowMinutes);
+        const stats = await getActiveUsersStats(windowMinutes);
         return res.json({ data: stats });
     } catch (error) {
         console.error('Active users error:', error);
@@ -523,7 +523,7 @@ router.get('/security/logs', requirePermission('security:read'), async (req, res
 router.get('/sessions', requirePermission('security:read'), async (req, res) => {
     try {
         const currentSessionId = req.user?.sessionId;
-        const sessions = listAdminSessions().map((record) => mapSessionForClient(record, currentSessionId));
+        const sessions = (await listAdminSessions()).map((record) => mapSessionForClient(record, currentSessionId));
         return res.json({
             data: sessions,
             meta: { total: sessions.length },
@@ -540,7 +540,7 @@ router.get('/sessions', requirePermission('security:read'), async (req, res) => 
  */
 router.get('/session', requirePermission('security:read'), async (req, res) => {
     try {
-        const session = getAdminSession(req.user?.sessionId);
+        const session = await getAdminSession(req.user?.sessionId);
         if (!session) {
             return res.status(404).json({ error: 'Session not found' });
         }
@@ -568,7 +568,7 @@ router.post('/sessions/terminate', requirePermission('security:read'), requireAd
                 message: 'Current session cannot be terminated from this endpoint.',
             });
         }
-        const removed = terminateAdminSession(sessionId);
+        const removed = await terminateAdminSession(sessionId);
         if (!removed) {
             return res.status(404).json({ error: 'Session not found' });
         }
@@ -594,7 +594,7 @@ router.post('/sessions/terminate-others', requirePermission('security:read'), re
         if (!req.user?.userId) {
             return res.status(400).json({ error: 'Missing user context' });
         }
-        const removed = terminateOtherSessions(req.user.userId, req.user.sessionId);
+        const removed = await terminateOtherSessions(req.user.userId, req.user.sessionId);
         if (removed > 0) {
             SecurityLogger.log({
                 ip_address: req.ip,
