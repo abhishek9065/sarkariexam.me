@@ -22,7 +22,7 @@ export function HomeDenseBox({
     className,
 }: HomeDenseBoxProps) {
     return (
-        <section className={`home-dense-box card${className ? ` ${className}` : ''}`} data-testid={testId}>
+        <section className={`home-dense-box${className ? ` ${className}` : ''}`} data-testid={testId}>
             <header className="home-dense-box-header">
                 <h2>{title}</h2>
             </header>

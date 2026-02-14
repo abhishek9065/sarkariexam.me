@@ -3429,41 +3429,36 @@ h6 {
 }
 
 /* =============================================
-   Home V3 Dense Layout (Screenshot-style structure, brand-new theme)
+   Home V3 Dense Layout (Exact screenshot parity)
    ============================================= */
 
 .home-v3-shell {
     display: grid;
-    gap: var(--space-4);
+    gap: 18px;
     margin-bottom: var(--space-6);
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .home-v3-top-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.08fr);
-    gap: var(--space-4);
-    align-items: stretch;
-}
-
-.home-v3-stack {
-    display: grid;
-    gap: var(--space-4);
-    align-content: start;
-}
-
-.home-v3-tall {
-    min-height: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
 }
 
 .home-v3-bottom-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-4);
+    grid-template-areas:
+        'answer syllabus admission'
+        'certificate important admission';
+    gap: 18px;
 }
 
 .home-dense-box {
-    border: 2px solid #1e8bda;
-    background: #eef3fa;
+    border: 1px solid #df8429;
+    background: #efefef;
+    border-radius: 0;
+    box-shadow: none;
     padding: 0;
     overflow: hidden;
     display: flex;
@@ -3471,105 +3466,94 @@ h6 {
     min-height: 0;
 }
 
-[data-theme="dark"] .home-dense-box {
-    background: #17253b;
-    border-color: #2e9cf0;
-}
-
 .home-dense-box-header {
-    padding: 10px var(--space-4);
-    background: linear-gradient(105deg, #0b2d67 0%, #0d4ca8 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-}
-
-[data-theme="dark"] .home-dense-box-header {
-    background: linear-gradient(105deg, #103873 0%, #0d5abf 100%);
+    padding: 8px 12px;
+    background: #ab183d;
 }
 
 .home-dense-box-header h2 {
     margin: 0;
-    font-size: 2rem;
-    line-height: 1;
+    text-align: center;
     color: #ffffff;
-    font-weight: 800;
-    letter-spacing: 0.01em;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0;
 }
 
 .home-dense-box-list {
-    flex: 1;
     margin: 0;
-    padding: var(--space-3) var(--space-4) 0 32px;
-    list-style: disc;
+    padding: 14px 14px 0 38px;
+    list-style: disc outside;
+    line-height: 1.28;
     display: grid;
-    gap: var(--space-2);
-    max-height: 510px;
-    overflow-y: auto;
+    gap: 12px;
 }
 
-.home-dense-box-tall .home-dense-box-list {
-    max-height: none;
+.home-dense-box-list li::marker {
+    color: #000000;
 }
 
 .home-dense-box-link {
-    color: #0031a8;
-    font-size: var(--font-md);
-    line-height: 1.35;
+    color: #0000ee;
+    font-size: 1.03rem;
+    line-height: 1.3;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 2px;
 }
 
-[data-theme="dark"] .home-dense-box-link {
-    color: #8cbcff;
-}
-
 .home-dense-box-link:hover {
-    color: #0a5ad5;
-}
-
-[data-theme="dark"] .home-dense-box-link:hover {
-    color: #c8deff;
+    color: #0000ee;
 }
 
 .home-dense-box-link:focus-visible,
 .home-dense-box-view-more:focus-visible {
-    outline: 3px solid #34d2ff;
+    outline: 2px solid #1f6feb;
     outline-offset: 2px;
-    border-radius: var(--radius-sm);
 }
 
 .home-dense-box-empty {
     margin: 0;
-    padding: var(--space-4);
-    color: var(--text-secondary);
-    font-size: var(--font-sm);
+    padding: 12px 14px;
+    color: #2f2f2f;
+    font-size: 0.95rem;
 }
 
 .home-dense-box-view-more {
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    margin-top: auto;
+    padding: 8px 14px 10px;
     text-align: right;
-    font-size: 1.65rem;
+    font-size: 2rem;
+    line-height: 1;
     font-weight: 700;
-    color: #072b8f;
-    background: color-mix(in srgb, #ffffff 80%, #e7eef9);
-    border-top: 1px solid #c8d6ee;
-}
-
-[data-theme="dark"] .home-dense-box-view-more {
-    color: #9ac0ff;
-    background: color-mix(in srgb, #1d2b42 85%, #15243a);
-    border-top-color: #28466f;
+    color: #00008b;
+    background: transparent;
+    border-top: 0;
 }
 
 .home-dense-box-view-more:hover {
-    color: #0a4fc8;
-    background: color-mix(in srgb, #ffffff 92%, #dbe8ff);
+    color: #00008b;
 }
 
-[data-theme="dark"] .home-dense-box-view-more:hover {
-    color: #d5e6ff;
-    background: color-mix(in srgb, #273a59 90%, #1d314d);
+.home-dense-box-area-answer {
+    grid-area: answer;
+}
+
+.home-dense-box-area-syllabus {
+    grid-area: syllabus;
+}
+
+.home-dense-box-area-admission {
+    grid-area: admission;
+}
+
+.home-dense-box-area-certificate {
+    grid-area: certificate;
+}
+
+.home-dense-box-area-important {
+    grid-area: important;
 }
 
 @media (max-width: 1199px) {
@@ -3577,12 +3561,16 @@ h6 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .home-v3-tall {
+    .home-v3-top-grid > :last-child {
         grid-column: 1 / -1;
     }
 
     .home-v3-bottom-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            'answer syllabus'
+            'admission admission'
+            'certificate important';
     }
 }
 
@@ -3590,10 +3578,27 @@ h6 {
     .home-v3-top-grid,
     .home-v3-bottom-grid {
         grid-template-columns: 1fr;
+        grid-template-areas: none;
     }
 
-    .home-dense-box-list {
-        max-height: 360px;
+    .home-dense-box-area-answer {
+        order: 1;
+    }
+
+    .home-dense-box-area-syllabus {
+        order: 2;
+    }
+
+    .home-dense-box-area-admission {
+        order: 3;
+    }
+
+    .home-dense-box-area-certificate {
+        order: 4;
+    }
+
+    .home-dense-box-area-important {
+        order: 5;
     }
 
     .home-dense-box-header h2 {
@@ -3601,6 +3606,6 @@ h6 {
     }
 
     .home-dense-box-view-more {
-        font-size: 1.35rem;
+        font-size: 1.6rem;
     }
 }

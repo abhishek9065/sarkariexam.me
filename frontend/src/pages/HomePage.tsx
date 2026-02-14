@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { HomeDenseBox } from '../components/home/HomeDenseBox';
-import { HomeEducationalContent } from '../components/home/HomeEducationalContent';
 import { getAnnouncementCards } from '../utils/api';
 import type { AnnouncementCard } from '../types';
 
@@ -52,7 +51,7 @@ function buildCertificateCards(
     admissionCards: AnnouncementCard[],
     resultCards: AnnouncementCard[],
     topViewCards: AnnouncementCard[],
-    limit = 10,
+    limit = 5,
 ): AnnouncementCard[] {
     const selected: AnnouncementCard[] = [];
     const seen = new Set<string>();
@@ -117,13 +116,13 @@ export function HomePage() {
                     getAnnouncementCards({ type: 'job', limit: 20, sort: 'newest' }),
                     getAnnouncementCards({ type: 'result', limit: 20, sort: 'newest' }),
                     getAnnouncementCards({ type: 'admit-card', limit: 20, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'answer-key', limit: 10, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'syllabus', limit: 10, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'answer-key', limit: 5, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'syllabus', limit: 5, sort: 'newest' }),
                     getAnnouncementCards({ type: 'admission', limit: 12, sort: 'newest' }),
-                    getAnnouncementCards({ limit: 10, sort: 'views' }),
+                    getAnnouncementCards({ limit: 5, sort: 'views' }),
                     getAnnouncementCards({ search: 'certificate', limit: 16, sort: 'newest' }),
                     getAnnouncementCards({ search: 'verification', limit: 16, sort: 'newest' }),
-                    getAnnouncementCards({ limit: 12, sort: 'views' }),
+                    getAnnouncementCards({ limit: 10, sort: 'views' }),
                 ]);
 
                 if (!mounted) return;
@@ -134,7 +133,7 @@ export function HomePage() {
                     admissionRes.data,
                     resultsRes.data,
                     topViewsRes.data,
-                    10,
+                    5,
                 );
 
                 setSections({
@@ -155,11 +154,11 @@ export function HomePage() {
                     jobs: createFallbackCards('job', 'jobs', 20),
                     results: createFallbackCards('result', 'results', 20),
                     admitCards: createFallbackCards('admit-card', 'admit-card', 20),
-                    answerKeys: createFallbackCards('answer-key', 'answer-key', 10),
-                    syllabus: createFallbackCards('syllabus', 'syllabus', 10),
+                    answerKeys: createFallbackCards('answer-key', 'answer-key', 5),
+                    syllabus: createFallbackCards('syllabus', 'syllabus', 5),
                     admissions: createFallbackCards('admission', 'admission', 12),
-                    important: createFallbackCards('job', 'important', 10),
-                    certificates: createFallbackCards('result', 'certificate', 10),
+                    important: createFallbackCards('job', 'important', 5),
+                    certificates: createFallbackCards('result', 'certificate', 5),
                 });
             } finally {
                 if (mounted) {
@@ -182,53 +181,6 @@ export function HomePage() {
         <Layout>
             <section className="home-v3-shell" data-testid="home-v3-shell">
                 <div className="home-v3-top-grid" data-testid="home-v3-top-grid">
-                    <div className="home-v3-stack">
-                        <HomeDenseBox
-                            title="Answer Key"
-                            viewMoreTo="/answer-key"
-                            items={sections.answerKeys}
-                            sourceTag="home_box_answer_key"
-                            testId="home-v3-dense-box-answer-key"
-                        />
-                        <HomeDenseBox
-                            title="Certificate Verification"
-                            viewMoreTo="/results?q=certificate"
-                            items={sections.certificates}
-                            sourceTag="home_box_certificate"
-                            testId="home-v3-dense-box-certificate"
-                        />
-                    </div>
-
-                    <div className="home-v3-stack">
-                        <HomeDenseBox
-                            title="Syllabus"
-                            viewMoreTo="/syllabus"
-                            items={sections.syllabus}
-                            sourceTag="home_box_syllabus"
-                            testId="home-v3-dense-box-syllabus"
-                        />
-                        <HomeDenseBox
-                            title="Important"
-                            viewMoreTo="/jobs?sort=views"
-                            items={sections.important}
-                            sourceTag="home_box_important"
-                            testId="home-v3-dense-box-important"
-                        />
-                    </div>
-
-                    <div className="home-v3-tall">
-                        <HomeDenseBox
-                            title="Admission"
-                            viewMoreTo="/admission"
-                            items={sections.admissions}
-                            sourceTag="home_box_admission"
-                            testId="home-v3-dense-box-admission"
-                            className="home-dense-box-tall"
-                        />
-                    </div>
-                </div>
-
-                <div className="home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
                     <HomeDenseBox
                         title="Result"
                         viewMoreTo="/results"
@@ -251,9 +203,50 @@ export function HomePage() {
                         testId="home-v3-dense-box-jobs"
                     />
                 </div>
-            </section>
 
-            <HomeEducationalContent />
+                <div className="home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
+                    <HomeDenseBox
+                        title="Answer Key"
+                        viewMoreTo="/answer-key"
+                        items={sections.answerKeys}
+                        sourceTag="home_box_answer_key"
+                        testId="home-v3-dense-box-answer-key"
+                        className="home-dense-box-area-answer"
+                    />
+                    <HomeDenseBox
+                        title="Syllabus"
+                        viewMoreTo="/syllabus"
+                        items={sections.syllabus}
+                        sourceTag="home_box_syllabus"
+                        testId="home-v3-dense-box-syllabus"
+                        className="home-dense-box-area-syllabus"
+                    />
+                    <HomeDenseBox
+                        title="Admission"
+                        viewMoreTo="/admission"
+                        items={sections.admissions}
+                        sourceTag="home_box_admission"
+                        testId="home-v3-dense-box-admission"
+                        className="home-dense-box-area-admission"
+                    />
+                    <HomeDenseBox
+                        title="Certificate Verification"
+                        viewMoreTo="/results?q=certificate"
+                        items={sections.certificates}
+                        sourceTag="home_box_certificate"
+                        testId="home-v3-dense-box-certificate"
+                        className="home-dense-box-area-certificate"
+                    />
+                    <HomeDenseBox
+                        title="Important"
+                        viewMoreTo="/jobs?sort=views"
+                        items={sections.important}
+                        sourceTag="home_box_important"
+                        testId="home-v3-dense-box-important"
+                        className="home-dense-box-area-important"
+                    />
+                </div>
+            </section>
 
             {!loading && !homepageReady && (
                 <div className="empty-state">
