@@ -76,6 +76,28 @@ const createRollupSummary = (overrides: Partial<Record<string, unknown>> = {}) =
     ...overrides,
 });
 
+const createDailyRollups = (days: number, viewResolver: (index: number) => number) => {
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+    return Array.from({ length: days }).map((_, index) => {
+        const date = new Date(start);
+        date.setUTCDate(start.getUTCDate() + index);
+        return {
+            date: date.toISOString().slice(0, 10),
+            count: 0,
+            views: viewResolver(index),
+            listingViews: 0,
+            cardClicks: 0,
+            categoryClicks: 0,
+            filterApplies: 0,
+            searches: 0,
+            bookmarkAdds: 0,
+            registrations: 0,
+        };
+    });
+};
+
 describe('analytics overview health flags', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -141,6 +163,8 @@ describe('analytics overview health flags', () => {
         // Backward compatibility fields remain present.
         expect(typeof data.insights.listingCoverageWindowPct).toBe('number');
         expect(typeof data.insights.listingCoverageAllTimePct).toBe('number');
+        expect(typeof data.insights.attributionCoveragePct).toBe('number');
+        expect(typeof data.insights.viewTrendMode).toBe('string');
         expect(typeof data.funnel.cardClicksInApp).toBe('number');
         expect(typeof data.funnel.detailViewsDirect).toBe('number');
     });
@@ -176,5 +200,20 @@ describe('analytics overview health flags', () => {
         expect(data.insights.anomaly).toBe(true);
         expect(data.insights.healthFlags.inAppClickCollapse).toBe(true);
     });
-});
 
+    it('sets viewTrendMode to baseline when previous window has zero views', async () => {
+        getDailyRollupsMock.mockResolvedValue(
+            createDailyRollups(14, (index) => (index < 7 ? 0 : 3))
+        );
+        getRollupSummaryMock.mockResolvedValue(createRollupSummary({
+            viewCount: 21,
+            listingViews: 12,
+            lastUpdatedAt: new Date().toISOString(),
+        }));
+
+        const { data } = await getAnalyticsOverview(30, { bypassCache: true });
+
+        expect(data.insights.viewTrendMode).toBe('baseline');
+        expect(data.insights.viewTrendPct).toBe(100);
+    });
+});

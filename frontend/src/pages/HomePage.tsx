@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { HomeDenseBox } from '../components/home/HomeDenseBox';
+import { HomeFeaturedBanner } from '../components/home/HomeFeaturedBanner';
 import { getAnnouncementCards } from '../utils/api';
 import type { AnnouncementCard } from '../types';
 
@@ -86,6 +87,7 @@ function buildCertificateCards(
 
 export function HomePage() {
     const [loading, setLoading] = useState(true);
+    const [featured, setFeatured] = useState<AnnouncementCard[]>([]);
     const [sections, setSections] = useState<HomeDenseSections>({
         jobs: [],
         results: [],
@@ -116,10 +118,10 @@ export function HomePage() {
                     getAnnouncementCards({ type: 'job', limit: 20, sort: 'newest' }),
                     getAnnouncementCards({ type: 'result', limit: 20, sort: 'newest' }),
                     getAnnouncementCards({ type: 'admit-card', limit: 20, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'answer-key', limit: 5, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'syllabus', limit: 5, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'answer-key', limit: 10, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'syllabus', limit: 10, sort: 'newest' }),
                     getAnnouncementCards({ type: 'admission', limit: 12, sort: 'newest' }),
-                    getAnnouncementCards({ limit: 5, sort: 'views' }),
+                    getAnnouncementCards({ limit: 10, sort: 'views' }),
                     getAnnouncementCards({ search: 'certificate', limit: 16, sort: 'newest' }),
                     getAnnouncementCards({ search: 'verification', limit: 16, sort: 'newest' }),
                     getAnnouncementCards({ limit: 10, sort: 'views' }),
@@ -133,8 +135,17 @@ export function HomePage() {
                     admissionRes.data,
                     resultsRes.data,
                     topViewsRes.data,
-                    5,
+                    10,
                 );
+
+                // Build featured banner: mix of top viewed + latest from each type
+                const featuredItems = dedupeCards([
+                    ...importantRes.data.slice(0, 3),
+                    ...jobsRes.data.slice(0, 2),
+                    ...resultsRes.data.slice(0, 2),
+                    ...admitRes.data.slice(0, 1),
+                ]).slice(0, 8);
+                setFeatured(featuredItems);
 
                 setSections({
                     jobs: jobsRes.data,
@@ -179,6 +190,8 @@ export function HomePage() {
 
     return (
         <Layout>
+            <HomeFeaturedBanner items={featured} />
+
             <section className="home-v3-shell" data-testid="home-v3-shell">
                 <div className="home-v3-top-grid" data-testid="home-v3-top-grid">
                     <HomeDenseBox
@@ -244,6 +257,7 @@ export function HomePage() {
                         sourceTag="home_box_important"
                         testId="home-v3-dense-box-important"
                         className="home-dense-box-area-important"
+                        showBadges
                     />
                 </div>
             </section>

@@ -18,6 +18,7 @@ export type SourceTag =
     | 'home_box_admission'
     | 'home_box_important'
     | 'home_box_certificate'
+    | 'home_banner'
     | 'category_list'
     | 'category_compact'
     | 'search_overlay'

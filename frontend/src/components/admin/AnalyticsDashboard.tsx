@@ -28,6 +28,7 @@ interface AnalyticsData {
     totalSubscriptionsUnsubscribed: number;
     totalListingViews: number;
     totalCardClicks: number;
+    totalCardClicksInApp?: number;
     totalCategoryClicks: number;
     totalFilterApplies: number;
     totalDigestClicks?: number;
@@ -51,9 +52,13 @@ interface AnalyticsData {
     funnel?: {
         listingViews: number;
         cardClicks: number;
+        cardClicksRaw?: number;
+        cardClicksInApp?: number;
         detailViews: number;
         detailViewsRaw?: number;
         detailViewsAdjusted?: number;
+        detailViewsDirect?: number;
+        detailViewsUnattributed?: number;
         hasAnomaly?: boolean;
         bookmarkAdds: number;
         subscriptionsVerified: number;
@@ -80,13 +85,23 @@ interface AnalyticsData {
     insights?: {
         viewTrendPct: number;
         viewTrendDirection: 'up' | 'down' | 'flat' | string;
+        viewTrendMode?: 'normal' | 'baseline' | string;
         clickThroughRate: number;
         funnelDropRate: number;
         listingCoverage: number;
+        listingCoverageWindowPct?: number;
+        listingCoverageAllTimePct?: number;
+        attributionCoveragePct?: number;
         topType?: { type: string; count: number; share?: number | null } | null;
         topCategory?: { category: string; count: number; share?: number | null } | null;
         anomaly?: boolean;
         rollupAgeMinutes?: number | null;
+        healthFlags?: {
+            zeroListingEvents: boolean;
+            staleRollups: boolean;
+            inAppClickCollapse: boolean;
+            staleThresholdMinutes: number;
+        };
     };
     comparison?: AnalyticsComparison;
     anomalies?: AnalyticsAnomaly[];
@@ -115,6 +130,7 @@ const DEFAULT_ANALYTICS: AnalyticsData = {
     totalSubscriptionsUnsubscribed: 0,
     totalListingViews: 0,
     totalCardClicks: 0,
+    totalCardClicksInApp: 0,
     totalCategoryClicks: 0,
     totalFilterApplies: 0,
     totalDigestClicks: 0,
@@ -127,9 +143,13 @@ const DEFAULT_ANALYTICS: AnalyticsData = {
     funnel: {
         listingViews: 0,
         cardClicks: 0,
+        cardClicksRaw: 0,
+        cardClicksInApp: 0,
         detailViews: 0,
         detailViewsRaw: 0,
         detailViewsAdjusted: 0,
+        detailViewsDirect: 0,
+        detailViewsUnattributed: 0,
         hasAnomaly: false,
         bookmarkAdds: 0,
         subscriptionsVerified: 0,
@@ -151,13 +171,23 @@ const DEFAULT_ANALYTICS: AnalyticsData = {
     insights: {
         viewTrendPct: 0,
         viewTrendDirection: 'flat',
+        viewTrendMode: 'normal',
         clickThroughRate: 0,
         funnelDropRate: 0,
         listingCoverage: 0,
+        listingCoverageWindowPct: 0,
+        listingCoverageAllTimePct: 0,
+        attributionCoveragePct: 0,
         topType: null,
         topCategory: null,
         anomaly: false,
         rollupAgeMinutes: null,
+        healthFlags: {
+            zeroListingEvents: false,
+            staleRollups: false,
+            inAppClickCollapse: false,
+            staleThresholdMinutes: 45,
+        },
     },
     comparison: {
         viewsDeltaPct: 0,
@@ -241,8 +271,8 @@ const METRIC_DEFINITIONS: Record<MetricDefinition['key'], MetricDefinition> = {
     },
     tracking_coverage: {
         key: 'tracking_coverage',
-        label: 'Tracking coverage',
-        description: 'Listing views compared to total page views. It can exceed 100% when users revisit lists.',
+        label: 'Attribution coverage',
+        description: 'Share of detail views with recognized attribution source metadata.',
     },
     conversion_rate: {
         key: 'conversion_rate',
@@ -656,8 +686,12 @@ export function AnalyticsDashboard({
 
     if (!analytics) return null;
     const engagementWindow = analytics.engagementWindowDays ?? 30;
+    const primaryCardClicks = analytics.totalCardClicksInApp
+        ?? analytics.funnel?.cardClicksInApp
+        ?? analytics.funnel?.cardClicks
+        ?? analytics.totalCardClicks;
     const ctr = analytics.totalListingViews > 0
-        ? Math.round((analytics.totalCardClicks / analytics.totalListingViews) * 100)
+        ? Math.round((primaryCardClicks / analytics.totalListingViews) * 100)
         : 0;
     const ctrByType = analytics.ctrByType ?? [];
     const digestClicks = analytics.digestClicks;
@@ -677,6 +711,7 @@ export function AnalyticsDashboard({
         && deepLinkAttribution.campaigns.length === 0;
     const insights = analytics.insights;
     const viewTrendPct = insights?.viewTrendPct ?? 0;
+    const viewTrendMode = insights?.viewTrendMode ?? 'normal';
     const viewTrendDirection = insights?.viewTrendDirection ?? (viewTrendPct > 2 ? 'up' : viewTrendPct < -2 ? 'down' : 'flat');
     const viewTrendLabel = viewTrendDirection === 'up'
         ? `Up ${Math.abs(viewTrendPct)}%`
@@ -684,8 +719,8 @@ export function AnalyticsDashboard({
             ? `Down ${Math.abs(viewTrendPct)}%`
             : 'Stable';
     const rollupAge = insights?.rollupAgeMinutes ?? null;
-    const ctrTone = ctr >= 10 ? 'good' : ctr >= 5 ? 'warn' : 'bad';
-    const listingCoverage = insights?.listingCoverage ?? 0;
+    const insightCtr = insights?.clickThroughRate ?? ctr;
+    const ctrTone = insightCtr >= 10 ? 'good' : insightCtr >= 5 ? 'warn' : 'bad';
     const funnelDropTone = (insights?.funnelDropRate ?? 0) >= 80 ? 'bad' : (insights?.funnelDropRate ?? 0) >= 60 ? 'warn' : 'good';
     const trendTone = viewTrendDirection === 'up' ? 'good' : viewTrendDirection === 'down' ? 'bad' : 'warn';
     const totalTypeCount = sortedTypeBreakdown.reduce((sum, item) => sum + item.count, 0);
@@ -701,13 +736,24 @@ export function AnalyticsDashboard({
     const funnel = analytics.funnel;
     const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
     const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
-    const hasAnomaly = funnel?.hasAnomaly ?? Boolean(
-        (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
-    );
-    const funnelHasDirectTraffic = Boolean(
-        (funnel?.cardClicks ?? 0) > 0 && rawDetailViews > (funnel?.cardClicks ?? 0)
-    );
-    const detailViewsLabel = hasAnomaly ? 'Detail views (capped)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
+    const detailViewsDirect = funnel?.detailViewsDirect ?? 0;
+    const detailViewsUnattributed = funnel?.detailViewsUnattributed ?? 0;
+    const hasAnomaly = insights?.healthFlags?.inAppClickCollapse
+        ?? funnel?.hasAnomaly
+        ?? Boolean((funnel?.cardClicks ?? 0) === 0 && rawDetailViews > 0);
+    const funnelHasDirectTraffic = !hasAnomaly && (detailViewsDirect > 0 || rawDetailViews > adjustedDetailViews);
+    const detailViewsLabel = hasAnomaly ? 'Detail views (adjusted)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
+    const attributionCoverage = insights?.attributionCoveragePct;
+    const finalCoverage = typeof attributionCoverage === 'number'
+        ? attributionCoverage
+        : (insights?.listingCoverage ?? 0);
+    const finalCoverageTone = finalCoverage >= 80 ? 'good' : finalCoverage >= 50 ? 'warn' : 'bad';
+    const coverageMetaText = finalCoverage === 0
+        ? 'No attributed detail views in this window. Verify source tagging on in-app links.'
+        : finalCoverage < 50
+            ? 'Many detail views are unattributed. Review source-tag normalization and URL attribution.'
+            : 'Attributed detail views vs total detail views';
+    const showCoverageAction = finalCoverage === 0 && rawDetailViews > 0;
     const lowCtrThreshold = 5;
     const minViewsForCtrFlag = 20;
     const funnelSteps = [
@@ -735,31 +781,19 @@ export function AnalyticsDashboard({
         },
     ];
 
-    // Recalculate coverage if 0 but we have views
-    const calculatedCoverage = analytics.totalViews > 0
-        ? Math.round((analytics.totalListingViews / analytics.totalViews) * 100)
-        : 0;
-    const finalCoverage = (listingCoverage === 0 && analytics.totalListingViews > 0)
-        ? calculatedCoverage
-        : listingCoverage;
-    const finalCoverageTone = finalCoverage >= 25 ? 'good' : finalCoverage >= 10 ? 'warn' : 'bad';
-    const coverageMetaText = finalCoverage === 0
-        ? 'No listing view events tracked. Verify listing pages fire view events.'
-        : finalCoverage < 10
-            ? 'Low coverage. Ensure list pages and filters trigger listing view tracking.'
-            : 'Listing views vs total views';
-    const showCoverageAction = finalCoverage === 0;
-
     const engagementCards = [
         { label: 'Searches', value: analytics.totalSearches, category: 'traffic' as const },
         { label: 'Bookmarks', value: analytics.totalBookmarks, category: 'engagement' as const },
         { label: 'Registrations', value: analytics.totalRegistrations, category: 'conversion' as const },
         { label: 'Unsubscribes', value: analytics.totalSubscriptionsUnsubscribed, category: 'risk' as const },
         { label: 'Listing views', value: analytics.totalListingViews, category: 'traffic' as const },
-        { label: 'Card clicks', value: analytics.totalCardClicks, category: 'engagement' as const },
+        { label: 'Card clicks (in-app)', value: primaryCardClicks, category: 'engagement' as const },
+        ...(analytics.totalCardClicks > primaryCardClicks
+            ? [{ label: 'Card clicks (all sources)', value: analytics.totalCardClicks, category: 'traffic' as const }]
+            : []),
         { label: 'Category clicks', value: analytics.totalCategoryClicks, category: 'engagement' as const },
         { label: 'Filter applies', value: analytics.totalFilterApplies, category: 'engagement' as const },
-        { label: 'CTR', value: ctr, category: 'conversion' as const, suffix: '%' },
+        { label: 'CTR', value: insightCtr, category: 'conversion' as const, suffix: '%' },
         { label: 'Digest clicks', value: analytics.totalDigestClicks ?? 0, category: 'engagement' as const },
         { label: 'Deep link clicks', value: analytics.totalDeepLinkClicks ?? 0, category: 'traffic' as const },
     ];
@@ -768,10 +802,10 @@ export function AnalyticsDashboard({
         ? engagementCards.slice(0, 8)
         : engagementCards;
 
-    // Weekly trend anomaly check
-    const isNewData = rollups.length <= 7 && prev7Views === 0;
-    const displayTrendLabel = isNewData ? 'New' : viewTrendLabel;
-    const displayTrendTone = isNewData ? 'good' : trendTone;
+    const isBaselineTrend = viewTrendMode === 'baseline'
+        || (rollups.length <= 7 && prev7Views === 0 && viewsLast7 > 0);
+    const displayTrendLabel = isBaselineTrend ? 'New baseline' : viewTrendLabel;
+    const displayTrendTone = isBaselineTrend ? 'good' : trendTone;
 
     const formatLastUpdated = (value?: string | null) => {
         if (!value) return 'Rollup not updated yet';
@@ -1423,7 +1457,7 @@ export function AnalyticsDashboard({
                 <div className="insights-grid">
                     <div className={`insight-card ${displayTrendTone}`}>
                         <div className="insight-label">Weekly views trend</div>
-                        <div className={`insight-value ${isNewData ? 'flat' : viewTrendDirection}`}>{displayTrendLabel}</div>
+                        <div className={`insight-value ${isBaselineTrend ? 'flat' : viewTrendDirection}`}>{displayTrendLabel}</div>
                         <div className="insight-meta">{formatMetric(viewsLast7)} vs {formatMetric(prev7Views)} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
@@ -1431,7 +1465,7 @@ export function AnalyticsDashboard({
                             Click-through rate
                             {enableUxV2 && <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.ctr} />}
                         </div>
-                        <div className="insight-value">{insights?.clickThroughRate ?? ctr}%</div>
+                        <div className="insight-value">{insightCtr}%</div>
                         <div className="insight-meta">From listing views to card clicks</div>
                     </div>
                     <div className={`insight-card ${funnelDropTone}`}>
@@ -1443,16 +1477,16 @@ export function AnalyticsDashboard({
                         <div className="insight-meta">Listing views not clicked</div>
                     </div>
                     <div className={`insight-card ${finalCoverageTone}`}>
-                        <div className="insight-label" title={!enableUxV2 ? 'Listing views as a percentage of total page views — can exceed 100% if listings are viewed more than pages' : undefined}>
+                        <div className="insight-label" title={!enableUxV2 ? 'Percent of detail views carrying recognized source attribution' : undefined}>
                             Tracking coverage
                             {enableUxV2 && <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.tracking_coverage} />}
                         </div>
-                        <div className="insight-value">{finalCoverage}%</div>
+                        <div className="insight-value">{finalCoverage.toFixed(1)}%</div>
                         <div className="insight-meta">{coverageMetaText}</div>
                         {showCoverageAction && (
                             <button
                                 className="admin-btn secondary small insight-action"
-                                onClick={() => setActionMessage('Tracking coverage uses listing_view events from /api/announcements/v3/cards. Ensure list pages hit that endpoint and cache onHit still records events.')}
+                                onClick={() => setActionMessage('Attribution coverage is based on detail-view source tags. Ensure in-app links include source and backend source normalization maps those tags to in_app.')}
                             >
                                 Fix tracking coverage
                             </button>
@@ -1483,11 +1517,11 @@ export function AnalyticsDashboard({
                         </div>
                         <div className="insight-meta">Latest rollup update</div>
                     </div>
-                    {insights?.anomaly && (
+                    {hasAnomaly && (
                         <div className="insight-card warning">
                             <div className="insight-label">Data anomaly</div>
                             <div className="insight-value">Check funnel</div>
-                            <div className="insight-meta">Detail views exceed card clicks</div>
+                            <div className="insight-meta">In-app click collapse or unattributed detail-view spike detected</div>
                         </div>
                     )}
                 </div>
@@ -1523,15 +1557,15 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>Warning: Funnel anomaly.</strong> Raw Detail views ({formatMetric(rawDetailViews)}) exceed Card clicks ({formatMetric(funnel?.cardClicks)}).
+                        <strong>Warning: Funnel anomaly.</strong> In-app clicks ({formatMetric(funnel?.cardClicks)}) are not keeping pace with detail views ({formatMetric(rawDetailViews)}).
                         <br />
-                        The funnel uses the adjusted value ({formatMetric(adjustedDetailViews)}) to ensure percentages make sense.
-                        <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
+                        The funnel uses adjusted detail views ({formatMetric(adjustedDetailViews)}) for conversion math. Direct: {formatMetric(detailViewsDirect)}, Unattributed: {formatMetric(detailViewsUnattributed)}.
+                        <div className="analytics-suggestion">Suggestion: verify in-app source tagging and attribution normalization before acting on conversion drop signals.</div>
                     </div>
                 )}
                 {funnelHasDirectTraffic && !hasAnomaly && (
                     <p className="analytics-hint">
-                        Detail views include direct/SEO visits, so they may exceed card clicks.
+                        Detail views include direct/SEO traffic, so raw detail views can exceed in-app card clicks without indicating a tracking failure.
                     </p>
                 )}
             </div>

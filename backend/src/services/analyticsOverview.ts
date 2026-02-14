@@ -27,6 +27,7 @@ const overviewCache = new Map<string, { data: any; expiresAt: number }>();
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 const roundToOneDecimal = (value: number) => Math.round(value * 10) / 10;
+const clampPercentage = (value: number): number => Math.max(0, Math.min(100, value));
 const toDeltaPct = (current: number, previous: number): number => {
     if (!Number.isFinite(current)) return 0;
     if (!Number.isFinite(previous) || previous <= 0) return current > 0 ? 100 : 0;
@@ -139,6 +140,7 @@ export async function getAnalyticsOverview(
     const previous7 = dailyRollups.slice(prevStart, prevEnd);
     const last7Views = sum(last7.map((row) => row.views ?? 0));
     const prev7Views = sum(previous7.map((row) => row.views ?? 0));
+    const viewTrendMode: 'normal' | 'baseline' = prev7Views <= 0 && last7Views > 0 ? 'baseline' : 'normal';
     const viewTrendPct = prev7Views > 0
         ? Math.round(((last7Views - prev7Views) / prev7Views) * 1000) / 10
         : last7Views > 0 ? 100 : 0;
@@ -155,6 +157,9 @@ export async function getAnalyticsOverview(
         : 0;
     const listingCoverageAllTimePct = totalViews > 0
         ? roundToOneDecimal((rollupSummary.listingViews / totalViews) * 100)
+        : 0;
+    const attributionCoveragePct = detailViewsRaw > 0
+        ? clampPercentage(roundToOneDecimal(((detailViewsRaw - detailViewsUnattributed) / detailViewsRaw) * 100))
         : 0;
 
     const rollupAgeMinutes = rollupSummary.lastUpdatedAt
@@ -302,11 +307,13 @@ export async function getAnalyticsOverview(
         insights: {
             viewTrendPct,
             viewTrendDirection,
+            viewTrendMode,
             clickThroughRate,
             funnelDropRate,
             listingCoverage: listingCoverageWindowPct,
             listingCoverageWindowPct,
             listingCoverageAllTimePct,
+            attributionCoveragePct,
             topType: sortedTypes[0]
                 ? { ...sortedTypes[0], share: totalAnnouncements ? Math.round((sortedTypes[0].count / totalAnnouncements) * 100) : 0 }
                 : null,

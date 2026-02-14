@@ -84,9 +84,18 @@ const SOURCE_ALIASES: Record<string, string> = {
   notification_prompt: 'push',
   push_prompt: 'push',
   app: 'push',
+  header_trending: 'home',
   '(direct)': 'direct',
   none: 'direct',
 };
+
+const SOURCE_PREFIX_ALIASES: Array<{ prefix: string; canonical: string }> = [
+  { prefix: 'home_', canonical: 'home' },
+  { prefix: 'category_', canonical: 'category' },
+  { prefix: 'bookmarks_', canonical: 'bookmarks' },
+  { prefix: 'profile_', canonical: 'profile' },
+  { prefix: 'detail_', canonical: 'related' },
+];
 
 const MEDIUM_ALIASES: Record<string, string> = {
   organic: 'organic',
@@ -149,7 +158,9 @@ const normalizeCampaign = (value?: string | null): string | null => {
 const normalizeSource = (value?: string | null): string | null => {
   const token = normalizeToken(value);
   if (!token) return null;
-  const mapped = SOURCE_ALIASES[token] ?? token;
+  const mappedAlias = SOURCE_ALIASES[token];
+  const mappedByPrefix = SOURCE_PREFIX_ALIASES.find((entry) => token.startsWith(entry.prefix))?.canonical;
+  const mapped = mappedAlias ?? mappedByPrefix ?? token;
   if (IN_APP_SOURCES.has(mapped) || DIRECT_SOURCES.has(mapped)) {
     return mapped;
   }

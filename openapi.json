@@ -913,7 +913,65 @@
         "operationId": "getApiAnalyticsOverview",
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "funnel": {
+                          "type": "object",
+                          "properties": {
+                            "cardClicks": {
+                              "type": "number"
+                            },
+                            "cardClicksRaw": {
+                              "type": "number"
+                            },
+                            "cardClicksInApp": {
+                              "type": "number"
+                            },
+                            "detailViewsDirect": {
+                              "type": "number"
+                            }
+                          }
+                        },
+                        "insights": {
+                          "type": "object",
+                          "properties": {
+                            "listingCoverage": {
+                              "type": "number"
+                            },
+                            "listingCoverageWindowPct": {
+                              "type": "number"
+                            },
+                            "listingCoverageAllTimePct": {
+                              "type": "number"
+                            },
+                            "attributionCoveragePct": {
+                              "type": "number"
+                            },
+                            "viewTrendMode": {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "baseline"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "cached": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad request"

@@ -3433,6 +3433,231 @@ h6 {
     }
 }
 
+/* =============================================
+   Home Featured Banner
+   ============================================= */
+
+.home-featured-banner {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: var(--space-5);
+    box-shadow: var(--shadow-sm);
+}
+
+.home-featured-banner-header {
+    padding: var(--space-3) var(--space-4);
+    background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%);
+}
+
+.home-featured-banner-header h2 {
+    margin: 0;
+    color: #fff;
+    font-size: var(--font-lg);
+    font-weight: var(--weight-bold);
+    line-height: 1.3;
+}
+
+.home-featured-banner-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+}
+
+.home-featured-banner-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    text-decoration: none;
+    color: var(--text-primary);
+    font-size: var(--font-sm);
+    line-height: 1.4;
+    border-bottom: 1px solid var(--border-light);
+    transition: background var(--transition-fast);
+}
+
+.home-featured-banner-item:nth-child(odd) {
+    border-right: 1px solid var(--border-light);
+}
+
+.home-featured-banner-item:hover {
+    background: var(--primary-50);
+    color: var(--text-primary);
+}
+
+.home-featured-banner-title {
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ─── Action Badges (Featured Banner) ─── */
+.home-featured-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: var(--weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+
+.badge-action-job {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.badge-action-result {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.badge-action-admit {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.badge-action-answer {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.badge-action-admission {
+    background: #cffafe;
+    color: #0e7490;
+}
+
+.badge-action-syllabus {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+.badge-action-default {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .badge-action-job {
+    background: #14532d;
+    color: #86efac;
+}
+
+[data-theme="dark"] .badge-action-result {
+    background: #7f1d1d;
+    color: #fca5a5;
+}
+
+[data-theme="dark"] .badge-action-admit {
+    background: #78350f;
+    color: #fcd34d;
+}
+
+[data-theme="dark"] .badge-action-answer {
+    background: #1e3a5f;
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .badge-action-admission {
+    background: #164e63;
+    color: #67e8f9;
+}
+
+[data-theme="dark"] .badge-action-syllabus {
+    background: #3b0764;
+    color: #c4b5fd;
+}
+
+/* ─── Inline Badges (Dense Box) ─── */
+.dense-inline-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: var(--weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    margin-left: var(--space-2);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.dense-badge-job {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.dense-badge-result {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.dense-badge-admit {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.dense-badge-answer {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.dense-badge-admission {
+    background: #cffafe;
+    color: #0e7490;
+}
+
+.dense-badge-syllabus {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+[data-theme="dark"] .dense-badge-job {
+    background: #14532d;
+    color: #86efac;
+}
+
+[data-theme="dark"] .dense-badge-result {
+    background: #7f1d1d;
+    color: #fca5a5;
+}
+
+[data-theme="dark"] .dense-badge-admit {
+    background: #78350f;
+    color: #fcd34d;
+}
+
+[data-theme="dark"] .dense-badge-answer {
+    background: #1e3a5f;
+    color: #93c5fd;
+}
+
+[data-theme="dark"] .dense-badge-admission {
+    background: #164e63;
+    color: #67e8f9;
+}
+
+[data-theme="dark"] .dense-badge-syllabus {
+    background: #3b0764;
+    color: #c4b5fd;
+}
+
+/* ─── Featured Banner Responsive ─── */
+@media (max-width: 768px) {
+    .home-featured-banner-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .home-featured-banner-item:nth-child(odd) {
+        border-right: none;
+    }
+}
+
 @media (max-width: 768px) {
     .jobs-filter-grid {
         grid-template-columns: 1fr;

@@ -78,10 +78,14 @@ const getCollectionSafe = <T>(name: string): Collection<T> | null => {
     }
 };
 
-export async function recordAnnouncementView(announcementId: string): Promise<void> {
+export async function recordAnnouncementView(
+    announcementId: string,
+    metadata?: Record<string, unknown>
+): Promise<void> {
     await recordAnalyticsEvent({
         type: 'announcement_view',
         announcementId,
+        metadata,
     });
 }
 
@@ -169,27 +173,43 @@ export async function getFunnelAttributionSplit(days: number = DEFAULT_ROLLUP_DA
     start.setUTCHours(0, 0, 0, 0);
 
     try {
-        const rows = await events.aggregate([
-            {
-                $match: {
-                    type: 'card_click',
-                    createdAt: { $gte: start },
+        const [cardClickRows, detailViewRows] = await Promise.all([
+            events.aggregate([
+                {
+                    $match: {
+                        type: 'card_click',
+                        createdAt: { $gte: start },
+                    },
                 },
-            },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.source', '__none__'] },
-                    count: { $sum: 1 },
+                {
+                    $group: {
+                        _id: { $ifNull: ['$metadata.source', '__none__'] },
+                        count: { $sum: 1 },
+                    },
                 },
-            },
-        ]).toArray();
+            ]).toArray(),
+            events.aggregate([
+                {
+                    $match: {
+                        type: 'announcement_view',
+                        createdAt: { $gte: start },
+                    },
+                },
+                {
+                    $group: {
+                        _id: { $ifNull: ['$metadata.source', '__none__'] },
+                        count: { $sum: 1 },
+                    },
+                },
+            ]).toArray(),
+        ]);
 
         let totalCardClicks = 0;
         let cardClicksInApp = 0;
         let detailViewsDirect = 0;
         let detailViewsUnattributed = 0;
 
-        for (const row of rows) {
+        for (const row of cardClickRows) {
             const count = Number(row.count ?? 0);
             if (!Number.isFinite(count) || count <= 0) continue;
 
@@ -199,9 +219,18 @@ export async function getFunnelAttributionSplit(days: number = DEFAULT_ROLLUP_DA
             const sourceClass = classifySource(source);
             if (sourceClass === 'in_app') {
                 cardClicksInApp += count;
-            } else if (sourceClass === 'direct') {
+            }
+        }
+
+        for (const row of detailViewRows) {
+            const count = Number(row.count ?? 0);
+            if (!Number.isFinite(count) || count <= 0) continue;
+
+            const source = row._id === '__none__' ? null : String(row._id);
+            const sourceClass = classifySource(source);
+            if (sourceClass === 'direct') {
                 detailViewsDirect += count;
-            } else {
+            } else if (sourceClass !== 'in_app') {
                 detailViewsUnattributed += count;
             }
         }

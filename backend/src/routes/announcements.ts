@@ -193,7 +193,6 @@ const recordListingAnalytics = (req: express.Request, options: {
 const recordAnnouncementAnalytics = (req: express.Request, announcement: Announcement) => {
   const announcementId = String(announcement.id);
   AnnouncementModel.incrementViewCount(announcementId).catch(console.error);
-  recordAnnouncementView(announcementId).catch(console.error);
   const attribution = normalizeAttribution({
     source: pickQueryValue(req.query.source),
     utmSource: pickQueryValue(req.query.utm_source),
@@ -212,16 +211,25 @@ const recordAnnouncementAnalytics = (req: express.Request, announcement: Announc
     ref: pickQueryValue(req.query.ref),
   });
 
-  recordAnalyticsEvent({
-    type: 'card_click',
-    announcementId,
-    metadata: {
-      type: announcement.type,
-      category: announcement.category ?? null,
-      sourceClass: attribution.sourceClass,
-      ...attribution,
-    },
+  recordAnnouncementView(announcementId, {
+    type: announcement.type,
+    category: announcement.category ?? null,
+    sourceClass: attribution.sourceClass,
+    ...attribution,
   }).catch(console.error);
+
+  if (attribution.sourceClass === 'in_app') {
+    recordAnalyticsEvent({
+      type: 'card_click',
+      announcementId,
+      metadata: {
+        type: announcement.type,
+        category: announcement.category ?? null,
+        sourceClass: attribution.sourceClass,
+        ...attribution,
+      },
+    }).catch(console.error);
+  }
 
   const hasAttribution = Object.values(attribution).some((value) => value);
   if (hasAttribution) {

@@ -62,9 +62,13 @@ const schema = buildSchema(`
   type AnalyticsFunnel {
     listingViews: Int!
     cardClicks: Int!
+    cardClicksRaw: Int
+    cardClicksInApp: Int
     detailViews: Int!
     detailViewsRaw: Int
     detailViewsAdjusted: Int
+    detailViewsDirect: Int
+    detailViewsUnattributed: Int
     hasAnomaly: Boolean
     bookmarkAdds: Int!
     subscriptionsVerified: Int!
@@ -136,13 +140,25 @@ const schema = buildSchema(`
   type AnalyticsInsights {
     viewTrendPct: Float!
     viewTrendDirection: String!
+    viewTrendMode: String
     clickThroughRate: Int!
     funnelDropRate: Int!
-    listingCoverage: Int!
+    listingCoverage: Float!
+    listingCoverageWindowPct: Float
+    listingCoverageAllTimePct: Float
+    attributionCoveragePct: Float
     topType: TypeBreakdown
     topCategory: CategoryBreakdown
     anomaly: Boolean!
     rollupAgeMinutes: Int
+    healthFlags: AnalyticsHealthFlags
+  }
+
+  type AnalyticsHealthFlags {
+    zeroListingEvents: Boolean!
+    staleRollups: Boolean!
+    inAppClickCollapse: Boolean!
+    staleThresholdMinutes: Int!
   }
 
   type PopularAnnouncement {
