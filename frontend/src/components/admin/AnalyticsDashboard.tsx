@@ -867,8 +867,8 @@ export function AnalyticsDashboard({
                             {enableUxV2 && (
                                 <option value="auto">Auto ({typeof navigator !== 'undefined' ? navigator.language : 'Browser'})</option>
                             )}
-                            <option value="en-IN">India (4,13,536)</option>
-                            <option value="en-US">International (413,536)</option>
+                            <option value="en-IN">India</option>
+                            <option value="en-US">International</option>
                         </select>
                     </div>
                 </div>
@@ -1170,7 +1170,11 @@ export function AnalyticsDashboard({
                     <div className="stat-info">
                         <div className="stat-value">{formatMetric(analytics.totalEmailSubscribers)}</div>
                         <div className="stat-label">Email Subscribers</div>
-                        <div className="stat-meta">Verified opt-ins</div>
+                        <div className="stat-meta">
+                            {analytics.totalEmailSubscribers > 0
+                                ? 'Verified opt-ins'
+                                : 'No subscribers yet. Set up email capture to activate this channel.'}
+                        </div>
                     </div>
                 </div>
                 <div className="stat-card push">
@@ -1178,7 +1182,11 @@ export function AnalyticsDashboard({
                     <div className="stat-info">
                         <div className="stat-value">{formatMetric(analytics.totalPushSubscribers)}</div>
                         <div className="stat-label">Push Subscribers</div>
-                        <div className="stat-meta">Active devices</div>
+                        <div className="stat-meta">
+                            {analytics.totalPushSubscribers > 0
+                                ? 'Active devices'
+                                : 'No devices subscribed yet. Prompt users to enable notifications.'}
+                        </div>
                     </div>
                 </div>
             </div>

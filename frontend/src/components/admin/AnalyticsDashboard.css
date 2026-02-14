@@ -1547,6 +1547,113 @@
   margin-left: 6px;
 }
 
+/* Analytics UX consistency overrides (2026-02) */
+.analytics-dashboard .range-toggle {
+  gap: 8px;
+}
+
+.analytics-dashboard .range-toggle .admin-btn {
+  font-size: 13px;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.analytics-dashboard .analytics-section-header h3 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.analytics-dashboard .analytics-subtitle,
+.analytics-dashboard .analytics-hint {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.analytics-dashboard .window-badge {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.analytics-dashboard .stats-grid .stat-value {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.analytics-dashboard .stat-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.analytics-dashboard .stat-meta {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.analytics-dashboard .engagement-value,
+.analytics-dashboard .funnel-value,
+.analytics-dashboard .insight-value {
+  font-size: 24px;
+}
+
+.analytics-dashboard .funnel-card,
+.analytics-dashboard .insight-card {
+  gap: 8px;
+  padding: 16px;
+}
+
+.analytics-dashboard .funnel-label,
+.analytics-dashboard .insight-label {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.analytics-dashboard .analytics-table th,
+.analytics-dashboard .analytics-table td {
+  line-height: 1.5;
+  padding: 14px 16px;
+}
+
+.analytics-dashboard .popular-table .admin-btn.small {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.analytics-dashboard .trend-chart {
+  padding: 20px;
+}
+
+.analytics-dashboard .trend-legend {
+  gap: 16px;
+}
+
+.analytics-dashboard .legend-item {
+  font-size: 12px;
+}
+
+.analytics-dashboard .table-pagination-controls .admin-btn {
+  min-height: 32px;
+  min-width: 36px;
+  padding: 0 10px;
+}
+
+@media (max-width: 760px) {
+  .analytics-dashboard .analytics-section-header h3 {
+    font-size: 20px;
+  }
+
+  .analytics-dashboard .stats-grid .stat-value {
+    font-size: 30px;
+  }
+
+  .analytics-dashboard .trend-chart {
+    padding: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .analytics-dashboard * {
     animation: none !important;

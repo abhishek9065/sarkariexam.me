@@ -1,5 +1,19 @@
 import { expect, test } from '@playwright/test';
 
+test.use({
+    storageState: {
+        cookies: [],
+        origins: [
+            {
+                origin: 'http://127.0.0.1:4173',
+                localStorage: [
+                    { name: 'token', value: 'test-admin-token' },
+                ],
+            },
+        ],
+    },
+});
+
 const overviewFixture = {
     data: {
         totalAnnouncements: 12,
@@ -77,15 +91,11 @@ const overviewFixture = {
 
 test.describe('Admin analytics local integrity', () => {
     test('renders in-app primary metrics, attribution coverage, and baseline trend messaging', async ({ page }) => {
-        await page.addInitScript(() => {
-            localStorage.setItem('token', 'test-admin-token');
-        });
-
         await page.route('**/api/**', async (route) => {
             const url = new URL(route.request().url());
             const path = url.pathname;
 
-            if (path.endsWith('/api/auth/me')) {
+            if (path.includes('/api/auth/me')) {
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',
@@ -102,7 +112,7 @@ test.describe('Admin analytics local integrity', () => {
                 });
             }
 
-            if (path.endsWith('/api/auth/admin/permissions')) {
+            if (path.includes('/api/auth/admin/permissions')) {
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',
@@ -117,7 +127,7 @@ test.describe('Admin analytics local integrity', () => {
                 });
             }
 
-            if (path.endsWith('/api/analytics/overview')) {
+            if (path.includes('/api/analytics/overview')) {
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',
@@ -125,7 +135,7 @@ test.describe('Admin analytics local integrity', () => {
                 });
             }
 
-            if (path.endsWith('/api/analytics/popular')) {
+            if (path.includes('/api/analytics/popular')) {
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',
@@ -133,7 +143,7 @@ test.describe('Admin analytics local integrity', () => {
                 });
             }
 
-            if (path.endsWith('/api/health')) {
+            if (path.includes('/api/health')) {
                 return route.fulfill({
                     status: 200,
                     contentType: 'application/json',
@@ -150,11 +160,11 @@ test.describe('Admin analytics local integrity', () => {
             }
 
             if (
-                path.endsWith('/api/admin/dashboard')
-                || path.endsWith('/api/admin/active-users')
-                || path.endsWith('/api/admin/announcements/summary')
-                || path.endsWith('/api/admin/sessions')
-                || path.endsWith('/api/auth/admin/2fa/backup-codes/status')
+                path.includes('/api/admin/dashboard')
+                || path.includes('/api/admin/active-users')
+                || path.includes('/api/admin/announcements/summary')
+                || path.includes('/api/admin/sessions')
+                || path.includes('/api/auth/admin/2fa/backup-codes/status')
             ) {
                 return route.fulfill({
                     status: 200,

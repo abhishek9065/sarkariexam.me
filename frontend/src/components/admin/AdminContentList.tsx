@@ -383,7 +383,7 @@ export function AdminContentList({
                                             <div className="row-title">
                                                 <span className="title-text" title={item.title}>{item.title}</span>
                                                 <div className="title-meta">
-                                                    <span className="org-text">{item.organization}</span>
+                                                    <span className="org-text" title={item.organization}>{item.organization}</span>
                                                     <CopyButton text={item.id} label="ID" />
                                                 </div>
                                             </div>
