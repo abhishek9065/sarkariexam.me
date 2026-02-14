@@ -55,6 +55,7 @@ export function JobsFilterPanel({
                     <input
                         className="input"
                         type="text"
+                        aria-label="Search"
                         value={value.search}
                         onChange={handleInput('search')}
                         placeholder="Search jobs..."
@@ -63,7 +64,7 @@ export function JobsFilterPanel({
 
                 <label className="jobs-filter-field">
                     <span>State</span>
-                    <select className="input" value={value.state} onChange={handleInput('state')}>
+                    <select className="input" aria-label="State" value={value.state} onChange={handleInput('state')}>
                         <option value="">All States</option>
                         {options.states.map((item) => (
                             <option key={item} value={item}>{item}</option>
@@ -73,7 +74,7 @@ export function JobsFilterPanel({
 
                 <label className="jobs-filter-field">
                     <span>Qualification</span>
-                    <select className="input" value={value.qualification} onChange={handleInput('qualification')}>
+                    <select className="input" aria-label="Qualification" value={value.qualification} onChange={handleInput('qualification')}>
                         <option value="">All Qualifications</option>
                         {options.qualifications.map((item) => (
                             <option key={item} value={item}>{item}</option>
@@ -83,7 +84,7 @@ export function JobsFilterPanel({
 
                 <label className="jobs-filter-field">
                     <span>Organization</span>
-                    <select className="input" value={value.organization} onChange={handleInput('organization')}>
+                    <select className="input" aria-label="Organization" value={value.organization} onChange={handleInput('organization')}>
                         <option value="">All Organizations</option>
                         {options.organizations.map((item) => (
                             <option key={item} value={item}>{item}</option>
@@ -95,6 +96,7 @@ export function JobsFilterPanel({
                     <span>Sort</span>
                     <select
                         className="input"
+                        aria-label="Sort"
                         value={sort}
                         onChange={(event) => onSortChange(event.target.value as 'newest' | 'oldest' | 'deadline' | 'views')}
                     >

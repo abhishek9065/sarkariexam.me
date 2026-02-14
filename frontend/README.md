@@ -88,5 +88,32 @@ The application is designed to fetch data from a backend API. It includes a **mo
 
 ## Configuration
 
-*   **API URL:** Configured via `VITE_API_BASE` environment variable (defaults to empty string, relative path).
+*   **API URL (`VITE_API_BASE`):** If set, frontend calls this base directly (`${VITE_API_BASE}/api`) and bypasses Vite dev proxy.
+*   **Dev Proxy Target (`VITE_PROXY_TARGET`):** Controls where Vite forwards `/api` and `/ws` during `npm run dev`.
+    *   Default/local backend mode: `http://localhost:5000`
+    *   Docker + nginx mode: `http://localhost`
 *   **PWA:** Configured in `vite.config.ts`.
+
+### Local Development Modes
+
+1.  **Local backend mode (default)**
+    *   Start backend on `http://localhost:5000`
+    *   Run frontend:
+    ```bash
+    npm run dev
+    ```
+
+2.  **Docker + nginx mode**
+    *   Ensure nginx is reachable on host `http://localhost`
+    *   PowerShell:
+    ```powershell
+    $env:VITE_PROXY_TARGET='http://localhost'
+    npm run dev
+    ```
+
+### Quick Proxy Verification
+
+With frontend dev server running on `http://localhost:4173`:
+
+*   `GET http://localhost:4173/api/health`
+*   `GET http://localhost:4173/api/announcements/v3/cards?type=job&limit=10`

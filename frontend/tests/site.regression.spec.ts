@@ -23,7 +23,10 @@ test.describe('Site regression', () => {
     test('mobile menu opens on small viewport', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-        await page.getByRole('button', { name: 'Toggle menu' }).click();
+        const header = page.locator('[data-testid="app-header"]');
+        const menuButton = header.getByRole('button', { name: 'Toggle menu' });
+        await expect(menuButton).toBeVisible();
+        await menuButton.click();
         await expect(page.locator('.header-mobile-menu')).toBeVisible();
     });
 
