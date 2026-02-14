@@ -2,6 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { getMe, setAuthToken, getAuthToken, login as apiLogin, register as apiRegister, ApiRequestError } from '../utils/api';
 import type { User } from '../types';
 
+/** Backend returns `name` but our User type uses `username` — normalize it */
+function normalizeUser(raw: any): User {
+    return {
+        ...raw,
+        username: raw.username || raw.name || raw.email,
+    };
+}
+
 interface AuthState {
     user: User | null;
     loading: boolean;
@@ -41,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (async () => {
             try {
                 const res = await getMe();
-                setState({ user: res.data, loading: false, error: null });
+                setState({ user: normalizeUser(res.data.user), loading: false, error: null });
             } catch {
                 setAuthToken(null);
                 setState({ user: null, loading: false, error: null });
@@ -53,9 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const res = await apiLogin(email, password, twoFactorCode);
-            setAuthToken(res.data.token);
+            /* Admin login uses httpOnly cookies — token may not be in body */
+            if (res.data.token) {
+                setAuthToken(res.data.token);
+            }
             setTwoFactorChallenge(null);
-            setState({ user: res.data.user, loading: false, error: null });
+            setState({ user: normalizeUser(res.data.user), loading: false, error: null });
             return 'success';
         } catch (err: unknown) {
             /* Handle 2FA challenge */
@@ -92,8 +103,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const res = await apiRegister(email, name, password);
-            setAuthToken(res.data.token);
-            setState({ user: res.data.user, loading: false, error: null });
+            if (res.data.token) {
+                setAuthToken(res.data.token);
+            }
+            setState({ user: normalizeUser(res.data.user), loading: false, error: null });
         } catch (err: unknown) {
             const message = err instanceof ApiRequestError
                 ? ((err.body as Record<string, unknown> | null)?.message as string) || err.message

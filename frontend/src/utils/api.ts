@@ -49,7 +49,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
         headers['Authorization'] = `Bearer ${authToken}`;
     }
 
-    const res = await fetch(`${BASE}${path}`, { ...options, headers });
+    const res = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
 
     if (!res.ok) {
         let body: unknown;
@@ -130,7 +130,7 @@ export function register(email: string, name: string, password: string) {
 }
 
 export function getMe() {
-    return apiFetch<{ data: User }>('/auth/me');
+    return apiFetch<{ data: { user: User } }>('/auth/me');
 }
 
 /* ─── Bookmarks ─── */

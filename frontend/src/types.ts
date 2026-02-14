@@ -71,15 +71,15 @@ export interface User {
     email: string;
     username: string;
     role: 'user' | 'admin' | 'editor' | 'reviewer' | 'viewer';
-    isActive: boolean;
-    createdAt: string;
+    isActive?: boolean;
+    createdAt?: string;
     lastLogin?: string;
     twoFactorEnabled?: boolean;
 }
 
 /* ─── Auth ─── */
 export interface AuthResponse {
-    token: string;
+    token?: string;
     user: User;
 }
 

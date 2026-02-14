@@ -39,9 +39,11 @@ export function ProfilePage() {
                 {activeTab === 'overview' && (
                     <div className="profile-overview">
                         <div className="profile-stats-grid">
-                            <ProfileStatCard icon="📅" label="Joined" value={new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })} />
+                            {user.createdAt && (
+                                <ProfileStatCard icon="📅" label="Joined" value={new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })} />
+                            )}
                             <ProfileStatCard icon="🔐" label="Role" value={user.role} />
-                            <ProfileStatCard icon="✅" label="Status" value={user.isActive ? 'Active' : 'Inactive'} />
+                            <ProfileStatCard icon="✅" label="Status" value={user.isActive !== undefined ? (user.isActive ? 'Active' : 'Inactive') : 'Active'} />
                             {user.lastLogin && (
                                 <ProfileStatCard icon="🕐" label="Last Login" value={new Date(user.lastLogin).toLocaleDateString('en-IN')} />
                             )}
