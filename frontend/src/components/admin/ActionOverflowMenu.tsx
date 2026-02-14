@@ -29,7 +29,7 @@ export function ActionOverflowMenu({ itemLabel, actions }: ActionOverflowMenuPro
     return (
         <details className="action-menu action-overflow-menu" ref={detailsRef}>
             <summary
-                className="admin-btn secondary small"
+                className="admin-btn secondary small overflow-trigger"
                 role="button"
                 aria-label={`More actions for ${itemLabel}`}
                 onKeyDown={(event) => {
@@ -44,7 +44,8 @@ export function ActionOverflowMenu({ itemLabel, actions }: ActionOverflowMenuPro
                     });
                 }}
             >
-                More
+                <span>More</span>
+                <span className="overflow-chevron" aria-hidden="true">▾</span>
             </summary>
             <div className="action-menu-panel action-overflow-panel">
                 {visibleActions.map((action, index) => (

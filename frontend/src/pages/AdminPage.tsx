@@ -3585,7 +3585,7 @@ export function AdminPage() {
                                         aria-current={activeAdminTab === 'analytics' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Analytics</span>
-                                        <span className="nav-short">📊</span>
+                                        <span className="nav-short">AN</span>
                                         <span className="nav-trailing">
                                             {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
                                         </span>
@@ -3599,7 +3599,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'users' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Users</span>
-                                            <span className="nav-short">👥</span>
+                                            <span className="nav-short">US</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3616,7 +3616,7 @@ export function AdminPage() {
                                         aria-current={activeAdminTab === 'list' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">All Announcements</span>
-                                        <span className="nav-short">📋</span>
+                                        <span className="nav-short">AL</span>
                                         <span className="nav-trailing" />
                                     </button>
                                     {canAccessTab('review') && (
@@ -3628,7 +3628,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'review' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Review Queue</span>
-                                            <span className="nav-short">✓</span>
+                                            <span className="nav-short">RQ</span>
                                             <span className="nav-trailing">
                                                 {pendingTotal > 0 && (
                                                     <span className="admin-nav-count warning">{formatNumber(pendingTotal, '0')}</span>
@@ -3646,7 +3646,7 @@ export function AdminPage() {
                                                 aria-current={activeAdminTab === 'add' ? 'page' : undefined}
                                             >
                                                 <span className="nav-label">Quick Add</span>
-                                                <span className="nav-short">⚡</span>
+                                                <span className="nav-short">QA</span>
                                                 <span className="nav-trailing" />
                                             </button>
                                             <button
@@ -3657,7 +3657,7 @@ export function AdminPage() {
                                                 aria-current={activeAdminTab === 'detailed' ? 'page' : undefined}
                                             >
                                                 <span className="nav-label">Detailed Post</span>
-                                                <span className="nav-short">📝</span>
+                                                <span className="nav-short">DP</span>
                                                 <span className="nav-trailing" />
                                             </button>
                                             <button
@@ -3668,7 +3668,7 @@ export function AdminPage() {
                                                 aria-current={activeAdminTab === 'bulk' ? 'page' : undefined}
                                             >
                                                 <span className="nav-label">Bulk Import</span>
-                                                <span className="nav-short">📦</span>
+                                                <span className="nav-short">BI</span>
                                                 <span className="nav-trailing" />
                                             </button>
                                         </>
@@ -3682,7 +3682,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'queue' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Schedule Queue</span>
-                                            <span className="nav-short">📅</span>
+                                            <span className="nav-short">SQ</span>
                                             <span className="nav-trailing">
                                                 {scheduledTotal > 0 && (
                                                     <span className="admin-nav-count info">{formatNumber(scheduledTotal, '0')}</span>
@@ -3704,7 +3704,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'community' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Community</span>
-                                            <span className="nav-short">💬</span>
+                                            <span className="nav-short">CM</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3717,7 +3717,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'errors' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Error Reports</span>
-                                            <span className="nav-short">🐛</span>
+                                            <span className="nav-short">ER</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3730,7 +3730,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'audit' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Audit Log</span>
-                                            <span className="nav-short">📜</span>
+                                            <span className="nav-short">AU</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3748,7 +3748,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'security' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Security</span>
-                                            <span className="nav-short">🔒</span>
+                                            <span className="nav-short">SC</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}

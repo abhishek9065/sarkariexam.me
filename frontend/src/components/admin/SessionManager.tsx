@@ -108,6 +108,23 @@ export function SessionManager({
         return date.toLocaleDateString();
     };
 
+    const maskIpAddress = (ip: string) => {
+        if (!ip) return '';
+        if (ip.includes('.')) {
+            const parts = ip.split('.');
+            if (parts.length === 4) {
+                return `${parts[0]}.${parts[1]}.xxx.xxx`;
+            }
+        }
+        if (ip.includes(':')) {
+            const parts = ip.split(':');
+            if (parts.length > 3) {
+                return `${parts[0]}:${parts[1]}:xxxx:xxxx`;
+            }
+        }
+        return ip;
+    };
+
     const getRiskIcon = (risk: string) => {
         switch (risk) {
             case 'high': return '🔴';
@@ -174,7 +191,7 @@ export function SessionManager({
                                     <div className="session-meta">
                                         <span className="location">{currentSession.location || 'Unknown Location'}</span>
                                         <span className="separator">•</span>
-                                        <span className="ip">{currentSession.ip}</span>
+                                        <span className="ip" title={currentSession.ip}>{maskIpAddress(currentSession.ip)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -279,7 +296,7 @@ export function SessionManager({
                                             <div className="session-meta">
                                                 <span className="location">{session.location || 'Unknown Location'}</span>
                                                 <span className="separator">•</span>
-                                                <span className="ip">{session.ip}</span>
+                                                <span className="ip" title={session.ip}>{maskIpAddress(session.ip)}</span>
                                             </div>
                                         </div>
                                     </div>

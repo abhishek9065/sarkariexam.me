@@ -1985,6 +1985,22 @@
   justify-content: center;
 }
 
+.action-overflow-menu .overflow-trigger {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.action-overflow-menu .overflow-chevron {
+  font-size: 12px;
+  line-height: 1;
+  transition: transform var(--transition-fast);
+}
+
+.action-overflow-menu[open] .overflow-chevron {
+  transform: rotate(180deg);
+}
+
 .action-overflow-panel {
   min-width: 196px;
 }
@@ -3790,6 +3806,61 @@
 .admin-page .status-pill.danger {
   background: rgba(248, 113, 113, 0.24);
   border-color: rgba(248, 113, 113, 0.45);
+}
+
+.admin-page .type-badge {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  padding: 6px 12px;
+  text-transform: capitalize;
+}
+
+.admin-page .type-badge.job {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.38);
+  color: #93c5fd;
+}
+
+.admin-page .type-badge.result {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.38);
+  color: #6ee7b7;
+}
+
+.admin-page .type-badge.admit-card {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+.admin-page .type-badge.answer-key {
+  background: rgba(168, 85, 247, 0.22);
+  border-color: rgba(168, 85, 247, 0.42);
+  color: #d8b4fe;
+}
+
+.admin-page .type-badge.admission {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.42);
+  color: #a5f3fc;
+}
+
+.admin-page .type-badge.syllabus {
+  background: rgba(244, 63, 94, 0.2);
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #fda4af;
+}
+
+.admin-page .type-badge.unknown {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.38);
+  color: #cbd5e1;
 }
 
 .admin-page .admin-btn:hover:not(:disabled),
