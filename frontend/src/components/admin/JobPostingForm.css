@@ -1,0 +1,656 @@
+/* Job Posting Form Styles */
+
+.job-posting-form {
+    background: linear-gradient(150deg, rgba(255, 255, 255, 0.06), rgba(12, 19, 36, 0.7));
+    border-radius: 20px;
+    padding: 28px;
+    max-width: 960px;
+    margin: 0 auto;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    box-shadow: var(--shadow-md);
+}
+
+.form-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.form-alert {
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--accent-red);
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.form-note {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: rgba(12, 19, 36, 0.5);
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-note.warn {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--accent-yellow);
+}
+
+.save-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(148, 163, 184, 0.6);
+}
+
+.save-dot.saving {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+    animation: pulse 1s infinite;
+}
+
+.save-dot.saved {
+    background: rgba(56, 189, 248, 0.9);
+}
+
+.form-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.progress-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.2);
+    overflow: hidden;
+}
+
+.progress-bar span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+}
+
+.form-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.tab-btn {
+    padding: 12px 20px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: rgba(12, 19, 36, 0.55);
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    background: rgba(12, 19, 36, 0.8);
+    border-color: rgba(76, 201, 240, 0.4);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 10px 18px rgba(76, 201, 240, 0.25);
+}
+
+.tab-check {
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--accent-green);
+}
+
+.form-content {
+    min-height: 400px;
+}
+
+.tab-panel h3 {
+    font-size: 16px;
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tab-panel h4 {
+    font-size: 14px;
+    margin: 16px 0 12px 0;
+    color: var(--text-secondary);
+}
+
+.form-hint {
+    margin: -6px 0 14px 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 12px;
+    font-size: 14px;
+    background: rgba(12, 19, 36, 0.6);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder,
+.list-row input::placeholder {
+    color: rgba(148, 163, 184, 0.9);
+}
+
+.field-invalid {
+    border-color: var(--accent-red) !important;
+}
+
+.field-valid {
+    border-color: var(--accent-green) !important;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(76, 201, 240, 0.18);
+}
+
+.form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* Dynamic Lists */
+.dynamic-list {
+    background: rgba(12, 19, 36, 0.5);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.list-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.list-row:last-of-type {
+    margin-bottom: 12px;
+}
+
+.list-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(12, 19, 36, 0.6);
+    color: var(--text-primary);
+}
+
+.list-row input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.list-row select {
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(12, 19, 36, 0.6);
+    color: var(--text-primary);
+    min-width: 100px;
+}
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.remove-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-red);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.date-presets {
+    display: flex;
+    gap: 6px;
+}
+
+.preset-btn {
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.preset-btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
+}
+
+.date-flag {
+    font-size: 11px;
+    color: var(--accent-red);
+    background: rgba(251, 113, 133, 0.2);
+    padding: 4px 8px;
+    border-radius: 999px;
+}
+
+.date-past {
+    border-color: rgba(248, 113, 113, 0.8) !important;
+}
+
+.remove-btn:hover {
+    background: #e11d48;
+}
+
+.add-btn {
+    width: 100%;
+    padding: 12px;
+    background: rgba(12, 19, 36, 0.4);
+    border: 1px dashed rgba(76, 201, 240, 0.4);
+    border-radius: 12px;
+    color: var(--accent-blue);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.add-btn.secondary {
+    border-style: solid;
+    color: var(--text-secondary);
+}
+
+.add-btn:hover {
+    background: rgba(76, 201, 240, 0.16);
+    border-color: var(--accent-blue);
+}
+
+/* Vacancy Table */
+.vacancy-table {
+    background: rgba(12, 19, 36, 0.5);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.vacancy-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 40px;
+    gap: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.vacancy-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 40px;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.vacancy-row input {
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(12, 19, 36, 0.6);
+    color: var(--text-primary);
+}
+
+.vacancy-row input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.vacancy-row .total-field {
+    background: rgba(12, 19, 36, 0.5);
+    font-weight: 600;
+}
+
+.total-vacancies {
+    text-align: right;
+    font-size: 16px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+    color: white;
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+/* FAQ Section */
+.faq-list {
+    background: rgba(12, 19, 36, 0.5);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.faq-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    position: relative;
+}
+
+.faq-item:last-of-type {
+    border-bottom: none;
+    margin-bottom: 12px;
+    padding-bottom: 0;
+}
+
+.faq-item input {
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    background: rgba(12, 19, 36, 0.6);
+    color: var(--text-primary);
+}
+
+.faq-item textarea {
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(12, 19, 36, 0.6);
+    color: var(--text-primary);
+    min-height: 60px;
+    resize: vertical;
+}
+
+.faq-item .remove-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+    flex-wrap: wrap;
+}
+
+.btn-primary {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.35);
+}
+
+.btn-secondary {
+    padding: 12px 24px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+}
+
+.btn-secondary.subtle {
+    color: var(--text-muted);
+}
+
+.btn-outline {
+    padding: 12px 24px;
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid rgba(56, 189, 248, 0.6);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+    background: rgba(56, 189, 248, 0.12);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-outline:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.form-disabled-note {
+    font-size: 12px;
+    color: var(--accent-yellow);
+    margin-left: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .job-posting-form {
+        padding: 16px;
+    }
+
+    .form-progress {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .form-tabs {
+        flex-wrap: nowrap;
+    }
+
+    .tab-btn {
+        padding: 10px 16px;
+        font-size: 12px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .vacancy-header,
+    .vacancy-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .vacancy-header {
+        display: none;
+    }
+
+    .vacancy-row input::placeholder {
+        visibility: visible;
+    }
+
+    .list-row {
+        flex-wrap: wrap;
+    }
+
+    .list-row input {
+        min-width: 100px;
+    }
+}
+
+.job-datepicker-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-primary);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.job-datepicker-calendar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+}
+
+.job-datepicker-calendar .react-datepicker__header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.job-datepicker-calendar .react-datepicker__day,
+.job-datepicker-calendar .react-datepicker__day-name {
+    color: var(--text-primary);
+}
+
+.job-datepicker-calendar .react-datepicker__day--selected,
+.job-datepicker-calendar .react-datepicker__day--keyboard-selected {
+    background: var(--accent-blue);
+    color: #fff;
+}
+
+/* Dark Mode */
+[data-theme="dark"] .job-posting-form {
+    background: var(--bg-card);
+}
+
+[data-theme="dark"] .dynamic-list,
+[data-theme="dark"] .vacancy-table,
+[data-theme="dark"] .faq-list {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .list-row input,
+[data-theme="dark"] .vacancy-row input,
+[data-theme="dark"] .faq-item input,
+[data-theme="dark"] .faq-item textarea {
+    background: var(--bg-input);
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .add-btn {
+    border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .add-btn:hover {
+    background: rgba(56, 189, 248, 0.18);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.2);
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
