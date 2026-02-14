@@ -3803,6 +3803,82 @@
   background: rgba(76, 201, 240, 0.1);
 }
 
+.admin-page .admin-form-intro {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.admin-page .basic-info-section,
+.admin-page .admin-form-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  padding: 20px;
+}
+
+.admin-page .admin-form-section-title {
+  margin: 0 0 16px;
+}
+
+.admin-page .form-row.two-col {
+  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-page .form-group label {
+  margin-bottom: 8px;
+}
+
+.admin-page .admin-form-container input::placeholder,
+.admin-page .admin-form-container textarea::placeholder,
+.admin-page .admin-search::placeholder,
+.admin-page .category-search::placeholder,
+.admin-page .admin-shell-search input::placeholder {
+  color: rgba(203, 213, 225, 0.96);
+  opacity: 1;
+}
+
+.admin-page .field-error {
+  color: #ef4444;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.admin-page .field-hint {
+  color: rgba(203, 213, 225, 0.92);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.admin-page .field-meta {
+  border-top: 1px dashed rgba(148, 163, 184, 0.35);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.admin-page .field-status.info {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.admin-page .qa-panel ul {
+  gap: 12px;
+}
+
+.admin-page .qa-item {
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.admin-page .form-actions {
+  gap: 12px;
+}
+
 @media (max-width: 900px) {
   .admin-page .admin-hero-metrics {
     gap: var(--space-4);
@@ -3814,6 +3890,11 @@
 
   .admin-page .admin-list .admin-table {
     table-layout: auto;
+  }
+
+  .admin-page .form-row.two-col {
+    gap: 16px;
+    grid-template-columns: 1fr;
   }
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { HomeDenseBox } from '../components/home/HomeDenseBox';
 import { HomeFeaturedBanner } from '../components/home/HomeFeaturedBanner';
+import { HomeMarquee } from '../components/home/HomeMarquee';
 import { getAnnouncementCards } from '../utils/api';
 import type { AnnouncementCard } from '../types';
 
@@ -191,6 +192,7 @@ export function HomePage() {
     return (
         <Layout>
             <HomeFeaturedBanner items={featured} />
+            <HomeMarquee items={featured} />
 
             <section className="home-v3-shell" data-testid="home-v3-shell">
                 <div className="home-v3-top-grid" data-testid="home-v3-top-grid">

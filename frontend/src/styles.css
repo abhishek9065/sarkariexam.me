@@ -3433,6 +3433,59 @@ h6 {
     }
 }
 
+/* =============================================
+   Home Marquee (Classic Sarkari Result)
+   ============================================= */
+
+.home-marquee-container {
+    background: #e1f5fe;
+    border: 2px solid #0288d1;
+    margin-bottom: 18px;
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 8px 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.home-marquee-content {
+    display: inline-block;
+    animation: marquee 40s linear infinite;
+}
+
+.home-marquee-content:hover {
+    animation-play-state: paused;
+}
+
+.home-marquee-item {
+    display: inline-block;
+    color: #0d47a1;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-decoration: none;
+    margin-right: 12px;
+}
+
+.home-marquee-item:hover {
+    text-decoration: underline;
+    color: #d32f2f;
+}
+
+.home-marquee-separator {
+    display: inline-block;
+    color: #ff0000;
+    margin-left: 12px;
+    font-weight: 900;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+
+    100% {
+        transform: translate3d(-50%, 0, 0);
+    }
+}
 
 /* =============================================
    Home Featured Banner (Classic Sarkari Result)
@@ -3510,13 +3563,40 @@ h6 {
     white-space: nowrap;
 }
 
-.badge-action-job { background: #388e3c; color: #fff; }
-.badge-action-result { background: #d32f2f; color: #fff; }
-.badge-action-admit { background: #f57f17; color: #fff; }
-.badge-action-answer { background: #1565c0; color: #fff; }
-.badge-action-admission { background: #00838f; color: #fff; }
-.badge-action-syllabus { background: #6a1b9a; color: #fff; }
-.badge-action-default { background: #616161; color: #fff; }
+.badge-action-job {
+    background: #388e3c;
+    color: #fff;
+}
+
+.badge-action-result {
+    background: #d32f2f;
+    color: #fff;
+}
+
+.badge-action-admit {
+    background: #f57f17;
+    color: #fff;
+}
+
+.badge-action-answer {
+    background: #1565c0;
+    color: #fff;
+}
+
+.badge-action-admission {
+    background: #00838f;
+    color: #fff;
+}
+
+.badge-action-syllabus {
+    background: #6a1b9a;
+    color: #fff;
+}
+
+.badge-action-default {
+    background: #616161;
+    color: #fff;
+}
 
 .dense-inline-badge {
     display: inline-block;
@@ -3531,30 +3611,67 @@ h6 {
     vertical-align: middle;
 }
 
-.dense-badge-job { background: #388e3c; color: #fff; }
-.dense-badge-result { background: #d32f2f; color: #fff; }
-.dense-badge-admit { background: #f57f17; color: #fff; }
-.dense-badge-answer { background: #1565c0; color: #fff; }
-.dense-badge-admission { background: #00838f; color: #fff; }
-.dense-badge-syllabus { background: #6a1b9a; color: #fff; }
+.dense-badge-job {
+    background: #388e3c;
+    color: #fff;
+}
+
+.dense-badge-result {
+    background: #d32f2f;
+    color: #fff;
+}
+
+.dense-badge-admit {
+    background: #f57f17;
+    color: #fff;
+}
+
+.dense-badge-answer {
+    background: #1565c0;
+    color: #fff;
+}
+
+.dense-badge-admission {
+    background: #00838f;
+    color: #fff;
+}
+
+.dense-badge-syllabus {
+    background: #6a1b9a;
+    color: #fff;
+}
 
 @media (max-width: 768px) {
     .home-featured-banner-grid {
         grid-template-columns: 1fr;
     }
+
     .home-featured-banner-item:nth-child(odd) {
         border-right: none;
     }
+
     .home-featured-banner-header h2 {
         font-size: 1.4rem;
     }
 }
 
 @media (max-width: 768px) {
-    .jobs-filter-grid { grid-template-columns: 1fr; }
-    .jobs-filter-actions { flex-direction: column; }
-    .jobs-filter-actions .btn { width: 100%; }
-    .footer-social-grid, .footer-org-grid { grid-template-columns: 1fr; }
+    .jobs-filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .jobs-filter-actions {
+        flex-direction: column;
+    }
+
+    .jobs-filter-actions .btn {
+        width: 100%;
+    }
+
+    .footer-social-grid,
+    .footer-org-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* =============================================
@@ -3667,19 +3784,35 @@ h6 {
     color: #00008b;
 }
 
-.home-dense-box-area-answer { grid-area: answer; }
-.home-dense-box-area-syllabus { grid-area: syllabus; }
-.home-dense-box-area-admission { grid-area: admission; }
-.home-dense-box-area-certificate { grid-area: certificate; }
-.home-dense-box-area-important { grid-area: important; }
+.home-dense-box-area-answer {
+    grid-area: answer;
+}
+
+.home-dense-box-area-syllabus {
+    grid-area: syllabus;
+}
+
+.home-dense-box-area-admission {
+    grid-area: admission;
+}
+
+.home-dense-box-area-certificate {
+    grid-area: certificate;
+}
+
+.home-dense-box-area-important {
+    grid-area: important;
+}
 
 @media (max-width: 1199px) {
     .home-v3-top-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .home-v3-top-grid > :last-child {
+
+    .home-v3-top-grid> :last-child {
         grid-column: 1 / -1;
     }
+
     .home-v3-bottom-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-template-areas:
@@ -3690,16 +3823,38 @@ h6 {
 }
 
 @media (max-width: 768px) {
+
     .home-v3-top-grid,
     .home-v3-bottom-grid {
         grid-template-columns: 1fr;
         grid-template-areas: none;
     }
-    .home-dense-box-area-answer { order: 1; }
-    .home-dense-box-area-syllabus { order: 2; }
-    .home-dense-box-area-admission { order: 3; }
-    .home-dense-box-area-certificate { order: 4; }
-    .home-dense-box-area-important { order: 5; }
-    .home-dense-box-header h2 { font-size: 1.75rem; }
-    .home-dense-box-view-more { font-size: 1.6rem; }
+
+    .home-dense-box-area-answer {
+        order: 1;
+    }
+
+    .home-dense-box-area-syllabus {
+        order: 2;
+    }
+
+    .home-dense-box-area-admission {
+        order: 3;
+    }
+
+    .home-dense-box-area-certificate {
+        order: 4;
+    }
+
+    .home-dense-box-area-important {
+        order: 5;
+    }
+
+    .home-dense-box-header h2 {
+        font-size: 1.75rem;
+    }
+
+    .home-dense-box-view-more {
+        font-size: 1.6rem;
+    }
 }

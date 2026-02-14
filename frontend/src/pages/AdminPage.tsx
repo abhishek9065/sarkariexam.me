@@ -4784,16 +4784,16 @@ export function AdminPage() {
 
                             <div className="admin-form-container">
                                 <h3>Detailed Job Posting</h3>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
+                                <p className="admin-form-intro">
                                     Create a comprehensive job posting with all details like UP Police example.
                                 </p>
 
                                 {/* Basic Info Section */}
-                                <div className="basic-info-section" style={{ marginBottom: '20px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px' }}>
-                                    <h4 style={{ marginBottom: '15px' }}>Basic Information</h4>
+                                <div className="basic-info-section admin-form-card">
+                                    <h4 className="admin-form-section-title">Basic Information</h4>
                                     <div className="form-row two-col">
                                         <div className="form-group">
-                                            <label htmlFor="detailed-title">Title *</label>
+                                            <label htmlFor="detailed-title">Title <span className="field-required">*</span></label>
                                             <input
                                                 id="detailed-title"
                                                 type="text"
@@ -4821,7 +4821,7 @@ export function AdminPage() {
                                             </div>
                                         </div>
                                         <div className="form-group">
-                                            <label htmlFor="detailed-organization">Organization *</label>
+                                            <label htmlFor="detailed-organization">Organization <span className="field-required">*</span></label>
                                             <input
                                                 id="detailed-organization"
                                                 type="text"
@@ -4843,7 +4843,7 @@ export function AdminPage() {
                                     </div>
                                     <div className="form-row two-col">
                                         <div className="form-group">
-                                            <label htmlFor="detailed-type">Type *</label>
+                                            <label htmlFor="detailed-type">Type <span className="field-required">*</span></label>
                                             <select id="detailed-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
                                                 <option value="job">Job</option>
                                                 <option value="result">Result</option>
@@ -4854,7 +4854,7 @@ export function AdminPage() {
                                             </select>
                                         </div>
                                         <div className="form-group">
-                                            <label htmlFor="detailed-category">Category *</label>
+                                            <label htmlFor="detailed-category">Category <span className="field-required">*</span></label>
                                             <input
                                                 id="detailed-category-search"
                                                 type="search"
@@ -5462,8 +5462,10 @@ export function AdminPage() {
                                                 <span id="quick-title-error" className="field-error" role="alert">Title must be at least 10 characters.</span>
                                             )}
                                             <div className="field-meta">
-                                                <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
-                                                    {titleValid ? '✓ Looks good' : 'Needs 10+ characters'}
+                                                <span className={`field-status ${(formData.title.trim().length > 0 || submitAttempted) ? (titleValid ? 'ok' : 'warn') : 'info'}`}>
+                                                    {(formData.title.trim().length > 0 || submitAttempted)
+                                                        ? (titleValid ? '✓ Looks good' : 'Needs 10+ characters')
+                                                        : 'Start typing to validate'}
                                                 </span>
                                                 <span className="field-count">{titleLength}/50</span>
                                             </div>
@@ -5475,7 +5477,7 @@ export function AdminPage() {
 
                                     <div className="form-row two-col">
                                         <div className="form-group">
-                                            <label htmlFor="quick-type">Type *</label>
+                                            <label htmlFor="quick-type">Type <span className="field-required">*</span></label>
                                             <select id="quick-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
                                                 <option value="job">Job</option>
                                                 <option value="result">Result</option>
@@ -5486,7 +5488,7 @@ export function AdminPage() {
                                             </select>
                                         </div>
                                         <div className="form-group">
-                                            <label htmlFor="quick-category">Category *</label>
+                                            <label htmlFor="quick-category">Category <span className="field-required">*</span></label>
                                             <input
                                                 id="quick-category-search"
                                                 type="search"
@@ -5526,7 +5528,7 @@ export function AdminPage() {
                                             {showOrganizationError && (
                                                 <span id="quick-organization-error" className="field-error" role="alert">Organization is required.</span>
                                             )}
-                                            {organizationValid && (
+                                            {organizationValid && (touchedFields.organization || submitAttempted) && (
                                                 <span className="field-status ok">✓ Looks good</span>
                                             )}
                                         </div>
