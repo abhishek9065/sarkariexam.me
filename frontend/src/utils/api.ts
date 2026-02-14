@@ -115,17 +115,17 @@ export function getSearchSuggestions(q: string, type?: ContentType) {
 }
 
 /* ─── Auth ─── */
-export function login(email: string, password: string) {
+export function login(email: string, password: string, twoFactorCode?: string) {
     return apiFetch<{ data: AuthResponse }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, ...(twoFactorCode ? { twoFactorCode } : {}) }),
     });
 }
 
-export function register(email: string, username: string, password: string) {
+export function register(email: string, name: string, password: string) {
     return apiFetch<{ data: AuthResponse }>('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ email, username, password }),
+        body: JSON.stringify({ email, name, password }),
     });
 }
 

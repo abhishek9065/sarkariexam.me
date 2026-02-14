@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { getMe, setAuthToken, getAuthToken, login as apiLogin, register as apiRegister } from '../utils/api';
+import { getMe, setAuthToken, getAuthToken, login as apiLogin, register as apiRegister, ApiRequestError } from '../utils/api';
 import type { User } from '../types';
 
 interface AuthState {
@@ -8,18 +8,26 @@ interface AuthState {
     error: string | null;
 }
 
+export interface TwoFactorChallenge {
+    email: string;
+    password: string;
+}
+
 interface AuthContextValue extends AuthState {
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
     register: (email: string, name: string, password: string) => Promise<void>;
     logout: () => void;
     clearError: () => void;
     isAdmin: boolean;
+    twoFactorChallenge: TwoFactorChallenge | null;
+    clearTwoFactorChallenge: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<AuthState>({ user: null, loading: true, error: null });
+    const [twoFactorChallenge, setTwoFactorChallenge] = useState<TwoFactorChallenge | null>(null);
 
     /* Bootstrap — try to load user from saved token */
     useEffect(() => {
@@ -39,18 +47,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })();
     }, []);
 
-    const login = useCallback(async (email: string, password: string) => {
+    const login = useCallback(async (email: string, password: string, twoFactorCode?: string) => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
-            const res = await apiLogin(email, password);
+            const res = await apiLogin(email, password, twoFactorCode);
             setAuthToken(res.data.token);
+            setTwoFactorChallenge(null);
             setState({ user: res.data.user, loading: false, error: null });
         } catch (err: unknown) {
-            setState((s) => ({
-                ...s,
-                loading: false,
-                error: err instanceof Error ? err.message : 'Login failed',
-            }));
+            /* Handle 2FA challenge */
+            if (err instanceof ApiRequestError && err.status === 403) {
+                const body = err.body as Record<string, unknown> | null;
+                const errorCode = body?.error;
+
+                if (errorCode === 'two_factor_required') {
+                    setTwoFactorChallenge({ email, password });
+                    setState((s) => ({ ...s, loading: false, error: null }));
+                    return; /* Don't throw — transition to 2FA step */
+                }
+
+                if (errorCode === 'two_factor_setup_required') {
+                    setState((s) => ({
+                        ...s,
+                        loading: false,
+                        error: 'Two-factor authentication setup is required. Please contact your administrator.',
+                    }));
+                    return;
+                }
+            }
+
+            const message = err instanceof ApiRequestError
+                ? ((err.body as Record<string, unknown> | null)?.message as string) || err.message
+                : err instanceof Error ? err.message : 'Login failed';
+
+            setState((s) => ({ ...s, loading: false, error: message }));
             throw err;
         }
     }, []);
@@ -62,17 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAuthToken(res.data.token);
             setState({ user: res.data.user, loading: false, error: null });
         } catch (err: unknown) {
-            setState((s) => ({
-                ...s,
-                loading: false,
-                error: err instanceof Error ? err.message : 'Registration failed',
-            }));
+            const message = err instanceof ApiRequestError
+                ? ((err.body as Record<string, unknown> | null)?.message as string) || err.message
+                : err instanceof Error ? err.message : 'Registration failed';
+
+            setState((s) => ({ ...s, loading: false, error: message }));
             throw err;
         }
     }, []);
 
     const logout = useCallback(() => {
         setAuthToken(null);
+        setTwoFactorChallenge(null);
         setState({ user: null, loading: false, error: null });
     }, []);
 
@@ -80,10 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, error: null }));
     }, []);
 
+    const clearTwoFactorChallenge = useCallback(() => {
+        setTwoFactorChallenge(null);
+    }, []);
+
     const isAdmin = state.user?.role === 'admin' || state.user?.role === 'editor';
 
     return (
-        <AuthContext.Provider value={{ ...state, login, register, logout, clearError, isAdmin }}>
+        <AuthContext.Provider value={{
+            ...state, login, register, logout, clearError,
+            isAdmin, twoFactorChallenge, clearTwoFactorChallenge,
+        }}>
             {children}
         </AuthContext.Provider>
     );

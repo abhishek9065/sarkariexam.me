@@ -8,14 +8,18 @@ interface Props {
 }
 
 export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
-    const { login, register, error, clearError } = useAuth();
+    const { login, register, error, clearError, twoFactorChallenge, clearTwoFactorChallenge } = useAuth();
     const [tab, setTab] = useState<'login' | 'register'>(initialTab);
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
+    const [twoFactorCode, setTwoFactorCode] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [localError, setLocalError] = useState<string | null>(null);
+
+    /* When the 2FA challenge is set, auto-transition to 2FA view */
+    const is2FAStep = !!twoFactorChallenge;
 
     useEffect(() => {
         if (isOpen) {
@@ -23,11 +27,13 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
             setName('');
             setPassword('');
             setConfirm('');
+            setTwoFactorCode('');
             setLocalError(null);
             clearError();
+            clearTwoFactorChallenge();
             setTab(initialTab);
         }
-    }, [isOpen, initialTab, clearError]);
+    }, [isOpen, initialTab, clearError, clearTwoFactorChallenge]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -38,29 +44,62 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
 
     if (!isOpen) return null;
 
-    const handleSubmit = async (e: FormEvent) => {
+    const handleLoginSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setLocalError(null);
+        setSubmitting(true);
+        try {
+            await login(email, password);
+            /* If login doesn't throw and no 2FA challenge, we're done */
+            if (!twoFactorChallenge) {
+                onClose();
+            }
+        } catch {
+            /* error is stored in context */
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handle2FASubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLocalError(null);
 
-        if (tab === 'register' && password !== confirm) {
+        if (!twoFactorCode.trim()) {
+            setLocalError('Please enter your authentication code');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            await login(twoFactorChallenge!.email, twoFactorChallenge!.password, twoFactorCode.trim());
+            onClose();
+        } catch {
+            /* error is stored in context */
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleRegisterSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setLocalError(null);
+
+        if (password !== confirm) {
             setLocalError('Passwords do not match');
             return;
         }
-        if (tab === 'register' && password.length < 8) {
+        if (password.length < 8) {
             setLocalError('Password must be at least 8 characters');
             return;
         }
 
         setSubmitting(true);
         try {
-            if (tab === 'login') {
-                await login(email, password);
-            } else {
-                await register(email, name, password);
-            }
+            await register(email, name, password);
             onClose();
         } catch {
-            /* error stored in context */
+            /* error is stored in context */
         } finally {
             setSubmitting(false);
         }
@@ -73,96 +112,188 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
             <div className="auth-modal card" onClick={(e) => e.stopPropagation()}>
                 <button className="auth-close" onClick={onClose} aria-label="Close">✕</button>
 
-                <div className="auth-tabs">
-                    <button
-                        className={`auth-tab${tab === 'login' ? ' active' : ''}`}
-                        onClick={() => { setTab('login'); setLocalError(null); clearError(); }}
-                    >
-                        Sign In
-                    </button>
-                    <button
-                        className={`auth-tab${tab === 'register' ? ' active' : ''}`}
-                        onClick={() => { setTab('register'); setLocalError(null); clearError(); }}
-                    >
-                        Register
-                    </button>
-                </div>
+                {/* ── 2FA Step ── */}
+                {is2FAStep ? (
+                    <>
+                        <div className="auth-2fa-header">
+                            <span className="auth-2fa-icon">🔐</span>
+                            <h3>Two-Factor Authentication</h3>
+                            <p className="text-muted" style={{ fontSize: 'var(--font-sm)', marginTop: 4 }}>
+                                Enter the 6-digit code from your authenticator app, or a backup code.
+                            </p>
+                        </div>
 
-                <form className="auth-form" onSubmit={handleSubmit}>
-                    {displayError && (
-                        <div className="auth-error">{displayError}</div>
-                    )}
+                        <form className="auth-form" onSubmit={handle2FASubmit}>
+                            {displayError && (
+                                <div className="auth-error">{displayError}</div>
+                            )}
 
-                    <label className="auth-label">
-                        Email
-                        <input
-                            type="email"
-                            className="input"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            autoComplete="email"
-                            placeholder="you@example.com"
-                        />
-                    </label>
+                            <label className="auth-label">
+                                Authentication Code
+                                <input
+                                    type="text"
+                                    className="input auth-2fa-input"
+                                    required
+                                    autoFocus
+                                    maxLength={20}
+                                    placeholder="123456"
+                                    value={twoFactorCode}
+                                    onChange={(e) => setTwoFactorCode(e.target.value)}
+                                    autoComplete="one-time-code"
+                                    inputMode="numeric"
+                                    pattern="[0-9a-zA-Z\-]*"
+                                />
+                            </label>
 
-                    {tab === 'register' && (
-                        <label className="auth-label">
-                            Full Name
-                            <input
-                                type="text"
-                                className="input"
-                                required
-                                minLength={2}
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                autoComplete="name"
-                                placeholder="John Doe"
-                            />
-                        </label>
-                    )}
+                            <button
+                                type="submit"
+                                className="btn btn-accent btn-lg auth-submit"
+                                disabled={submitting}
+                            >
+                                {submitting ? 'Verifying…' : 'Verify'}
+                            </button>
 
-                    <label className="auth-label">
-                        Password
-                        <input
-                            type="password"
-                            className="input"
-                            required
-                            minLength={8}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-                            placeholder="••••••••"
-                        />
-                    </label>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                style={{ alignSelf: 'center' }}
+                                onClick={() => { clearTwoFactorChallenge(); clearError(); }}
+                            >
+                                ← Back to Sign In
+                            </button>
+                        </form>
+                    </>
+                ) : (
+                    <>
+                        {/* ── Normal Login/Register Tabs ── */}
+                        <div className="auth-tabs">
+                            <button
+                                className={`auth-tab${tab === 'login' ? ' active' : ''}`}
+                                onClick={() => { setTab('login'); setLocalError(null); clearError(); }}
+                            >
+                                Sign In
+                            </button>
+                            <button
+                                className={`auth-tab${tab === 'register' ? ' active' : ''}`}
+                                onClick={() => { setTab('register'); setLocalError(null); clearError(); }}
+                            >
+                                Register
+                            </button>
+                        </div>
 
-                    {tab === 'register' && (
-                        <label className="auth-label">
-                            Confirm Password
-                            <input
-                                type="password"
-                                className="input"
-                                required
-                                minLength={8}
-                                value={confirm}
-                                onChange={(e) => setConfirm(e.target.value)}
-                                autoComplete="new-password"
-                                placeholder="••••••••"
-                            />
-                        </label>
-                    )}
+                        {tab === 'login' ? (
+                            <form className="auth-form" onSubmit={handleLoginSubmit}>
+                                {displayError && (
+                                    <div className="auth-error">{displayError}</div>
+                                )}
 
-                    <button
-                        type="submit"
-                        className="btn btn-accent btn-lg auth-submit"
-                        disabled={submitting}
-                    >
-                        {submitting
-                            ? (tab === 'login' ? 'Signing in…' : 'Creating account…')
-                            : (tab === 'login' ? 'Sign In' : 'Create Account')
-                        }
-                    </button>
-                </form>
+                                <label className="auth-label">
+                                    Email
+                                    <input
+                                        type="email"
+                                        className="input"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        autoComplete="email"
+                                        placeholder="you@example.com"
+                                    />
+                                </label>
+
+                                <label className="auth-label">
+                                    Password
+                                    <input
+                                        type="password"
+                                        className="input"
+                                        required
+                                        minLength={8}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        autoComplete="current-password"
+                                        placeholder="••••••••"
+                                    />
+                                </label>
+
+                                <button
+                                    type="submit"
+                                    className="btn btn-accent btn-lg auth-submit"
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'Signing in…' : 'Sign In'}
+                                </button>
+                            </form>
+                        ) : (
+                            <form className="auth-form" onSubmit={handleRegisterSubmit}>
+                                {displayError && (
+                                    <div className="auth-error">{displayError}</div>
+                                )}
+
+                                <label className="auth-label">
+                                    Email
+                                    <input
+                                        type="email"
+                                        className="input"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        autoComplete="email"
+                                        placeholder="you@example.com"
+                                    />
+                                </label>
+
+                                <label className="auth-label">
+                                    Full Name
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        required
+                                        minLength={2}
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        autoComplete="name"
+                                        placeholder="John Doe"
+                                    />
+                                </label>
+
+                                <label className="auth-label">
+                                    Password
+                                    <input
+                                        type="password"
+                                        className="input"
+                                        required
+                                        minLength={8}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        autoComplete="new-password"
+                                        placeholder="••••••••"
+                                    />
+                                </label>
+
+                                <label className="auth-label">
+                                    Confirm Password
+                                    <input
+                                        type="password"
+                                        className="input"
+                                        required
+                                        minLength={8}
+                                        value={confirm}
+                                        onChange={(e) => setConfirm(e.target.value)}
+                                        autoComplete="new-password"
+                                        placeholder="••••••••"
+                                    />
+                                </label>
+
+                                <button
+                                    type="submit"
+                                    className="btn btn-accent btn-lg auth-submit"
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'Creating account…' : 'Create Account'}
+                                </button>
+                            </form>
+                        )}
+                    </>
+                )}
             </div>
         </div>
     );
