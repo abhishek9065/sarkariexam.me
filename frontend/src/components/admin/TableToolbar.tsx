@@ -8,10 +8,20 @@ interface TableToolbarProps {
     onTypeFilterChange: (value: ContentType | 'all') => void;
     statusFilter: AnnouncementStatus | 'all';
     onStatusFilterChange: (value: AnnouncementStatus | 'all') => void;
-    sortOption: 'newest' | 'updated' | 'deadline' | 'views';
-    onSortChange: (value: 'newest' | 'updated' | 'deadline' | 'views') => void;
+    sortOption: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+    onSortChange: (value: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views') => void;
     filterSummary?: string;
     onClearFilters?: () => void;
+    quickChips?: Array<{
+        id: string;
+        label: string;
+        active?: boolean;
+        onClick: () => void;
+    }>;
+    presets?: Array<{ id: string; label: string }>;
+    selectedPresetId?: string;
+    onSelectPreset?: (presetId: string) => void;
+    onSavePreset?: () => void;
 }
 
 export function TableToolbar({
@@ -25,6 +35,11 @@ export function TableToolbar({
     onSortChange,
     filterSummary,
     onClearFilters,
+    quickChips = [],
+    presets = [],
+    selectedPresetId = '',
+    onSelectPreset,
+    onSavePreset,
 }: TableToolbarProps) {
     return (
         <div className="admin-filters admin-table-toolbar">
@@ -64,16 +79,52 @@ export function TableToolbar({
                 </select>
                 <select
                     value={sortOption}
-                    onChange={(event) => onSortChange(event.target.value as 'newest' | 'updated' | 'deadline' | 'views')}
+                    onChange={(event) => onSortChange(event.target.value as 'newest' | 'oldest' | 'updated' | 'deadline' | 'views')}
                     aria-label="Sort announcements"
                     className="admin-select"
                 >
                     <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
                     <option value="updated">Recently updated</option>
                     <option value="deadline">Deadline soonest</option>
                     <option value="views">Most viewed</option>
                 </select>
             </div>
+            {quickChips.length > 0 && (
+                <div className="admin-quick-chip-row" aria-label="Quick list modes">
+                    {quickChips.map((chip) => (
+                        <button
+                            key={chip.id}
+                            type="button"
+                            className={`quick-chip ${chip.active ? 'active' : ''}`}
+                            onClick={chip.onClick}
+                        >
+                            {chip.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {(presets.length > 0 || onSavePreset) && (
+                <div className="admin-preset-row">
+                    <label className="sr-only" htmlFor="admin-preset-select">Saved filter preset</label>
+                    <select
+                        id="admin-preset-select"
+                        className="admin-select"
+                        value={selectedPresetId}
+                        onChange={(event) => onSelectPreset?.(event.target.value)}
+                    >
+                        <option value="">Saved presets</option>
+                        {presets.map((preset) => (
+                            <option key={preset.id} value={preset.id}>{preset.label}</option>
+                        ))}
+                    </select>
+                    {onSavePreset && (
+                        <button type="button" className="admin-btn secondary small" onClick={onSavePreset}>
+                            Save current filters
+                        </button>
+                    )}
+                </div>
+            )}
             {filterSummary && (
                 <div className="filter-summary" role="status" aria-live="polite">
                     <span>{filterSummary}</span>
@@ -87,4 +138,3 @@ export function TableToolbar({
         </div>
     );
 }
-

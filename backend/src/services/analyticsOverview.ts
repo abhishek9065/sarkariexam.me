@@ -23,18 +23,38 @@ const STALE_ROLLUP_THRESHOLD_MINUTES = 45;
 const IN_APP_CLICK_COLLAPSE_OVERAGE_RATIO = 0.35;
 const IN_APP_CLICK_COLLAPSE_UNATTRIBUTED_SHARE = 0.2;
 
-const overviewCache = new Map<number, { data: any; expiresAt: number }>();
+const overviewCache = new Map<string, { data: any; expiresAt: number }>();
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 const roundToOneDecimal = (value: number) => Math.round(value * 10) / 10;
+const toDeltaPct = (current: number, previous: number): number => {
+    if (!Number.isFinite(current)) return 0;
+    if (!Number.isFinite(previous) || previous <= 0) return current > 0 ? 100 : 0;
+    return roundToOneDecimal(((current - previous) / previous) * 100);
+};
+
+const getWindowMetrics = (rows: Array<{ views?: number; searches?: number; listingViews?: number; cardClicks?: number }>) => {
+    const views = sum(rows.map((row) => row.views ?? 0));
+    const searches = sum(rows.map((row) => row.searches ?? 0));
+    const listingViews = sum(rows.map((row) => row.listingViews ?? 0));
+    const cardClicks = sum(rows.map((row) => row.cardClicks ?? 0));
+    const ctr = listingViews > 0 ? roundToOneDecimal((cardClicks / listingViews) * 100) : 0;
+    const dropOff = listingViews > 0 ? roundToOneDecimal(((listingViews - cardClicks) / listingViews) * 100) : 0;
+    return { views, searches, ctr, dropOff };
+};
 
 export async function getAnalyticsOverview(
     days: number = 30,
-    options?: { bypassCache?: boolean }
+    options?: { bypassCache?: boolean; compareDays?: number }
 ): Promise<{ data: any; cached: boolean }> {
     const clampedDays = Math.max(1, Math.min(MAX_DAYS, Math.round(days)));
+    const comparisonWindow = Math.max(
+        1,
+        Math.min(MAX_DAYS, Math.round(options?.compareDays ?? clampedDays))
+    );
+    const cacheKey = `${clampedDays}:${comparisonWindow}`;
     if (!options?.bypassCache) {
-        const cachedEntry = overviewCache.get(clampedDays);
+        const cachedEntry = overviewCache.get(cacheKey);
         if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
             return { data: cachedEntry.data, cached: true };
         }
@@ -144,6 +164,90 @@ export async function getAnalyticsOverview(
     const staleRollups = rollupAgeMinutes === null || rollupAgeMinutes > STALE_ROLLUP_THRESHOLD_MINUTES;
     const inAppClickCollapse = rollupSummary.listingViews > 0 && (cardClicksInApp === 0 || hasAnomaly);
 
+    const currentRows = dailyRollups.slice(-comparisonWindow);
+    const previousRows = dailyRollups.slice(
+        Math.max(0, dailyRollups.length - comparisonWindow * 2),
+        Math.max(0, dailyRollups.length - comparisonWindow)
+    );
+    const currentMetrics = getWindowMetrics(currentRows);
+    const previousMetrics = getWindowMetrics(previousRows);
+
+    const comparison = {
+        viewsDeltaPct: toDeltaPct(currentMetrics.views, previousMetrics.views),
+        searchesDeltaPct: toDeltaPct(currentMetrics.searches, previousMetrics.searches),
+        ctrDeltaPct: toDeltaPct(currentMetrics.ctr, previousMetrics.ctr),
+        dropOffDeltaPct: toDeltaPct(currentMetrics.dropOff, previousMetrics.dropOff),
+        compareDays: comparisonWindow,
+    };
+
+    const anomalies: Array<{
+        key: string;
+        severity: 'low' | 'medium' | 'high';
+        message: string;
+        targetQuery?: Record<string, string>;
+    }> = [];
+
+    const lowCtrTypes = ctrByType
+        .filter((entry) => (entry.listingViews ?? 0) >= 80 && (entry.ctr ?? 0) <= 2)
+        .sort((a, b) => (a.ctr ?? 0) - (b.ctr ?? 0))
+        .slice(0, 3);
+
+    for (const entry of lowCtrTypes) {
+        anomalies.push({
+            key: `low_ctr_${entry.type}`,
+            severity: (entry.ctr ?? 0) < 1 ? 'high' : 'medium',
+            message: `${entry.type} CTR is low (${entry.ctr}%) on ${(entry.listingViews ?? 0).toLocaleString('en-IN')} listing views.`,
+            targetQuery: {
+                tab: 'list',
+                type: String(entry.type),
+                status: 'published',
+                sort: 'views',
+                q: '',
+                mode: 'low_ctr',
+            },
+        });
+    }
+
+    if (funnelDropRate >= 70) {
+        anomalies.push({
+            key: 'drop_off_spike',
+            severity: funnelDropRate >= 85 ? 'high' : 'medium',
+            message: `Drop-off rate is elevated (${funnelDropRate}%). Review listing card quality and relevance.`,
+            targetQuery: {
+                tab: 'list',
+                status: 'published',
+                sort: 'views',
+                mode: 'drop_off',
+            },
+        });
+    }
+
+    if (listingCoverageWindowPct > 0 && listingCoverageWindowPct < 40) {
+        anomalies.push({
+            key: 'tracking_coverage_low',
+            severity: listingCoverageWindowPct < 25 ? 'high' : 'medium',
+            message: `Tracking coverage is low (${listingCoverageWindowPct}%). Check listing view event capture.`,
+            targetQuery: {
+                tab: 'analytics',
+                focus: 'tracking',
+                mode: 'coverage',
+            },
+        });
+    }
+
+    if (staleRollups) {
+        anomalies.push({
+            key: 'rollups_stale',
+            severity: 'high',
+            message: `Rollups are stale (${rollupAgeMinutes ?? 'unknown'} min). Refresh analytics pipeline health.`,
+            targetQuery: {
+                tab: 'analytics',
+                focus: 'rollups',
+                mode: 'stale',
+            },
+        });
+    }
+
     const payload = {
         totalAnnouncements,
         totalViews,
@@ -191,6 +295,8 @@ export async function getAnalyticsOverview(
         ctrByType,
         digestClicks,
         deepLinkAttribution,
+        comparison,
+        anomalies,
         typeBreakdown,
         categoryBreakdown,
         insights: {
@@ -219,7 +325,7 @@ export async function getAnalyticsOverview(
         lastUpdated: new Date().toISOString(),
     };
 
-    overviewCache.set(clampedDays, { data: payload, expiresAt: Date.now() + OVERVIEW_CACHE_TTL_MS });
+    overviewCache.set(cacheKey, { data: payload, expiresAt: Date.now() + OVERVIEW_CACHE_TTL_MS });
 
     return { data: payload, cached: false };
 }

@@ -6,7 +6,12 @@ import { MiniSparkline } from './MiniSparkline';
 import { KpiCard } from './KpiCard';
 import { MetricDefinitionTooltip } from './MetricDefinitionTooltip';
 import { ActionOverflowMenu } from './ActionOverflowMenu';
-import type { MetricDefinition, NumberLocalePref } from '../../types';
+import type {
+    AnalyticsAnomaly,
+    AnalyticsComparison,
+    MetricDefinition,
+    NumberLocalePref,
+} from '../../types';
 import './AnalyticsDashboard.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -83,6 +88,8 @@ interface AnalyticsData {
         anomaly?: boolean;
         rollupAgeMinutes?: number | null;
     };
+    comparison?: AnalyticsComparison;
+    anomalies?: AnalyticsAnomaly[];
 }
 
 interface PopularAnnouncement {
@@ -152,6 +159,14 @@ const DEFAULT_ANALYTICS: AnalyticsData = {
         anomaly: false,
         rollupAgeMinutes: null,
     },
+    comparison: {
+        viewsDeltaPct: 0,
+        searchesDeltaPct: 0,
+        ctrDeltaPct: 0,
+        dropOffDeltaPct: 0,
+        compareDays: 30,
+    },
+    anomalies: [],
 };
 
 const asArray = <T,>(value: unknown): T[] => {
@@ -195,6 +210,11 @@ const normalizeAnalyticsData = (value: unknown): AnalyticsData => {
             ...DEFAULT_ANALYTICS.insights,
             ...(incoming.insights ?? {}),
         },
+        comparison: {
+            ...(DEFAULT_ANALYTICS.comparison ?? {}),
+            ...((incoming.comparison ?? {}) as AnalyticsComparison),
+        },
+        anomalies: asArray(incoming.anomalies),
     };
 };
 
@@ -321,16 +341,22 @@ export function AnalyticsDashboard({
     adminToken,
     onEditById,
     onOpenList,
+    onDrilldown,
+    onMetricDrilldown,
     onUnauthorized,
     onLoadingChange,
     enableUxV2 = true,
+    enableV3 = false,
 }: {
     adminToken?: string | null;
     onEditById?: (id: string) => void;
     onOpenList?: () => void;
+    onDrilldown?: (query: Record<string, string>) => void;
+    onMetricDrilldown?: (source: string, query: Record<string, string>) => void;
     onUnauthorized?: () => void;
     onLoadingChange?: (loading: boolean) => void;
     enableUxV2?: boolean;
+    enableV3?: boolean;
 }) {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
@@ -342,6 +368,7 @@ export function AnalyticsDashboard({
     const [liveEnabled, setLiveEnabled] = useState(true);
     const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'live' | 'error'>('idle');
     const [rangeDays, setRangeDays] = useState(30);
+    const [compareDays, setCompareDays] = useState(30);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
     const [showExportPreview, setShowExportPreview] = useState(false);
     const [showExportDropdown, setShowExportDropdown] = useState(false);
@@ -436,6 +463,7 @@ export function AnalyticsDashboard({
 
         try {
             const nocache = options?.forceFresh ? '&nocache=1' : '';
+            const compareParam = enableV3 ? `&compareDays=${compareDays}` : '';
             const headers = adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined;
             const onRateLimit = (response: Response) => {
                 const retryAfter = response.headers.get('Retry-After');
@@ -444,7 +472,7 @@ export function AnalyticsDashboard({
                     : 'Too many requests. Please wait and try again.');
             };
             const [overviewRes, popularRes] = await Promise.all([
-                adminRequest(`${apiBase}/api/analytics/overview?days=${rangeDays}${nocache}`, {
+                adminRequest(`${apiBase}/api/analytics/overview?days=${rangeDays}${compareParam}${nocache}`, {
                     headers,
                     onRateLimit,
                 }),
@@ -480,7 +508,7 @@ export function AnalyticsDashboard({
             setLoading(false);
             setRefreshing(false);
         }
-    }, [adminToken, rangeDays, onUnauthorized]);
+    }, [adminToken, compareDays, enableV3, rangeDays, onUnauthorized]);
 
     useEffect(() => {
         loadAnalytics();
@@ -608,6 +636,16 @@ export function AnalyticsDashboard({
         setActionMessage('Boosting is not configured yet. Configure promotions to enable this action.');
     };
 
+    const openMetricDrilldown = (source: string, query: Record<string, string>) => {
+        if (onDrilldown) {
+            onDrilldown(query);
+            onMetricDrilldown?.(source, query);
+            return;
+        }
+        onOpenList?.();
+        onMetricDrilldown?.(source, query);
+    };
+
     if (loading) {
         return <div className="analytics-loading">Loading analytics...</div>;
     }
@@ -653,6 +691,8 @@ export function AnalyticsDashboard({
     const totalTypeCount = sortedTypeBreakdown.reduce((sum, item) => sum + item.count, 0);
     const viewsDeltaTone = viewsDeltaPct === null ? 'flat' : viewsDeltaPct >= 0 ? 'up' : 'down';
     const searchesDeltaTone = searchesDeltaPct === null ? 'flat' : searchesDeltaPct >= 0 ? 'up' : 'down';
+    const comparison = analytics.comparison ?? DEFAULT_ANALYTICS.comparison!;
+    const anomalies = analytics.anomalies ?? [];
     const trendListRows = trendRows.slice(-10).reverse();
     const POPULAR_PAGE_SIZE = 5;
     const popularTotalPages = Math.max(1, Math.ceil(popular.length / POPULAR_PAGE_SIZE));
@@ -780,6 +820,21 @@ export function AnalyticsDashboard({
                             </button>
                         ))}
                     </div>
+                    {enableV3 && (
+                        <div className="range-toggle compare-toggle">
+                            <span className="compare-label">Compare</span>
+                            {[7, 30].map((days) => (
+                                <button
+                                    key={`compare-${days}`}
+                                    className={`admin-btn secondary small ${compareDays === days ? 'active' : ''}`}
+                                    onClick={() => setCompareDays(days)}
+                                    aria-pressed={compareDays === days}
+                                >
+                                    {days}d
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="locale-toggle">
                         <label htmlFor="number-locale">Number format</label>
                         <select
@@ -851,6 +906,59 @@ export function AnalyticsDashboard({
             </div>
             {actionMessage && (
                 <div className="analytics-note" role="status">{actionMessage}</div>
+            )}
+            {enableV3 && (
+                <div className="analytics-comparison-grid" aria-label="Comparison metrics">
+                    <div className={`comparison-card ${comparison.viewsDeltaPct >= 0 ? 'up' : 'down'}`}>
+                        <div className="comparison-label">Views delta</div>
+                        <div className="comparison-value">{comparison.viewsDeltaPct}%</div>
+                        <div className="comparison-meta">vs previous {comparison.compareDays} days</div>
+                    </div>
+                    <div className={`comparison-card ${comparison.searchesDeltaPct >= 0 ? 'up' : 'down'}`}>
+                        <div className="comparison-label">Search delta</div>
+                        <div className="comparison-value">{comparison.searchesDeltaPct}%</div>
+                        <div className="comparison-meta">vs previous {comparison.compareDays} days</div>
+                    </div>
+                    <div className={`comparison-card ${comparison.ctrDeltaPct >= 0 ? 'up' : 'down'}`}>
+                        <div className="comparison-label">CTR delta</div>
+                        <div className="comparison-value">{comparison.ctrDeltaPct}%</div>
+                        <div className="comparison-meta">vs previous {comparison.compareDays} days</div>
+                    </div>
+                    <div className={`comparison-card ${comparison.dropOffDeltaPct <= 0 ? 'up' : 'down'}`}>
+                        <div className="comparison-label">Drop-off delta</div>
+                        <div className="comparison-value">{comparison.dropOffDeltaPct}%</div>
+                        <div className="comparison-meta">vs previous {comparison.compareDays} days</div>
+                    </div>
+                </div>
+            )}
+            {enableV3 && anomalies.length > 0 && (
+                <div className="analytics-section">
+                    <div className="analytics-section-header">
+                        <div>
+                            <h3>Anomaly watch</h3>
+                            <p className="analytics-subtitle">Segments that need action now.</p>
+                        </div>
+                    </div>
+                    <div className="anomaly-grid">
+                        {anomalies.map((anomaly) => (
+                            <div key={anomaly.key} className={`anomaly-card ${anomaly.severity}`}>
+                                <div className="anomaly-title">
+                                    <span className={`anomaly-severity ${anomaly.severity}`}>{anomaly.severity}</span>
+                                    <span>{anomaly.key.replace(/_/g, ' ')}</span>
+                                </div>
+                                <p>{anomaly.message}</p>
+                                {anomaly.targetQuery && (
+                                    <button
+                                        className="admin-btn secondary small"
+                                        onClick={() => openMetricDrilldown(anomaly.key, anomaly.targetQuery as Record<string, string>)}
+                                    >
+                                        Fix now
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             )}
             {showExportPreview && (
                 <div className="analytics-preview">
@@ -1481,6 +1589,21 @@ export function AnalyticsDashboard({
                                                 <span className="ctr-bar">
                                                     <span style={{ width: `${Math.min(100, Math.max(item.ctr, item.ctr > 0 ? 5 : 0))}%` }} />
                                                 </span>
+                                                {enableV3 && (
+                                                    <button
+                                                        type="button"
+                                                        className="admin-btn secondary small ctr-drilldown-btn"
+                                                        onClick={() => openMetricDrilldown('ctr_by_type', {
+                                                            tab: 'list',
+                                                            type: item.type,
+                                                            status: 'published',
+                                                            sort: 'views',
+                                                            mode: 'ctr',
+                                                        })}
+                                                    >
+                                                        Open list
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

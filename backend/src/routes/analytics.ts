@@ -15,6 +15,7 @@ const popularCache: { data: any | null; expiresAt: number } = {
 // Input validation schemas
 const analyticsQuerySchema = z.object({
     days: z.coerce.number().int().min(1).max(90).default(30),
+    compareDays: z.coerce.number().int().min(1).max(90).optional(),
     nocache: z.string().optional().transform(val => val === '1')
 });
 
@@ -42,8 +43,8 @@ router.get('/overview', async (req, res) => {
             });
         }
         
-        const { days, nocache: bypassCache } = parseResult.data;
-        const { data, cached } = await getAnalyticsOverview(days, { bypassCache });
+        const { days, compareDays, nocache: bypassCache } = parseResult.data;
+        const { data, cached } = await getAnalyticsOverview(days, { bypassCache, compareDays });
         return res.json({ data, cached });
     } catch (error) {
         console.error('[Analytics] Overview error:', error);

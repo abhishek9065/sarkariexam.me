@@ -18,7 +18,7 @@ import {
 } from '../services/adminApprovals.js';
 import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
 import { getAdminAuditLogsPaged, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
-import { getDailyRollups } from '../services/analytics.js';
+import { getDailyRollups, recordAnalyticsEvent } from '../services/analytics.js';
 import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { hasPermission } from '../services/rbac.js';
@@ -122,10 +122,34 @@ const bulkUpdateSchema = z.object({
     data: adminAnnouncementPartialSchema,
 });
 
+const bulkPreviewSchema = z.object({
+    ids: z.array(z.string().min(1)).min(1),
+    data: adminAnnouncementPartialSchema,
+});
+
 const bulkReviewSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
     dryRun: z.boolean().optional().default(false),
     note: z.string().max(500).optional().or(z.literal('')),
+});
+
+const reviewPreviewSchema = z.object({
+    ids: z.array(z.string().min(1)).min(1),
+    action: z.enum(['approve', 'reject', 'schedule']),
+    note: z.string().max(500).optional().or(z.literal('')),
+    scheduleAt: dateField,
+});
+
+const adminTelemetrySchema = z.object({
+    type: z.enum([
+        'admin_list_loaded',
+        'admin_filter_applied',
+        'admin_row_action_clicked',
+        'admin_review_decision_submitted',
+        'admin_bulk_preview_opened',
+        'admin_metric_drilldown_opened',
+    ]),
+    metadata: z.record(z.any()).optional(),
 });
 
 const auditQuerySchema = z.object({
@@ -289,6 +313,36 @@ const normalizeRollbackDateField = (value: unknown): string | undefined => {
     return value;
 };
 
+const getQaWarningCount = (doc: any): number => {
+    let count = 0;
+    if (!doc?.title || String(doc.title).trim().length < 10) count += 1;
+    if (!doc?.category || String(doc.category).trim().length === 0) count += 1;
+    if (!doc?.organization || String(doc.organization).trim().length === 0) count += 1;
+    if (doc?.status === 'scheduled' && !doc?.publishAt) count += 1;
+    if (typeof doc?.externalLink === 'string' && doc.externalLink.trim()) {
+        try {
+            // eslint-disable-next-line no-new
+            new URL(doc.externalLink);
+        } catch {
+            count += 1;
+        }
+    }
+    if (doc?.deadline) {
+        const deadlineTime = new Date(doc.deadline).getTime();
+        if (!Number.isNaN(deadlineTime) && deadlineTime < Date.now()) count += 1;
+    }
+    return count;
+};
+
+const getDueSoonCount = (docs: any[], days = 7): number => {
+    const threshold = Date.now() + days * 24 * 60 * 60 * 1000;
+    return docs.filter((doc) => {
+        if (!doc?.deadline) return false;
+        const deadlineTime = new Date(doc.deadline).getTime();
+        return !Number.isNaN(deadlineTime) && deadlineTime >= Date.now() && deadlineTime <= threshold;
+    }).length;
+};
+
 const requireDualApproval = async (
     req: any,
     res: any,
@@ -386,6 +440,34 @@ const finalizeApprovalExecution = async (req: any, approvalId?: string) => {
 };
 // All admin dashboard routes require admin-level read access
 router.use(authenticateToken, requirePermission('admin:read'));
+
+/**
+ * POST /api/admin/telemetry/events
+ * Lightweight admin-side instrumentation sink.
+ */
+router.post('/telemetry/events', requirePermission('admin:read'), async (req, res) => {
+    try {
+        const parsed = adminTelemetrySchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        await recordAnalyticsEvent({
+            type: parsed.data.type as any,
+            userId: req.user?.userId,
+            metadata: {
+                ...parsed.data.metadata,
+                role: req.user?.role,
+                source: 'admin_console',
+            },
+        });
+
+        return res.status(202).json({ message: 'Telemetry recorded' });
+    } catch (error) {
+        console.error('Admin telemetry error:', error);
+        return res.status(500).json({ error: 'Failed to record telemetry event' });
+    }
+});
 
 /**
  * GET /api/admin/dashboard
@@ -1134,6 +1216,149 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
     } catch (error) {
         console.error('Create announcement error:', error);
         return res.status(500).json({ error: 'Failed to create announcement' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/bulk/preview
+ * Preview impact for bulk updates without mutating records.
+ */
+router.post('/announcements/bulk/preview', requirePermission('announcements:write'), async (req, res) => {
+    try {
+        const parseResult = bulkPreviewSchema.safeParse(req.body ?? {});
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const { ids, data } = parseResult.data as {
+            ids: string[];
+            data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
+        };
+        const docs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+        const missingIds = collectMissingIds(ids, docs);
+
+        const affectedByStatus = docs.reduce<Record<string, number>>((acc, doc: any) => {
+            const status = normalizeAnnouncementStatus(doc?.status);
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        }, {});
+
+        const highTrafficPublished = docs.filter(
+            (doc: any) => normalizeAnnouncementStatus(doc?.status) === 'published' && Number(doc?.viewCount || 0) >= 5000
+        );
+        const qaHeavy = docs.filter((doc: any) => getQaWarningCount(doc) >= 2);
+
+        const warnings: string[] = [];
+        if (highTrafficPublished.length > 0) {
+            warnings.push(`${highTrafficPublished.length} high-traffic published listing(s) are included.`);
+        }
+        if (data.status === 'archived' || data.status === 'draft') {
+            const publishedCount = affectedByStatus.published || 0;
+            if (publishedCount > 0) {
+                warnings.push(`${publishedCount} currently published listing(s) will leave the live surface.`);
+            }
+        }
+        if (data.status === 'published' && data.publishAt) {
+            warnings.push('Publish status with publishAt provided: publishAt will be normalized to immediate publish.');
+        }
+        if (qaHeavy.length > 0) {
+            warnings.push(`${qaHeavy.length} selected listing(s) have multiple QA warnings.`);
+        }
+        if (missingIds.length > 0) {
+            warnings.push(`${missingIds.length} requested id(s) were not found.`);
+        }
+
+        return res.json({
+            data: {
+                totalTargets: docs.length,
+                affectedByStatus,
+                warnings,
+                missingIds,
+            },
+        });
+    } catch (error) {
+        console.error('Bulk preview error:', error);
+        return res.status(500).json({ error: 'Failed to preview bulk update' });
+    }
+});
+
+/**
+ * POST /api/admin/review/preview
+ * Preview review queue bulk decisions before submission.
+ */
+router.post('/review/preview', requirePermission('announcements:approve'), async (req, res) => {
+    try {
+        const parseResult = reviewPreviewSchema.safeParse(req.body ?? {});
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const { ids, action, scheduleAt } = parseResult.data;
+        const docs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+
+        const eligibleIds: string[] = [];
+        const blockedIds: Array<{ id: string; reason: string }> = [];
+
+        const scheduleDate = scheduleAt ? parseDateParam(scheduleAt, 'start') : undefined;
+        if (action === 'schedule' && !scheduleDate) {
+            return res.status(400).json({ error: 'scheduleAt is required for schedule action.' });
+        }
+
+        for (const doc of docs as any[]) {
+            const id = toAnnouncementId(doc);
+            const status = normalizeAnnouncementStatus(doc?.status);
+            if (!id) continue;
+
+            if (action === 'approve') {
+                if (status === 'pending' || status === 'scheduled' || status === 'draft') {
+                    eligibleIds.push(id);
+                } else {
+                    blockedIds.push({ id, reason: `Cannot approve from status "${status}"` });
+                }
+                continue;
+            }
+
+            if (action === 'reject') {
+                if (status === 'pending' || status === 'scheduled' || status === 'published') {
+                    eligibleIds.push(id);
+                } else {
+                    blockedIds.push({ id, reason: `Cannot reject from status "${status}"` });
+                }
+                continue;
+            }
+
+            if (action === 'schedule') {
+                if (status === 'pending' || status === 'draft') {
+                    eligibleIds.push(id);
+                } else {
+                    blockedIds.push({ id, reason: `Cannot schedule from status "${status}"` });
+                }
+            }
+        }
+
+        const pendingDocs = docs.filter((doc: any) => normalizeAnnouncementStatus(doc?.status) === 'pending');
+        const dueSoonCount = getDueSoonCount(docs);
+        const warnings: string[] = [];
+        if (dueSoonCount > 0) {
+            warnings.push(`${dueSoonCount} selected listing(s) have deadlines in the next 7 days.`);
+        }
+        if (pendingDocs.length > 0 && action !== 'approve') {
+            warnings.push(`${pendingDocs.length} pending listing(s) may remain unapproved after this action.`);
+        }
+        if (blockedIds.length > 0) {
+            warnings.push(`${blockedIds.length} selected listing(s) are blocked for this action.`);
+        }
+
+        return res.json({
+            data: {
+                eligibleIds,
+                blockedIds,
+                warnings,
+            },
+        });
+    } catch (error) {
+        console.error('Review preview error:', error);
+        return res.status(500).json({ error: 'Failed to preview review action' });
     }
 });
 

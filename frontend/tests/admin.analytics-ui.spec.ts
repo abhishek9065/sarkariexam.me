@@ -35,6 +35,12 @@ test.describe('@prod Admin analytics UX', () => {
         await expect(page.locator('.window-badge').first()).toBeVisible();
         await expect(page.locator('#number-locale')).toBeVisible();
         await expect(page.locator('.metric-definition-tooltip').first()).toBeVisible();
+        if (await page.locator('.compare-toggle').count()) {
+            await expect(page.locator('.compare-toggle').first()).toBeVisible();
+        }
+        if (await page.locator('.anomaly-card').count()) {
+            await expect(page.locator('.anomaly-card').first()).toBeVisible();
+        }
 
         const showMoreButton = page.getByRole('button', { name: /Show more metrics|Show fewer metrics/i });
         if (await showMoreButton.count()) {
@@ -43,4 +49,3 @@ test.describe('@prod Admin analytics UX', () => {
         }
     });
 });
-

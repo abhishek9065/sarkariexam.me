@@ -15,6 +15,7 @@ interface ActionOverflowMenuProps {
 
 export function ActionOverflowMenu({ itemLabel, actions }: ActionOverflowMenuProps) {
     const detailsRef = useRef<HTMLDetailsElement | null>(null);
+    const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
     const handleAction = (action: OverflowAction) => {
         action.onClick();
@@ -31,17 +32,50 @@ export function ActionOverflowMenu({ itemLabel, actions }: ActionOverflowMenuPro
                 className="admin-btn secondary small"
                 role="button"
                 aria-label={`More actions for ${itemLabel}`}
+                onKeyDown={(event) => {
+                    if (event.key !== 'ArrowDown') return;
+                    event.preventDefault();
+                    if (detailsRef.current) {
+                        detailsRef.current.open = true;
+                    }
+                    window.requestAnimationFrame(() => {
+                        const first = buttonRefs.current.find(Boolean);
+                        first?.focus();
+                    });
+                }}
             >
                 More
             </summary>
             <div className="action-menu-panel action-overflow-panel">
-                {visibleActions.map((action) => (
+                {visibleActions.map((action, index) => (
                     <button
                         key={action.id}
+                        ref={(element) => {
+                            buttonRefs.current[index] = element;
+                        }}
                         type="button"
                         className={`admin-btn secondary small ${action.tone === 'danger' ? 'danger' : action.tone === 'warning' ? 'warning' : action.tone === 'info' ? 'info' : ''}`}
                         disabled={action.disabled}
                         onClick={() => handleAction(action)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                                event.preventDefault();
+                                if (detailsRef.current) {
+                                    detailsRef.current.open = false;
+                                    detailsRef.current.querySelector('summary')?.focus();
+                                }
+                                return;
+                            }
+                            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                            event.preventDefault();
+                            const enabledButtons = buttonRefs.current.filter((node) => node && !node.disabled);
+                            if (enabledButtons.length === 0) return;
+                            const currentIndex = enabledButtons.findIndex((node) => node === event.currentTarget);
+                            const nextIndex = event.key === 'ArrowDown'
+                                ? (currentIndex + 1) % enabledButtons.length
+                                : (currentIndex - 1 + enabledButtons.length) % enabledButtons.length;
+                            enabledButtons[nextIndex]?.focus();
+                        }}
                     >
                         {action.label}
                     </button>

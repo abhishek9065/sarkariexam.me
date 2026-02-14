@@ -22,7 +22,13 @@ export type AnalyticsEventType =
     | 'deep_link_click'
     | 'push_subscribe_attempt'
     | 'push_subscribe_success'
-    | 'push_subscribe_failure';
+    | 'push_subscribe_failure'
+    | 'admin_list_loaded'
+    | 'admin_filter_applied'
+    | 'admin_row_action_clicked'
+    | 'admin_review_decision_submitted'
+    | 'admin_bulk_preview_opened'
+    | 'admin_metric_drilldown_opened';
 
 interface AnalyticsEventDoc {
     type: AnalyticsEventType;

@@ -15,6 +15,10 @@ const envFallbackFlags: AdminUiFlags = {
     admin_nav_ux_v2: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_NAV_UX_V2, true),
     admin_analytics_ux_v2: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_ANALYTICS_UX_V2, true),
     admin_lists_ux_v2: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_LISTS_UX_V2, true),
+    admin_lists_v3: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_LISTS_V3, false),
+    admin_review_v3: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_REVIEW_V3, false),
+    admin_analytics_v3: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_ANALYTICS_V3, false),
+    admin_command_palette_v1: parseBoolean(import.meta.env.VITE_FEATURE_ADMIN_COMMAND_PALETTE_V1, false),
 };
 
 let cachedFlags: AdminUiFlags | null = null;
@@ -44,6 +48,10 @@ export async function loadAdminUiFlags(): Promise<AdminUiFlags> {
                 admin_nav_ux_v2: parseBoolean(featureFlags.admin_nav_ux_v2, envFallbackFlags.admin_nav_ux_v2),
                 admin_analytics_ux_v2: parseBoolean(featureFlags.admin_analytics_ux_v2, envFallbackFlags.admin_analytics_ux_v2),
                 admin_lists_ux_v2: parseBoolean(featureFlags.admin_lists_ux_v2, envFallbackFlags.admin_lists_ux_v2),
+                admin_lists_v3: parseBoolean(featureFlags.admin_lists_v3, envFallbackFlags.admin_lists_v3),
+                admin_review_v3: parseBoolean(featureFlags.admin_review_v3, envFallbackFlags.admin_review_v3),
+                admin_analytics_v3: parseBoolean(featureFlags.admin_analytics_v3, envFallbackFlags.admin_analytics_v3),
+                admin_command_palette_v1: parseBoolean(featureFlags.admin_command_palette_v1, envFallbackFlags.admin_command_palette_v1),
             };
             return cachedFlags;
         } catch {
@@ -73,4 +81,3 @@ export function useAdminUiFlags() {
 
     return flags;
 }
-

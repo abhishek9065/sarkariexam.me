@@ -42,6 +42,17 @@ export interface AdminUiFlags {
     admin_nav_ux_v2: boolean;
     admin_analytics_ux_v2: boolean;
     admin_lists_ux_v2: boolean;
+    admin_lists_v3: boolean;
+    admin_review_v3: boolean;
+    admin_analytics_v3: boolean;
+    admin_command_palette_v1: boolean;
+}
+
+export interface AdminV3Flags {
+    admin_lists_v3: boolean;
+    admin_review_v3: boolean;
+    admin_analytics_v3: boolean;
+    admin_command_palette_v1: boolean;
 }
 
 export interface MetricDefinition {
@@ -167,4 +178,32 @@ export interface ApiError {
     error: string;
     message?: string;
     details?: Record<string, string[]>;
+}
+
+export interface BulkPreviewResult {
+    totalTargets: number;
+    affectedByStatus: Record<string, number>;
+    warnings: string[];
+    missingIds: string[];
+}
+
+export interface ReviewPreviewResult {
+    eligibleIds: string[];
+    blockedIds: Array<{ id: string; reason: string }>;
+    warnings: string[];
+}
+
+export interface AnalyticsComparison {
+    viewsDeltaPct: number;
+    searchesDeltaPct: number;
+    ctrDeltaPct: number;
+    dropOffDeltaPct: number;
+    compareDays: number;
+}
+
+export interface AnalyticsAnomaly {
+    key: string;
+    severity: 'low' | 'medium' | 'high';
+    message: string;
+    targetQuery?: Record<string, string>;
 }

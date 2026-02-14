@@ -6,15 +6,24 @@ import { ConfirmDialogProvider } from '../components/admin/ConfirmDialog';
 import { AuthLoadingIndicator } from '../components/admin/AuthLoadingIndicator';
 import { AdminNotificationSystem } from '../components/admin/AdminNotification';
 import { useAdminNotifications } from '../components/admin/useAdminNotifications';
+import { AdminCommandPalette } from '../components/admin/AdminCommandPalette';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import type { Announcement, ContentType, AnnouncementStatus, AdminPermission } from '../types';
+import type {
+    Announcement,
+    AnnouncementStatus,
+    BulkPreviewResult,
+    ContentType,
+    AdminPermission,
+    ReviewPreviewResult,
+} from '../types';
 import { isAdminPortalRole } from '../utils/adminRbac';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
 import { adminRequest } from '../utils/adminRequest';
 import { useAdminUiFlags } from '../utils/adminFlags';
+import { trackAdminTelemetry } from '../utils/adminTelemetry';
 import { AdminShellSearch } from '../components/admin/AdminShellSearch';
 import './AdminPage.css';
 
@@ -199,6 +208,7 @@ const CATEGORY_OPTIONS: Array<{ value: string; label: string; icon: string }> = 
 ];
 
 const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
+const LIST_FILTER_PRESETS_KEY = 'adminListFilterPresets';
 const ADMIN_USER_STORAGE_KEY = 'adminUserProfile';
 const ADMIN_TIMEZONE_KEY = 'adminTimezoneMode';
 const ADMIN_SIDEBAR_KEY = 'adminSidebarCollapsed';
@@ -209,7 +219,23 @@ type ListFilterState = {
     query?: string;
     type?: ContentType | 'all';
     status?: AnnouncementStatus | 'all';
-    sort?: 'newest' | 'updated' | 'deadline' | 'views';
+    sort?: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+};
+
+type ListFilterPreset = ListFilterState & {
+    id: string;
+    label: string;
+};
+
+type ReviewPreviewState = {
+    action: 'approve' | 'reject' | 'schedule';
+    payload: { ids: string[]; note?: string; scheduleAt?: string };
+    result: ReviewPreviewResult;
+};
+
+type BulkPreviewState = {
+    payload: Record<string, any>;
+    result: BulkPreviewResult;
 };
 
 const loadListFilters = (): ListFilterState | null => {
@@ -219,6 +245,27 @@ const loadListFilters = (): ListFilterState | null => {
         return JSON.parse(raw) as ListFilterState;
     } catch {
         return null;
+    }
+};
+
+const loadListFilterPresets = (): ListFilterPreset[] => {
+    try {
+        const raw = localStorage.getItem(LIST_FILTER_PRESETS_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .filter((preset) => preset && typeof preset === 'object')
+            .map((preset) => ({
+                id: String(preset.id || crypto.randomUUID()),
+                label: String(preset.label || 'Untitled preset'),
+                query: typeof preset.query === 'string' ? preset.query : '',
+                type: preset.type === 'all' || CONTENT_TYPES.some((item) => item.value === preset.type) ? preset.type : 'all',
+                status: preset.status === 'all' || STATUS_OPTIONS.some((item) => item.value === preset.status) ? preset.status : 'all',
+                sort: preset.sort === 'updated' || preset.sort === 'deadline' || preset.sort === 'views' || preset.sort === 'oldest' ? preset.sort : 'newest',
+            }));
+    } catch {
+        return [];
     }
 };
 
@@ -434,6 +481,13 @@ const AUDIT_ACTIONS = [
 
 const ACTIVE_USER_WINDOWS = [15, 30, 60, 120];
 
+const REVIEW_NOTE_TEMPLATES = [
+    { id: 'approve_clean', label: 'Approve: QA verified', value: 'QA verified. Ready for publish.' },
+    { id: 'approve_fast', label: 'Approve: Time-sensitive', value: 'Time-sensitive update. Publishing now.' },
+    { id: 'reject_missing_docs', label: 'Reject: Missing details', value: 'Rejected: Missing mandatory details and official references.' },
+    { id: 'reject_link_invalid', label: 'Reject: Invalid link', value: 'Rejected: Official link invalid or unreachable.' },
+];
+
 const DEFAULT_FORM_DATA = {
     title: '',
     type: 'job' as ContentType,
@@ -471,6 +525,10 @@ export function AdminPage() {
     const enableAdminNavUx = adminUiFlags.admin_nav_ux_v2;
     const enableAdminAnalyticsUx = adminUiFlags.admin_analytics_ux_v2;
     const enableAdminListsUx = adminUiFlags.admin_lists_ux_v2;
+    const enableAdminListsV3 = adminUiFlags.admin_lists_v3;
+    const enableAdminReviewV3 = adminUiFlags.admin_review_v3;
+    const enableAdminAnalyticsV3 = adminUiFlags.admin_analytics_v3;
+    const enableAdminCommandPalette = adminUiFlags.admin_command_palette_v1;
     const canReadAdmin = hasAdminPortalAccess && can('admin:read');
     const canWriteAnnouncements = can('announcements:write');
     const canDeleteAnnouncements = can('announcements:delete');
@@ -496,12 +554,15 @@ export function AdminPage() {
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [listAnnouncements, setListAnnouncements] = useState<Announcement[]>([]);
     const [listTotal, setListTotal] = useState(0);
+    const [listPresets, setListPresets] = useState<ListFilterPreset[]>(() => loadListFilterPresets());
+    const [selectedPresetId, setSelectedPresetId] = useState('');
+    const [activeQuickMode, setActiveQuickMode] = useState<string>('');
     const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
     const storedFilters = useMemo(() => loadListFilters(), []);
     const [listQuery, setListQuery] = useState(storedFilters?.query ?? '');
     const [debouncedListQuery, setDebouncedListQuery] = useState(listQuery);
     const [listTypeFilter, setListTypeFilter] = useState<ContentType | 'all'>(storedFilters?.type ?? 'all');
-    const [listSort, setListSort] = useState<'newest' | 'updated' | 'deadline' | 'views'>(storedFilters?.sort ?? 'newest');
+    const [listSort, setListSort] = useState<'newest' | 'oldest' | 'updated' | 'deadline' | 'views'>(storedFilters?.sort ?? 'newest');
     const [listPage, setListPage] = useState(1);
     const [categorySearch, setCategorySearch] = useState('');
 
@@ -509,14 +570,20 @@ export function AdminPage() {
     const [listLoading, setListLoading] = useState(false);
     const [listUpdatedAt, setListUpdatedAt] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkPreview, setBulkPreview] = useState<BulkPreviewState | null>(null);
+    const [bulkApplying, setBulkApplying] = useState(false);
     const [bulkStatus, setBulkStatus] = useState<AnnouncementStatus | ''>('');
     const [bulkPublishAt, setBulkPublishAt] = useState('');
     const [bulkIsActive, setBulkIsActive] = useState<'keep' | 'active' | 'inactive'>('keep');
     const [, setBulkLoading] = useState(false);
     const [qaBulkLoading, setQaBulkLoading] = useState(false);
+    const [reviewPreview, setReviewPreview] = useState<ReviewPreviewState | null>(null);
     const [reviewBulkNote, setReviewBulkNote] = useState('');
+    const [selectedReviewTemplate, setSelectedReviewTemplate] = useState('');
     const [reviewScheduleAt, setReviewScheduleAt] = useState('');
     const [reviewLoading, setReviewLoading] = useState(false);
+    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+    const [commandPaletteQuery, setCommandPaletteQuery] = useState('');
     const [activeUsers, setActiveUsers] = useState<{
         windowMinutes: number;
         since: string;
@@ -559,6 +626,7 @@ export function AdminPage() {
     const listRequestInFlight = useRef(false);
     const listLastFetchAt = useRef(0);
     const listRateLimitUntil = useRef(0);
+    const hasTrackedFilterRef = useRef(false);
     const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
     const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
     const [communityTab, setCommunityTab] = useState<'flags' | 'forums' | 'qa' | 'groups'>('flags');
@@ -617,6 +685,23 @@ export function AdminPage() {
             setToasts((prev) => prev.filter((toast) => toast.id !== id));
         }, 3000);
     }, []);
+
+    const trackAdminEvent = useCallback((
+        type: 'admin_list_loaded' | 'admin_filter_applied' | 'admin_row_action_clicked' | 'admin_review_decision_submitted' | 'admin_bulk_preview_opened' | 'admin_metric_drilldown_opened',
+        metadata: Record<string, unknown> = {}
+    ) => {
+        trackAdminTelemetry(
+            {
+                type,
+                metadata: {
+                    tab: activeAdminTab,
+                    role: user?.role || 'unknown',
+                    ...metadata,
+                },
+            },
+            localStorage.getItem('token') || localStorage.getItem('adminToken')
+        );
+    }, [activeAdminTab, user?.role]);
 
     const handleNavSelect = useCallback((tab: AdminTab) => {
         if (!canAccessTab(tab)) {
@@ -699,7 +784,24 @@ export function AdminPage() {
             },
             description: 'Go to list view',
         },
-    ], [isLoggedIn, activeAdminTab, canWriteAnnouncements, canAccessTab]);
+        ...(enableAdminCommandPalette
+            ? [{
+                key: 'k',
+                ctrl: true,
+                handler: () => {
+                    if (!isLoggedIn) return;
+                    setIsCommandPaletteOpen(true);
+                },
+                description: 'Open command palette',
+            } satisfies KeyboardShortcut]
+            : []),
+    ], [
+        isLoggedIn,
+        activeAdminTab,
+        canWriteAnnouncements,
+        canAccessTab,
+        enableAdminCommandPalette,
+    ]);
 
     useKeyboardShortcuts(keyboardShortcuts, isLoggedIn);
 
@@ -937,8 +1039,17 @@ export function AdminPage() {
             }
             const data = await res.json();
             setListAnnouncements(asArray<Announcement>(data.data));
-            setListTotal(getNumber(data.meta?.total ?? data.total ?? data.count ?? data.data?.length, 0));
+            const total = getNumber(data.meta?.total ?? data.total ?? data.count ?? data.data?.length, 0);
+            setListTotal(total);
             setListUpdatedAt(new Date().toISOString());
+            trackAdminEvent('admin_list_loaded', {
+                total,
+                page: listPage,
+                query: debouncedListQuery.trim(),
+                type: listTypeFilter,
+                status: listStatusFilter,
+                sort: listSort,
+            });
         } catch (error) {
             console.error(error);
             setMessage('Failed to load announcements.');
@@ -946,7 +1057,7 @@ export function AdminPage() {
             listRequestInFlight.current = false;
             setListLoading(false);
         }
-    }, [adminFetch, debouncedListQuery, isLoggedIn, listPage, listSort, listStatusFilter, listTypeFilter, pageSize]);
+    }, [adminFetch, debouncedListQuery, isLoggedIn, listPage, listSort, listStatusFilter, listTypeFilter, pageSize, trackAdminEvent]);
 
     const refreshActiveUsers = async () => {
         if (!isLoggedIn) return;
@@ -1356,6 +1467,7 @@ export function AdminPage() {
             notifyWarning('Read-only role', READ_ONLY_MESSAGE);
             return;
         }
+        trackAdminEvent('admin_row_action_clicked', { action: 'delete', id });
         if (!window.confirm('Are you sure you want to delete this announcement?')) return;
         if (!isLoggedIn) {
             setMessage('Not authenticated.');
@@ -1503,6 +1615,7 @@ export function AdminPage() {
             setMessage(READ_ONLY_MESSAGE);
             return;
         }
+        trackAdminEvent('admin_row_action_clicked', { action: 'edit', id: item.id, status: item.status ?? 'published' });
         setFormData({
             title: item.title,
             type: item.type,
@@ -1547,6 +1660,7 @@ export function AdminPage() {
             setMessage(READ_ONLY_MESSAGE);
             return;
         }
+        trackAdminEvent('admin_row_action_clicked', { action: 'duplicate', id: item.id, status: item.status ?? 'published' });
         setFormData({
             ...DEFAULT_FORM_DATA,
             title: item.title,
@@ -1658,6 +1772,7 @@ export function AdminPage() {
 
     const handleView = (item: Announcement) => {
         if (!item.slug) return;
+        trackAdminEvent('admin_row_action_clicked', { action: 'view', id: item.id, slug: item.slug });
         const url = `/${item.type}/${item.slug}`;
         window.open(url, '_blank', 'noopener,noreferrer');
     };
@@ -1667,6 +1782,10 @@ export function AdminPage() {
             setMessage(READ_ONLY_MESSAGE);
             return;
         }
+        trackAdminEvent('admin_row_action_clicked', {
+            action: item.status === 'published' ? 'unpublish' : 'publish',
+            id: item.id,
+        });
         const isPublished = item.status === 'published';
         const nextStatus: AnnouncementStatus = isPublished ? 'archived' : 'published';
         const nextActive = !isPublished;
@@ -1686,6 +1805,7 @@ export function AdminPage() {
     };
 
     const handleBoost = (item: Announcement) => {
+        trackAdminEvent('admin_row_action_clicked', { action: 'boost', id: item.id });
         setMessage(`Boost is not configured for "${item.title}" yet. Configure promotions to enable this action.`);
         notifyInfo('Boost pending', 'Configure promotional workflow to use boost actions.');
     };
@@ -1754,6 +1874,7 @@ export function AdminPage() {
                 body: JSON.stringify({ note }),
             });
             if (response.ok) {
+                trackAdminEvent('admin_review_decision_submitted', { action: 'approve', id });
                 setMessage('Announcement approved and published.');
                 setReviewNotes((prev) => {
                     const next = { ...prev };
@@ -1802,6 +1923,7 @@ export function AdminPage() {
                 body: JSON.stringify({ note }),
             });
             if (response.ok) {
+                trackAdminEvent('admin_review_decision_submitted', { action: 'reject', id });
                 setMessage('Announcement moved back to draft.');
                 setReviewNotes((prev) => {
                     const next = { ...prev };
@@ -1907,7 +2029,7 @@ export function AdminPage() {
         }
     };
 
-    const handleBulkUpdate = async (options?: { status?: AnnouncementStatus, isActive?: boolean, publishAt?: string }) => {
+    const handleBulkUpdate = async (options?: { status?: AnnouncementStatus, isActive?: boolean, publishAt?: string, skipPreview?: boolean }) => {
         if (!canWriteAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
             return;
@@ -1920,6 +2042,8 @@ export function AdminPage() {
             setMessage('Select at least one announcement for bulk updates.');
             return;
         }
+
+        const ids = Array.from(selectedIds);
 
         const payload: Record<string, any> = {};
 
@@ -1951,15 +2075,80 @@ export function AdminPage() {
             return;
         }
 
+        if (enableAdminListsV3 && !options?.skipPreview) {
+            try {
+                const previewResponse = await adminFetch(`${apiBase}/api/admin/announcements/bulk/preview`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ids,
+                        data: payload,
+                    }),
+                });
+                if (previewResponse.ok) {
+                    const previewPayload = await previewResponse.json();
+                    const previewData = (previewPayload?.data ?? {}) as BulkPreviewResult;
+                    setBulkPreview({
+                        payload,
+                        result: {
+                            totalTargets: Number(previewData.totalTargets ?? 0),
+                            affectedByStatus: previewData.affectedByStatus ?? {},
+                            warnings: Array.isArray(previewData.warnings) ? previewData.warnings : [],
+                            missingIds: Array.isArray(previewData.missingIds) ? previewData.missingIds : [],
+                        },
+                    });
+                    trackAdminEvent('admin_bulk_preview_opened', {
+                        selected: ids.length,
+                        status: payload.status ?? null,
+                    });
+                    return;
+                }
+            } catch (error) {
+                console.error(error);
+                setMessage('Failed to load bulk preview. Proceeding without preview.');
+            }
+        }
+
         setBulkLoading(true);
+        if (enableAdminListsV3) {
+            setBulkApplying(true);
+        }
         try {
+            const previousAnnouncements = announcements;
+            const previousListAnnouncements = listAnnouncements;
+            if (enableAdminListsV3) {
+                const patch = payload;
+                setAnnouncements((prev) => prev.map((item) => (
+                    selectedIds.has(item.id)
+                        ? {
+                            ...item,
+                            status: (patch.status as AnnouncementStatus) ?? item.status,
+                            publishAt: typeof patch.publishAt === 'string' ? patch.publishAt : item.publishAt,
+                            isActive: typeof patch.isActive === 'boolean' ? patch.isActive : item.isActive,
+                        }
+                        : item
+                )));
+                setListAnnouncements((prev) => prev.map((item) => (
+                    selectedIds.has(item.id)
+                        ? {
+                            ...item,
+                            status: (patch.status as AnnouncementStatus) ?? item.status,
+                            publishAt: typeof patch.publishAt === 'string' ? patch.publishAt : item.publishAt,
+                            isActive: typeof patch.isActive === 'boolean' ? patch.isActive : item.isActive,
+                        }
+                        : item
+                )));
+            }
+
             const response = await adminFetch(`${apiBase}/api/admin/announcements/bulk`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    ids: Array.from(selectedIds),
+                    ids,
                     data: payload,
                 }),
             });
@@ -1969,10 +2158,15 @@ export function AdminPage() {
                 setBulkStatus('');
                 setBulkPublishAt('');
                 setBulkIsActive('keep');
+                setBulkPreview(null);
                 clearSelection();
                 refreshData();
                 refreshDashboard();
             } else {
+                if (enableAdminListsV3) {
+                    setAnnouncements(previousAnnouncements);
+                    setListAnnouncements(previousListAnnouncements);
+                }
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Bulk update failed.'));
             }
@@ -1981,10 +2175,42 @@ export function AdminPage() {
             setMessage('Error applying bulk update.');
         } finally {
             setBulkLoading(false);
+            setBulkApplying(false);
         }
     };
 
-    const handleBulkApprove = async () => {
+    const requestReviewPreview = useCallback(async (
+        action: 'approve' | 'reject' | 'schedule',
+        payload: { ids: string[]; note?: string; scheduleAt?: string }
+    ) => {
+        const previewResponse = await adminFetch(`${apiBase}/api/admin/review/preview`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ids: payload.ids,
+                action,
+                note: payload.note,
+                scheduleAt: payload.scheduleAt,
+            }),
+        });
+        if (!previewResponse.ok) {
+            return null;
+        }
+        const previewPayload = await previewResponse.json();
+        const result = (previewPayload?.data ?? {}) as ReviewPreviewResult;
+        const normalized: ReviewPreviewResult = {
+            eligibleIds: Array.isArray(result.eligibleIds) ? result.eligibleIds : [],
+            blockedIds: Array.isArray(result.blockedIds) ? result.blockedIds : [],
+            warnings: Array.isArray(result.warnings) ? result.warnings : [],
+        };
+        setReviewPreview({ action, payload, result: normalized });
+        trackAdminEvent('admin_bulk_preview_opened', { action, eligible: normalized.eligibleIds.length });
+        return normalized;
+    }, [adminFetch, trackAdminEvent]);
+
+    const handleBulkApprove = async (options?: { skipPreview?: boolean; ids?: string[]; note?: string }) => {
         if (!canApproveAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
             return;
@@ -1993,9 +2219,22 @@ export function AdminPage() {
             setMessage('Not authenticated.');
             return;
         }
-        if (selectedIds.size === 0) {
+        const idsToUse = options?.ids ?? Array.from(selectedIds);
+        const noteToUse = options?.note ?? (reviewBulkNote.trim() || undefined);
+
+        if (idsToUse.length === 0) {
             setMessage('Select at least one announcement to approve.');
             return;
+        }
+
+        const payload = {
+            ids: idsToUse,
+            note: noteToUse,
+        };
+
+        if (enableAdminReviewV3 && !options?.skipPreview) {
+            const preview = await requestReviewPreview('approve', payload);
+            if (preview) return;
         }
 
         setReviewLoading(true);
@@ -2005,14 +2244,16 @@ export function AdminPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    ids: Array.from(selectedIds),
-                    note: reviewBulkNote.trim() || undefined,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (response.ok) {
+                trackAdminEvent('admin_review_decision_submitted', {
+                    action: 'bulk_approve',
+                    ids: payload.ids.length,
+                });
                 setMessage('Bulk approve complete.');
+                setReviewPreview(null);
                 setReviewBulkNote('');
                 clearSelection();
                 refreshData();
@@ -2030,7 +2271,7 @@ export function AdminPage() {
         }
     };
 
-    const handleBulkReject = async () => {
+    const handleBulkReject = async (options?: { skipPreview?: boolean; ids?: string[]; note?: string }) => {
         if (!canApproveAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
             return;
@@ -2039,9 +2280,22 @@ export function AdminPage() {
             setMessage('Not authenticated.');
             return;
         }
-        if (selectedIds.size === 0) {
+        const idsToUse = options?.ids ?? Array.from(selectedIds);
+        const noteToUse = options?.note ?? (reviewBulkNote.trim() || undefined);
+
+        if (idsToUse.length === 0) {
             setMessage('Select at least one announcement to reject.');
             return;
+        }
+
+        const payload = {
+            ids: idsToUse,
+            note: noteToUse,
+        };
+
+        if (enableAdminReviewV3 && !options?.skipPreview) {
+            const preview = await requestReviewPreview('reject', payload);
+            if (preview) return;
         }
 
         setReviewLoading(true);
@@ -2051,14 +2305,16 @@ export function AdminPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    ids: Array.from(selectedIds),
-                    note: reviewBulkNote.trim() || undefined,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (response.ok) {
+                trackAdminEvent('admin_review_decision_submitted', {
+                    action: 'bulk_reject',
+                    ids: payload.ids.length,
+                });
                 setMessage('Bulk reject complete.');
+                setReviewPreview(null);
                 setReviewBulkNote('');
                 clearSelection();
                 refreshData();
@@ -2076,7 +2332,7 @@ export function AdminPage() {
         }
     };
 
-    const handleBulkSchedule = async () => {
+    const handleBulkSchedule = async (options?: { skipPreview?: boolean; ids?: string[]; note?: string; scheduleAt?: string }) => {
         if (!canWriteAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
             return;
@@ -2085,13 +2341,28 @@ export function AdminPage() {
             setMessage('Not authenticated.');
             return;
         }
-        if (selectedIds.size === 0) {
+        const idsToUse = options?.ids ?? Array.from(selectedIds);
+        const noteToUse = options?.note ?? (reviewBulkNote.trim() || undefined);
+        const scheduleToUse = options?.scheduleAt ?? reviewScheduleAt;
+
+        if (idsToUse.length === 0) {
             setMessage('Select at least one announcement to schedule.');
             return;
         }
-        if (!reviewScheduleAt) {
+        if (!scheduleToUse) {
             setMessage('Publish time is required for scheduling.');
             return;
+        }
+
+        const payload = {
+            ids: idsToUse,
+            note: noteToUse,
+            scheduleAt: normalizeDateTime(scheduleToUse),
+        };
+
+        if (enableAdminReviewV3 && !options?.skipPreview) {
+            const preview = await requestReviewPreview('schedule', payload);
+            if (preview) return;
         }
 
         setReviewLoading(true);
@@ -2102,17 +2373,22 @@ export function AdminPage() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    ids: Array.from(selectedIds),
+                    ids: payload.ids,
                     data: {
                         status: 'scheduled',
-                        publishAt: normalizeDateTime(reviewScheduleAt),
-                        note: reviewBulkNote.trim() || undefined,
+                        publishAt: payload.scheduleAt,
+                        note: payload.note,
                     },
                 }),
             });
 
             if (response.ok) {
+                trackAdminEvent('admin_review_decision_submitted', {
+                    action: 'bulk_schedule',
+                    ids: payload.ids.length,
+                });
                 setMessage('Bulk schedule complete.');
+                setReviewPreview(null);
                 setReviewBulkNote('');
                 setReviewScheduleAt('');
                 clearSelection();
@@ -2129,6 +2405,42 @@ export function AdminPage() {
         } finally {
             setReviewLoading(false);
         }
+    };
+
+    const applyBulkPreview = async () => {
+        if (!bulkPreview) return;
+        const payload = bulkPreview.payload;
+        setBulkPreview(null);
+        await handleBulkUpdate({
+            status: payload.status as AnnouncementStatus | undefined,
+            isActive: typeof payload.isActive === 'boolean' ? payload.isActive : undefined,
+            publishAt: typeof payload.publishAt === 'string' ? payload.publishAt : undefined,
+            skipPreview: true,
+        });
+    };
+
+    const applyReviewPreview = async () => {
+        if (!reviewPreview) return;
+        const eligibleIds = reviewPreview.result.eligibleIds;
+        if (eligibleIds.length === 0) {
+            setMessage('No eligible announcements in this preview.');
+            setReviewPreview(null);
+            return;
+        }
+
+        if (reviewPreview.action === 'approve') {
+            await handleBulkApprove({ skipPreview: true, ids: eligibleIds, note: reviewPreview.payload.note });
+        } else if (reviewPreview.action === 'reject') {
+            await handleBulkReject({ skipPreview: true, ids: eligibleIds, note: reviewPreview.payload.note });
+        } else {
+            await handleBulkSchedule({
+                skipPreview: true,
+                ids: eligibleIds,
+                note: reviewPreview.payload.note,
+                scheduleAt: reviewPreview.payload.scheduleAt,
+            });
+        }
+        setReviewPreview(null);
     };
 
     const handleBulkQaFix = async () => {
@@ -2386,8 +2698,16 @@ export function AdminPage() {
     }, [announcements]);
 
     const pendingAnnouncements = useMemo(() => {
-        return announcements.filter((item) => (item.status ?? 'published') === 'pending');
-    }, [announcements]);
+        const pending = announcements.filter((item) => (item.status ?? 'published') === 'pending');
+        if (!enableAdminReviewV3) return pending;
+        return pending.slice().sort((a, b) => {
+            const riskDelta = getReviewRisk(b).score - getReviewRisk(a).score;
+            if (riskDelta !== 0) return riskDelta;
+            const aTime = new Date(a.updatedAt || a.postedAt).getTime();
+            const bTime = new Date(b.updatedAt || b.postedAt).getTime();
+            return aTime - bTime;
+        });
+    }, [announcements, enableAdminReviewV3]);
 
     const pendingWarningCount = useMemo(() => {
         if (adminSummary?.counts?.pendingQaIssues !== undefined) {
@@ -2496,6 +2816,53 @@ export function AdminPage() {
         },
     ];
 
+    const commandPaletteCommands = useMemo(() => ([
+        {
+            id: 'goto-list',
+            label: 'Go to listings',
+            description: 'Open all announcements list',
+            onSelect: () => handleNavSelect('list'),
+        },
+        {
+            id: 'focus-search',
+            label: 'Focus list search',
+            description: 'Jump to listings and focus search field',
+            onSelect: () => handleShellSearch(listQuery.trim()),
+        },
+        {
+            id: 'goto-review',
+            label: 'Go to pending review',
+            description: 'Open review queue',
+            onSelect: () => handleNavSelect('review'),
+        },
+        {
+            id: 'goto-analytics',
+            label: 'Go to analytics',
+            description: 'Open analytics command center',
+            onSelect: () => handleNavSelect('analytics'),
+        },
+    ]), [handleNavSelect, handleShellSearch, listQuery]);
+
+    const commandPaletteAnnouncements = useMemo(() => {
+        const map = new Map<string, Announcement>();
+        for (const item of announcements) {
+            if (!item?.id || map.has(item.id)) continue;
+            map.set(item.id, item);
+        }
+        for (const item of listAnnouncements) {
+            if (!item?.id || map.has(item.id)) continue;
+            map.set(item.id, item);
+        }
+        return Array.from(map.values());
+    }, [announcements, listAnnouncements]);
+
+    const handleCommandPaletteOpenAnnouncement = useCallback((id: string) => {
+        trackAdminEvent('admin_row_action_clicked', { action: 'command_open_announcement', id });
+        setIsCommandPaletteOpen(false);
+        setCommandPaletteQuery('');
+        handleEditById(id);
+    }, [handleEditById, trackAdminEvent]);
+
     const parseDateOnly = (value?: string) => {
         if (!value) return null;
         const date = new Date(`${value}T00:00:00`);
@@ -2562,7 +2929,139 @@ export function AdminPage() {
         setListStatusFilter('all');
         setListSort('newest');
         setListPage(1);
+        setSelectedPresetId('');
+        setActiveQuickMode('');
     }, [setListQuery, setListTypeFilter, setListStatusFilter, setListSort, setListPage]);
+
+    const applyListPreset = useCallback((presetId: string) => {
+        setSelectedPresetId(presetId);
+        if (!presetId) return;
+        const preset = listPresets.find((item) => item.id === presetId);
+        if (!preset) return;
+        setListQuery(preset.query ?? '');
+        setListTypeFilter((preset.type as ContentType | 'all') ?? 'all');
+        setListStatusFilter((preset.status as AnnouncementStatus | 'all') ?? 'all');
+        setListSort(preset.sort ?? 'newest');
+        setListPage(1);
+        setActiveQuickMode('');
+    }, [listPresets]);
+
+    const saveCurrentFiltersAsPreset = useCallback(() => {
+        const hasAnyFilter = !!listQuery.trim() || listTypeFilter !== 'all' || listStatusFilter !== 'all' || listSort !== 'newest';
+        if (!hasAnyFilter) {
+            setMessage('Apply filters before saving a preset.');
+            return;
+        }
+        const label = window.prompt('Preset name', `Preset ${listPresets.length + 1}`)?.trim();
+        if (!label) return;
+
+        const preset: ListFilterPreset = {
+            id: crypto.randomUUID(),
+            label,
+            query: listQuery.trim(),
+            type: listTypeFilter,
+            status: listStatusFilter,
+            sort: listSort,
+        };
+        const next = [preset, ...listPresets].slice(0, 12);
+        setListPresets(next);
+        localStorage.setItem(LIST_FILTER_PRESETS_KEY, JSON.stringify(next));
+        setSelectedPresetId(preset.id);
+        setMessage(`Saved preset "${label}".`);
+    }, [listPresets, listQuery, listSort, listStatusFilter, listTypeFilter]);
+
+    const applyQuickMode = useCallback((mode: 'pending' | 'expiring' | 'low_ctr' | 'stale') => {
+        setActiveQuickMode(mode);
+        if (mode === 'pending') {
+            setListStatusFilter('pending');
+            setListTypeFilter('all');
+            setListSort('updated');
+            setListQuery('');
+            return;
+        }
+        if (mode === 'expiring') {
+            setListStatusFilter('published');
+            setListTypeFilter('all');
+            setListSort('deadline');
+            setListQuery('');
+            return;
+        }
+        if (mode === 'stale') {
+            setListStatusFilter('pending');
+            setListTypeFilter('all');
+            setListSort('oldest');
+            setListQuery('');
+            return;
+        }
+        setActiveAdminTab('analytics');
+        setMessage('Low CTR mode opens analytics anomalies. Use "Fix now" to jump into targeted lists.');
+    }, []);
+
+    const handleAnalyticsDrilldown = useCallback((query: Record<string, string>) => {
+        trackAdminEvent('admin_metric_drilldown_opened', query);
+        if (query.tab === 'analytics') {
+            setActiveAdminTab('analytics');
+            if (query.focus === 'tracking') {
+                setMessage('Tracking coverage details opened. Validate listing_view event flow and rollup freshness.');
+            }
+            return;
+        }
+
+        if (query.tab === 'review') {
+            handleNavSelect('review');
+            return;
+        }
+
+        handleNavSelect('list');
+        if (typeof query.q === 'string') setListQuery(query.q);
+        if (query.type && CONTENT_TYPES.some((item) => item.value === query.type)) {
+            setListTypeFilter(query.type as ContentType);
+        }
+        if (query.status && STATUS_OPTIONS.some((item) => item.value === query.status)) {
+            setListStatusFilter(query.status as AnnouncementStatus);
+        }
+        if (query.sort && ['newest', 'updated', 'deadline', 'views', 'oldest'].includes(query.sort)) {
+            setListSort(query.sort as 'newest' | 'oldest' | 'updated' | 'deadline' | 'views');
+        }
+        if (query.mode) setActiveQuickMode(query.mode);
+        setListPage(1);
+    }, [handleNavSelect, trackAdminEvent]);
+
+    const listQuickChips = useMemo(() => ([
+        {
+            id: 'pending',
+            label: 'Pending',
+            active: activeQuickMode === 'pending',
+            onClick: () => applyQuickMode('pending'),
+        },
+        {
+            id: 'expiring',
+            label: 'Expiring',
+            active: activeQuickMode === 'expiring',
+            onClick: () => applyQuickMode('expiring'),
+        },
+        {
+            id: 'stale',
+            label: 'Stale',
+            active: activeQuickMode === 'stale',
+            onClick: () => applyQuickMode('stale'),
+        },
+        {
+            id: 'low_ctr',
+            label: 'Low CTR',
+            active: activeQuickMode === 'low_ctr',
+            onClick: () => applyQuickMode('low_ctr'),
+        },
+    ]), [activeQuickMode, applyQuickMode]);
+
+    const handleReviewTemplateSelect = useCallback((templateId: string) => {
+        setSelectedReviewTemplate(templateId);
+        if (!templateId) return;
+        const template = REVIEW_NOTE_TEMPLATES.find((item) => item.id === templateId);
+        if (template) {
+            setReviewBulkNote(template.value);
+        }
+    }, []);
 
     function isValidUrl(value?: string | null) {
         if (!value) return true;
@@ -2598,6 +3097,18 @@ export function AdminPage() {
             warnings.push('External link is invalid');
         }
         return warnings;
+    }
+
+    function getReviewRisk(item: Announcement) {
+        const warnings = getAnnouncementWarnings(item);
+        const now = Date.now();
+        const baseDate = new Date(item.updatedAt || item.postedAt).getTime();
+        const ageDays = Number.isNaN(baseDate) ? 0 : Math.max(0, Math.floor((now - baseDate) / (1000 * 60 * 60 * 24)));
+        const deadlineTime = item.deadline ? new Date(item.deadline).getTime() : NaN;
+        const dueSoon = !Number.isNaN(deadlineTime) && deadlineTime > now && deadlineTime <= now + (7 * 24 * 60 * 60 * 1000);
+        const score = ageDays * 2 + warnings.length * 8 + (dueSoon ? 12 : 0);
+        const severity: 'high' | 'medium' | 'low' = score >= 30 ? 'high' : score >= 18 ? 'medium' : 'low';
+        return { score, severity, ageDays, warnings, dueSoon };
     }
 
     function getFixableWarnings(item: Announcement) {
@@ -2811,6 +3322,41 @@ export function AdminPage() {
     }, [activeAdminTab]);
 
     useEffect(() => {
+        if (!isLoggedIn || !enableAdminReviewV3 || activeAdminTab !== 'review') return;
+
+        const handler = (event: KeyboardEvent) => {
+            if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return;
+            const key = event.key.toLowerCase();
+            if (key === 'a' && canApproveAnnouncements && selectedIds.size > 0 && !reviewLoading) {
+                event.preventDefault();
+                void handleBulkApprove();
+            }
+            if (key === 'r' && canApproveAnnouncements && selectedIds.size > 0 && !reviewLoading) {
+                event.preventDefault();
+                void handleBulkReject();
+            }
+            if (key === 's' && canWriteAnnouncements && selectedIds.size > 0 && !reviewLoading) {
+                event.preventDefault();
+                void handleBulkSchedule();
+            }
+        };
+
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [
+        activeAdminTab,
+        canApproveAnnouncements,
+        canWriteAnnouncements,
+        enableAdminReviewV3,
+        isLoggedIn,
+        reviewLoading,
+        selectedIds.size,
+        handleBulkApprove,
+        handleBulkReject,
+        handleBulkSchedule,
+    ]);
+
+    useEffect(() => {
         setListPage(1);
         setSelectedIds(new Set());
     }, [listQuery, listTypeFilter, listStatusFilter, listSort]);
@@ -2831,6 +3377,20 @@ export function AdminPage() {
         };
         localStorage.setItem(LIST_FILTER_STORAGE_KEY, JSON.stringify(payload));
     }, [listQuery, listTypeFilter, listStatusFilter, listSort]);
+
+    useEffect(() => {
+        if (!isLoggedIn || activeAdminTab !== 'list') return;
+        if (!hasTrackedFilterRef.current) {
+            hasTrackedFilterRef.current = true;
+            return;
+        }
+        trackAdminEvent('admin_filter_applied', {
+            query: listQuery.trim(),
+            type: listTypeFilter,
+            status: listStatusFilter,
+            sort: listSort,
+        });
+    }, [activeAdminTab, isLoggedIn, listQuery, listSort, listStatusFilter, listTypeFilter, trackAdminEvent]);
 
     useEffect(() => {
         setListPage((page) => Math.min(page, totalPages));
@@ -2891,6 +3451,17 @@ export function AdminPage() {
                     </div>
                 ))}
             </div>
+            {enableAdminCommandPalette && (
+                <AdminCommandPalette
+                    open={isCommandPaletteOpen}
+                    query={commandPaletteQuery}
+                    onQueryChange={setCommandPaletteQuery}
+                    onClose={() => setIsCommandPaletteOpen(false)}
+                    commands={commandPaletteCommands}
+                    announcements={commandPaletteAnnouncements}
+                    onOpenAnnouncement={handleCommandPaletteOpenAnnouncement}
+                />
+            )}
             <div className="admin-container">
                 {rateLimitRemaining && (
                     <div className="admin-banner warning" role="status">
@@ -3322,6 +3893,15 @@ export function AdminPage() {
                                         disabled={listLoading}
                                     />
                                 )}
+                                {enableAdminCommandPalette && (
+                                    <button
+                                        type="button"
+                                        className="admin-btn secondary"
+                                        onClick={() => setIsCommandPaletteOpen(true)}
+                                    >
+                                        Command palette (Ctrl+K)
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     className="admin-nav-toggle"
@@ -3354,9 +3934,12 @@ export function AdminPage() {
                                 <AnalyticsDashboard
                                     onEditById={handleEditById}
                                     onOpenList={() => handleNavSelect('list')}
+                                    onDrilldown={handleAnalyticsDrilldown}
+                                    onMetricDrilldown={(source, query) => trackAdminEvent('admin_metric_drilldown_opened', { source, ...query })}
                                     onUnauthorized={handleUnauthorized}
                                     onLoadingChange={setAnalyticsLoading}
                                     enableUxV2={enableAdminAnalyticsUx}
+                                    enableV3={enableAdminAnalyticsV3}
                                 />
                             </Suspense>
                         ) : activeAdminTab === 'users' ? (
@@ -3840,6 +4423,11 @@ export function AdminPage() {
                                     timeZoneLabel={timeZoneLabel}
                                     filterSummary={listFilterSummary}
                                     onClearFilters={handleClearListFilters}
+                                    quickChips={enableAdminListsV3 ? listQuickChips : []}
+                                    presets={enableAdminListsV3 ? listPresets.map((preset) => ({ id: preset.id, label: preset.label })) : []}
+                                    selectedPresetId={selectedPresetId}
+                                    onSelectPreset={enableAdminListsV3 ? applyListPreset : undefined}
+                                    onSavePreset={enableAdminListsV3 ? saveCurrentFiltersAsPreset : undefined}
                                     canWrite={canWriteAnnouncements}
                                     canDelete={canDeleteAnnouncements}
                                     canApprove={canApproveAnnouncements}
@@ -3860,14 +4448,32 @@ export function AdminPage() {
                                         </button>
                                     </div>
                                 </div>
+                                {enableAdminReviewV3 && !canApproveAnnouncements && (
+                                    <div className="admin-banner warning" role="status">
+                                        Read-only role: review decisions are disabled for your account.
+                                    </div>
+                                )}
 
-                                <div className="admin-review-panel">
+                                <div className={`admin-review-panel ${enableAdminReviewV3 ? 'sticky' : ''}`}>
                                     <div className="admin-review-meta">
                                         <span>{pendingSlaStats.pendingTotal} pending</span>
                                         <span>Showing {pendingAnnouncements.length} of {pendingSlaStats.pendingTotal}</span>
                                         <span>{selectedIds.size} selected</span>
                                     </div>
                                     <div className="admin-review-controls">
+                                        {enableAdminReviewV3 && (
+                                            <select
+                                                className="admin-select"
+                                                value={selectedReviewTemplate}
+                                                onChange={(e) => handleReviewTemplateSelect(e.target.value)}
+                                                aria-label="Review note templates"
+                                            >
+                                                <option value="">Decision templates</option>
+                                                {REVIEW_NOTE_TEMPLATES.map((template) => (
+                                                    <option key={template.id} value={template.id}>{template.label}</option>
+                                                ))}
+                                            </select>
+                                        )}
                                         <input
                                             className="review-note-input"
                                             aria-label="Review note"
@@ -3960,12 +4566,14 @@ export function AdminPage() {
                                                     <th>Stale pending</th>
                                                     <th>Age</th>
                                                     <th>QA</th>
+                                                    {enableAdminReviewV3 && <th>Risk</th>}
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {pendingSlaStats.stale.map(({ item, ageDays }) => {
                                                     const warnings = getAnnouncementWarnings(item);
+                                                    const risk = getReviewRisk(item);
                                                     const reviewNote = reviewNotes[item.id] ?? '';
                                                     const isRowMutating = mutatingIds.has(item.id);
                                                     return (
@@ -3992,6 +4600,13 @@ export function AdminPage() {
                                                                     <span className="status-sub success">Clear</span>
                                                                 )}
                                                             </td>
+                                                            {enableAdminReviewV3 && (
+                                                                <td>
+                                                                    <span className={`status-pill ${risk.severity === 'high' ? 'warning' : risk.severity === 'medium' ? 'info' : 'success'}`}>
+                                                                        {risk.severity} ({risk.score})
+                                                                    </span>
+                                                                </td>
+                                                            )}
                                                             <td>
                                                                 <div className="table-actions">
                                                                     <input
@@ -4062,12 +4677,14 @@ export function AdminPage() {
                                                     <th>Type</th>
                                                     <th>Deadline</th>
                                                     <th>QA</th>
+                                                    {enableAdminReviewV3 && <th>Risk</th>}
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {pendingAnnouncements.map((item) => {
                                                     const qaWarnings = getAnnouncementWarnings(item);
+                                                    const risk = getReviewRisk(item);
                                                     const reviewNote = reviewNotes[item.id] ?? '';
                                                     const isRowMutating = mutatingIds.has(item.id);
                                                     return (
@@ -4103,6 +4720,13 @@ export function AdminPage() {
                                                                     <span className="status-sub success">Looks good</span>
                                                                 )}
                                                             </td>
+                                                            {enableAdminReviewV3 && (
+                                                                <td>
+                                                                    <span className={`status-pill ${risk.severity === 'high' ? 'warning' : risk.severity === 'medium' ? 'info' : 'success'}`}>
+                                                                        {risk.severity} ({risk.score})
+                                                                    </span>
+                                                                </td>
+                                                            )}
                                                             <td>
                                                                 <div className="table-actions">
                                                                     <input
@@ -5138,6 +5762,113 @@ export function AdminPage() {
                     </section>
                 </div>
             </div>
+
+            {bulkPreview && (
+                <div className="admin-modal-overlay" onClick={() => setBulkPreview(null)}>
+                    <div
+                        className="admin-modal"
+                        onClick={(event) => event.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="bulk-preview-title"
+                    >
+                        <div className="admin-modal-header">
+                            <div>
+                                <h3 id="bulk-preview-title">Bulk impact preview</h3>
+                                <p className="admin-subtitle">Review impact before applying this bulk update.</p>
+                            </div>
+                            <button className="admin-btn secondary small" onClick={() => setBulkPreview(null)}>Close</button>
+                        </div>
+                        <div className="admin-modal-body">
+                            <div className="admin-user-grid">
+                                <div className="user-card">
+                                    <div className="card-label">Targets</div>
+                                    <div className="card-value">{bulkPreview.result.totalTargets}</div>
+                                </div>
+                                <div className="user-card">
+                                    <div className="card-label">Missing IDs</div>
+                                    <div className="card-value">{bulkPreview.result.missingIds.length}</div>
+                                </div>
+                            </div>
+                            <div className="bulk-preview-status-grid">
+                                {Object.entries(bulkPreview.result.affectedByStatus).map(([status, count]) => (
+                                    <span key={status} className="status-pill info">
+                                        {status}: {count}
+                                    </span>
+                                ))}
+                            </div>
+                            {bulkPreview.result.warnings.length > 0 && (
+                                <div className="admin-banner warning" role="status">
+                                    <ul className="admin-modal-list">
+                                        {bulkPreview.result.warnings.map((warning) => (
+                                            <li key={warning}>{warning}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <div className="admin-modal-actions">
+                                <button className="admin-btn secondary" onClick={() => setBulkPreview(null)}>
+                                    Cancel
+                                </button>
+                                <button className="admin-btn primary" onClick={() => void applyBulkPreview()} disabled={bulkApplying}>
+                                    {bulkApplying ? 'Applying...' : 'Apply bulk update'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {reviewPreview && (
+                <div className="admin-modal-overlay" onClick={() => setReviewPreview(null)}>
+                    <div
+                        className="admin-modal"
+                        onClick={(event) => event.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="review-preview-title"
+                    >
+                        <div className="admin-modal-header">
+                            <div>
+                                <h3 id="review-preview-title">Review decision preview</h3>
+                                <p className="admin-subtitle">
+                                    Action: {reviewPreview.action} · Eligible: {reviewPreview.result.eligibleIds.length}
+                                </p>
+                            </div>
+                            <button className="admin-btn secondary small" onClick={() => setReviewPreview(null)}>Close</button>
+                        </div>
+                        <div className="admin-modal-body">
+                            {reviewPreview.result.warnings.length > 0 && (
+                                <div className="admin-banner warning" role="status">
+                                    <ul className="admin-modal-list">
+                                        {reviewPreview.result.warnings.map((warning) => (
+                                            <li key={warning}>{warning}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {reviewPreview.result.blockedIds.length > 0 && (
+                                <div className="admin-banner info" role="status">
+                                    <strong>Blocked items ({reviewPreview.result.blockedIds.length})</strong>
+                                    <ul className="admin-modal-list">
+                                        {reviewPreview.result.blockedIds.slice(0, 8).map((entry) => (
+                                            <li key={`${entry.id}-${entry.reason}`}>{entry.id}: {entry.reason}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <div className="admin-modal-actions">
+                                <button className="admin-btn secondary" onClick={() => setReviewPreview(null)}>
+                                    Cancel
+                                </button>
+                                <button className="admin-btn primary" onClick={() => void applyReviewPreview()} disabled={reviewLoading}>
+                                    {reviewLoading ? 'Applying...' : `Apply ${reviewPreview.action}`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Preview Modal */}
             {

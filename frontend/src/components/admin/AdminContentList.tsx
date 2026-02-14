@@ -19,8 +19,8 @@ interface AdminContentListProps {
     onTypeFilterChange: (type: ContentType | 'all') => void;
     statusFilter: AnnouncementStatus | 'all';
     onStatusFilterChange: (status: AnnouncementStatus | 'all') => void;
-    sortOption: 'newest' | 'updated' | 'deadline' | 'views';
-    onSortChange: (sort: 'newest' | 'updated' | 'deadline' | 'views') => void;
+    sortOption: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+    onSortChange: (sort: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views') => void;
 
     // Actions
     onRefresh: () => void;
@@ -47,6 +47,16 @@ interface AdminContentListProps {
     canDelete?: boolean;
     canApprove?: boolean;
     enableCompactActions?: boolean;
+    quickChips?: Array<{
+        id: string;
+        label: string;
+        active?: boolean;
+        onClick: () => void;
+    }>;
+    presets?: Array<{ id: string; label: string }>;
+    selectedPresetId?: string;
+    onSelectPreset?: (presetId: string) => void;
+    onSavePreset?: () => void;
 }
 
 export function AdminContentList({
@@ -85,6 +95,11 @@ export function AdminContentList({
     canDelete = true,
     canApprove = true,
     enableCompactActions = true,
+    quickChips = [],
+    presets = [],
+    selectedPresetId = '',
+    onSelectPreset,
+    onSavePreset,
 }: AdminContentListProps) {
 
     const toggleSelection = (id: string) => {
@@ -130,7 +145,7 @@ export function AdminContentList({
         }
     };
 
-    const renderSortButton = (label: string, sortKey: 'newest' | 'updated' | 'deadline' | 'views') => {
+    const renderSortButton = (label: string, sortKey: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views') => {
         const isActive = sortOption === sortKey;
         return (
             <button
@@ -191,6 +206,11 @@ export function AdminContentList({
                     onSortChange={onSortChange}
                     filterSummary={filterSummary}
                     onClearFilters={onClearFilters}
+                    quickChips={quickChips}
+                    presets={presets}
+                    selectedPresetId={selectedPresetId}
+                    onSelectPreset={onSelectPreset}
+                    onSavePreset={onSavePreset}
                 />
             ) : (
                 <div className="admin-filters">
@@ -235,11 +255,12 @@ export function AdminContentList({
                         </select>
                         <select
                             value={sortOption}
-                            onChange={(e) => onSortChange(e.target.value as 'newest' | 'updated' | 'deadline' | 'views')}
+                            onChange={(e) => onSortChange(e.target.value as 'newest' | 'oldest' | 'updated' | 'deadline' | 'views')}
                             aria-label="Sort announcements"
                             className="admin-select"
                         >
                             <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
                             <option value="updated">Recently Updated</option>
                             <option value="deadline">Deadline Soonest</option>
                             <option value="views">Most Viewed</option>

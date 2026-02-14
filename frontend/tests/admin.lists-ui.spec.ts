@@ -34,6 +34,12 @@ test.describe('@prod Admin list UX', () => {
         await expect(page.getByRole('heading', { name: /Content manager/i })).toBeVisible();
         await expect(page.locator('#admin-list-search')).toBeVisible();
         await expect(page.getByRole('columnheader', { name: /Title \/ Organization/i })).toBeVisible();
+        if (await page.locator('.admin-quick-chip-row').count()) {
+            await expect(page.locator('.admin-quick-chip-row').first()).toBeVisible();
+        }
+        if (await page.locator('#admin-preset-select').count()) {
+            await expect(page.locator('#admin-preset-select')).toBeVisible();
+        }
 
         const rowCount = await page.locator('.admin-table tbody tr').count();
         if (rowCount > 0) {
@@ -46,4 +52,3 @@ test.describe('@prod Admin list UX', () => {
         }
     });
 });
-

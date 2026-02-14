@@ -144,6 +144,10 @@ const featureFlags = {
   admin_nav_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_NAV_UX_V2, true),
   admin_analytics_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_ANALYTICS_UX_V2, true),
   admin_lists_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_LISTS_UX_V2, true),
+  admin_lists_v3: parseBoolean(process.env.FEATURE_ADMIN_LISTS_V3, false),
+  admin_review_v3: parseBoolean(process.env.FEATURE_ADMIN_REVIEW_V3, false),
+  admin_analytics_v3: parseBoolean(process.env.FEATURE_ADMIN_ANALYTICS_V3, false),
+  admin_command_palette_v1: parseBoolean(process.env.FEATURE_ADMIN_COMMAND_PALETTE_V1, false),
 };
 
 // Validate secrets aren't using known insecure defaults in production
