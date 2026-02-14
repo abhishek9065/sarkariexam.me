@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.warn('Admin permissions fetch failed, using fallback mapping.', error);
             setAdminPermissions(fallbackPermissionsSnapshot(user.role));
         }
-    }, [syncAdminPermissions]);
+    }, []);
 
     /* Bootstrap — try to load user from saved token */
     useEffect(() => {
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setState((s) => ({ ...s, loading: false, error: message }));
             throw err;
         }
-    }, []);
+    }, [syncAdminPermissions]);
 
     const register = useCallback(async (email: string, name: string, password: string) => {
         setState((s) => ({ ...s, loading: true, error: null }));
@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setState((s) => ({ ...s, loading: false, error: message }));
             throw err;
         }
-    }, []);
+    }, [syncAdminPermissions]);
 
     const logout = useCallback(async () => {
         try {
@@ -181,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAdminPermissions(null);
         setTwoFactorChallenge(null);
         setState({ user: null, loading: false, error: null });
-    }, [syncAdminPermissions]);
+    }, []);
 
     const clearError = useCallback(() => {
         setState((s) => ({ ...s, error: null }));
