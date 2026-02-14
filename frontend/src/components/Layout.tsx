@@ -1,0 +1,23 @@
+import { useEffect, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Header } from './Header';
+import { Footer } from './Footer';
+
+export function Layout({ children }: { children: ReactNode }) {
+    const { pathname } = useLocation();
+
+    /* Scroll to top on route change */
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [pathname]);
+
+    return (
+        <div className="app">
+            <Header />
+            <main className="main-content container animate-fade-in">
+                {children}
+            </main>
+            <Footer />
+        </div>
+    );
+}

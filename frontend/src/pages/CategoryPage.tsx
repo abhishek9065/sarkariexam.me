@@ -1,817 +1,182 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, SkeletonLoader, SearchFilters, type FilterState, Breadcrumbs, ErrorState, MobileNav, ScrollToTop, CompareJobs } from '../components';
-import { SearchOverlay } from '../components/modals/SearchOverlay';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContextStore';
-import { useApplicationTracker } from '../hooks/useApplicationTracker';
-import { type TabType, API_BASE, getDaysRemaining, isExpired, isUrgent, formatDate, formatNumber, PATHS, isFeatureEnabled } from '../utils';
-import { fetchAnnouncementCardsPage, fetchAnnouncementCategories, fetchAnnouncementOrganizations } from '../utils/api';
-import { prefetchAnnouncementDetail } from '../utils/prefetch';
-import { buildTrackedDetailPath } from '../utils/trackingLinks';
-import type { Announcement, ContentType } from '../types';
-import './V2.css';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Layout } from '../components/Layout';
+import { AnnouncementCard, AnnouncementCardSkeleton } from '../components/AnnouncementCard';
+import { getAnnouncementCards } from '../utils/api';
+import type { AnnouncementCard as CardType, ContentType } from '../types';
 
-interface CategoryPageProps {
-    type: ContentType;
-}
-
-type QuickMode = 'all' | 'fresh' | 'closing' | 'high-posts' | 'trending';
-
-const CATEGORY_TITLES: Record<ContentType, string> = {
-    'job': 'Latest Government Jobs',
-    'result': 'Latest Results',
-    'admit-card': 'Admit Cards',
-    'answer-key': 'Answer Keys',
-    'admission': 'Admissions',
-    'syllabus': 'Syllabus'
+const TYPE_META: Record<ContentType, { title: string; icon: string; description: string }> = {
+    job: { title: 'Latest Jobs', icon: '💼', description: 'Browse the latest government job vacancies across India.' },
+    result: { title: 'Results', icon: '📊', description: 'Check exam results, merit lists, and cut-off marks.' },
+    'admit-card': { title: 'Admit Cards', icon: '🎫', description: 'Download hall tickets for upcoming examinations.' },
+    'answer-key': { title: 'Answer Keys', icon: '🔑', description: 'View official answer keys and objection forms.' },
+    admission: { title: 'Admissions', icon: '🎓', description: 'University and college admission notifications.' },
+    syllabus: { title: 'Syllabus', icon: '📚', description: 'Exam syllabus, patterns, and preparation material.' },
 };
 
-const buildDefaultFilters = (type: ContentType): FilterState => ({
-    keyword: '',
-    type,
-    location: '',
-    qualification: '',
-    categories: [],
-    organizations: [],
-    minSalary: '',
-    maxSalary: '',
-    minAge: '',
-    maxAge: '',
-    sortBy: 'latest',
-});
+const SORT_OPTIONS = [
+    { value: 'newest', label: 'Newest First' },
+    { value: 'oldest', label: 'Oldest First' },
+    { value: 'deadline', label: 'Deadline' },
+    { value: 'views', label: 'Most Viewed' },
+] as const;
 
-export function CategoryPage({ type }: CategoryPageProps) {
-    const [data, setData] = useState<Announcement[]>([]);
+const PAGE_SIZE = 20;
+
+export function CategoryPage({ type }: { type: ContentType }) {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [cards, setCards] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [filters, setFilters] = useState<FilterState>(() => buildDefaultFilters(type));
-    const [filtersPanelVersion, setFiltersPanelVersion] = useState(0);
-    const [quickMode, setQuickMode] = useState<QuickMode>('all');
-    const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
-    const [saveSearchMessage, setSaveSearchMessage] = useState('');
-    const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
-    const [organizationOptions, setOrganizationOptions] = useState<string[]>([]);
-    const [showSearchOverlay, setShowSearchOverlay] = useState(false);
-    const [showCompareModal, setShowCompareModal] = useState(false);
-    const [compareSelection, setCompareSelection] = useState<Announcement[]>([]);
-    const loadMoreRef = useRef<HTMLDivElement | null>(null);
-    const navigate = useNavigate();
-    const location = useLocation();
-    const { user, logout, isAuthenticated, token } = useAuth();
-    const { items: trackedApplications } = useApplicationTracker();
-    const [, setShowAuthModal] = useState(false);
-    const { t } = useLanguage();
-    const searchOverlayEnabled = isFeatureEnabled('search_overlay_v2');
-    const compareEnabled = isFeatureEnabled('compare_jobs_v2');
-    const LOAD_TIMEOUT_MS = 8000;
-    const searchSource = useMemo(() => {
-        const value = new URLSearchParams(location.search).get('source');
-        return value === 'overlay_submit' ? value : undefined;
-    }, [location.search]);
+    const [nextCursor, setNextCursor] = useState<string | undefined>();
+    const [total, setTotal] = useState<number | undefined>();
 
-    useEffect(() => {
-        let isActive = true;
-        let didTimeout = false;
-        setLoading(true);
-        setError(null);
-        setData([]);
-        setCursor(null);
-        setHasMore(false);
+    // Filter state from URL params
+    const sort = (searchParams.get('sort') as typeof SORT_OPTIONS[number]['value']) || 'newest';
+    const search = searchParams.get('q') || '';
+    const location = searchParams.get('location') || '';
+    const qualification = searchParams.get('qualification') || '';
 
-        const apiSort = filters.sortBy === 'deadline'
-            ? 'deadline'
-            : filters.sortBy === 'views'
-                ? 'views'
-                : 'newest';
+    const meta = TYPE_META[type];
 
-        const timeoutId = setTimeout(() => {
-            if (!isActive) return;
-            didTimeout = true;
-            setError('This is taking longer than usual. Please retry.');
-            setLoading(false);
-        }, LOAD_TIMEOUT_MS);
+    const fetchCards = useCallback(async (cursor?: string) => {
+        const isInitial = !cursor;
+        if (isInitial) setLoading(true);
+        else setLoadingMore(true);
 
-        fetchAnnouncementCardsPage({
-            type,
-            limit: 50,
-            search: filters.keyword || undefined,
-            location: filters.location || undefined,
-            qualification: filters.qualification || undefined,
-            category: filters.categories.length ? filters.categories : undefined,
-            organization: filters.organizations.length ? filters.organizations : undefined,
-            salaryMin: filters.minSalary ? Number(filters.minSalary) : undefined,
-            salaryMax: filters.maxSalary ? Number(filters.maxSalary) : undefined,
-            ageMin: filters.minAge ? Number(filters.minAge) : undefined,
-            ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
-            sort: apiSort,
-            source: filters.keyword ? (searchSource ?? 'category_query') : 'category',
-        })
-            .then(response => {
-                if (!isActive || didTimeout) return;
-                const items = Array.isArray(response.data) ? (response.data as Announcement[]) : [];
-                if (!Array.isArray(response.data)) {
-                    setError('We could not load listings. Please try again.');
-                    setData([]);
-                    setCursor(null);
-                    setHasMore(false);
-                    return;
-                }
-                setData(items);
-                setCursor(response.nextCursor ?? null);
-                setHasMore(Boolean(response.hasMore));
-            })
-            .catch((err) => {
-                console.error(err);
-                if (!isActive || didTimeout) return;
-                setError('We could not load listings. Please try again.');
-            })
-            .finally(() => {
-                if (!isActive || didTimeout) return;
-                clearTimeout(timeoutId);
-                setLoading(false);
-            });
-
-        return () => {
-            isActive = false;
-            clearTimeout(timeoutId);
-        };
-    }, [type, filters, searchSource]);
-
-    useEffect(() => {
-        setFilters((prev) => ({ ...prev, type }));
-        setQuickMode('all');
-    }, [type]);
-
-    useEffect(() => {
-        if (saveSearchMessage) {
-            setSaveSearchMessage('');
-        }
-    }, [filters]);
-
-    useEffect(() => {
-        let mounted = true;
-        const runWhenIdle = (callback: () => void, timeout = 800) => {
-            const idleWindow = window as Window & {
-                requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
-                cancelIdleCallback?: (id: number) => void;
-            };
-
-            if (typeof idleWindow.requestIdleCallback === 'function' && typeof idleWindow.cancelIdleCallback === 'function') {
-                const id = idleWindow.requestIdleCallback(callback, { timeout });
-                return () => idleWindow.cancelIdleCallback?.(id);
-            }
-            const timer = setTimeout(callback, timeout);
-            return () => clearTimeout(timer);
-        };
-        const loadMeta = async () => {
-            const [categories, organizations] = await Promise.all([
-                fetchAnnouncementCategories(),
-                fetchAnnouncementOrganizations(),
-            ]);
-            if (!mounted) return;
-            setCategoryOptions(categories);
-            setOrganizationOptions(organizations);
-        };
-        const cancel = runWhenIdle(loadMeta);
-        return () => {
-            mounted = false;
-            cancel();
-        };
-    }, []);
-
-    const handleItemClick = (item: Announcement) => {
-        navigate(buildTrackedDetailPath(item.type, item.slug, 'category'));
-    };
-
-    const handleFilterChange = useCallback((nextFilters: FilterState) => {
-        if (nextFilters.type && nextFilters.type !== type) {
-            const paths: Record<ContentType, string> = {
-                'job': '/jobs',
-                'result': '/results',
-                'admit-card': '/admit-card',
-                'answer-key': '/answer-key',
-                'admission': '/admission',
-                'syllabus': '/syllabus'
-            };
-            navigate(paths[nextFilters.type]);
-            return;
-        }
-        setFilters(nextFilters);
-    }, [navigate, type]);
-
-    const visibleData = useMemo(() => {
-        const items = [...data];
-        const keyword = filters.keyword.trim().toLowerCase();
-
-        const scoreRelevance = (item: Announcement) => {
-            if (!keyword) return 0;
-            const title = item.title?.toLowerCase() || '';
-            const organization = item.organization?.toLowerCase() || '';
-            const category = item.category?.toLowerCase() || '';
-            const location = item.location?.toLowerCase() || '';
-            const qualification = item.minQualification?.toLowerCase() || '';
-            const tags = (item.tags || []).map((tag) => tag.name.toLowerCase()).filter(Boolean);
-
-            let score = 0;
-            if (title.includes(keyword)) score += 6;
-            if (organization.includes(keyword)) score += 3;
-            if (category.includes(keyword)) score += 2;
-            if (location.includes(keyword)) score += 2;
-            if (qualification.includes(keyword)) score += 2;
-            if (tags.some((tag) => tag.includes(keyword))) score += 2;
-
-            const words = keyword.split(/\s+/).filter(Boolean);
-            for (const word of words) {
-                if (title.includes(word)) score += 2;
-                if (organization.includes(word)) score += 1;
-                if (tags.some((tag) => tag.includes(word))) score += 1;
-            }
-
-            return score;
-        };
-
-        switch (filters.sortBy) {
-            case 'relevance':
-                if (!keyword) return items;
-                return items.sort((a, b) => {
-                    const scoreB = scoreRelevance(b);
-                    const scoreA = scoreRelevance(a);
-                    if (scoreB !== scoreA) return scoreB - scoreA;
-                    return (b.viewCount ?? 0) - (a.viewCount ?? 0);
-                });
-            case 'posts':
-                return items.sort((a, b) => (b.totalPosts ?? 0) - (a.totalPosts ?? 0));
-            case 'title':
-                return items.sort((a, b) => a.title.localeCompare(b.title));
-            case 'views':
-                return items.sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0));
-            default:
-                return items;
-        }
-    }, [data, filters]);
-    const quickModeCounts = useMemo(() => {
-        const fresh = visibleData.filter((item) => {
-            if (!item.postedAt) return false;
-            const postedAt = new Date(item.postedAt).getTime();
-            if (Number.isNaN(postedAt)) return false;
-            const ageMs = Date.now() - postedAt;
-            return ageMs <= 3 * 24 * 60 * 60 * 1000;
-        }).length;
-        const closing = visibleData.filter((item) => {
-            if (!item.deadline) return false;
-            const days = getDaysRemaining(item.deadline);
-            return days !== null && days >= 0 && days <= 7;
-        }).length;
-        const highPosts = visibleData.filter((item) => (item.totalPosts ?? 0) >= 500).length;
-        const trending = visibleData.filter((item) => (item.viewCount ?? 0) >= 1200).length;
-        return {
-            all: visibleData.length,
-            fresh,
-            closing,
-            'high-posts': highPosts,
-            trending,
-        };
-    }, [visibleData]);
-    const quickFilteredData = useMemo(() => {
-        switch (quickMode) {
-            case 'fresh':
-                return visibleData.filter((item) => {
-                    if (!item.postedAt) return false;
-                    const postedAt = new Date(item.postedAt).getTime();
-                    if (Number.isNaN(postedAt)) return false;
-                    const ageMs = Date.now() - postedAt;
-                    return ageMs <= 3 * 24 * 60 * 60 * 1000;
-                });
-            case 'closing':
-                return visibleData.filter((item) => {
-                    if (!item.deadline) return false;
-                    const days = getDaysRemaining(item.deadline);
-                    return days !== null && days >= 0 && days <= 7;
-                });
-            case 'high-posts':
-                return visibleData.filter((item) => (item.totalPosts ?? 0) >= 500);
-            case 'trending':
-                return visibleData.filter((item) => (item.viewCount ?? 0) >= 1200);
-            default:
-                return visibleData;
-        }
-    }, [quickMode, visibleData]);
-    const trackedAnnouncementSeeds = useMemo<Announcement[]>(
-        () => trackedApplications.map((item) => ({
-            id: item.id,
-            title: item.title,
-            slug: item.slug,
-            type: item.type,
-            category: 'Tracked',
-            organization: item.organization || 'Government',
-            deadline: item.deadline || undefined,
-            postedAt: item.trackedAt,
-            updatedAt: item.updatedAt,
-            isActive: true,
-            viewCount: 0,
-        })),
-        [trackedApplications]
-    );
-    const comparePool = useMemo(() => {
-        const map = new Map<string, Announcement>();
-        for (const item of [...quickFilteredData, ...trackedAnnouncementSeeds]) {
-            if (item.type !== 'job') continue;
-            const key = item.id || item.slug;
-            if (!key || map.has(key)) continue;
-            map.set(key, item);
-        }
-        return Array.from(map.values());
-    }, [quickFilteredData, trackedAnnouncementSeeds]);
-
-    const addToCompare = (item: Announcement) => {
-        if (!compareEnabled || item.type !== 'job') return;
-        setCompareSelection((prev) => {
-            const key = item.id || item.slug;
-            if (!key) return prev;
-            if (prev.some((entry) => (entry.id || entry.slug) === key)) return prev;
-            if (prev.length >= 3) return prev;
-            return [...prev, item];
-        });
-        setShowCompareModal(true);
-    };
-
-    const handleOverlayCategorySearch = (filter: 'all' | 'job' | 'result' | 'admit-card', query: string) => {
-        const basePath = filter === 'all'
-            ? '/jobs'
-            : filter === 'job'
-                ? '/jobs'
-                : filter === 'result'
-                    ? '/results'
-                    : '/admit-card';
-        const params = new URLSearchParams({ search: query, source: 'overlay_submit' });
-        navigate(`${basePath}?${params.toString()}`);
-    };
-
-    const handleLoadMore = useCallback(async () => {
-        if (!hasMore || loadingMore) return;
-        setLoadingMore(true);
         try {
-            const apiSort = filters.sortBy === 'deadline'
-                ? 'deadline'
-                : filters.sortBy === 'views'
-                    ? 'views'
-                    : 'newest';
-            const response = await fetchAnnouncementCardsPage({
+            const res = await getAnnouncementCards({
                 type,
-                limit: 50,
+                sort,
+                search: search || undefined,
+                location: location || undefined,
+                qualification: qualification || undefined,
+                limit: PAGE_SIZE,
                 cursor,
-                search: filters.keyword || undefined,
-                location: filters.location || undefined,
-                qualification: filters.qualification || undefined,
-                category: filters.categories.length ? filters.categories : undefined,
-                organization: filters.organizations.length ? filters.organizations : undefined,
-                salaryMin: filters.minSalary ? Number(filters.minSalary) : undefined,
-                salaryMax: filters.maxSalary ? Number(filters.maxSalary) : undefined,
-                ageMin: filters.minAge ? Number(filters.minAge) : undefined,
-                ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
-                sort: apiSort,
-                source: filters.keyword ? (searchSource ?? 'category_query') : 'category',
             });
-            setData(prev => [...prev, ...response.data] as Announcement[]);
-            setCursor(response.nextCursor ?? null);
-            setHasMore(response.hasMore);
-        } catch (error) {
-            console.error(error);
-            setError('Unable to load more listings.');
+            if (isInitial) {
+                setCards(res.data);
+            } else {
+                setCards((prev) => [...prev, ...res.data]);
+            }
+            setHasMore(res.hasMore ?? false);
+            setNextCursor(res.nextCursor);
+            setTotal(res.total);
+        } catch (err) {
+            console.error('Failed to fetch cards:', err);
         } finally {
+            setLoading(false);
             setLoadingMore(false);
         }
-    }, [hasMore, loadingMore, filters, cursor, type, searchSource]);
+    }, [type, sort, search, location, qualification]);
 
+    // Fetch on mount and when filters change
     useEffect(() => {
-        const target = loadMoreRef.current;
-        if (!target) return;
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const [entry] = entries;
-                if (entry.isIntersecting) {
-                    handleLoadMore();
-                }
-            },
-            { rootMargin: '200px' }
-        );
-        observer.observe(target);
-        return () => observer.disconnect();
-    }, [handleLoadMore]);
+        setCards([]);
+        setNextCursor(undefined);
+        fetchCards();
+    }, [fetchCards]);
 
-    const hasSaveCriteria = Boolean(
-        filters.keyword ||
-        filters.location ||
-        filters.qualification ||
-        filters.categories.length ||
-        filters.organizations.length ||
-        filters.minSalary ||
-        filters.maxSalary ||
-        filters.minAge ||
-        filters.maxAge
-    );
-    const activeFilterCount = useMemo(() => ([
-        Boolean(filters.keyword),
-        Boolean(filters.location),
-        Boolean(filters.qualification),
-        filters.categories.length > 0,
-        filters.organizations.length > 0,
-        Boolean(filters.minSalary),
-        Boolean(filters.maxSalary),
-        Boolean(filters.minAge),
-        Boolean(filters.maxAge),
-    ]).filter(Boolean).length, [filters]);
-    const closingSoonCount = useMemo(() => quickFilteredData.filter((item) => {
-        if (!item.deadline) return false;
-        const days = getDaysRemaining(item.deadline);
-        return days !== null && days >= 0 && days <= 7;
-    }).length, [quickFilteredData]);
-    const activeFilterLabels = useMemo(() => {
-        const labels: string[] = [];
-        if (filters.keyword) labels.push(`Keyword: ${filters.keyword}`);
-        if (filters.location) labels.push(`Location: ${filters.location}`);
-        if (filters.qualification) labels.push(`Qualification: ${filters.qualification}`);
-        if (filters.categories.length) labels.push(`Categories: ${filters.categories.join(', ')}`);
-        if (filters.organizations.length) labels.push(`Organizations: ${filters.organizations.join(', ')}`);
-        if (filters.minSalary || filters.maxSalary) {
-            labels.push(`Salary: ${filters.minSalary || 'Any'} - ${filters.maxSalary || 'Any'}`);
-        }
-        if (filters.minAge || filters.maxAge) {
-            labels.push(`Age: ${filters.minAge || 'Any'} - ${filters.maxAge || 'Any'}`);
-        }
-        return labels;
-    }, [filters]);
-
-    const formatSalaryRange = (min?: number | null, max?: number | null) => {
-        if (!min && !max) return null;
-        const fmt = (value: number) => new Intl.NumberFormat('en-IN').format(value);
-        if (min && max) return `₹${fmt(min)} - ₹${fmt(max)}`;
-        if (min) return `₹${fmt(min)}+`;
-        if (max) return `Up to ₹${fmt(max)}`;
-        return null;
-    };
-
-    const handleSaveSearch = async () => {
-        if (!token) return;
-        if (!hasSaveCriteria) {
-            setSaveSearchMessage(t('category.saveNeedFilters'));
-            return;
-        }
-
-        const nameParts = [];
-        if (filters.keyword) nameParts.push(filters.keyword);
-        nameParts.push(CATEGORY_TITLES[type]);
-        if (filters.location) nameParts.push(filters.location);
-        const name = nameParts.slice(0, 3).join(' • ');
-
-        const payload = {
-            name,
-            query: filters.keyword || '',
-            filters: {
-                type,
-                category: filters.categories.length ? filters.categories.join(',') : undefined,
-                organization: filters.organizations.length ? filters.organizations.join(',') : undefined,
-                location: filters.location || undefined,
-                qualification: filters.qualification || undefined,
-                salaryMin: filters.minSalary ? Number(filters.minSalary) : undefined,
-                salaryMax: filters.maxSalary ? Number(filters.maxSalary) : undefined,
-                ageMin: filters.minAge ? Number(filters.minAge) : undefined,
-                ageMax: filters.maxAge ? Number(filters.maxAge) : undefined,
-            }
-        };
-
-        try {
-            setSaveSearchMessage('Saving...');
-            const res = await fetch(`${API_BASE}/api/profile/saved-searches`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(payload),
-            });
-            if (res.ok) {
-                setSaveSearchMessage(t('category.saveSuccess'));
-            } else {
-                setSaveSearchMessage(t('category.saveError'));
-            }
-        } catch (error) {
-            console.error(error);
-            setSaveSearchMessage(t('category.saveError'));
-        }
-    };
-
-    const handleResetFilters = () => {
-        const nextFilters = buildDefaultFilters(type);
-        setFilters(nextFilters);
-        setQuickMode('all');
-        setSaveSearchMessage('');
-        setError(null);
-        setFiltersPanelVersion((prev) => prev + 1);
-        try {
-            localStorage.removeItem(`filters:category-${type}`);
-        } catch {
-            // Ignore storage access issues.
-        }
+    const updateFilter = (key: string, value: string) => {
+        const params = new URLSearchParams(searchParams);
+        if (value) params.set(key, value);
+        else params.delete(key);
+        setSearchParams(params, { replace: true });
     };
 
     return (
-        <div className="app sr-v2-category">
-            <a className="sr-v2-skip-link" href="#category-main">
-                Skip to listings
-            </a>
-            <Header
-                setCurrentPage={(page) => navigate('/' + page)}
-                user={user}
-                token={token}
-                isAuthenticated={isAuthenticated}
-                onLogin={() => setShowAuthModal(true)}
-                onLogout={logout}
-                onProfileClick={() => navigate('/profile')}
-            />
-            <Navigation
-                activeTab={type as TabType}
-                setActiveTab={(tab) => {
-                    if (!tab) navigate('/');
-                    else if (tab === 'bookmarks') {
-                        // Bookmarks handled elsewhere
-                    } else {
-                        navigate(`/${tab === 'job' ? 'jobs' : tab === 'result' ? 'results' : tab}`);
-                    }
-                }}
-                setShowSearch={(show) => {
-                    if (searchOverlayEnabled) setShowSearchOverlay(show);
-                }}
-                goBack={() => navigate('/')}
-                setCurrentPage={(page) => navigate('/' + page)}
-                isAuthenticated={isAuthenticated}
-                onShowAuth={() => setShowAuthModal(true)}
-            />
-
-            <main id="category-main" className="main-content sr-v2-main">
-                <section className="sr-v2-category-intro" aria-label="Category insights">
-                    <div className="sr-v2-category-intro-item">
-                        <span className="sr-v2-intro-label">Showing</span>
-                        <strong>{formatNumber(quickFilteredData.length)}</strong>
-                        <small>results</small>
-                    </div>
-                    <div className="sr-v2-category-intro-item">
-                        <span className="sr-v2-intro-label">Active Filters</span>
-                        <strong>{activeFilterCount}</strong>
-                        <small>{activeFilterCount === 1 ? 'filter' : 'filters'}</small>
-                    </div>
-                    <div className="sr-v2-category-intro-item">
-                        <span className="sr-v2-intro-label">Closing in 7 Days</span>
-                        <strong>{closingSoonCount}</strong>
-                        <small>alerts</small>
-                    </div>
-                </section>
-                <section className="sr-v2-quick-modes" aria-label="Smart views">
-                    <button
-                        type="button"
-                        className={`sr-v2-quick-mode-chip ${quickMode === 'all' ? 'active' : ''}`}
-                        onClick={() => setQuickMode('all')}
-                    >
-                        All
-                        <small>{formatNumber(quickModeCounts.all)}</small>
-                    </button>
-                    <button
-                        type="button"
-                        className={`sr-v2-quick-mode-chip ${quickMode === 'fresh' ? 'active' : ''}`}
-                        onClick={() => setQuickMode('fresh')}
-                    >
-                        Fresh 72h
-                        <small>{formatNumber(quickModeCounts.fresh)}</small>
-                    </button>
-                    <button
-                        type="button"
-                        className={`sr-v2-quick-mode-chip ${quickMode === 'closing' ? 'active' : ''}`}
-                        onClick={() => setQuickMode('closing')}
-                    >
-                        Closing Soon
-                        <small>{formatNumber(quickModeCounts.closing)}</small>
-                    </button>
-                    <button
-                        type="button"
-                        className={`sr-v2-quick-mode-chip ${quickMode === 'high-posts' ? 'active' : ''}`}
-                        onClick={() => setQuickMode('high-posts')}
-                    >
-                        High Vacancy
-                        <small>{formatNumber(quickModeCounts['high-posts'])}</small>
-                    </button>
-                    <button
-                        type="button"
-                        className={`sr-v2-quick-mode-chip ${quickMode === 'trending' ? 'active' : ''}`}
-                        onClick={() => setQuickMode('trending')}
-                    >
-                        Trending
-                        <small>{formatNumber(quickModeCounts.trending)}</small>
-                    </button>
-                </section>
-                {activeFilterLabels.length > 0 && (
-                    <section className="sr-v2-filter-summary" aria-label="Active filters">
-                        <div className="sr-v2-filter-chip-list">
-                            {activeFilterLabels.map((label, index) => (
-                                <span key={`${label}-${index}`} className="sr-v2-filter-chip">
-                                    {label}
-                                </span>
-                            ))}
-                        </div>
-                        <button type="button" className="btn btn-secondary sr-v2-filter-reset" onClick={handleResetFilters}>
-                            Reset filters
-                        </button>
-                    </section>
-                )}
-                <div className="category-header">
+        <Layout>
+            {/* Page header */}
+            <section className="category-header animate-fade-in">
+                <div className="category-header-title">
+                    <span className="category-header-icon">{meta.icon}</span>
                     <div>
-                        <Breadcrumbs
-                            items={[
-                                { label: CATEGORY_TITLES[type], path: PATHS[type] },
-                            ]}
-                        />
-                        <h1 className="category-title">{CATEGORY_TITLES[type]}</h1>
-                        <p className="category-subtitle" aria-live="polite">{quickFilteredData.length} {t('category.listings')}</p>
-                        {compareEnabled && type === 'job' && (
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => setShowCompareModal(true)}
-                                disabled={comparePool.length === 0}
-                            >
-                                Compare Jobs
-                            </button>
-                        )}
-                    </div>
-                    <div className="category-controls sticky-filters">
-                        <SearchFilters
-                            key={`category-filters-${type}-${filtersPanelVersion}`}
-                            onFilterChange={handleFilterChange}
-                            showTypeFilter
-                            initialType={type}
-                            persistKey={`category-${type}`}
-                            includeAllTypes={false}
-                            categories={categoryOptions}
-                            organizations={organizationOptions}
-                            suggestions={[...categoryOptions.slice(0, 10), ...organizationOptions.slice(0, 10)]}
-                        />
-                        {isAuthenticated && hasSaveCriteria && (
-                            <div className="save-search-prompt">
-                                <div>
-                                    <strong>{t('category.saveTitle')}</strong>
-                                    <p>{t('category.saveHint')}</p>
-                                </div>
-                                <button className="btn btn-secondary" onClick={handleSaveSearch} disabled={!hasSaveCriteria}>
-                                    {t('category.saveAction')}
-                                </button>
-                                {saveSearchMessage && <span className="save-search-message">{saveSearchMessage}</span>}
-                            </div>
-                        )}
+                        <h1>{meta.title}</h1>
+                        <p className="text-muted">{meta.description}</p>
                     </div>
                 </div>
-
-                {loading ? (
-                    <SkeletonLoader />
-                ) : error ? (
-                    <ErrorState message={error} onRetry={() => setFilters((prev) => ({ ...prev }))} />
-                ) : (
-                    <>
-                        <div className="category-list">
-                            {quickFilteredData.length > 0 ? (
-                                quickFilteredData.map(item => (
-                                    <div
-                                        key={item.id}
-                                        className="category-item"
-                                        onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
-                                        onFocus={() => prefetchAnnouncementDetail(item.slug)}
-                                        onClick={() => handleItemClick(item)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === 'Enter' || event.key === ' ') {
-                                                event.preventDefault();
-                                                handleItemClick(item);
-                                            }
-                                        }}
-                                        role="button"
-                                        tabIndex={0}
-                                        aria-label={`Open listing: ${item.title}`}
-                                    >
-                                        <div className="item-title">{item.title}</div>
-                                        <div className="item-meta">
-                                            <span className="org">{item.organization}</span>
-                                            {item.totalPosts && <span className="posts">{formatNumber(item.totalPosts ?? undefined)} Posts</span>}
-                                            {item.location && <span className="location">{item.location}</span>}
-                                            {formatSalaryRange(item.salaryMin ?? undefined, item.salaryMax ?? undefined) && (
-                                                <span className="salary-range">
-                                                    {formatSalaryRange(item.salaryMin ?? undefined, item.salaryMax ?? undefined)}
-                                                </span>
-                                            )}
-                                            {item.difficulty && (
-                                                <span className={`difficulty-badge ${item.difficulty}`}>
-                                                    {item.difficulty.toUpperCase()}
-                                                </span>
-                                            )}
-                                            {item.deadline && (
-                                                <span className="deadline">Last: {new Date(item.deadline).toLocaleDateString('en-IN')}</span>
-                                            )}
-                                            {item.deadline && (
-                                                <span
-                                                    className={`deadline-badge ${isExpired(item.deadline) ? 'expired' : isUrgent(item.deadline) ? 'urgent' : 'active'}`}
-                                                >
-                                                    {(() => {
-                                                        const days = getDaysRemaining(item.deadline);
-                                                        if (days === null) return 'No deadline';
-                                                        if (days < 0) return 'Closed';
-                                                        if (days === 0) return 'Last day';
-                                                        return `${days} days left`;
-                                                    })()}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {(item.minQualification || item.ageLimit) && (
-                                            <div className="item-eligibility">
-                                                {item.minQualification && <span>🎓 {item.minQualification}</span>}
-                                                {item.ageLimit && <span>👤 {item.ageLimit}</span>}
-                                            </div>
-                                        )}
-                                        {item.cutoffMarks && (
-                                            <div className="item-eligibility">
-                                                <span>🎯 Prev Cutoff: {item.cutoffMarks}</span>
-                                            </div>
-                                        )}
-                                        <div className="item-meta secondary">
-                                            <span className="posted">Posted: {formatDate(item.postedAt)}</span>
-                                            <span className="views">👁️ {formatNumber(item.viewCount ?? undefined)}</span>
-                                            {compareEnabled && item.type === 'job' && (
-                                                <button
-                                                    type="button"
-                                                    className="sr-mini-compare"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        addToCompare(item);
-                                                    }}
-                                                    aria-label={`Add ${item.title} to compare`}
-                                                >
-                                                    Compare
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="sr-v2-empty-state">
-                                    <p className="no-data">{hasSaveCriteria ? t('category.noMatches') : t('section.noItems')}</p>
-                                    <div className="sr-v2-empty-actions">
-                                        {activeFilterCount > 0 && (
-                                            <button type="button" className="btn btn-secondary" onClick={handleResetFilters}>
-                                                Clear filters
-                                            </button>
-                                        )}
-                                        <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
-                                            Back to homepage
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        {hasMore && (
-                            <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                                <button className="btn btn-primary" onClick={handleLoadMore} disabled={loadingMore}>
-                                    {loadingMore ? 'Loading...' : 'Load More'}
-                                </button>
-                            </div>
-                        )}
-                        <div ref={loadMoreRef} />
-                    </>
+                {total !== undefined && (
+                    <span className="category-count">{total.toLocaleString()} found</span>
                 )}
-            </main>
+            </section>
 
-            <Footer setCurrentPage={(page) => navigate('/' + page)} />
-            <MobileNav onShowAuth={() => setShowAuthModal(true)} />
-            <ScrollToTop />
+            {/* Filters bar */}
+            <section className="filters-bar">
+                <div className="filters-row">
+                    <input
+                        className="input filter-search"
+                        type="text"
+                        placeholder="Search within results..."
+                        value={search}
+                        onChange={(e) => updateFilter('q', e.target.value)}
+                    />
+                    <input
+                        className="input filter-field"
+                        type="text"
+                        placeholder="Location"
+                        value={location}
+                        onChange={(e) => updateFilter('location', e.target.value)}
+                    />
+                    <input
+                        className="input filter-field"
+                        type="text"
+                        placeholder="Qualification"
+                        value={qualification}
+                        onChange={(e) => updateFilter('qualification', e.target.value)}
+                    />
+                    <select
+                        className="input filter-sort"
+                        value={sort}
+                        onChange={(e) => updateFilter('sort', e.target.value)}
+                    >
+                        {SORT_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                    </select>
+                </div>
+            </section>
 
-            {searchOverlayEnabled && (
-                <SearchOverlay
-                    open={showSearchOverlay}
-                    onClose={() => setShowSearchOverlay(false)}
-                    onOpenDetail={(itemType, slug) => navigate(buildTrackedDetailPath(itemType, slug, 'search_overlay'))}
-                    onOpenCategory={handleOverlayCategorySearch}
-                />
-            )}
+            {/* Card grid */}
+            <section className="category-listing">
+                <div className="grid-auto">
+                    {loading
+                        ? Array.from({ length: 8 }).map((_, i) => <AnnouncementCardSkeleton key={i} />)
+                        : cards.map((card) => (
+                            <AnnouncementCard key={card.id} card={card} showType={false} />
+                        ))
+                    }
+                </div>
 
-            {compareEnabled && showCompareModal && (
-                <CompareJobs
-                    announcements={comparePool}
-                    selected={compareSelection}
-                    onSelectionChange={setCompareSelection}
-                    onViewJob={(item) => {
-                        setShowCompareModal(false);
-                        handleItemClick(item);
-                    }}
-                    onClose={() => setShowCompareModal(false)}
-                />
-            )}
-        </div>
+                {/* Empty state */}
+                {!loading && cards.length === 0 && (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">📭</span>
+                        <h3>No {meta.title.toLowerCase()} found</h3>
+                        <p className="text-muted">Try adjusting your filters or check back later.</p>
+                    </div>
+                )}
+
+                {/* Load more */}
+                {hasMore && !loading && (
+                    <div className="load-more">
+                        <button
+                            className="btn btn-outline btn-lg"
+                            onClick={() => fetchCards(nextCursor)}
+                            disabled={loadingMore}
+                        >
+                            {loadingMore ? (
+                                <>
+                                    <span className="spinner" style={{ width: 16, height: 16 }} />
+                                    Loading...
+                                </>
+                            ) : (
+                                'Load More'
+                            )}
+                        </button>
+                    </div>
+                )}
+            </section>
+        </Layout>
     );
 }

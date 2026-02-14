@@ -3,11 +3,13 @@ import { z } from 'zod';
 
 import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
+import { getAdminSloSnapshot } from '../middleware/responseTime.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
 import {
     approveAdminApprovalRequest,
     createAdminApprovalRequest,
+    getAdminApprovalWorkflowSummary,
     listAdminApprovalRequests,
     markAdminApprovalExecuted,
     rejectAdminApprovalRequest,
@@ -15,9 +17,9 @@ import {
     type AdminApprovalActionType,
 } from '../services/adminApprovals.js';
 import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
-import { getAdminAuditLogsPaged, recordAdminAudit } from '../services/adminAudit.js';
+import { getAdminAuditLogsPaged, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
 import { getDailyRollups } from '../services/analytics.js';
-import { getCollection } from '../services/cosmosdb.js';
+import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
@@ -116,11 +118,13 @@ const adminListQuerySchema = z.object({
 
 const bulkUpdateSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
+    dryRun: z.boolean().optional().default(false),
     data: adminAnnouncementPartialSchema,
 });
 
 const bulkReviewSchema = z.object({
     ids: z.array(z.string().min(1)).min(1),
+    dryRun: z.boolean().optional().default(false),
     note: z.string().max(500).optional().or(z.literal('')),
 });
 
@@ -131,6 +135,21 @@ const auditQuerySchema = z.object({
     action: z.string().trim().optional(),
     start: z.string().trim().optional(),
     end: z.string().trim().optional(),
+});
+
+const workflowOverviewQuerySchema = z.object({
+    staleLimit: z.coerce.number().int().min(1).max(100).default(10),
+    dueSoonMinutes: z.coerce.number().int().min(1).max(24 * 60).default(30),
+});
+
+const auditIntegrityQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100_000).default(5000),
+});
+
+const rollbackSchema = z.object({
+    version: z.coerce.number().int().min(1),
+    dryRun: z.boolean().optional().default(false),
+    note: z.string().max(500).optional().or(z.literal('')),
 });
 
 const adminExportQuerySchema = z.object({
@@ -223,6 +242,52 @@ const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Da
 };
 
 const getEndpointPath = (url: string) => url.split('?')[0];
+
+const toAnnouncementId = (doc: any): string =>
+    doc?.id?.toString?.() || doc?._id?.toString?.() || '';
+
+const collectMissingIds = (ids: string[], docs: any[]): string[] => {
+    const foundIds = new Set(docs.map((doc) => toAnnouncementId(doc)).filter(Boolean));
+    return ids.filter((id) => !foundIds.has(id));
+};
+
+const normalizeRollbackTags = (tags: any): string[] | undefined => {
+    if (!Array.isArray(tags)) return undefined;
+    const normalized = tags
+        .map((tag) => {
+            if (typeof tag === 'string') return tag.trim();
+            if (tag && typeof tag === 'object' && typeof tag.name === 'string') return tag.name.trim();
+            return '';
+        })
+        .filter(Boolean);
+    return normalized.length ? normalized : undefined;
+};
+
+const normalizeRollbackImportantDates = (importantDates: any) => {
+    if (!Array.isArray(importantDates)) return undefined;
+    const normalized = importantDates
+        .map((entry) => {
+            if (!entry || typeof entry !== 'object') return null;
+            const eventName = typeof entry.eventName === 'string' ? entry.eventName.trim() : '';
+            const eventDate = typeof entry.eventDate === 'string' ? entry.eventDate : undefined;
+            if (!eventName || !eventDate) return null;
+            return {
+                eventName,
+                eventDate,
+                description: typeof entry.description === 'string' ? entry.description : undefined,
+            };
+        })
+        .filter(Boolean);
+    return normalized.length ? normalized : undefined;
+};
+
+const normalizeRollbackDateField = (value: unknown): string | undefined => {
+    if (typeof value !== 'string') return undefined;
+    if (!value.trim()) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return undefined;
+    return value;
+};
 
 const requireDualApproval = async (
     req: any,
@@ -438,6 +503,36 @@ router.get('/stats', async (_req, res) => {
     } catch (error) {
         console.error('Stats error:', error);
         return res.status(500).json({ error: 'Failed to load stats' });
+    }
+});
+
+/**
+ * GET /api/admin/slo
+ * Get admin SLO snapshot with synthetic dependency status.
+ */
+router.get('/slo', async (_req, res) => {
+    try {
+        const snapshot = getAdminSloSnapshot();
+        const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+        let syntheticStatus: 'ok' | 'degraded' | 'not_configured' = 'not_configured';
+
+        if (dbConfigured) {
+            const ok = await healthCheck().catch(() => false);
+            syntheticStatus = ok ? 'ok' : 'degraded';
+        }
+
+        return res.json({
+            data: {
+                ...snapshot,
+                synthetic: {
+                    status: syntheticStatus,
+                    dbConfigured,
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Admin SLO error:', error);
+        return res.status(500).json({ error: 'Failed to load admin SLO snapshot' });
     }
 });
 
@@ -658,6 +753,42 @@ router.get('/approvals', requirePermission('announcements:approve'), async (req,
 });
 
 /**
+ * GET /api/admin/workflow/overview
+ * Combined review queue, approval, and session workflow summary.
+ */
+router.get('/workflow/overview', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = workflowOverviewQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const { staleLimit, dueSoonMinutes } = parsed.data;
+        const [reviewQueue, approvals, sessions] = await Promise.all([
+            AnnouncementModelMongo.getPendingSlaSummary({
+                includeInactive: true,
+                staleLimit,
+            }),
+            getAdminApprovalWorkflowSummary({ dueSoonMinutes }),
+            listAdminSessions(),
+        ]);
+
+        return res.json({
+            data: {
+                reviewQueue,
+                approvals,
+                sessions: {
+                    total: sessions.length,
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Admin workflow overview error:', error);
+        return res.status(500).json({ error: 'Failed to load workflow overview' });
+    }
+});
+
+/**
  * POST /api/admin/approvals/:id/approve
  * Approve a pending high-risk action.
  */
@@ -780,6 +911,25 @@ router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
     } catch (error) {
         console.error('Audit log error:', error);
         return res.status(500).json({ error: 'Failed to load audit log' });
+    }
+});
+
+/**
+ * GET /api/admin/audit-log/integrity
+ * Verify immutable admin audit ledger integrity.
+ */
+router.get('/audit-log/integrity', requirePermission('audit:read'), async (req, res) => {
+    try {
+        const parsed = auditIntegrityQuerySchema.safeParse(req.query);
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const result = await verifyAdminAuditLedger(parsed.data.limit);
+        return res.json({ data: result });
+    } catch (error) {
+        console.error('Audit log integrity error:', error);
+        return res.status(500).json({ error: 'Failed to verify audit log integrity' });
     }
 });
 
@@ -975,17 +1125,30 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, data } = parseResult.data as unknown as {
+        const { ids, data, dryRun } = parseResult.data as unknown as {
             ids: string[];
+            dryRun: boolean;
             data: Partial<CreateAnnouncementDto> & { isActive?: boolean };
         };
+        const existingDocs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+        if (dryRun) {
+            return res.json({
+                data: {
+                    dryRun: true,
+                    preview: {
+                        totalTargets: existingDocs.length,
+                    },
+                    missingIds: collectMissingIds(ids, existingDocs),
+                },
+            });
+        }
+
         let publishTransitionIds: string[] = [];
         if (data.status === 'published' && !hasPermission(req.user?.role as any, 'announcements:approve')) {
             return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
         }
         let approvalId: string | undefined;
         if (data.status === 'published') {
-            const existingDocs = await AnnouncementModelMongo.findByIdsAdmin(ids);
             publishTransitionIds = existingDocs
                 .filter((doc) => !isPublishedStatus(doc.status as any))
                 .map((doc) => doc._id?.toString())
@@ -1033,7 +1196,14 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, note } = parseResult.data;
+        const { ids, note, dryRun } = parseResult.data;
+        if (dryRun) {
+            return res.json({
+                data: {
+                    dryRun: true,
+                },
+            });
+        }
         const existingDocs = await AnnouncementModelMongo.findByIdsAdmin(ids);
         const publishTransitionIds = existingDocs
             .filter((doc) => !isPublishedStatus(doc.status as any))
@@ -1090,7 +1260,14 @@ router.post('/announcements/bulk-reject', requirePermission('announcements:appro
             return res.status(400).json({ error: parseResult.error.flatten() });
         }
 
-        const { ids, note } = parseResult.data;
+        const { ids, note, dryRun } = parseResult.data;
+        if (dryRun) {
+            return res.json({
+                data: {
+                    dryRun: true,
+                },
+            });
+        }
         const data = {
             status: 'draft' as const,
             approvedAt: '',
@@ -1258,6 +1435,95 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
     } catch (error) {
         console.error('Reject announcement error:', error);
         return res.status(500).json({ error: 'Failed to reject announcement' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/:id/rollback
+ * Rollback to a specific historical version snapshot.
+ */
+router.post('/announcements/:id/rollback', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const parsed = rollbackSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const announcement = await AnnouncementModelMongo.findById(req.params.id);
+        if (!announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        const targetVersion = announcement.versions?.find((entry) => entry.version === parsed.data.version);
+        if (!targetVersion?.snapshot) {
+            return res.status(404).json({ error: 'Version snapshot not found' });
+        }
+
+        if (parsed.data.dryRun) {
+            return res.json({
+                data: {
+                    dryRun: true,
+                    targetVersion: parsed.data.version,
+                },
+            });
+        }
+
+        const snapshot = targetVersion.snapshot as any;
+        const rollbackPayload: Partial<CreateAnnouncementDto> & { isActive?: boolean; note?: string } = {
+            title: snapshot.title,
+            type: snapshot.type,
+            category: snapshot.category,
+            organization: snapshot.organization,
+            content: snapshot.content,
+            externalLink: snapshot.externalLink,
+            location: snapshot.location,
+            minQualification: snapshot.minQualification,
+            ageLimit: snapshot.ageLimit,
+            applicationFee: snapshot.applicationFee,
+            salaryMin: snapshot.salaryMin,
+            salaryMax: snapshot.salaryMax,
+            difficulty: snapshot.difficulty,
+            cutoffMarks: snapshot.cutoffMarks,
+            totalPosts: snapshot.totalPosts,
+            status: snapshot.status,
+            publishAt: normalizeRollbackDateField(snapshot.publishAt),
+            approvedAt: normalizeRollbackDateField(snapshot.approvedAt),
+            approvedBy: typeof snapshot.approvedBy === 'string' ? snapshot.approvedBy : undefined,
+            tags: normalizeRollbackTags(snapshot.tags),
+            importantDates: normalizeRollbackImportantDates(snapshot.importantDates),
+            jobDetails: snapshot.jobDetails,
+            isActive: typeof snapshot.isActive === 'boolean' ? snapshot.isActive : undefined,
+            note: parsed.data.note?.trim() || undefined,
+        };
+
+        if (typeof snapshot.deadline === 'string') {
+            rollbackPayload.deadline = snapshot.deadline || '';
+        }
+
+        const updated = await AnnouncementModelMongo.update(req.params.id, rollbackPayload, req.user?.userId);
+        if (!updated) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        recordAdminAudit({
+            action: 'rollback',
+            announcementId: updated.id,
+            title: updated.title,
+            userId: req.user?.userId,
+            note: parsed.data.note?.trim() || undefined,
+            metadata: {
+                targetVersion: parsed.data.version,
+            },
+        }).catch(console.error);
+
+        await invalidateAnnouncementCaches().catch((err) => {
+            console.error('Failed to invalidate caches after admin rollback:', err);
+        });
+
+        return res.json({ data: updated });
+    } catch (error) {
+        console.error('Rollback announcement error:', error);
+        return res.status(500).json({ error: 'Failed to rollback announcement' });
     }
 });
 

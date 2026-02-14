@@ -1,138 +1,141 @@
-import { useNavigate, useParams } from 'react-router-dom';
-import './V2.css';
+import { Layout } from '../components/Layout';
 
-const pages = {
-  about: {
-    title: 'About Us',
-    content: `
-        <h3>Welcome to SarkariExams.me</h3>
-        <p>SarkariExams.me is India's leading platform for government job notifications, exam results, admit cards, and application forms.</p>
-        
-        <h4>Our Mission</h4>
-        <p>To provide accurate, timely, and comprehensive information about government employment opportunities to millions of job seekers across India.</p>
-        
-        <h4>What We Offer</h4>
-        <ul>
-          <li>Latest Government Job Notifications</li>
-          <li>Exam Results & Answer Keys</li>
-          <li>Admit Card Downloads</li>
-          <li>Admission Updates</li>
-          <li>Syllabus & Exam Patterns</li>
-        </ul>
-        
-        <h4>Why Choose Us</h4>
-        <ul>
-          <li>✅ 100% Verified Information</li>
-          <li>✅ Real-time Updates</li>
-          <li>✅ User-friendly Interface</li>
-          <li>✅ No Registration Required</li>
-          <li>✅ Free to Use</li>
-        </ul>
-      `
-  },
-  contact: {
-    title: 'Contact Us',
-    content: `
-        <h3>Get in Touch</h3>
-        <p>We'd love to hear from you! For any queries, suggestions, or feedback, please reach out to us.</p>
-        
-        <div class="contact-info">
-          <p><strong>📧 Email:</strong> contact@sarkariresult.com</p>
-          <p><strong>📱 WhatsApp:</strong> +91-XXXXXXXXXX</p>
-          <p><strong>📍 Address:</strong> New Delhi, India</p>
-        </div>
-        
-        <h4>Follow Us</h4>
-        <p>
-          <a href="#">Telegram</a> | 
-          <a href="#">WhatsApp</a> | 
-          <a href="#">Facebook</a> | 
-          <a href="#">Twitter</a>
-        </p>
-        
-        <h4>Feedback Form</h4>
-        <p>For detailed queries or job posting requests, please email us with your complete details.</p>
-      `
-  },
-  privacy: {
-    title: 'Privacy Policy',
-    content: `
-        <h3>Privacy Policy</h3>
-        <p><strong>Last Updated:</strong> December 2024</p>
-        
-        <h4>Information We Collect</h4>
-        <p>We may collect the following types of information:</p>
-        <ul>
-          <li>Browser type and version</li>
-          <li>Pages visited and time spent</li>
-          <li>Referring website</li>
-          <li>IP address (anonymized)</li>
-        </ul>
-        
-        <h4>How We Use Information</h4>
-        <ul>
-          <li>Improve website functionality</li>
-          <li>Analyze traffic patterns</li>
-          <li>Provide relevant content</li>
-        </ul>
-        
-        <h4>Cookies</h4>
-        <p>We use cookies to enhance user experience. You can disable cookies in your browser settings.</p>
-        
-        <h4>Third-party Services</h4>
-        <p>We may use third-party services like Google Analytics and advertising networks.</p>
-        
-        <h4>Contact</h4>
-        <p>For privacy concerns, email us at privacy@sarkariresult.com</p>
-      `
-  },
-  disclaimer: {
-    title: 'Disclaimer',
-    content: `
-        <h3>Disclaimer</h3>
-        
-        <h4>Information Accuracy</h4>
-        <p>While we strive to provide accurate and up-to-date information, we make no warranties about the completeness, reliability, or accuracy of the information on this website.</p>
-        
-        <h4>Official Sources</h4>
-        <p>All information is collected from official government websites and notifications. Users are advised to verify information from official sources before taking any action.</p>
-        
-        <h4>External Links</h4>
-        <p>This website contains links to external websites. We are not responsible for the content or privacy practices of these sites.</p>
-        
-        <h4>No Guarantee</h4>
-        <p>We do not guarantee any job offers, results, or admission. The final authority rests with the respective recruiting organizations.</p>
-        
-        <h4>Liability</h4>
-        <p>We shall not be held liable for any loss or damage arising from the use of information on this website.</p>
-        
-        <h4>Updates</h4>
-        <p>This disclaimer may be updated from time to time. Please check regularly for updates.</p>
-      `
-  }
+type PageType = 'about' | 'contact' | 'privacy' | 'disclaimer';
+
+const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element }> = {
+    about: {
+        title: 'About Us',
+        icon: 'ℹ️',
+        body: (
+            <>
+                <p>
+                    <strong>SarkariExams</strong> is India's trusted destination for government job notifications,
+                    exam results, admit cards, and application updates. We aggregate information from official
+                    government sources to bring you accurate, timely updates all in one place.
+                </p>
+                <h2>Our Mission</h2>
+                <p>
+                    To simplify the government job search for millions of aspirants across India by providing
+                    a clean, fast, and reliable platform with real-time updates.
+                </p>
+                <h2>What We Offer</h2>
+                <ul>
+                    <li><strong>Latest Job Notifications</strong> — Central & State government vacancies</li>
+                    <li><strong>Exam Results</strong> — Instant updates for all major exams</li>
+                    <li><strong>Admit Cards</strong> — Download links as soon as they're available</li>
+                    <li><strong>Answer Keys</strong> — Official and unofficial answer keys</li>
+                    <li><strong>Syllabus</strong> — Complete exam syllabi and patterns</li>
+                    <li><strong>Admissions</strong> — University and college admission notices</li>
+                </ul>
+                <h2>Disclaimer</h2>
+                <p>
+                    All information is sourced from official government websites. We recommend verifying
+                    details from the official notification before applying.
+                </p>
+            </>
+        ),
+    },
+    contact: {
+        title: 'Contact Us',
+        icon: '📧',
+        body: (
+            <>
+                <p>
+                    Have questions, feedback, or found an error in our listings? We'd love to hear from you.
+                </p>
+                <div className="contact-grid">
+                    <div className="card contact-card">
+                        <h3>📧 Email</h3>
+                        <p>For general inquiries and support:</p>
+                        <a href="mailto:support@sarkariexams.com" className="contact-link">support@sarkariexams.com</a>
+                    </div>
+                    <div className="card contact-card">
+                        <h3>🐛 Report an Issue</h3>
+                        <p>Found incorrect information or a broken link?</p>
+                        <a href="mailto:corrections@sarkariexams.com" className="contact-link">corrections@sarkariexams.com</a>
+                    </div>
+                    <div className="card contact-card">
+                        <h3>🤝 Partnerships</h3>
+                        <p>Interested in collaboration?</p>
+                        <a href="mailto:partners@sarkariexams.com" className="contact-link">partners@sarkariexams.com</a>
+                    </div>
+                </div>
+                <p className="text-muted" style={{ marginTop: 24 }}>
+                    We typically respond within 24–48 hours.
+                </p>
+            </>
+        ),
+    },
+    privacy: {
+        title: 'Privacy Policy',
+        icon: '🔒',
+        body: (
+            <>
+                <p><em>Last updated: February 2026</em></p>
+                <h2>Information We Collect</h2>
+                <p>We collect information you provide directly: email address, name, and preferences when you create an account. We also collect usage data like pages visited and search queries to improve our service.</p>
+                <h2>How We Use Your Information</h2>
+                <ul>
+                    <li>To provide and improve our services</li>
+                    <li>To send notifications about saved jobs and exam updates</li>
+                    <li>To personalize your experience based on preferences</li>
+                    <li>To analyze usage patterns and improve performance</li>
+                </ul>
+                <h2>Data Security</h2>
+                <p>We use industry-standard security measures including encrypted connections (HTTPS), secure password hashing, and regular security audits to protect your data.</p>
+                <h2>Cookies</h2>
+                <p>We use essential cookies for authentication and theme preferences. No third-party tracking cookies are used.</p>
+                <h2>Your Rights</h2>
+                <p>You can access, modify, or delete your account data at any time from your profile settings. Contact us to request a full data export or deletion.</p>
+            </>
+        ),
+    },
+    disclaimer: {
+        title: 'Disclaimer',
+        icon: '⚠️',
+        body: (
+            <>
+                <p>
+                    The information provided on SarkariExams is for general informational purposes only.
+                    While we strive to keep the information up-to-date and accurate, we make no representations
+                    or warranties of any kind about the completeness, accuracy, reliability, or availability
+                    of any information on this website.
+                </p>
+                <h2>Official Sources</h2>
+                <p>
+                    All job notifications, results, and other content are sourced from official government
+                    websites. <strong>Always verify information from the official notification PDF</strong> before
+                    making any decisions or submitting applications.
+                </p>
+                <h2>External Links</h2>
+                <p>
+                    This site contains links to external government websites. We have no control over the
+                    content or availability of those sites and are not responsible for their content.
+                </p>
+                <h2>No Guarantee</h2>
+                <p>
+                    We do not guarantee the accuracy of any dates, eligibility criteria, or other details
+                    posted on this platform. The official recruitment notification is the final authority.
+                </p>
+            </>
+        ),
+    },
 };
 
-interface StaticPageProps {
-  page?: 'about' | 'contact' | 'privacy' | 'disclaimer';
+export function StaticPage({ type }: { type: PageType }) {
+    const page = CONTENT[type];
+
+    return (
+        <Layout>
+            <article className="static-page animate-fade-in">
+                <div className="static-header">
+                    <span className="static-icon">{page.icon}</span>
+                    <h1>{page.title}</h1>
+                </div>
+                <div className="static-content">
+                    {page.body}
+                </div>
+            </article>
+        </Layout>
+    );
 }
-
-export function StaticPage({ page: pageProp }: StaticPageProps) {
-  const { type } = useParams<{ type: string }>();
-  const navigate = useNavigate();
-
-  // Use prop if provided, otherwise fallback to URL param
-  const pageType = pageProp || type;
-  // Default to about if type is invalid or not found in pages
-  const pageKey = (pageType && pageType in pages) ? pageType as keyof typeof pages : 'about';
-  const page = pages[pageKey];
-
-  return (
-    <div className="static-page sr-v2-static-legacy">
-      <button className="back-btn sr-v2-static-back" onClick={() => navigate(-1)}>← Back</button>
-      <h1 className="page-title">{page.title}</h1>
-      <div className="static-content sr-v2-static-content" dangerouslySetInnerHTML={{ __html: page.content }} />
-    </div>
-  );
-}
-
-export default StaticPage;

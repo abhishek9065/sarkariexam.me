@@ -1,188 +1,92 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Header, Navigation, Footer, SkeletonLoader, BookmarkButton, ExportButtons, SearchBox, ScrollToTop } from '../components';
-import { AuthModal } from '../components/modals/AuthModal';
-import { GlobalSearchModal } from '../components/modals/GlobalSearchModal';
-import { useAuth } from '../context/AuthContext';
-import { useBookmarks } from '../hooks/useData';
-import { prefetchAnnouncementDetail } from '../utils/prefetch';
-import { formatNumber } from '../utils/formatters';
-import { getDaysRemaining } from '../utils';
-import { buildTrackedDetailPath } from '../utils/trackingLinks';
-import type { Announcement } from '../types';
-import './V2.css';
+import { useState, useEffect, useCallback } from 'react';
+import { Layout } from '../components/Layout';
+import { AnnouncementCard, AnnouncementCardSkeleton } from '../components/AnnouncementCard';
+import { getBookmarks, removeBookmark } from '../utils/api';
+import type { AnnouncementCard as CardType } from '../types';
 
 export function BookmarksPage() {
-    const navigate = useNavigate();
-    const { user, token, logout, isAuthenticated } = useAuth();
-    const { bookmarks, toggleBookmark, isBookmarked, loading } = useBookmarks();
-    const [showAuthModal, setShowAuthModal] = useState(false);
-    const [showSearchModal, setShowSearchModal] = useState(false);
-    const [query, setQuery] = useState('');
-    const handlePageNavigation = (page: string) => {
-        if (page === 'home') navigate('/');
-        else if (page === 'admin') navigate('/admin');
-        else navigate('/' + page);
-    };
+    const [bookmarks, setBookmarks] = useState<CardType[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [removing, setRemoving] = useState<Set<string>>(new Set());
 
-    const handleItemClick = (item: Announcement) => {
-        navigate(buildTrackedDetailPath(item.type, item.slug, 'bookmarks'));
-    };
+    const fetchBookmarks = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await getBookmarks();
+            // Map full announcements to card-shaped objects
+            const cards: CardType[] = res.data.map((a) => ({
+                id: a.id,
+                title: a.title,
+                slug: a.slug,
+                type: a.type,
+                category: a.category,
+                organization: a.organization,
+                location: a.location,
+                deadline: a.deadline,
+                totalPosts: a.totalPosts,
+                postedAt: a.postedAt,
+                viewCount: a.viewCount,
+            }));
+            setBookmarks(cards);
+        } catch (err) {
+            console.error('Failed to load bookmarks:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const normalizedQuery = query.trim().toLowerCase();
-    const visibleBookmarks = normalizedQuery
-        ? bookmarks.filter(item =>
-            item.title.toLowerCase().includes(normalizedQuery) ||
-            (item.organization || '').toLowerCase().includes(normalizedQuery)
-        )
-        : bookmarks;
-    const closingSoonCount = useMemo(() => visibleBookmarks.filter((item) => {
-        const daysRemaining = getDaysRemaining(item.deadline ?? undefined);
-        return daysRemaining !== null && daysRemaining >= 0 && daysRemaining <= 7;
-    }).length, [visibleBookmarks]);
+    useEffect(() => { fetchBookmarks(); }, [fetchBookmarks]);
 
-    const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, item: Announcement) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        handleItemClick(item);
+    const handleRemove = async (id: string) => {
+        setRemoving((s) => new Set(s).add(id));
+        try {
+            await removeBookmark(id);
+            setBookmarks((prev) => prev.filter((b) => b.id !== id));
+        } catch (err) {
+            console.error('Failed to remove bookmark:', err);
+        } finally {
+            setRemoving((s) => { const n = new Set(s); n.delete(id); return n; });
+        }
     };
 
     return (
-        <div className="app sr-v2-bookmarks">
-            <a className="sr-v2-skip-link" href="#bookmarks-main">
-                Skip to bookmarks
-            </a>
-            <Header
-                setCurrentPage={handlePageNavigation}
-                user={user}
-                token={token}
-                isAuthenticated={isAuthenticated}
-                onLogin={() => setShowAuthModal(true)}
-                onLogout={logout}
-                onProfileClick={() => navigate('/profile')}
-            />
-            <Navigation
-                activeTab={'bookmarks'}
-                setShowSearch={() => setShowSearchModal(true)}
-                setCurrentPage={handlePageNavigation}
-                isAuthenticated={isAuthenticated}
-                onShowAuth={() => setShowAuthModal(true)}
-            />
-
-            <main id="bookmarks-main" className="main-content sr-v2-main">
-                <div className="bookmarks-page">
-                    <h1 className="bookmarks-title">Saved Bookmarks</h1>
-                    <section className="sr-v2-bookmarks-intro" aria-label="Bookmarks pulse">
-                        <div className="sr-v2-bookmarks-intro-item">
-                            <span className="sr-v2-intro-label">Saved Items</span>
-                            <strong>{formatNumber(bookmarks.length)}</strong>
-                            <small>Total bookmarks in your account</small>
-                        </div>
-                        <div className="sr-v2-bookmarks-intro-item">
-                            <span className="sr-v2-intro-label">Visible Results</span>
-                            <strong>{formatNumber(visibleBookmarks.length)}</strong>
-                            <small>{normalizedQuery ? 'Filtered by search query' : 'No search filter applied'}</small>
-                        </div>
-                        <div className="sr-v2-bookmarks-intro-item">
-                            <span className="sr-v2-intro-label">Closing in 7 Days</span>
-                            <strong>{formatNumber(closingSoonCount)}</strong>
-                            <small>Act soon on expiring opportunities</small>
-                        </div>
-                    </section>
-
-                    {!isAuthenticated ? (
-                        <>
-                            <p className="no-data">Sign in to view your saved bookmarks.</p>
-                            <div style={{ textAlign: 'center' }}>
-                                <button className="btn btn-primary v2-shell-login" onClick={() => setShowAuthModal(true)}>
-                                    Login
-                                </button>
-                            </div>
-                        </>
-                    ) : loading ? (
-                        <SkeletonLoader />
-                    ) : bookmarks.length === 0 ? (
-                        <div className="sr-v2-empty-state">
-                            <p className="no-data">No bookmarks yet.</p>
-                            <div className="sr-v2-empty-actions">
-                                <button type="button" className="btn btn-primary" onClick={() => navigate('/jobs')}>
-                                    Browse latest jobs
-                                </button>
-                            </div>
-                        </div>
-                    ) : visibleBookmarks.length === 0 ? (
-                        <div className="sr-v2-empty-state">
-                            <p className="no-data">No bookmarks match your search.</p>
-                            <div className="sr-v2-empty-actions">
-                                <button type="button" className="btn btn-secondary" onClick={() => setQuery('')}>
-                                    Clear search
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="category-header">
-                                <div>
-                                    <p className="category-subtitle" aria-live="polite">{visibleBookmarks.length} saved items</p>
-                                </div>
-                                <div className="category-controls">
-                                    <SearchBox
-                                        value={query}
-                                        onChange={setQuery}
-                                        placeholder="Search bookmarks"
-                                        resultCount={visibleBookmarks.length}
-                                    />
-                                </div>
-                            </div>
-                            <ExportButtons bookmarks={visibleBookmarks} />
-                            <div className="bookmarks-grid">
-                                {visibleBookmarks.map(item => (
-                                    <div
-                                        key={item.id}
-                                        className="bookmark-card category-item"
-                                        onClick={() => handleItemClick(item)}
-                                        onMouseEnter={() => prefetchAnnouncementDetail(item.slug)}
-                                        onFocus={() => prefetchAnnouncementDetail(item.slug)}
-                                        onKeyDown={(event) => handleCardKeyDown(event, item)}
-                                        role="button"
-                                        tabIndex={0}
-                                        aria-label={`Open ${item.title}`}
-                                    >
-                                        <div className="sr-v2-bookmark-card-head">
-                                            <span className={`type-badge ${item.type}`}>{item.type}</span>
-                                            <BookmarkButton
-                                                announcementId={item.id}
-                                                isBookmarked={isBookmarked(item.id)}
-                                                onToggle={toggleBookmark}
-                                                isAuthenticated={isAuthenticated}
-                                                onLoginRequired={() => setShowAuthModal(true)}
-                                                size="small"
-                                            />
-                                        </div>
-                                        <div className="item-title">{item.title}</div>
-                                        <div className="item-meta">
-                                            <span className="org">{item.organization}</span>
-                                            {item.totalPosts && <span className="posts">{formatNumber(item.totalPosts ?? undefined)} Posts</span>}
-                                            {item.deadline && (
-                                                <span className="deadline">
-                                                    Last: {new Date(item.deadline).toLocaleDateString('en-IN')}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </>
+        <Layout>
+            <div className="bookmarks-page animate-fade-in">
+                <div className="section-header">
+                    <h1>🔖 My Bookmarks</h1>
+                    {bookmarks.length > 0 && (
+                        <span className="badge">{bookmarks.length} saved</span>
                     )}
                 </div>
-            </main>
 
-            <Footer setCurrentPage={handlePageNavigation} />
-            <AuthModal show={showAuthModal} onClose={() => setShowAuthModal(false)} />
-            <GlobalSearchModal open={showSearchModal} onClose={() => setShowSearchModal(false)} />
-            <ScrollToTop />
-        </div>
+                {loading ? (
+                    <div className="grid-auto">
+                        {Array.from({ length: 6 }).map((_, i) => <AnnouncementCardSkeleton key={i} />)}
+                    </div>
+                ) : bookmarks.length === 0 ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">🔖</span>
+                        <h3>No bookmarks yet</h3>
+                        <p className="text-muted">Save announcements to quickly access them later.</p>
+                    </div>
+                ) : (
+                    <div className="grid-auto">
+                        {bookmarks.map((card) => (
+                            <div key={card.id} className="bookmark-card-wrapper">
+                                <AnnouncementCard card={card} />
+                                <button
+                                    className="bookmark-remove-btn"
+                                    onClick={() => handleRemove(card.id)}
+                                    disabled={removing.has(card.id)}
+                                    title="Remove bookmark"
+                                >
+                                    {removing.has(card.id) ? '⏳' : '✕'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </Layout>
     );
 }
-
-export default BookmarksPage;

@@ -1,96 +1,123 @@
-import type { components } from './types/api';
-
-// Re-export JobDetails type for convenience
-export type { JobDetails } from './components/admin/JobPostingForm';
-
-export type ContentType = components['schemas']['ContentType'];
-export type Tag = components['schemas']['Tag'];
-export type AnnouncementCard = components['schemas']['AnnouncementCard'];
-
-
+/* ─── Core enums / unions ─── */
+export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
+export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
 
-export type AnnouncementVersion = {
-  version: number;
-  updatedAt: string;
-  updatedBy?: string;
-  note?: string;
-  snapshot: {
-    title?: string;
-    type?: ContentType;
-    category?: string;
-    organization?: string;
+/* ─── Tags ─── */
+export interface Tag {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+/* ─── Important Dates ─── */
+export interface ImportantDate {
+    id?: string;
+    eventName: string;
+    eventDate: string;
+    description?: string;
+}
+
+/* ─── Announcement (full) ─── */
+export interface Announcement {
+    id: string;
+    title: string;
+    slug: string;
+    type: ContentType;
+    category: string;
+    organization: string;
     content?: string;
     externalLink?: string;
     location?: string;
-    deadline?: string;
+    deadline?: string | null;
     minQualification?: string;
     ageLimit?: string;
     applicationFee?: string;
+    salaryMin?: number;
+    salaryMax?: number;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    cutoffMarks?: string;
     totalPosts?: number;
+    postedBy?: string;
+    postedAt: string;
+    updatedAt: string;
     status?: AnnouncementStatus;
     publishAt?: string;
-    approvedAt?: string;
-    approvedBy?: string;
-    isActive?: boolean;
-  };
-};
-
-export type Announcement = Omit<components['schemas']['Announcement'], 'jobDetails' | 'deadline' | 'totalPosts'> & {
-  jobDetails?: import('./components/admin/JobPostingForm').JobDetails;
-  deadline?: string | null;
-  totalPosts?: number | null;
-  status?: AnnouncementStatus;
-  publishAt?: string;
-  approvedAt?: string;
-  approvedBy?: string;
-  version?: number;
-  versions?: AnnouncementVersion[];
-};
-
-export type User = Omit<components['schemas']['User'], 'role'> & {
-  role: 'user' | 'admin';
-};
-
-export type AuthResponse = components['schemas']['AuthResponse']['data'];
-
-export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
-
-export interface TrackedApplication {
-  id: string;
-  announcementId?: string;
-  slug: string;
-  type: ContentType;
-  title: string;
-  organization?: string;
-  deadline?: string | null;
-  status: TrackerStatus;
-  notes?: string;
-  reminderAt?: string | null;
-  trackedAt: string;
-  updatedAt: string;
+    isActive: boolean;
+    viewCount: number;
+    tags?: Tag[];
+    importantDates?: ImportantDate[];
+    jobDetails?: Record<string, unknown>;
 }
 
-export interface SearchSuggestion {
-  title: string;
-  slug: string;
-  type: ContentType;
-  organization?: string;
-}
-
-export interface DashboardWidgetPayload {
-  trackedCounts: Record<TrackerStatus | 'total', number>;
-  upcomingDeadlines: Array<{
+/* ─── Lightweight card returned by /v3/cards ─── */
+export interface AnnouncementCard {
     id: string;
-    slug: string;
     title: string;
+    slug: string;
     type: ContentType;
-    deadline: string;
+    category: string;
+    organization: string;
+    location?: string;
+    deadline?: string | null;
+    totalPosts?: number;
+    postedAt: string;
+    viewCount?: number;
+}
+
+/* ─── User ─── */
+export interface User {
+    id: string;
+    email: string;
+    username: string;
+    role: 'user' | 'admin' | 'editor' | 'reviewer' | 'viewer';
+    isActive: boolean;
+    createdAt: string;
+    lastLogin?: string;
+    twoFactorEnabled?: boolean;
+}
+
+/* ─── Auth ─── */
+export interface AuthResponse {
+    token: string;
+    user: User;
+}
+
+/* ─── Tracked Application ─── */
+export interface TrackedApplication {
+    id: string;
+    announcementId?: string;
+    slug: string;
+    type: ContentType;
+    title: string;
+    organization?: string;
+    deadline?: string | null;
     status: TrackerStatus;
-    daysRemaining: number;
-  }>;
-  recommendationCount: number;
-  savedSearchMatches: number;
-  generatedAt: string;
-  windowDays: number;
+    notes?: string;
+    reminderAt?: string | null;
+    trackedAt: string;
+    updatedAt: string;
+}
+
+/* ─── Search Suggestion ─── */
+export interface SearchSuggestion {
+    title: string;
+    slug: string;
+    type: ContentType;
+    organization?: string;
+}
+
+/* ─── Paginated response wrapper ─── */
+export interface PaginatedResponse<T> {
+    data: T[];
+    total?: number;
+    nextCursor?: string;
+    hasMore?: boolean;
+}
+
+/* ─── API error shape ─── */
+export interface ApiError {
+    error: string;
+    message?: string;
+    details?: Record<string, string[]>;
 }
