@@ -58,11 +58,12 @@ export function DetailPage({ type }: { type: ContentType }) {
                 const res = await getAnnouncementBySlug(type, slug);
                 setAnnouncement(res.data);
 
-                // Fetch related
                 try {
-                    const rel = await getAnnouncementCards({ type, limit: 4, sort: 'newest' });
-                    setRelated(rel.data.filter((c) => c.slug !== slug).slice(0, 3));
-                } catch { /* ignore related fail */ }
+                    const rel = await getAnnouncementCards({ type, limit: 6, sort: 'newest' });
+                    setRelated(rel.data.filter((item) => item.slug !== slug).slice(0, 3));
+                } catch {
+                    setRelated([]);
+                }
             } catch (err: unknown) {
                 setError(err instanceof Error ? err.message : 'Failed to load announcement');
             } finally {
@@ -77,7 +78,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                 <div className="detail-skeleton animate-fade-in">
                     <div className="skeleton" style={{ height: 28, width: '70%', marginBottom: 16 }} />
                     <div className="skeleton" style={{ height: 16, width: '40%', marginBottom: 32 }} />
-                    <div className="skeleton" style={{ height: 200, width: '100%', marginBottom: 24 }} />
+                    <div className="skeleton" style={{ height: 120, width: '100%', marginBottom: 24 }} />
                     <div className="skeleton" style={{ height: 16, width: '90%', marginBottom: 8 }} />
                     <div className="skeleton" style={{ height: 16, width: '80%', marginBottom: 8 }} />
                     <div className="skeleton" style={{ height: 16, width: '60%' }} />
@@ -107,7 +108,6 @@ export function DetailPage({ type }: { type: ContentType }) {
     return (
         <Layout>
             <article className="detail-page animate-fade-in">
-                {/* Breadcrumb */}
                 <nav className="detail-breadcrumb">
                     <Link to="/">Home</Link>
                     <span className="breadcrumb-sep">/</span>
@@ -116,7 +116,6 @@ export function DetailPage({ type }: { type: ContentType }) {
                     <span className="breadcrumb-current">{a.title}</span>
                 </nav>
 
-                {/* Header */}
                 <header className="detail-header">
                     <span className={`badge badge-${a.type}`} style={{ marginBottom: 8 }}>
                         {TYPE_LABELS[a.type]}
@@ -131,18 +130,28 @@ export function DetailPage({ type }: { type: ContentType }) {
                     </div>
                 </header>
 
-                {/* Body */}
+                <section className="detail-quick-slab card">
+                    <div className="detail-quick-item">
+                        <span>Deadline</span>
+                        <strong>{formatDate(a.deadline)}</strong>
+                    </div>
+                    <div className="detail-quick-item">
+                        <span>Qualification</span>
+                        <strong>{a.minQualification || 'As per notice'}</strong>
+                    </div>
+                    <div className="detail-quick-item">
+                        <span>Total Posts</span>
+                        <strong>{a.totalPosts ? a.totalPosts.toLocaleString() : '—'}</strong>
+                    </div>
+                    <div className="detail-quick-item">
+                        <span>Salary</span>
+                        <strong>{salary || 'As per notice'}</strong>
+                    </div>
+                </section>
+
                 <div className="detail-body-grid">
-                    {/* Main content */}
                     <div className="detail-content">
-                        {/* Key info grid */}
                         <div className="detail-info-grid">
-                            {a.totalPosts != null && a.totalPosts > 0 && (
-                                <div className="detail-info-item">
-                                    <span className="detail-info-label">Total Posts</span>
-                                    <span className="detail-info-value">{a.totalPosts.toLocaleString()}</span>
-                                </div>
-                            )}
                             {a.minQualification && (
                                 <div className="detail-info-item">
                                     <span className="detail-info-label">Qualification</span>
@@ -161,70 +170,56 @@ export function DetailPage({ type }: { type: ContentType }) {
                                     <span className="detail-info-value">{a.applicationFee}</span>
                                 </div>
                             )}
-                            {salary && (
-                                <div className="detail-info-item">
-                                    <span className="detail-info-label">Salary</span>
-                                    <span className="detail-info-value">{salary}</span>
-                                </div>
-                            )}
-                            {a.difficulty && (
-                                <div className="detail-info-item">
-                                    <span className="detail-info-label">Difficulty</span>
-                                    <span className="detail-info-value" style={{ textTransform: 'capitalize' }}>{a.difficulty}</span>
-                                </div>
-                            )}
                             {a.cutoffMarks && (
                                 <div className="detail-info-item">
                                     <span className="detail-info-label">Cut-off Marks</span>
                                     <span className="detail-info-value">{a.cutoffMarks}</span>
                                 </div>
                             )}
-                            {a.deadline && (
-                                <div className="detail-info-item">
-                                    <span className="detail-info-label">Deadline</span>
-                                    <span className="detail-info-value">{formatDate(a.deadline)}</span>
-                                </div>
-                            )}
                         </div>
 
-                        {/* Content */}
                         {a.content && (
                             <div className="detail-body-content" dangerouslySetInnerHTML={{ __html: a.content }} />
                         )}
                     </div>
 
-                    {/* Sidebar */}
                     <aside className="detail-sidebar">
-                        {/* Important dates */}
+                        <div className="detail-action-panel card">
+                            {a.externalLink ? (
+                                <a
+                                    href={a.externalLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-accent btn-lg detail-apply-btn"
+                                >
+                                    Apply / Official Website ↗
+                                </a>
+                            ) : (
+                                <button type="button" className="btn btn-outline btn-lg detail-apply-btn" disabled>
+                                    Link Unavailable
+                                </button>
+                            )}
+                            <Link to={TYPE_ROUTES[type]} className="btn btn-outline detail-sidebar-secondary-btn">
+                                More {TYPE_LABELS[type]}
+                            </Link>
+                        </div>
+
                         {a.importantDates && a.importantDates.length > 0 && (
                             <div className="detail-dates card">
                                 <h3>📅 Important Dates</h3>
                                 <ul className="dates-list">
-                                    {a.importantDates.map((d, i) => (
-                                        <li key={d.id ?? i} className="date-item">
-                                            <span className="date-label">{d.eventName}</span>
-                                            <span className="date-value">{formatDate(d.eventDate)}</span>
+                                    {a.importantDates.map((date, index) => (
+                                        <li key={date.id ?? index} className="date-item">
+                                            <span className="date-label">{date.eventName}</span>
+                                            <span className="date-value">{formatDate(date.eventDate)}</span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                         )}
 
-                        {/* External link */}
-                        {a.externalLink && (
-                            <a
-                                href={a.externalLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn btn-accent btn-lg detail-apply-btn"
-                            >
-                                Apply / Visit Official Link ↗
-                            </a>
-                        )}
-
-                        {/* Tags */}
                         {a.tags && a.tags.length > 0 && (
-                            <div className="detail-tags">
+                            <div className="detail-tags card">
                                 <h4>Tags</h4>
                                 <div className="tags-list">
                                     {a.tags.map((tag) => (
@@ -236,13 +231,12 @@ export function DetailPage({ type }: { type: ContentType }) {
                     </aside>
                 </div>
 
-                {/* Related */}
                 {related.length > 0 && (
                     <section className="detail-related">
                         <h2>Related Updates</h2>
                         <div className="grid-auto">
-                            {related.map((c) => (
-                                <AnnouncementCard key={c.id} card={c} />
+                            {related.map((card) => (
+                                <AnnouncementCard key={card.id} card={card} sourceTag="detail_related" />
                             ))}
                         </div>
                     </section>

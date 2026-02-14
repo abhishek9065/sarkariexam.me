@@ -482,7 +482,7 @@ export function AdminPage() {
         publishAt: false,
         externalLink: false,
     });
-    
+
     const [isLoggedIn, setIsLoggedIn] = useState(() => canReadAdmin);
     const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('analytics');
     const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -796,22 +796,22 @@ export function AdminPage() {
 
     const handleLogout = useCallback(async () => {
         setMessage('');
-        
+
         notifyInfo('Logging out...', 'Ending your admin session securely.', 1500);
-        
+
         try {
             await logout();
         } catch (error) {
             console.error('Logout API call failed:', error);
             notifyWarning('Logout Warning', 'Session cleared locally. Server logout may have failed.');
         }
-        
+
         clearAdminSession();
         pushToast('Logged out successfully.', 'info');
-        
+
         notifySuccess(
-            'Logout Successful', 
-            'You have been safely logged out. Redirecting to login page...', 
+            'Logout Successful',
+            'You have been safely logged out. Redirecting to login page...',
             3000
         );
     }, [clearAdminSession, logout, pushToast, notifyInfo, notifySuccess, notifyWarning]);
@@ -1320,7 +1320,7 @@ export function AdminPage() {
             }
 
             if (errors.length > 0) {
-                setCommunityError(`Failed to load ${errors.join(', ')}.`);    
+                setCommunityError(`Failed to load ${errors.join(', ')}.`);
             }
             setCommunityUpdatedAt(new Date().toISOString());
         } catch (error) {
@@ -1346,10 +1346,10 @@ export function AdminPage() {
         }
 
         updateMutating(id, true);
-        
+
         // Show delete in progress notification
         notifyInfo('Deleting...', 'Removing announcement from the system.', 2000);
-        
+
         try {
             const response = await adminFetch(`${apiBase}/api/admin/announcements/${id}`, {
                 method: 'DELETE',
@@ -2212,11 +2212,11 @@ export function AdminPage() {
         }
         setSubmitAttempted(true);
         setMessage('Processing...');
-        
+
         // Show processing notification
         notifyInfo(
             editingId ? 'Updating...' : 'Creating...',
-            editingId 
+            editingId
                 ? 'Updating announcement with your changes...'
                 : 'Creating new announcement...',
             3000
@@ -2266,7 +2266,7 @@ export function AdminPage() {
                 // Enhanced success notification
                 notifySuccess(
                     editingId ? 'Update Complete' : 'Created Successfully',
-                    editingId 
+                    editingId
                         ? `Announcement "${formData.title}" has been updated and is now live.`
                         : `New announcement "${formData.title}" has been created and published.`,
                     5000
@@ -2294,7 +2294,7 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 const errorMsg = getApiErrorMessage(errorBody, 'Failed to save announcement.');
                 setMessage(errorMsg);
-                
+
                 notifyError(
                     editingId ? 'Update Failed' : 'Creation Failed',
                     errorMsg,
@@ -2305,7 +2305,7 @@ export function AdminPage() {
             console.error(error);
             const errorMsg = 'Error saving announcement.';
             setMessage(errorMsg);
-            
+
             notifyError(
                 'Save Error',
                 'Network error occurred while saving. Please check your connection and try again.',
@@ -2832,11 +2832,11 @@ export function AdminPage() {
             <a className="skip-link" href="#admin-main">
                 Skip to main content
             </a>
-            <AdminNotificationSystem 
-                notifications={notifications} 
-                onRemove={removeNotification} 
+            <AdminNotificationSystem
+                notifications={notifications}
+                onRemove={removeNotification}
             />
-            
+
             <div className="toast-stack" role="status" aria-live="polite" aria-atomic="true">
                 {toasts.map((toast) => (
                     <div key={toast.id} className={`toast ${toast.tone}`}>
@@ -2968,7 +2968,7 @@ export function AdminPage() {
                                         aria-current={activeAdminTab === 'analytics' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">Analytics</span>
-                                        <span className="nav-short">AN</span>
+                                        <span className="nav-short">📊</span>
                                         <span className="nav-trailing">
                                             {analyticsLoading && <span className="tab-spinner" aria-hidden="true" />}
                                         </span>
@@ -2982,7 +2982,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'users' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Users</span>
-                                            <span className="nav-short">US</span>
+                                            <span className="nav-short">👥</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -2999,7 +2999,7 @@ export function AdminPage() {
                                         aria-current={activeAdminTab === 'list' ? 'page' : undefined}
                                     >
                                         <span className="nav-label">All Announcements</span>
-                                        <span className="nav-short">LI</span>
+                                        <span className="nav-short">📋</span>
                                         <span className="nav-trailing" />
                                     </button>
                                     {canAccessTab('review') && (
@@ -3011,7 +3011,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'review' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Review Queue</span>
-                                            <span className="nav-short">RV</span>
+                                            <span className="nav-short">✓</span>
                                             <span className="nav-trailing">
                                                 {pendingTotal > 0 && (
                                                     <span className="admin-nav-count warning">{formatNumber(pendingTotal, '0')}</span>
@@ -3029,7 +3029,7 @@ export function AdminPage() {
                                                 aria-current={activeAdminTab === 'add' ? 'page' : undefined}
                                             >
                                                 <span className="nav-label">Quick Add</span>
-                                                <span className="nav-short">QA</span>
+                                                <span className="nav-short">⚡</span>
                                                 <span className="nav-trailing" />
                                             </button>
                                             <button
@@ -3040,7 +3040,7 @@ export function AdminPage() {
                                                 aria-current={activeAdminTab === 'detailed' ? 'page' : undefined}
                                             >
                                                 <span className="nav-label">Detailed Post</span>
-                                                <span className="nav-short">DP</span>
+                                                <span className="nav-short">📝</span>
                                                 <span className="nav-trailing" />
                                             </button>
                                             <button
@@ -3051,7 +3051,7 @@ export function AdminPage() {
                                                 aria-current={activeAdminTab === 'bulk' ? 'page' : undefined}
                                             >
                                                 <span className="nav-label">Bulk Import</span>
-                                                <span className="nav-short">BI</span>
+                                                <span className="nav-short">📦</span>
                                                 <span className="nav-trailing" />
                                             </button>
                                         </>
@@ -3065,7 +3065,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'queue' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Schedule Queue</span>
-                                            <span className="nav-short">SQ</span>
+                                            <span className="nav-short">📅</span>
                                             <span className="nav-trailing">
                                                 {scheduledTotal > 0 && (
                                                     <span className="admin-nav-count info">{formatNumber(scheduledTotal, '0')}</span>
@@ -3087,7 +3087,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'community' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Community</span>
-                                            <span className="nav-short">CM</span>
+                                            <span className="nav-short">💬</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3100,7 +3100,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'errors' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Error Reports</span>
-                                            <span className="nav-short">ER</span>
+                                            <span className="nav-short">🐛</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3113,7 +3113,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'audit' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Audit Log</span>
-                                            <span className="nav-short">AL</span>
+                                            <span className="nav-short">📜</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3131,7 +3131,7 @@ export function AdminPage() {
                                             aria-current={activeAdminTab === 'security' ? 'page' : undefined}
                                         >
                                             <span className="nav-label">Security</span>
-                                            <span className="nav-short">SC</span>
+                                            <span className="nav-short">🔒</span>
                                             <span className="nav-trailing" />
                                         </button>
                                     )}
@@ -3248,7 +3248,7 @@ export function AdminPage() {
                             <div className="admin-context-info">
                                 <div className="admin-breadcrumbs">
                                     <span>Admin</span>
-                                    <span className="breadcrumb-sep">/</span>
+                                    <span className="breadcrumb-sep">›</span>
                                     <span>{activeTabMeta.label}</span>
                                 </div>
                                 <span className="admin-context-kicker">Active module</span>
@@ -3288,1150 +3288,1150 @@ export function AdminPage() {
                         </div>
 
                         {activeAdminTab === 'analytics' ? (
-                    <Suspense fallback={<div className="admin-loading">Loading analytics...</div>}>
-                        <AnalyticsDashboard
-                            onEditById={handleEditById}
-                            onOpenList={() => handleNavSelect('list')}
-                            onUnauthorized={handleUnauthorized}
-                            onLoadingChange={setAnalyticsLoading}
-                        />
-                    </Suspense>
-                ) : activeAdminTab === 'users' ? (
-                    <div className="admin-users">
-                        <div className="admin-list-header">
-                            <div>
-                                <h3>User analytics</h3>
-                                <p className="admin-subtitle">Track subscriber growth and engagement.</p>
-                            </div>
-                            <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(dashboardUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshDashboard} disabled={dashboardLoading}>
-                                    {dashboardLoading ? 'Refreshing...' : 'Refresh'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {dashboardLoading ? (
-                            <div className="admin-loading">Loading user analytics...</div>
-                        ) : dashboardError ? (
-                            <div className="admin-error">{dashboardError}</div>
-                        ) : (
-                            <div className="admin-user-grid">
-                                <div className="user-card">
-                                    <div className="card-label">Total users</div>
-                                    <div className="card-value">{dashboard?.users?.totalUsers ?? 0}</div>
-                                </div>
-                                <div className="user-card">
-                                    <div className="card-label">New today</div>
-                                    <div className="card-value accent">{dashboard?.users?.newToday ?? 0}</div>
-                                </div>
-                                <div className="user-card">
-                                    <div className="card-label">New this week</div>
-                                    <div className="card-value accent">{dashboard?.users?.newThisWeek ?? 0}</div>
-                                </div>
-                                <div className="user-card">
-                                    <div className="card-label">Active subscribers</div>
-                                    <div className="card-value">{dashboard?.users?.activeSubscribers ?? 0}</div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="admin-section-panel">
-                            <div className="admin-list-header">
-                                <div>
-                                    <h4>Current users</h4>
-                                    <p className="admin-subtitle">Activity in the last {activeUsersWindow} minutes.</p>
-                                </div>
-                                <div className="admin-list-actions">
-                                    <label htmlFor="activeWindow" className="admin-inline-label">Window</label>
-                                    <select
-                                        id="activeWindow"
-                                        value={activeUsersWindow}
-                                        onChange={(e) => setActiveUsersWindow(parseInt(e.target.value))}
-                                    >
-                                        {ACTIVE_USER_WINDOWS.map((window) => (
-                                            <option key={window} value={window}>{window}m</option>
-                                        ))}
-                                    </select>
-                                    <span className="admin-updated">{formatLastUpdated(activeUsersUpdatedAt)}</span>
-                                    <button className="admin-btn secondary" onClick={refreshActiveUsers} disabled={activeUsersLoading}>
-                                        {activeUsersLoading ? 'Refreshing...' : 'Refresh'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {activeUsersLoading ? (
-                                <div className="admin-loading">Loading active users...</div>
-                            ) : activeUsers ? (
-                                <div className="admin-user-grid">
-                                    <div className="user-card">
-                                        <div className="card-label">Active now</div>
-                                        <div className="card-value">{activeUsers.total}</div>
-                                    </div>
-                                    <div className="user-card">
-                                        <div className="card-label">Authenticated</div>
-                                        <div className="card-value">{activeUsers.authenticated}</div>
-                                    </div>
-                                    <div className="user-card">
-                                        <div className="card-label">Anonymous</div>
-                                        <div className="card-value">{activeUsers.anonymous}</div>
-                                    </div>
-                                    <div className="user-card">
-                                        <div className="card-label">Admins</div>
-                                        <div className="card-value">{activeUsers.admins}</div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="admin-error">{activeUsersError ?? 'Unable to load active users.'}</div>
-                            )}
-                        </div>
-                    </div>
-                ) : activeAdminTab === 'community' ? (
-                    <div className="admin-list">
-                        <div className="admin-list-header">
-                            <div>
-                                <h3>Community moderation</h3>
-                                <p className="admin-subtitle">Review reports, answer Q&amp;A, and remove abusive content.</p>
-                            </div>
-                            <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(communityUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshCommunity} disabled={communityLoading}>
-                                    {communityLoading ? 'Refreshing...' : 'Refresh'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="admin-toggle">
-                            <button
-                                className={`admin-btn secondary ${communityTab === 'flags' ? 'active' : ''}`}
-                                onClick={() => setCommunityTab('flags')}
-                            >
-                                Flags
-                            </button>
-                            <button
-                                className={`admin-btn secondary ${communityTab === 'forums' ? 'active' : ''}`}
-                                onClick={() => setCommunityTab('forums')}
-                            >
-                                Forums
-                            </button>
-                            <button
-                                className={`admin-btn secondary ${communityTab === 'qa' ? 'active' : ''}`}
-                                onClick={() => setCommunityTab('qa')}
-                            >
-                                Q&amp;A
-                            </button>
-                            <button
-                                className={`admin-btn secondary ${communityTab === 'groups' ? 'active' : ''}`}
-                                onClick={() => setCommunityTab('groups')}
-                            >
-                                Groups
-                            </button>
-                        </div>
-
-                        {communityTab === 'flags' && (
-                            <div className="admin-community-filter">
-                                <label htmlFor="flagFilter" className="admin-inline-label">Status</label>
-                                <select
-                                    id="flagFilter"
-                                    value={flagFilter}
-                                    onChange={(e) => setFlagFilter(e.target.value as 'all' | 'open' | 'reviewed' | 'resolved')}
-                                >
-                                    <option value="open">Open</option>
-                                    <option value="reviewed">Reviewed</option>
-                                    <option value="resolved">Resolved</option>
-                                    <option value="all">All</option>
-                                </select>
-                            </div>
-                        )}
-
-                        {communityError && <div className="admin-error">{communityError}</div>}
-
-                        {communityLoading ? (
-                            <div className="admin-loading">Loading community moderation data...</div>
-                        ) : communityTab === 'flags' ? (
-                            <div className="admin-community-grid">
-                                {communityFlags.length === 0 ? (
-                                    <div className="empty-state">No flags to review.</div>
-                                ) : (
-                                    communityFlags.map((flag) => (
-                                        <div key={flag.id} className="admin-community-item">
-                                            <div className="admin-community-header">
-                                                <div>
-                                                    <h4>Flagged {flag.entityType.toUpperCase()}</h4>
-                                                    <p className="admin-subtitle">{flag.reason}</p>
-                                                </div>
-                                                <span className={`status-pill ${flag.status === 'open' ? 'danger' : 'info'}`}>{flag.status}</span>
-                                            </div>
-                                            <div className="admin-community-meta">
-                                                <span>Item ID: {flag.entityId}</span>
-                                                <span>Reporter: {flag.reporter || 'Anonymous'}</span>
-                                                <span>{new Date(flag.createdAt).toLocaleString()}</span>
-                                            </div>
-                                            <div className="admin-community-actions">
-                                                {canWriteAdmin && (
-                                                    <button
-                                                        className="admin-btn warning small"
-                                                        onClick={() => handleCommunityDelete(flag.entityType, flag.entityId)}
-                                                        disabled={communityMutatingIds.has(flag.entityId)}
-                                                    >
-                                                        Delete item
-                                                    </button>
-                                                )}
-                                                {canWriteAdmin && (
-                                                    <button
-                                                        className="admin-btn secondary small"
-                                                        onClick={() => handleResolveFlag(flag.id)}
-                                                        disabled={communityMutatingIds.has(flag.id)}
-                                                    >
-                                                        Resolve flag
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        ) : communityTab === 'forums' ? (
-                            <div className="admin-community-grid">
-                                {communityForums.length === 0 ? (
-                                    <div className="empty-state">No forum posts yet.</div>
-                                ) : (
-                                    communityForums.map((post) => (
-                                        <div key={post.id} className="admin-community-item">
-                                            <div className="admin-community-header">
-                                                <div>
-                                                    <h4>{post.title}</h4>
-                                                    <p className="admin-subtitle">{post.category}</p>
-                                                </div>
-                                            </div>
-                                            <p className="admin-community-content">{post.content}</p>
-                                            <div className="admin-community-meta">
-                                                <span>By {post.author}</span>
-                                                <span>{new Date(post.createdAt).toLocaleString()}</span>
-                                            </div>
-                                            <div className="admin-community-actions">
-                                                {canWriteAdmin && (
-                                                    <button
-                                                        className="admin-btn warning small"
-                                                        onClick={() => handleCommunityDelete('forum', post.id)}
-                                                        disabled={communityMutatingIds.has(post.id)}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        ) : communityTab === 'qa' ? (
-                            <div className="admin-community-grid">
-                                {communityQa.length === 0 ? (
-                                    <div className="empty-state">No Q&amp;A threads yet.</div>
-                                ) : (
-                                    communityQa.map((thread) => (
-                                        <div key={thread.id} className="admin-community-item">
-                                            <div className="admin-community-header">
-                                                <div>
-                                                    <h4>{thread.question}</h4>
-                                                    <p className="admin-subtitle">Asked by {thread.author}</p>
-                                                </div>
-                                                <span className={`status-pill ${thread.answer ? 'success' : 'warning'}`}>
-                                                    {thread.answer ? 'Answered' : 'Pending'}
-                                                </span>
-                                            </div>
-                                            <div className="admin-community-meta">
-                                                <span>{new Date(thread.createdAt).toLocaleString()}</span>
-                                                {thread.answeredBy && <span>Answered by {thread.answeredBy}</span>}
-                                            </div>
-                                            <div className="admin-community-answer">
-                                                {thread.answer ? thread.answer : 'No answer yet.'}
-                                            </div>
-                                            <textarea
-                                                className="review-note-input compact"
-                                                rows={3}
-                                                placeholder="Write an official answer..."
-                                                value={qaAnswerDrafts[thread.id] ?? ''}
-                                                onChange={(e) => setQaAnswerDrafts((prev) => ({ ...prev, [thread.id]: e.target.value }))}
-                                            />
-                                            <div className="admin-community-actions">
-                                                {canWriteAdmin && (
-                                                    <button
-                                                        className="admin-btn success small"
-                                                        onClick={() => handleAnswerQa(thread.id)}
-                                                        disabled={communityMutatingIds.has(thread.id)}
-                                                    >
-                                                        {communityMutatingIds.has(thread.id) ? 'Saving...' : 'Post answer'}
-                                                    </button>
-                                                )}
-                                                {canWriteAdmin && (
-                                                    <button
-                                                        className="admin-btn warning small"
-                                                        onClick={() => handleCommunityDelete('qa', thread.id)}
-                                                        disabled={communityMutatingIds.has(thread.id)}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        ) : (
-                            <div className="admin-community-grid">
-                                {communityGroups.length === 0 ? (
-                                    <div className="empty-state">No study groups yet.</div>
-                                ) : (
-                                    communityGroups.map((group) => (
-                                        <div key={group.id} className="admin-community-item">
-                                            <div className="admin-community-header">
-                                                <div>
-                                                    <h4>{group.name}</h4>
-                                                    <p className="admin-subtitle">{group.topic}</p>
-                                                </div>
-                                                <span className="status-pill info">{group.language}</span>
-                                            </div>
-                                            <div className="admin-community-meta">
-                                                <span>{new Date(group.createdAt).toLocaleString()}</span>
-                                                {group.link && <span>Invite: {group.link}</span>}
-                                            </div>
-                                            <div className="admin-community-actions">
-                                                {canWriteAdmin && (
-                                                    <button
-                                                        className="admin-btn warning small"
-                                                        onClick={() => handleCommunityDelete('group', group.id)}
-                                                        disabled={communityMutatingIds.has(group.id)}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ) : activeAdminTab === 'errors' ? (
-                    <div className="admin-list">
-                        <div className="admin-list-header">
-                            <div>
-                                <h3>Error reports</h3>
-                                <p className="admin-subtitle">Review client error reports submitted from the UI.</p>
-                            </div>
-                            <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(errorReportsUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshErrorReports} disabled={errorReportsLoading}>
-                                    {errorReportsLoading ? 'Refreshing...' : 'Refresh'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="admin-community-filter">
-                            <label htmlFor="errorStatusFilter" className="admin-inline-label">Status</label>
-                            <select
-                                id="errorStatusFilter"
-                                value={errorReportStatusFilter}
-                                onChange={(e) => setErrorReportStatusFilter(e.target.value as ErrorReportStatus | 'all')}
-                            >
-                                <option value="new">New</option>
-                                <option value="triaged">Triaged</option>
-                                <option value="resolved">Resolved</option>
-                                <option value="all">All</option>
-                            </select>
-                            <label htmlFor="errorIdFilter" className="admin-inline-label">Error ID</label>
-                            <input
-                                id="errorIdFilter"
-                                type="text"
-                                placeholder="Search error ID"
-                                value={errorReportQuery}
-                                onChange={(e) => setErrorReportQuery(e.target.value)}
-                            />
-                        </div>
-
-                        {errorReportsError && <div className="admin-error">{errorReportsError}</div>}
-
-                        {errorReportsLoading ? (
-                            <div className="admin-loading">Loading error reports...</div>
-                        ) : errorReports.length === 0 ? (
-                            <div className="empty-state">No error reports available.</div>
-                        ) : (
-                            <div className="admin-community-grid">
-                                {errorReports.map((report) => (
-                                    <div key={report.id} className="admin-community-item">
-                                        <div className="admin-community-header">
-                                            <div>
-                                                <h4>{report.message}</h4>
-                                                <p className="admin-subtitle">Error ID: {report.errorId}</p>
-                                            </div>
-                                            <span className={`status-pill ${report.status === 'new' ? 'danger' : report.status === 'resolved' ? 'success' : 'warning'}`}>
-                                                {report.status}
-                                            </span>
-                                        </div>
-                                        <div className="admin-community-meta">
-                                            <span>{new Date(report.createdAt).toLocaleString()}</span>
-                                            {report.userEmail && <span>User: {report.userEmail}</span>}
-                                            {report.pageUrl && (
-                                                <a href={report.pageUrl} target="_blank" rel="noreferrer" className="community-link">
-                                                    Page link
-                                                </a>
-                                            )}
-                                        </div>
-                                        {report.note && (
-                                            <div className="admin-community-answer">User note: {report.note}</div>
-                                        )}
-                                        {(report.stack || report.componentStack || report.userAgent) && (
-                                            <details className="admin-trace">
-                                                <summary>Debug details</summary>
-                                                {report.userAgent && (
-                                                    <p className="admin-trace-meta"><strong>User agent:</strong> {report.userAgent}</p>
-                                                )}
-                                                {report.stack && (
-                                                    <pre className="admin-trace-block">{report.stack}</pre>
-                                                )}
-                                                {report.componentStack && (
-                                                    <>
-                                                        <p className="admin-trace-meta"><strong>Component stack:</strong></p>
-                                                        <pre className="admin-trace-block">{report.componentStack}</pre>
-                                                    </>
-                                                )}
-                                            </details>
-                                        )}
-                                        <textarea
-                                            className="review-note-input compact"
-                                            rows={3}
-                                            placeholder="Add internal triage notes..."
-                                            value={errorReportNotes[report.id] ?? report.adminNote ?? ''}
-                                            onChange={(e) => setErrorReportNotes((prev) => ({ ...prev, [report.id]: e.target.value }))}
-                                        />
-                                        {canWriteAdmin && (
-                                            <div className="admin-community-actions">
-                                                <button
-                                                    className="admin-btn warning small"
-                                                    onClick={() => updateErrorReport(report.id, 'triaged')}
-                                                    disabled={communityMutatingIds.has(report.id)}
-                                                >
-                                                    Mark triaged
-                                                </button>
-                                                <button
-                                                    className="admin-btn success small"
-                                                    onClick={() => updateErrorReport(report.id, 'resolved')}
-                                                    disabled={communityMutatingIds.has(report.id)}
-                                                >
-                                                    Resolve
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ) : activeAdminTab === 'list' ? (
-                    <Suspense fallback={<div className="admin-loading">Loading listings...</div>}>
-                        <AdminContentList
-                            items={pagedAnnouncements}
-                            loading={listLoading}
-                            total={listTotal}
-                            page={listPage}
-                            totalPages={totalPages}
-                            onPageChange={setListPage}
-                            searchQuery={listQuery}
-                            onSearchChange={setListQuery}
-                            typeFilter={listTypeFilter}
-                            onTypeFilterChange={setListTypeFilter}
-                            statusFilter={listStatusFilter}
-                            onStatusFilterChange={setListStatusFilter}
-                            sortOption={listSort}
-                            onSortChange={setListSort}
-                            onRefresh={refreshListData}
-                            onEdit={handleEdit}
-                            onDelete={(id) => handleDelete(id)}
-                            onView={handleView}
-                            onDuplicate={handleDuplicate}
-                            onExport={() => {
-                                const params = new URLSearchParams();
-                                if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
-                                if (listTypeFilter !== 'all') params.set('type', listTypeFilter);
-                                params.set('includeInactive', 'true');
-                                downloadCsv(`/api/admin/announcements/export/csv?${params.toString()}`, `admin-announcements-${new Date().toISOString().split('T')[0]}.csv`);
-                            }}
-                            onCreate={() => handleQuickCreate('job', 'add')}
-                            selectedIds={selectedIds}
-                            onSelectionChange={setSelectedIds}
-                            onBulkAction={(action) => {
-                                if (action === 'approve') handleBulkUpdate({ status: 'published' });
-                                else if (action === 'reject') handleBulkUpdate({ status: 'pending' });
-                                else if (action === 'archive') handleBulkUpdate({ status: 'archived' });
-                                else if (action === 'delete') {
-                                    if (window.confirm('Are you sure you want to move selected items to Draft?')) {
-                                        handleBulkUpdate({ status: 'draft' });
-                                    }
-                                }
-                            }}
-                            lastUpdated={listUpdatedAt}
-                            formatDateTime={formatDateTime}
-                            timeZoneLabel={timeZoneLabel}
-                            filterSummary={listFilterSummary}
-                            onClearFilters={handleClearListFilters}
-                            canWrite={canWriteAnnouncements}
-                            canDelete={canDeleteAnnouncements}
-                            canApprove={canApproveAnnouncements}
-                        />
-                    </Suspense>
-                ) : activeAdminTab === 'review' ? (
-                    <div className="admin-list">
-                        <div className="admin-list-header">
-                            <div>
-                                <h3>Pending review queue</h3>
-                                <p className="admin-subtitle">Approve, reject, or schedule announcements awaiting review.</p>
-                            </div>
-                            <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
-                                    {listLoading ? 'Refreshing...' : 'Refresh'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="admin-review-panel">
-                            <div className="admin-review-meta">
-                                <span>{pendingSlaStats.pendingTotal} pending</span>
-                                <span>Showing {pendingAnnouncements.length} of {pendingSlaStats.pendingTotal}</span>
-                                <span>{selectedIds.size} selected</span>
-                            </div>
-                            <div className="admin-review-controls">
-                                <input
-                                    className="review-note-input"
-                                    aria-label="Review note"
-                                    type="text"
-                                    value={reviewBulkNote}
-                                    onChange={(e) => setReviewBulkNote(e.target.value)}
-                                    placeholder="Review note for bulk actions"
-                                    disabled={reviewLoading}
+                            <Suspense fallback={<div className="admin-loading">Loading analytics...</div>}>
+                                <AnalyticsDashboard
+                                    onEditById={handleEditById}
+                                    onOpenList={() => handleNavSelect('list')}
+                                    onUnauthorized={handleUnauthorized}
+                                    onLoadingChange={setAnalyticsLoading}
                                 />
-                                <input
-                                    type="datetime-local"
-                                    value={reviewScheduleAt}
-                                    onChange={(e) => setReviewScheduleAt(e.target.value)}
-                                    disabled={reviewLoading}
-                                />
-                                {canApproveAnnouncements && (
-                                    <button className="admin-btn success" onClick={handleBulkApprove} disabled={reviewLoading}>
-                                        {reviewLoading ? 'Working...' : 'Approve selected'}
-                                    </button>
-                                )}
-                                {canApproveAnnouncements && (
-                                    <button className="admin-btn warning" onClick={handleBulkReject} disabled={reviewLoading}>
-                                        Reject selected
-                                    </button>
-                                )}
-                                {canWriteAnnouncements && (
-                                    <button className="admin-btn primary" onClick={handleBulkSchedule} disabled={reviewLoading}>
-                                        Schedule selected
-                                    </button>
-                                )}
-                                {canWriteAnnouncements && (
-                                    <button
-                                        className="admin-btn info"
-                                        onClick={handleBulkQaFix}
-                                        disabled={reviewLoading || qaBulkLoading || selectedQaFixableCount === 0}
-                                    >
-                                        {qaBulkLoading ? 'Working...' : `QA auto-fix (${selectedQaFixableCount})`}
-                                    </button>
-                                )}
-                                {canWriteAnnouncements && (
-                                    <button
-                                        className="admin-btn warning"
-                                        onClick={handleBulkQaFlag}
-                                        disabled={reviewLoading || qaBulkLoading || selectedQaIssueCount === 0}
-                                    >
-                                        Flag QA ({selectedQaIssueCount})
-                                    </button>
-                                )}
-                                <button className="admin-btn secondary" onClick={clearSelection} disabled={reviewLoading}>
-                                    Clear selection
-                                </button>
-                            </div>
-                        </div>
+                            </Suspense>
+                        ) : activeAdminTab === 'users' ? (
+                            <div className="admin-users">
+                                <div className="admin-list-header">
+                                    <div>
+                                        <h3>User analytics</h3>
+                                        <p className="admin-subtitle">Track subscriber growth and engagement.</p>
+                                    </div>
+                                    <div className="admin-list-actions">
+                                        <span className="admin-updated">{formatLastUpdated(dashboardUpdatedAt)}</span>
+                                        <button className="admin-btn secondary" onClick={refreshDashboard} disabled={dashboardLoading}>
+                                            {dashboardLoading ? 'Refreshing...' : 'Refresh'}
+                                        </button>
+                                    </div>
+                                </div>
 
-                        <div className="admin-section-panel">
-                            <div className="admin-list-header">
-                                <div>
-                                    <h4>SLA view</h4>
-                                    <p className="admin-subtitle">Ageing pending items and stale backlog (7+ days).</p>
-                                </div>
-                                <div className="admin-list-actions">
-                                    <span className="admin-updated">Average age: {pendingSlaStats.averageDays}d</span>
-                                </div>
-                            </div>
-                            <div className="admin-user-grid">
-                                <div className="user-card">
-                                    <div className="card-label">&lt; 1 day</div>
-                                    <div className="card-value">{pendingSlaStats.buckets.lt1}</div>
-                                </div>
-                                <div className="user-card">
-                                    <div className="card-label">1 - 3 days</div>
-                                    <div className="card-value">{pendingSlaStats.buckets.d1_3}</div>
-                                </div>
-                                <div className="user-card">
-                                    <div className="card-label">3 - 7 days</div>
-                                    <div className="card-value">{pendingSlaStats.buckets.d3_7}</div>
-                                </div>
-                                <div className="user-card">
-                                    <div className="card-label">Stale &gt; 7d</div>
-                                    <div className="card-value accent">{pendingSlaStats.buckets.gt7}</div>
-                                </div>
-                            </div>
-                        </div>
+                                {dashboardLoading ? (
+                                    <div className="admin-loading">Loading user analytics...</div>
+                                ) : dashboardError ? (
+                                    <div className="admin-error">{dashboardError}</div>
+                                ) : (
+                                    <div className="admin-user-grid">
+                                        <div className="user-card">
+                                            <div className="card-label">Total users</div>
+                                            <div className="card-value">{dashboard?.users?.totalUsers ?? 0}</div>
+                                        </div>
+                                        <div className="user-card">
+                                            <div className="card-label">New today</div>
+                                            <div className="card-value accent">{dashboard?.users?.newToday ?? 0}</div>
+                                        </div>
+                                        <div className="user-card">
+                                            <div className="card-label">New this week</div>
+                                            <div className="card-value accent">{dashboard?.users?.newThisWeek ?? 0}</div>
+                                        </div>
+                                        <div className="user-card">
+                                            <div className="card-label">Active subscribers</div>
+                                            <div className="card-value">{dashboard?.users?.activeSubscribers ?? 0}</div>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {pendingSlaStats.stale.length > 0 && (
-                            <div className="admin-table-wrapper">
-                                <table className="admin-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Stale pending</th>
-                                            <th>Age</th>
-                                            <th>QA</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingSlaStats.stale.map(({ item, ageDays }) => {
-                                            const warnings = getAnnouncementWarnings(item);
-                                            const reviewNote = reviewNotes[item.id] ?? '';
-                                            const isRowMutating = mutatingIds.has(item.id);
-                                            return (
-                                                <tr key={item.id}>
-                                                    <td>
-                                                        <div className="title-cell">
-                                                            <div className="title-text" title={item.title}>{item.title}</div>
-                                                            <div className="title-meta">
-                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
-                                                                <span className="meta-sep">|</span>
-                                                                <span>{item.category || 'Uncategorized'}</span>
-                                                                <span className="meta-sep">|</span>
-                                                                <span>v{item.version ?? 1}</span>
-                                                            </div>
+                                <div className="admin-section-panel">
+                                    <div className="admin-list-header">
+                                        <div>
+                                            <h4>Current users</h4>
+                                            <p className="admin-subtitle">Activity in the last {activeUsersWindow} minutes.</p>
+                                        </div>
+                                        <div className="admin-list-actions">
+                                            <label htmlFor="activeWindow" className="admin-inline-label">Window</label>
+                                            <select
+                                                id="activeWindow"
+                                                value={activeUsersWindow}
+                                                onChange={(e) => setActiveUsersWindow(parseInt(e.target.value))}
+                                            >
+                                                {ACTIVE_USER_WINDOWS.map((window) => (
+                                                    <option key={window} value={window}>{window}m</option>
+                                                ))}
+                                            </select>
+                                            <span className="admin-updated">{formatLastUpdated(activeUsersUpdatedAt)}</span>
+                                            <button className="admin-btn secondary" onClick={refreshActiveUsers} disabled={activeUsersLoading}>
+                                                {activeUsersLoading ? 'Refreshing...' : 'Refresh'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {activeUsersLoading ? (
+                                        <div className="admin-loading">Loading active users...</div>
+                                    ) : activeUsers ? (
+                                        <div className="admin-user-grid">
+                                            <div className="user-card">
+                                                <div className="card-label">Active now</div>
+                                                <div className="card-value">{activeUsers.total}</div>
+                                            </div>
+                                            <div className="user-card">
+                                                <div className="card-label">Authenticated</div>
+                                                <div className="card-value">{activeUsers.authenticated}</div>
+                                            </div>
+                                            <div className="user-card">
+                                                <div className="card-label">Anonymous</div>
+                                                <div className="card-value">{activeUsers.anonymous}</div>
+                                            </div>
+                                            <div className="user-card">
+                                                <div className="card-label">Admins</div>
+                                                <div className="card-value">{activeUsers.admins}</div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="admin-error">{activeUsersError ?? 'Unable to load active users.'}</div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : activeAdminTab === 'community' ? (
+                            <div className="admin-list">
+                                <div className="admin-list-header">
+                                    <div>
+                                        <h3>Community moderation</h3>
+                                        <p className="admin-subtitle">Review reports, answer Q&amp;A, and remove abusive content.</p>
+                                    </div>
+                                    <div className="admin-list-actions">
+                                        <span className="admin-updated">{formatLastUpdated(communityUpdatedAt)}</span>
+                                        <button className="admin-btn secondary" onClick={refreshCommunity} disabled={communityLoading}>
+                                            {communityLoading ? 'Refreshing...' : 'Refresh'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-toggle">
+                                    <button
+                                        className={`admin-btn secondary ${communityTab === 'flags' ? 'active' : ''}`}
+                                        onClick={() => setCommunityTab('flags')}
+                                    >
+                                        Flags
+                                    </button>
+                                    <button
+                                        className={`admin-btn secondary ${communityTab === 'forums' ? 'active' : ''}`}
+                                        onClick={() => setCommunityTab('forums')}
+                                    >
+                                        Forums
+                                    </button>
+                                    <button
+                                        className={`admin-btn secondary ${communityTab === 'qa' ? 'active' : ''}`}
+                                        onClick={() => setCommunityTab('qa')}
+                                    >
+                                        Q&amp;A
+                                    </button>
+                                    <button
+                                        className={`admin-btn secondary ${communityTab === 'groups' ? 'active' : ''}`}
+                                        onClick={() => setCommunityTab('groups')}
+                                    >
+                                        Groups
+                                    </button>
+                                </div>
+
+                                {communityTab === 'flags' && (
+                                    <div className="admin-community-filter">
+                                        <label htmlFor="flagFilter" className="admin-inline-label">Status</label>
+                                        <select
+                                            id="flagFilter"
+                                            value={flagFilter}
+                                            onChange={(e) => setFlagFilter(e.target.value as 'all' | 'open' | 'reviewed' | 'resolved')}
+                                        >
+                                            <option value="open">Open</option>
+                                            <option value="reviewed">Reviewed</option>
+                                            <option value="resolved">Resolved</option>
+                                            <option value="all">All</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                {communityError && <div className="admin-error">{communityError}</div>}
+
+                                {communityLoading ? (
+                                    <div className="admin-loading">Loading community moderation data...</div>
+                                ) : communityTab === 'flags' ? (
+                                    <div className="admin-community-grid">
+                                        {communityFlags.length === 0 ? (
+                                            <div className="empty-state">No flags to review.</div>
+                                        ) : (
+                                            communityFlags.map((flag) => (
+                                                <div key={flag.id} className="admin-community-item">
+                                                    <div className="admin-community-header">
+                                                        <div>
+                                                            <h4>Flagged {flag.entityType.toUpperCase()}</h4>
+                                                            <p className="admin-subtitle">{flag.reason}</p>
                                                         </div>
-                                                    </td>
-                                                    <td>{ageDays}d</td>
-                                                    <td>
-                                                        {warnings.length > 0 ? (
-                                                            <span className="qa-warning" title={warnings.join(' • ')}>
-                                                                {warnings.length} issue{warnings.length > 1 ? 's' : ''}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="status-sub success">Clear</span>
+                                                        <span className={`status-pill ${flag.status === 'open' ? 'danger' : 'info'}`}>{flag.status}</span>
+                                                    </div>
+                                                    <div className="admin-community-meta">
+                                                        <span>Item ID: {flag.entityId}</span>
+                                                        <span>Reporter: {flag.reporter || 'Anonymous'}</span>
+                                                        <span>{new Date(flag.createdAt).toLocaleString()}</span>
+                                                    </div>
+                                                    <div className="admin-community-actions">
+                                                        {canWriteAdmin && (
+                                                            <button
+                                                                className="admin-btn warning small"
+                                                                onClick={() => handleCommunityDelete(flag.entityType, flag.entityId)}
+                                                                disabled={communityMutatingIds.has(flag.entityId)}
+                                                            >
+                                                                Delete item
+                                                            </button>
                                                         )}
-                                                    </td>
-                                                    <td>
-                                                        <div className="table-actions">
-                                                            <input
-                                                                className="review-note-input"
-                                                                aria-label="Review note"
-                                                                type="text"
-                                                                value={reviewNote}
-                                                                onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                                                placeholder="Review note (optional)"
-                                                                disabled={isRowMutating}
-                                                            />
-                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
-                                                            {canWriteAnnouncements && (
-                                                                <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
-                                                            )}
-                                                            {canWriteAnnouncements && warnings.length > 0 && (
-                                                                <>
-                                                                    <button
-                                                                        className="admin-btn info small"
-                                                                        onClick={() => handleQaFix(item)}
-                                                                        disabled={isRowMutating}
-                                                                        title="Apply automated QA fixes for this row"
-                                                                    >
-                                                                        Auto-fix
-                                                                    </button>
-                                                                    <button
-                                                                        className="admin-btn warning small"
-                                                                        onClick={() => handleQaFlag(item)}
-                                                                        disabled={isRowMutating}
-                                                                        title="Flag this listing for QA review"
-                                                                    >
-                                                                        Flag
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                            {canApproveAnnouncements && (
-                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
-                                                            )}
-                                                            {canApproveAnnouncements && (
-                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
-                                                            )}
+                                                        {canWriteAdmin && (
+                                                            <button
+                                                                className="admin-btn secondary small"
+                                                                onClick={() => handleResolveFlag(flag.id)}
+                                                                disabled={communityMutatingIds.has(flag.id)}
+                                                            >
+                                                                Resolve flag
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                ) : communityTab === 'forums' ? (
+                                    <div className="admin-community-grid">
+                                        {communityForums.length === 0 ? (
+                                            <div className="empty-state">No forum posts yet.</div>
+                                        ) : (
+                                            communityForums.map((post) => (
+                                                <div key={post.id} className="admin-community-item">
+                                                    <div className="admin-community-header">
+                                                        <div>
+                                                            <h4>{post.title}</h4>
+                                                            <p className="admin-subtitle">{post.category}</p>
                                                         </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                    </div>
+                                                    <p className="admin-community-content">{post.content}</p>
+                                                    <div className="admin-community-meta">
+                                                        <span>By {post.author}</span>
+                                                        <span>{new Date(post.createdAt).toLocaleString()}</span>
+                                                    </div>
+                                                    <div className="admin-community-actions">
+                                                        {canWriteAdmin && (
+                                                            <button
+                                                                className="admin-btn warning small"
+                                                                onClick={() => handleCommunityDelete('forum', post.id)}
+                                                                disabled={communityMutatingIds.has(post.id)}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                ) : communityTab === 'qa' ? (
+                                    <div className="admin-community-grid">
+                                        {communityQa.length === 0 ? (
+                                            <div className="empty-state">No Q&amp;A threads yet.</div>
+                                        ) : (
+                                            communityQa.map((thread) => (
+                                                <div key={thread.id} className="admin-community-item">
+                                                    <div className="admin-community-header">
+                                                        <div>
+                                                            <h4>{thread.question}</h4>
+                                                            <p className="admin-subtitle">Asked by {thread.author}</p>
+                                                        </div>
+                                                        <span className={`status-pill ${thread.answer ? 'success' : 'warning'}`}>
+                                                            {thread.answer ? 'Answered' : 'Pending'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="admin-community-meta">
+                                                        <span>{new Date(thread.createdAt).toLocaleString()}</span>
+                                                        {thread.answeredBy && <span>Answered by {thread.answeredBy}</span>}
+                                                    </div>
+                                                    <div className="admin-community-answer">
+                                                        {thread.answer ? thread.answer : 'No answer yet.'}
+                                                    </div>
+                                                    <textarea
+                                                        className="review-note-input compact"
+                                                        rows={3}
+                                                        placeholder="Write an official answer..."
+                                                        value={qaAnswerDrafts[thread.id] ?? ''}
+                                                        onChange={(e) => setQaAnswerDrafts((prev) => ({ ...prev, [thread.id]: e.target.value }))}
+                                                    />
+                                                    <div className="admin-community-actions">
+                                                        {canWriteAdmin && (
+                                                            <button
+                                                                className="admin-btn success small"
+                                                                onClick={() => handleAnswerQa(thread.id)}
+                                                                disabled={communityMutatingIds.has(thread.id)}
+                                                            >
+                                                                {communityMutatingIds.has(thread.id) ? 'Saving...' : 'Post answer'}
+                                                            </button>
+                                                        )}
+                                                        {canWriteAdmin && (
+                                                            <button
+                                                                className="admin-btn warning small"
+                                                                onClick={() => handleCommunityDelete('qa', thread.id)}
+                                                                disabled={communityMutatingIds.has(thread.id)}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="admin-community-grid">
+                                        {communityGroups.length === 0 ? (
+                                            <div className="empty-state">No study groups yet.</div>
+                                        ) : (
+                                            communityGroups.map((group) => (
+                                                <div key={group.id} className="admin-community-item">
+                                                    <div className="admin-community-header">
+                                                        <div>
+                                                            <h4>{group.name}</h4>
+                                                            <p className="admin-subtitle">{group.topic}</p>
+                                                        </div>
+                                                        <span className="status-pill info">{group.language}</span>
+                                                    </div>
+                                                    <div className="admin-community-meta">
+                                                        <span>{new Date(group.createdAt).toLocaleString()}</span>
+                                                        {group.link && <span>Invite: {group.link}</span>}
+                                                    </div>
+                                                    <div className="admin-community-actions">
+                                                        {canWriteAdmin && (
+                                                            <button
+                                                                className="admin-btn warning small"
+                                                                onClick={() => handleCommunityDelete('group', group.id)}
+                                                                disabled={communityMutatingIds.has(group.id)}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        ) : activeAdminTab === 'errors' ? (
+                            <div className="admin-list">
+                                <div className="admin-list-header">
+                                    <div>
+                                        <h3>Error reports</h3>
+                                        <p className="admin-subtitle">Review client error reports submitted from the UI.</p>
+                                    </div>
+                                    <div className="admin-list-actions">
+                                        <span className="admin-updated">{formatLastUpdated(errorReportsUpdatedAt)}</span>
+                                        <button className="admin-btn secondary" onClick={refreshErrorReports} disabled={errorReportsLoading}>
+                                            {errorReportsLoading ? 'Refreshing...' : 'Refresh'}
+                                        </button>
+                                    </div>
+                                </div>
 
-                        {pendingAnnouncements.length === 0 ? (
-                            <div className="empty-state">No announcements pending review.</div>
-                        ) : (
-                            <div className="admin-table-wrapper">
-                                <table className="admin-table">
-                                    <thead>
-                                        <tr>
-                                            <th>
-                                                <input
-                                                    type="checkbox"
-                                                    aria-label="Select all pending"
-                                                    checked={pendingAnnouncements.length > 0 && pendingAnnouncements.every((item) => selectedIds.has(item.id))}
-                                                    onChange={(e) => toggleSelectAll(e.target.checked, pendingAnnouncements.map((item) => item.id))}
+                                <div className="admin-community-filter">
+                                    <label htmlFor="errorStatusFilter" className="admin-inline-label">Status</label>
+                                    <select
+                                        id="errorStatusFilter"
+                                        value={errorReportStatusFilter}
+                                        onChange={(e) => setErrorReportStatusFilter(e.target.value as ErrorReportStatus | 'all')}
+                                    >
+                                        <option value="new">New</option>
+                                        <option value="triaged">Triaged</option>
+                                        <option value="resolved">Resolved</option>
+                                        <option value="all">All</option>
+                                    </select>
+                                    <label htmlFor="errorIdFilter" className="admin-inline-label">Error ID</label>
+                                    <input
+                                        id="errorIdFilter"
+                                        type="text"
+                                        placeholder="Search error ID"
+                                        value={errorReportQuery}
+                                        onChange={(e) => setErrorReportQuery(e.target.value)}
+                                    />
+                                </div>
+
+                                {errorReportsError && <div className="admin-error">{errorReportsError}</div>}
+
+                                {errorReportsLoading ? (
+                                    <div className="admin-loading">Loading error reports...</div>
+                                ) : errorReports.length === 0 ? (
+                                    <div className="empty-state">No error reports available.</div>
+                                ) : (
+                                    <div className="admin-community-grid">
+                                        {errorReports.map((report) => (
+                                            <div key={report.id} className="admin-community-item">
+                                                <div className="admin-community-header">
+                                                    <div>
+                                                        <h4>{report.message}</h4>
+                                                        <p className="admin-subtitle">Error ID: {report.errorId}</p>
+                                                    </div>
+                                                    <span className={`status-pill ${report.status === 'new' ? 'danger' : report.status === 'resolved' ? 'success' : 'warning'}`}>
+                                                        {report.status}
+                                                    </span>
+                                                </div>
+                                                <div className="admin-community-meta">
+                                                    <span>{new Date(report.createdAt).toLocaleString()}</span>
+                                                    {report.userEmail && <span>User: {report.userEmail}</span>}
+                                                    {report.pageUrl && (
+                                                        <a href={report.pageUrl} target="_blank" rel="noreferrer" className="community-link">
+                                                            Page link
+                                                        </a>
+                                                    )}
+                                                </div>
+                                                {report.note && (
+                                                    <div className="admin-community-answer">User note: {report.note}</div>
+                                                )}
+                                                {(report.stack || report.componentStack || report.userAgent) && (
+                                                    <details className="admin-trace">
+                                                        <summary>Debug details</summary>
+                                                        {report.userAgent && (
+                                                            <p className="admin-trace-meta"><strong>User agent:</strong> {report.userAgent}</p>
+                                                        )}
+                                                        {report.stack && (
+                                                            <pre className="admin-trace-block">{report.stack}</pre>
+                                                        )}
+                                                        {report.componentStack && (
+                                                            <>
+                                                                <p className="admin-trace-meta"><strong>Component stack:</strong></p>
+                                                                <pre className="admin-trace-block">{report.componentStack}</pre>
+                                                            </>
+                                                        )}
+                                                    </details>
+                                                )}
+                                                <textarea
+                                                    className="review-note-input compact"
+                                                    rows={3}
+                                                    placeholder="Add internal triage notes..."
+                                                    value={errorReportNotes[report.id] ?? report.adminNote ?? ''}
+                                                    onChange={(e) => setErrorReportNotes((prev) => ({ ...prev, [report.id]: e.target.value }))}
                                                 />
-                                            </th>
-                                            <th>Title</th>
-                                            <th>Type</th>
-                                            <th>Deadline</th>
-                                            <th>QA</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingAnnouncements.map((item) => {
-                                            const qaWarnings = getAnnouncementWarnings(item);
-                                            const reviewNote = reviewNotes[item.id] ?? '';
-                                            const isRowMutating = mutatingIds.has(item.id);
-                                            return (
-                                                <tr key={item.id}>
-                                                    <td>
+                                                {canWriteAdmin && (
+                                                    <div className="admin-community-actions">
+                                                        <button
+                                                            className="admin-btn warning small"
+                                                            onClick={() => updateErrorReport(report.id, 'triaged')}
+                                                            disabled={communityMutatingIds.has(report.id)}
+                                                        >
+                                                            Mark triaged
+                                                        </button>
+                                                        <button
+                                                            className="admin-btn success small"
+                                                            onClick={() => updateErrorReport(report.id, 'resolved')}
+                                                            disabled={communityMutatingIds.has(report.id)}
+                                                        >
+                                                            Resolve
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : activeAdminTab === 'list' ? (
+                            <Suspense fallback={<div className="admin-loading">Loading listings...</div>}>
+                                <AdminContentList
+                                    items={pagedAnnouncements}
+                                    loading={listLoading}
+                                    total={listTotal}
+                                    page={listPage}
+                                    totalPages={totalPages}
+                                    onPageChange={setListPage}
+                                    searchQuery={listQuery}
+                                    onSearchChange={setListQuery}
+                                    typeFilter={listTypeFilter}
+                                    onTypeFilterChange={setListTypeFilter}
+                                    statusFilter={listStatusFilter}
+                                    onStatusFilterChange={setListStatusFilter}
+                                    sortOption={listSort}
+                                    onSortChange={setListSort}
+                                    onRefresh={refreshListData}
+                                    onEdit={handleEdit}
+                                    onDelete={(id) => handleDelete(id)}
+                                    onView={handleView}
+                                    onDuplicate={handleDuplicate}
+                                    onExport={() => {
+                                        const params = new URLSearchParams();
+                                        if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
+                                        if (listTypeFilter !== 'all') params.set('type', listTypeFilter);
+                                        params.set('includeInactive', 'true');
+                                        downloadCsv(`/api/admin/announcements/export/csv?${params.toString()}`, `admin-announcements-${new Date().toISOString().split('T')[0]}.csv`);
+                                    }}
+                                    onCreate={() => handleQuickCreate('job', 'add')}
+                                    selectedIds={selectedIds}
+                                    onSelectionChange={setSelectedIds}
+                                    onBulkAction={(action) => {
+                                        if (action === 'approve') handleBulkUpdate({ status: 'published' });
+                                        else if (action === 'reject') handleBulkUpdate({ status: 'pending' });
+                                        else if (action === 'archive') handleBulkUpdate({ status: 'archived' });
+                                        else if (action === 'delete') {
+                                            if (window.confirm('Are you sure you want to move selected items to Draft?')) {
+                                                handleBulkUpdate({ status: 'draft' });
+                                            }
+                                        }
+                                    }}
+                                    lastUpdated={listUpdatedAt}
+                                    formatDateTime={formatDateTime}
+                                    timeZoneLabel={timeZoneLabel}
+                                    filterSummary={listFilterSummary}
+                                    onClearFilters={handleClearListFilters}
+                                    canWrite={canWriteAnnouncements}
+                                    canDelete={canDeleteAnnouncements}
+                                    canApprove={canApproveAnnouncements}
+                                />
+                            </Suspense>
+                        ) : activeAdminTab === 'review' ? (
+                            <div className="admin-list">
+                                <div className="admin-list-header">
+                                    <div>
+                                        <h3>Pending review queue</h3>
+                                        <p className="admin-subtitle">Approve, reject, or schedule announcements awaiting review.</p>
+                                    </div>
+                                    <div className="admin-list-actions">
+                                        <span className="admin-updated">{formatLastUpdated(listUpdatedAt)}</span>
+                                        <button className="admin-btn secondary" onClick={refreshData} disabled={listLoading}>
+                                            {listLoading ? 'Refreshing...' : 'Refresh'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-review-panel">
+                                    <div className="admin-review-meta">
+                                        <span>{pendingSlaStats.pendingTotal} pending</span>
+                                        <span>Showing {pendingAnnouncements.length} of {pendingSlaStats.pendingTotal}</span>
+                                        <span>{selectedIds.size} selected</span>
+                                    </div>
+                                    <div className="admin-review-controls">
+                                        <input
+                                            className="review-note-input"
+                                            aria-label="Review note"
+                                            type="text"
+                                            value={reviewBulkNote}
+                                            onChange={(e) => setReviewBulkNote(e.target.value)}
+                                            placeholder="Review note for bulk actions"
+                                            disabled={reviewLoading}
+                                        />
+                                        <input
+                                            type="datetime-local"
+                                            value={reviewScheduleAt}
+                                            onChange={(e) => setReviewScheduleAt(e.target.value)}
+                                            disabled={reviewLoading}
+                                        />
+                                        {canApproveAnnouncements && (
+                                            <button className="admin-btn success" onClick={handleBulkApprove} disabled={reviewLoading}>
+                                                {reviewLoading ? 'Working...' : 'Approve selected'}
+                                            </button>
+                                        )}
+                                        {canApproveAnnouncements && (
+                                            <button className="admin-btn warning" onClick={handleBulkReject} disabled={reviewLoading}>
+                                                Reject selected
+                                            </button>
+                                        )}
+                                        {canWriteAnnouncements && (
+                                            <button className="admin-btn primary" onClick={handleBulkSchedule} disabled={reviewLoading}>
+                                                Schedule selected
+                                            </button>
+                                        )}
+                                        {canWriteAnnouncements && (
+                                            <button
+                                                className="admin-btn info"
+                                                onClick={handleBulkQaFix}
+                                                disabled={reviewLoading || qaBulkLoading || selectedQaFixableCount === 0}
+                                            >
+                                                {qaBulkLoading ? 'Working...' : `QA auto-fix (${selectedQaFixableCount})`}
+                                            </button>
+                                        )}
+                                        {canWriteAnnouncements && (
+                                            <button
+                                                className="admin-btn warning"
+                                                onClick={handleBulkQaFlag}
+                                                disabled={reviewLoading || qaBulkLoading || selectedQaIssueCount === 0}
+                                            >
+                                                Flag QA ({selectedQaIssueCount})
+                                            </button>
+                                        )}
+                                        <button className="admin-btn secondary" onClick={clearSelection} disabled={reviewLoading}>
+                                            Clear selection
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-section-panel">
+                                    <div className="admin-list-header">
+                                        <div>
+                                            <h4>SLA view</h4>
+                                            <p className="admin-subtitle">Ageing pending items and stale backlog (7+ days).</p>
+                                        </div>
+                                        <div className="admin-list-actions">
+                                            <span className="admin-updated">Average age: {pendingSlaStats.averageDays}d</span>
+                                        </div>
+                                    </div>
+                                    <div className="admin-user-grid">
+                                        <div className="user-card">
+                                            <div className="card-label">&lt; 1 day</div>
+                                            <div className="card-value">{pendingSlaStats.buckets.lt1}</div>
+                                        </div>
+                                        <div className="user-card">
+                                            <div className="card-label">1 - 3 days</div>
+                                            <div className="card-value">{pendingSlaStats.buckets.d1_3}</div>
+                                        </div>
+                                        <div className="user-card">
+                                            <div className="card-label">3 - 7 days</div>
+                                            <div className="card-value">{pendingSlaStats.buckets.d3_7}</div>
+                                        </div>
+                                        <div className="user-card">
+                                            <div className="card-label">Stale &gt; 7d</div>
+                                            <div className="card-value accent">{pendingSlaStats.buckets.gt7}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {pendingSlaStats.stale.length > 0 && (
+                                    <div className="admin-table-wrapper">
+                                        <table className="admin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Stale pending</th>
+                                                    <th>Age</th>
+                                                    <th>QA</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pendingSlaStats.stale.map(({ item, ageDays }) => {
+                                                    const warnings = getAnnouncementWarnings(item);
+                                                    const reviewNote = reviewNotes[item.id] ?? '';
+                                                    const isRowMutating = mutatingIds.has(item.id);
+                                                    return (
+                                                        <tr key={item.id}>
+                                                            <td>
+                                                                <div className="title-cell">
+                                                                    <div className="title-text" title={item.title}>{item.title}</div>
+                                                                    <div className="title-meta">
+                                                                        <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
+                                                                        <span className="meta-sep">|</span>
+                                                                        <span>{item.category || 'Uncategorized'}</span>
+                                                                        <span className="meta-sep">|</span>
+                                                                        <span>v{item.version ?? 1}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td>{ageDays}d</td>
+                                                            <td>
+                                                                {warnings.length > 0 ? (
+                                                                    <span className="qa-warning" title={warnings.join(' • ')}>
+                                                                        {warnings.length} issue{warnings.length > 1 ? 's' : ''}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="status-sub success">Clear</span>
+                                                                )}
+                                                            </td>
+                                                            <td>
+                                                                <div className="table-actions">
+                                                                    <input
+                                                                        className="review-note-input"
+                                                                        aria-label="Review note"
+                                                                        type="text"
+                                                                        value={reviewNote}
+                                                                        onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                        placeholder="Review note (optional)"
+                                                                        disabled={isRowMutating}
+                                                                    />
+                                                                    <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
+                                                                    {canWriteAnnouncements && (
+                                                                        <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
+                                                                    )}
+                                                                    {canWriteAnnouncements && warnings.length > 0 && (
+                                                                        <>
+                                                                            <button
+                                                                                className="admin-btn info small"
+                                                                                onClick={() => handleQaFix(item)}
+                                                                                disabled={isRowMutating}
+                                                                                title="Apply automated QA fixes for this row"
+                                                                            >
+                                                                                Auto-fix
+                                                                            </button>
+                                                                            <button
+                                                                                className="admin-btn warning small"
+                                                                                onClick={() => handleQaFlag(item)}
+                                                                                disabled={isRowMutating}
+                                                                                title="Flag this listing for QA review"
+                                                                            >
+                                                                                Flag
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    {canApproveAnnouncements && (
+                                                                        <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
+                                                                    )}
+                                                                    {canApproveAnnouncements && (
+                                                                        <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {pendingAnnouncements.length === 0 ? (
+                                    <div className="empty-state">No announcements pending review.</div>
+                                ) : (
+                                    <div className="admin-table-wrapper">
+                                        <table className="admin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>
                                                         <input
                                                             type="checkbox"
-                                                            checked={selectedIds.has(item.id)}
-                                                            onChange={() => toggleSelection(item.id)}
-                                                            disabled={isRowMutating}
+                                                            aria-label="Select all pending"
+                                                            checked={pendingAnnouncements.length > 0 && pendingAnnouncements.every((item) => selectedIds.has(item.id))}
+                                                            onChange={(e) => toggleSelectAll(e.target.checked, pendingAnnouncements.map((item) => item.id))}
                                                         />
-                                                    </td>
-                                                    <td>
-                                                        <div className="title-cell">
-                                                            <div className="title-text" title={item.title}>{item.title}</div>
-                                                            <div className="title-meta">
-                                                                <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
-                                                                <span className="meta-sep">|</span>
-                                                                <span>{item.category || 'Uncategorized'}</span>
-                                                                <span className="meta-sep">|</span>
-                                                                <span>v{item.version ?? 1}</span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
-                                                    <td>{renderDateCell(item.deadline ?? undefined)}</td>
-                                                    <td>
-                                                        {qaWarnings.length > 0 ? (
-                                                            <span className="qa-warning" title={qaWarnings.join(' • ')}>
-                                                                {qaWarnings.length} issue{qaWarnings.length > 1 ? 's' : ''}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="status-sub success">Looks good</span>
-                                                        )}
-                                                    </td>
-                                                    <td>
-                                                        <div className="table-actions">
-                                                            <input
-                                                                className="review-note-input"
-                                                                aria-label="Review note"
-                                                                type="text"
-                                                                value={reviewNote}
-                                                                onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                                                placeholder="Review note (optional)"
-                                                                disabled={isRowMutating}
-                                                            />
-                                                            <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
-                                                            {canWriteAnnouncements && (
-                                                                <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
-                                                            )}
-                                                            {canApproveAnnouncements && (
-                                                                <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
-                                                            )}
-                                                            {canApproveAnnouncements && (
-                                                                <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
-                                                            )}
-                                                        </div>
-                                                    </td>
+                                                    </th>
+                                                    <th>Title</th>
+                                                    <th>Type</th>
+                                                    <th>Deadline</th>
+                                                    <th>QA</th>
+                                                    <th>Actions</th>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                ) : activeAdminTab === 'queue' ? (
-                    <Suspense fallback={<div className="admin-loading">Loading schedule queue...</div>}>
-                        <AdminQueue
-                            items={scheduledAnnouncements}
-                            stats={scheduledStats}
-                            formatDateTime={formatDateTime}
-                            formatDate={formatDate}
-                            formatTime={formatTime}
-                            timeZoneLabel={timeZoneLabel}
-                            onEdit={handleEdit}
-                            onReschedule={handleReschedule}
-                            onPublishNow={(id) => handleApprove(id, '')}
-                            onReject={(id) => handleReject(id, '')}
-                            onRefresh={refreshData}
-                            onExport={() => { }}
-                            onNewJob={() => handleQuickCreate('job', 'add')}
-                            lastUpdated={listUpdatedAt}
-                            loading={listLoading}
-                            canWrite={canWriteAnnouncements}
-                            canApprove={canApproveAnnouncements}
-                        />
-                    </Suspense>
-                ) : activeAdminTab === 'detailed' ? (
-
-                    <div className="admin-form-container">
-                        <h3>Detailed Job Posting</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
-                            Create a comprehensive job posting with all details like UP Police example.
-                        </p>
-
-                        {/* Basic Info Section */}
-                        <div className="basic-info-section" style={{ marginBottom: '20px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px' }}>
-                            <h4 style={{ marginBottom: '15px' }}>Basic Information</h4>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="detailed-title">Title *</label>
-                                    <input
-                                        id="detailed-title"
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
-                                        placeholder="e.g. UP Police Constable Recruitment 2026"
-                                        required
-                                        className={showTitleError ? 'field-invalid' : titleValid ? 'field-valid' : ''}
-                                        aria-invalid={showTitleError || undefined}
-                                    />
-                                    {showTitleError && (
-                                        <span className="field-error">Title must be at least 10 characters.</span>
-                                    )}
-                                    <div className="field-meta">
-                                        <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
-                                            {(formData.title.trim().length > 0 || submitAttempted)
-                                                ? (titleValid ? '✓ Looks good' : 'Needs 10+ characters')
-                                                : 'Start typing to validate'}
-                                        </span>
-                                        <span className="field-count">{titleLength}/50</span>
+                                            </thead>
+                                            <tbody>
+                                                {pendingAnnouncements.map((item) => {
+                                                    const qaWarnings = getAnnouncementWarnings(item);
+                                                    const reviewNote = reviewNotes[item.id] ?? '';
+                                                    const isRowMutating = mutatingIds.has(item.id);
+                                                    return (
+                                                        <tr key={item.id}>
+                                                            <td>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedIds.has(item.id)}
+                                                                    onChange={() => toggleSelection(item.id)}
+                                                                    disabled={isRowMutating}
+                                                                />
+                                                            </td>
+                                                            <td>
+                                                                <div className="title-cell">
+                                                                    <div className="title-text" title={item.title}>{item.title}</div>
+                                                                    <div className="title-meta">
+                                                                        <span title={item.organization || 'Unknown'}>{item.organization || 'Unknown'}</span>
+                                                                        <span className="meta-sep">|</span>
+                                                                        <span>{item.category || 'Uncategorized'}</span>
+                                                                        <span className="meta-sep">|</span>
+                                                                        <span>v{item.version ?? 1}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td><span className={`type-badge ${item.type}`}>{item.type}</span></td>
+                                                            <td>{renderDateCell(item.deadline ?? undefined)}</td>
+                                                            <td>
+                                                                {qaWarnings.length > 0 ? (
+                                                                    <span className="qa-warning" title={qaWarnings.join(' • ')}>
+                                                                        {qaWarnings.length} issue{qaWarnings.length > 1 ? 's' : ''}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="status-sub success">Looks good</span>
+                                                                )}
+                                                            </td>
+                                                            <td>
+                                                                <div className="table-actions">
+                                                                    <input
+                                                                        className="review-note-input"
+                                                                        aria-label="Review note"
+                                                                        type="text"
+                                                                        value={reviewNote}
+                                                                        onChange={(e) => setReviewNotes((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                                                        placeholder="Review note (optional)"
+                                                                        disabled={isRowMutating}
+                                                                    />
+                                                                    <button className="admin-btn secondary small" onClick={() => handleView(item)} disabled={isRowMutating}>View</button>
+                                                                    {canWriteAnnouncements && (
+                                                                        <button className="admin-btn primary small" onClick={() => handleEdit(item)} disabled={isRowMutating}>Edit</button>
+                                                                    )}
+                                                                    {canApproveAnnouncements && (
+                                                                        <button className="admin-btn success small" onClick={() => handleApprove(item.id, reviewNote)} disabled={isRowMutating}>Approve</button>
+                                                                    )}
+                                                                    {canApproveAnnouncements && (
+                                                                        <button className="admin-btn warning small" onClick={() => handleReject(item.id, reviewNote)} disabled={isRowMutating}>Reject</button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                    <div className="field-progress">
-                                        <span style={{ width: `${titleProgress}%` }} />
-                                    </div>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="detailed-organization">Organization *</label>
-                                    <input
-                                        id="detailed-organization"
-                                        type="text"
-                                        value={formData.organization}
-                                        onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, organization: true }))}
-                                        placeholder="e.g. UPPRPB"
-                                        required
-                                        className={showOrganizationError ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
-                                        aria-invalid={showOrganizationError || undefined}
-                                    />
-                                    {showOrganizationError && (
-                                        <span className="field-error">Organization is required.</span>
-                                    )}
-                                    {organizationValid && (touchedFields.organization || submitAttempted) && (
-                                        <span className="field-status ok">✓ Looks good</span>
-                                    )}
-                                </div>
+                                )}
                             </div>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="detailed-type">Type *</label>
-                                    <select id="detailed-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
-                                        <option value="job">Job</option>
-                                        <option value="result">Result</option>
-                                        <option value="admit-card">Admit Card</option>
-                                        <option value="answer-key">Answer Key</option>
-                                        <option value="admission">Admission</option>
-                                        <option value="syllabus">Syllabus</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="detailed-category">Category *</label>
-                                    <input
-                                        id="detailed-category-search"
-                                        type="search"
-                                        className="category-search"
-                                        placeholder="Filter categories"
-                                        value={categorySearch}
-                                        onChange={(e) => setCategorySearch(e.target.value)}
-                                        aria-label="Filter categories"
-                                    />
-                                    <select id="detailed-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                                        {categoryOptions.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.icon} {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="detailed-total-posts">Total Posts</label>
-                                    <input
-                                        id="detailed-total-posts"
-                                        type="number"
-                                        value={formData.totalPosts}
-                                        onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
-                                        min={0}
-                                        step={1}
-                                        inputMode="numeric"
-                                        placeholder="e.g. 32679 (numbers only)"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="detailed-deadline">Last Date to Apply</label>
-                                    <DatePicker
-                                        id="detailed-deadline"
-                                        selected={parseDateOnly(formData.deadline)}
-                                        onChange={(date) => {
-                                            setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
-                                            setTouchedFields((prev) => ({ ...prev, deadline: true }));
-                                        }}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, deadline: true }))}
-                                        placeholderText="Select deadline"
-                                        className={`admin-datepicker-input ${showDeadlineWarning ? 'field-warning' : ''}`}
-                                        calendarClassName="admin-datepicker-calendar"
-                                        popperClassName="admin-datepicker-popper"
-                                        dateFormat="dd MMM yyyy"
-                                        aria-describedby="detailed-deadline-hint"
-                                    />
-                                    {showDeadlineWarning && (
-                                        <span id="detailed-deadline-hint" className="field-error" role="alert">Deadline is in the past.</span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="detailed-salary-min">Salary (Min)</label>
-                                    <input
-                                        id="detailed-salary-min"
-                                        type="number"
-                                        value={formData.salaryMin}
-                                        onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
-                                        min={0}
-                                        step={1}
-                                        inputMode="numeric"
-                                        placeholder="e.g. 25000"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="detailed-salary-max">Salary (Max)</label>
-                                    <input
-                                        id="detailed-salary-max"
-                                        type="number"
-                                        value={formData.salaryMax}
-                                        onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
-                                        min={0}
-                                        step={1}
-                                        inputMode="numeric"
-                                        placeholder="e.g. 55000"
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="detailed-difficulty">Difficulty</label>
-                                    <select
-                                        id="detailed-difficulty"
-                                        value={formData.difficulty}
-                                        onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'easy' | 'medium' | 'hard' | '' })}
-                                    >
-                                        <option value="">Not specified</option>
-                                        <option value="easy">Easy</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="hard">Hard</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="detailed-cutoff">Previous Cutoff</label>
-                                    <input
-                                        id="detailed-cutoff"
-                                        type="text"
-                                        value={formData.cutoffMarks}
-                                        onChange={(e) => setFormData({ ...formData, cutoffMarks: e.target.value })}
-                                        placeholder="e.g. 132/200 or 65%"
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="detailed-status">Status</label>
-                                    <select
-                                        id="detailed-status"
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
-                                    >
-                                        {STATUS_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="detailed-publish-at">
-                                        Publish at
-                                        {formData.status !== 'scheduled' && (
-                                            <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
-                                        )}
-                                    </label>
-                                    <DatePicker
-                                        id="detailed-publish-at"
-                                        selected={parseDateTime(formData.publishAt)}
-                                        onChange={(date) => {
-                                            setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
-                                            setTouchedFields((prev) => ({ ...prev, publishAt: true }));
-                                        }}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, publishAt: true }))}
-                                        placeholderText="Select date & time"
-                                        className={`admin-datepicker-input ${showPublishAtError ? 'field-invalid' : ''}`}
-                                        calendarClassName="admin-datepicker-calendar"
-                                        popperClassName="admin-datepicker-popper"
-                                        dateFormat="dd MMM yyyy, h:mm aa"
-                                        showTimeSelect
-                                        timeIntervals={15}
-                                        disabled={formData.status !== 'scheduled'}
-                                        aria-describedby="detailed-publish-hint"
-                                    />
-                                    {formData.status !== 'scheduled' && (
-                                        <p className="field-hint">Enabled only when Status is Scheduled.</p>
-                                    )}
-                                    {formData.status === 'scheduled' && (
-                                        <p className="field-hint">Time zone: {timeZoneLabel}</p>
-                                    )}
-                                    {showPublishAtError && (
-                                        <span id="detailed-publish-hint" className="field-error" role="alert">Publish time is required for scheduled posts.</span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                        ) : activeAdminTab === 'queue' ? (
+                            <Suspense fallback={<div className="admin-loading">Loading schedule queue...</div>}>
+                                <AdminQueue
+                                    items={scheduledAnnouncements}
+                                    stats={scheduledStats}
+                                    formatDateTime={formatDateTime}
+                                    formatDate={formatDate}
+                                    formatTime={formatTime}
+                                    timeZoneLabel={timeZoneLabel}
+                                    onEdit={handleEdit}
+                                    onReschedule={handleReschedule}
+                                    onPublishNow={(id) => handleApprove(id, '')}
+                                    onReject={(id) => handleReject(id, '')}
+                                    onRefresh={refreshData}
+                                    onExport={() => { }}
+                                    onNewJob={() => handleQuickCreate('job', 'add')}
+                                    lastUpdated={listUpdatedAt}
+                                    loading={listLoading}
+                                    canWrite={canWriteAnnouncements}
+                                    canApprove={canApproveAnnouncements}
+                                />
+                            </Suspense>
+                        ) : activeAdminTab === 'detailed' ? (
 
-                        {formWarnings.length > 0 && (
-                            <div className="qa-panel">
-                                <h4>QA checks</h4>
-                                <ul>
-                                    {formWarnings.map((warning) => {
-                                        const tone = getWarningTone(warning);
-                                        return (
-                                            <li key={warning} className={`qa-item ${tone}`}>
-                                                <span className="qa-badge" aria-hidden="true">
-                                                    {tone === 'critical' ? '🔴' : '🟡'}
+                            <div className="admin-form-container">
+                                <h3>Detailed Job Posting</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
+                                    Create a comprehensive job posting with all details like UP Police example.
+                                </p>
+
+                                {/* Basic Info Section */}
+                                <div className="basic-info-section" style={{ marginBottom: '20px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px' }}>
+                                    <h4 style={{ marginBottom: '15px' }}>Basic Information</h4>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-title">Title *</label>
+                                            <input
+                                                id="detailed-title"
+                                                type="text"
+                                                value={formData.title}
+                                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
+                                                placeholder="e.g. UP Police Constable Recruitment 2026"
+                                                required
+                                                className={showTitleError ? 'field-invalid' : titleValid ? 'field-valid' : ''}
+                                                aria-invalid={showTitleError || undefined}
+                                            />
+                                            {showTitleError && (
+                                                <span className="field-error">Title must be at least 10 characters.</span>
+                                            )}
+                                            <div className="field-meta">
+                                                <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
+                                                    {(formData.title.trim().length > 0 || submitAttempted)
+                                                        ? (titleValid ? '✓ Looks good' : 'Needs 10+ characters')
+                                                        : 'Start typing to validate'}
                                                 </span>
-                                                <span>{warning}</span>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
+                                                <span className="field-count">{titleLength}/50</span>
+                                            </div>
+                                            <div className="field-progress">
+                                                <span style={{ width: `${titleProgress}%` }} />
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-organization">Organization *</label>
+                                            <input
+                                                id="detailed-organization"
+                                                type="text"
+                                                value={formData.organization}
+                                                onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, organization: true }))}
+                                                placeholder="e.g. UPPRPB"
+                                                required
+                                                className={showOrganizationError ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
+                                                aria-invalid={showOrganizationError || undefined}
+                                            />
+                                            {showOrganizationError && (
+                                                <span className="field-error">Organization is required.</span>
+                                            )}
+                                            {organizationValid && (touchedFields.organization || submitAttempted) && (
+                                                <span className="field-status ok">✓ Looks good</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-type">Type *</label>
+                                            <select id="detailed-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
+                                                <option value="job">Job</option>
+                                                <option value="result">Result</option>
+                                                <option value="admit-card">Admit Card</option>
+                                                <option value="answer-key">Answer Key</option>
+                                                <option value="admission">Admission</option>
+                                                <option value="syllabus">Syllabus</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-category">Category *</label>
+                                            <input
+                                                id="detailed-category-search"
+                                                type="search"
+                                                className="category-search"
+                                                placeholder="Filter categories"
+                                                value={categorySearch}
+                                                onChange={(e) => setCategorySearch(e.target.value)}
+                                                aria-label="Filter categories"
+                                            />
+                                            <select id="detailed-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
+                                                {categoryOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.icon} {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-total-posts">Total Posts</label>
+                                            <input
+                                                id="detailed-total-posts"
+                                                type="number"
+                                                value={formData.totalPosts}
+                                                onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
+                                                min={0}
+                                                step={1}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 32679 (numbers only)"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-deadline">Last Date to Apply</label>
+                                            <DatePicker
+                                                id="detailed-deadline"
+                                                selected={parseDateOnly(formData.deadline)}
+                                                onChange={(date) => {
+                                                    setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
+                                                    setTouchedFields((prev) => ({ ...prev, deadline: true }));
+                                                }}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, deadline: true }))}
+                                                placeholderText="Select deadline"
+                                                className={`admin-datepicker-input ${showDeadlineWarning ? 'field-warning' : ''}`}
+                                                calendarClassName="admin-datepicker-calendar"
+                                                popperClassName="admin-datepicker-popper"
+                                                dateFormat="dd MMM yyyy"
+                                                aria-describedby="detailed-deadline-hint"
+                                            />
+                                            {showDeadlineWarning && (
+                                                <span id="detailed-deadline-hint" className="field-error" role="alert">Deadline is in the past.</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-salary-min">Salary (Min)</label>
+                                            <input
+                                                id="detailed-salary-min"
+                                                type="number"
+                                                value={formData.salaryMin}
+                                                onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                                min={0}
+                                                step={1}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 25000"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-salary-max">Salary (Max)</label>
+                                            <input
+                                                id="detailed-salary-max"
+                                                type="number"
+                                                value={formData.salaryMax}
+                                                onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                                min={0}
+                                                step={1}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 55000"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-difficulty">Difficulty</label>
+                                            <select
+                                                id="detailed-difficulty"
+                                                value={formData.difficulty}
+                                                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'easy' | 'medium' | 'hard' | '' })}
+                                            >
+                                                <option value="">Not specified</option>
+                                                <option value="easy">Easy</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="hard">Hard</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-cutoff">Previous Cutoff</label>
+                                            <input
+                                                id="detailed-cutoff"
+                                                type="text"
+                                                value={formData.cutoffMarks}
+                                                onChange={(e) => setFormData({ ...formData, cutoffMarks: e.target.value })}
+                                                placeholder="e.g. 132/200 or 65%"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-status">Status</label>
+                                            <select
+                                                id="detailed-status"
+                                                value={formData.status}
+                                                onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
+                                            >
+                                                {STATUS_OPTIONS.map((option) => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="detailed-publish-at">
+                                                Publish at
+                                                {formData.status !== 'scheduled' && (
+                                                    <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
+                                                )}
+                                            </label>
+                                            <DatePicker
+                                                id="detailed-publish-at"
+                                                selected={parseDateTime(formData.publishAt)}
+                                                onChange={(date) => {
+                                                    setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
+                                                    setTouchedFields((prev) => ({ ...prev, publishAt: true }));
+                                                }}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, publishAt: true }))}
+                                                placeholderText="Select date & time"
+                                                className={`admin-datepicker-input ${showPublishAtError ? 'field-invalid' : ''}`}
+                                                calendarClassName="admin-datepicker-calendar"
+                                                popperClassName="admin-datepicker-popper"
+                                                dateFormat="dd MMM yyyy, h:mm aa"
+                                                showTimeSelect
+                                                timeIntervals={15}
+                                                disabled={formData.status !== 'scheduled'}
+                                                aria-describedby="detailed-publish-hint"
+                                            />
+                                            {formData.status !== 'scheduled' && (
+                                                <p className="field-hint">Enabled only when Status is Scheduled.</p>
+                                            )}
+                                            {formData.status === 'scheduled' && (
+                                                <p className="field-hint">Time zone: {timeZoneLabel}</p>
+                                            )}
+                                            {showPublishAtError && (
+                                                <span id="detailed-publish-hint" className="field-error" role="alert">Publish time is required for scheduled posts.</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {formWarnings.length > 0 && (
+                                    <div className="qa-panel">
+                                        <h4>QA checks</h4>
+                                        <ul>
+                                            {formWarnings.map((warning) => {
+                                                const tone = getWarningTone(warning);
+                                                return (
+                                                    <li key={warning} className={`qa-item ${tone}`}>
+                                                        <span className="qa-badge" aria-hidden="true">
+                                                            {tone === 'critical' ? '🔴' : '🟡'}
+                                                        </span>
+                                                        <span>{warning}</span>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {/* Job Details Form */}
+                                <Suspense fallback={<div className="admin-loading">Loading job form...</div>}>
+                                    <JobPostingForm
+                                        initialData={jobDetails || undefined}
+                                        isDisabled={titleInvalid || organizationMissing}
+                                        onSubmit={async (details) => {
+                                            if (!isLoggedIn) {
+                                                setMessage('Not authenticated');
+                                                return;
+                                            }
+
+                                            if (!formData.title || !formData.organization) {
+                                                setMessage('Please fill in Title and Organization in Basic Information');
+                                                return;
+                                            }
+
+                                            setMessage(editingId ? 'Updating...' : 'Saving...');
+                                            try {
+                                                const url = editingId
+                                                    ? `${apiBase}/api/admin/announcements/${editingId}`
+                                                    : `${apiBase}/api/admin/announcements`;
+                                                const method = editingId ? 'PUT' : 'POST';
+                                                const payload = {
+                                                    ...formData,
+                                                    totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
+                                                    salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
+                                                    salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
+                                                    difficulty: formData.difficulty || undefined,
+                                                    cutoffMarks: formData.cutoffMarks || undefined,
+                                                    publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
+                                                    jobDetails: details,
+                                                };
+
+                                                const response = await adminFetch(url, {
+                                                    method,
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                    },
+                                                    body: JSON.stringify(payload),
+                                                });
+
+                                                if (response.ok) {
+                                                    setMessage(editingId ? 'Job posting updated successfully!' : 'Job posting created successfully!');
+
+                                                    setFormData({ ...DEFAULT_FORM_DATA });
+
+                                                    setJobDetails(null);
+
+                                                    setEditingId(null);
+
+                                                    setPreviewData(null);
+
+                                                    refreshData();
+
+                                                    refreshDashboard();
+
+                                                    setActiveAdminTab('list');
+                                                } else {
+                                                    const error = await response.json();
+                                                    setMessage(error.message || 'Failed to save');
+                                                }
+                                            } catch (error) {
+                                                console.error(error);
+                                                setMessage('Error saving job posting');
+                                            }
+                                        }}
+                                        onCancel={() => {
+                                            setEditingId(null);
+                                            setJobDetails(null);
+                                            setActiveAdminTab('list');
+                                        }}
+                                        onPreview={(details) => {
+                                            if (!formData.title || !formData.organization) {
+                                                setMessage('Please fill in Title and Organization before previewing');
+                                                return;
+                                            }
+                                            setPreviewData({ formData, jobDetails: details });
+                                            setShowPreview(true);
+                                        }}
+                                    />
+                                </Suspense>
                             </div>
-                        )}
-
-                        {/* Job Details Form */}
-                        <Suspense fallback={<div className="admin-loading">Loading job form...</div>}>
-                            <JobPostingForm
-                                initialData={jobDetails || undefined}
-                                isDisabled={titleInvalid || organizationMissing}
-                                onSubmit={async (details) => {
-                                    if (!isLoggedIn) {
-                                        setMessage('Not authenticated');
-                                        return;
-                                    }
-
-                                    if (!formData.title || !formData.organization) {
-                                        setMessage('Please fill in Title and Organization in Basic Information');
-                                        return;
-                                    }
-
-                                    setMessage(editingId ? 'Updating...' : 'Saving...');
-                                    try {
-                                        const url = editingId
-                                            ? `${apiBase}/api/admin/announcements/${editingId}`
-                                            : `${apiBase}/api/admin/announcements`;
-                                        const method = editingId ? 'PUT' : 'POST';
-                                        const payload = {
-                                            ...formData,
-                                            totalPosts: formData.totalPosts ? parseInt(formData.totalPosts) : undefined,
-                                            salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
-                                            salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
-                                            difficulty: formData.difficulty || undefined,
-                                            cutoffMarks: formData.cutoffMarks || undefined,
-                                            publishAt: formData.status === 'scheduled' && formData.publishAt ? normalizeDateTime(formData.publishAt) : undefined,
-                                            jobDetails: details,
-                                        };
-
-                                    const response = await adminFetch(url, {
-                                        method,
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify(payload),
-                                    });
-
-                                    if (response.ok) {
-                                        setMessage(editingId ? 'Job posting updated successfully!' : 'Job posting created successfully!');
-
-                                        setFormData({ ...DEFAULT_FORM_DATA });
-
-                                        setJobDetails(null);
-
-                                        setEditingId(null);
-
-                                        setPreviewData(null);
-
-                                        refreshData();
-
-                                        refreshDashboard();
-
-                                        setActiveAdminTab('list');
-                                    } else {
-                                        const error = await response.json();
-                                        setMessage(error.message || 'Failed to save');
-                                    }
-                                } catch (error) {
-                                    console.error(error);
-                                    setMessage('Error saving job posting');
-                                }
-                            }}
-                            onCancel={() => {
-                                setEditingId(null);
-                                setJobDetails(null);
-                                setActiveAdminTab('list');
-                            }}
-                            onPreview={(details) => {
-                                if (!formData.title || !formData.organization) {
-                                    setMessage('Please fill in Title and Organization before previewing');
-                                    return;
-                                }
-                                setPreviewData({ formData, jobDetails: details });
-                                setShowPreview(true);
-                            }}
-                        />
-                        </Suspense>
-                    </div>
-                ) : activeAdminTab === 'bulk' ? (
-                    <div className="admin-form-container">
-                        <h3>Bulk Import Announcements</h3>
-                        <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Paste JSON array of announcements below. Required fields: title, type, category, organization.</p>
-                        <textarea
-                            value={bulkJson}
-                            onChange={(e) => setBulkJson(e.target.value)}
-                            placeholder={`{
+                        ) : activeAdminTab === 'bulk' ? (
+                            <div className="admin-form-container">
+                                <h3>Bulk Import Announcements</h3>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Paste JSON array of announcements below. Required fields: title, type, category, organization.</p>
+                                <textarea
+                                    value={bulkJson}
+                                    onChange={(e) => setBulkJson(e.target.value)}
+                                    placeholder={`{
 "announcements": [
   {
     "title": "SSC CGL 2025",
@@ -4442,633 +4442,633 @@ export function AdminPage() {
   }
 ]
 }`}
-                            style={{
-                                width: '100%',
-                                height: '300px',
-                                fontFamily: 'monospace',
-                                fontSize: '0.9rem',
-                                padding: '15px',
-                                border: '1px solid var(--border-primary)',
-                                borderRadius: '8px',
-                                marginBottom: '15px'
-                            }}
-                        />
-                        <button
-                            className="admin-btn primary"
-                            onClick={async () => {
-                                if (!isLoggedIn) {
-                                    setMessage('Not authenticated');
-                                    return;
-                                }
-                                try {
-                                    const jsonData = JSON.parse(bulkJson);
-                                    const response = await adminFetch(`${apiBase}/api/bulk/import`, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify(jsonData),
-                                    });
-                                    const result = await response.json();
-                                    setMessage(result.message || 'Import complete');
-                                    if (response.ok) {
-
-                                        refreshData();
-
-                                        refreshDashboard();
-
-                                        setBulkJson('');
-
-                                    }
-
-                                } catch (err: any) {
-                                    setMessage('Invalid JSON: ' + err.message);
-                                }
-                            }}
-                        >
-                            Import Announcements
-                        </button>
-                    </div>
-                ) : activeAdminTab === 'audit' ? (
-                    <div className="admin-list">
-                        <div className="admin-list-header">
-                            <div>
-                                <h3>Audit log</h3>
-                                <p className="admin-subtitle">Recent admin actions across create, review, and bulk updates.</p>
-                            </div>
-                            <div className="admin-list-actions">
-                                <span className="admin-updated">{formatLastUpdated(auditUpdatedAt)}</span>
-                                <button className="admin-btn secondary" onClick={() => refreshAuditLogs()} disabled={auditLoading}>
-                                    {auditLoading ? 'Refreshing...' : 'Refresh'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="admin-filter-panel">
-                            <div className="filter-group">
-                                <label htmlFor="audit-admin-id">Admin ID</label>
-                                <input
-                                    id="audit-admin-id"
-                                    type="text"
-                                    value={auditFilters.userId}
-                                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, userId: e.target.value }))}
-                                    placeholder="User ID"
-                                />
-                            </div>
-                            <div className="filter-group">
-                                <label htmlFor="audit-action">Action</label>
-                                <select
-                                    id="audit-action"
-                                    value={auditFilters.action}
-                                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, action: e.target.value }))}
-                                >
-                                    <option value="">All actions</option>
-                                    {AUDIT_ACTIONS.map((action) => (
-                                        <option key={action} value={action}>{action}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="filter-group">
-                                <label htmlFor="audit-start-date">Start date</label>
-                                <input
-                                    id="audit-start-date"
-                                    type="date"
-                                    value={auditFilters.start}
-                                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, start: e.target.value }))}
-                                />
-                            </div>
-                            <div className="filter-group">
-                                <label htmlFor="audit-end-date">End date</label>
-                                <input
-                                    id="audit-end-date"
-                                    type="date"
-                                    value={auditFilters.end}
-                                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, end: e.target.value }))}
-                                />
-                            </div>
-                            <div className="filter-group">
-                                <label htmlFor="audit-limit">Limit</label>
-                                <input
-                                    id="audit-limit"
-                                    type="number"
-                                    min={10}
-                                    max={200}
-                                    value={auditLimit}
-                                    onChange={(e) => {
-                                        setAuditLimit(Number(e.target.value) || 50);
-                                        setAuditPage(1);
+                                    style={{
+                                        width: '100%',
+                                        height: '300px',
+                                        fontFamily: 'monospace',
+                                        fontSize: '0.9rem',
+                                        padding: '15px',
+                                        border: '1px solid var(--border-primary)',
+                                        borderRadius: '8px',
+                                        marginBottom: '15px'
                                     }}
                                 />
-                            </div>
-                            <div className="filter-actions">
                                 <button
-                                    className="admin-btn secondary"
-                                    onClick={() => refreshAuditLogs(1)}
-                                    disabled={auditLoading}
-                                >
-                                    Apply
-                                </button>
-                                <button
-                                    className="admin-btn secondary"
-                                    onClick={() => {
-                                        setAuditFilters({ userId: '', action: '', start: '', end: '' });
-                                        setAuditLimit(50);
-                                        refreshAuditLogs(1);
-                                    }}
-                                    disabled={auditLoading}
-                                >
-                                    Clear
-                                </button>
-                            </div>
-                        </div>
+                                    className="admin-btn primary"
+                                    onClick={async () => {
+                                        if (!isLoggedIn) {
+                                            setMessage('Not authenticated');
+                                            return;
+                                        }
+                                        try {
+                                            const jsonData = JSON.parse(bulkJson);
+                                            const response = await adminFetch(`${apiBase}/api/bulk/import`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                },
+                                                body: JSON.stringify(jsonData),
+                                            });
+                                            const result = await response.json();
+                                            setMessage(result.message || 'Import complete');
+                                            if (response.ok) {
 
-                        {auditLoading ? (
-                            <div className="admin-loading">Loading audit log...</div>
-                        ) : auditError ? (
-                            <div className="admin-error">{auditError}</div>
-                        ) : auditLogs.length === 0 ? (
-                            <div className="empty-state">No audit entries yet. Approvals, rejects, deletes, and bulk edits will appear here.</div>
-                        ) : (
-                            <>
-                                <div className="admin-table-wrapper">
-                                    <table className="admin-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Time</th>
-                                                <th>Action</th>
-                                                <th>Title</th>
-                                                <th>Note</th>
-                                                <th>Admin</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {auditLogs.map((log) => (
-                                                <tr key={log.id}>
-                                                    <td>{formatDateTime(log.createdAt)}</td>
-                                                    <td><span className="status-pill info">{log.action}</span></td>
-                                                    <td>{log.title || log.announcementId || '-'}</td>
-                                                    <td>{log.note || '-'}</td>
-                                                    <td>{log.userId || 'system'}</td>
-                                                </tr>
+                                                refreshData();
+
+                                                refreshDashboard();
+
+                                                setBulkJson('');
+
+                                            }
+
+                                        } catch (err: any) {
+                                            setMessage('Invalid JSON: ' + err.message);
+                                        }
+                                    }}
+                                >
+                                    Import Announcements
+                                </button>
+                            </div>
+                        ) : activeAdminTab === 'audit' ? (
+                            <div className="admin-list">
+                                <div className="admin-list-header">
+                                    <div>
+                                        <h3>Audit log</h3>
+                                        <p className="admin-subtitle">Recent admin actions across create, review, and bulk updates.</p>
+                                    </div>
+                                    <div className="admin-list-actions">
+                                        <span className="admin-updated">{formatLastUpdated(auditUpdatedAt)}</span>
+                                        <button className="admin-btn secondary" onClick={() => refreshAuditLogs()} disabled={auditLoading}>
+                                            {auditLoading ? 'Refreshing...' : 'Refresh'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="admin-filter-panel">
+                                    <div className="filter-group">
+                                        <label htmlFor="audit-admin-id">Admin ID</label>
+                                        <input
+                                            id="audit-admin-id"
+                                            type="text"
+                                            value={auditFilters.userId}
+                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, userId: e.target.value }))}
+                                            placeholder="User ID"
+                                        />
+                                    </div>
+                                    <div className="filter-group">
+                                        <label htmlFor="audit-action">Action</label>
+                                        <select
+                                            id="audit-action"
+                                            value={auditFilters.action}
+                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, action: e.target.value }))}
+                                        >
+                                            <option value="">All actions</option>
+                                            {AUDIT_ACTIONS.map((action) => (
+                                                <option key={action} value={action}>{action}</option>
                                             ))}
-                                        </tbody>
-                                    </table>
+                                        </select>
+                                    </div>
+                                    <div className="filter-group">
+                                        <label htmlFor="audit-start-date">Start date</label>
+                                        <input
+                                            id="audit-start-date"
+                                            type="date"
+                                            value={auditFilters.start}
+                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, start: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="filter-group">
+                                        <label htmlFor="audit-end-date">End date</label>
+                                        <input
+                                            id="audit-end-date"
+                                            type="date"
+                                            value={auditFilters.end}
+                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, end: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="filter-group">
+                                        <label htmlFor="audit-limit">Limit</label>
+                                        <input
+                                            id="audit-limit"
+                                            type="number"
+                                            min={10}
+                                            max={200}
+                                            value={auditLimit}
+                                            onChange={(e) => {
+                                                setAuditLimit(Number(e.target.value) || 50);
+                                                setAuditPage(1);
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="filter-actions">
+                                        <button
+                                            className="admin-btn secondary"
+                                            onClick={() => refreshAuditLogs(1)}
+                                            disabled={auditLoading}
+                                        >
+                                            Apply
+                                        </button>
+                                        <button
+                                            className="admin-btn secondary"
+                                            onClick={() => {
+                                                setAuditFilters({ userId: '', action: '', start: '', end: '' });
+                                                setAuditLimit(50);
+                                                refreshAuditLogs(1);
+                                            }}
+                                            disabled={auditLoading}
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="admin-pagination">
-                                    <span className="pagination-info">
-                                        Showing {auditStartIndex}-{auditEndIndex} of {auditTotal}
-                                    </span>
-                                    <button
-                                        className="admin-btn secondary small"
-                                        onClick={() => refreshAuditLogs(Math.max(1, auditPage - 1))}
-                                        disabled={auditLoading || auditPage <= 1}
-                                    >
-                                        Prev
-                                    </button>
-                                    <span className="pagination-info">
-                                        Page {auditPage} of {auditTotalPages}
-                                    </span>
-                                    <button
-                                        className="admin-btn secondary small"
-                                        onClick={() => refreshAuditLogs(Math.min(auditTotalPages, auditPage + 1))}
-                                        disabled={auditLoading || auditPage >= auditTotalPages}
-                                    >
-                                        Next
-                                    </button>
+
+                                {auditLoading ? (
+                                    <div className="admin-loading">Loading audit log...</div>
+                                ) : auditError ? (
+                                    <div className="admin-error">{auditError}</div>
+                                ) : auditLogs.length === 0 ? (
+                                    <div className="empty-state">No audit entries yet. Approvals, rejects, deletes, and bulk edits will appear here.</div>
+                                ) : (
+                                    <>
+                                        <div className="admin-table-wrapper">
+                                            <table className="admin-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Time</th>
+                                                        <th>Action</th>
+                                                        <th>Title</th>
+                                                        <th>Note</th>
+                                                        <th>Admin</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {auditLogs.map((log) => (
+                                                        <tr key={log.id}>
+                                                            <td>{formatDateTime(log.createdAt)}</td>
+                                                            <td><span className="status-pill info">{log.action}</span></td>
+                                                            <td>{log.title || log.announcementId || '-'}</td>
+                                                            <td>{log.note || '-'}</td>
+                                                            <td>{log.userId || 'system'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="admin-pagination">
+                                            <span className="pagination-info">
+                                                Showing {auditStartIndex}-{auditEndIndex} of {auditTotal}
+                                            </span>
+                                            <button
+                                                className="admin-btn secondary small"
+                                                onClick={() => refreshAuditLogs(Math.max(1, auditPage - 1))}
+                                                disabled={auditLoading || auditPage <= 1}
+                                            >
+                                                Prev
+                                            </button>
+                                            <span className="pagination-info">
+                                                Page {auditPage} of {auditTotalPages}
+                                            </span>
+                                            <button
+                                                className="admin-btn secondary small"
+                                                onClick={() => refreshAuditLogs(Math.min(auditTotalPages, auditPage + 1))}
+                                                disabled={auditLoading || auditPage >= auditTotalPages}
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ) : activeAdminTab === 'security' ? (
+                            <div className="admin-security">
+                                <div className="admin-security-grid">
+                                    <div className="admin-security-card">
+                                        <div className="security-card-header">
+                                            <div>
+                                                <h4>Two-factor recovery</h4>
+                                                <p className="admin-subtitle">Generate backup codes for account recovery.</p>
+                                            </div>
+                                            <span className="security-card-pill">
+                                                {backupCodesStatus
+                                                    ? `${backupCodesStatus.remaining}/${backupCodesStatus.total} remaining`
+                                                    : 'Not generated'}
+                                            </span>
+                                        </div>
+                                        <div className="security-card-body">
+                                            <div className="security-stat">
+                                                <span className="stat-label">Backup codes remaining</span>
+                                                <span className="stat-value">{backupCodesStatus?.remaining ?? 0}</span>
+                                            </div>
+                                            <div className="security-stat">
+                                                <span className="stat-label">Last generated</span>
+                                                <span className="stat-value">
+                                                    {backupCodesStatus?.updatedAt ? formatDateTime(backupCodesStatus.updatedAt) : 'Not generated'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="security-card-actions">
+                                            {canWriteAdmin && (
+                                                <button
+                                                    className="admin-btn primary small"
+                                                    onClick={generateBackupCodes}
+                                                    disabled={backupCodesLoading}
+                                                >
+                                                    {backupCodesLoading ? 'Generating…' : 'Generate backup codes'}
+                                                </button>
+                                            )}
+                                            <button
+                                                className="admin-btn secondary small"
+                                                onClick={refreshBackupCodesStatus}
+                                                disabled={backupCodesLoading}
+                                            >
+                                                Refresh status
+                                            </button>
+                                        </div>
+                                        <p className="security-card-note">
+                                            Generate a new set to invalidate old codes and store them somewhere safe.
+                                        </p>
+                                    </div>
+
+                                    <div className="admin-security-card">
+                                        <div className="security-card-header">
+                                            <div>
+                                                <h4>Session health</h4>
+                                                <p className="admin-subtitle">Monitor active sessions and risk signals.</p>
+                                            </div>
+                                            <span className="security-card-pill">{sessions.length} total</span>
+                                        </div>
+                                        <div className="security-card-body">
+                                            <div className="security-stat">
+                                                <span className="stat-label">Active now</span>
+                                                <span className="stat-value">{activeSessionCount}</span>
+                                            </div>
+                                            <div className="security-stat">
+                                                <span className="stat-label">High risk</span>
+                                                <span className="stat-value">{highRiskSessionCount}</span>
+                                            </div>
+                                        </div>
+                                        <div className="security-card-actions">
+                                            <button
+                                                className="admin-btn secondary small"
+                                                onClick={refreshSessions}
+                                                disabled={sessionsLoading}
+                                            >
+                                                {sessionsLoading ? 'Refreshing…' : 'Refresh sessions'}
+                                            </button>
+                                            {sessions.length > 1 && (
+                                                <button
+                                                    className="admin-btn warning small"
+                                                    onClick={terminateOtherSessions}
+                                                    disabled={sessionsLoading || !canWriteAdmin}
+                                                >
+                                                    End other sessions
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p className="security-card-note">
+                                            Terminate unknown sessions immediately if you see unfamiliar devices.
+                                        </p>
+                                    </div>
                                 </div>
-                            </>
+
+                                {sessionsError && <div className="admin-error">{sessionsError}</div>}
+
+                                <Suspense fallback={<div className="admin-loading">Loading sessions...</div>}>
+                                    <SessionManager
+                                        sessions={sessions}
+                                        onTerminateSession={terminateSession}
+                                        onTerminateAllOther={terminateOtherSessions}
+                                        onRefresh={refreshSessions}
+                                        loading={sessionsLoading}
+                                        canManage={canWriteAdmin}
+                                    />
+                                </Suspense>
+
+                                <Suspense fallback={<div className="admin-loading">Loading security logs...</div>}>
+                                    <SecurityLogsTable onUnauthorized={handleUnauthorized} />
+                                </Suspense>
+                            </div>
+                        ) : (
+                            <div className="admin-form-container">
+                                <form onSubmit={handleSubmit} className="admin-form">
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-title">
+                                                Title <span className="field-required">*</span>
+                                            </label>
+                                            <input
+                                                id="quick-title"
+                                                type="text"
+                                                value={formData.title}
+                                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
+                                                placeholder="e.g. SSC CGL 2025 Recruitment"
+                                                required
+                                                className={showTitleError ? 'field-invalid' : titleValid ? 'field-valid' : ''}
+                                                aria-invalid={showTitleError || undefined}
+                                                aria-describedby="quick-title-error"
+                                            />
+                                            {showTitleError && (
+                                                <span id="quick-title-error" className="field-error" role="alert">Title must be at least 10 characters.</span>
+                                            )}
+                                            <div className="field-meta">
+                                                <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
+                                                    {titleValid ? '✓ Looks good' : 'Needs 10+ characters'}
+                                                </span>
+                                                <span className="field-count">{titleLength}/50</span>
+                                            </div>
+                                            <div className="field-progress">
+                                                <span style={{ width: `${titleProgress}%` }} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-type">Type *</label>
+                                            <select id="quick-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
+                                                <option value="job">Job</option>
+                                                <option value="result">Result</option>
+                                                <option value="admit-card">Admit Card</option>
+                                                <option value="answer-key">Answer Key</option>
+                                                <option value="admission">Admission</option>
+                                                <option value="syllabus">Syllabus</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-category">Category *</label>
+                                            <input
+                                                id="quick-category-search"
+                                                type="search"
+                                                className="category-search"
+                                                placeholder="Filter categories"
+                                                value={categorySearch}
+                                                onChange={(e) => setCategorySearch(e.target.value)}
+                                                aria-label="Filter categories"
+                                            />
+                                            <select id="quick-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
+                                                {categoryOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.icon} {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Rest of form fields - simplified for brevity, assume similar to original */}
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-organization">
+                                                Organization <span className="field-required">*</span>
+                                            </label>
+                                            <input
+                                                id="quick-organization"
+                                                type="text"
+                                                value={formData.organization}
+                                                onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, organization: true }))}
+                                                required
+                                                className={showOrganizationError ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
+                                                aria-invalid={showOrganizationError || undefined}
+                                                aria-describedby="quick-organization-error"
+                                            />
+                                            {showOrganizationError && (
+                                                <span id="quick-organization-error" className="field-error" role="alert">Organization is required.</span>
+                                            )}
+                                            {organizationValid && (
+                                                <span className="field-status ok">✓ Looks good</span>
+                                            )}
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-location">Location</label>
+                                            <input
+                                                id="quick-location"
+                                                type="text"
+                                                value={formData.location}
+                                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-total-posts">Total Posts</label>
+                                            <input
+                                                id="quick-total-posts"
+                                                type="number"
+                                                value={formData.totalPosts}
+                                                onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
+                                                min={0}
+                                                step={1}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 32679 (numbers only)"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-deadline">Last Date</label>
+                                            <DatePicker
+                                                id="quick-deadline"
+                                                selected={parseDateOnly(formData.deadline)}
+                                                onChange={(date) => {
+                                                    setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
+                                                    setTouchedFields((prev) => ({ ...prev, deadline: true }));
+                                                }}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, deadline: true }))}
+                                                placeholderText="Select deadline"
+                                                className={`admin-datepicker-input ${showDeadlineWarning ? 'field-warning' : ''}`}
+                                                calendarClassName="admin-datepicker-calendar"
+                                                popperClassName="admin-datepicker-popper"
+                                                dateFormat="dd MMM yyyy"
+                                                aria-describedby="quick-deadline-hint"
+                                            />
+                                            {showDeadlineWarning && (
+                                                <span id="quick-deadline-hint" className="field-error" role="alert">Deadline is in the past.</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-qualification">Qualification</label>
+                                            <input
+                                                id="quick-qualification"
+                                                type="text"
+                                                value={formData.minQualification}
+                                                onChange={(e) => setFormData({ ...formData, minQualification: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-age-limit">Age Limit</label>
+                                            <input
+                                                id="quick-age-limit"
+                                                type="text"
+                                                value={formData.ageLimit}
+                                                onChange={(e) => setFormData({ ...formData, ageLimit: e.target.value })}
+                                                placeholder="e.g., 18-27 years"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-salary-min">Salary (Min)</label>
+                                            <input
+                                                id="quick-salary-min"
+                                                type="number"
+                                                value={formData.salaryMin}
+                                                onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                                min={0}
+                                                step={1}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 25000"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-salary-max">Salary (Max)</label>
+                                            <input
+                                                id="quick-salary-max"
+                                                type="number"
+                                                value={formData.salaryMax}
+                                                onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                                min={0}
+                                                step={1}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 55000"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-difficulty">Difficulty</label>
+                                            <select
+                                                id="quick-difficulty"
+                                                value={formData.difficulty}
+                                                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'easy' | 'medium' | 'hard' | '' })}
+                                            >
+                                                <option value="">Not specified</option>
+                                                <option value="easy">Easy</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="hard">Hard</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-cutoff">Previous Cutoff</label>
+                                            <input
+                                                id="quick-cutoff"
+                                                type="text"
+                                                value={formData.cutoffMarks}
+                                                onChange={(e) => setFormData({ ...formData, cutoffMarks: e.target.value })}
+                                                placeholder="e.g. 132/200 or 65%"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-application-fee">Application Fee</label>
+                                            <input
+                                                id="quick-application-fee"
+                                                type="text"
+                                                value={formData.applicationFee}
+                                                onChange={(e) => setFormData({ ...formData, applicationFee: e.target.value })}
+                                                placeholder="e.g., ₹500 / NIL"
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-external-link">External Link</label>
+                                            <input
+                                                id="quick-external-link"
+                                                type="url"
+                                                value={formData.externalLink}
+                                                onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, externalLink: true }))}
+                                                className={showExternalLinkError ? 'field-invalid' : ''}
+                                                aria-invalid={showExternalLinkError || undefined}
+                                                aria-describedby="quick-external-link-error"
+                                            />
+                                            {showExternalLinkError && (
+                                                <span id="quick-external-link-error" className="field-error" role="alert">Enter a valid URL starting with http or https.</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row two-col">
+                                        <div className="form-group">
+                                            <label htmlFor="quick-status">Status</label>
+                                            <select
+                                                id="quick-status"
+                                                value={formData.status}
+                                                onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
+                                            >
+                                                {STATUS_OPTIONS.map((option) => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="quick-publish-at">
+                                                Publish at
+                                                {formData.status !== 'scheduled' && (
+                                                    <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
+                                                )}
+                                            </label>
+                                            <DatePicker
+                                                id="quick-publish-at"
+                                                selected={parseDateTime(formData.publishAt)}
+                                                onChange={(date) => {
+                                                    setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
+                                                    setTouchedFields((prev) => ({ ...prev, publishAt: true }));
+                                                }}
+                                                onBlur={() => setTouchedFields((prev) => ({ ...prev, publishAt: true }))}
+                                                placeholderText="Select date & time"
+                                                className={`admin-datepicker-input ${showPublishAtError ? 'field-invalid' : ''}`}
+                                                calendarClassName="admin-datepicker-calendar"
+                                                popperClassName="admin-datepicker-popper"
+                                                dateFormat="dd MMM yyyy, h:mm aa"
+                                                showTimeSelect
+                                                timeIntervals={15}
+                                                disabled={formData.status !== 'scheduled'}
+                                                aria-describedby="quick-publish-hint"
+                                            />
+                                            {formData.status !== 'scheduled' && (
+                                                <p className="field-hint">Enabled only when Status is Scheduled.</p>
+                                            )}
+                                            {formData.status === 'scheduled' && (
+                                                <p className="field-hint">Time zone: {timeZoneLabel}</p>
+                                            )}
+                                            {showPublishAtError && (
+                                                <span id="quick-publish-hint" className="field-error" role="alert">Publish time is required for scheduled posts.</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {formWarnings.length > 0 && (
+                                        <div className="qa-panel">
+                                            <h4>QA checks</h4>
+                                            <ul>
+                                                {formWarnings.map((warning) => {
+                                                    const tone = getWarningTone(warning);
+                                                    return (
+                                                        <li key={warning} className={`qa-item ${tone}`}>
+                                                            <span className="qa-badge" aria-hidden="true">
+                                                                {tone === 'critical' ? '🔴' : '🟡'}
+                                                            </span>
+                                                            <span>{warning}</span>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    <div className="form-actions">
+                                        <button type="submit" className="admin-btn primary">Save Announcement</button>
+                                        <button type="button" className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
                         )}
-                    </div>
-                ) : activeAdminTab === 'security' ? (
-                    <div className="admin-security">
-                        <div className="admin-security-grid">
-                            <div className="admin-security-card">
-                                <div className="security-card-header">
-                                    <div>
-                                        <h4>Two-factor recovery</h4>
-                                        <p className="admin-subtitle">Generate backup codes for account recovery.</p>
-                                    </div>
-                                    <span className="security-card-pill">
-                                        {backupCodesStatus
-                                            ? `${backupCodesStatus.remaining}/${backupCodesStatus.total} remaining`
-                                            : 'Not generated'}
-                                    </span>
-                                </div>
-                                <div className="security-card-body">
-                                    <div className="security-stat">
-                                        <span className="stat-label">Backup codes remaining</span>
-                                        <span className="stat-value">{backupCodesStatus?.remaining ?? 0}</span>
-                                    </div>
-                                    <div className="security-stat">
-                                        <span className="stat-label">Last generated</span>
-                                        <span className="stat-value">
-                                            {backupCodesStatus?.updatedAt ? formatDateTime(backupCodesStatus.updatedAt) : 'Not generated'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="security-card-actions">
-                                    {canWriteAdmin && (
-                                        <button
-                                            className="admin-btn primary small"
-                                            onClick={generateBackupCodes}
-                                            disabled={backupCodesLoading}
-                                        >
-                                            {backupCodesLoading ? 'Generating…' : 'Generate backup codes'}
-                                        </button>
-                                    )}
-                                    <button
-                                        className="admin-btn secondary small"
-                                        onClick={refreshBackupCodesStatus}
-                                        disabled={backupCodesLoading}
-                                    >
-                                        Refresh status
-                                    </button>
-                                </div>
-                                <p className="security-card-note">
-                                    Generate a new set to invalidate old codes and store them somewhere safe.
-                                </p>
-                            </div>
-
-                            <div className="admin-security-card">
-                                <div className="security-card-header">
-                                    <div>
-                                        <h4>Session health</h4>
-                                        <p className="admin-subtitle">Monitor active sessions and risk signals.</p>
-                                    </div>
-                                    <span className="security-card-pill">{sessions.length} total</span>
-                                </div>
-                                <div className="security-card-body">
-                                    <div className="security-stat">
-                                        <span className="stat-label">Active now</span>
-                                        <span className="stat-value">{activeSessionCount}</span>
-                                    </div>
-                                    <div className="security-stat">
-                                        <span className="stat-label">High risk</span>
-                                        <span className="stat-value">{highRiskSessionCount}</span>
-                                    </div>
-                                </div>
-                                <div className="security-card-actions">
-                                    <button
-                                        className="admin-btn secondary small"
-                                        onClick={refreshSessions}
-                                        disabled={sessionsLoading}
-                                    >
-                                        {sessionsLoading ? 'Refreshing…' : 'Refresh sessions'}
-                                    </button>
-                                    {sessions.length > 1 && (
-                                        <button
-                                            className="admin-btn warning small"
-                                            onClick={terminateOtherSessions}
-                                            disabled={sessionsLoading || !canWriteAdmin}
-                                        >
-                                            End other sessions
-                                        </button>
-                                    )}
-                                </div>
-                                <p className="security-card-note">
-                                    Terminate unknown sessions immediately if you see unfamiliar devices.
-                                </p>
-                            </div>
-                        </div>
-
-                        {sessionsError && <div className="admin-error">{sessionsError}</div>}
-
-                        <Suspense fallback={<div className="admin-loading">Loading sessions...</div>}>
-                            <SessionManager
-                                sessions={sessions}
-                                onTerminateSession={terminateSession}
-                                onTerminateAllOther={terminateOtherSessions}
-                                onRefresh={refreshSessions}
-                                loading={sessionsLoading}
-                                canManage={canWriteAdmin}
-                            />
-                        </Suspense>
-
-                        <Suspense fallback={<div className="admin-loading">Loading security logs...</div>}>
-                            <SecurityLogsTable onUnauthorized={handleUnauthorized} />
-                        </Suspense>
-                    </div>
-                ) : (
-                    <div className="admin-form-container">
-                        <form onSubmit={handleSubmit} className="admin-form">
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="quick-title">
-                                        Title <span className="field-required">*</span>
-                                    </label>
-                                    <input
-                                        id="quick-title"
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, title: true }))}
-                                        placeholder="e.g. SSC CGL 2025 Recruitment"
-                                        required
-                                        className={showTitleError ? 'field-invalid' : titleValid ? 'field-valid' : ''}
-                                        aria-invalid={showTitleError || undefined}
-                                        aria-describedby="quick-title-error"
-                                    />
-                                    {showTitleError && (
-                                        <span id="quick-title-error" className="field-error" role="alert">Title must be at least 10 characters.</span>
-                                    )}
-                                    <div className="field-meta">
-                                        <span className={`field-status ${titleValid ? 'ok' : 'warn'}`}>
-                                            {titleValid ? '✓ Looks good' : 'Needs 10+ characters'}
-                                        </span>
-                                        <span className="field-count">{titleLength}/50</span>
-                                    </div>
-                                    <div className="field-progress">
-                                        <span style={{ width: `${titleProgress}%` }} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-type">Type *</label>
-                                    <select id="quick-type" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as ContentType })}>
-                                        <option value="job">Job</option>
-                                        <option value="result">Result</option>
-                                        <option value="admit-card">Admit Card</option>
-                                        <option value="answer-key">Answer Key</option>
-                                        <option value="admission">Admission</option>
-                                        <option value="syllabus">Syllabus</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-category">Category *</label>
-                                    <input
-                                        id="quick-category-search"
-                                        type="search"
-                                        className="category-search"
-                                        placeholder="Filter categories"
-                                        value={categorySearch}
-                                        onChange={(e) => setCategorySearch(e.target.value)}
-                                        aria-label="Filter categories"
-                                    />
-                                    <select id="quick-category" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                                        {categoryOptions.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.icon} {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Rest of form fields - simplified for brevity, assume similar to original */}
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-organization">
-                                        Organization <span className="field-required">*</span>
-                                    </label>
-                                    <input
-                                        id="quick-organization"
-                                        type="text"
-                                        value={formData.organization}
-                                        onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, organization: true }))}
-                                        required
-                                        className={showOrganizationError ? 'field-invalid' : organizationValid ? 'field-valid' : ''}
-                                        aria-invalid={showOrganizationError || undefined}
-                                        aria-describedby="quick-organization-error"
-                                    />
-                                    {showOrganizationError && (
-                                        <span id="quick-organization-error" className="field-error" role="alert">Organization is required.</span>
-                                    )}
-                                    {organizationValid && (
-                                        <span className="field-status ok">✓ Looks good</span>
-                                    )}
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-location">Location</label>
-                                    <input
-                                        id="quick-location"
-                                        type="text"
-                                        value={formData.location}
-                                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-total-posts">Total Posts</label>
-                                    <input
-                                        id="quick-total-posts"
-                                        type="number"
-                                        value={formData.totalPosts}
-                                        onChange={(e) => setFormData({ ...formData, totalPosts: e.target.value })}
-                                        min={0}
-                                        step={1}
-                                        inputMode="numeric"
-                                        placeholder="e.g. 32679 (numbers only)"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-deadline">Last Date</label>
-                                    <DatePicker
-                                        id="quick-deadline"
-                                        selected={parseDateOnly(formData.deadline)}
-                                        onChange={(date) => {
-                                            setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
-                                            setTouchedFields((prev) => ({ ...prev, deadline: true }));
-                                        }}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, deadline: true }))}
-                                        placeholderText="Select deadline"
-                                        className={`admin-datepicker-input ${showDeadlineWarning ? 'field-warning' : ''}`}
-                                        calendarClassName="admin-datepicker-calendar"
-                                        popperClassName="admin-datepicker-popper"
-                                        dateFormat="dd MMM yyyy"
-                                        aria-describedby="quick-deadline-hint"
-                                    />
-                                    {showDeadlineWarning && (
-                                        <span id="quick-deadline-hint" className="field-error" role="alert">Deadline is in the past.</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-qualification">Qualification</label>
-                                    <input
-                                        id="quick-qualification"
-                                        type="text"
-                                        value={formData.minQualification}
-                                        onChange={(e) => setFormData({ ...formData, minQualification: e.target.value })}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-age-limit">Age Limit</label>
-                                    <input
-                                        id="quick-age-limit"
-                                        type="text"
-                                        value={formData.ageLimit}
-                                        onChange={(e) => setFormData({ ...formData, ageLimit: e.target.value })}
-                                        placeholder="e.g., 18-27 years"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-salary-min">Salary (Min)</label>
-                                    <input
-                                        id="quick-salary-min"
-                                        type="number"
-                                        value={formData.salaryMin}
-                                        onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
-                                        min={0}
-                                        step={1}
-                                        inputMode="numeric"
-                                        placeholder="e.g. 25000"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-salary-max">Salary (Max)</label>
-                                    <input
-                                        id="quick-salary-max"
-                                        type="number"
-                                        value={formData.salaryMax}
-                                        onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
-                                        min={0}
-                                        step={1}
-                                        inputMode="numeric"
-                                        placeholder="e.g. 55000"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-difficulty">Difficulty</label>
-                                    <select
-                                        id="quick-difficulty"
-                                        value={formData.difficulty}
-                                        onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as 'easy' | 'medium' | 'hard' | '' })}
-                                    >
-                                        <option value="">Not specified</option>
-                                        <option value="easy">Easy</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="hard">Hard</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-cutoff">Previous Cutoff</label>
-                                    <input
-                                        id="quick-cutoff"
-                                        type="text"
-                                        value={formData.cutoffMarks}
-                                        onChange={(e) => setFormData({ ...formData, cutoffMarks: e.target.value })}
-                                        placeholder="e.g. 132/200 or 65%"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-application-fee">Application Fee</label>
-                                    <input
-                                        id="quick-application-fee"
-                                        type="text"
-                                        value={formData.applicationFee}
-                                        onChange={(e) => setFormData({ ...formData, applicationFee: e.target.value })}
-                                        placeholder="e.g., ₹500 / NIL"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-external-link">External Link</label>
-                                    <input
-                                        id="quick-external-link"
-                                        type="url"
-                                        value={formData.externalLink}
-                                        onChange={(e) => setFormData({ ...formData, externalLink: e.target.value })}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, externalLink: true }))}
-                                        className={showExternalLinkError ? 'field-invalid' : ''}
-                                        aria-invalid={showExternalLinkError || undefined}
-                                        aria-describedby="quick-external-link-error"
-                                    />
-                                    {showExternalLinkError && (
-                                        <span id="quick-external-link-error" className="field-error" role="alert">Enter a valid URL starting with http or https.</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="form-row two-col">
-                                <div className="form-group">
-                                    <label htmlFor="quick-status">Status</label>
-                                    <select
-                                        id="quick-status"
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as AnnouncementStatus })}
-                                    >
-                                        {STATUS_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="quick-publish-at">
-                                        Publish at
-                                        {formData.status !== 'scheduled' && (
-                                            <span className="field-lock" title="Enabled only when Status is Scheduled">🔒</span>
-                                        )}
-                                    </label>
-                                    <DatePicker
-                                        id="quick-publish-at"
-                                        selected={parseDateTime(formData.publishAt)}
-                                        onChange={(date) => {
-                                            setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
-                                            setTouchedFields((prev) => ({ ...prev, publishAt: true }));
-                                        }}
-                                        onBlur={() => setTouchedFields((prev) => ({ ...prev, publishAt: true }))}
-                                        placeholderText="Select date & time"
-                                        className={`admin-datepicker-input ${showPublishAtError ? 'field-invalid' : ''}`}
-                                        calendarClassName="admin-datepicker-calendar"
-                                        popperClassName="admin-datepicker-popper"
-                                        dateFormat="dd MMM yyyy, h:mm aa"
-                                        showTimeSelect
-                                        timeIntervals={15}
-                                        disabled={formData.status !== 'scheduled'}
-                                        aria-describedby="quick-publish-hint"
-                                    />
-                                    {formData.status !== 'scheduled' && (
-                                        <p className="field-hint">Enabled only when Status is Scheduled.</p>
-                                    )}
-                                    {formData.status === 'scheduled' && (
-                                        <p className="field-hint">Time zone: {timeZoneLabel}</p>
-                                    )}
-                                    {showPublishAtError && (
-                                        <span id="quick-publish-hint" className="field-error" role="alert">Publish time is required for scheduled posts.</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {formWarnings.length > 0 && (
-                                <div className="qa-panel">
-                                    <h4>QA checks</h4>
-                                    <ul>
-                                        {formWarnings.map((warning) => {
-                                            const tone = getWarningTone(warning);
-                                            return (
-                                                <li key={warning} className={`qa-item ${tone}`}>
-                                                    <span className="qa-badge" aria-hidden="true">
-                                                        {tone === 'critical' ? '🔴' : '🟡'}
-                                                    </span>
-                                                    <span>{warning}</span>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                </div>
-                            )}
-
-                            <div className="form-actions">
-                                <button type="submit" className="admin-btn primary">Save Announcement</button>
-                                <button type="button" className="admin-btn secondary" onClick={() => setActiveAdminTab('list')}>Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                )}
                     </section>
                 </div>
             </div>
@@ -5092,12 +5092,12 @@ export function AdminPage() {
                             aria-labelledby="preview-title"
                             aria-describedby="preview-desc"
                             style={{
-                            maxWidth: '1000px',
-                            margin: '0 auto',
-                            background: 'var(--bg-primary, white)',
-                            borderRadius: '16px',
-                            overflow: 'hidden'
-                        }}>
+                                maxWidth: '1000px',
+                                margin: '0 auto',
+                                background: 'var(--bg-primary, white)',
+                                borderRadius: '16px',
+                                overflow: 'hidden'
+                            }}>
                             <div className="preview-header" style={{
                                 background: 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%)',
                                 color: 'white',

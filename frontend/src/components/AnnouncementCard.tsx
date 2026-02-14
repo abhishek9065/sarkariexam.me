@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { AnnouncementCard as CardType, ContentType } from '../types';
+import { buildAnnouncementDetailPath, type SourceTag } from '../utils/trackingLinks';
 
 const TYPE_LABELS: Record<ContentType, string> = {
     job: 'Job',
@@ -48,14 +49,16 @@ interface Props {
     card: CardType;
     /** Show type badge. Defaults to true */
     showType?: boolean;
+    /** Optional source tagging for analytics attribution */
+    sourceTag?: SourceTag;
 }
 
-export function AnnouncementCard({ card, showType = true }: Props) {
+export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
     const deadlineInfo = getDeadlineStatus(card.deadline);
-    const detailPath = `/${card.type}/${card.slug}`;
+    const detailPath = buildAnnouncementDetailPath(card.type, card.slug, sourceTag);
 
     return (
-        <Link to={detailPath} className="announcement-card card card-clickable">
+        <Link to={detailPath} className="announcement-card card card-clickable" data-source={sourceTag}>
             <div className="announcement-card-header">
                 {showType && (
                     <span className={`badge badge-${card.type}`}>

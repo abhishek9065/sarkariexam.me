@@ -315,6 +315,8 @@ export function AnalyticsDashboard({
     const [rangeDays, setRangeDays] = useState(30);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
     const [showExportPreview, setShowExportPreview] = useState(false);
+    const [showExportDropdown, setShowExportDropdown] = useState(false);
+    const [popularPage, setPopularPage] = useState(0);
     const [numberLocale, setNumberLocale] = useState(() => {
         if (typeof window === 'undefined') return 'en-IN';
         try {
@@ -614,7 +616,10 @@ export function AnalyticsDashboard({
     const viewsDeltaTone = viewsDeltaPct === null ? 'flat' : viewsDeltaPct >= 0 ? 'up' : 'down';
     const searchesDeltaTone = searchesDeltaPct === null ? 'flat' : searchesDeltaPct >= 0 ? 'up' : 'down';
     const trendListRows = trendRows.slice(-10).reverse();
-    const popularItems = popular.slice(0, 8);
+    const POPULAR_PAGE_SIZE = 5;
+    const popularTotalPages = Math.max(1, Math.ceil(popular.length / POPULAR_PAGE_SIZE));
+    const safePopularPage = Math.min(popularPage, popularTotalPages - 1);
+    const popularItems = popular.slice(safePopularPage * POPULAR_PAGE_SIZE, (safePopularPage + 1) * POPULAR_PAGE_SIZE);
     const funnel = analytics.funnel;
     const rawDetailViews = funnel?.detailViewsRaw ?? funnel?.detailViews ?? 0;
     const adjustedDetailViews = funnel?.detailViewsAdjusted ?? funnel?.detailViews ?? 0;
@@ -653,11 +658,11 @@ export function AnalyticsDashboard({
     ];
 
     // Recalculate coverage if 0 but we have views
-    const calculatedCoverage = analytics.totalViews > 0 
-        ? Math.round((analytics.totalListingViews / analytics.totalViews) * 100) 
+    const calculatedCoverage = analytics.totalViews > 0
+        ? Math.round((analytics.totalListingViews / analytics.totalViews) * 100)
         : 0;
-    const finalCoverage = (listingCoverage === 0 && analytics.totalListingViews > 0) 
-        ? calculatedCoverage 
+    const finalCoverage = (listingCoverage === 0 && analytics.totalListingViews > 0)
+        ? calculatedCoverage
         : listingCoverage;
     const finalCoverageTone = finalCoverage >= 25 ? 'good' : finalCoverage >= 10 ? 'warn' : 'bad';
     const coverageMetaText = finalCoverage === 0
@@ -722,8 +727,10 @@ export function AnalyticsDashboard({
                 <button
                     className="admin-btn secondary small"
                     onClick={() => setLiveEnabled((prev) => !prev)}
+                    aria-pressed={liveEnabled}
+                    title={liveEnabled ? 'Click to pause live updates' : 'Click to resume live updates'}
                 >
-                    {liveEnabled ? 'Pause live' : 'Resume live'}
+                    {liveEnabled ? '⏸ Pause live' : '▶ Resume live'}
                 </button>
                 <button
                     className="admin-btn secondary"
@@ -732,15 +739,34 @@ export function AnalyticsDashboard({
                 >
                     {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
-                <button
-                    className="admin-btn secondary"
-                    onClick={() => setShowExportPreview((prev) => !prev)}
-                >
-                    {showExportPreview ? 'Hide preview' : 'Preview export'}
-                </button>
-                <button className="admin-btn secondary" onClick={handleExport} disabled={exporting}>
-                    {exporting ? 'Exporting...' : 'Export CSV'}
-                </button>
+                <div className="export-dropdown-wrap">
+                    <button
+                        className="admin-btn secondary"
+                        onClick={() => setShowExportDropdown((prev) => !prev)}
+                        aria-expanded={showExportDropdown}
+                        aria-haspopup="true"
+                    >
+                        Export ▾
+                    </button>
+                    {showExportDropdown && (
+                        <div className="export-dropdown-menu" role="menu">
+                            <button
+                                role="menuitem"
+                                onClick={() => { setShowExportPreview((prev) => !prev); setShowExportDropdown(false); }}
+                            >
+                                {showExportPreview ? '👁 Hide preview' : '👁 Preview export'}
+                            </button>
+                            <div className="export-dropdown-divider" />
+                            <button
+                                role="menuitem"
+                                onClick={() => { handleExport(); setShowExportDropdown(false); }}
+                                disabled={exporting}
+                            >
+                                {exporting ? '⏳ Exporting…' : '📥 Download CSV'}
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
             {actionMessage && (
                 <div className="analytics-note" role="status">{actionMessage}</div>
@@ -752,7 +778,10 @@ export function AnalyticsDashboard({
                         <span className="analytics-preview-meta">Showing the latest {previewRows.length} rollups</span>
                     </div>
                     {previewRows.length === 0 ? (
-                        <div className="empty-state">No rollup data yet. Generate traffic to preview exports.</div>
+                        <div className="empty-state">
+                            <span className="empty-state-icon" aria-hidden="true">📊</span>
+                            <span>No rollup data yet. Generate traffic to preview exports.</span>
+                        </div>
                     ) : (
                         <table className="analytics-table">
                             <thead>
@@ -788,7 +817,7 @@ export function AnalyticsDashboard({
                         {viewsDeltaPct === null ? 'No prior 7d data' : `${viewsDeltaPct > 0 ? '+' : ''}${viewsDeltaPct}% vs prev 7d`}
                     </div>
                 </div>
-                <div className={`kpi-card ${ctrTone}`}>
+                <div className={`kpi-card ${ctrTone}`} title={`CTR tone: ${ctrTone || 'neutral'} — ${ctr >= 10 ? 'Good (≥10%)' : ctr >= 5 ? 'Moderate (5–9%)' : 'Low (<5%)'}`}>
                     <div className="kpi-label">CTR last 30 days</div>
                     <div className="kpi-value">{ctr}%</div>
                     <div className="kpi-sub">Card clicks / listing views</div>
@@ -822,25 +851,28 @@ export function AnalyticsDashboard({
                                 className="admin-btn secondary small"
                                 onClick={() => setShowZeroTrend((prev) => !prev)}
                             >
-                                {showZeroTrend ? 'Hide zero days' : `Show zero days (${zeroTrendCount})`}
+                                {showZeroTrend ? 'Hide days with no traffic' : `Include ${zeroTrendCount} days with no traffic`}
                             </button>
                         </div>
                     )}
                 </div>
                 {trendRows.length === 0 ? (
-                    <div className="empty-state">No rollup data yet. Publish a few announcements to start tracking trends.</div>
+                    <div className="empty-state">
+                        <span className="empty-state-icon" aria-hidden="true">📈</span>
+                        <span>No rollup data yet. Publish a few announcements to start tracking trends.</span>
+                    </div>
                 ) : (
                     <>
                         <div className="trend-chart-wrap">
+                            <div className="trend-legend">
+                                <span className="legend-item views">Views</span>
+                                <span className="legend-item searches">Searches</span>
+                            </div>
                             <TrendChart data={trendRows.map((item) => ({
                                 date: item.date,
                                 views: item.views ?? 0,
                                 searches: item.searches ?? 0,
                             }))} />
-                            <div className="trend-legend">
-                                <span className="legend-item views">Views</span>
-                                <span className="legend-item searches">Searches</span>
-                            </div>
                         </div>
                         <div className="trend-list">
                             {trendListRows.map((item) => (
@@ -868,7 +900,7 @@ export function AnalyticsDashboard({
             {/* Stats Cards */}
             <div className="stats-grid">
                 <div className="stat-card views">
-                    <div className="stat-icon" aria-hidden="true">V</div>
+                    <div className="stat-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg></div>
                     <div className="stat-info">
                         <div className="stat-value">{formatMetric(analytics.totalViews)}</div>
                         <div className="stat-label">Total Views</div>
@@ -884,7 +916,7 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 <div className="stat-card posts">
-                    <div className="stat-icon" aria-hidden="true">A</div>
+                    <div className="stat-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg></div>
                     <div className="stat-info">
                         <div className="stat-value">{formatMetric(analytics.totalAnnouncements)}</div>
                         <div className="stat-label">Announcements</div>
@@ -892,7 +924,7 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 <div className="stat-card subscribers">
-                    <div className="stat-icon" aria-hidden="true">E</div>
+                    <div className="stat-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg></div>
                     <div className="stat-info">
                         <div className="stat-value">{formatMetric(analytics.totalEmailSubscribers)}</div>
                         <div className="stat-label">Email Subscribers</div>
@@ -900,7 +932,7 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 <div className="stat-card push">
-                    <div className="stat-icon" aria-hidden="true">P</div>
+                    <div className="stat-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg></div>
                     <div className="stat-info">
                         <div className="stat-value">{formatMetric(analytics.totalPushSubscribers)}</div>
                         <div className="stat-label">Push Subscribers</div>
@@ -951,7 +983,7 @@ export function AnalyticsDashboard({
                         <div className="engagement-value">{formatMetric(analytics.totalFilterApplies)}</div>
                     </div>
                     <div className={`engagement-card ${ctrTone}`}>
-                        <div className="engagement-label">CTR</div>
+                        <div className="engagement-label" title="Click-Through Rate: percentage of listing views that resulted in card clicks">CTR</div>
                         <div className="engagement-value">{ctr}%</div>
                     </div>
                     <div className="engagement-card">
@@ -979,7 +1011,10 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 {totalTypeCount === 0 ? (
-                    <div className="empty-state">No content breakdown yet. Create announcements to see distribution.</div>
+                    <div className="empty-state">
+                        <span className="empty-state-icon" aria-hidden="true">🗂️</span>
+                        <span>No content breakdown yet. Create announcements to see distribution.</span>
+                    </div>
                 ) : (
                     <>
                         <div className="chart-container">
@@ -1036,7 +1071,10 @@ export function AnalyticsDashboard({
                     </div>
                 </div>
                 {topSearches.length === 0 ? (
-                    <div className="empty-state">No search terms tracked yet.</div>
+                    <div className="empty-state">
+                        <span className="empty-state-icon" aria-hidden="true">🔍</span>
+                        <span>No search terms tracked yet. Users need to search to populate this section.</span>
+                    </div>
                 ) : (
                     <table className="analytics-table">
                         <thead>
@@ -1072,70 +1110,99 @@ export function AnalyticsDashboard({
                         Open content list
                     </button>
                 </div>
-                {popularItems.length === 0 ? (
-                    <div className="empty-state">No popular announcements yet. Views will appear after traffic arrives.</div>
+                {popular.length === 0 ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon" aria-hidden="true">🏆</span>
+                        <span>No popular announcements yet. Views will appear after traffic arrives.</span>
+                    </div>
                 ) : (
-                    <table className="analytics-table popular-table">
-                        <thead>
-                            <tr>
-                                <th>Announcement</th>
-                                <th className="numeric">Views</th>
-                                <th>Status</th>
-                                <th className="numeric">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {popularItems.map((item) => (
-                                <tr key={item.id}>
-                                    <td>
-                                        <div className="popular-title">
-                                            <span className={`type-badge ${item.type}`}>{item.type}</span>
-                                            <span>{item.title}</span>
-                                        </div>
-                                        <span className="popular-meta">{item.category || 'Uncategorized'}</span>
-                                    </td>
-                                    <td className="numeric">{formatMetric(item.viewCount)}</td>
-                                    <td>
-                                        <span className={`status-pill ${item.status === 'published' ? 'success' : item.status === 'archived' ? 'muted' : 'warning'}`}>
-                                            {item.status ?? 'published'}
-                                        </span>
-                                    </td>
-                                    <td className="numeric">
-                                        <div className="popular-actions">
-                                            <button
-                                                className="admin-btn secondary small"
-                                                type="button"
-                                                onClick={() => handlePopularView(item)}
-                                            >
-                                                View
-                                            </button>
-                                            <button
-                                                className="admin-btn secondary small"
-                                                type="button"
-                                                onClick={() => handlePopularEdit(item)}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                className="admin-btn warning small"
-                                                type="button"
-                                                onClick={() => handlePopularUnpublish(item)}
-                                            >
-                                                Unpublish
-                                            </button>
-                                            <button
-                                                className="admin-btn info small"
-                                                type="button"
-                                                onClick={handlePopularBoost}
-                                            >
-                                                Boost
-                                            </button>
-                                        </div>
-                                    </td>
+                    <>
+                        <table className="analytics-table popular-table">
+                            <thead>
+                                <tr>
+                                    <th>Announcement</th>
+                                    <th className="numeric">Views</th>
+                                    <th>Status</th>
+                                    <th className="numeric">Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {popularItems.map((item) => (
+                                    <tr key={item.id}>
+                                        <td>
+                                            <div className="popular-title">
+                                                <span className={`type-badge ${item.type}`}>{item.type}</span>
+                                                <span>{item.title}</span>
+                                            </div>
+                                            <span className="popular-meta">{item.category || 'Uncategorized'}</span>
+                                        </td>
+                                        <td className="numeric">{formatMetric(item.viewCount)}</td>
+                                        <td>
+                                            <span className={`status-pill ${item.status === 'published' ? 'success' : item.status === 'archived' ? 'muted' : 'warning'}`}>
+                                                {item.status ?? 'published'}
+                                            </span>
+                                        </td>
+                                        <td className="numeric">
+                                            <div className="popular-actions">
+                                                <button
+                                                    className="admin-btn secondary small"
+                                                    type="button"
+                                                    onClick={() => handlePopularView(item)}
+                                                >
+                                                    View
+                                                </button>
+                                                <button
+                                                    className="admin-btn secondary small"
+                                                    type="button"
+                                                    onClick={() => handlePopularEdit(item)}
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    className="admin-btn warning small"
+                                                    type="button"
+                                                    onClick={() => handlePopularUnpublish(item)}
+                                                >
+                                                    Unpublish
+                                                </button>
+                                                <button
+                                                    className="admin-btn info small"
+                                                    type="button"
+                                                    onClick={handlePopularBoost}
+                                                >
+                                                    Boost
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {popular.length > POPULAR_PAGE_SIZE && (
+                            <div className="table-pagination">
+                                <span>Showing {safePopularPage * POPULAR_PAGE_SIZE + 1}–{Math.min((safePopularPage + 1) * POPULAR_PAGE_SIZE, popular.length)} of {popular.length}</span>
+                                <div className="table-pagination-controls">
+                                    <button
+                                        className="admin-btn secondary small"
+                                        disabled={safePopularPage === 0}
+                                        onClick={() => setPopularPage((p) => Math.max(0, p - 1))}
+                                        type="button"
+                                    >
+                                        ← Prev
+                                    </button>
+                                    <span>{safePopularPage + 1} / {popularTotalPages}</span>
+                                    <button
+                                        className="admin-btn secondary small"
+                                        disabled={safePopularPage >= popularTotalPages - 1}
+                                        onClick={() => setPopularPage((p) => Math.min(popularTotalPages - 1, p + 1))}
+                                        type="button"
+                                    >
+                                        Next →
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -1153,17 +1220,17 @@ export function AnalyticsDashboard({
                         <div className="insight-meta">{formatMetric(viewsLast7)} vs {formatMetric(prev7Views)} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
-                        <div className="insight-label">Click-through rate</div>
+                        <div className="insight-label" title="Click-Through Rate: percentage of listing views that resulted in card clicks">Click-through rate</div>
                         <div className="insight-value">{insights?.clickThroughRate ?? ctr}%</div>
                         <div className="insight-meta">From listing views to card clicks</div>
                     </div>
                     <div className={`insight-card ${funnelDropTone}`}>
-                        <div className="insight-label">Drop-off rate</div>
+                        <div className="insight-label" title="Percentage of listing views that did not result in a card click">Drop-off rate</div>
                         <div className="insight-value">{insights?.funnelDropRate ?? 0}%</div>
                         <div className="insight-meta">Listing views not clicked</div>
                     </div>
                     <div className={`insight-card ${finalCoverageTone}`}>
-                        <div className="insight-label">Tracking coverage</div>
+                        <div className="insight-label" title="Listing views as a percentage of total page views — can exceed 100% if listings are viewed more than pages">Tracking coverage</div>
                         <div className="insight-value">{finalCoverage}%</div>
                         <div className="insight-meta">{coverageMetaText}</div>
                         {showCoverageAction && (

@@ -10,5 +10,8 @@ test.describe('Homepage dense layout', () => {
         await expect(page.locator('.home-column')).toHaveCount(3);
         await expect(page.locator('[data-testid="home-secondary-sections"] .home-horizontal')).toHaveCount(4);
         await expect(page.locator('[data-testid="popular-searches"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-admission-extended"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-admission-extended"] .home-admission-list li')).toHaveCount(10);
+        await expect(page.locator('[data-testid="home-educational-content"]')).toBeVisible();
     });
 });

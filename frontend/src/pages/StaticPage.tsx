@@ -1,6 +1,7 @@
+import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 
-type PageType = 'about' | 'contact' | 'privacy' | 'disclaimer';
+type PageType = 'about' | 'contact' | 'privacy' | 'disclaimer' | 'advertise';
 
 const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element }> = {
     about: {
@@ -120,6 +121,34 @@ const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element
             </>
         ),
     },
+    advertise: {
+        title: 'Advertise With Us',
+        icon: '📣',
+        body: (
+            <>
+                <p>
+                    Reach active government exam and job-seeking audiences through placements across homepage,
+                    category listings, and high-traffic update pages.
+                </p>
+                <h2>Available Inventory</h2>
+                <ul>
+                    <li>Homepage spotlight placements</li>
+                    <li>Category page banner placements</li>
+                    <li>Newsletter and digest sponsorship slots</li>
+                    <li>Campaign-specific promoted update cards</li>
+                </ul>
+                <h2>Media Kit & Contact</h2>
+                <p>
+                    For pricing, traffic snapshots, and package options, contact:
+                    <br />
+                    <a href="mailto:contact@sarkariexams.me" className="contact-link">contact@sarkariexams.me</a>
+                </p>
+                <p className="text-muted">
+                    We review requests within 2 business days and share a tailored plan based on campaign goals.
+                </p>
+            </>
+        ),
+    },
 };
 
 export function StaticPage({ type }: { type: PageType }) {
@@ -130,8 +159,20 @@ export function StaticPage({ type }: { type: PageType }) {
             <article className="static-page animate-fade-in">
                 <div className="static-header">
                     <span className="static-icon">{page.icon}</span>
-                    <h1>{page.title}</h1>
+                    <div>
+                        <h1>{page.title}</h1>
+                        <p className="text-muted">SarkariExams information center</p>
+                    </div>
                 </div>
+
+                <nav className="static-quick-links">
+                    <Link to="/jobs">Latest Jobs</Link>
+                    <Link to="/results">Results</Link>
+                    <Link to="/admit-card">Admit Card</Link>
+                    <Link to="/contact">Contact</Link>
+                    <Link to="/advertise">Advertise</Link>
+                </nav>
+
                 <div className="static-content">
                     {page.body}
                 </div>

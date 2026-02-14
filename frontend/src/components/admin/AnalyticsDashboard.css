@@ -58,8 +58,20 @@
 
 .range-toggle {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 0;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.range-toggle .admin-btn {
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border-primary);
+}
+
+.range-toggle .admin-btn:last-child {
+  border-right: none;
 }
 
 .locale-toggle {
@@ -373,7 +385,7 @@
   opacity: 0.8;
 }
 
-.analytics-section > * {
+.analytics-section>* {
   position: relative;
   z-index: 1;
 }
@@ -552,8 +564,9 @@
 .analytics-table thead th {
   text-align: left;
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
   color: var(--text-muted);
   background: rgba(15, 23, 42, 0.9);
 }
@@ -632,8 +645,8 @@
 
 .engagement-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
 }
 
 .engagement-hint {
@@ -1016,8 +1029,8 @@
 
 .ctr-bar {
   position: relative;
-  width: 90px;
-  height: 6px;
+  width: 120px;
+  height: 10px;
   border-radius: var(--radius-full);
   background: var(--bg-secondary);
   overflow: hidden;
@@ -1165,5 +1178,191 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Status Pills */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+  line-height: 1.4;
+}
+
+.status-pill.success {
+  color: var(--accent-green);
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.status-pill.warning {
+  color: var(--accent-yellow);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.status-pill.muted {
+  color: var(--text-muted);
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.3);
+}
+
+.status-pill.info {
+  color: var(--accent-blue);
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+/* Empty States */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  border: 1px dashed var(--border-primary);
+  border-radius: var(--radius-xl);
+  background: rgba(12, 19, 36, 0.3);
+}
+
+.empty-state-icon {
+  font-size: 28px;
+  opacity: 0.5;
+}
+
+.empty-state-action {
+  margin-top: 4px;
+}
+
+/* Hover Micro-interactions */
+.insight-card {
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.insight-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.funnel-card {
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.funnel-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.category-chip {
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.category-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(76, 201, 240, 0.45);
+}
+
+.analytics-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.breakdown-item {
+  transition: transform var(--transition-fast);
+}
+
+.breakdown-item:hover {
+  transform: translateX(2px);
+}
+
+/* Pagination */
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-primary);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.table-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.table-pagination-controls .admin-btn {
+  min-width: 32px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* Export Dropdown */
+.export-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+  padding: 4px 0;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.export-dropdown-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.export-dropdown-menu button:hover {
+  background: rgba(76, 201, 240, 0.12);
+}
+
+.export-dropdown-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-dropdown-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-primary);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

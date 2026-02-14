@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SkeletonLoader } from './components/SkeletonLoader';
@@ -28,52 +29,55 @@ function SuspenseFallback() {
 export default function App() {
     return (
         <ThemeProvider>
-            <BrowserRouter>
-                <AuthProvider>
-                    <ErrorBoundary>
-                        <Suspense fallback={<SuspenseFallback />}>
-                            <Routes>
-                                {/* Home */}
-                                <Route path="/" element={<HomePage />} />
-                                <Route path="/home" element={<HomePage />} />
+            <LanguageProvider>
+                <BrowserRouter>
+                    <AuthProvider>
+                        <ErrorBoundary>
+                            <Suspense fallback={<SuspenseFallback />}>
+                                <Routes>
+                                    {/* Home */}
+                                    <Route path="/" element={<HomePage />} />
+                                    <Route path="/home" element={<HomePage />} />
 
-                                {/* Category pages */}
-                                <Route path="/jobs" element={<CategoryPage type="job" />} />
-                                <Route path="/results" element={<CategoryPage type="result" />} />
-                                <Route path="/admit-card" element={<CategoryPage type="admit-card" />} />
-                                <Route path="/admit-cards" element={<CategoryPage type="admit-card" />} />
-                                <Route path="/answer-key" element={<CategoryPage type="answer-key" />} />
-                                <Route path="/admission" element={<CategoryPage type="admission" />} />
-                                <Route path="/syllabus" element={<CategoryPage type="syllabus" />} />
+                                    {/* Category pages */}
+                                    <Route path="/jobs" element={<CategoryPage type="job" />} />
+                                    <Route path="/results" element={<CategoryPage type="result" />} />
+                                    <Route path="/admit-card" element={<CategoryPage type="admit-card" />} />
+                                    <Route path="/admit-cards" element={<CategoryPage type="admit-card" />} />
+                                    <Route path="/answer-key" element={<CategoryPage type="answer-key" />} />
+                                    <Route path="/admission" element={<CategoryPage type="admission" />} />
+                                    <Route path="/syllabus" element={<CategoryPage type="syllabus" />} />
 
-                                {/* Detail pages */}
-                                <Route path="/job/:slug" element={<DetailPage type="job" />} />
-                                <Route path="/result/:slug" element={<DetailPage type="result" />} />
-                                <Route path="/admit-card/:slug" element={<DetailPage type="admit-card" />} />
-                                <Route path="/answer-key/:slug" element={<DetailPage type="answer-key" />} />
-                                <Route path="/admission/:slug" element={<DetailPage type="admission" />} />
-                                <Route path="/syllabus/:slug" element={<DetailPage type="syllabus" />} />
+                                    {/* Detail pages */}
+                                    <Route path="/job/:slug" element={<DetailPage type="job" />} />
+                                    <Route path="/result/:slug" element={<DetailPage type="result" />} />
+                                    <Route path="/admit-card/:slug" element={<DetailPage type="admit-card" />} />
+                                    <Route path="/answer-key/:slug" element={<DetailPage type="answer-key" />} />
+                                    <Route path="/admission/:slug" element={<DetailPage type="admission" />} />
+                                    <Route path="/syllabus/:slug" element={<DetailPage type="syllabus" />} />
 
-                                {/* Protected: User pages */}
-                                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                                <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
+                                    {/* Protected: User pages */}
+                                    <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                                    <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
 
-                                {/* Protected: Admin */}
-                                <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
+                                    {/* Protected: Admin */}
+                                    <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
 
-                                {/* Static pages */}
-                                <Route path="/about" element={<StaticPage type="about" />} />
-                                <Route path="/contact" element={<StaticPage type="contact" />} />
-                                <Route path="/privacy" element={<StaticPage type="privacy" />} />
-                                <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
+                                    {/* Static pages */}
+                                    <Route path="/about" element={<StaticPage type="about" />} />
+                                    <Route path="/contact" element={<StaticPage type="contact" />} />
+                                    <Route path="/privacy" element={<StaticPage type="privacy" />} />
+                                    <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
+                                    <Route path="/advertise" element={<StaticPage type="advertise" />} />
 
-                                {/* 404 */}
-                                <Route path="*" element={<NotFoundPage />} />
-                            </Routes>
-                        </Suspense>
-                    </ErrorBoundary>
-                </AuthProvider>
-            </BrowserRouter>
+                                    {/* 404 */}
+                                    <Route path="*" element={<NotFoundPage />} />
+                                </Routes>
+                            </Suspense>
+                        </ErrorBoundary>
+                    </AuthProvider>
+                </BrowserRouter>
+            </LanguageProvider>
         </ThemeProvider>
     );
 }

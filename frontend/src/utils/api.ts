@@ -194,6 +194,11 @@ export function getCategories() {
     return apiFetch<{ data: string[] }>('/announcements/meta/categories');
 }
 
+/** Get organizations */
+export function getOrganizations() {
+    return apiFetch<{ data: string[] }>('/announcements/meta/organizations');
+}
+
 /** Get tags */
 export function getTags() {
     return apiFetch<{ data: Tag[] }>('/announcements/meta/tags');
@@ -203,6 +208,12 @@ export function getTags() {
 export function getSearchSuggestions(q: string, type?: ContentType) {
     const qs = toQueryString({ q, type, limit: 8 });
     return apiFetch<{ data: SearchSuggestion[] }>(`/announcements/search/suggest${qs}`);
+}
+
+/** Trending searches */
+export function getTrendingSearches(days = 30, limit = 8) {
+    const qs = toQueryString({ days, limit });
+    return apiFetch<{ data: Array<{ query: string; count: number }> }>(`/announcements/search/trending${qs}`);
 }
 
 /* ─── Auth ─── */
@@ -248,6 +259,71 @@ export function addBookmark(announcementId: string) {
 
 export function removeBookmark(announcementId: string) {
     return apiFetch<void>(`/bookmarks/${announcementId}`, { method: 'DELETE' });
+}
+
+/* ─── Profile utility ─── */
+export interface ProfileWidgetData {
+    trackedCounts: Record<string, number>;
+    upcomingDeadlines: Array<{
+        id: string;
+        slug: string;
+        title: string;
+        type: ContentType;
+        deadline: string;
+        status: string;
+        daysRemaining: number;
+    }>;
+    recommendationCount: number;
+    savedSearchMatches: number;
+    generatedAt: string;
+    windowDays: number;
+}
+
+export interface SavedSearchItem {
+    id: string;
+    name: string;
+    query: string;
+    frequency: 'instant' | 'daily' | 'weekly';
+    notificationsEnabled: boolean;
+    updatedAt: string;
+}
+
+export interface UserNotificationItem {
+    id: string;
+    title: string;
+    type: ContentType;
+    slug?: string;
+    source: string;
+    createdAt: string;
+    readAt?: string | null;
+}
+
+export interface TrackedApplicationItem {
+    id: string;
+    slug: string;
+    title: string;
+    type: ContentType;
+    status: string;
+    deadline?: string | null;
+    updatedAt?: string | null;
+}
+
+export function getProfileWidgets(windowDays = 7) {
+    const qs = toQueryString({ windowDays });
+    return apiFetch<{ data: ProfileWidgetData }>(`/profile/widgets${qs}`);
+}
+
+export function getProfileSavedSearches() {
+    return apiFetch<{ data: SavedSearchItem[] }>('/profile/saved-searches');
+}
+
+export function getProfileNotifications(limit = 12) {
+    const qs = toQueryString({ limit });
+    return apiFetch<{ data: UserNotificationItem[]; unreadCount: number }>(`/profile/notifications${qs}`);
+}
+
+export function getTrackedApplications() {
+    return apiFetch<{ data: TrackedApplicationItem[] }>('/profile/tracked-applications');
 }
 
 /* ─── Re-export types for convenience ─── */

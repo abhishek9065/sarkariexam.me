@@ -109,7 +109,9 @@ export function QuickActions({
     if (actions.length === 0) {
         return (
             <div className="quick-actions-empty">
-                <span className="quick-actions-icon">✅</span>
+                <span className="quick-actions-icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
+                </span>
                 <span>All clear! No urgent actions needed.</span>
             </div>
         );
