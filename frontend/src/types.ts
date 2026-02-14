@@ -2,6 +2,38 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
+export type AdminPortalRole = 'admin' | 'editor' | 'reviewer' | 'viewer';
+export type AdminPermission =
+    | 'admin:read'
+    | 'admin:write'
+    | 'analytics:read'
+    | 'announcements:read'
+    | 'announcements:write'
+    | 'announcements:approve'
+    | 'announcements:delete'
+    | 'audit:read'
+    | 'security:read';
+export type AdminTab =
+    | 'analytics'
+    | 'list'
+    | 'review'
+    | 'add'
+    | 'detailed'
+    | 'bulk'
+    | 'queue'
+    | 'security'
+    | 'users'
+    | 'audit'
+    | 'community'
+    | 'errors'
+    | 'approvals';
+
+export interface AdminPermissionsSnapshot {
+    role: AdminPortalRole;
+    roles: Record<AdminPortalRole, string[]>;
+    tabs: Record<AdminTab, AdminPermission>;
+    highRiskActions: string[];
+}
 
 /* ─── Tags ─── */
 export interface Tag {
@@ -70,7 +102,7 @@ export interface User {
     id: string;
     email: string;
     username: string;
-    role: 'user' | 'admin' | 'editor' | 'reviewer' | 'viewer';
+    role: 'user' | AdminPortalRole;
     isActive?: boolean;
     createdAt?: string;
     lastLogin?: string;

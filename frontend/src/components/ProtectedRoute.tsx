@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function ProtectedRoute({ children, requireAdmin }: Props) {
-    const { user, loading, isAdmin } = useAuth();
+    const { user, loading, hasAdminPortalAccess } = useAuth();
 
     if (loading) {
         return <Layout><SkeletonLoader /></Layout>;
@@ -19,7 +19,7 @@ export function ProtectedRoute({ children, requireAdmin }: Props) {
         return <Navigate to="/?login=1" replace />;
     }
 
-    if (requireAdmin && !isAdmin) {
+    if (requireAdmin && !hasAdminPortalAccess) {
         return <Navigate to="/" replace />;
     }
 

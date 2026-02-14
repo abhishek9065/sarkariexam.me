@@ -78,7 +78,7 @@ function getDashboardStats(data: DashboardData | null): DashboardStats {
 }
 
 export default function AdminPage() {
-    const { user } = useAuth();
+    const { user, hasAdminPortalAccess, can } = useAuth();
     const [view, setView] = useState<ViewMode>('dashboard');
     const [dashData, setDashData] = useState<DashboardData | null>(null);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -89,7 +89,19 @@ export default function AdminPage() {
     const [search, setSearch] = useState('');
     const [offset, setOffset] = useState(0);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [accessNotice, setAccessNotice] = useState<string | null>(null);
     const LIMIT = 20;
+    const canReadAdmin = can('admin:read');
+    const canWriteAnnouncements = can('announcements:write');
+    const canDeleteAnnouncements = can('announcements:delete');
+
+    useEffect(() => {
+        if (!canWriteAnnouncements && (view === 'create' || view === 'edit')) {
+            setView('dashboard');
+            setEditingId(null);
+            setAccessNotice('Read-only role: changes are restricted for your account.');
+        }
+    }, [canWriteAnnouncements, view]);
 
     /* Dashboard data */
     useEffect(() => {
@@ -125,6 +137,10 @@ export default function AdminPage() {
 
     /* Delete */
     const handleDelete = async (id: string) => {
+        if (!canDeleteAnnouncements) {
+            setAccessNotice('Read-only role: changes are restricted for your account.');
+            return;
+        }
         if (!confirm('Delete this announcement permanently?')) return;
         try {
             await adminFetch(`/admin/announcements/${id}`, { method: 'DELETE' });
@@ -135,6 +151,21 @@ export default function AdminPage() {
         }
     };
 
+    if (!hasAdminPortalAccess || !canReadAdmin) {
+        return (
+            <Layout>
+                <div className="admin-page animate-fade-in">
+                    <div className="card" style={{ padding: 24 }}>
+                        <h2>Access denied</h2>
+                        <p className="text-muted" style={{ marginTop: 8 }}>
+                            Your account does not have permission to access the admin command center.
+                        </p>
+                    </div>
+                </div>
+            </Layout>
+        );
+    }
+
     return (
         <Layout>
             <div className="admin-page animate-fade-in">
@@ -142,6 +173,18 @@ export default function AdminPage() {
                     <h1>⚙️ Admin Panel</h1>
                     <span className="text-muted">Welcome, {user?.username}</span>
                 </div>
+
+                {!canWriteAnnouncements && (
+                    <div className="card" style={{ padding: 14, marginBottom: 16 }}>
+                        <strong>Read-only role: changes are restricted for your account.</strong>
+                    </div>
+                )}
+
+                {accessNotice && (
+                    <div className="card" style={{ padding: 14, marginBottom: 16 }}>
+                        {accessNotice}
+                    </div>
+                )}
 
                 {/* Nav */}
                 <div className="admin-nav">
@@ -151,14 +194,16 @@ export default function AdminPage() {
                     <button className={`admin-nav-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')}>
                         📋 Announcements
                     </button>
-                    <button className={`admin-nav-btn${view === 'create' ? ' active' : ''}`} onClick={() => { setView('create'); setEditingId(null); }}>
-                        ➕ Create New
-                    </button>
+                    {canWriteAnnouncements && (
+                        <button className={`admin-nav-btn${view === 'create' ? ' active' : ''}`} onClick={() => { setView('create'); setEditingId(null); }}>
+                            ➕ Create New
+                        </button>
+                    )}
                 </div>
 
                 {/* Dashboard view */}
                 {view === 'dashboard' && (
-                    <DashboardView data={dashData} onNavigate={setView} />
+                    <DashboardView data={dashData} onNavigate={setView} canWriteAnnouncements={canWriteAnnouncements} />
                 )}
 
                 {/* List view */}
@@ -204,8 +249,15 @@ export default function AdminPage() {
                                                     <td>{(a.viewCount ?? 0).toLocaleString()}</td>
                                                     <td>{new Date(a.postedAt).toLocaleDateString('en-IN')}</td>
                                                     <td className="admin-actions-cell">
-                                                        <button className="btn btn-ghost btn-sm" onClick={() => { setEditingId(a.id); setView('edit'); }} title="Edit">✏️</button>
-                                                        <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(a.id)} title="Delete">🗑️</button>
+                                                        {canWriteAnnouncements && (
+                                                            <button className="btn btn-ghost btn-sm" onClick={() => { setEditingId(a.id); setView('edit'); }} title="Edit">✏️</button>
+                                                        )}
+                                                        {canDeleteAnnouncements && (
+                                                            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(a.id)} title="Delete">🗑️</button>
+                                                        )}
+                                                        {!canWriteAnnouncements && !canDeleteAnnouncements && (
+                                                            <span className="text-muted">Read-only</span>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -227,7 +279,7 @@ export default function AdminPage() {
                 )}
 
                 {/* Create / Edit view */}
-                {(view === 'create' || view === 'edit') && (
+                {(view === 'create' || view === 'edit') && canWriteAnnouncements && (
                     <AnnouncementForm
                         announcementId={editingId}
                         onSaved={() => { setView('list'); loadList(0); }}
@@ -240,7 +292,15 @@ export default function AdminPage() {
 }
 
 /* ──────── Dashboard View ──────── */
-function DashboardView({ data, onNavigate }: { data: DashboardData | null; onNavigate: (v: ViewMode) => void }) {
+function DashboardView({
+    data,
+    onNavigate,
+    canWriteAnnouncements,
+}: {
+    data: DashboardData | null;
+    onNavigate: (v: ViewMode) => void;
+    canWriteAnnouncements: boolean;
+}) {
     if (!data) return <div style={{ textAlign: 'center', padding: 40 }}>Loading dashboard…</div>;
 
     const stats = getDashboardStats(data);
@@ -259,7 +319,9 @@ function DashboardView({ data, onNavigate }: { data: DashboardData | null; onNav
             <div className="admin-quick-actions">
                 <h3>Quick Actions</h3>
                 <div className="admin-actions-row">
-                    <button className="btn btn-accent" onClick={() => onNavigate('create')}>➕ Create Announcement</button>
+                    {canWriteAnnouncements && (
+                        <button className="btn btn-accent" onClick={() => onNavigate('create')}>➕ Create Announcement</button>
+                    )}
                     <button className="btn btn-outline" onClick={() => onNavigate('list')}>📋 View All Announcements</button>
                 </div>
             </div>

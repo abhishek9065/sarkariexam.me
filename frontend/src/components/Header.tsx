@@ -17,7 +17,7 @@ const NAV_LINKS = [
 
 export function Header() {
     const { theme, toggleTheme } = useTheme();
-    const { user, logout, isAdmin } = useAuth();
+    const { user, logout, hasAdminPortalAccess } = useAuth();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -91,7 +91,7 @@ export function Header() {
                                         <Link to="/bookmarks" className="user-dropdown-item" onClick={() => setUserMenuOpen(false)}>
                                             🔖 Bookmarks
                                         </Link>
-                                        {isAdmin && (
+                                        {hasAdminPortalAccess && (
                                             <Link to="/admin" className="user-dropdown-item" onClick={() => setUserMenuOpen(false)}>
                                                 ⚙️ Admin Panel
                                             </Link>
@@ -134,7 +134,7 @@ export function Header() {
                                 <>
                                     <Link to="/profile" className="header-mobile-link" onClick={() => setMobileOpen(false)}>👤 Profile</Link>
                                     <Link to="/bookmarks" className="header-mobile-link" onClick={() => setMobileOpen(false)}>🔖 Bookmarks</Link>
-                                    {isAdmin && <Link to="/admin" className="header-mobile-link" onClick={() => setMobileOpen(false)}>⚙️ Admin</Link>}
+                                    {hasAdminPortalAccess && <Link to="/admin" className="header-mobile-link" onClick={() => setMobileOpen(false)}>⚙️ Admin</Link>}
                                     <button className="header-mobile-link" style={{ textAlign: 'left', width: '100%', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', font: 'inherit', padding: 'inherit' }} onClick={() => { void logout(); setMobileOpen(false); }}>🚪 Sign Out</button>
                                 </>
                             ) : (
