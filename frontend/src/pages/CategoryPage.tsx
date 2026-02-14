@@ -62,7 +62,9 @@ export function CategoryPage({ type }: { type: ContentType }) {
             }
             setHasMore(res.hasMore ?? false);
             setNextCursor(res.nextCursor);
-            setTotal(res.total);
+            if (res.total !== undefined) {
+                setTotal(res.total);
+            }
         } catch (err) {
             console.error('Failed to fetch cards:', err);
         } finally {

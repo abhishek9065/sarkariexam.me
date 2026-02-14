@@ -429,6 +429,27 @@ router.get('/dashboard', async (_req, res) => {
             count: stats.count,
             views: stats.views
         }));
+        const statusMap = announcements.reduce<Record<string, number>>((acc, item) => {
+            const key = item.status || 'published';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+        const stats = {
+            total,
+            published: statusMap.published || 0,
+            draft: statusMap.draft || 0,
+            archived: statusMap.archived || 0,
+            users: totalUsers,
+            views: totalViews,
+        };
+        const recent = announcements
+            .slice()
+            .sort((a, b) => {
+                const aTime = new Date(a.updatedAt || a.postedAt).getTime();
+                const bTime = new Date(b.updatedAt || b.postedAt).getTime();
+                return bTime - aTime;
+            })
+            .slice(0, 8);
         const trends = await getDailyRollups(14);
 
         const topContent = announcements
@@ -445,6 +466,8 @@ router.get('/dashboard', async (_req, res) => {
 
         return res.json({
             data: {
+                stats,
+                recent,
                 overview: {
                     totalAnnouncements: total,
                     totalUsers,

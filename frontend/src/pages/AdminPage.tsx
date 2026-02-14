@@ -18,9 +18,24 @@ async function adminFetch<T>(path: string, options: RequestInit = {}): Promise<T
     return res.json();
 }
 
+interface DashboardStats {
+    total: number;
+    published: number;
+    draft: number;
+    archived: number;
+    users: number;
+    views: number;
+}
+
 interface DashboardData {
-    stats: { total: number; published: number; draft: number; archived: number; users: number; views: number };
-    recent: Announcement[];
+    stats?: Partial<DashboardStats>;
+    overview?: {
+        totalAnnouncements?: number;
+        totalUsers?: number;
+        totalViews?: number;
+        activeJobs?: number;
+    };
+    recent?: Announcement[];
 }
 
 interface AdminListResponse {
@@ -32,6 +47,35 @@ type ViewMode = 'dashboard' | 'list' | 'create' | 'edit';
 
 const STATUS_OPTIONS: AnnouncementStatus[] = ['draft', 'pending', 'published', 'archived'];
 const TYPE_OPTIONS: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'admission', 'syllabus'];
+
+const EMPTY_DASHBOARD_STATS: DashboardStats = {
+    total: 0,
+    published: 0,
+    draft: 0,
+    archived: 0,
+    users: 0,
+    views: 0,
+};
+
+function getDashboardStats(data: DashboardData | null): DashboardStats {
+    if (!data) return EMPTY_DASHBOARD_STATS;
+    if (data.stats) {
+        return {
+            ...EMPTY_DASHBOARD_STATS,
+            ...data.stats,
+        };
+    }
+    if (data.overview) {
+        return {
+            ...EMPTY_DASHBOARD_STATS,
+            total: data.overview.totalAnnouncements ?? 0,
+            published: data.overview.activeJobs ?? 0,
+            users: data.overview.totalUsers ?? 0,
+            views: data.overview.totalViews ?? 0,
+        };
+    }
+    return EMPTY_DASHBOARD_STATS;
+}
 
 export default function AdminPage() {
     const { user } = useAuth();
@@ -65,8 +109,8 @@ export default function AdminPage() {
             if (filterType) params.set('type', filterType);
             if (search.trim()) params.set('search', search.trim());
             const res = await adminFetch<AdminListResponse>(`/admin/announcements?${params}`);
-            setAnnouncements(res.data);
-            setTotal(res.total);
+            setAnnouncements(Array.isArray(res.data) ? res.data : []);
+            setTotal(typeof res.total === 'number' ? res.total : 0);
             setOffset(newOffset);
         } catch (err) {
             console.error('Admin list error:', err);
@@ -157,7 +201,7 @@ export default function AdminPage() {
                                                     <td className="admin-title-cell">{a.title}</td>
                                                     <td><span className={`badge badge-${a.type}`}>{a.type}</span></td>
                                                     <td><span className={`badge admin-status-${a.status}`}>{a.status}</span></td>
-                                                    <td>{a.viewCount.toLocaleString()}</td>
+                                                    <td>{(a.viewCount ?? 0).toLocaleString()}</td>
                                                     <td>{new Date(a.postedAt).toLocaleDateString('en-IN')}</td>
                                                     <td className="admin-actions-cell">
                                                         <button className="btn btn-ghost btn-sm" onClick={() => { setEditingId(a.id); setView('edit'); }} title="Edit">✏️</button>
@@ -169,7 +213,9 @@ export default function AdminPage() {
                                     </table>
                                 </div>
                                 <div className="admin-pagination">
-                                    <span className="text-muted">Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total}</span>
+                                    <span className="text-muted">
+                                        Showing {total === 0 ? 0 : offset + 1}–{total === 0 ? 0 : Math.min(offset + LIMIT, total)} of {total}
+                                    </span>
                                     <div className="admin-pagination-btns">
                                         <button className="btn btn-ghost btn-sm" disabled={offset === 0} onClick={() => loadList(Math.max(0, offset - LIMIT))}>← Prev</button>
                                         <button className="btn btn-ghost btn-sm" disabled={offset + LIMIT >= total} onClick={() => loadList(offset + LIMIT)}>Next →</button>
@@ -197,7 +243,7 @@ export default function AdminPage() {
 function DashboardView({ data, onNavigate }: { data: DashboardData | null; onNavigate: (v: ViewMode) => void }) {
     if (!data) return <div style={{ textAlign: 'center', padding: 40 }}>Loading dashboard…</div>;
 
-    const { stats } = data;
+    const stats = getDashboardStats(data);
 
     return (
         <div className="admin-dashboard">

@@ -16,11 +16,11 @@ const router = express.Router();
 
 // Add rate limiting info to responses
 router.use((req, res, next) => {
-    // Add API version header
-    res.set('X-API-Version', '2.0.0');
-    // Add request timestamp
-    res.set('X-Request-Time', new Date().toISOString());
-    next();
+  // Add API version header
+  res.set('X-API-Version', '2.0.0');
+  // Add request timestamp
+  res.set('X-Request-Time', new Date().toISOString());
+  next();
 });
 
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
@@ -263,10 +263,10 @@ router.get('/', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcement
     const announcements = await AnnouncementModel.findAll(filters);
 
     return res.json({ data: announcements, count: announcements.length });
-    } catch (error) {
+  } catch (error) {
     console.error('Error fetching announcements:', error);
     return res.status(500).json({ error: 'Failed to fetch announcements' });
-    }
+  }
 });
 
 // V2: Cursor-based pagination (faster for large datasets)
@@ -276,28 +276,28 @@ router.get(
   cacheControl(120),
   async (req, res) => {
     try {
-    const parseResult = cursorQuerySchema.safeParse(req.query);
-    if (!parseResult.success) {
-      return res.status(400).json({ error: parseResult.error.flatten() });
-    }
+      const parseResult = cursorQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+      }
 
-    const filters = parseResult.data;
-    const result = await AnnouncementModel.findAllWithCursor({
-      ...filters,
-      cursor: filters.cursor?.toString(),
-    });
+      const filters = parseResult.data;
+      const result = await AnnouncementModel.findAllWithCursor({
+        ...filters,
+        cursor: filters.cursor?.toString(),
+      });
 
-    return res.json({
-      data: result.data,
-      count: result.data.length,
-      nextCursor: result.nextCursor,
-      hasMore: result.hasMore,
-    });
+      return res.json({
+        data: result.data,
+        count: result.data.length,
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore,
+      });
     } catch (error) {
-    console.error('Error fetching announcements (v2):', error);
-    return res.status(500).json({ error: 'Failed to fetch announcements' });
+      console.error('Error fetching announcements (v2):', error);
+      return res.status(500).json({ error: 'Failed to fetch announcements' });
     }
-});
+  });
 
 // V3: OPTIMIZED listing cards (minimal fields, 60% less RU consumption)
 router.get(
@@ -330,48 +330,50 @@ router.get(
   cacheControl(120),
   async (req, res) => {
     try {
-    const parseResult = cursorQuerySchema.safeParse(req.query);
-    if (!parseResult.success) {
-      return res.status(400).json({ error: parseResult.error.flatten() });
-    }
+      const parseResult = cursorQuerySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.flatten() });
+      }
 
-    const filters = parseResult.data;
-    const result = await AnnouncementModel.findListingCards({
-      type: filters.type,
-      category: filters.category,
-      search: filters.search,
-      organization: filters.organization,
-      location: filters.location,
-      qualification: filters.qualification,
-      salaryMin: filters.salaryMin,
-      salaryMax: filters.salaryMax,
-      sort: filters.sort,
-      limit: filters.limit,
-      cursor: filters.cursor?.toString(),
-    });
+      const filters = parseResult.data;
+      const result = await AnnouncementModel.findListingCards({
+        type: filters.type,
+        category: filters.category,
+        search: filters.search,
+        organization: filters.organization,
+        location: filters.location,
+        qualification: filters.qualification,
+        salaryMin: filters.salaryMin,
+        salaryMax: filters.salaryMax,
+        sort: filters.sort,
+        limit: filters.limit,
+        cursor: filters.cursor?.toString(),
+        includeTotal: !filters.cursor, // Only fetch total on first page
+      });
 
-    recordListingAnalytics(req, {
-      count: result.data.length,
-      type: filters.type ?? null,
-      category: filters.category ?? null,
-      search: filters.search ?? null,
-      organization: filters.organization ?? null,
-      location: filters.location ?? null,
-      qualification: filters.qualification ?? null,
-      source: pickQueryValue(req.query.source) ?? null,
-    });
+      recordListingAnalytics(req, {
+        count: result.data.length,
+        type: filters.type ?? null,
+        category: filters.category ?? null,
+        search: filters.search ?? null,
+        organization: filters.organization ?? null,
+        location: filters.location ?? null,
+        qualification: filters.qualification ?? null,
+        source: pickQueryValue(req.query.source) ?? null,
+      });
 
-    return res.json({
-      data: result.data,
-      count: result.data.length,
-      nextCursor: result.nextCursor,
-      hasMore: result.hasMore,
-    });
+      return res.json({
+        data: result.data,
+        count: result.data.length,
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore,
+        total: result.total,
+      });
     } catch (error) {
-    console.error('Error fetching listing cards (v3):', error);
-    return res.status(500).json({ error: 'Failed to fetch listing cards' });
+      console.error('Error fetching listing cards (v3):', error);
+      return res.status(500).json({ error: 'Failed to fetch listing cards' });
     }
-});
+  });
 
 // Get categories - long cache (1 hour)
 router.get(
@@ -379,14 +381,14 @@ router.get(
   cacheMiddleware({ ttl: 3600, keyGenerator: cacheKeys.categories }),
   cacheControl(1800),
   async (_req, res) => {
-  try {
-    const categories = await AnnouncementModel.getCategories();
-    return res.json({ data: categories });
+    try {
+      const categories = await AnnouncementModel.getCategories();
+      return res.json({ data: categories });
     } catch (error) {
-    console.error('Error fetching categories:', error);
-    return res.status(500).json({ error: 'Failed to fetch categories' });
+      console.error('Error fetching categories:', error);
+      return res.status(500).json({ error: 'Failed to fetch categories' });
     }
-});
+  });
 
 // Get organizations - long cache (1 hour)
 router.get(
@@ -394,14 +396,14 @@ router.get(
   cacheMiddleware({ ttl: 3600, keyGenerator: cacheKeys.organizations }),
   cacheControl(1800),
   async (_req, res) => {
-  try {
-    const organizations = await AnnouncementModel.getOrganizations();
-    return res.json({ data: organizations });
+    try {
+      const organizations = await AnnouncementModel.getOrganizations();
+      return res.json({ data: organizations });
     } catch (error) {
-    console.error('Error fetching organizations:', error);
-    return res.status(500).json({ error: 'Failed to fetch organizations' });
+      console.error('Error fetching organizations:', error);
+      return res.status(500).json({ error: 'Failed to fetch organizations' });
     }
-});
+  });
 
 // Get tags - medium cache (30 min)
 router.get(
@@ -409,14 +411,14 @@ router.get(
   cacheMiddleware({ ttl: 1800, keyGenerator: cacheKeys.tags }),
   cacheControl(600),
   async (_req, res) => {
-  try {
-    const tags = await AnnouncementModel.getTags();
-    return res.json({ data: tags });
+    try {
+      const tags = await AnnouncementModel.getTags();
+      return res.json({ data: tags });
     } catch (error) {
-    console.error('Error fetching tags:', error);
-    return res.status(500).json({ error: 'Failed to fetch tags' });
+      console.error('Error fetching tags:', error);
+      return res.status(500).json({ error: 'Failed to fetch tags' });
     }
-});
+  });
 
 // Search suggestions for global overlay
 router.get(
@@ -562,24 +564,24 @@ router.get(
     try {
       const parseResult = searchQuerySchema.safeParse(req.query);
       if (!parseResult.success) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Invalid search parameters',
           details: parseResult.error.flatten().fieldErrors
         });
       }
 
       const filters = parseResult.data;
-      
+
       // Sanitize search query to prevent injection attacks
       const sanitizedQuery = filters.q.replace(/[<>"'&$]/g, '').trim();
       if (sanitizedQuery.length < 2) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Search query too short',
           message: 'Search query must be at least 2 characters after sanitization'
         });
       }
       const normalizedQuery = normalizeSearchTerm(sanitizedQuery);
-      
+
       const announcements = await AnnouncementModel.findAll({
         search: sanitizedQuery,
         type: filters.type,
@@ -621,23 +623,23 @@ router.get(
   }),
   cacheControl(300),
   async (req, res) => {
-  try {
-    const announcement = await AnnouncementModel.findBySlug(req.params.slug);
+    try {
+      const announcement = await AnnouncementModel.findBySlug(req.params.slug);
 
-    if (!announcement) {
-      return res.status(404).json({ error: 'Announcement not found' });
-    }
+      if (!announcement) {
+        return res.status(404).json({ error: 'Announcement not found' });
+      }
 
-    if (!isPrefetchRequest(req)) {
-      recordAnnouncementAnalytics(req, announcement);
-    }
+      if (!isPrefetchRequest(req)) {
+        recordAnnouncementAnalytics(req, announcement);
+      }
 
-    return res.json({ data: announcement });
+      return res.json({ data: announcement });
     } catch (error) {
-    console.error('Error fetching announcement:', error);
-    return res.status(500).json({ error: 'Failed to fetch announcement' });
+      console.error('Error fetching announcement:', error);
+      return res.status(500).json({ error: 'Failed to fetch announcement' });
     }
-});
+  });
 
 // Create announcement schema
 const createAnnouncementBaseSchema = z.object({
@@ -767,10 +769,10 @@ router.post('/', authenticateToken, requirePermission('announcements:write'), as
     });
 
     return res.status(201).json({ data: announcement });
-    } catch (error) {
+  } catch (error) {
     console.error('Error creating announcement:', error);
     return res.status(500).json({ error: 'Failed to create announcement' });
-    }
+  }
 });
 
 // Update announcement (admin only)
@@ -808,10 +810,10 @@ router.patch('/:id', authenticateToken, requirePermission('announcements:write')
     });
 
     return res.json({ data: announcement });
-    } catch (error) {
+  } catch (error) {
     console.error('Error updating announcement:', error);
     return res.status(500).json({ error: 'Failed to update announcement' });
-    }
+  }
 });
 
 
@@ -834,10 +836,10 @@ router.delete('/:id', authenticateToken, requirePermission('announcements:delete
     });
 
     return res.json({ message: 'Announcement deleted successfully' });
-    } catch (error) {
+  } catch (error) {
     console.error('Error deleting announcement:', error);
     return res.status(500).json({ error: 'Failed to delete announcement' });
-    }
+  }
 });
 
 // Export announcements as CSV (admin only)
@@ -867,10 +869,10 @@ router.get('/export/csv', authenticateToken, requirePermission('announcements:re
     res.setHeader('Content-Disposition', `attachment; filename="announcements-${new Date().toISOString().split('T')[0]}.csv"`);
 
     return res.send(csv);
-    } catch (error) {
+  } catch (error) {
     console.error('Error exporting announcements:', error);
     return res.status(500).json({ error: 'Failed to export announcements' });
-    }
+  }
 });
 
 export default router;

@@ -27,24 +27,24 @@ function buildStringFilter(value?: string) {
 function buildSearchRegexes(value: string): RegExp[] {
     const trimmed = value.trim();
     if (!trimmed) return [];
-    
+
     // Limit input length to prevent ReDoS attacks
     if (trimmed.length > 100) {
         throw new Error('Search query too long');
     }
-    
+
     const exact = new RegExp(escapeRegex(trimmed), 'i');
-    
+
     // Only allow fuzzy search for reasonable lengths and simple patterns
     if (trimmed.length >= 4 && trimmed.length <= 20 && /^[a-zA-Z0-9\s]+$/.test(trimmed)) {
         const words = trimmed.split(/\s+/).filter(Boolean).slice(0, 5); // Limit words
         const fuzzyPattern = words
             .map(word => word.split('').slice(0, 10).map(char => escapeRegex(char)).join('.*?'))
             .join('.*');
-        
+
         return [exact, new RegExp(fuzzyPattern, 'i')];
     }
-    
+
     return [exact];
 }
 
@@ -779,6 +779,7 @@ export class AnnouncementModelMongo {
         sort?: 'newest' | 'oldest' | 'deadline' | 'views';
         limit?: number;
         cursor?: string;
+        includeTotal?: boolean;
     }): Promise<{
         data: Array<{
             id: string;
@@ -798,9 +799,11 @@ export class AnnouncementModelMongo {
             totalPosts: number | null;
             postedAt: string;
             viewCount: number;
+            isActive: boolean;
         }>;
         nextCursor: string | null;
-        hasMore: boolean
+        hasMore: boolean;
+        total?: number;
     }> {
         try {
             const query: Filter<AnnouncementDoc> = buildLiveQuery();
@@ -870,12 +873,15 @@ export class AnnouncementModelMongo {
                 sort = { viewCount: -1, _id: -1 };
             }
 
-            const docs = await this.collection
-                .find(query)
-                .project(projection)
-                .sort(sort)
-                .limit(limit + 1)
-                .toArray();
+            const [docs, total] = await Promise.all([
+                this.collection
+                    .find(query)
+                    .project(projection)
+                    .sort(sort)
+                    .limit(limit + 1)
+                    .toArray(),
+                filters?.includeTotal ? this.collection.countDocuments(query) : Promise.resolve(undefined)
+            ]);
 
             const hasMore = docs.length > limit;
             if (hasMore) docs.pop();
@@ -904,7 +910,8 @@ export class AnnouncementModelMongo {
                     isActive: doc.isActive
                 })),
                 nextCursor,
-                hasMore
+                hasMore,
+                total
             };
         } catch (error) {
             console.error('[MongoDB] findListingCards error:', error);
