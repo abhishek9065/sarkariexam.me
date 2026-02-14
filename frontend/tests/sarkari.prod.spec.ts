@@ -16,6 +16,8 @@ test.describe('@prod Public site probes', () => {
 
     test('navigation and dense homepage sections appear', async ({ page }) => {
         await expect(page.getByRole('link', { name: 'Latest Jobs' }).first()).toBeVisible();
+        await expect(page.locator('[data-testid="home-featured-banner"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="home-marquee"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header h2').nth(0)).toHaveText('Result');

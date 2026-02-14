@@ -8,6 +8,8 @@ test.describe('Site regression', () => {
         await expect(page).toHaveTitle(/SarkariExams\.me/i);
         await expect(page.locator('[data-testid="app-header"]')).toBeVisible();
         await expect(page.locator('[data-testid="app-footer"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-featured-banner"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="home-marquee"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header h2').nth(0)).toHaveText('Result');

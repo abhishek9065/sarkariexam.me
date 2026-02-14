@@ -6,6 +6,9 @@ test.describe('Homepage dense layout v3', () => {
     test('renders screenshot-parity section order and dense groups', async ({ page }) => {
         await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
 
+        await expect(page.locator('[data-testid="home-featured-banner"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="home-marquee"]')).toHaveCount(0);
+
         await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid^="home-v3-dense-box-"]')).toHaveCount(8);
