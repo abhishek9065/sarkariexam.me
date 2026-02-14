@@ -750,7 +750,7 @@ export function AnalyticsDashboard({
             : 'Listing views vs total views';
     const showCoverageAction = finalCoverage === 0;
 
-    const engagementCards = useMemo(() => ([
+    const engagementCards = [
         { label: 'Searches', value: analytics.totalSearches, category: 'traffic' as const },
         { label: 'Bookmarks', value: analytics.totalBookmarks, category: 'engagement' as const },
         { label: 'Registrations', value: analytics.totalRegistrations, category: 'conversion' as const },
@@ -762,19 +762,7 @@ export function AnalyticsDashboard({
         { label: 'CTR', value: ctr, category: 'conversion' as const, suffix: '%' },
         { label: 'Digest clicks', value: analytics.totalDigestClicks ?? 0, category: 'engagement' as const },
         { label: 'Deep link clicks', value: analytics.totalDeepLinkClicks ?? 0, category: 'traffic' as const },
-    ]), [
-        analytics.totalSearches,
-        analytics.totalBookmarks,
-        analytics.totalRegistrations,
-        analytics.totalSubscriptionsUnsubscribed,
-        analytics.totalListingViews,
-        analytics.totalCardClicks,
-        analytics.totalCategoryClicks,
-        analytics.totalFilterApplies,
-        analytics.totalDigestClicks,
-        analytics.totalDeepLinkClicks,
-        ctr,
-    ]);
+    ];
 
     const visibleEngagementCards = enableUxV2 && !showAllEngagementMetrics
         ? engagementCards.slice(0, 8)
