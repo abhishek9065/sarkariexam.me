@@ -8,7 +8,8 @@ test.describe('CI smoke', () => {
         await expect(page).toHaveTitle(/SarkariExams\.me/i);
         await expect(page.locator('[data-testid="app-header"]')).toBeVisible();
         await expect(page.locator('[data-testid="app-footer"]')).toBeVisible();
-        await expect(page.locator('[data-testid="home-dense-columns"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
     });
 
     test('admin route redirects to login modal', async ({ page }) => {

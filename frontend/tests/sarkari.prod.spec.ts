@@ -16,8 +16,9 @@ test.describe('@prod Public site probes', () => {
 
     test('navigation and dense homepage sections appear', async ({ page }) => {
         await expect(page.getByRole('link', { name: 'Latest Jobs' }).first()).toBeVisible();
-        await expect(page.locator('[data-testid="home-dense-columns"]')).toBeVisible();
-        await expect(page.locator('.home-featured-grid .home-featured-card').first()).toBeVisible();
+        await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-v3-dense-box-jobs"]')).toBeVisible();
     });
 
     test('theme toggle is available', async ({ page }) => {
