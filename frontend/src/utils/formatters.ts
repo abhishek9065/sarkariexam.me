@@ -93,7 +93,17 @@ export function isValidUrl(value?: string | null) {
     }
 }
 
+const resolveNumberLocale = (locale?: string) => {
+    if (!locale || locale === 'auto') {
+        if (typeof navigator !== 'undefined' && navigator.language) {
+            return navigator.language;
+        }
+        return 'en-IN';
+    }
+    return locale;
+};
+
 export function formatNumber(value?: number | null, fallback = '0', locale = 'en-IN') {
     if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-    return value.toLocaleString(locale);
+    return value.toLocaleString(resolveNumberLocale(locale));
 }

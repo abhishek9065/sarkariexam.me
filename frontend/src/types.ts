@@ -13,6 +13,9 @@ export type AdminPermission =
     | 'announcements:delete'
     | 'audit:read'
     | 'security:read';
+export type NumberLocalePref = 'auto' | 'en-IN' | 'en-US';
+export type MetricCategory = 'traffic' | 'engagement' | 'conversion' | 'risk';
+export type AdminRowAction = 'view' | 'edit' | 'publish_toggle' | 'boost' | 'delete';
 export type AdminTab =
     | 'analytics'
     | 'list'
@@ -33,6 +36,18 @@ export interface AdminPermissionsSnapshot {
     roles: Record<AdminPortalRole, string[]>;
     tabs: Record<AdminTab, AdminPermission>;
     highRiskActions: string[];
+}
+
+export interface AdminUiFlags {
+    admin_nav_ux_v2: boolean;
+    admin_analytics_ux_v2: boolean;
+    admin_lists_ux_v2: boolean;
+}
+
+export interface MetricDefinition {
+    key: 'ctr' | 'drop_off_rate' | 'tracking_coverage' | 'conversion_rate';
+    label: string;
+    description: string;
 }
 
 /* ─── Tags ─── */

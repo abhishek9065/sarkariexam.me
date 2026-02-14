@@ -23,20 +23,27 @@ async function loginFromAuthModal(page: Page, email: string, password: string, t
     }
 }
 
-test.describe('@prod Admin UI smoke', () => {
-    test('admin login and core admin flows', async ({ page }) => {
+test.describe('@prod Admin list UX', () => {
+    test('list table shows dense controls with primary + overflow actions', async ({ page }) => {
         test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL (or ADMIN_BASE_URL) to run production probes.');
         test.skip(!adminEmail || !adminPassword, 'ADMIN_TEST_EMAIL/PASSWORD not set');
 
         await loginFromAuthModal(page, adminEmail as string, adminPassword as string, adminBackupCode || adminTotp);
-        await expect(page.getByRole('heading', { name: /Operations Hub/i })).toBeVisible({ timeout: 10000 });
-
         await page.getByRole('button', { name: /All Announcements/i }).click();
+
         await expect(page.getByRole('heading', { name: /Content manager/i })).toBeVisible();
-        await expect(page.getByLabel(/Search announcements/i)).toBeVisible();
+        await expect(page.locator('#admin-list-search')).toBeVisible();
         await expect(page.getByRole('columnheader', { name: /Title \/ Organization/i })).toBeVisible();
 
-        await page.getByRole('button', { name: /^New announcement$/i }).first().click();
-        await expect(page.getByRole('heading', { name: /Quick Add/i })).toBeVisible();
+        const rowCount = await page.locator('.admin-table tbody tr').count();
+        if (rowCount > 0) {
+            await expect(page.getByRole('button', { name: /^View$/i }).first()).toBeVisible();
+            const overflow = page.getByRole('button', { name: /^More$/i });
+            if (await overflow.count()) {
+                await overflow.first().click();
+                await expect(page.getByRole('button', { name: /^Edit$/i }).first()).toBeVisible();
+            }
+        }
     });
 });
+

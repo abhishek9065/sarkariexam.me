@@ -14,6 +14,8 @@ import { isAdminPortalRole } from '../utils/adminRbac';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
 import { adminRequest } from '../utils/adminRequest';
+import { useAdminUiFlags } from '../utils/adminFlags';
+import { AdminShellSearch } from '../components/admin/AdminShellSearch';
 import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -465,6 +467,10 @@ export function AdminPage() {
 
     const { themeMode, setThemeMode } = useTheme();
     const { user, hasAdminPortalAccess, can, logout } = useAuth();
+    const adminUiFlags = useAdminUiFlags();
+    const enableAdminNavUx = adminUiFlags.admin_nav_ux_v2;
+    const enableAdminAnalyticsUx = adminUiFlags.admin_analytics_ux_v2;
+    const enableAdminListsUx = adminUiFlags.admin_lists_ux_v2;
     const canReadAdmin = hasAdminPortalAccess && can('admin:read');
     const canWriteAnnouncements = can('announcements:write');
     const canDeleteAnnouncements = can('announcements:delete');
@@ -621,6 +627,18 @@ export function AdminPage() {
         setActiveAdminTab(tab);
         setIsNavOpen(false);
     }, [canAccessTab, pushToast]);
+
+    const handleShellSearch = useCallback((query: string) => {
+        setListQuery(query);
+        setListPage(1);
+        if (activeAdminTab !== 'list') {
+            handleNavSelect('list');
+        }
+        window.setTimeout(() => {
+            const target = document.getElementById('admin-list-search') as HTMLInputElement | null;
+            target?.focus();
+        }, 0);
+    }, [activeAdminTab, handleNavSelect]);
 
     const clearAdminSession = useCallback(() => {
         setIsLoggedIn(false);
@@ -1642,6 +1660,34 @@ export function AdminPage() {
         if (!item.slug) return;
         const url = `/${item.type}/${item.slug}`;
         window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleTogglePublish = async (item: Announcement) => {
+        if (!canWriteAnnouncements) {
+            setMessage(READ_ONLY_MESSAGE);
+            return;
+        }
+        const isPublished = item.status === 'published';
+        const nextStatus: AnnouncementStatus = isPublished ? 'archived' : 'published';
+        const nextActive = !isPublished;
+        const ok = await applyQaUpdate(
+            item.id,
+            {
+                status: nextStatus,
+                isActive: nextActive,
+                note: isPublished ? 'Unpublished from content list' : 'Published from content list',
+            },
+            { successMessage: isPublished ? 'Announcement unpublished.' : 'Announcement published.' }
+        );
+        if (ok) {
+            refreshData();
+            refreshDashboard();
+        }
+    };
+
+    const handleBoost = (item: Announcement) => {
+        setMessage(`Boost is not configured for "${item.title}" yet. Configure promotions to enable this action.`);
+        notifyInfo('Boost pending', 'Configure promotional workflow to use boost actions.');
     };
 
     const toggleSelection = (id: string) => {
@@ -3247,7 +3293,17 @@ export function AdminPage() {
                         <div className="admin-context">
                             <div className="admin-context-info">
                                 <div className="admin-breadcrumbs">
-                                    <span>Admin</span>
+                                    {enableAdminNavUx ? (
+                                        <button
+                                            type="button"
+                                            className="breadcrumb-link"
+                                            onClick={() => handleNavSelect('analytics')}
+                                        >
+                                            Admin Command Center
+                                        </button>
+                                    ) : (
+                                        <span>Admin</span>
+                                    )}
                                     <span className="breadcrumb-sep">›</span>
                                     <span>{activeTabMeta.label}</span>
                                 </div>
@@ -3260,6 +3316,12 @@ export function AdminPage() {
                                 </div>
                             </div>
                             <div className="admin-context-actions">
+                                {enableAdminNavUx && canAccessTab('list') && (
+                                    <AdminShellSearch
+                                        onSearch={handleShellSearch}
+                                        disabled={listLoading}
+                                    />
+                                )}
                                 <button
                                     type="button"
                                     className="admin-nav-toggle"
@@ -3271,7 +3333,7 @@ export function AdminPage() {
                                 </button>
                                 {canWriteAnnouncements && activeAdminTab !== 'add' && activeAdminTab !== 'detailed' && (
                                     <button className="admin-btn primary" onClick={() => handleQuickCreate('job', 'add')}>
-                                        New job post
+                                        {enableAdminNavUx ? 'New announcement' : 'New job post'}
                                     </button>
                                 )}
                                 {canAccessTab('list') && activeAdminTab !== 'list' && (
@@ -3294,6 +3356,7 @@ export function AdminPage() {
                                     onOpenList={() => handleNavSelect('list')}
                                     onUnauthorized={handleUnauthorized}
                                     onLoadingChange={setAnalyticsLoading}
+                                    enableUxV2={enableAdminAnalyticsUx}
                                 />
                             </Suspense>
                         ) : activeAdminTab === 'users' ? (
@@ -3750,6 +3813,8 @@ export function AdminPage() {
                                     onDelete={(id) => handleDelete(id)}
                                     onView={handleView}
                                     onDuplicate={handleDuplicate}
+                                    onTogglePublish={handleTogglePublish}
+                                    onBoost={handleBoost}
                                     onExport={() => {
                                         const params = new URLSearchParams();
                                         if (listStatusFilter !== 'all') params.set('status', listStatusFilter);
@@ -3778,6 +3843,7 @@ export function AdminPage() {
                                     canWrite={canWriteAnnouncements}
                                     canDelete={canDeleteAnnouncements}
                                     canApprove={canApproveAnnouncements}
+                                    enableCompactActions={enableAdminListsUx}
                                 />
                             </Suspense>
                         ) : activeAdminTab === 'review' ? (

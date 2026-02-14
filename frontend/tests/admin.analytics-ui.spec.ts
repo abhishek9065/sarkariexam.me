@@ -23,20 +23,24 @@ async function loginFromAuthModal(page: Page, email: string, password: string, t
     }
 }
 
-test.describe('@prod Admin UI smoke', () => {
-    test('admin login and core admin flows', async ({ page }) => {
+test.describe('@prod Admin analytics UX', () => {
+    test('analytics controls and readability helpers are present', async ({ page }) => {
         test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL (or ADMIN_BASE_URL) to run production probes.');
         test.skip(!adminEmail || !adminPassword, 'ADMIN_TEST_EMAIL/PASSWORD not set');
 
         await loginFromAuthModal(page, adminEmail as string, adminPassword as string, adminBackupCode || adminTotp);
         await expect(page.getByRole('heading', { name: /Operations Hub/i })).toBeVisible({ timeout: 10000 });
 
-        await page.getByRole('button', { name: /All Announcements/i }).click();
-        await expect(page.getByRole('heading', { name: /Content manager/i })).toBeVisible();
-        await expect(page.getByLabel(/Search announcements/i)).toBeVisible();
-        await expect(page.getByRole('columnheader', { name: /Title \/ Organization/i })).toBeVisible();
+        await expect(page.getByRole('button', { name: /Export options/i })).toBeVisible();
+        await expect(page.locator('.window-badge').first()).toBeVisible();
+        await expect(page.locator('#number-locale')).toBeVisible();
+        await expect(page.locator('.metric-definition-tooltip').first()).toBeVisible();
 
-        await page.getByRole('button', { name: /^New announcement$/i }).first().click();
-        await expect(page.getByRole('heading', { name: /Quick Add/i })).toBeVisible();
+        const showMoreButton = page.getByRole('button', { name: /Show more metrics|Show fewer metrics/i });
+        if (await showMoreButton.count()) {
+            await showMoreButton.first().click();
+            await expect(page.locator('.engagement-grid .engagement-card').first()).toBeVisible();
+        }
     });
 });
+

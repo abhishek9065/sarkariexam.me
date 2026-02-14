@@ -141,6 +141,9 @@ const featureFlags = {
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),
   tracker_api_v2: parseBoolean(process.env.FEATURE_TRACKER_API_V2, true),
   dashboard_widgets_v2: parseBoolean(process.env.FEATURE_DASHBOARD_WIDGETS_V2, true),
+  admin_nav_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_NAV_UX_V2, true),
+  admin_analytics_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_ANALYTICS_UX_V2, true),
+  admin_lists_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_LISTS_UX_V2, true),
 };
 
 // Validate secrets aren't using known insecure defaults in production

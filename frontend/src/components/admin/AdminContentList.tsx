@@ -1,7 +1,8 @@
 import { Announcement, AnnouncementStatus, ContentType } from '../../types';
-import { CONTENT_TYPES, STATUS_OPTIONS } from './constants';
 import { CopyButton } from './CopyButton';
 import { formatNumber } from '../../utils/formatters';
+import { ActionOverflowMenu } from './ActionOverflowMenu';
+import { TableToolbar } from './TableToolbar';
 
 interface AdminContentListProps {
     items: Announcement[];
@@ -29,6 +30,8 @@ interface AdminContentListProps {
     onDuplicate: (item: Announcement) => void;
     onExport: () => void;
     onCreate?: () => void;
+    onTogglePublish?: (item: Announcement) => void;
+    onBoost?: (item: Announcement) => void;
 
     // Selection
     selectedIds: Set<string>;
@@ -43,6 +46,7 @@ interface AdminContentListProps {
     canWrite?: boolean;
     canDelete?: boolean;
     canApprove?: boolean;
+    enableCompactActions?: boolean;
 }
 
 export function AdminContentList({
@@ -67,6 +71,8 @@ export function AdminContentList({
     onDuplicate,
     onExport,
     onCreate,
+    onTogglePublish,
+    onBoost,
     selectedIds,
     onSelectionChange,
     onBulkAction,
@@ -78,6 +84,7 @@ export function AdminContentList({
     canWrite = true,
     canDelete = true,
     canApprove = true,
+    enableCompactActions = true,
 }: AdminContentListProps) {
 
     const toggleSelection = (id: string) => {
@@ -158,7 +165,7 @@ export function AdminContentList({
                         {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
                     <button type="button" className="admin-btn secondary" onClick={onExport}>
-                        Export CSV
+                        {enableCompactActions ? 'Download CSV' : 'Export CSV'}
                     </button>
                     {canWrite && (
                         <button
@@ -166,69 +173,90 @@ export function AdminContentList({
                             className="admin-btn primary"
                             onClick={() => (onCreate ? onCreate() : onEdit({} as any))}
                         >
-                            New job
+                            {enableCompactActions ? 'New announcement' : 'New job'}
                         </button>
                     )}
                 </div>
             </div>
 
-            <div className="admin-filters">
-                <div className="filter-group main">
-                    <input
-                        type="text"
-                        placeholder="Search by title, organization..."
-                        value={searchQuery}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        aria-label="Search announcements"
-                        className="admin-search"
-                    />
-                </div>
-                <div className="filter-group">
-                    <select
-                        value={typeFilter}
-                        onChange={(e) => onTypeFilterChange(e.target.value as ContentType | 'all')}
-                        aria-label="Filter by announcement type"
-                        className="admin-select"
-                    >
-                        <option value="all">All Types</option>
-                        {CONTENT_TYPES.map(type => (
-                            <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => onStatusFilterChange(e.target.value as AnnouncementStatus | 'all')}
-                        aria-label="Filter by status"
-                        className="admin-select"
-                    >
-                        <option value="all">All Status</option>
-                        {STATUS_OPTIONS.map(status => (
-                            <option key={status.value} value={status.value}>{status.label}</option>
-                        ))}
-                    </select>
-                    <select
-                        value={sortOption}
-                        onChange={(e) => onSortChange(e.target.value as any)}
-                        aria-label="Sort announcements"
-                        className="admin-select"
-                    >
-                        <option value="newest">Newest First</option>
-                        <option value="updated">Recently Updated</option>
-                        <option value="deadline">Deadline Soonest</option>
-                        <option value="views">Most Viewed</option>
-                    </select>
-                </div>
-                {filterSummary && (
-                    <div className="filter-summary" role="status" aria-live="polite">
-                        <span>{filterSummary}</span>
-                        {onClearFilters && (
-                            <button type="button" className="filter-clear" onClick={onClearFilters}>
-                                Clear filters
-                            </button>
-                        )}
+            {enableCompactActions ? (
+                <TableToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={onSearchChange}
+                    typeFilter={typeFilter}
+                    onTypeFilterChange={onTypeFilterChange}
+                    statusFilter={statusFilter}
+                    onStatusFilterChange={onStatusFilterChange}
+                    sortOption={sortOption}
+                    onSortChange={onSortChange}
+                    filterSummary={filterSummary}
+                    onClearFilters={onClearFilters}
+                />
+            ) : (
+                <div className="admin-filters">
+                    <div className="filter-group main">
+                        <input
+                            id="admin-list-search"
+                            type="text"
+                            placeholder="Search by title, organization..."
+                            value={searchQuery}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            aria-label="Search announcements"
+                            className="admin-search"
+                        />
                     </div>
-                )}
-            </div>
+                    <div className="filter-group">
+                        <select
+                            value={typeFilter}
+                            onChange={(e) => onTypeFilterChange(e.target.value as ContentType | 'all')}
+                            aria-label="Filter by announcement type"
+                            className="admin-select"
+                        >
+                            <option value="all">All Types</option>
+                            <option value="job">Latest Jobs</option>
+                            <option value="admit-card">Admit Cards</option>
+                            <option value="result">Latest Results</option>
+                            <option value="answer-key">Answer Keys</option>
+                            <option value="syllabus">Syllabus</option>
+                            <option value="admission">Admission</option>
+                        </select>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => onStatusFilterChange(e.target.value as AnnouncementStatus | 'all')}
+                            aria-label="Filter by status"
+                            className="admin-select"
+                        >
+                            <option value="all">All Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="pending">Pending Review</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="published">Published</option>
+                            <option value="archived">Archived</option>
+                        </select>
+                        <select
+                            value={sortOption}
+                            onChange={(e) => onSortChange(e.target.value as 'newest' | 'updated' | 'deadline' | 'views')}
+                            aria-label="Sort announcements"
+                            className="admin-select"
+                        >
+                            <option value="newest">Newest First</option>
+                            <option value="updated">Recently Updated</option>
+                            <option value="deadline">Deadline Soonest</option>
+                            <option value="views">Most Viewed</option>
+                        </select>
+                    </div>
+                    {filterSummary && (
+                        <div className="filter-summary" role="status" aria-live="polite">
+                            <span>{filterSummary}</span>
+                            {onClearFilters && (
+                                <button type="button" className="filter-clear" onClick={onClearFilters}>
+                                    Clear filters
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {selectedIds.size > 0 && (
                 <div className="admin-bulk-actions">
@@ -292,6 +320,33 @@ export function AdminContentList({
                                 if (!item) return null;
                                 const availability = getAvailabilityStatus(item);
                                 const workflow = getWorkflowStatus(item);
+                                const overflowActions = [
+                                    ...(canWrite
+                                        ? [
+                                            { id: 'edit', label: 'Edit', onClick: () => onEdit(item) },
+                                            { id: 'duplicate', label: 'Duplicate', onClick: () => onDuplicate(item) },
+                                        ]
+                                        : []),
+                                    ...(canWrite && onTogglePublish
+                                        ? [{
+                                            id: 'publish_toggle',
+                                            label: item.status === 'published' ? 'Unpublish' : 'Publish',
+                                            onClick: () => onTogglePublish(item),
+                                            tone: item.status === 'published' ? 'warning' as const : 'info' as const,
+                                        }]
+                                        : []),
+                                    ...(canWrite && onBoost
+                                        ? [{ id: 'boost', label: 'Boost', onClick: () => onBoost(item), tone: 'info' as const }]
+                                        : []),
+                                    ...(canDelete
+                                        ? [{
+                                            id: 'delete',
+                                            label: 'Delete',
+                                            onClick: () => onDelete(item.id, item.title),
+                                            tone: 'danger' as const,
+                                        }]
+                                        : []),
+                                ];
 
                                 return (
                                     <tr key={item.id} className={selectedIds.has(item.id) ? 'selected' : ''}>
@@ -333,24 +388,38 @@ export function AdminContentList({
                                         <td>{formatNumber(item.viewCount)}</td>
                                         <td>
                                             <div className="row-actions">
-                                                <button type="button" className="action-btn" title="View" data-tooltip="View" aria-label="View announcement" onClick={() => onView(item)}>
-                                                    👁
+                                                <button
+                                                    type="button"
+                                                    className="admin-btn secondary small"
+                                                    aria-label="View announcement"
+                                                    onClick={() => onView(item)}
+                                                >
+                                                    View
                                                 </button>
-                                                {canWrite && (
-                                                    <button type="button" className="action-btn" title="Edit" data-tooltip="Edit" aria-label="Edit announcement" onClick={() => onEdit(item)}>
-                                                        ✎
-                                                    </button>
-                                                )}
-                                                {canWrite && (
-                                                    <button type="button" className="action-btn" title="Duplicate" data-tooltip="Duplicate" aria-label="Duplicate announcement" onClick={() => onDuplicate(item)}>
-                                                        📋
-                                                    </button>
-                                                )}
-                                                {canDelete && (
-                                                    <button type="button" className="action-btn danger" title="Delete" data-tooltip="Delete" aria-label="Delete announcement" onClick={() => onDelete(item.id, item.title)}>
-                                                        🗑
-                                                    </button>
-                                                )}
+                                                {enableCompactActions && overflowActions.length > 0 ? (
+                                                    <ActionOverflowMenu
+                                                        itemLabel={item.title}
+                                                        actions={overflowActions}
+                                                    />
+                                                ) : !enableCompactActions ? (
+                                                    <>
+                                                        {canWrite && (
+                                                            <button type="button" className="action-btn" title="Edit" data-tooltip="Edit" aria-label="Edit announcement" onClick={() => onEdit(item)}>
+                                                                ✎
+                                                            </button>
+                                                        )}
+                                                        {canWrite && (
+                                                            <button type="button" className="action-btn" title="Duplicate" data-tooltip="Duplicate" aria-label="Duplicate announcement" onClick={() => onDuplicate(item)}>
+                                                                📋
+                                                            </button>
+                                                        )}
+                                                        {canDelete && (
+                                                            <button type="button" className="action-btn danger" title="Delete" data-tooltip="Delete" aria-label="Delete announcement" onClick={() => onDelete(item.id, item.title)}>
+                                                                🗑
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                ) : null}
                                                 {!canWrite && !canDelete && (
                                                     <span className="cell-muted">Read-only</span>
                                                 )}

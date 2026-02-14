@@ -196,6 +196,27 @@
   color: var(--text-muted);
 }
 
+.breadcrumb-link {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.breadcrumb-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.breadcrumb-link:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.8);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .breadcrumb-sep {
   opacity: 0.6;
 }
@@ -232,8 +253,41 @@
 .admin-context-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   justify-content: flex-end;
+}
+
+.admin-shell-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.admin-shell-search input {
+  min-width: 260px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.admin-shell-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.admin-shell-search input:focus {
+  outline: none;
+}
+
+.admin-shell-search input:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.8);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .admin-nav-toggle {
@@ -323,7 +377,8 @@
 
 .metric-sub {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  opacity: 0.82;
 }
 
 .admin-user-menu {
@@ -900,7 +955,8 @@
 
 .admin-subtitle {
   margin-top: 6px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  opacity: 0.86;
   font-size: 13px;
 }
 
@@ -1401,7 +1457,7 @@
 
 .admin-table thead th {
   background: var(--bg-secondary);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 11px;
   text-transform: none;
   letter-spacing: 0.04em;
@@ -1453,6 +1509,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .action-btn {
@@ -1923,6 +1980,19 @@
   justify-content: flex-start;
 }
 
+.action-overflow-menu summary {
+  min-width: 84px;
+  justify-content: center;
+}
+
+.action-overflow-panel {
+  min-width: 196px;
+}
+
+.admin-table-toolbar .admin-search {
+  min-width: 280px;
+}
+
 .action-menu-panel .review-note-input {
   width: 100%;
 }
@@ -2277,6 +2347,15 @@
   .admin-context-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .admin-shell-search {
+    width: 100%;
+  }
+
+  .admin-shell-search input {
+    min-width: 0;
+    width: 100%;
   }
 
   .admin-nav-toggle {
@@ -3230,9 +3309,9 @@
 }
 
 .admin-page .admin-table thead th {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 11px;
 }
 
 .admin-page .admin-table tbody tr {

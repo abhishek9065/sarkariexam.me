@@ -3,6 +3,10 @@ import { adminRequest } from '../../utils/adminRequest';
 import { formatNumber } from '../../utils/formatters';
 import { QuickActions } from './QuickActions';
 import { MiniSparkline } from './MiniSparkline';
+import { KpiCard } from './KpiCard';
+import { MetricDefinitionTooltip } from './MetricDefinitionTooltip';
+import { ActionOverflowMenu } from './ActionOverflowMenu';
+import type { MetricDefinition, NumberLocalePref } from '../../types';
 import './AnalyticsDashboard.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
@@ -204,6 +208,29 @@ const TYPE_COLORS: Record<string, string> = {
     admission: '#F97316',
 };
 
+const METRIC_DEFINITIONS: Record<MetricDefinition['key'], MetricDefinition> = {
+    ctr: {
+        key: 'ctr',
+        label: 'Click-through rate',
+        description: 'Percent of listing views that converted into card clicks.',
+    },
+    drop_off_rate: {
+        key: 'drop_off_rate',
+        label: 'Drop-off rate',
+        description: 'Percent of listing views that did not convert into card clicks.',
+    },
+    tracking_coverage: {
+        key: 'tracking_coverage',
+        label: 'Tracking coverage',
+        description: 'Listing views compared to total page views. It can exceed 100% when users revisit lists.',
+    },
+    conversion_rate: {
+        key: 'conversion_rate',
+        label: 'Conversion rate',
+        description: 'Step-to-step completion rate across the engagement funnel.',
+    },
+};
+
 function DonutChart({ data, total }: { data: { type: string; count: number }[]; total: number }) {
     if (total === 0 || !data || data.length === 0) return null;
 
@@ -296,12 +323,14 @@ export function AnalyticsDashboard({
     onOpenList,
     onUnauthorized,
     onLoadingChange,
+    enableUxV2 = true,
 }: {
     adminToken?: string | null;
     onEditById?: (id: string) => void;
     onOpenList?: () => void;
     onUnauthorized?: () => void;
     onLoadingChange?: (loading: boolean) => void;
+    enableUxV2?: boolean;
 }) {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [popular, setPopular] = useState<PopularAnnouncement[]>([]);
@@ -317,12 +346,18 @@ export function AnalyticsDashboard({
     const [showExportPreview, setShowExportPreview] = useState(false);
     const [showExportDropdown, setShowExportDropdown] = useState(false);
     const [popularPage, setPopularPage] = useState(0);
-    const [numberLocale, setNumberLocale] = useState(() => {
-        if (typeof window === 'undefined') return 'en-IN';
+    const [showAllEngagementMetrics, setShowAllEngagementMetrics] = useState(false);
+    const [numberLocale, setNumberLocale] = useState<NumberLocalePref>(() => {
+        if (typeof window === 'undefined') return enableUxV2 ? 'auto' : 'en-IN';
         try {
-            return localStorage.getItem('admin_number_locale') || 'en-IN';
+            const stored = localStorage.getItem('admin_number_locale');
+            if (stored === 'auto' || stored === 'en-IN' || stored === 'en-US') {
+                if (!enableUxV2 && stored === 'auto') return 'en-IN';
+                return stored;
+            }
+            return enableUxV2 ? 'auto' : 'en-IN';
         } catch {
-            return 'en-IN';
+            return enableUxV2 ? 'auto' : 'en-IN';
         }
     });
     const typeBreakdown = analytics?.typeBreakdown ?? [];
@@ -362,6 +397,9 @@ export function AnalyticsDashboard({
         if (!rollups.length) return [];
         return [...rollups].slice(-5).reverse();
     }, [rollups]);
+    const resolvedNumberLocale = numberLocale === 'auto'
+        ? (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-IN')
+        : numberLocale;
     const formatMetric = useCallback((value: number | null | undefined, fallback = '0') => {
         return formatNumber(typeof value === 'number' ? value : undefined, fallback, numberLocale);
     }, [numberLocale]);
@@ -672,6 +710,36 @@ export function AnalyticsDashboard({
             : 'Listing views vs total views';
     const showCoverageAction = finalCoverage === 0;
 
+    const engagementCards = useMemo(() => ([
+        { label: 'Searches', value: analytics.totalSearches, category: 'traffic' as const },
+        { label: 'Bookmarks', value: analytics.totalBookmarks, category: 'engagement' as const },
+        { label: 'Registrations', value: analytics.totalRegistrations, category: 'conversion' as const },
+        { label: 'Unsubscribes', value: analytics.totalSubscriptionsUnsubscribed, category: 'risk' as const },
+        { label: 'Listing views', value: analytics.totalListingViews, category: 'traffic' as const },
+        { label: 'Card clicks', value: analytics.totalCardClicks, category: 'engagement' as const },
+        { label: 'Category clicks', value: analytics.totalCategoryClicks, category: 'engagement' as const },
+        { label: 'Filter applies', value: analytics.totalFilterApplies, category: 'engagement' as const },
+        { label: 'CTR', value: ctr, category: 'conversion' as const, suffix: '%' },
+        { label: 'Digest clicks', value: analytics.totalDigestClicks ?? 0, category: 'engagement' as const },
+        { label: 'Deep link clicks', value: analytics.totalDeepLinkClicks ?? 0, category: 'traffic' as const },
+    ]), [
+        analytics.totalSearches,
+        analytics.totalBookmarks,
+        analytics.totalRegistrations,
+        analytics.totalSubscriptionsUnsubscribed,
+        analytics.totalListingViews,
+        analytics.totalCardClicks,
+        analytics.totalCategoryClicks,
+        analytics.totalFilterApplies,
+        analytics.totalDigestClicks,
+        analytics.totalDeepLinkClicks,
+        ctr,
+    ]);
+
+    const visibleEngagementCards = enableUxV2 && !showAllEngagementMetrics
+        ? engagementCards.slice(0, 8)
+        : engagementCards;
+
     // Weekly trend anomaly check
     const isNewData = rollups.length <= 7 && prev7Views === 0;
     const displayTrendLabel = isNewData ? 'New' : viewTrendLabel;
@@ -693,7 +761,12 @@ export function AnalyticsDashboard({
         <div className={`analytics-dashboard ${refreshing ? 'refreshing' : ''}`}>
             <div className="analytics-actions">
                 <div className="analytics-actions-left">
-                    <span className="analytics-subtitle">Export rollups for the last {engagementWindow} days.</span>
+                    <span className="analytics-subtitle">
+                        {enableUxV2
+                            ? 'Export rollups and monitor trends.'
+                            : `Export rollups for the last ${engagementWindow} days.`}
+                    </span>
+                    {enableUxV2 && <span className="window-badge">{engagementWindow} day window</span>}
                     <span className="analytics-freshness">{rollupFreshness}</span>
                     <div className="range-toggle">
                         {[7, 30, 90].map((days) => (
@@ -701,6 +774,7 @@ export function AnalyticsDashboard({
                                 key={days}
                                 className={`admin-btn secondary small ${rangeDays === days ? 'active' : ''}`}
                                 onClick={() => setRangeDays(days)}
+                                aria-pressed={rangeDays === days}
                             >
                                 {days} days
                             </button>
@@ -711,8 +785,11 @@ export function AnalyticsDashboard({
                         <select
                             id="number-locale"
                             value={numberLocale}
-                            onChange={(event) => setNumberLocale(event.target.value)}
+                            onChange={(event) => setNumberLocale(event.target.value as NumberLocalePref)}
                         >
+                            {enableUxV2 && (
+                                <option value="auto">Auto ({typeof navigator !== 'undefined' ? navigator.language : 'Browser'})</option>
+                            )}
                             <option value="en-IN">India (4,13,536)</option>
                             <option value="en-US">International (413,536)</option>
                         </select>
@@ -746,7 +823,7 @@ export function AnalyticsDashboard({
                         aria-expanded={showExportDropdown}
                         aria-haspopup="true"
                     >
-                        Export ▾
+                        {enableUxV2 ? 'Export options ▾' : 'Export ▾'}
                     </button>
                     {showExportDropdown && (
                         <div className="export-dropdown-menu" role="menu">
@@ -754,7 +831,9 @@ export function AnalyticsDashboard({
                                 role="menuitem"
                                 onClick={() => { setShowExportPreview((prev) => !prev); setShowExportDropdown(false); }}
                             >
-                                {showExportPreview ? '👁 Hide preview' : '👁 Preview export'}
+                                {enableUxV2
+                                    ? (showExportPreview ? 'Hide preview table' : 'Preview export table')
+                                    : (showExportPreview ? '👁 Hide preview' : '👁 Preview export')}
                             </button>
                             <div className="export-dropdown-divider" />
                             <button
@@ -762,7 +841,9 @@ export function AnalyticsDashboard({
                                 onClick={() => { handleExport(); setShowExportDropdown(false); }}
                                 disabled={exporting}
                             >
-                                {exporting ? '⏳ Exporting…' : '📥 Download CSV'}
+                                {enableUxV2
+                                    ? (exporting ? 'Exporting CSV…' : 'Download CSV file')
+                                    : (exporting ? '⏳ Exporting…' : '📥 Download CSV')}
                             </button>
                         </div>
                     )}
@@ -809,27 +890,57 @@ export function AnalyticsDashboard({
                 </div>
             )}
             <div className="kpi-grid">
-                <div className="kpi-card">
-                    <div className="kpi-label">Views last 7 days</div>
-                    <div className="kpi-value">{formatMetric(viewsLast7)}</div>
-                    <div className="kpi-sub">Highlights recent demand</div>
-                    <div className={`kpi-delta ${viewsDeltaTone}`}>
-                        {viewsDeltaPct === null ? 'No prior 7d data' : `${viewsDeltaPct > 0 ? '+' : ''}${viewsDeltaPct}% vs prev 7d`}
-                    </div>
-                </div>
-                <div className={`kpi-card ${ctrTone}`} title={`CTR tone: ${ctrTone || 'neutral'} — ${ctr >= 10 ? 'Good (≥10%)' : ctr >= 5 ? 'Moderate (5–9%)' : 'Low (<5%)'}`}>
-                    <div className="kpi-label">CTR last 30 days</div>
-                    <div className="kpi-value">{ctr}%</div>
-                    <div className="kpi-sub">Card clicks / listing views</div>
-                </div>
-                <div className="kpi-card">
-                    <div className="kpi-label">Searches last 7 days</div>
-                    <div className="kpi-value">{formatMetric(searchesLast7)}</div>
-                    <div className="kpi-sub">Keyword interest trend</div>
-                    <div className={`kpi-delta ${searchesDeltaTone}`}>
-                        {searchesDeltaPct === null ? 'No prior 7d data' : `${searchesDeltaPct > 0 ? '+' : ''}${searchesDeltaPct}% vs prev 7d`}
-                    </div>
-                </div>
+                {enableUxV2 ? (
+                    <>
+                        <KpiCard
+                            label="Views last 7 days"
+                            value={formatMetric(viewsLast7)}
+                            sub="Highlights recent demand"
+                            delta={viewsDeltaPct === null ? 'No prior 7d data' : `${viewsDeltaPct > 0 ? '+' : ''}${viewsDeltaPct}% vs prev 7d`}
+                            deltaTone={viewsDeltaTone}
+                            tone="traffic"
+                        />
+                        <KpiCard
+                            label="CTR last 30 days"
+                            value={`${ctr}%`}
+                            sub="Card clicks / listing views"
+                            tone="conversion"
+                            title={`CTR tone: ${ctrTone || 'neutral'} — ${ctr >= 10 ? 'Good (≥10%)' : ctr >= 5 ? 'Moderate (5–9%)' : 'Low (<5%)'}`}
+                        />
+                        <KpiCard
+                            label="Searches last 7 days"
+                            value={formatMetric(searchesLast7)}
+                            sub="Keyword interest trend"
+                            delta={searchesDeltaPct === null ? 'No prior 7d data' : `${searchesDeltaPct > 0 ? '+' : ''}${searchesDeltaPct}% vs prev 7d`}
+                            deltaTone={searchesDeltaTone}
+                            tone="engagement"
+                        />
+                    </>
+                ) : (
+                    <>
+                        <div className="kpi-card">
+                            <div className="kpi-label">Views last 7 days</div>
+                            <div className="kpi-value">{formatMetric(viewsLast7)}</div>
+                            <div className="kpi-sub">Highlights recent demand</div>
+                            <div className={`kpi-delta ${viewsDeltaTone}`}>
+                                {viewsDeltaPct === null ? 'No prior 7d data' : `${viewsDeltaPct > 0 ? '+' : ''}${viewsDeltaPct}% vs prev 7d`}
+                            </div>
+                        </div>
+                        <div className={`kpi-card ${ctrTone}`} title={`CTR tone: ${ctrTone || 'neutral'} — ${ctr >= 10 ? 'Good (≥10%)' : ctr >= 5 ? 'Moderate (5–9%)' : 'Low (<5%)'}`}>
+                            <div className="kpi-label">CTR last 30 days</div>
+                            <div className="kpi-value">{ctr}%</div>
+                            <div className="kpi-sub">Card clicks / listing views</div>
+                        </div>
+                        <div className="kpi-card">
+                            <div className="kpi-label">Searches last 7 days</div>
+                            <div className="kpi-value">{formatMetric(searchesLast7)}</div>
+                            <div className="kpi-sub">Keyword interest trend</div>
+                            <div className={`kpi-delta ${searchesDeltaTone}`}>
+                                {searchesDeltaPct === null ? 'No prior 7d data' : `${searchesDeltaPct > 0 ? '+' : ''}${searchesDeltaPct}% vs prev 7d`}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
             {/* Quick Actions */}
             <QuickActions
@@ -844,6 +955,7 @@ export function AnalyticsDashboard({
                         <h3>Weekly Trend</h3>
                         <p className="analytics-subtitle">Views and searches across the last {rangeDays} days.</p>
                     </div>
+                    {enableUxV2 && <span className="window-badge">Range: {rangeDays} days</span>}
                     {zeroTrendCount > 0 && (
                         <div className="trend-toggle">
                             <button
@@ -910,7 +1022,7 @@ export function AnalyticsDashboard({
                                 color="blue"
                                 height={24}
                                 width={60}
-                                locale={numberLocale}
+                                locale={resolvedNumberLocale}
                             />
                         </div>
                     </div>
@@ -947,54 +1059,33 @@ export function AnalyticsDashboard({
                         <h3>Engagement Overview</h3>
                         <p className="analytics-subtitle">Searches, bookmarks, and signups from the last {engagementWindow} days.</p>
                     </div>
+                    {enableUxV2 && <span className="window-badge">{engagementWindow} day window</span>}
                     <span className="analytics-updated">{formatLastUpdated(analytics.rollupLastUpdatedAt ?? null)}</span>
                 </div>
                 <div className="engagement-grid">
-                    <div className="engagement-card">
-                        <div className="engagement-label">Searches</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalSearches)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Bookmarks</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalBookmarks)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Registrations</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalRegistrations)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Unsubscribes</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalSubscriptionsUnsubscribed)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Listing views</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalListingViews)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Card clicks</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalCardClicks)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Category clicks</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalCategoryClicks)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Filter applies</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalFilterApplies)}</div>
-                    </div>
-                    <div className={`engagement-card ${ctrTone}`}>
-                        <div className="engagement-label" title="Click-Through Rate: percentage of listing views that resulted in card clicks">CTR</div>
-                        <div className="engagement-value">{ctr}%</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Digest clicks</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalDigestClicks)}</div>
-                    </div>
-                    <div className="engagement-card">
-                        <div className="engagement-label">Deep link clicks</div>
-                        <div className="engagement-value">{formatMetric(analytics.totalDeepLinkClicks)}</div>
-                    </div>
+                    {visibleEngagementCards.map((item) => (
+                        <div key={item.label} className={`engagement-card metric-${item.category} ${item.label === 'CTR' ? ctrTone : ''}`}>
+                            <div className="engagement-label">
+                                {item.label}
+                                {item.label === 'CTR' && (
+                                    <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.ctr} />
+                                )}
+                            </div>
+                            <div className="engagement-value">
+                                {item.suffix ? `${item.value}${item.suffix}` : formatMetric(item.value)}
+                            </div>
+                        </div>
+                    ))}
                 </div>
+                {enableUxV2 && engagementCards.length > 8 && (
+                    <button
+                        type="button"
+                        className="admin-btn secondary small"
+                        onClick={() => setShowAllEngagementMetrics((prev) => !prev)}
+                    >
+                        {showAllEngagementMetrics ? 'Show fewer metrics' : `Show more metrics (${engagementCards.length - 8})`}
+                    </button>
+                )}
                 <p className="engagement-hint">CTR uses card clicks divided by listing views. If listing views are zero, make sure listing view events are tracked.</p>
                 <p className="analytics-hint">
                     {analytics.rollupLastUpdatedAt
@@ -1069,6 +1160,7 @@ export function AnalyticsDashboard({
                         <h3>Top Searches</h3>
                         <p className="analytics-subtitle">Most frequent search terms in the last {engagementWindow} days.</p>
                     </div>
+                    {enableUxV2 && <span className="window-badge">{engagementWindow} day window</span>}
                 </div>
                 {topSearches.length === 0 ? (
                     <div className="empty-state">
@@ -1151,27 +1243,45 @@ export function AnalyticsDashboard({
                                                 >
                                                     View
                                                 </button>
-                                                <button
-                                                    className="admin-btn secondary small"
-                                                    type="button"
-                                                    onClick={() => handlePopularEdit(item)}
-                                                >
-                                                    Edit
-                                                </button>
-                                                <button
-                                                    className="admin-btn warning small"
-                                                    type="button"
-                                                    onClick={() => handlePopularUnpublish(item)}
-                                                >
-                                                    Unpublish
-                                                </button>
-                                                <button
-                                                    className="admin-btn info small"
-                                                    type="button"
-                                                    onClick={handlePopularBoost}
-                                                >
-                                                    Boost
-                                                </button>
+                                                {enableUxV2 ? (
+                                                    <ActionOverflowMenu
+                                                        itemLabel={item.title}
+                                                        actions={[
+                                                            { id: 'edit', label: 'Edit', onClick: () => handlePopularEdit(item) },
+                                                            {
+                                                                id: 'publish_toggle',
+                                                                label: item.status === 'published' ? 'Unpublish' : 'Archive',
+                                                                onClick: () => handlePopularUnpublish(item),
+                                                                tone: 'warning',
+                                                            },
+                                                            { id: 'boost', label: 'Boost', onClick: handlePopularBoost, tone: 'info' },
+                                                        ]}
+                                                    />
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            className="admin-btn secondary small"
+                                                            type="button"
+                                                            onClick={() => handlePopularEdit(item)}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            className="admin-btn warning small"
+                                                            type="button"
+                                                            onClick={() => handlePopularUnpublish(item)}
+                                                        >
+                                                            Unpublish
+                                                        </button>
+                                                        <button
+                                                            className="admin-btn info small"
+                                                            type="button"
+                                                            onClick={handlePopularBoost}
+                                                        >
+                                                            Boost
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -1212,6 +1322,7 @@ export function AnalyticsDashboard({
                         <h3>Insights</h3>
                         <p className="analytics-subtitle">Automated signals from the most recent rollups.</p>
                     </div>
+                    {enableUxV2 && <span className="window-badge">{engagementWindow} day window</span>}
                 </div>
                 <div className="insights-grid">
                     <div className={`insight-card ${displayTrendTone}`}>
@@ -1220,17 +1331,26 @@ export function AnalyticsDashboard({
                         <div className="insight-meta">{formatMetric(viewsLast7)} vs {formatMetric(prev7Views)} views</div>
                     </div>
                     <div className={`insight-card ${ctrTone}`}>
-                        <div className="insight-label" title="Click-Through Rate: percentage of listing views that resulted in card clicks">Click-through rate</div>
+                        <div className="insight-label" title={!enableUxV2 ? 'Click-Through Rate: percentage of listing views that resulted in card clicks' : undefined}>
+                            Click-through rate
+                            {enableUxV2 && <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.ctr} />}
+                        </div>
                         <div className="insight-value">{insights?.clickThroughRate ?? ctr}%</div>
                         <div className="insight-meta">From listing views to card clicks</div>
                     </div>
                     <div className={`insight-card ${funnelDropTone}`}>
-                        <div className="insight-label" title="Percentage of listing views that did not result in a card click">Drop-off rate</div>
+                        <div className="insight-label" title={!enableUxV2 ? 'Percentage of listing views that did not result in a card click' : undefined}>
+                            Drop-off rate
+                            {enableUxV2 && <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.drop_off_rate} />}
+                        </div>
                         <div className="insight-value">{insights?.funnelDropRate ?? 0}%</div>
                         <div className="insight-meta">Listing views not clicked</div>
                     </div>
                     <div className={`insight-card ${finalCoverageTone}`}>
-                        <div className="insight-label" title="Listing views as a percentage of total page views — can exceed 100% if listings are viewed more than pages">Tracking coverage</div>
+                        <div className="insight-label" title={!enableUxV2 ? 'Listing views as a percentage of total page views — can exceed 100% if listings are viewed more than pages' : undefined}>
+                            Tracking coverage
+                            {enableUxV2 && <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.tracking_coverage} />}
+                        </div>
                         <div className="insight-value">{finalCoverage}%</div>
                         <div className="insight-meta">{coverageMetaText}</div>
                         {showCoverageAction && (
@@ -1283,6 +1403,11 @@ export function AnalyticsDashboard({
                         <h3>Engagement Funnel</h3>
                         <p className="analytics-subtitle">Conversion from views to subscriptions in the last {engagementWindow} days.</p>
                     </div>
+                    {enableUxV2 && (
+                        <span className="window-badge">
+                            {engagementWindow} day window <MetricDefinitionTooltip definition={METRIC_DEFINITIONS.conversion_rate} />
+                        </span>
+                    )}
                 </div>
                 <div className="funnel-grid">
                     {funnelSteps.map((step, index) => (
@@ -1302,7 +1427,7 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>⚠ Funnel anomaly:</strong> Raw Detail views ({formatMetric(rawDetailViews)}) exceed Card clicks ({formatMetric(funnel?.cardClicks)}).
+                        <strong>Warning: Funnel anomaly.</strong> Raw Detail views ({formatMetric(rawDetailViews)}) exceed Card clicks ({formatMetric(funnel?.cardClicks)}).
                         <br />
                         The funnel uses the adjusted value ({formatMetric(adjustedDetailViews)}) to ensure percentages make sense.
                         <div className="analytics-suggestion">Suggestion: Check if users are bypassing listing pages (direct links/SEO) or if card clicks are under-tracked.</div>
@@ -1321,6 +1446,7 @@ export function AnalyticsDashboard({
                         <h3>CTR by Listing Type</h3>
                         <p className="analytics-subtitle">Card clicks per listing view, grouped by type.</p>
                     </div>
+                    {enableUxV2 && <span className="window-badge">{engagementWindow} day window</span>}
                 </div>
                 <p className="analytics-hint">
                     CTR is based on listing views tracked with a type filter, so totals can be lower than overall views.
@@ -1353,7 +1479,7 @@ export function AnalyticsDashboard({
                                             <div className="ctr-cell">
                                                 <span className="ctr-value">{item.ctr}%</span>
                                                 <span className="ctr-bar">
-                                                    <span style={{ width: `${Math.min(100, item.ctr)}%` }} />
+                                                    <span style={{ width: `${Math.min(100, Math.max(item.ctr, item.ctr > 0 ? 5 : 0))}%` }} />
                                                 </span>
                                             </div>
                                         </td>

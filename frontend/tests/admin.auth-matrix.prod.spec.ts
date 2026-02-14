@@ -69,9 +69,9 @@ test.describe('@prod Admin RBAC auth matrix', () => {
             test.skip(!scenario.email || !scenario.password, `${scenario.name} credentials not provided`);
 
             await loginFromAuthModal(page, scenario.email as string, scenario.password as string, scenario.twoFactorCode);
-            await expect(page.getByRole('heading', { name: /Admin Panel/i })).toBeVisible({ timeout: 10000 });
+            await expect(page.getByRole('heading', { name: /Operations Hub/i })).toBeVisible({ timeout: 10000 });
 
-            const createNavButton = page.getByRole('button', { name: /Create New/i });
+            const createNavButton = page.getByRole('button', { name: /^New announcement$/i }).first();
             if (scenario.expectWrite) {
                 await expect(createNavButton).toBeVisible();
             } else {
@@ -79,24 +79,27 @@ test.describe('@prod Admin RBAC auth matrix', () => {
                 await expect(page.getByText(/Read-only role: changes are restricted/i)).toBeVisible();
             }
 
-            await page.getByRole('button', { name: /Announcements/i }).click();
-            await expect(page.getByRole('columnheader', { name: 'Title' })).toBeVisible();
+            await page.getByRole('button', { name: /All Announcements/i }).click();
+            await expect(page.getByRole('columnheader', { name: /Title \/ Organization/i })).toBeVisible();
 
-            const editActions = page.locator('button[title="Edit"]');
-            const deleteActions = page.locator('button[title="Delete"]');
+            const editActions = page.getByRole('button', { name: /^Edit$/i });
+            const deleteActions = page.getByRole('button', { name: /^Delete$/i });
+            const overflowActions = page.getByRole('button', { name: /^More$/i });
 
             if (scenario.expectWrite) {
                 const rowCount = await page.locator('.admin-table tbody tr').count();
                 if (rowCount > 0) {
-                    await expect(editActions.first()).toBeVisible();
+                    await expect(overflowActions.first()).toBeVisible();
                 }
             } else {
+                await expect(overflowActions).toHaveCount(0);
                 await expect(editActions).toHaveCount(0);
             }
 
             if (scenario.expectDelete) {
                 const rowCount = await page.locator('.admin-table tbody tr').count();
                 if (rowCount > 0) {
+                    await overflowActions.first().click();
                     await expect(deleteActions.first()).toBeVisible();
                 }
             } else {
@@ -113,7 +116,7 @@ test.describe('@prod Admin RBAC auth matrix', () => {
         test.skip(!userEmail || !userPassword, 'Non-admin credentials not provided');
 
         await loginFromAuthModal(page, userEmail as string, userPassword as string);
-        await expect(page.getByRole('heading', { name: /Admin Panel/i })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: /Operations Hub/i })).toHaveCount(0);
         await expect(page).toHaveURL(new RegExp(`${(PROD_BASE_URL as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`));
     });
 });
