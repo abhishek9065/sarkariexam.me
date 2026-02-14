@@ -122,14 +122,19 @@ export async function getAnalyticsOverview(
     const cardClicksInApp = funnelSplit.cardClicksInApp;
     const detailViewsDirect = funnelSplit.detailViewsDirect;
     const detailViewsUnattributed = funnelSplit.detailViewsUnattributed;
-    const detailViewsAdjusted = Math.min(detailViewsRaw, cardClicksInApp || detailViewsRaw);
-    const overageRatio = cardClicksInApp > 0
-        ? (detailViewsRaw - cardClicksInApp) / cardClicksInApp
-        : 0;
-    const hasAnomaly = detailViewsRaw > 0
-        && detailViewsUnattributed > 0
-        && overageRatio > IN_APP_CLICK_COLLAPSE_OVERAGE_RATIO
-        && detailViewsUnattributed / detailViewsRaw > IN_APP_CLICK_COLLAPSE_UNATTRIBUTED_SHARE;
+    const detailViewsInApp = Math.max(0, detailViewsRaw - detailViewsDirect - detailViewsUnattributed);
+    const detailViewsAdjusted = detailViewsInApp;
+    const inAppDetailDelta = detailViewsInApp - cardClicksInApp;
+    const overageRatio = cardClicksInApp > 0 ? inAppDetailDelta / cardClicksInApp : 0;
+    const unattributedShare = detailViewsRaw > 0 ? detailViewsUnattributed / detailViewsRaw : 0;
+    const hasAnomaly = detailViewsInApp > 0 && (
+        cardClicksInApp === 0
+        || (
+            detailViewsUnattributed > 0
+            && overageRatio > IN_APP_CLICK_COLLAPSE_OVERAGE_RATIO
+            && unattributedShare > IN_APP_CLICK_COLLAPSE_UNATTRIBUTED_SHARE
+        )
+    );
 
     const sortedTypes = [...typeBreakdown].sort((a, b) => b.count - a.count);
     const sortedCategories = [...categoryBreakdown].sort((a, b) => b.count - a.count);
@@ -167,7 +172,7 @@ export async function getAnalyticsOverview(
         : null;
     const zeroListingEvents = rollupSummary.listingViews === 0;
     const staleRollups = rollupAgeMinutes === null || rollupAgeMinutes > STALE_ROLLUP_THRESHOLD_MINUTES;
-    const inAppClickCollapse = rollupSummary.listingViews > 0 && (cardClicksInApp === 0 || hasAnomaly);
+    const inAppClickCollapse = rollupSummary.listingViews > 0 && hasAnomaly;
 
     const currentRows = dailyRollups.slice(-comparisonWindow);
     const previousRows = dailyRollups.slice(
@@ -288,7 +293,7 @@ export async function getAnalyticsOverview(
             cardClicks: cardClicksInApp,
             cardClicksRaw: rollupSummary.cardClicks,
             cardClicksInApp,
-            detailViews: detailViewsAdjusted,
+            detailViews: detailViewsInApp,
             detailViewsRaw,
             detailViewsAdjusted,
             detailViewsDirect,

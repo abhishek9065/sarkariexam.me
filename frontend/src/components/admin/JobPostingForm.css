@@ -762,13 +762,13 @@
 
 .field-error {
     color: #ef4444;
-    line-height: 1.5;
-    margin-top: 8px;
+    line-height: 1.6;
+    margin-top: 12px;
 }
 
 .field-hint {
-    line-height: 1.5;
-    margin-top: 8px;
+    line-height: 1.6;
+    margin-top: 12px;
 }
 
 .qa-panel ul {
@@ -891,6 +891,23 @@
 
     .admin-form-container {
         padding: 16px;
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .job-posting-form .remove-btn,
+    .admin-form-container .remove-btn {
+        height: 44px;
+        width: 44px;
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .job-posting-form .preset-btn,
+    .job-posting-form .add-btn,
+    .admin-form-container .preset-btn,
+    .admin-form-container .add-btn {
+        min-height: 44px;
     }
 }
 

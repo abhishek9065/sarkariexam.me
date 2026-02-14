@@ -184,11 +184,11 @@ export function HomePage() {
                 <HomeMobileTabs
                     tabs={[
                         {
-                            key: 'result',
-                            title: 'Result',
-                            viewMoreTo: '/results',
-                            sourceTag: 'home_box_results',
-                            items: sections.results.slice(0, 8),
+                            key: 'job',
+                            title: 'Latest Jobs',
+                            viewMoreTo: '/jobs',
+                            sourceTag: 'home_box_jobs',
+                            items: sections.jobs.slice(0, 8),
                         },
                         {
                             key: 'admit-card',
@@ -198,22 +198,22 @@ export function HomePage() {
                             items: sections.admitCards.slice(0, 8),
                         },
                         {
-                            key: 'job',
-                            title: 'Latest Jobs',
-                            viewMoreTo: '/jobs',
-                            sourceTag: 'home_box_jobs',
-                            items: sections.jobs.slice(0, 8),
+                            key: 'result',
+                            title: 'Result',
+                            viewMoreTo: '/results',
+                            sourceTag: 'home_box_results',
+                            items: sections.results.slice(0, 8),
                         },
                     ]}
                 />
 
                 <div className="home-v3-top-grid" data-testid="home-v3-top-grid">
                     <HomeDenseBox
-                        title="Result"
-                        viewMoreTo="/results"
-                        items={sections.results}
-                        sourceTag="home_box_results"
-                        testId="home-v3-dense-box-results"
+                        title="Latest Jobs"
+                        viewMoreTo="/jobs"
+                        items={sections.jobs}
+                        sourceTag="home_box_jobs"
+                        testId="home-v3-dense-box-jobs"
                     />
                     <HomeDenseBox
                         title="Admit Card"
@@ -223,11 +223,11 @@ export function HomePage() {
                         testId="home-v3-dense-box-admit"
                     />
                     <HomeDenseBox
-                        title="Latest Jobs"
-                        viewMoreTo="/jobs"
-                        items={sections.jobs}
-                        sourceTag="home_box_jobs"
-                        testId="home-v3-dense-box-jobs"
+                        title="Result"
+                        viewMoreTo="/results"
+                        items={sections.results}
+                        sourceTag="home_box_results"
+                        testId="home-v3-dense-box-results"
                     />
                 </div>
 

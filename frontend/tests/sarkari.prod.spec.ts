@@ -20,7 +20,7 @@ test.describe('@prod Public site probes', () => {
         await expect(page.locator('[data-testid="home-marquee"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
-        await expect(page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header h2').nth(0)).toHaveText('Result');
+        await expect(page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header h2').nth(0)).toHaveText('Latest Jobs');
         await expect(page.locator('[data-testid="home-educational-content"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="home-v3-dense-box-jobs"]')).toBeVisible();
     });

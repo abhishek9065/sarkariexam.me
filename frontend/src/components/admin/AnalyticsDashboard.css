@@ -11,10 +11,23 @@
 }
 
 .info-icon {
-  margin-left: 5px;
-  cursor: help;
+  align-items: center;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-full);
   color: var(--text-muted);
-  font-size: 14px;
+  cursor: help;
+  display: inline-flex;
+  height: 18px;
+  justify-content: center;
+  margin-left: 5px;
+  padding: 0;
+  width: 18px;
+}
+
+.info-icon:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 
 .analytics-actions {
@@ -1399,6 +1412,7 @@
 }
 
 .metric-definition-tooltip {
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1409,11 +1423,17 @@
   color: var(--text-muted);
   font-size: 10px;
   cursor: help;
+  padding: 0;
 }
 
 .metric-definition-tooltip:hover {
   color: var(--text-primary);
   border-color: rgba(96, 165, 250, 0.6);
+}
+
+.metric-definition-tooltip:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 
 .export-dropdown-divider {

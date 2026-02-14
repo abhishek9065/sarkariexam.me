@@ -740,9 +740,9 @@ export function AnalyticsDashboard({
     const detailViewsUnattributed = funnel?.detailViewsUnattributed ?? 0;
     const hasAnomaly = insights?.healthFlags?.inAppClickCollapse
         ?? funnel?.hasAnomaly
-        ?? Boolean((funnel?.cardClicks ?? 0) === 0 && rawDetailViews > 0);
-    const funnelHasDirectTraffic = !hasAnomaly && (detailViewsDirect > 0 || rawDetailViews > adjustedDetailViews);
-    const detailViewsLabel = hasAnomaly ? 'Detail views (adjusted)' : (funnelHasDirectTraffic ? 'Detail views (all)' : 'Detail views');
+        ?? false;
+    const funnelHasDirectTraffic = !hasAnomaly && (detailViewsDirect > 0 || detailViewsUnattributed > 0);
+    const detailViewsLabel = 'Detail views (in-app)';
     const attributionCoverage = insights?.attributionCoveragePct;
     const finalCoverage = typeof attributionCoverage === 'number'
         ? attributionCoverage
@@ -767,7 +767,7 @@ export function AnalyticsDashboard({
             label: detailViewsLabel,
             value: adjustedDetailViews,
             rate: funnel?.cardClicks ? Math.round((adjustedDetailViews / funnel.cardClicks) * 100) : 0,
-            rateLabel: funnelHasDirectTraffic ? 'Includes direct traffic' : undefined,
+            rateLabel: 'In-app attributed detail views',
         },
         {
             label: 'Bookmarks',
@@ -1550,9 +1550,21 @@ export function AnalyticsDashboard({
                 <div className="funnel-grid">
                     {funnelSteps.map((step, index) => (
                         <div key={step.label} className="funnel-card">
-                            <div className="funnel-label" title={step.label === 'Detail views (adjusted)' ? 'Capped at card clicks to calculate conversion' : undefined}>
+                            <div
+                                className="funnel-label"
+                                title={step.label === detailViewsLabel ? 'In-app attributed detail views only' : undefined}
+                            >
                                 {step.label}
-                                {step.label === 'Detail views (adjusted)' && <span className="info-icon" title="Adjusted to not exceed card clicks for valid conversion rates">ⓘ</span>}
+                                {step.label === detailViewsLabel && (
+                                    <button
+                                        type="button"
+                                        className="info-icon"
+                                        aria-label="In-app detail views include only recognized in-app source attribution"
+                                        title="In-app detail views include only recognized in-app source attribution"
+                                    >
+                                        ⓘ
+                                    </button>
+                                )}
                             </div>
                             <div className="funnel-value">{formatMetric(step.value)}</div>
                             {index > 0 && (
@@ -1565,15 +1577,15 @@ export function AnalyticsDashboard({
                 </div>
                 {hasAnomaly && (
                     <div className="analytics-warning">
-                        <strong>Warning: Funnel anomaly.</strong> In-app clicks ({formatMetric(funnel?.cardClicks)}) are not keeping pace with detail views ({formatMetric(rawDetailViews)}).
+                        <strong>Warning: Funnel anomaly.</strong> In-app clicks ({formatMetric(funnel?.cardClicks)}) are not keeping pace with in-app detail views ({formatMetric(adjustedDetailViews)}).
                         <br />
-                        The funnel uses adjusted detail views ({formatMetric(adjustedDetailViews)}) for conversion math. Direct: {formatMetric(detailViewsDirect)}, Unattributed: {formatMetric(detailViewsUnattributed)}.
+                        Raw detail views ({formatMetric(rawDetailViews)}) include direct and unattributed traffic. Direct: {formatMetric(detailViewsDirect)}, Unattributed: {formatMetric(detailViewsUnattributed)}.
                         <div className="analytics-suggestion">Suggestion: verify in-app source tagging and attribution normalization before acting on conversion drop signals.</div>
                     </div>
                 )}
                 {funnelHasDirectTraffic && !hasAnomaly && (
                     <p className="analytics-hint">
-                        Detail views include direct/SEO traffic, so raw detail views can exceed in-app card clicks without indicating a tracking failure.
+                        Raw detail views include traffic outside in-app navigation paths. Direct: {formatMetric(detailViewsDirect)}, Unattributed: {formatMetric(detailViewsUnattributed)}.
                     </p>
                 )}
             </div>

@@ -1195,14 +1195,16 @@
 
 .field-error {
   display: block;
-  margin-top: 6px;
+  margin-top: 12px;
   font-size: 12px;
+  line-height: 1.6;
   color: var(--accent-red);
 }
 
 .field-hint {
-  margin-top: 6px;
+  margin-top: 12px;
   font-size: 12px;
+  line-height: 1.6;
   color: var(--text-muted);
 }
 
@@ -3915,15 +3917,15 @@
 .admin-page .field-error {
   color: #ef4444;
   font-size: 13px;
-  line-height: 1.5;
-  margin-top: 8px;
+  line-height: 1.6;
+  margin-top: 12px;
 }
 
 .admin-page .field-hint {
   color: rgba(203, 213, 225, 0.92);
   font-size: 13px;
-  line-height: 1.5;
-  margin-top: 8px;
+  line-height: 1.6;
+  margin-top: 12px;
 }
 
 .admin-page .field-meta {

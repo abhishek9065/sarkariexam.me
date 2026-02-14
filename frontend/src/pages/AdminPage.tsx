@@ -21,6 +21,7 @@ import type {
 import { isAdminPortalRole } from '../utils/adminRbac';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
+import { maskIpAddress } from '../utils/maskIpAddress';
 import { adminRequest } from '../utils/adminRequest';
 import { useAdminUiFlags } from '../utils/adminFlags';
 import { trackAdminTelemetry } from '../utils/adminTelemetry';
@@ -3473,7 +3474,7 @@ export function AdminPage() {
                         <div className="admin-banner-content">
                             <strong>Secure session active</strong>
                             <span>{currentSession.device} • {currentSession.browser}</span>
-                            <span>IP: {currentSession.ip}</span>
+                            <span title={currentSession.ip}>IP: {maskIpAddress(currentSession.ip)}</span>
                             <span>{formatLastUpdated(currentSession.lastActivity, 'Last active')}</span>
                         </div>
                         <div className="admin-banner-actions">

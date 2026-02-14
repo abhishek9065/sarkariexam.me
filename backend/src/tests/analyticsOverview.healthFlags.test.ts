@@ -201,6 +201,28 @@ describe('analytics overview health flags', () => {
         expect(data.insights.healthFlags.inAppClickCollapse).toBe(true);
     });
 
+    it('does not set inAppClickCollapse for direct-heavy detail traffic with no in-app flow', async () => {
+        getRollupSummaryMock.mockResolvedValue(createRollupSummary({
+            viewCount: 200,
+            listingViews: 120,
+            lastUpdatedAt: new Date().toISOString(),
+        }));
+        getFunnelAttributionSplitMock.mockResolvedValue({
+            totalCardClicks: 10,
+            cardClicksInApp: 0,
+            detailViewsDirect: 180,
+            detailViewsUnattributed: 20,
+        });
+
+        const { data } = await getAnalyticsOverview(30, { bypassCache: true });
+
+        expect(data.insights.anomaly).toBe(false);
+        expect(data.insights.healthFlags.inAppClickCollapse).toBe(false);
+        expect(data.funnel.detailViews).toBe(0);
+        expect(data.funnel.detailViewsAdjusted).toBe(0);
+        expect(data.funnel.detailViewsDirect).toBe(180);
+    });
+
     it('sets viewTrendMode to baseline when previous window has zero views', async () => {
         getDailyRollupsMock.mockResolvedValue(
             createDailyRollups(14, (index) => (index < 7 ? 0 : 3))

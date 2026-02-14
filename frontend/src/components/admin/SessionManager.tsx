@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { maskIpAddress } from '../../utils/maskIpAddress';
 import './SessionManager.css';
 
 export interface SessionData {
@@ -106,23 +107,6 @@ export function SessionManager({
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays < 7) return `${diffDays}d ago`;
         return date.toLocaleDateString();
-    };
-
-    const maskIpAddress = (ip: string) => {
-        if (!ip) return '';
-        if (ip.includes('.')) {
-            const parts = ip.split('.');
-            if (parts.length === 4) {
-                return `${parts[0]}.${parts[1]}.xxx.xxx`;
-            }
-        }
-        if (ip.includes(':')) {
-            const parts = ip.split(':');
-            if (parts.length > 3) {
-                return `${parts[0]}:${parts[1]}:xxxx:xxxx`;
-            }
-        }
-        return ip;
     };
 
     const getRiskIcon = (risk: string) => {

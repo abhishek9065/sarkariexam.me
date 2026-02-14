@@ -186,8 +186,18 @@ test.describe('Admin analytics local integrity', () => {
         await expect(page.getByText('Card clicks (in-app)')).toBeVisible();
         await expect(page.getByText('Card clicks (all sources)')).toBeVisible();
         await expect(page.getByText('New baseline')).toBeVisible();
+        await expect(page.getByText('Detail views (in-app)')).toBeVisible();
+        await expect(page.getByText('Warning: Funnel anomaly.')).toHaveCount(0);
 
         const coverageCard = page.locator('.insight-card').filter({ hasText: 'Tracking coverage' }).first();
         await expect(coverageCard).toContainText('85.0%');
+
+        const ctrMetricTooltip = page.getByRole('button', { name: /Click-through rate:/i }).first();
+        await ctrMetricTooltip.focus();
+        await expect(ctrMetricTooltip).toBeFocused();
+
+        const funnelInfoTooltip = page.getByRole('button', { name: /In-app detail views include only recognized in-app source attribution/i }).first();
+        await funnelInfoTooltip.focus();
+        await expect(funnelInfoTooltip).toBeFocused();
     });
 });
