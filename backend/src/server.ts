@@ -246,7 +246,17 @@ app.get('/api/performance', authenticateToken, requirePermission('admin:read'), 
 });
 
 // Core Routes (MongoDB-based)
-app.use('/api/auth', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), authRouter);
+app.use(
+  '/api/auth',
+  csrfProtection({
+    cookieNames: [config.adminAuthCookieName],
+    exempt: [
+      { method: 'POST', path: '/login' },
+      { method: 'POST', path: '/register' },
+    ],
+  }),
+  authRouter
+);
 app.use('/api/auth/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminSetupRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminRouter);

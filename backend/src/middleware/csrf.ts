@@ -8,6 +8,27 @@ const AUTH_COOKIE_NAME = 'auth_token';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const CSRF_HEADER_CANDIDATES = ['x-csrf-token', 'x-xsrf-token'];
+type CsrfExemptRule = {
+  method: string;
+  path: string;
+};
+
+type CsrfProtectionOptions = {
+  cookieNames?: string[];
+  exempt?: CsrfExemptRule[];
+};
+
+const normalizePath = (value: string): string => {
+  const normalized = value.trim();
+  if (!normalized || normalized === '/') return '/';
+  return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
+};
+
+const matchesExemptRule = (req: Request, rule: CsrfExemptRule): boolean => {
+  const methodMatches = req.method.toUpperCase() === rule.method.toUpperCase();
+  if (!methodMatches) return false;
+  return normalizePath(req.path) === normalizePath(rule.path);
+};
 
 const readHeaderToken = (req: Request): string | undefined => {
   for (const headerName of CSRF_HEADER_CANDIDATES) {
@@ -46,11 +67,17 @@ export const clearCsrfCookie = (res: Response): void => {
   });
 };
 
-export const csrfProtection = (options?: { cookieNames?: string[] }) => {
+export const csrfProtection = (options?: CsrfProtectionOptions) => {
   const cookieNames = options?.cookieNames?.length ? options.cookieNames : getAuthCookieNames();
+  const exemptRules = options?.exempt ?? [];
 
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!MUTATING_METHODS.has(req.method.toUpperCase())) {
+      next();
+      return;
+    }
+
+    if (exemptRules.some((rule) => matchesExemptRule(req, rule))) {
       next();
       return;
     }

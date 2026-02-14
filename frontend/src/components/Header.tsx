@@ -97,7 +97,7 @@ export function Header() {
                                             </Link>
                                         )}
                                         <hr className="user-dropdown-divider" />
-                                        <button className="user-dropdown-item user-dropdown-logout" onClick={() => { logout(); setUserMenuOpen(false); }}>
+                                        <button className="user-dropdown-item user-dropdown-logout" onClick={() => { void logout(); setUserMenuOpen(false); }}>
                                             🚪 Sign Out
                                         </button>
                                     </div>
@@ -135,7 +135,7 @@ export function Header() {
                                     <Link to="/profile" className="header-mobile-link" onClick={() => setMobileOpen(false)}>👤 Profile</Link>
                                     <Link to="/bookmarks" className="header-mobile-link" onClick={() => setMobileOpen(false)}>🔖 Bookmarks</Link>
                                     {isAdmin && <Link to="/admin" className="header-mobile-link" onClick={() => setMobileOpen(false)}>⚙️ Admin</Link>}
-                                    <button className="header-mobile-link" style={{ textAlign: 'left', width: '100%', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', font: 'inherit', padding: 'inherit' }} onClick={() => { logout(); setMobileOpen(false); }}>🚪 Sign Out</button>
+                                    <button className="header-mobile-link" style={{ textAlign: 'left', width: '100%', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', font: 'inherit', padding: 'inherit' }} onClick={() => { void logout(); setMobileOpen(false); }}>🚪 Sign Out</button>
                                 </>
                             ) : (
                                 <>

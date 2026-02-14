@@ -12,9 +12,12 @@ import type {
 const BASE = import.meta.env.VITE_API_BASE
     ? `${import.meta.env.VITE_API_BASE}/api`
     : '/api';
+const CSRF_COOKIE_NAME = 'csrf_token';
+const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
 /* ─── Token helpers ─── */
 let authToken: string | null = localStorage.getItem('token');
+let csrfTokenCache: string | null = null;
 
 export function setAuthToken(token: string | null) {
     authToken = token;
@@ -24,6 +27,18 @@ export function setAuthToken(token: string | null) {
 
 export function getAuthToken() {
     return authToken;
+}
+
+function readCookie(name: string): string | null {
+    if (typeof document === 'undefined') return null;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+    if (!match) return null;
+    try {
+        return decodeURIComponent(match[1]);
+    } catch {
+        return match[1];
+    }
 }
 
 /* ─── Generic fetch wrapper ─── */
@@ -39,6 +54,49 @@ export class ApiRequestError extends Error {
     }
 }
 
+async function parseResponseBody(res: Response): Promise<unknown> {
+    try {
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
+
+async function ensureCsrfToken(forceRefresh = false): Promise<string> {
+    if (!forceRefresh) {
+        const cookieToken = readCookie(CSRF_COOKIE_NAME);
+        if (cookieToken) {
+            csrfTokenCache = cookieToken;
+            return cookieToken;
+        }
+        if (csrfTokenCache) return csrfTokenCache;
+    }
+
+    const res = await fetch(`${BASE}/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+
+    if (!res.ok) {
+        const body = await parseResponseBody(res);
+        throw new ApiRequestError(res.status, body);
+    }
+
+    const body = await parseResponseBody(res) as { data?: { csrfToken?: string } } | null;
+    const csrfToken = body?.data?.csrfToken || readCookie(CSRF_COOKIE_NAME);
+    if (!csrfToken) {
+        throw new Error('Unable to initialize CSRF token');
+    }
+    csrfTokenCache = csrfToken;
+    return csrfToken;
+}
+
+function isCsrfInvalid(error: unknown): boolean {
+    if (!(error instanceof ApiRequestError) || error.status !== 403) return false;
+    const body = error.body as Record<string, unknown> | null;
+    return body?.error === 'csrf_invalid';
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -52,13 +110,45 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     const res = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
 
     if (!res.ok) {
-        let body: unknown;
-        try { body = await res.json(); } catch { body = null; }
+        const body = await parseResponseBody(res);
         throw new ApiRequestError(res.status, body);
     }
 
     if (res.status === 204) return undefined as T;
-    return res.json() as Promise<T>;
+    return parseResponseBody(res) as Promise<T>;
+}
+
+async function apiFetchWithCsrf<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const requestWithCsrf = async (forceRefreshToken = false): Promise<T> => {
+        const csrfToken = await ensureCsrfToken(forceRefreshToken);
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            ...(options.headers as Record<string, string> || {}),
+            [CSRF_HEADER_NAME]: csrfToken,
+        };
+
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const res = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
+        if (!res.ok) {
+            const body = await parseResponseBody(res);
+            throw new ApiRequestError(res.status, body);
+        }
+
+        if (res.status === 204) return undefined as T;
+        return parseResponseBody(res) as Promise<T>;
+    };
+
+    try {
+        return await requestWithCsrf(false);
+    } catch (error) {
+        if (isCsrfInvalid(error)) {
+            return requestWithCsrf(true);
+        }
+        throw error;
+    }
 }
 
 /* ─── Announcements ─── */
@@ -94,8 +184,8 @@ export function getAnnouncementCards(filters: AnnouncementFilters = {}) {
 }
 
 /** Fetch single announcement by slug */
-export function getAnnouncementBySlug(type: ContentType, slug: string) {
-    return apiFetch<{ data: Announcement }>(`/announcements/${type}/${slug}`);
+export function getAnnouncementBySlug(_type: ContentType, slug: string) {
+    return apiFetch<{ data: Announcement }>(`/announcements/${slug}`);
 }
 
 /** Get categories */
@@ -116,14 +206,14 @@ export function getSearchSuggestions(q: string, type?: ContentType) {
 
 /* ─── Auth ─── */
 export function login(email: string, password: string, twoFactorCode?: string) {
-    return apiFetch<{ data: AuthResponse }>('/auth/login', {
+    return apiFetchWithCsrf<{ data: AuthResponse }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password, ...(twoFactorCode ? { twoFactorCode } : {}) }),
     });
 }
 
 export function register(email: string, name: string, password: string) {
-    return apiFetch<{ data: AuthResponse }>('/auth/register', {
+    return apiFetchWithCsrf<{ data: AuthResponse }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ email, name, password }),
     });
@@ -131,6 +221,12 @@ export function register(email: string, name: string, password: string) {
 
 export function getMe() {
     return apiFetch<{ data: { user: User } }>('/auth/me');
+}
+
+export function logout() {
+    return apiFetchWithCsrf<{ message: string }>('/auth/logout', {
+        method: 'POST',
+    });
 }
 
 /* ─── Bookmarks ─── */
