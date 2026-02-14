@@ -1,18 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-test('has title', async ({ page }) => {
-  await page.goto('https://playwright.dev/');
+const BASE_URL = process.env.CI_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4173';
 
-  // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/Playwright/);
-});
+test.describe('Example local checks', () => {
+    test('has app title', async ({ page }) => {
+        await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+        await expect(page).toHaveTitle(/SarkariExams\.me/i);
+    });
 
-test('get started link', async ({ page }) => {
-  await page.goto('https://playwright.dev/');
-
-  // Click the get started link.
-  await page.getByRole('link', { name: 'Get started' }).click();
-
-  // Expects page to have a heading with the name of Installation.
-  await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
+    test('header and footer are visible', async ({ page }) => {
+        await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+        await expect(page.locator('[data-testid="app-header"]')).toBeVisible();
+        await expect(page.locator('[data-testid="app-footer"]')).toBeVisible();
+    });
 });

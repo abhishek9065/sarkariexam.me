@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const BASE_URL = process.env.ADMIN_BASE_URL || 'https://sarkariexams.me';
-const ADMIN_URL = `${BASE_URL.replace(/\/$/, '')}/admin`;
+const PROD_BASE_URL = process.env.PROD_BASE_URL || process.env.ADMIN_BASE_URL;
+const ADMIN_URL = PROD_BASE_URL ? `${PROD_BASE_URL.replace(/\/$/, '')}/admin` : '';
 
 const adminEmail = process.env.ADMIN_TEST_EMAIL;
 const adminPassword = process.env.ADMIN_TEST_PASSWORD;
@@ -23,8 +23,9 @@ async function loginFromAuthModal(page: Page, email: string, password: string, t
     }
 }
 
-test.describe('Admin UI smoke', () => {
+test.describe('@prod Admin UI smoke', () => {
     test('admin login and core admin flows', async ({ page }) => {
+        test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL (or ADMIN_BASE_URL) to run production probes.');
         test.skip(!adminEmail || !adminPassword, 'ADMIN_TEST_EMAIL/PASSWORD not set');
 
         await loginFromAuthModal(page, adminEmail as string, adminPassword as string, adminBackupCode || adminTotp);

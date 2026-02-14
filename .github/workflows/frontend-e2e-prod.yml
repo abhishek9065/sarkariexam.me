@@ -1,0 +1,73 @@
+name: Frontend E2E Production Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  production-probe:
+    name: Production Probe (Manual)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate required probe inputs
+        env:
+          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+        run: |
+          if [ -z "$PROD_BASE_URL" ]; then
+            echo "Missing required secret: PROD_BASE_URL"
+            exit 1
+          fi
+
+      - name: Run production probe
+        env:
+          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          ADMIN_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          ADMIN_TEST_EMAIL: ${{ secrets.ADMIN_TEST_EMAIL }}
+          ADMIN_TEST_PASSWORD: ${{ secrets.ADMIN_TEST_PASSWORD }}
+          ADMIN_TEST_TOTP: ${{ secrets.ADMIN_TEST_TOTP }}
+          ADMIN_TEST_BACKUP_CODE: ${{ secrets.ADMIN_TEST_BACKUP_CODE }}
+          ADMIN_EDITOR_EMAIL: ${{ secrets.ADMIN_EDITOR_EMAIL }}
+          ADMIN_EDITOR_PASSWORD: ${{ secrets.ADMIN_EDITOR_PASSWORD }}
+          ADMIN_EDITOR_TOTP: ${{ secrets.ADMIN_EDITOR_TOTP }}
+          ADMIN_EDITOR_BACKUP_CODE: ${{ secrets.ADMIN_EDITOR_BACKUP_CODE }}
+          ADMIN_REVIEWER_EMAIL: ${{ secrets.ADMIN_REVIEWER_EMAIL }}
+          ADMIN_REVIEWER_PASSWORD: ${{ secrets.ADMIN_REVIEWER_PASSWORD }}
+          ADMIN_REVIEWER_TOTP: ${{ secrets.ADMIN_REVIEWER_TOTP }}
+          ADMIN_REVIEWER_BACKUP_CODE: ${{ secrets.ADMIN_REVIEWER_BACKUP_CODE }}
+          ADMIN_VIEWER_EMAIL: ${{ secrets.ADMIN_VIEWER_EMAIL }}
+          ADMIN_VIEWER_PASSWORD: ${{ secrets.ADMIN_VIEWER_PASSWORD }}
+          ADMIN_VIEWER_TOTP: ${{ secrets.ADMIN_VIEWER_TOTP }}
+          ADMIN_VIEWER_BACKUP_CODE: ${{ secrets.ADMIN_VIEWER_BACKUP_CODE }}
+          ADMIN_NON_ADMIN_EMAIL: ${{ secrets.ADMIN_NON_ADMIN_EMAIL }}
+          ADMIN_NON_ADMIN_PASSWORD: ${{ secrets.ADMIN_NON_ADMIN_PASSWORD }}
+          USER_TEST_EMAIL: ${{ secrets.USER_TEST_EMAIL }}
+          USER_TEST_PASSWORD: ${{ secrets.USER_TEST_PASSWORD }}
+        run: npm run test:e2e:prod
+
+      - name: Upload production probe artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-production-probe-artifacts
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore

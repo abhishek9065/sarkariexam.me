@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const BASE_URL = process.env.ADMIN_BASE_URL || 'https://sarkariexams.me';
-const ADMIN_URL = `${BASE_URL.replace(/\/$/, '')}/admin`;
+const PROD_BASE_URL = process.env.PROD_BASE_URL || process.env.ADMIN_BASE_URL;
+const ADMIN_URL = PROD_BASE_URL ? `${PROD_BASE_URL.replace(/\/$/, '')}/admin` : '';
 
 interface RoleScenario {
     name: string;
@@ -62,9 +62,10 @@ async function loginFromAuthModal(page: Page, email: string, password: string, t
     }
 }
 
-test.describe('Admin RBAC auth matrix', () => {
+test.describe('@prod Admin RBAC auth matrix', () => {
     for (const scenario of scenarios) {
         test(`${scenario.name} role sees only permitted controls`, async ({ page }) => {
+            test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL (or ADMIN_BASE_URL) to run production probes.');
             test.skip(!scenario.email || !scenario.password, `${scenario.name} credentials not provided`);
 
             await loginFromAuthModal(page, scenario.email as string, scenario.password as string, scenario.twoFactorCode);
@@ -105,12 +106,14 @@ test.describe('Admin RBAC auth matrix', () => {
     }
 
     test('non-admin user cannot access /admin', async ({ page }) => {
+        test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL (or ADMIN_BASE_URL) to run production probes.');
+
         const userEmail = process.env.ADMIN_NON_ADMIN_EMAIL || process.env.USER_TEST_EMAIL;
         const userPassword = process.env.ADMIN_NON_ADMIN_PASSWORD || process.env.USER_TEST_PASSWORD;
         test.skip(!userEmail || !userPassword, 'Non-admin credentials not provided');
 
         await loginFromAuthModal(page, userEmail as string, userPassword as string);
         await expect(page.getByRole('heading', { name: /Admin Panel/i })).toHaveCount(0);
-        await expect(page).toHaveURL(new RegExp(`${BASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`));
+        await expect(page).toHaveURL(new RegExp(`${(PROD_BASE_URL as string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`));
     });
 });

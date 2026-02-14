@@ -98,4 +98,14 @@ jobs:
       - name: Run Playwright smoke
         env:
           CI_BASE_URL: http://127.0.0.1:4173
-        run: npx playwright test tests/ci.smoke.spec.ts --project=chromium
+        run: npm run test:e2e:ci
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-artifacts
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore
