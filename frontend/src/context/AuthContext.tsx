@@ -13,8 +13,10 @@ export interface TwoFactorChallenge {
     password: string;
 }
 
+export type LoginResult = 'success' | 'two_factor_required';
+
 interface AuthContextValue extends AuthState {
-    login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
+    login: (email: string, password: string, twoFactorCode?: string) => Promise<LoginResult>;
     register: (email: string, name: string, password: string) => Promise<void>;
     logout: () => void;
     clearError: () => void;
@@ -47,13 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })();
     }, []);
 
-    const login = useCallback(async (email: string, password: string, twoFactorCode?: string) => {
+    const login = useCallback(async (email: string, password: string, twoFactorCode?: string): Promise<LoginResult> => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const res = await apiLogin(email, password, twoFactorCode);
             setAuthToken(res.data.token);
             setTwoFactorChallenge(null);
             setState({ user: res.data.user, loading: false, error: null });
+            return 'success';
         } catch (err: unknown) {
             /* Handle 2FA challenge */
             if (err instanceof ApiRequestError && err.status === 403) {
@@ -63,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (errorCode === 'two_factor_required') {
                     setTwoFactorChallenge({ email, password });
                     setState((s) => ({ ...s, loading: false, error: null }));
-                    return; /* Don't throw — transition to 2FA step */
+                    return 'two_factor_required';
                 }
 
                 if (errorCode === 'two_factor_setup_required') {
@@ -72,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         loading: false,
                         error: 'Two-factor authentication setup is required. Please contact your administrator.',
                     }));
-                    return;
+                    throw new Error('Two-factor authentication setup is required. Please contact your administrator.');
                 }
             }
 

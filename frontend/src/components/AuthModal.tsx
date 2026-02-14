@@ -49,11 +49,11 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
         setLocalError(null);
         setSubmitting(true);
         try {
-            await login(email, password);
-            /* If login doesn't throw and no 2FA challenge, we're done */
-            if (!twoFactorChallenge) {
+            const result = await login(email, password);
+            if (result === 'success') {
                 onClose();
             }
+            /* If 'two_factor_required', component will re-render to show 2FA step */
         } catch {
             /* error is stored in context */
         } finally {
