@@ -17,6 +17,15 @@ const getConnectionString = (): string | undefined =>
 const getDatabaseName = (): string =>
     process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
 
+const isTestEnv = () => process.env.NODE_ENV === 'test';
+
+const formatErrorForTestLog = (error: unknown): string => {
+    if (error instanceof Error) {
+        return `${error.name}: ${error.message}`;
+    }
+    return String(error);
+};
+
 /**
  * Sleep utility for delays
  */
@@ -92,7 +101,11 @@ export async function connectToDatabase(): Promise<Db> {
 
             return db;
         } catch (error) {
-            console.error(`[CosmosDB] Connection attempt ${attempt} failed:`, error);
+            if (isTestEnv()) {
+                console.error(`[CosmosDB] Connection attempt ${attempt} failed: ${formatErrorForTestLog(error)}`);
+            } else {
+                console.error(`[CosmosDB] Connection attempt ${attempt} failed:`, error);
+            }
             
             // Clean up failed connection
             if (client) {
@@ -134,7 +147,11 @@ export async function getDatabase(): Promise<Db> {
         await db.admin().ping();
         return db;
     } catch (error) {
-        console.warn('[CosmosDB] Database connection unhealthy, reconnecting...', error);
+        if (isTestEnv()) {
+            console.warn(`[CosmosDB] Database connection unhealthy, reconnecting... ${formatErrorForTestLog(error)}`);
+        } else {
+            console.warn('[CosmosDB] Database connection unhealthy, reconnecting...', error);
+        }
         db = null;
         client = null;
         return await connectToDatabase();

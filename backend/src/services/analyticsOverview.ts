@@ -19,6 +19,9 @@ interface SubscriptionDoc {
 
 const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
 const MAX_DAYS = 90;
+const STALE_ROLLUP_THRESHOLD_MINUTES = 45;
+const IN_APP_CLICK_COLLAPSE_OVERAGE_RATIO = 0.35;
+const IN_APP_CLICK_COLLAPSE_UNATTRIBUTED_SHARE = 0.2;
 
 const overviewCache = new Map<number, { data: any; expiresAt: number }>();
 
@@ -104,8 +107,8 @@ export async function getAnalyticsOverview(
         : 0;
     const hasAnomaly = detailViewsRaw > 0
         && detailViewsUnattributed > 0
-        && overageRatio > 0.35
-        && detailViewsUnattributed / detailViewsRaw > 0.2;
+        && overageRatio > IN_APP_CLICK_COLLAPSE_OVERAGE_RATIO
+        && detailViewsUnattributed / detailViewsRaw > IN_APP_CLICK_COLLAPSE_UNATTRIBUTED_SHARE;
 
     const sortedTypes = [...typeBreakdown].sort((a, b) => b.count - a.count);
     const sortedCategories = [...categoryBreakdown].sort((a, b) => b.count - a.count);
@@ -137,6 +140,9 @@ export async function getAnalyticsOverview(
     const rollupAgeMinutes = rollupSummary.lastUpdatedAt
         ? Math.max(0, Math.round((Date.now() - new Date(rollupSummary.lastUpdatedAt).getTime()) / 60000))
         : null;
+    const zeroListingEvents = rollupSummary.listingViews === 0;
+    const staleRollups = rollupAgeMinutes === null || rollupAgeMinutes > STALE_ROLLUP_THRESHOLD_MINUTES;
+    const inAppClickCollapse = rollupSummary.listingViews > 0 && (cardClicksInApp === 0 || hasAnomaly);
 
     const payload = {
         totalAnnouncements,
@@ -203,6 +209,12 @@ export async function getAnalyticsOverview(
                 : null,
             anomaly: hasAnomaly,
             rollupAgeMinutes,
+            healthFlags: {
+                zeroListingEvents,
+                staleRollups,
+                inAppClickCollapse,
+                staleThresholdMinutes: STALE_ROLLUP_THRESHOLD_MINUTES,
+            },
         },
         lastUpdated: new Date().toISOString(),
     };
