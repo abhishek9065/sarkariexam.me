@@ -10,9 +10,11 @@ import type {
 } from '../types';
 
 /* ─── Base URL ─── */
-const BASE = import.meta.env.VITE_API_BASE
-    ? `${import.meta.env.VITE_API_BASE}/api`
-    : '/api';
+const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
+const configuredApiBase = import.meta.env.VITE_API_BASE
+    ? `${normalizeBase(String(import.meta.env.VITE_API_BASE))}/api`
+    : null;
+const API_BASE_CANDIDATES = configuredApiBase ? [configuredApiBase, '/api'] : ['/api'];
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
@@ -63,6 +65,30 @@ async function parseResponseBody(res: Response): Promise<unknown> {
     }
 }
 
+function isRetryableNetworkError(error: unknown): boolean {
+    return error instanceof TypeError;
+}
+
+async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<Response> {
+    let lastError: unknown = null;
+
+    for (const base of API_BASE_CANDIDATES) {
+        try {
+            return await fetch(`${base}${path}`, init);
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableNetworkError(error)) {
+                throw error;
+            }
+        }
+    }
+
+    if (lastError instanceof Error) {
+        throw lastError;
+    }
+    throw new TypeError('Failed to fetch');
+}
+
 async function ensureCsrfToken(forceRefresh = false): Promise<string> {
     if (!forceRefresh) {
         const cookieToken = readCookie(CSRF_COOKIE_NAME);
@@ -73,7 +99,7 @@ async function ensureCsrfToken(forceRefresh = false): Promise<string> {
         if (csrfTokenCache) return csrfTokenCache;
     }
 
-    const res = await fetch(`${BASE}/auth/csrf`, {
+    const res = await fetchWithBaseFallback('/auth/csrf', {
         method: 'GET',
         credentials: 'include',
     });
@@ -108,7 +134,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
         headers['Authorization'] = `Bearer ${authToken}`;
     }
 
-    const res = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
+    const res = await fetchWithBaseFallback(path, { ...options, headers, credentials: 'include' });
 
     if (!res.ok) {
         const body = await parseResponseBody(res);
@@ -132,7 +158,7 @@ async function apiFetchWithCsrf<T>(path: string, options: RequestInit = {}): Pro
             headers['Authorization'] = `Bearer ${authToken}`;
         }
 
-        const res = await fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
+        const res = await fetchWithBaseFallback(path, { ...options, headers, credentials: 'include' });
         if (!res.ok) {
             const body = await parseResponseBody(res);
             throw new ApiRequestError(res.status, body);

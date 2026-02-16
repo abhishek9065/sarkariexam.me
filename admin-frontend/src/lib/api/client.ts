@@ -16,7 +16,11 @@ import type {
     CommunityQa,
 } from '../../types';
 
-const apiBase = import.meta.env.VITE_API_BASE ?? '';
+const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
+const configuredApiBase = import.meta.env.VITE_API_BASE
+    ? normalizeBase(String(import.meta.env.VITE_API_BASE))
+    : '';
+const apiBaseCandidates = configuredApiBase ? [configuredApiBase, ''] : [''];
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
@@ -52,13 +56,35 @@ const mutationHeaders = (stepUpToken?: string, includeIdempotency = true): Heade
     return headers;
 };
 
+const isRetryableNetworkError = (error: unknown): boolean => error instanceof TypeError;
+
+async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<Response> {
+    let lastError: unknown = null;
+
+    for (const base of apiBaseCandidates) {
+        try {
+            return await fetch(`${base}${path}`, init);
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableNetworkError(error)) {
+                throw error;
+            }
+        }
+    }
+
+    if (lastError instanceof Error) {
+        throw lastError;
+    }
+    throw new TypeError('Failed to fetch');
+}
+
 async function ensureCsrfToken(forceRefresh = false): Promise<string | null> {
     if (!forceRefresh) {
         const existing = readCookie(CSRF_COOKIE_NAME);
         if (existing) return existing;
     }
 
-    const response = await fetch(`${apiBase}/api/auth/csrf`, {
+    const response = await fetchWithBaseFallback('/api/auth/csrf', {
         credentials: 'include',
         headers: {
             'Cache-Control': 'no-store',
@@ -81,7 +107,7 @@ async function request(path: string, init: RequestInit = {}, withCsrf = false) {
         }
     }
 
-    const response = await fetch(`${apiBase}${path}`, {
+    const response = await fetchWithBaseFallback(path, {
         ...init,
         credentials: 'include',
         headers,

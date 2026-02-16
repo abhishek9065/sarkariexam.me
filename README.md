@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Backend runs on `http://localhost:5000`.
+Backend runs on `http://localhost:4000`.
 
 ### 2) Frontend
 ```bash
@@ -49,12 +49,25 @@ Admin frontend runs on `http://localhost:4174/admin`.
 
 ## Environment Variables
 
+### Production Docker Compose (`./.env` at repo root)
+```env
+COSMOS_CONNECTION_STRING=...
+JWT_SECRET=...
+ADMIN_SETUP_KEY=...
+TOTP_ENCRYPTION_KEY=...
+ADMIN_EMAIL_ALLOWLIST=admin@example.com
+# or
+ADMIN_DOMAIN_ALLOWLIST=example.com
+```
+`ADMIN_SETUP_KEY`, `TOTP_ENCRYPTION_KEY`, and one of `ADMIN_EMAIL_ALLOWLIST`/`ADMIN_DOMAIN_ALLOWLIST` are required in production.
+`ADMIN_BACKUP_CODE_SALT` is optional (if omitted, backend safely falls back to `JWT_SECRET`).
+
 ### Backend (`backend/.env`)
 ```env
 COSMOS_CONNECTION_STRING=mongodb://localhost:27017/sarkari_db
 COSMOS_DATABASE_NAME=sarkari_db
 JWT_SECRET=change-me
-PORT=5000
+PORT=4000
 
 # Optional integrations
 SENDGRID_API_KEY=
@@ -82,13 +95,16 @@ ADMIN_BACKUP_CODE_SALT=change-this-backup-salt
 
 ### Frontend (`frontend/.env`)
 ```env
-VITE_API_BASE=http://localhost:5000
+# Optional: use direct API origin (without nginx)
+VITE_API_BASE=http://localhost:4000
 ```
+If you run with reverse proxy and `/api` on the same host, leave `VITE_API_BASE` unset.
 
 ### Admin Frontend (`admin-frontend/.env`)
 ```env
-VITE_API_BASE=http://localhost:5000
+VITE_API_BASE=http://localhost:4000
 ```
+If `/api` is proxied on the same host as `/admin`, you can also leave `VITE_API_BASE` unset.
 
 ## Quality Gates
 
@@ -147,6 +163,14 @@ admin-frontend/tests/      Admin Playwright smoke suite
 - `docs/CLOUDFLARE_SETUP.md`
 - `docs/DIGITALOCEAN_DEPLOY.md`
 - `docs/GITHUB_GOVERNANCE_CHECKLIST.md`
+
+## Production Deploy (Recommended)
+Use the guarded deploy script on server:
+```bash
+cd ~/sarkari-result
+bash scripts/deploy-prod.sh
+```
+It validates required production env vars before deploy and checks API health after startup.
 
 ## Notes
 - Mainline branch is `main`.
