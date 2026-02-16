@@ -1,80 +1,66 @@
-# Sarkari Result - Government Jobs Portal
+# SarkariExams.me
 
-A modern, fast, and feature-rich government jobs portal built with React + Vite (Frontend) and Node.js + Express + MongoDB (Backend).
+Government jobs and exam updates platform built with:
+- Frontend: React 19 + TypeScript + Vite
+- Backend: Express 5 + TypeScript + MongoDB/Cosmos DB
 
-## 🚀 Features
+## Highlights
+- Latest jobs, results, admit cards, answer keys, syllabus, admissions
+- Fast homepage + mobile tab UX
+- Admin workflow with approvals and audit-friendly controls
+- PWA support
+- E2E and backend contract test coverage
+- Security workflows: `npm audit` + CodeQL
 
-- **Job Listings** - Latest government jobs, results, admit cards, answer keys
-- **PWA Support** - Install as mobile app, offline access
-- **Dark Mode** - Eye-friendly dark theme
-- **Push Notifications** - Get notified about new jobs
-- **Email Subscriptions** - Daily/weekly job alerts
-- **Search & Filters** - Find jobs by location, qualification, category
-- **Bookmarks** - Save jobs for later with CSV/PDF export
-- **SEO Optimized** - JSON-LD schema for Google Jobs
-
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Frontend | React, TypeScript, Vite |
-| Styling | CSS3 with CSS Variables |
-| Backend | Node.js, Express, TypeScript |
-| Database | MongoDB / Azure Cosmos DB |
-| Hosting | Digital Ocean |
-
-## 📦 Quick Start
-
-### Prerequisites
+## Requirements
 - Node.js 22+
-- MongoDB 6.0+
-- npm or yarn
+- npm 10+
+- MongoDB 6+ (or Azure Cosmos DB Mongo API)
 
-### Frontend Setup
+## Local Setup
+
+### 1) Backend
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Backend runs on `http://localhost:5000`.
+
+### 2) Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### Backend Setup
-```bash
-cd backend
-npm install
+Frontend runs on `http://localhost:4173`.
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your database credentials
+## Environment Variables
 
-# Start server
-npm run dev
-```
-
-## 🔧 Environment Variables
-
-### Backend (.env)
+### Backend (`backend/.env`)
 ```env
-# Connection string for CosmosDB or MongoDB
 COSMOS_CONNECTION_STRING=mongodb://localhost:27017/sarkari_db
 COSMOS_DATABASE_NAME=sarkari_db
-JWT_SECRET=your-secret-key
+JWT_SECRET=change-me
 PORT=5000
 
-# Optional
-SENDGRID_API_KEY=your-sendgrid-key
-TELEGRAM_BOT_TOKEN=your-bot-token
-VAPID_PUBLIC_KEY=your-vapid-public
-VAPID_PRIVATE_KEY=your-vapid-private
+# Optional integrations
+SENDGRID_API_KEY=
+TELEGRAM_BOT_TOKEN=
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
 
-# CORS (comma-separated origins)
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000,https://sarkariexams.me,https://www.sarkariexams.me
+# CORS
+CORS_ORIGINS=http://localhost:4173,http://localhost:3000,https://sarkariexams.me,https://www.sarkariexams.me
 
-# Rate limiting
+# Rate limits
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=200
 AUTH_RATE_LIMIT_MAX=20
 
-# Admin security (recommended in production)
+# Admin hardening
 ADMIN_SETUP_KEY=change-this-strong-key
 ADMIN_REQUIRE_2FA=true
 ADMIN_EMAIL_ALLOWLIST=admin@example.com
@@ -84,86 +70,48 @@ TOTP_ENCRYPTION_KEY=change-this-strong-encryption-key
 ADMIN_BACKUP_CODE_SALT=change-this-backup-salt
 ```
 
-### Frontend (.env)
+### Frontend (`frontend/.env`)
 ```env
 VITE_API_BASE=http://localhost:5000
 ```
 
-## 📁 Project Structure
+## Quality Gates
 
-```
-├── docs/              # Documentation & Deployment guides
-├── frontend/
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── pages/         # Page components
-│   │   ├── hooks/         # Custom hooks
-│   │   ├── context/       # React context
-│   │   └── styles.css     # Global styles
-│   └── tests/             # Playwright E2E tests
-│
-├── backend/
-│   ├── src/
-│   │   ├── routes/        # API endpoints
-│   │   ├── models/        # Database models
-│   │   ├── middleware/    # Express middleware
-│   │   └── services/      # Business logic
-│   └── dist/              # Compiled output
-```
-
-## 🧪 Testing
-
+### Backend
 ```bash
-# Backend checks
 cd backend
 npm run lint
 npm run test:ci
+npm audit --omit=dev --audit-level=high
+```
 
-# Frontend checks
-cd ../frontend
+### Frontend
+```bash
+cd frontend
 npm run lint
 npm run build
 npm run test:e2e:ci
+npm audit --omit=dev --audit-level=high
 ```
 
-Admin smoke tests (optional) read credentials from environment variables:
+## Repository Layout
+```text
+docs/                      Deployment and governance docs
+backend/                   Express API
+backend/src/tests/         Vitest suites
+frontend/                  React app
+frontend/tests/            Playwright suites
+.github/workflows/         CI, security, e2e workflows
 ```
-ADMIN_TEST_EMAIL=admin@example.com
-ADMIN_TEST_PASSWORD=your-password
-# Optional when 2FA is enforced:
-ADMIN_TEST_TOTP=123456
-ADMIN_TEST_BACKUP_CODE=ABCD-1234
-```
 
-## 🚀 Deployment
-
-### Deployment
-
-Please refer to:
+## Deployment Docs
 - `docs/CLOUDFLARE_SETUP.md`
 - `docs/DIGITALOCEAN_DEPLOY.md`
+- `docs/GITHUB_GOVERNANCE_CHECKLIST.md`
 
-## 📊 Performance
+## Notes
+- Mainline branch is `main`.
+- Contributor identities are normalized via `.mailmap`.
 
-- **Database Pool**: 50 connections (optimized)
-- **Rate Limiting**: 200 req/min per IP
-- **Caching**: In-memory cache (5min TTL)
-- **PWA**: Service worker for offline support
-
-## 📄 License
-
-MIT License - feel free to use for personal or commercial projects.
-
-## 🤝 Contributing
-
-1. Fork the repo
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
-
----
-
-**Live Demo**: https://sarkariexams.me
-
-**API**: https://api.sarkariexams.me
+## License
+MIT

@@ -10,15 +10,21 @@ const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element
         body: (
             <>
                 <p>
-                    <strong>SarkariExams</strong> is India's trusted destination for government job notifications,
-                    exam results, admit cards, and application updates. We aggregate information from official
-                    government sources to bring you accurate, timely updates all in one place.
+                    <strong>SarkariExams.me</strong> is an independent information platform for government jobs,
+                    results, admit cards, answer keys, syllabus updates, and admission notices.
+                    We collect updates from official departments and publish them in a structured, searchable format.
                 </p>
                 <h2>Our Mission</h2>
                 <p>
-                    To simplify the government job search for millions of aspirants across India by providing
-                    a clean, fast, and reliable platform with real-time updates.
+                    To make exam and recruitment updates easier to track by providing a fast, clear, and reliable
+                    portal for students and job aspirants across India.
                 </p>
+                <h2>Editorial Standards</h2>
+                <ul>
+                    <li>Source-first publishing from official notifications and government portals</li>
+                    <li>Timestamped updates and quick correction workflow when errors are reported</li>
+                    <li>Clear tagging by exam type, organization, and region for faster navigation</li>
+                </ul>
                 <h2>What We Offer</h2>
                 <ul>
                     <li><strong>Latest Job Notifications</strong> — Central & State government vacancies</li>
@@ -28,10 +34,11 @@ const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element
                     <li><strong>Syllabus</strong> — Complete exam syllabi and patterns</li>
                     <li><strong>Admissions</strong> — University and college admission notices</li>
                 </ul>
-                <h2>Disclaimer</h2>
+                <h2>Important Note</h2>
                 <p>
-                    All information is sourced from official government websites. We recommend verifying
-                    details from the official notification before applying.
+                    SarkariExams.me is not a government website.
+                    Users should always verify eligibility, dates, fees, and final instructions
+                    directly from the official notification before applying.
                 </p>
             </>
         ),
@@ -48,17 +55,17 @@ const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element
                     <div className="card contact-card">
                         <h3>📧 Email</h3>
                         <p>For general inquiries and support:</p>
-                        <a href="mailto:support@sarkariexams.com" className="contact-link">support@sarkariexams.com</a>
+                        <a href="mailto:support@sarkariexams.me" className="contact-link">support@sarkariexams.me</a>
                     </div>
                     <div className="card contact-card">
                         <h3>🐛 Report an Issue</h3>
                         <p>Found incorrect information or a broken link?</p>
-                        <a href="mailto:corrections@sarkariexams.com" className="contact-link">corrections@sarkariexams.com</a>
+                        <a href="mailto:corrections@sarkariexams.me" className="contact-link">corrections@sarkariexams.me</a>
                     </div>
                     <div className="card contact-card">
                         <h3>🤝 Partnerships</h3>
                         <p>Interested in collaboration?</p>
-                        <a href="mailto:partners@sarkariexams.com" className="contact-link">partners@sarkariexams.com</a>
+                        <a href="mailto:partners@sarkariexams.me" className="contact-link">partners@sarkariexams.me</a>
                     </div>
                 </div>
                 <p className="text-muted" style={{ marginTop: 24 }}>
