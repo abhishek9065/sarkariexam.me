@@ -16,8 +16,8 @@ test.describe('Homepage dense layout v3', () => {
         const topHeaders = page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header h2');
         await expect(topHeaders).toHaveCount(3);
         await expect(topHeaders.nth(0)).toHaveText('Latest Jobs');
-        await expect(topHeaders.nth(1)).toHaveText('Admit Card');
-        await expect(topHeaders.nth(2)).toHaveText('Result');
+        await expect(topHeaders.nth(1)).toHaveText('Result');
+        await expect(topHeaders.nth(2)).toHaveText('Admit Card');
 
         const secondaryHeaders = page.locator('[data-testid="home-v3-bottom-grid"] .home-dense-box-header h2');
         await expect(secondaryHeaders).toHaveCount(5);
