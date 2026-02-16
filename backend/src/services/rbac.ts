@@ -1,4 +1,5 @@
 import type { UserRole } from '../types.js';
+
 import { ADMIN_ROLE_PERMISSIONS } from './adminPermissions.js';
 
 export type Permission =

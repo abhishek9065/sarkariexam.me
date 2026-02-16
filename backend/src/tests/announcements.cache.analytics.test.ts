@@ -2,6 +2,7 @@ import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import announcementsRouter from '../routes/announcements.js';
 import { invalidateCache } from '../utils/cache.js';
 
 const {
@@ -46,7 +47,6 @@ vi.mock('../services/telegram.js', () => ({
     sendAnnouncementNotification: vi.fn().mockResolvedValue(false),
 }));
 
-import announcementsRouter from '../routes/announcements.js';
 
 describe('announcements v3 cards cache analytics', () => {
     const app = express();

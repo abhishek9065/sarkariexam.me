@@ -1,7 +1,9 @@
 import crypto from 'crypto';
+
 import jwt from 'jsonwebtoken';
 
 import { config } from '../config.js';
+
 import RedisCache from './redis.js';
 
 export const ADMIN_STEP_UP_HEADER = 'x-admin-step-up-token';

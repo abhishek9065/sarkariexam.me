@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Announcement } from '../types.js';
-
 vi.mock('../services/cosmosdb.js', () => ({
     getCollection: vi.fn(),
 }));
@@ -13,6 +11,7 @@ vi.mock('../services/email.js', () => ({
 import { getCollection } from '../services/cosmosdb.js';
 import { sendAnnouncementEmail } from '../services/email.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
+import type { Announcement } from '../types.js';
 
 const baseAnnouncement: Announcement = {
     id: 'a1',

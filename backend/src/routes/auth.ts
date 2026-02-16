@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+
 import express from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
@@ -12,21 +13,21 @@ import {
   getClientIP
 } from '../middleware/security.js';
 import { UserModelMongo } from '../models/users.mongo.js';
-import { recordAnalyticsEvent } from '../services/analytics.js';
-import { createAdminSession, isNewDeviceForUser, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
-import { clearAuthAbuseFailures, getAuthAbuseStatus, recordAuthAbuseFailure } from '../services/authAbuse.js';
 import {
   getAdminPermissionsSnapshot,
   isAdminPortalRole,
 } from '../services/adminPermissions.js';
+import { createAdminSession, isNewDeviceForUser, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { issueAdminStepUpToken } from '../services/adminStepUp.js';
+import { recordAnalyticsEvent } from '../services/analytics.js';
+import { clearAuthAbuseFailures, getAuthAbuseStatus, recordAuthAbuseFailure } from '../services/authAbuse.js';
 import { sendAdminNewDeviceLoginEmail, sendAdminPasswordResetEmail, sendAdminSecurityAlertEmail } from '../services/email.js';
 import { checkPasswordSecurity } from '../services/passwordSecurity.js';
 import RedisCache from '../services/redis.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { JwtPayload } from '../types.js';
-import { decryptSecret, encryptSecret } from '../utils/crypto.js';
 import { generateBackupCodes, hashBackupCode, normalizeBackupCode } from '../utils/backupCodes.js';
+import { decryptSecret, encryptSecret } from '../utils/crypto.js';
 import { generateTotpSecret, verifyTotpCode } from '../utils/totp.js';
 
 const router = express.Router();

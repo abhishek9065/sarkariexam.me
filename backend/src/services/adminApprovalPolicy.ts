@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import type { ContentType } from '../types.js';
+
 import type { AdminApprovalActionType } from './adminApprovals.js';
 
 export type AdminApprovalRisk = 'low' | 'medium' | 'high' | 'critical';

@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 
 import { config } from '../config.js';
+
 import { getCollectionAsync } from './cosmosdb.js';
 
 /**

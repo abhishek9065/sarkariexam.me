@@ -1,7 +1,7 @@
 import type { Collection } from 'mongodb';
 
-import { getCollection } from './cosmosdb.js';
 import { classifySource } from './attribution.js';
+import { getCollection } from './cosmosdb.js';
 
 export type AnalyticsEventType =
     | 'announcement_view'

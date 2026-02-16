@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 import { config } from '../config.js';
+
 import RedisCache from './redis.js';
 
 const SESSION_INACTIVE_WINDOW_MS = 30 * 60 * 1000;

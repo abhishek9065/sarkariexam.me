@@ -6,6 +6,7 @@ import { idempotency } from '../middleware/idempotency.js';
 import { getAdminSloSnapshot } from '../middleware/responseTime.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
+import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
 import {
     approveAdminApprovalRequest,
     createAdminApprovalRequest,
@@ -16,15 +17,14 @@ import {
     validateApprovalForExecution,
     type AdminApprovalActionType,
 } from '../services/adminApprovals.js';
-import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
 import { getAdminAuditLogsPaged, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
+import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { getDailyRollups, recordAnalyticsEvent } from '../services/analytics.js';
-import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
+import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
-import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 
 const router = Router();
@@ -321,7 +321,7 @@ const getQaWarningCount = (doc: any): number => {
     if (doc?.status === 'scheduled' && !doc?.publishAt) count += 1;
     if (typeof doc?.externalLink === 'string' && doc.externalLink.trim()) {
         try {
-            // eslint-disable-next-line no-new
+             
             new URL(doc.externalLink);
         } catch {
             count += 1;
