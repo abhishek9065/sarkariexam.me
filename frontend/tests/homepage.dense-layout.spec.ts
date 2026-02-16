@@ -13,26 +13,31 @@ test.describe('Homepage v3 premium layout', () => {
         await expect(page.locator('[data-testid="home-featured-banner"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="home-marquee"]')).toHaveCount(0);
 
-        // Section grids
+        // Section grids (3 rows)
         await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
+        await expect(page.locator('[data-testid="home-v3-middle-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-bottom-grid"]')).toBeVisible();
         await expect(page.locator('[data-testid^="home-v3-dense-box-"]')).toHaveCount(8);
 
-        // Top grid: 4 sections
+        // Row 1: Result | Admit Card | Latest Jobs
         const topHeaders = page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header');
-        await expect(topHeaders).toHaveCount(4);
+        await expect(topHeaders).toHaveCount(3);
         await expect(topHeaders.nth(0)).toContainText('Result');
-        await expect(topHeaders.nth(1)).toContainText('Latest Jobs');
-        await expect(topHeaders.nth(2)).toContainText('Admit Card');
-        await expect(topHeaders.nth(3)).toContainText('Answer Key');
+        await expect(topHeaders.nth(1)).toContainText('Admit Card');
+        await expect(topHeaders.nth(2)).toContainText('Latest Jobs');
 
-        // Bottom grid: 4 sections
+        // Row 2: Answer Key | Syllabus | Admission
+        const middleHeaders = page.locator('[data-testid="home-v3-middle-grid"] .home-dense-box-header');
+        await expect(middleHeaders).toHaveCount(3);
+        await expect(middleHeaders.nth(0)).toContainText('Answer Key');
+        await expect(middleHeaders.nth(1)).toContainText('Syllabus');
+        await expect(middleHeaders.nth(2)).toContainText('Admission');
+
+        // Row 3: Certificate Verification | Important
         const bottomHeaders = page.locator('[data-testid="home-v3-bottom-grid"] .home-dense-box-header');
-        await expect(bottomHeaders).toHaveCount(4);
-        await expect(bottomHeaders.nth(0)).toContainText('Syllabus');
-        await expect(bottomHeaders.nth(1)).toContainText('Admission');
-        await expect(bottomHeaders.nth(2)).toContainText('Certificate Verification');
-        await expect(bottomHeaders.nth(3)).toContainText('Important');
+        await expect(bottomHeaders).toHaveCount(2);
+        await expect(bottomHeaders.nth(0)).toContainText('Certificate Verification');
+        await expect(bottomHeaders.nth(1)).toContainText('Important');
 
         // Data loads
         await expect(page.locator('[data-testid="home-v3-dense-box-jobs"] .section-card-list li').first()).toBeVisible();
