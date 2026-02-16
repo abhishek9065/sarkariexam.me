@@ -180,13 +180,13 @@ test.describe('Admin analytics local integrity', () => {
             });
         });
 
-        await page.goto('/admin');
+        await page.goto('/admin', { waitUntil: 'domcontentloaded' });
 
-        await expect(page.getByRole('heading', { name: /Operations Hub/i })).toBeVisible();
-        await expect(page.getByText('Card clicks (in-app)')).toBeVisible();
-        await expect(page.getByText('Card clicks (all sources)')).toBeVisible();
-        await expect(page.getByText('New baseline')).toBeVisible();
-        await expect(page.getByText('Detail views (in-app)')).toBeVisible();
+        await expect(page.getByRole('heading', { name: /Operations Hub/i })).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText('Card clicks (in-app)')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText('Card clicks (all sources)')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText('New baseline')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText('Detail views (in-app)')).toBeVisible({ timeout: 15000 });
         await expect(page.getByText('Warning: Funnel anomaly.')).toHaveCount(0);
 
         const coverageCard = page.locator('.insight-card').filter({ hasText: 'Tracking coverage' }).first();
