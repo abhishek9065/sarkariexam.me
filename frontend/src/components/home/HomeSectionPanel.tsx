@@ -21,6 +21,22 @@ function isRecent(postedAt?: string | null): boolean {
     return !Number.isNaN(d) && Date.now() - d < 3 * 24 * 60 * 60 * 1000;
 }
 
+/** Relative time display (e.g. "2h ago", "1d ago") */
+function timeAgo(postedAt?: string | null): string | null {
+    if (!postedAt) return null;
+    const d = new Date(postedAt).getTime();
+    if (Number.isNaN(d)) return null;
+    const diff = Date.now() - d;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'now';
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    return null; // older than a week, don't show
+}
+
 export function HomeSectionPanel({
     title,
     icon,
@@ -64,17 +80,21 @@ export function HomeSectionPanel({
                 </div>
             ) : (
                 <ul className="section-card-list">
-                    {visibleItems.map((item) => (
-                        <li key={item.id}>
-                            <Link
-                                className="home-dense-box-link"
-                                to={buildAnnouncementDetailPath(item.type, item.slug, sourceTag)}
-                            >
-                                {isRecent(item.postedAt) && <span className="section-link-new" />}
-                                {item.title}
-                            </Link>
-                        </li>
-                    ))}
+                    {visibleItems.map((item) => {
+                        const ago = timeAgo(item.postedAt);
+                        return (
+                            <li key={item.id}>
+                                <Link
+                                    className="home-dense-box-link"
+                                    to={buildAnnouncementDetailPath(item.type, item.slug, sourceTag)}
+                                >
+                                    {isRecent(item.postedAt) && <span className="section-link-new" />}
+                                    {item.title}
+                                    {ago && <span className="section-link-time">{ago}</span>}
+                                </Link>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
 

@@ -20,6 +20,7 @@ export type SourceTag =
     | 'home_box_certificate'
     | 'home_banner'
     | 'home_marquee'
+    | 'home_ticker'
     | 'category_list'
     | 'category_compact'
     | 'search_overlay'
