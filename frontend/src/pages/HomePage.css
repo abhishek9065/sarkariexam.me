@@ -395,12 +395,16 @@
     gap: 4px;
 }
 
-/* ─── SECTION GRID (2 columns) ─── */
+/* ─── SECTION GRID (3 columns) ─── */
 .home-section-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     margin-bottom: 20px;
+}
+
+.home-v3-third-grid {
+    grid-template-columns: repeat(2, 1fr);
 }
 
 /* ─── SECTION PANEL — Modern Card ─── */
