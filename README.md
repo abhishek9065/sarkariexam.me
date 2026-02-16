@@ -17,7 +17,7 @@ A modern, fast, and feature-rich government jobs portal built with React + Vite 
 
 | Component | Technology |
 |-----------|------------|
-| Frontend | React 18, TypeScript, Vite |
+| Frontend | React, TypeScript, Vite |
 | Styling | CSS3 with CSS Variables |
 | Backend | Node.js, Express, TypeScript |
 | Database | MongoDB / Azure Cosmos DB |
@@ -26,7 +26,7 @@ A modern, fast, and feature-rich government jobs portal built with React + Vite 
 ## 📦 Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 22+
 - MongoDB 6.0+
 - npm or yarn
 
@@ -114,13 +114,16 @@ VITE_API_BASE=http://localhost:5000
 ## 🧪 Testing
 
 ```bash
-# Run E2E tests
-cd frontend
-npx playwright install
-npx playwright test
+# Backend checks
+cd backend
+npm run lint
+npm run test:ci
 
-# Run with UI
-npx playwright test --ui
+# Frontend checks
+cd ../frontend
+npm run lint
+npm run build
+npm run test:e2e:ci
 ```
 
 Admin smoke tests (optional) read credentials from environment variables:
@@ -136,7 +139,9 @@ ADMIN_TEST_BACKUP_CODE=ABCD-1234
 
 ### Deployment
 
-Please refer to `docs/DIGITALOCEAN_DEPLOY.md` for detailed deployment instructions.
+Please refer to:
+- `docs/CLOUDFLARE_SETUP.md`
+- `docs/DIGITALOCEAN_DEPLOY.md`
 
 ## 📊 Performance
 

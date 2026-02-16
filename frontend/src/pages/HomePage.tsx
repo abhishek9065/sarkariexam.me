@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { HomeMobileTabs } from '../components/home/HomeMobileTabs';
 import { HomeSectionPanel } from '../components/home/HomeSectionPanel';
 import { getAnnouncementCards } from '../utils/api';
+import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
 import type { AnnouncementCard } from '../types';
 
 import './HomePage.css';
@@ -20,7 +21,6 @@ interface HomeDenseSections {
 }
 
 const CERTIFICATE_KEYWORD_REGEX = /\b(certificate|verification|epic|download)\b/i;
-const EXAM_PULSE = ['SSC CGL', 'UPSC', 'Railway', 'Bank PO', 'Police', 'Teaching'];
 
 function createFallbackCards(type: AnnouncementCard['type'], prefix: string, count: number): AnnouncementCard[] {
     return Array.from({ length: count }).map((_, index) => ({
@@ -126,12 +126,12 @@ export function HomePage() {
                     getAnnouncementCards({ type: 'job', limit: 20, sort: 'newest' }),
                     getAnnouncementCards({ type: 'result', limit: 20, sort: 'newest' }),
                     getAnnouncementCards({ type: 'admit-card', limit: 20, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'answer-key', limit: 10, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'syllabus', limit: 10, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'admission', limit: 12, sort: 'newest' }),
-                    getAnnouncementCards({ limit: 10, sort: 'views' }),
-                    getAnnouncementCards({ search: 'certificate', limit: 16, sort: 'newest' }),
-                    getAnnouncementCards({ search: 'verification', limit: 16, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'answer-key', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'syllabus', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'admission', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ limit: 20, sort: 'views' }),
+                    getAnnouncementCards({ search: 'certificate', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ search: 'verification', limit: 20, sort: 'newest' }),
                 ]);
 
                 if (!mounted) return;
@@ -142,7 +142,7 @@ export function HomePage() {
                     admissionRes.data,
                     resultsRes.data,
                     importantRes.data,
-                    10,
+                    15,
                 );
 
                 setSections({
@@ -190,7 +190,27 @@ export function HomePage() {
         return Object.values(sections).some((items) => items.length > 0);
     }, [loading, sections]);
 
+    /** Build featured links for the top grid (like sarkariresult.com's trending table) */
+    const featuredItems = useMemo(() => {
+        const items: { title: string; slug: string; type: AnnouncementCard['type']; badge: 'apply' | 'admit' | 'declared' | 'new' }[] = [];
+        const seen = new Set<string>();
+        const addItem = (card: AnnouncementCard, badge: 'apply' | 'admit' | 'declared' | 'new') => {
+            if (seen.has(card.id) || items.length >= 12) return;
+            seen.add(card.id);
+            items.push({ title: card.title, slug: card.slug, type: card.type, badge });
+        };
 
+        // Top jobs → "Apply Online"
+        sections.jobs.slice(0, 4).forEach((c) => addItem(c, 'apply'));
+        // Top admit cards → "Admit Card"
+        sections.admitCards.slice(0, 3).forEach((c) => addItem(c, 'admit'));
+        // Top results → "Declared"
+        sections.results.slice(0, 3).forEach((c) => addItem(c, 'declared'));
+        // Fill remaining from important
+        sections.important.slice(0, 4).forEach((c) => addItem(c, 'new'));
+
+        return items;
+    }, [sections.jobs, sections.admitCards, sections.results, sections.important]);
 
     const handleHeroSearchSubmit = (event: React.FormEvent) => {
         event.preventDefault();
@@ -199,9 +219,44 @@ export function HomePage() {
         navigate(`/jobs?q=${encodeURIComponent(trimmed)}&source=home`);
     };
 
+    const badgeLabels: Record<string, string> = {
+        apply: 'Apply Online',
+        admit: 'Admit Card',
+        declared: 'Declared',
+        new: 'New',
+    };
+
     return (
         <Layout>
             <section className="home-v4-shell" data-testid="home-v4-shell">
+                {/* Quick Links Row — like sarkariresult.com's app/social buttons */}
+                <div className="home-quick-links">
+                    <Link to="/jobs" className="home-quick-link">Latest Jobs</Link>
+                    <Link to="/results" className="home-quick-link green">Results</Link>
+                    <Link to="/admit-card" className="home-quick-link blue">Admit Card</Link>
+                    <Link to="/answer-key" className="home-quick-link purple">Answer Key</Link>
+                    <Link to="/syllabus" className="home-quick-link">Syllabus</Link>
+                    <Link to="/admission" className="home-quick-link green">Admission</Link>
+                </div>
+
+                {/* Featured Links Grid — like sarkariresult.com's centered trending table */}
+                {featuredItems.length > 0 && (
+                    <div className="home-featured-grid" data-testid="home-featured-grid">
+                        {featuredItems.map((item) => (
+                            <div className="home-featured-item" key={item.slug}>
+                                <div>
+                                    <Link to={buildAnnouncementDetailPath(item.type, item.slug, 'home_featured')}>
+                                        {item.title}
+                                    </Link>
+                                    <span className={`home-featured-badge home-featured-badge-${item.badge}`}>
+                                        {badgeLabels[item.badge]}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* Compact Search Strip */}
                 <div className="home-search-strip">
                     <h1>Sarkari Exam Updates</h1>
@@ -226,19 +281,6 @@ export function HomePage() {
                     </p>
                 </div>
 
-                {/* Popular Exam Quick Links */}
-                <div className="home-v4-pulse-row" aria-label="Popular exam searches">
-                    {EXAM_PULSE.map((item) => (
-                        <Link
-                            key={item}
-                            to={`/jobs?q=${encodeURIComponent(item)}&source=home`}
-                            className="home-v4-pulse-chip"
-                        >
-                            {item}
-                        </Link>
-                    ))}
-                </div>
-
                 {/* Mobile Tabs (visible only on mobile) */}
                 <HomeMobileTabs
                     tabs={[
@@ -247,109 +289,117 @@ export function HomePage() {
                             title: 'Latest Jobs',
                             viewMoreTo: '/jobs',
                             sourceTag: 'home_box_jobs',
-                            items: sections.jobs.slice(0, 8),
+                            items: sections.jobs.slice(0, 10),
                         },
                         {
                             key: 'admit-card',
                             title: 'Admit Card',
                             viewMoreTo: '/admit-card',
                             sourceTag: 'home_box_admit',
-                            items: sections.admitCards.slice(0, 8),
+                            items: sections.admitCards.slice(0, 10),
                         },
                         {
                             key: 'result',
                             title: 'Result',
                             viewMoreTo: '/results',
                             sourceTag: 'home_box_results',
-                            items: sections.results.slice(0, 8),
+                            items: sections.results.slice(0, 10),
                         },
                     ]}
                 />
 
-                {/* Unified Dense Section Grid — all 8 panels in 2 columns */}
+                {/* Single-Column Stacked Sections — sarkariresult.com order */}
                 <div className="home-v4-section-grid home-v3-top-grid" data-testid="home-v3-top-grid">
                     <HomeSectionPanel
-                        title="Latest Jobs"
-                        subtitle="Recruitment forms and vacancy drives"
-                        viewMoreTo="/jobs"
-                        items={sections.jobs}
-                        sourceTag="home_box_jobs"
-                        testId="home-v3-dense-box-jobs"
-                        className="home-v4-panel home-v4-panel-jobs"
-                        loading={loading}
-                    />
-                    <HomeSectionPanel
                         title="Result"
-                        subtitle="Declared and updated scorecards"
+                        subtitle=""
                         viewMoreTo="/results"
                         items={sections.results}
                         sourceTag="home_box_results"
                         testId="home-v3-dense-box-results"
                         className="home-v4-panel home-v4-panel-result"
                         loading={loading}
+                        maxItems={15}
                     />
                     <HomeSectionPanel
-                        title="Admit Card"
-                        subtitle="Hall ticket release tracker"
-                        viewMoreTo="/admit-card"
-                        items={sections.admitCards}
-                        sourceTag="home_box_admit"
-                        testId="home-v3-dense-box-admit"
-                        className="home-v4-panel home-v4-panel-admit"
+                        title="Answer Key"
+                        subtitle=""
+                        viewMoreTo="/answer-key"
+                        items={sections.answerKeys}
+                        sourceTag="home_box_answer_key"
+                        testId="home-v3-dense-box-answer-key"
+                        className="home-v4-panel home-v4-panel-answer"
                         loading={loading}
+                        maxItems={15}
+                    />
+                    <HomeSectionPanel
+                        title="Certificate Verification"
+                        subtitle=""
+                        viewMoreTo="/results?q=certificate"
+                        items={sections.certificates}
+                        sourceTag="home_box_certificate"
+                        testId="home-v3-dense-box-certificate"
+                        className="home-v4-panel home-v4-panel-certificate"
+                        loading={loading}
+                        maxItems={15}
                     />
                 </div>
 
                 <div className="home-v4-section-grid home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
                     <HomeSectionPanel
-                        title="Answer Key"
-                        subtitle="Objection windows and official keys"
-                        viewMoreTo="/answer-key"
-                        items={sections.answerKeys}
-                        sourceTag="home_box_answer_key"
-                        testId="home-v3-dense-box-answer-key"
-                        className="home-v4-panel home-v4-panel-answer home-dense-box-area-answer"
+                        title="Admit Card"
+                        subtitle=""
+                        viewMoreTo="/admit-card"
+                        items={sections.admitCards}
+                        sourceTag="home_box_admit"
+                        testId="home-v3-dense-box-admit"
+                        className="home-v4-panel home-v4-panel-admit home-dense-box-area-admit"
                         loading={loading}
+                        maxItems={15}
                     />
                     <HomeSectionPanel
                         title="Syllabus"
-                        subtitle="Pattern and topic blueprint"
+                        subtitle=""
                         viewMoreTo="/syllabus"
                         items={sections.syllabus}
                         sourceTag="home_box_syllabus"
                         testId="home-v3-dense-box-syllabus"
                         className="home-v4-panel home-v4-panel-syllabus home-dense-box-area-syllabus"
                         loading={loading}
-                    />
-                    <HomeSectionPanel
-                        title="Admission"
-                        subtitle="Counselling and admission updates"
-                        viewMoreTo="/admission"
-                        items={sections.admissions}
-                        sourceTag="home_box_admission"
-                        testId="home-v3-dense-box-admission"
-                        className="home-v4-panel home-v4-panel-admission home-dense-box-area-admission"
-                        loading={loading}
-                    />
-                    <HomeSectionPanel
-                        title="Certificate Verification"
-                        subtitle="Verification and document links"
-                        viewMoreTo="/results?q=certificate"
-                        items={sections.certificates}
-                        sourceTag="home_box_certificate"
-                        testId="home-v3-dense-box-certificate"
-                        className="home-v4-panel home-v4-panel-certificate home-dense-box-area-certificate"
-                        loading={loading}
+                        maxItems={15}
                     />
                     <HomeSectionPanel
                         title="Important"
-                        subtitle="High-impact notices by traffic"
+                        subtitle=""
                         viewMoreTo="/jobs?sort=views"
                         items={sections.important}
                         sourceTag="home_box_important"
                         testId="home-v3-dense-box-important"
                         className="home-v4-panel home-v4-panel-important home-dense-box-area-important"
                         loading={loading}
+                        maxItems={15}
+                    />
+                    <HomeSectionPanel
+                        title="Latest Jobs"
+                        subtitle=""
+                        viewMoreTo="/jobs"
+                        items={sections.jobs}
+                        sourceTag="home_box_jobs"
+                        testId="home-v3-dense-box-jobs"
+                        className="home-v4-panel home-v4-panel-jobs home-dense-box-area-jobs"
+                        loading={loading}
+                        maxItems={15}
+                    />
+                    <HomeSectionPanel
+                        title="Admission"
+                        subtitle=""
+                        viewMoreTo="/admission"
+                        items={sections.admissions}
+                        sourceTag="home_box_admission"
+                        testId="home-v3-dense-box-admission"
+                        className="home-v4-panel home-v4-panel-admission home-dense-box-area-admission"
+                        loading={loading}
+                        maxItems={15}
                     />
                 </div>
             </section>
@@ -364,3 +414,4 @@ export function HomePage() {
         </Layout>
     );
 }
+

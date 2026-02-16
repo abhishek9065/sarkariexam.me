@@ -20,6 +20,7 @@ declare global {
     interface Request {
       user?: JwtPayload;
       adminStepUp?: { verifiedAt: string; jti?: string };
+      requestId?: string;
     }
   }
 }

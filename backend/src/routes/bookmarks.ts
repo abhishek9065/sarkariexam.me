@@ -5,6 +5,7 @@ import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
+import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
 
@@ -102,7 +103,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
  */
 router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
     try {
-        const announcementId = req.params.id;
+        const announcementId = getPathParam(req.params.id);
         if (!announcementId) {
             return res.status(400).json({ error: 'announcementId is required' });
         }

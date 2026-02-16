@@ -15,17 +15,17 @@ test.describe('Homepage dense layout v3', () => {
 
         const topHeaders = page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header h2');
         await expect(topHeaders).toHaveCount(3);
-        await expect(topHeaders.nth(0)).toHaveText('Latest Jobs');
-        await expect(topHeaders.nth(1)).toHaveText('Result');
-        await expect(topHeaders.nth(2)).toHaveText('Admit Card');
+        await expect(topHeaders.nth(0)).toHaveText('Result');
+        await expect(topHeaders.nth(1)).toHaveText('Answer Key');
+        await expect(topHeaders.nth(2)).toHaveText('Certificate Verification');
 
         const secondaryHeaders = page.locator('[data-testid="home-v3-bottom-grid"] .home-dense-box-header h2');
         await expect(secondaryHeaders).toHaveCount(5);
-        await expect(secondaryHeaders.nth(0)).toHaveText('Answer Key');
+        await expect(secondaryHeaders.nth(0)).toHaveText('Admit Card');
         await expect(secondaryHeaders.nth(1)).toHaveText('Syllabus');
-        await expect(secondaryHeaders.nth(2)).toHaveText('Admission');
-        await expect(secondaryHeaders.nth(3)).toHaveText('Certificate Verification');
-        await expect(secondaryHeaders.nth(4)).toHaveText('Important');
+        await expect(secondaryHeaders.nth(2)).toHaveText('Important');
+        await expect(secondaryHeaders.nth(3)).toHaveText('Latest Jobs');
+        await expect(secondaryHeaders.nth(4)).toHaveText('Admission');
 
         await expect(page.locator('[data-testid="home-v3-dense-box-jobs"] .home-dense-box-list li').first()).toBeVisible();
         await expect(page.locator('[data-testid="home-v3-dense-box-results"] .home-dense-box-list li').first()).toBeVisible();

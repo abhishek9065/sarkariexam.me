@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useTheme } from '../context/useTheme';
+import { useAuth } from '../context/useAuth';
+import { useLanguage } from '../context/useLanguage';
 import { SearchOverlay } from './SearchOverlay';
 import { AuthModal } from './AuthModal';
 import { getTrendingSearches } from '../utils/api';

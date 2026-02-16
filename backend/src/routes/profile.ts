@@ -6,6 +6,7 @@ import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import { ContentType, TrackerStatus } from '../types.js';
+import { getPathParam } from '../utils/routeParams.js';
 
 interface UserProfileDoc {
     userId: string;
@@ -596,7 +597,8 @@ router.post('/saved-searches', authenticateToken, async (req, res) => {
 });
 
 router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
-    if (!isValidObjectId(req.params.id)) {
+    const id = getPathParam(req.params.id);
+    if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid saved search id' });
     }
 
@@ -626,7 +628,7 @@ router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
         }
 
         const result = await savedSearchesCollection().updateOne(
-            { _id: toObjectId(req.params.id), userId: req.user!.userId },
+            { _id: toObjectId(id), userId: req.user!.userId },
             { $set: update }
         );
 
@@ -634,7 +636,7 @@ router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Saved search not found' });
         }
 
-        const updated = await savedSearchesCollection().findOne({ _id: toObjectId(req.params.id), userId: req.user!.userId });
+        const updated = await savedSearchesCollection().findOne({ _id: toObjectId(id), userId: req.user!.userId });
         return res.json({ data: updated ? formatSavedSearch(updated) : null });
     } catch (error) {
         console.error('Saved search update error:', error);
@@ -643,13 +645,14 @@ router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
 });
 
 router.delete('/saved-searches/:id', authenticateToken, async (req, res) => {
-    if (!isValidObjectId(req.params.id)) {
+    const id = getPathParam(req.params.id);
+    if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid saved search id' });
     }
 
     try {
         const result = await savedSearchesCollection().deleteOne({
-            _id: toObjectId(req.params.id),
+            _id: toObjectId(id),
             userId: req.user!.userId,
         });
 
@@ -932,7 +935,8 @@ router.post('/tracked-applications', authenticateToken, async (req, res) => {
 });
 
 router.patch('/tracked-applications/:id', authenticateToken, async (req, res) => {
-    if (!isValidObjectId(req.params.id)) {
+    const id = getPathParam(req.params.id);
+    if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid tracked application id' });
     }
 
@@ -959,7 +963,7 @@ router.patch('/tracked-applications/:id', authenticateToken, async (req, res) =>
 
     try {
         const result = await trackedApplicationsCollection().findOneAndUpdate(
-            { _id: toObjectId(req.params.id), userId: req.user!.userId },
+            { _id: toObjectId(id), userId: req.user!.userId },
             { $set: update },
             { returnDocument: 'after' }
         );
@@ -980,13 +984,14 @@ router.patch('/tracked-applications/:id', authenticateToken, async (req, res) =>
 });
 
 router.delete('/tracked-applications/:id', authenticateToken, async (req, res) => {
-    if (!isValidObjectId(req.params.id)) {
+    const id = getPathParam(req.params.id);
+    if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid tracked application id' });
     }
 
     try {
         const deleted = await trackedApplicationsCollection().deleteOne({
-            _id: toObjectId(req.params.id),
+            _id: toObjectId(id),
             userId: req.user!.userId,
         });
 

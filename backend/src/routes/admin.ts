@@ -26,6 +26,7 @@ import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
+import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
 
@@ -899,13 +900,14 @@ router.get('/workflow/overview', requirePermission('announcements:read'), async 
  */
 router.post('/approvals/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
     try {
+        const approvalId = getPathParam(req.params.id);
         const parsed = adminApprovalResolveSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
             return res.status(400).json({ error: parsed.error.flatten() });
         }
 
         const approved = await approveAdminApprovalRequest({
-            id: req.params.id,
+            id: approvalId,
             approvedBy: {
                 userId: req.user?.userId ?? 'unknown',
                 email: req.user?.email ?? 'unknown',
@@ -925,7 +927,7 @@ router.post('/approvals/:id/approve', requirePermission('announcements:approve')
             ip_address: req.ip,
             event_type: 'admin_approval_approved',
             endpoint: '/api/admin/approvals/:id/approve',
-            metadata: { approvalId: req.params.id, approvedBy: req.user?.email },
+            metadata: { approvalId, approvedBy: req.user?.email },
         });
         return res.json({ data: approved.approval });
     } catch (error) {
@@ -940,13 +942,14 @@ router.post('/approvals/:id/approve', requirePermission('announcements:approve')
  */
 router.post('/approvals/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
     try {
+        const approvalId = getPathParam(req.params.id);
         const parsed = adminApprovalResolveSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
             return res.status(400).json({ error: parsed.error.flatten() });
         }
 
         const rejected = await rejectAdminApprovalRequest({
-            id: req.params.id,
+            id: approvalId,
             rejectedBy: {
                 userId: req.user?.userId ?? 'unknown',
                 email: req.user?.email ?? 'unknown',
@@ -965,7 +968,7 @@ router.post('/approvals/:id/reject', requirePermission('announcements:approve'),
             ip_address: req.ip,
             event_type: 'admin_approval_rejected',
             endpoint: '/api/admin/approvals/:id/reject',
-            metadata: { approvalId: req.params.id, rejectedBy: req.user?.email },
+            metadata: { approvalId, rejectedBy: req.user?.email },
         });
         return res.json({ data: rejected.approval });
     } catch (error) {
@@ -1548,6 +1551,7 @@ router.post('/announcements/bulk-reject', requirePermission('announcements:appro
  */
 router.put('/announcements/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
+        const announcementId = getPathParam(req.params.id);
         const updateSchema = adminAnnouncementPartialSchema;
         const parseResult = updateSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -1557,12 +1561,12 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
         const note = typeof (parseResult.data as any).note === 'string'
             ? (parseResult.data as any).note.trim() || undefined
             : undefined;
-        const existing = await AnnouncementModelMongo.findById(req.params.id);
+        const existing = await AnnouncementModelMongo.findById(announcementId);
         if (!existing) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
         const announcement = await AnnouncementModelMongo.update(
-            req.params.id,
+            announcementId,
             parseResult.data as unknown as Partial<CreateAnnouncementDto> & { note?: string },
             req.user?.userId
         );
@@ -1598,14 +1602,15 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
  */
 router.post('/announcements/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
+        const announcementId = getPathParam(req.params.id);
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
-        const existing = await AnnouncementModelMongo.findById(req.params.id);
+        const existing = await AnnouncementModelMongo.findById(announcementId);
         if (!existing) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
         const approvalGate = await requireDualApproval(req, res, {
             actionType: 'announcement_publish',
-            targetIds: [req.params.id],
+            targetIds: [announcementId],
             payload: { note },
             note,
         });
@@ -1613,7 +1618,7 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
 
         const now = new Date().toISOString();
         const announcement = await AnnouncementModelMongo.update(
-            req.params.id,
+            announcementId,
             {
                 status: 'published',
                 publishAt: now,
@@ -1655,9 +1660,10 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
  */
 router.post('/announcements/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
+        const announcementId = getPathParam(req.params.id);
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
         const announcement = await AnnouncementModelMongo.update(
-            req.params.id,
+            announcementId,
             {
                 status: 'draft',
                 approvedAt: '',
@@ -1692,12 +1698,13 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
  */
 router.post('/announcements/:id/rollback', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
+        const announcementId = getPathParam(req.params.id);
         const parsed = rollbackSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
             return res.status(400).json({ error: parsed.error.flatten() });
         }
 
-        const announcement = await AnnouncementModelMongo.findById(req.params.id);
+        const announcement = await AnnouncementModelMongo.findById(announcementId);
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
@@ -1748,7 +1755,7 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
             rollbackPayload.deadline = snapshot.deadline || '';
         }
 
-        const updated = await AnnouncementModelMongo.update(req.params.id, rollbackPayload, req.user?.userId);
+        const updated = await AnnouncementModelMongo.update(announcementId, rollbackPayload, req.user?.userId);
         if (!updated) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
@@ -1781,20 +1788,21 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
  */
 router.delete('/announcements/:id', requirePermission('announcements:delete'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
+        const announcementId = getPathParam(req.params.id);
         const approvalGate = await requireDualApproval(req, res, {
             actionType: 'announcement_delete',
-            targetIds: [req.params.id],
+            targetIds: [announcementId],
             payload: {},
         });
         if (!approvalGate.allowed) return;
 
-        const deleted = await AnnouncementModelMongo.delete(req.params.id);
+        const deleted = await AnnouncementModelMongo.delete(announcementId);
         if (!deleted) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
         recordAdminAudit({
             action: 'delete',
-            announcementId: req.params.id,
+            announcementId,
             userId: req.user?.userId,
         }).catch(console.error);
         await finalizeApprovalExecution(req, approvalGate.approvalId);

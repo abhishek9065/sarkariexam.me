@@ -11,6 +11,7 @@ import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import { sendAnnouncementNotification } from '../services/telegram.js';
 import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
+import { getPathParam } from '../utils/routeParams.js';
 
 const router = express.Router();
 
@@ -632,7 +633,7 @@ router.get(
   cacheControl(300),
   async (req, res) => {
     try {
-      const announcement = await AnnouncementModel.findBySlug(req.params.slug);
+      const announcement = await AnnouncementModel.findBySlug(getPathParam(req.params.slug));
 
       if (!announcement) {
         return res.status(404).json({ error: 'Announcement not found' });
@@ -786,7 +787,7 @@ router.post('/', authenticateToken, requirePermission('announcements:write'), as
 // Update announcement (admin only)
 router.patch('/:id', authenticateToken, requirePermission('announcements:write'), async (req, res) => {
   try {
-    const id = req.params.id; // String ID for MongoDB
+    const id = getPathParam(req.params.id); // String ID for MongoDB
     if (!id || id.length < 1) {
       return res.status(400).json({ error: 'Invalid announcement ID' });
     }
@@ -829,7 +830,7 @@ router.patch('/:id', authenticateToken, requirePermission('announcements:write')
 // Delete announcement (admin only)
 router.delete('/:id', authenticateToken, requirePermission('announcements:delete'), async (req, res) => {
   try {
-    const id = req.params.id; // String ID for MongoDB
+    const id = getPathParam(req.params.id); // String ID for MongoDB
     if (!id || id.length < 1) {
       return res.status(400).json({ error: 'Invalid announcement ID' });
     }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import {
     getAdminPermissions,
     getMe,
@@ -11,6 +11,7 @@ import {
 } from '../utils/api';
 import type { AdminPermission, AdminPermissionsSnapshot, User } from '../types';
 import { fallbackPermissionsSnapshot, hasAdminPermission, isAdminPortalRole } from '../utils/adminRbac';
+import { AuthContext, type LoginResult, type TwoFactorChallenge } from './auth-context';
 
 /** Backend returns `name` but our User type uses `username` — normalize it */
 function normalizeUser(raw: any): User {
@@ -20,37 +21,12 @@ function normalizeUser(raw: any): User {
     };
 }
 
-interface AuthState {
-    user: User | null;
-    loading: boolean;
-    error: string | null;
-}
-
-export interface TwoFactorChallenge {
-    email: string;
-    password: string;
-}
-
-export type LoginResult = 'success' | 'two_factor_required';
-
-interface AuthContextValue extends AuthState {
-    login: (email: string, password: string, twoFactorCode?: string) => Promise<LoginResult>;
-    register: (email: string, name: string, password: string) => Promise<void>;
-    logout: () => Promise<void>;
-    clearError: () => void;
-    isAdmin: boolean;
-    hasAdminPortalAccess: boolean;
-    adminPermissions: AdminPermissionsSnapshot | null;
-    can: (permission: AdminPermission) => boolean;
-    canAny: (permissions: AdminPermission[]) => boolean;
-    twoFactorChallenge: TwoFactorChallenge | null;
-    clearTwoFactorChallenge: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [state, setState] = useState<AuthState>({ user: null, loading: true, error: null });
+    const [state, setState] = useState<{ user: User | null; loading: boolean; error: string | null }>({
+        user: null,
+        loading: true,
+        error: null,
+    });
     const [twoFactorChallenge, setTwoFactorChallenge] = useState<TwoFactorChallenge | null>(null);
     const [adminPermissions, setAdminPermissions] = useState<AdminPermissionsSnapshot | null>(null);
 
@@ -211,10 +187,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             {children}
         </AuthContext.Provider>
     );
-}
-
-export function useAuth(): AuthContextValue {
-    const ctx = useContext(AuthContext);
-    if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-    return ctx;
 }

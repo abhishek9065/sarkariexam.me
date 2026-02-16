@@ -8,8 +8,8 @@ import { AdminNotificationSystem } from '../components/admin/AdminNotification';
 import { useAdminNotifications } from '../components/admin/useAdminNotifications';
 import { AdminCommandPalette } from '../components/admin/AdminCommandPalette';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
-import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/useTheme';
+import { useAuth } from '../context/useAuth';
 import type {
     Announcement,
     AnnouncementStatus,

@@ -1,13 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
-export type LanguageCode = 'en' | 'hi';
-
-interface LanguageContextValue {
-    language: LanguageCode;
-    setLanguage: (lang: LanguageCode) => void;
-    toggleLanguage: () => void;
-    t: (key: string) => string;
-}
+import { LanguageContext, type LanguageCode, type LanguageContextValue } from './language-context';
 
 const STORAGE_KEY = 'ui_language';
 
@@ -58,8 +51,6 @@ const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
     },
 };
 
-const LanguageContext = createContext<LanguageContextValue | null>(null);
-
 export function LanguageProvider({ children }: { children: ReactNode }) {
     const [language, setLanguageState] = useState<LanguageCode>('en');
 
@@ -91,13 +82,5 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
             {children}
         </LanguageContext.Provider>
     );
-}
-
-export function useLanguage(): LanguageContextValue {
-    const context = useContext(LanguageContext);
-    if (!context) {
-        throw new Error('useLanguage must be used within LanguageProvider');
-    }
-    return context;
 }
 

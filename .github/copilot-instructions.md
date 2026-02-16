@@ -7,7 +7,7 @@ This is a full-stack government jobs portal (Sarkari Result) built with TypeScri
 ## Architecture
 
 - **Frontend**: React 18 + TypeScript + Vite (in `frontend/`)
-- **Backend**: Node.js 20 + Express + TypeScript (in `backend/`)
+- **Backend**: Node.js 22 + Express + TypeScript (in `backend/`)
 - **Database**: MongoDB for local development; Azure Cosmos DB (MongoDB API) in production
 - **Reverse Proxy**: Nginx (in `nginx/`)
 - **Deployment**: Docker + Docker Compose on DigitalOcean

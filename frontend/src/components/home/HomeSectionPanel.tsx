@@ -15,11 +15,13 @@ interface HomeSectionPanelProps {
     loading?: boolean;
 }
 
-function formatDate(value?: string | null): string {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+/** Check if an item was posted within the last 3 days */
+function isRecentItem(postedAt?: string | null): boolean {
+    if (!postedAt) return false;
+    const posted = new Date(postedAt).getTime();
+    if (Number.isNaN(posted)) return false;
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+    return Date.now() - posted < threeDaysMs;
 }
 
 export function HomeSectionPanel({
@@ -43,9 +45,11 @@ export function HomeSectionPanel({
             <header className="home-dense-box-header home-section-panel-header">
                 <div>
                     <h2>{title}</h2>
-                    <p>{subtitle}</p>
+                    {subtitle ? <p>{subtitle}</p> : null}
                 </div>
-                <span className="home-section-panel-count">{items.length}</span>
+                <Link to={viewMoreTo} className="home-section-panel-header-view-more">
+                    View More
+                </Link>
             </header>
 
             {loading ? (
@@ -69,6 +73,9 @@ export function HomeSectionPanel({
                             >
                                 {item.title}
                             </Link>
+                            {isRecentItem(item.postedAt) && (
+                                <span className="home-section-panel-badge home-section-panel-badge-new">New</span>
+                            )}
                             <div className="home-section-panel-meta">
                                 <span>{item.organization || 'Govt update'}</span>
                                 {item.deadline ? <span>Deadline: {formatDate(item.deadline)}</span> : null}
@@ -79,8 +86,16 @@ export function HomeSectionPanel({
             )}
 
             <Link to={viewMoreTo} className="home-dense-box-view-more home-section-panel-view-more">
-                View More
+                View More →
             </Link>
         </section>
     );
 }
+
+function formatDate(value?: string | null): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+

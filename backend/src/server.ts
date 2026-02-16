@@ -14,6 +14,7 @@ import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit } from './middleware/rateLimit.js';
+import { requestIdMiddleware } from './middleware/requestId.js';
 import { responseTimeLogger, getPerformanceStats } from './middleware/responseTime.js';
 import {
   securityHeaders,
@@ -56,6 +57,7 @@ export { app };
 app.set('trust proxy', 1);
 
 // ============ SECURITY MIDDLEWARE ============
+app.use(requestIdMiddleware);
 app.use(cloudflareMiddleware());
 app.use(securityHeaders);
 app.use(blockSuspiciousAgents);
@@ -272,10 +274,12 @@ app.use('/api/community', communityRouter);
 app.use('/api/support', supportRouter);
 
 // 404 handler for API routes
-app.use('/api/*', (_req, res) => {
+app.use('/api', (req, res) => {
   res.status(404).json({
     error: 'Endpoint not found',
-    message: 'The requested API endpoint does not exist.'
+    code: 'NOT_FOUND',
+    message: 'The requested API endpoint does not exist.',
+    requestId: req.requestId,
   });
 });
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authenticateToken, optionalAuth, requirePermission } from '../middleware/auth.js';
 import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import ErrorTracking from '../services/errorTracking.js';
+import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
 
@@ -129,7 +130,7 @@ router.get('/error-reports', authenticateToken, requirePermission('admin:read'),
 });
 
 router.patch('/error-reports/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const { id } = req.params;
+    const id = getPathParam(req.params.id);
     if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid report id' });
     }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { authenticateToken, optionalAuth, requirePermission } from '../middleware/auth.js';
 import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
+import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
 
@@ -148,7 +149,7 @@ router.post('/forums', async (req, res) => {
 });
 
 router.delete('/forums/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const { id } = req.params;
+    const id = getPathParam(req.params.id);
     if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid forum id' });
     }
@@ -216,7 +217,7 @@ router.post('/qa', async (req, res) => {
 });
 
 router.patch('/qa/:id/answer', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const { id } = req.params;
+    const id = getPathParam(req.params.id);
     if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid question id' });
     }
@@ -251,7 +252,7 @@ router.patch('/qa/:id/answer', authenticateToken, requirePermission('admin:write
 });
 
 router.delete('/qa/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const { id } = req.params;
+    const id = getPathParam(req.params.id);
     if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid question id' });
     }
@@ -320,7 +321,7 @@ router.post('/groups', async (req, res) => {
 });
 
 router.delete('/groups/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const { id } = req.params;
+    const id = getPathParam(req.params.id);
     if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid group id' });
     }
@@ -392,7 +393,7 @@ router.post('/flags', optionalAuth, async (req, res) => {
 });
 
 router.delete('/flags/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const { id } = req.params;
+    const id = getPathParam(req.params.id);
     if (!isValidObjectId(id)) {
         return res.status(400).json({ error: 'Invalid flag id' });
     }
