@@ -32,21 +32,7 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Start preview server
-        run: npm run preview -- --host 127.0.0.1 --port 4173 &
-
-      - name: Wait for preview
-        run: |
-          for i in {1..30}; do
-            curl -sf http://127.0.0.1:4173 > /dev/null && exit 0
-            sleep 2
-          done
-          echo "Preview server did not start in time"
-          exit 1
-
       - name: Run nightly e2e
-        env:
-          CI_BASE_URL: http://127.0.0.1:4173
         run: npm run test:e2e:nightly
 
       - name: Upload Playwright nightly artifacts
