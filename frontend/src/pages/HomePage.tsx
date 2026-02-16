@@ -248,6 +248,7 @@ export function HomePage() {
             <div className="home-v3" data-testid="home-v4-shell">
                 {/* ═══ HERO SECTION ═══ */}
                 <div className="home-hero">
+                    <div className="home-hero-particles" aria-hidden="true" />
                     <div className="home-hero-content">
                         <h1>Your Gateway to Government Careers</h1>
                         <p className="home-hero-tagline">

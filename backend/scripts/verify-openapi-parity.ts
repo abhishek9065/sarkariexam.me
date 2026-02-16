@@ -9,6 +9,7 @@ const serverPath = path.join(backendRoot, 'src', 'server.ts');
 const openApiPath = path.join(repoRoot, 'openapi.json');
 
 const ROUTER_FILE_BY_VAR: Record<string, string> = {
+    adminAuthRouter: 'src/routes/admin-auth.ts',
     adminSetupRouter: 'src/routes/admin-setup.ts',
     adminRouter: 'src/routes/admin.ts',
     analyticsRouter: 'src/routes/analytics.ts',

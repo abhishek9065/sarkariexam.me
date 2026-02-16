@@ -62,6 +62,32 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+  admin-frontend-build:
+    name: Admin Frontend Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint admin frontend
+        run: npm run lint
+
+      - name: Build admin frontend
+        run: npm run build
+
   playwright-smoke:
     name: Playwright Smoke
     runs-on: ubuntu-latest
@@ -100,4 +126,41 @@ jobs:
           path: |
             frontend/playwright-report
             frontend/test-results
+          if-no-files-found: ignore
+
+  admin-playwright-smoke:
+    name: Admin Playwright Smoke
+    runs-on: ubuntu-latest
+    needs: admin-frontend-build
+    defaults:
+      run:
+        working-directory: admin-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run admin Playwright smoke
+        run: npm run test:e2e:ci
+
+      - name: Upload admin Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-playwright-smoke-artifacts
+          path: |
+            admin-frontend/playwright-report
+            admin-frontend/test-results
           if-no-files-found: ignore

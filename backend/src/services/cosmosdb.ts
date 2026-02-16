@@ -193,6 +193,7 @@ async function createIndexes(): Promise<void> {
         const analyticsEvents = database.collection('analytics_events');
         const analyticsRollups = database.collection('analytics_rollups');
         const adminAuditLogs = database.collection('admin_audit_logs');
+        const adminAccounts = database.collection('admin_accounts');
         const userNotifications = database.collection('user_notifications');
         const trackedApplications = database.collection('tracked_applications');
         const reminderDispatchLogs = database.collection('reminder_dispatch_logs');
@@ -260,6 +261,10 @@ async function createIndexes(): Promise<void> {
         await adminApprovalRequests.createIndex({ status: 1, requestedAt: -1 });
         await adminApprovalRequests.createIndex({ expiresAt: 1 });
         await adminApprovalRequests.createIndex({ requestHash: 1, status: 1 });
+        await adminAccounts.createIndex({ userId: 1 }, { unique: true });
+        await adminAccounts.createIndex({ email: 1 }, { unique: true });
+        await adminAccounts.createIndex({ role: 1, status: 1 });
+        await adminAccounts.createIndex({ status: 1, updatedAt: -1 });
 
         // User notifications
         await userNotifications.createIndex({ userId: 1, createdAt: -1 });

@@ -31,7 +31,8 @@ test.describe('Site regression', () => {
         const header = page.locator('[data-testid="app-header"]');
         const menuButton = header.getByRole('button', { name: 'Toggle menu' });
         await expect(menuButton).toBeVisible();
-        await menuButton.click();
+        await menuButton.click({ force: true });
+        await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
         await expect(page.locator('.header-mobile-menu')).toBeVisible();
     });
 

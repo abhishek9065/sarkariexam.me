@@ -24,6 +24,7 @@ import {
   enforceAdminHttps,
   enforceAdminIpAllowlist
 } from './middleware/security.js';
+import adminAuthRouter from './routes/admin-auth.js';
 import adminSetupRouter from './routes/admin-setup.js';
 import adminRouter from './routes/admin.js';
 import analyticsRouter from './routes/analytics.js';
@@ -258,6 +259,14 @@ app.use(
     ],
   }),
   authRouter
+);
+app.use(
+  '/api/admin-auth',
+  csrfProtection({
+    cookieNames: [config.adminAuthCookieName],
+    exempt: [{ method: 'POST', path: '/login' }],
+  }),
+  adminAuthRouter
 );
 app.use('/api/auth/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminSetupRouter);
 app.use('/api/announcements', announcementsRouter);

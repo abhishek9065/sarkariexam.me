@@ -62,6 +62,7 @@ export default function App() {
 
                                     {/* Protected: Admin */}
                                     <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
+                                    <Route path="/admin-legacy/*" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
 
                                     {/* Static pages */}
                                     <Route path="/about" element={<StaticPage type="about" />} />
