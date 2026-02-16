@@ -35,3 +35,6 @@ frontend/.env
 # SSL private keys
 nginx/ssl/*.key
 nginx/ssl/*.pem
+
+# Local Playwright Config
+frontend/playwright.local.config.ts

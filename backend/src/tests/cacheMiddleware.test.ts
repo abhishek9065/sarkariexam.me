@@ -2,7 +2,7 @@ import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { cacheMiddleware } from '../middleware/cache.js';
+import { cacheKeys, cacheMiddleware } from '../middleware/cache.js';
 import { bumpCacheVersion } from '../services/cacheVersion.js';
 import { invalidateCache } from '../utils/cache.js';
 
@@ -108,5 +108,40 @@ describeOrSkip('cache middleware key and version behavior', () => {
             extractCacheVersion(first.headers['x-cache-key'] as string) + 1
         );
         expect(third.body.counter).toBeGreaterThan(first.body.counter);
+    });
+
+    it('includes location and salary filters in announcements cache keys', () => {
+        const req = {
+            query: {
+                type: 'job',
+                limit: '20',
+                offset: '0',
+                search: 'railway',
+                category: 'sc',
+                organization: 'rrb',
+                location: 'delhi',
+                qualification: 'graduate',
+                salaryMin: '30000',
+                salaryMax: '50000',
+                sort: 'newest',
+                cursor: 'abc123',
+            },
+        } as any;
+
+        const v1 = cacheKeys.announcements(req);
+        const v2 = cacheKeys.announcementsV2(req);
+        const v3 = cacheKeys.announcementsV3Cards(req);
+
+        expect(v1).toContain('location:delhi');
+        expect(v1).toContain('salaryMin:30000');
+        expect(v1).toContain('salaryMax:50000');
+
+        expect(v2).toContain('location:delhi');
+        expect(v2).toContain('salaryMin:30000');
+        expect(v2).toContain('salaryMax:50000');
+
+        expect(v3).toContain('location:delhi');
+        expect(v3).toContain('salaryMin:30000');
+        expect(v3).toContain('salaryMax:50000');
     });
 });

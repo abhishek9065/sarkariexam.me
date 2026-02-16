@@ -72,13 +72,13 @@ const parseServerMethods = (source: string): Array<{ method: HttpMethod; path: s
 
 const parseMountedRouters = (source: string): Array<{ mountPath: string; routerVar: string }> => {
     const results: Array<{ mountPath: string; routerVar: string }> = [];
-    for (const line of source.split(/\r?\n/)) {
-        if (!line.includes('app.use(')) continue;
-        const mountMatch = line.match(/app\.use\(\s*['"`]([^'"`]+)['"`](.*)\);\s*$/);
-        if (!mountMatch) continue;
+    const useCallRegex = /app\.use\(\s*['"`]([^'"`]+)['"`]([\s\S]*?)\);\s*/g;
+    let match: RegExpExecArray | null;
+    while ((match = useCallRegex.exec(source)) !== null) {
+        const mountPath = match[1];
+        const tail = (match[2] ?? '').trim();
+        if (!tail.startsWith(',')) continue;
 
-        const mountPath = mountMatch[1];
-        const tail = mountMatch[2] ?? '';
         const routerMatch = tail.match(/,\s*([A-Za-z0-9_]+)\s*$/);
         if (!routerMatch) continue;
 
