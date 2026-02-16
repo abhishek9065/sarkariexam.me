@@ -21,8 +21,8 @@ test.describe('Homepage v3 premium layout', () => {
         // Top grid: 4 sections
         const topHeaders = page.locator('[data-testid="home-v3-top-grid"] .home-dense-box-header');
         await expect(topHeaders).toHaveCount(4);
-        await expect(topHeaders.nth(0)).toContainText('Latest Jobs');
-        await expect(topHeaders.nth(1)).toContainText('Result');
+        await expect(topHeaders.nth(0)).toContainText('Result');
+        await expect(topHeaders.nth(1)).toContainText('Latest Jobs');
         await expect(topHeaders.nth(2)).toContainText('Admit Card');
         await expect(topHeaders.nth(3)).toContainText('Answer Key');
 

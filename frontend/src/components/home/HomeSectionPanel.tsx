@@ -40,10 +40,10 @@ export function HomeSectionPanel({
             data-testid={testId}
         >
             {/* Header */}
-            <header className="section-card-header">
+            <header className="section-card-header home-dense-box-header">
                 <div className="section-card-title-group">
                     {icon && <span className="section-card-icon">{icon}</span>}
-                    <h2 className="section-card-title home-dense-box-header">{title}</h2>
+                    <h2 className="section-card-title">{title}</h2>
                 </div>
                 <span className="section-card-count">{items.length}</span>
             </header>
@@ -66,7 +66,10 @@ export function HomeSectionPanel({
                 <ul className="section-card-list">
                     {visibleItems.map((item) => (
                         <li key={item.id}>
-                            <Link to={buildAnnouncementDetailPath(item.type, item.slug, sourceTag)}>
+                            <Link
+                                className="home-dense-box-link"
+                                to={buildAnnouncementDetailPath(item.type, item.slug, sourceTag)}
+                            >
                                 {isRecent(item.postedAt) && <span className="section-link-new" />}
                                 {item.title}
                             </Link>

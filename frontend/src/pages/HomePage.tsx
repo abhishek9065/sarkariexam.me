@@ -257,18 +257,7 @@ export function HomePage() {
                 />
 
                 {/* ═══ SECTION GRID — 2 columns of modern cards ═══ */}
-                <div className="home-section-grid" data-testid="home-v3-top-grid">
-                    <HomeSectionPanel
-                        title="Latest Jobs"
-                        icon="💼"
-                        viewMoreTo="/jobs"
-                        items={sections.jobs}
-                        sourceTag="home_box_jobs"
-                        testId="home-v3-dense-box-jobs"
-                        cardClass="section-card-jobs"
-                        loading={loading}
-                        maxItems={10}
-                    />
+                <div className="home-section-grid home-v3-top-grid" data-testid="home-v3-top-grid">
                     <HomeSectionPanel
                         title="Result"
                         icon="📊"
@@ -277,6 +266,17 @@ export function HomePage() {
                         sourceTag="home_box_results"
                         testId="home-v3-dense-box-results"
                         cardClass="section-card-results"
+                        loading={loading}
+                        maxItems={10}
+                    />
+                    <HomeSectionPanel
+                        title="Latest Jobs"
+                        icon="💼"
+                        viewMoreTo="/jobs"
+                        items={sections.jobs}
+                        sourceTag="home_box_jobs"
+                        testId="home-v3-dense-box-jobs"
+                        cardClass="section-card-jobs"
                         loading={loading}
                         maxItems={10}
                     />
@@ -304,7 +304,7 @@ export function HomePage() {
                     />
                 </div>
 
-                <div className="home-section-grid" data-testid="home-v3-bottom-grid">
+                <div className="home-section-grid home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
                     <HomeSectionPanel
                         title="Syllabus"
                         icon="📚"

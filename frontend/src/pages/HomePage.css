@@ -883,7 +883,12 @@
         display: block;
     }
 
-    /* On mobile, the primary sections are shown in tabs instead */
+    /* On mobile, major sections are shown in tabs instead of top grid. */
+    .home-v3-top-grid {
+        display: none;
+    }
+
+    /* Extra safety in case top-grid cards render in other wrappers. */
     .home-section-grid .section-card-jobs,
     .home-section-grid .section-card-results,
     .home-section-grid .section-card-admit {

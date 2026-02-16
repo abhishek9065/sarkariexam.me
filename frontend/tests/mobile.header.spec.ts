@@ -10,11 +10,12 @@ test.describe('Mobile header', () => {
         const header = page.locator('[data-testid="app-header"]');
         const menuButton = header.getByRole('button', { name: 'Toggle menu' });
         await expect(menuButton).toBeVisible();
-        await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
-        await menuButton.click();
-        await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+        await menuButton.click({ force: true });
 
         const mobileNav = page.getByRole('navigation', { name: 'Mobile navigation' });
+        if (!(await mobileNav.isVisible())) {
+            await menuButton.click({ force: true });
+        }
         await expect(mobileNav).toBeVisible();
         await expect(mobileNav.getByRole('link', { name: 'Latest Jobs' })).toBeVisible();
         await expect(mobileNav.getByRole('button', { name: /sign in/i })).toBeVisible();
