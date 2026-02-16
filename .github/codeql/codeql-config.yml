@@ -1,0 +1,23 @@
+name: "CodeQL Config"
+
+# Scan only production application code to reduce false positives from tests/fixtures.
+paths:
+  - backend/src
+  - frontend/src
+
+paths-ignore:
+  - backend/src/tests
+  - backend/tests
+  - frontend/tests
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/*.d.ts"
+
+queries:
+  - uses: security-extended
+
+# Keep the Security tab focused on actionable issues.
+query-filters:
+  - exclude:
+      problem.severity:
+        - warning
