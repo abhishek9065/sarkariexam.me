@@ -92,6 +92,7 @@ VITE_API_BASE=http://localhost:5000
 ## 📁 Project Structure
 
 ```
+├── docs/              # Documentation & Deployment guides
 ├── frontend/
 │   ├── src/
 │   │   ├── components/    # React components
@@ -135,7 +136,7 @@ ADMIN_TEST_BACKUP_CODE=ABCD-1234
 
 ### Deployment
 
-Please refer to `DIGITALOCEAN_DEPLOY.md` for detailed deployment instructions.
+Please refer to `docs/DIGITALOCEAN_DEPLOY.md` for detailed deployment instructions.
 
 ## 📊 Performance
 
