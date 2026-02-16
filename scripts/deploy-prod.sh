@@ -81,11 +81,70 @@ docker compose --env-file .env up -d --build nginx backend frontend admin-fronte
 echo "Container status:"
 docker compose ps
 
+wait_for_backend_health() {
+  local attempts="${1:-60}"
+  local sleep_seconds="${2:-2}"
+  local i
+
+  echo "Waiting for backend container health..."
+  for ((i=1; i<=attempts; i++)); do
+    local health
+    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' sarkari-backend 2>/dev/null || true)"
+
+    if [[ "$health" == "healthy" ]]; then
+      echo "Backend container reports healthy."
+      return 0
+    fi
+
+    if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
+      echo "Backend container status is '$health'."
+      docker compose logs --tail=120 backend || true
+      return 1
+    fi
+
+    echo "  [$i/$attempts] backend status: ${health:-unknown} ..."
+    sleep "$sleep_seconds"
+  done
+
+  echo "Timed out waiting for backend container health."
+  docker compose logs --tail=120 backend || true
+  return 1
+}
+
+wait_for_backend_endpoint() {
+  local attempts="${1:-60}"
+  local sleep_seconds="${2:-2}"
+  local i
+
+  echo "Waiting for backend /api/health endpoint..."
+  for ((i=1; i<=attempts; i++)); do
+    if docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health >/dev/null 2>&1; then
+      echo "Backend health endpoint is reachable."
+      return 0
+    fi
+    echo "  [$i/$attempts] backend endpoint not ready ..."
+    sleep "$sleep_seconds"
+  done
+
+  echo "Timed out waiting for backend /api/health endpoint."
+  docker compose logs --tail=120 backend || true
+  return 1
+}
+
+wait_for_backend_health
+wait_for_backend_endpoint
+
 echo "Backend health (container internal):"
-docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health
+docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
+  echo
+  echo "ERROR: backend health endpoint failed after readiness checks."
+  docker compose logs --tail=120 backend || true
+  exit 1
+}
 echo
 
 echo "Backend health (public edge):"
-curl -fsS https://sarkariexams.me/api/health >/dev/null && echo "ok"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://sarkariexams.me/api/health}"
+curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null && echo "ok ($PUBLIC_HEALTH_URL)"
 
 echo "Deploy completed successfully."
