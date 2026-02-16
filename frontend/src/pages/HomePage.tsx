@@ -9,6 +9,8 @@ import type { AnnouncementCard } from '../types';
 
 import './HomePage.css';
 
+/* Homepage v3 — Premium 3-column layout */
+
 /* ─── Types ─── */
 interface HomeSections {
     jobs: AnnouncementCard[];
