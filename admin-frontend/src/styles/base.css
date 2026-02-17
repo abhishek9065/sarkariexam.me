@@ -1,0 +1,108 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    background:
+        radial-gradient(circle at 16% 4%, rgba(11, 197, 234, 0.14), transparent 34%),
+        radial-gradient(circle at 84% 0%, rgba(112, 178, 255, 0.12), transparent 30%),
+        linear-gradient(180deg, #050a10 0%, #060b12 100%);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+a {
+    color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+    margin: 0;
+    font-family: var(--font-heading);
+    letter-spacing: 0.01em;
+}
+
+p {
+    margin: 0;
+}
+
+input,
+select,
+textarea,
+button {
+    font: inherit;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    color: var(--text-primary);
+    background: var(--bg-input);
+}
+
+textarea {
+    resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: color-mix(in srgb, var(--text-muted) 92%, #000 8%);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 86%, #fff 14%);
+    outline-offset: 2px;
+}
+
+code {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--border-soft);
+    background: rgba(10, 22, 38, 0.7);
+    color: color-mix(in srgb, var(--info) 74%, #fff 26%);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.79rem;
+}
+
+.admin-muted,
+.ops-muted {
+    color: var(--text-secondary);
+}
+
+.ops-inline-muted {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+}
+
+.ops-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+}

@@ -1,9 +1,17 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../components/ops';
 import { getAdminAnnouncements } from '../lib/api/client';
-import type { AdminAnnouncementListItem } from '../types';
 import { useLocalStorageState } from '../lib/useLocalStorageState';
+import type { AdminAnnouncementListItem } from '../types';
+
+const statusTone = (status?: string) => {
+    if (status === 'published') return 'success';
+    if (status === 'pending' || status === 'scheduled') return 'warning';
+    if (status === 'archived') return 'danger';
+    return 'neutral';
+};
 
 export function AnnouncementsPage() {
     const [status, setStatus] = useLocalStorageState<string>('admin-vnext-announcements-status', 'all', (raw) => {
@@ -43,73 +51,67 @@ export function AnnouncementsPage() {
     };
 
     return (
-        <div className="admin-card">
-            <h2>Announcements</h2>
-            <p className="admin-muted">Parity list module with persisted filters for fast moderation rounds.</p>
-
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '2fr 1fr 1fr', marginBottom: 12 }}>
-                <input
-                    type="search"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search title / keyword..."
-                    aria-label="Search announcements"
-                />
-                <select
-                    value={status}
-                    onChange={(event) => setStatus(event.target.value)}
-                    aria-label="Filter announcements by status"
-                >
-                    {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                </select>
-                <select
-                    value={String(limit)}
-                    onChange={(event) => setLimit(Number(event.target.value))}
-                    aria-label="Rows per page"
-                >
-                    <option value="20">20 rows</option>
-                    <option value="50">50 rows</option>
-                    <option value="100">100 rows</option>
-                </select>
-            </div>
-
-            {query.isPending ? <div>Loading announcements...</div> : null}
-            {query.error ? <div style={{ color: '#b91c1c' }}>Failed to load announcements list.</div> : null}
-            {rows.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr>
-                                <th style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>Title</th>
-                                <th style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>Status</th>
-                                <th style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>Type</th>
-                                <th style={{ textAlign: 'left', borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((item: AdminAnnouncementListItem) => (
-                                <tr key={item.id || item._id || item.slug || item.title}>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {item.title || 'Untitled'}
-                                    </td>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {item.status || '-'}
-                                    </td>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {item.type || '-'}
-                                    </td>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {formatDate(item.updatedAt || item.publishedAt)}
-                                    </td>
-                                </tr>
+        <OpsCard title="Announcements" description="Parity list module with persisted filters for rapid moderation rounds.">
+            <OpsToolbar
+                controls={
+                    <>
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search title or keyword"
+                            aria-label="Search announcements"
+                        />
+                        <select
+                            value={status}
+                            onChange={(event) => setStatus(event.target.value)}
+                            aria-label="Filter announcements by status"
+                        >
+                            {statusOptions.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
+                        </select>
+                        <select
+                            value={String(limit)}
+                            onChange={(event) => setLimit(Number(event.target.value))}
+                            aria-label="Rows per page"
+                        >
+                            <option value="20">20 rows</option>
+                            <option value="50">50 rows</option>
+                            <option value="100">100 rows</option>
+                        </select>
+                    </>
+                }
+            />
+
+            {query.isPending ? <div className="admin-alert info">Loading announcements...</div> : null}
+            {query.error ? <OpsErrorState message="Failed to load announcements list." /> : null}
+            {rows.length > 0 ? (
+                <OpsTable
+                    columns={[
+                        { key: 'title', label: 'Title' },
+                        { key: 'status', label: 'Status' },
+                        { key: 'type', label: 'Type' },
+                        { key: 'updated', label: 'Updated' },
+                    ]}
+                >
+                    {rows.map((item: AdminAnnouncementListItem) => (
+                        <tr key={item.id || item._id || item.slug || item.title}>
+                            <td>{item.title || 'Untitled'}</td>
+                            <td>
+                                <OpsBadge tone={statusTone(item.status) as 'neutral' | 'success' | 'warning' | 'danger'}>
+                                    {item.status || '-'}
+                                </OpsBadge>
+                            </td>
+                            <td>{item.type || '-'}</td>
+                            <td>{formatDate(item.updatedAt || item.publishedAt)}</td>
+                        </tr>
+                    ))}
+                </OpsTable>
             ) : null}
-            {!query.isPending && !query.error && rows.length === 0 ? <div className="admin-muted">No announcements found.</div> : null}
-        </div>
+            {!query.isPending && !query.error && rows.length === 0 ? (
+                <OpsEmptyState message="No announcements found for current filters." />
+            ) : null}
+        </OpsCard>
     );
 }

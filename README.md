@@ -103,8 +103,12 @@ If you run with reverse proxy and `/api` on the same host, leave `VITE_API_BASE`
 ### Admin Frontend (`admin-frontend/.env`)
 ```env
 VITE_API_BASE=http://localhost:4000
+# Optional phased rollout gate for vNext modules
+# Example: dashboard,announcements,review,approvals
+VITE_ADMIN_VNEXT_MODULES=
 ```
 If `/api` is proxied on the same host as `/admin`, you can also leave `VITE_API_BASE` unset.
+If `VITE_ADMIN_VNEXT_MODULES` is empty or unset, all admin vNext modules are enabled.
 
 ## Quality Gates
 

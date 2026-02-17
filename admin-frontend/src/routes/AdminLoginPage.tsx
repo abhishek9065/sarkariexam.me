@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { useAdminAuth } from '../app/useAdminAuth';
+import { OpsBadge } from '../components/ops';
 
 export function AdminLoginPage() {
     const { user, login } = useAdminAuth();
@@ -17,8 +18,13 @@ export function AdminLoginPage() {
     return (
         <div className="admin-login-wrap">
             <div className="admin-login-card">
-                <h1>Admin Sign In</h1>
-                <p className="admin-muted">Dedicated admin auth service with role-gated access.</p>
+                <div className="ops-row wrap">
+                    <OpsBadge tone="info">Admin Auth Boundary</OpsBadge>
+                    <OpsBadge tone="warning">2FA Ready</OpsBadge>
+                </div>
+                <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
+                <p className="admin-muted">Sign in to the operations console with dedicated admin auth and session boundaries.</p>
+
                 <form
                     className="admin-login-form"
                     onSubmit={async (event) => {
@@ -52,13 +58,15 @@ export function AdminLoginPage() {
                     />
                     <input
                         type="text"
-                        placeholder="2FA / backup code (optional)"
+                        placeholder="2FA or backup code"
                         value={twoFactorCode}
                         onChange={(event) => setTwoFactorCode(event.target.value)}
                     />
-                    {error ? <div style={{ color: '#b91c1c' }}>{error}</div> : null}
+
+                    {error ? <div className="admin-alert error">{error}</div> : null}
+
                     <button className="admin-btn primary" type="submit" disabled={submitting}>
-                        {submitting ? 'Signing in...' : 'Sign in'}
+                        {submitting ? 'Signing in...' : 'Sign in to Admin'}
                     </button>
                 </form>
             </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
+import { OpsCard, OpsErrorState } from '../../components/ops';
 import { createAdminAnnouncement } from '../../lib/api/client';
 
 const defaultForm = {
@@ -47,11 +48,9 @@ export function QuickAddModule() {
     });
 
     return (
-        <div className="admin-card">
-            <h2>Quick Add</h2>
-            <p className="admin-muted">Fast posting flow for operations teams.</p>
+        <OpsCard title="Quick Add" description="Fast posting flow for operations teams.">
             <form
-                style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
+                className="ops-form-grid"
                 onSubmit={(event) => {
                     event.preventDefault();
                     setSuccessMessage(null);
@@ -64,7 +63,7 @@ export function QuickAddModule() {
                     placeholder="Title"
                     required
                     minLength={10}
-                    style={{ gridColumn: '1 / -1' }}
+                    className="ops-span-full"
                 />
                 <select
                     value={form.type}
@@ -120,21 +119,21 @@ export function QuickAddModule() {
                     value={form.externalLink}
                     onChange={(event) => setForm((current) => ({ ...current, externalLink: event.target.value }))}
                     placeholder="External link (optional)"
-                    style={{ gridColumn: '1 / -1' }}
+                    className="ops-span-full"
                 />
                 <input
                     value={form.minQualification}
                     onChange={(event) => setForm((current) => ({ ...current, minQualification: event.target.value }))}
                     placeholder="Minimum qualification"
-                    style={{ gridColumn: '1 / -1' }}
+                    className="ops-span-full"
                 />
                 <textarea
                     value={form.content}
                     onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
                     placeholder="Content / summary"
-                    style={{ gridColumn: '1 / -1', minHeight: 140, border: '1px solid #d6dde3', borderRadius: 8, padding: 10 }}
+                    className="ops-span-full ops-textarea"
                 />
-                <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+                <div className="ops-actions ops-span-full">
                     <button type="submit" className="admin-btn primary" disabled={mutation.isPending}>
                         {mutation.isPending ? 'Creating...' : 'Create Announcement'}
                     </button>
@@ -144,11 +143,9 @@ export function QuickAddModule() {
                 </div>
             </form>
             {mutation.isError ? (
-                <div style={{ color: '#b91c1c', marginTop: 10 }}>
-                    {mutation.error instanceof Error ? mutation.error.message : 'Failed to create announcement.'}
-                </div>
+                <OpsErrorState message={mutation.error instanceof Error ? mutation.error.message : 'Failed to create announcement.'} />
             ) : null}
-            {successMessage ? <div style={{ color: '#166534', marginTop: 10 }}>{successMessage}</div> : null}
-        </div>
+            {successMessage ? <div className="ops-success">{successMessage}</div> : null}
+        </OpsCard>
     );
 }

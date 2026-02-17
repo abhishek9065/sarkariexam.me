@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { OpsCard, OpsErrorState } from '../../components/ops';
 import { getAnalyticsOverview } from '../../lib/api/client';
 
 const readValue = (payload: Record<string, unknown> | null, key: string) => {
@@ -24,21 +25,19 @@ export function AnalyticsModule() {
     ];
 
     return (
-        <div className="admin-card">
-            <h2>Analytics</h2>
-            <p className="admin-muted">Operational analytics summary for review and publish planning.</p>
-            {query.isPending ? <div>Loading analytics...</div> : null}
-            {query.error ? <div style={{ color: '#b91c1c' }}>Failed to load analytics overview.</div> : null}
+        <OpsCard title="Analytics" description="Operational analytics summary for review and publish planning.">
+            {query.isPending ? <div className="admin-alert info">Loading analytics...</div> : null}
+            {query.error ? <OpsErrorState message="Failed to load analytics overview." /> : null}
             {!query.isPending && !query.error ? (
-                <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                <div className="ops-kpi-grid">
                     {cards.map((card) => (
-                        <div key={card.label} className="admin-card" style={{ marginBottom: 0, background: '#f8fbfd' }}>
-                            <div className="admin-muted" style={{ fontSize: 12 }}>{card.label}</div>
-                            <div style={{ fontSize: 22, fontWeight: 700 }}>{card.value}</div>
+                        <div key={card.label} className="ops-kpi-card">
+                            <div className="ops-kpi-label">{card.label}</div>
+                            <div className="ops-kpi-value">{card.value}</div>
                         </div>
                     ))}
                 </div>
             ) : null}
-        </div>
+        </OpsCard>
     );
 }

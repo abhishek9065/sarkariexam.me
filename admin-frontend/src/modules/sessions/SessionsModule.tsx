@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getAdminSessions, terminateAdminSessionById } from '../../lib/api/client';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
+import { OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { getAdminSessions, terminateAdminSessionById } from '../../lib/api/client';
 import type { AdminSession } from '../../types';
 
 export function SessionsModule() {
@@ -30,60 +31,50 @@ export function SessionsModule() {
     return (
         <>
             <AdminStepUpCard />
-            <div className="admin-card">
-                <h2>Sessions</h2>
-                <p className="admin-muted">View active sessions and terminate suspicious devices.</p>
-                {query.isPending ? <div>Loading sessions...</div> : null}
-                {query.error ? <div style={{ color: '#b91c1c' }}>Failed to load sessions.</div> : null}
+            <OpsCard title="Sessions" description="View active sessions and terminate suspicious devices.">
+                {query.isPending ? <div className="admin-alert info">Loading sessions...</div> : null}
+                {query.error ? <OpsErrorState message="Failed to load sessions." /> : null}
                 {terminateMutation.isError ? (
-                    <div style={{ color: '#b91c1c' }}>
-                        {terminateMutation.error instanceof Error ? terminateMutation.error.message : 'Failed to terminate session.'}
-                    </div>
+                    <OpsErrorState message={terminateMutation.error instanceof Error ? terminateMutation.error.message : 'Failed to terminate session.'} />
                 ) : null}
+
                 {rows.length > 0 ? (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Device</th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>IP</th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Last Activity</th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Risk</th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((row: AdminSession) => (
-                                    <tr key={row.id}>
-                                        <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                            <strong>{row.device}</strong> <span className="admin-muted">({row.browser})</span>
-                                        </td>
-                                        <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>{row.ip}</td>
-                                        <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                            {new Date(row.lastActivity).toLocaleString()}
-                                        </td>
-                                        <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>{row.riskScore}</td>
-                                        <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                            {row.isCurrentSession ? (
-                                                <span className="admin-muted">Current session</span>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    className="admin-btn"
-                                                    disabled={terminateMutation.isPending || !hasValidStepUp}
-                                                    onClick={() => terminateMutation.mutate(row.id)}
-                                                >
-                                                    Terminate
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <OpsTable
+                        columns={[
+                            { key: 'device', label: 'Device' },
+                            { key: 'ip', label: 'IP' },
+                            { key: 'activity', label: 'Last Activity' },
+                            { key: 'risk', label: 'Risk' },
+                            { key: 'action', label: 'Action' },
+                        ]}
+                    >
+                        {rows.map((row: AdminSession) => (
+                            <tr key={row.id}>
+                                <td><strong>{row.device}</strong> <span className="ops-inline-muted">({row.browser})</span></td>
+                                <td>{row.ip}</td>
+                                <td>{new Date(row.lastActivity).toLocaleString()}</td>
+                                <td>{row.riskScore}</td>
+                                <td>
+                                    {row.isCurrentSession ? (
+                                        <span className="ops-inline-muted">Current session</span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="admin-btn"
+                                            disabled={terminateMutation.isPending || !hasValidStepUp}
+                                            onClick={() => terminateMutation.mutate(row.id)}
+                                        >
+                                            Terminate
+                                        </button>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </OpsTable>
                 ) : null}
-            </div>
+
+                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No active sessions found." /> : null}
+            </OpsCard>
         </>
     );
 }

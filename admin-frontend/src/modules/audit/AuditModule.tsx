@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
 import { getAdminAuditLogs } from '../../lib/api/client';
 import type { AdminAuditLog } from '../../types';
 
@@ -12,44 +13,31 @@ export function AuditModule() {
     const rows = query.data ?? [];
 
     return (
-        <div className="admin-card">
-            <h2>Audit</h2>
-            <p className="admin-muted">Immutable admin actions timeline for review and compliance checks.</p>
-            {query.isPending ? <div>Loading audit logs...</div> : null}
-            {query.error ? <div style={{ color: '#b91c1c' }}>Failed to load audit logs.</div> : null}
+        <OpsCard title="Audit" description="Immutable admin action timeline for compliance checks.">
+            {query.isPending ? <div className="admin-alert info">Loading audit logs...</div> : null}
+            {query.error ? <OpsErrorState message="Failed to load audit logs." /> : null}
             {rows.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr>
-                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Action</th>
-                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Actor</th>
-                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>When</th>
-                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Ref</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((row: AdminAuditLog, index: number) => (
-                                <tr key={row.id || `${row.action}-${index}`}>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {String(row.action ?? '-')}
-                                    </td>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {String(row.actorEmail ?? row.actorId ?? '-')}
-                                    </td>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        {row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}
-                                    </td>
-                                    <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                        <code>{String(row.id ?? '-')}</code>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <OpsTable
+                    columns={[
+                        { key: 'action', label: 'Action' },
+                        { key: 'actor', label: 'Actor' },
+                        { key: 'when', label: 'When' },
+                        { key: 'ref', label: 'Reference' },
+                    ]}
+                >
+                    {rows.map((row: AdminAuditLog, index: number) => (
+                        <tr key={row.id || `${row.action}-${index}`}>
+                            <td>{String(row.action ?? '-')}</td>
+                            <td>{String(row.actorEmail ?? row.actorId ?? '-')}</td>
+                            <td>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
+                            <td><code>{String(row.id ?? '-')}</code></td>
+                        </tr>
+                    ))}
+                </OpsTable>
             ) : null}
-            {!query.isPending && !query.error && rows.length === 0 ? <div className="admin-muted">No audit entries found.</div> : null}
-        </div>
+            {!query.isPending && !query.error && rows.length === 0 ? (
+                <OpsEmptyState message="No audit entries found." />
+            ) : null}
+        </OpsCard>
     );
 }

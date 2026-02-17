@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { useAdminAuth } from '../app/useAdminAuth';
+import { OpsBadge, OpsCard } from './ops';
 
 type AdminStepUpCardProps = {
     title?: string;
@@ -25,18 +26,20 @@ export function AdminStepUpCard({
     }, [stepUpExpiresAt, hasValidStepUp]);
 
     return (
-        <div className="admin-card" style={{ background: '#f8fbfd' }}>
-            <h3 style={{ marginTop: 0, marginBottom: 6 }}>{title}</h3>
-            <p className="admin-muted" style={{ marginTop: 0 }}>{description}</p>
-
+        <OpsCard
+            title={title}
+            description={description}
+            tone="muted"
+            actions={hasValidStepUp ? <OpsBadge tone="success">Verified</OpsBadge> : <OpsBadge tone="warning">Required</OpsBadge>}
+        >
             {hasValidStepUp ? (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span className="admin-muted">Verified until {expiryLabel ?? 'active window'}.</span>
+                <div className="admin-stepup-state">
+                    <span className="ops-inline-muted">Verified until {expiryLabel ?? 'active window'}.</span>
                     <button type="button" className="admin-btn" onClick={clearStepUp}>Clear Token</button>
                 </div>
             ) : (
                 <form
-                    style={{ display: 'grid', gap: 8, gridTemplateColumns: '2fr 1fr auto', alignItems: 'center' }}
+                    className="admin-stepup-grid"
                     onSubmit={async (event) => {
                         event.preventDefault();
                         setError(null);
@@ -63,14 +66,14 @@ export function AdminStepUpCard({
                         type="text"
                         value={twoFactorCode}
                         onChange={(event) => setTwoFactorCode(event.target.value)}
-                        placeholder="2FA / backup code"
+                        placeholder="2FA or backup code"
                     />
                     <button type="submit" className="admin-btn primary" disabled={loading}>
                         {loading ? 'Verifying...' : 'Verify'}
                     </button>
-                    {error ? <div style={{ gridColumn: '1 / -1', color: '#b91c1c' }}>{error}</div> : null}
+                    {error ? <div className="ops-error ops-span-full">{error}</div> : null}
                 </form>
             )}
-        </div>
+        </OpsCard>
     );
 }

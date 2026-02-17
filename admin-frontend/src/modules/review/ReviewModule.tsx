@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
+import { OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import {
     getAdminAnnouncements,
     getReviewPreview,
@@ -75,96 +76,99 @@ export function ReviewModule() {
     return (
         <>
             <AdminStepUpCard />
-            <div className="admin-card">
-                <h2>Review</h2>
-                <p className="admin-muted">Review queue with preview-first decisions and controlled execution.</p>
-
-                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '2fr 1fr 1fr', marginBottom: 12 }}>
-                    <input
-                        type="search"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search pending items..."
-                    />
-                    <select
-                        value={action}
-                        onChange={(event) => setAction(event.target.value as 'approve' | 'reject' | 'schedule')}
-                    >
-                        <option value="approve">Approve</option>
-                        <option value="reject">Reject</option>
-                        <option value="schedule">Schedule</option>
-                    </select>
-                    <input
-                        type={action === 'schedule' ? 'datetime-local' : 'text'}
-                        value={action === 'schedule' ? scheduleAt : note}
-                        onChange={(event) => {
-                            if (action === 'schedule') setScheduleAt(event.target.value);
-                            else setNote(event.target.value);
-                        }}
-                        placeholder={action === 'schedule' ? 'Schedule time' : 'Note (optional)'}
-                    />
-                </div>
+            <OpsCard title="Review" description="Review queue with preview-first decisions and controlled execution.">
+                <OpsToolbar
+                    controls={
+                        <>
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search pending items"
+                            />
+                            <select
+                                value={action}
+                                onChange={(event) => setAction(event.target.value as 'approve' | 'reject' | 'schedule')}
+                            >
+                                <option value="approve">Approve</option>
+                                <option value="reject">Reject</option>
+                                <option value="schedule">Schedule</option>
+                            </select>
+                            <input
+                                type={action === 'schedule' ? 'datetime-local' : 'text'}
+                                value={action === 'schedule' ? scheduleAt : note}
+                                onChange={(event) => {
+                                    if (action === 'schedule') setScheduleAt(event.target.value);
+                                    else setNote(event.target.value);
+                                }}
+                                placeholder={action === 'schedule' ? 'Schedule time' : 'Note (optional)'}
+                            />
+                        </>
+                    }
+                />
 
                 {action === 'schedule' ? (
-                    <div style={{ marginBottom: 10 }}>
-                        <input
-                            type="text"
-                            value={note}
-                            onChange={(event) => setNote(event.target.value)}
-                            placeholder="Schedule note (optional)"
-                        />
-                    </div>
+                    <input
+                        type="text"
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        placeholder="Schedule note (optional)"
+                    />
                 ) : null}
 
-                {query.isPending ? <div>Loading review queue...</div> : null}
-                {query.error ? <div style={{ color: '#b91c1c' }}>Failed to load review queue.</div> : null}
+                {query.isPending ? <div className="admin-alert info">Loading review queue...</div> : null}
+                {query.error ? <OpsErrorState message="Failed to load review queue." /> : null}
+
                 {rows.length > 0 ? (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>
+                    <OpsTable
+                        columns={[
+                            { key: 'select', label: 'Select' },
+                            { key: 'title', label: 'Title' },
+                            { key: 'status', label: 'Status' },
+                            { key: 'type', label: 'Type' },
+                        ]}
+                    >
+                        <tr>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    checked={allSelected}
+                                    onChange={() => {
+                                        if (allSelected) {
+                                            setSelectedIds([]);
+                                        } else {
+                                            setSelectedIds(rows.map((item) => item.id || item._id || '').filter(Boolean));
+                                        }
+                                    }}
+                                />
+                            </td>
+                            <td colSpan={3} className="ops-inline-muted">Select all rows</td>
+                        </tr>
+                        {rows.map((item: AdminAnnouncementListItem) => {
+                            const id = item.id || item._id || '';
+                            return (
+                                <tr key={id}>
+                                    <td>
                                         <input
                                             type="checkbox"
-                                            checked={allSelected}
-                                            onChange={() => {
-                                                if (allSelected) {
-                                                    setSelectedIds([]);
-                                                } else {
-                                                    setSelectedIds(rows.map((item) => item.id || item._id || '').filter(Boolean));
-                                                }
-                                            }}
+                                            checked={selectedIds.includes(id)}
+                                            onChange={() => toggleSelect(id)}
                                         />
-                                    </th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Title</th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Status</th>
-                                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>Type</th>
+                                    </td>
+                                    <td>{item.title || 'Untitled'}</td>
+                                    <td>{item.status || '-'}</td>
+                                    <td>{item.type || '-'}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((item: AdminAnnouncementListItem) => {
-                                    const id = item.id || item._id || '';
-                                    return (
-                                        <tr key={id}>
-                                            <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.includes(id)}
-                                                    onChange={() => toggleSelect(id)}
-                                                />
-                                            </td>
-                                            <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>{item.title || 'Untitled'}</td>
-                                            <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>{item.status || '-'}</td>
-                                            <td style={{ borderBottom: '1px solid #edf2f7', padding: '8px 6px' }}>{item.type || '-'}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                            );
+                        })}
+                    </OpsTable>
                 ) : null}
 
-                <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {!query.isPending && !query.error && rows.length === 0 ? (
+                    <OpsEmptyState message="No pending announcements found." />
+                ) : null}
+
+                <div className="ops-actions">
                     <button
                         type="button"
                         className="admin-btn"
@@ -184,26 +188,24 @@ export function ReviewModule() {
                 </div>
 
                 {preview ? (
-                    <div className="admin-card" style={{ marginTop: 12, background: '#f8fbfd' }}>
+                    <div className="ops-card muted">
                         <div><strong>Eligible:</strong> {preview.eligibleIds.length}</div>
                         <div><strong>Blocked:</strong> {preview.blockedIds.length}</div>
                         {preview.warnings.length > 0 ? (
-                            <ul style={{ marginTop: 8, marginBottom: 0 }}>
+                            <ul className="ops-list">
                                 {preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
                             </ul>
                         ) : (
-                            <div className="admin-muted" style={{ marginTop: 8 }}>No warnings.</div>
+                            <div className="ops-inline-muted">No warnings.</div>
                         )}
                     </div>
                 ) : null}
 
                 {executeMutation.isError ? (
-                    <div style={{ color: '#b91c1c', marginTop: 10 }}>
-                        {executeMutation.error instanceof Error ? executeMutation.error.message : 'Failed to execute action.'}
-                    </div>
+                    <OpsErrorState message={executeMutation.error instanceof Error ? executeMutation.error.message : 'Failed to execute action.'} />
                 ) : null}
-                {executeMutation.isSuccess ? <div style={{ color: '#166534', marginTop: 10 }}>Review action applied.</div> : null}
-            </div>
+                {executeMutation.isSuccess ? <div className="ops-success">Review action applied.</div> : null}
+            </OpsCard>
         </>
     );
 }

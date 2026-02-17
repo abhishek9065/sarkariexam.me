@@ -75,6 +75,10 @@ export interface AdminAnnouncementListItem {
     content?: string;
     externalLink?: string;
     location?: string;
+    riskLevel?: 'low' | 'medium' | 'high';
+    warningCount?: number;
+    approvalState?: string;
+    updatedBy?: string;
 }
 
 export interface AdminUser {
@@ -169,4 +173,19 @@ export interface CommunityGroup {
     language: string;
     link?: string | null;
     createdAt: string;
+}
+
+export type OpsStatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
+
+export interface OpsFilterPreset {
+    id: string;
+    label: string;
+    filters: Record<string, string | number | boolean | null | undefined>;
+}
+
+export interface ModuleHealthState {
+    module: string;
+    status: 'live' | 'gated' | 'degraded';
+    updatedAt?: string;
+    note?: string;
 }

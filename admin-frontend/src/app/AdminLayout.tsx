@@ -1,40 +1,62 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAdminAuth } from './useAdminAuth';
 import { useLocalStorageState } from '../lib/useLocalStorageState';
-
-const links = [
-    { to: '/dashboard', label: 'Dashboard' },
-    { to: '/announcements', label: 'Announcements' },
-    { to: '/review', label: 'Review' },
-    { to: '/create', label: 'Quick Add' },
-    { to: '/detailed', label: 'Detailed Post' },
-    { to: '/bulk', label: 'Bulk' },
-    { to: '/queue', label: 'Queue' },
-    { to: '/security', label: 'Security' },
-    { to: '/sessions', label: 'Sessions' },
-    { to: '/audit', label: 'Audit' },
-    { to: '/community', label: 'Community' },
-    { to: '/errors', label: 'Errors' },
-    { to: '/approvals', label: 'Approvals' },
-];
-
-type AdminDensity = 'comfortable' | 'compact';
+import {
+    adminModuleNavItems,
+    getModuleByPath,
+    groupedModuleLabels,
+    isAdminModuleEnabled,
+    type ModuleGroupKey,
+} from '../config/adminModules';
 
 const SIDEBAR_COLLAPSED_KEY = 'admin-vnext-sidebar-collapsed';
 const DENSITY_KEY = 'admin-vnext-density';
 
+type AdminDensity = 'comfortable' | 'compact';
+
+const GROUP_ORDER: ModuleGroupKey[] = ['core', 'publishing', 'risk'];
+
 export function AdminLayout() {
     const { user, logout, hasValidStepUp, stepUpExpiresAt } = useAdminAuth();
+    const location = useLocation();
     const navigate = useNavigate();
+
     const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorageState<boolean>(SIDEBAR_COLLAPSED_KEY, false);
     const [density, setDensity] = useLocalStorageState<AdminDensity>(DENSITY_KEY, 'comfortable', (raw) => {
         if (raw === '"compact"' || raw === 'compact') return 'compact';
         return 'comfortable';
     });
+
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [paletteQuery, setPaletteQuery] = useState('');
+
+    const activeModule = getModuleByPath(location.pathname);
+
+    const enabledNavItems = useMemo(
+        () => adminModuleNavItems.filter((item) => isAdminModuleEnabled(item.key)),
+        []
+    );
+
+    const navGroups = useMemo(
+        () => GROUP_ORDER.map((group) => ({
+            key: group,
+            label: groupedModuleLabels[group],
+            items: enabledNavItems.filter((item) => item.group === group),
+        })).filter((group) => group.items.length > 0),
+        [enabledNavItems]
+    );
+
+    const filteredPaletteItems = useMemo(() => {
+        const query = paletteQuery.trim().toLowerCase();
+        if (!query) {
+            return enabledNavItems;
+        }
+        return enabledNavItems.filter((item) => {
+            return item.label.toLowerCase().includes(query) || item.to.toLowerCase().includes(query);
+        });
+    }, [paletteQuery, enabledNavItems]);
 
     useEffect(() => {
         document.body.dataset.adminDensity = density;
@@ -57,61 +79,80 @@ export function AdminLayout() {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, []);
 
-    const filteredLinks = useMemo(() => {
-        const query = paletteQuery.trim().toLowerCase();
-        if (!query) return links;
-        return links.filter((link) => link.label.toLowerCase().includes(query) || link.to.toLowerCase().includes(query));
-    }, [paletteQuery]);
+    const stepUpLabel = hasValidStepUp
+        ? `Step-up active${stepUpExpiresAt ? ` until ${new Date(stepUpExpiresAt).toLocaleTimeString()}` : ''}`
+        : 'Step-up required for high-risk actions';
 
     return (
         <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-            <aside className="admin-sidebar">
-                <div className="admin-brand">SarkariExams Admin vNext</div>
+            <aside className="admin-sidebar" aria-label="Admin navigation shell">
+                <div className="admin-brand">
+                    <h1 className="admin-brand-title">SarkariExams Admin</h1>
+                    <span className="admin-brand-subtitle">vNext Ops Console</span>
+                </div>
+
                 <div className="admin-sidebar-controls">
                     <button
                         type="button"
-                        className="admin-btn admin-btn-subtle"
+                        className="admin-btn subtle"
                         onClick={() => setSidebarCollapsed((current) => !current)}
                     >
-                        {sidebarCollapsed ? 'Expand' : 'Collapse'}
+                        {sidebarCollapsed ? 'Expand rail' : 'Collapse rail'}
                     </button>
                     <button
                         type="button"
-                        className="admin-btn admin-btn-subtle"
+                        className="admin-btn subtle"
                         onClick={() => setPaletteOpen(true)}
                     >
                         Palette (Ctrl/Cmd + K)
                     </button>
                 </div>
-                <nav className="admin-nav" aria-label="Admin navigation">
-                    {links.map((link) => (
-                        <NavLink key={link.to} to={link.to} className={({ isActive }) => (isActive ? 'active' : '')}>
-                            {link.label}
-                        </NavLink>
-                    ))}
-                    <a href="/admin-legacy" target="_blank" rel="noreferrer">Open Legacy Admin</a>
-                </nav>
-            </aside>
-            <main className="admin-main">
-                <header className="admin-header">
-                    <div>
-                        <strong>{user?.email ?? 'Unknown admin'}</strong>
-                        <div className="admin-muted">Role: {user?.role ?? 'none'}</div>
-                        <div className="admin-muted">
-                            Step-up: {hasValidStepUp ? `active until ${stepUpExpiresAt ? new Date(stepUpExpiresAt).toLocaleTimeString() : 'valid window'}` : 'required for risky actions'}
+
+                <nav className="admin-nav" aria-label="Admin modules">
+                    {navGroups.map((group) => (
+                        <div key={group.key} className="admin-nav-group">
+                            <div className="admin-nav-group-title">{group.label}</div>
+                            {group.items.map((item) => (
+                                <NavLink
+                                    key={item.key}
+                                    to={item.to}
+                                    className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}
+                                    title={item.summary}
+                                >
+                                    <span className="admin-nav-short">{item.shortLabel}</span>
+                                    <span className="admin-nav-label">{item.label}</span>
+                                </NavLink>
+                            ))}
                         </div>
+                    ))}
+                </nav>
+
+                <div className="admin-sidebar-footer">
+                    <a className="admin-nav-link" href="/admin-legacy" target="_blank" rel="noreferrer">
+                        <span className="admin-nav-short">LG</span>
+                        <span className="admin-nav-label">Open Legacy Admin</span>
+                    </a>
+                    <span>Rollback path remains active during phased rollout.</span>
+                </div>
+            </aside>
+
+            <main className="admin-main">
+                <header className="admin-topbar">
+                    <div className="admin-topbar-info">
+                        <div className="admin-topbar-title">{user?.email ?? 'Unknown admin'}</div>
+                        <div className="admin-topbar-meta">Role: {user?.role ?? 'none'} | {stepUpLabel}</div>
                     </div>
-                    <div className="admin-header-actions">
+                    <div className="admin-topbar-actions">
                         <button
                             type="button"
-                            className="admin-btn admin-btn-subtle"
+                            className="admin-btn subtle"
                             onClick={() => setDensity((current) => (current === 'comfortable' ? 'compact' : 'comfortable'))}
                         >
                             Density: {density === 'comfortable' ? 'Comfortable' : 'Compact'}
                         </button>
                         <button
                             type="button"
-                            className="admin-btn"
+                            className="admin-btn primary"
                             onClick={async () => {
                                 await logout();
                                 navigate('/login', { replace: true });
@@ -121,7 +162,22 @@ export function AdminLayout() {
                         </button>
                     </div>
                 </header>
-                <Outlet />
+
+                <section className="admin-context" aria-live="polite">
+                    <div className="admin-context-main">
+                        <span className="admin-context-kicker">Operations Workspace</span>
+                        <h2 className="admin-context-title">{activeModule?.label ?? 'Dashboard'}</h2>
+                        <p className="admin-context-summary">{activeModule?.summary ?? 'Admin workflow and operations control surface.'}</p>
+                    </div>
+                    <div className="admin-context-pills">
+                        <span className="admin-context-pill">Auth Boundary: /api/admin-auth</span>
+                        <span className="admin-context-pill">Module: {activeModule ? 'Live' : 'Fallback'}</span>
+                    </div>
+                </section>
+
+                <div className="admin-shell-content">
+                    <Outlet />
+                </div>
             </main>
 
             {paletteOpen ? (
@@ -141,19 +197,19 @@ export function AdminLayout() {
                             onChange={(event) => setPaletteQuery(event.target.value)}
                         />
                         <div className="admin-palette-list">
-                            {filteredLinks.map((link) => (
+                            {filteredPaletteItems.map((item) => (
                                 <button
-                                    key={link.to}
+                                    key={item.key}
                                     type="button"
                                     className="admin-palette-item"
                                     onClick={() => {
-                                        navigate(link.to);
+                                        navigate(item.to);
                                         setPaletteOpen(false);
                                         setPaletteQuery('');
                                     }}
                                 >
-                                    <span>{link.label}</span>
-                                    <code>{link.to}</code>
+                                    <span>{item.label}</span>
+                                    <code>{item.to}</code>
                                 </button>
                             ))}
                             <button
