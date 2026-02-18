@@ -1,19 +1,19 @@
 import { Link } from 'react-router-dom';
 
 const SOCIAL_LINKS = [
-    { label: 'X / Twitter', href: 'https://x.com/sarkariexamsme' },
-    { label: 'Telegram', href: 'https://t.me/sarkariexamsme' },
-    { label: 'WhatsApp', href: 'https://wa.me/910000000000' },
-    { label: 'Instagram', href: 'https://instagram.com/sarkariexamsme' },
-    { label: 'Threads', href: 'https://threads.net/@sarkariexamsme' },
-    { label: 'Facebook', href: 'https://facebook.com/sarkariexamsme' },
-    { label: 'LinkedIn', href: 'https://linkedin.com/company/sarkariexamsme' },
-    { label: 'YouTube', href: 'https://youtube.com/@sarkariexamsme' },
+    { label: 'X / Twitter', href: 'https://x.com/sarkariexamsme', icon: '𝕏', platform: 'twitter' },
+    { label: 'Telegram', href: 'https://t.me/sarkariexamsme', icon: '✈️', platform: 'telegram' },
+    { label: 'WhatsApp', href: 'https://wa.me/910000000000', icon: '💬', platform: 'whatsapp' },
+    { label: 'Instagram', href: 'https://instagram.com/sarkariexamsme', icon: '📸', platform: 'instagram' },
+    { label: 'Threads', href: 'https://threads.net/@sarkariexamsme', icon: '@', platform: 'threads' },
+    { label: 'Facebook', href: 'https://facebook.com/sarkariexamsme', icon: 'f', platform: 'facebook' },
+    { label: 'LinkedIn', href: 'https://linkedin.com/company/sarkariexamsme', icon: 'in', platform: 'linkedin' },
+    { label: 'YouTube', href: 'https://youtube.com/@sarkariexamsme', icon: '▶', platform: 'youtube' },
 ];
 
 const APP_LINKS = [
-    { label: 'Android App', href: 'https://play.google.com/store/apps' },
-    { label: 'iOS App', href: 'https://apps.apple.com/' },
+    { label: 'Android App', href: 'https://play.google.com/store/apps', icon: '▶', store: 'Google Play', platform: 'android' },
+    { label: 'iOS App', href: 'https://apps.apple.com/', icon: '', store: 'App Store', platform: 'ios' },
 ];
 
 const ORG_LINK_GROUPS: Array<Array<{ label: string; to: string }>> = [
@@ -61,12 +61,25 @@ export function Footer() {
     return (
         <footer className="footer footer-expanded" data-testid="app-footer">
             <div className="container footer-inner">
+                {/* Brand Hero Section */}
+                <section className="footer-brand-hero">
+                    <div className="footer-brand-logo">
+                        <span className="footer-brand-icon">📋</span>
+                        <div>
+                            <span className="footer-brand-name">Sarkari<span className="footer-brand-accent">Exams</span>.me</span>
+                            <span className="footer-brand-subtitle">Your Gateway to Government Careers</span>
+                        </div>
+                    </div>
+                    <p className="footer-brand-desc">India&apos;s most trusted platform for government job updates, exam results, admit cards, and notifications. Trusted by lakhs of aspirants.</p>
+                </section>
+
                 <section className="footer-social-zone">
                     <h3>Connect With Us</h3>
                     <div className="footer-social-grid">
                         {SOCIAL_LINKS.map((item) => (
-                            <a key={item.label} href={item.href} target="_blank" rel="noreferrer" className="footer-social-link">
-                                {item.label}
+                            <a key={item.label} href={item.href} target="_blank" rel="noreferrer" className={`footer-social-link footer-social-${item.platform}`}>
+                                <span className="footer-social-icon">{item.icon}</span>
+                                <span>{item.label}</span>
                             </a>
                         ))}
                     </div>
@@ -76,8 +89,12 @@ export function Footer() {
                     <h3>Download Our Apps</h3>
                     <div className="footer-app-buttons">
                         {APP_LINKS.map((item) => (
-                            <a key={item.label} href={item.href} target="_blank" rel="noreferrer" className="footer-app-btn">
-                                {item.label}
+                            <a key={item.label} href={item.href} target="_blank" rel="noreferrer" className={`footer-app-btn footer-app-${item.platform}`}>
+                                <span className="footer-app-icon">{item.icon}</span>
+                                <span className="footer-app-text">
+                                    <span className="footer-app-small">Get it on</span>
+                                    <span className="footer-app-store">{item.store}</span>
+                                </span>
                             </a>
                         ))}
                     </div>
