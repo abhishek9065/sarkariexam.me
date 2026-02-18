@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/useAuth';
@@ -45,12 +45,28 @@ export function Header() {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
     const [trendingTerms, setTrendingTerms] = useState<string[]>(TRENDING_FALLBACK);
+    const userMenuRef = useRef<HTMLDivElement>(null);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setMobileOpen(false);
         setUserMenuOpen(false);
         setMoreOpen(false);
     }, [location.pathname]);
+
+    // Close dropdowns on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+                setUserMenuOpen(false);
+            }
+            if (moreOpen && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+                setMoreOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [userMenuOpen, moreOpen]);
 
     useEffect(() => {
         if (searchParams.get('login') === '1') {
@@ -145,7 +161,7 @@ export function Header() {
                                 </Link>
                             ))}
 
-                            <div className="header-more-wrap">
+                            <div className="header-more-wrap" ref={moreMenuRef}>
                                 <button
                                     type="button"
                                     className={`header-nav-link header-more-btn${moreOpen ? ' active' : ''}`}
@@ -186,7 +202,7 @@ export function Header() {
                             </button>
 
                             {user ? (
-                                <div className="user-menu-wrapper">
+                                <div className="user-menu-wrapper" ref={userMenuRef}>
                                     <button
                                         type="button"
                                         className="btn btn-ghost user-avatar-btn"
@@ -212,9 +228,9 @@ export function Header() {
                                                 🔖 {t('header.bookmarks')}
                                             </Link>
                                             {hasAdminPortalAccess && (
-                                                <Link to="/admin" className="user-dropdown-item" role="menuitem">
+                                                <a href="/admin-legacy" className="user-dropdown-item" role="menuitem">
                                                     ⚙️ {t('header.admin')}
-                                                </Link>
+                                                </a>
                                             )}
                                             <hr className="user-dropdown-divider" />
                                             <button
@@ -300,10 +316,10 @@ export function Header() {
 
                             <div className="header-mobile-block">
                                 <span className="header-mobile-block-title">Apps & Channels</span>
-                                <a href="#" className="header-mobile-link">Android App</a>
-                                <a href="#" className="header-mobile-link">iOS App</a>
-                                <a href="#" className="header-mobile-link">Telegram</a>
-                                <a href="#" className="header-mobile-link">WhatsApp</a>
+                                <a href="https://play.google.com/store/apps" target="_blank" rel="noreferrer" className="header-mobile-link">📱 Android App</a>
+                                <a href="https://apps.apple.com/" target="_blank" rel="noreferrer" className="header-mobile-link">🍎 iOS App</a>
+                                <a href="https://t.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-mobile-link">✈️ Telegram</a>
+                                <a href="https://wa.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-mobile-link">💬 WhatsApp</a>
                             </div>
 
                             <button
@@ -326,9 +342,9 @@ export function Header() {
                                         🔖 {t('header.bookmarks')}
                                     </Link>
                                     {hasAdminPortalAccess && (
-                                        <Link to="/admin" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
+                                        <a href="/admin-legacy" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
                                             ⚙️ {t('header.admin')}
-                                        </Link>
+                                        </a>
                                     )}
                                     <button
                                         type="button"

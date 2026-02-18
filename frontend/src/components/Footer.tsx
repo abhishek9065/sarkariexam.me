@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 const SOCIAL_LINKS = [
     { label: 'X / Twitter', href: 'https://x.com/sarkariexamsme', icon: '𝕏', platform: 'twitter' },
     { label: 'Telegram', href: 'https://t.me/sarkariexamsme', icon: '✈️', platform: 'telegram' },
-    { label: 'WhatsApp', href: 'https://wa.me/910000000000', icon: '💬', platform: 'whatsapp' },
+    { label: 'WhatsApp', href: 'https://wa.me/sarkariexamsme', icon: '💬', platform: 'whatsapp' },
     { label: 'Instagram', href: 'https://instagram.com/sarkariexamsme', icon: '📸', platform: 'instagram' },
     { label: 'Threads', href: 'https://threads.net/@sarkariexamsme', icon: '@', platform: 'threads' },
     { label: 'Facebook', href: 'https://facebook.com/sarkariexamsme', icon: 'f', platform: 'facebook' },

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { Layout } from '../components/Layout';
 import { AnnouncementCard } from '../components/AnnouncementCard';
 import { getAnnouncementBySlug, getAnnouncementCards } from '../utils/api';
@@ -179,7 +180,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                         </div>
 
                         {a.content && (
-                            <div className="detail-body-content" dangerouslySetInnerHTML={{ __html: a.content }} />
+                            <div className="detail-body-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(a.content) }} />
                         )}
                     </div>
 

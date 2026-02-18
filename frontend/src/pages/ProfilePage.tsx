@@ -75,7 +75,7 @@ export function ProfilePage() {
             <div className="profile-page animate-fade-in">
                 <div className="profile-header">
                     <div className="profile-avatar-lg">
-                        {(user.username || user.email)[0].toUpperCase()}
+                        {(user.username || user.email || '?')[0].toUpperCase()}
                     </div>
                     <div className="profile-header-info">
                         <h1 className="profile-name">{user.username}</h1>

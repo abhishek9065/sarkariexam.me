@@ -83,6 +83,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
     const [cards, setCards] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
+    const [fetchError, setFetchError] = useState(false);
     const [hasMore, setHasMore] = useState(false);
     const [nextCursor, setNextCursor] = useState<string | undefined>();
     const [total, setTotal] = useState<number | undefined>();
@@ -141,7 +142,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
     const fetchCards = useCallback(async (cursor?: string) => {
         const isInitial = !cursor;
-        if (isInitial) setLoading(true);
+        if (isInitial) { setLoading(true); setFetchError(false); }
         else setLoadingMore(true);
 
         try {
@@ -167,6 +168,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
             }
         } catch (err) {
             console.error('Failed to fetch cards:', err);
+            if (!cursor) setFetchError(true);
         } finally {
             setLoading(false);
             setLoadingMore(false);
@@ -335,11 +337,20 @@ export function CategoryPage({ type }: { type: ContentType }) {
                     </div>
                 )}
 
-                {!loading && cards.length === 0 && (
+                {!loading && cards.length === 0 && !fetchError && (
                     <div className="empty-state">
                         <span className="empty-state-icon">📭</span>
                         <h3>No {meta.title.toLowerCase()} found</h3>
                         <p className="text-muted">Try adjusting your filters or check back later.</p>
+                    </div>
+                )}
+
+                {!loading && fetchError && (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">⚠️</span>
+                        <h3>Something went wrong</h3>
+                        <p className="text-muted">Could not load {meta.title.toLowerCase()}. Please try again.</p>
+                        <button type="button" className="btn btn-accent" onClick={() => void fetchCards()}>Retry</button>
                     </div>
                 )}
 

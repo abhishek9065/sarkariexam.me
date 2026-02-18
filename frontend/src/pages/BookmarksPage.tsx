@@ -19,12 +19,14 @@ function toTimestamp(value?: string | null): number {
 export function BookmarksPage() {
     const [bookmarks, setBookmarks] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [removing, setRemoving] = useState<Set<string>>(new Set());
     const [sort, setSort] = useState<SortMode>('newest');
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
     const fetchBookmarks = useCallback(async () => {
         setLoading(true);
+        setError(false);
         try {
             const res = await getBookmarks();
             const cards: CardType[] = res.data.map((item) => ({
@@ -43,6 +45,7 @@ export function BookmarksPage() {
             setBookmarks(cards);
         } catch (err) {
             console.error('Failed to load bookmarks:', err);
+            setError(true);
         } finally {
             setLoading(false);
         }
@@ -122,6 +125,13 @@ export function BookmarksPage() {
                 {loading ? (
                     <div className="grid-auto">
                         {Array.from({ length: 6 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
+                    </div>
+                ) : error ? (
+                    <div className="empty-state">
+                        <span className="empty-state-icon">⚠️</span>
+                        <h3>Something went wrong</h3>
+                        <p className="text-muted">Could not load your bookmarks. Please try again.</p>
+                        <button type="button" className="btn btn-accent" onClick={() => void fetchBookmarks()}>Retry</button>
                     </div>
                 ) : sortedBookmarks.length === 0 ? (
                     <div className="empty-state">
