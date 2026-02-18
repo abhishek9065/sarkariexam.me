@@ -29,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Backend runs on `http://localhost:4000`.
+Backend runs on `http://localhost:5000`.
 
 ### 2) Frontend
 ```bash
@@ -69,7 +69,7 @@ ADMIN_DOMAIN_ALLOWLIST=example.com
 COSMOS_CONNECTION_STRING=mongodb://localhost:27017/sarkari_db
 COSMOS_DATABASE_NAME=sarkari_db
 JWT_SECRET=change-me
-PORT=4000
+PORT=5000
 
 # Optional integrations
 SENDGRID_API_KEY=
@@ -98,13 +98,13 @@ ADMIN_BACKUP_CODE_SALT=change-this-backup-salt
 ### Frontend (`frontend/.env`)
 ```env
 # Optional: use direct API origin (without nginx)
-VITE_API_BASE=http://localhost:4000
+VITE_API_BASE=http://localhost:5000
 ```
 If you run with reverse proxy and `/api` on the same host, leave `VITE_API_BASE` unset.
 
 ### Admin Frontend (`admin-frontend/.env`)
 ```env
-VITE_API_BASE=http://localhost:4000
+VITE_API_BASE=http://localhost:5000
 # Local router basename (dev default is /admin)
 VITE_ADMIN_BASENAME=/admin
 # Optional phased rollout gate for vNext modules

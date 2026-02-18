@@ -151,32 +151,53 @@ export function HomePage() {
         let mounted = true;
         (async () => {
             try {
-                const [jobsRes, resultsRes, admitRes, answerRes, syllabusRes, admissionRes, importantRes, certRes, verifyRes] =
-                    await Promise.all([
-                        getAnnouncementCards({ type: 'job', limit: 20, sort: 'newest' }),
-                        getAnnouncementCards({ type: 'result', limit: 20, sort: 'newest' }),
-                        getAnnouncementCards({ type: 'admit-card', limit: 20, sort: 'newest' }),
-                        getAnnouncementCards({ type: 'answer-key', limit: 15, sort: 'newest' }),
-                        getAnnouncementCards({ type: 'syllabus', limit: 15, sort: 'newest' }),
-                        getAnnouncementCards({ type: 'admission', limit: 15, sort: 'newest' }),
-                        getAnnouncementCards({ limit: 15, sort: 'views' }),
-                        getAnnouncementCards({ search: 'certificate', limit: 16, sort: 'newest' }),
-                        getAnnouncementCards({ search: 'verification', limit: 16, sort: 'newest' }),
-                    ]);
+                const results = await Promise.allSettled([
+                    getAnnouncementCards({ type: 'job', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'result', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'admit-card', limit: 20, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'answer-key', limit: 15, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'syllabus', limit: 15, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'admission', limit: 15, sort: 'newest' }),
+                    getAnnouncementCards({ limit: 15, sort: 'views' }),
+                    getAnnouncementCards({ search: 'certificate', limit: 16, sort: 'newest' }),
+                    getAnnouncementCards({ search: 'verification', limit: 16, sort: 'newest' }),
+                ]);
+
                 if (!mounted) return;
 
-                const keywordCards = dedupeCards([...certRes.data, ...verifyRes.data]);
+                const resolveCards = (index: number, sectionName: string, fallback: AnnouncementCard[]): AnnouncementCard[] => {
+                    const result = results[index];
+                    if (result && result.status === 'fulfilled') {
+                        return result.value.data;
+                    }
+                    console.error(`[Home] Failed to fetch section: ${sectionName}`, result && result.status === 'rejected' ? result.reason : null);
+                    return fallback;
+                };
+
+                const jobs = resolveCards(0, 'jobs', createFallbackCards('job', 'jobs', 10));
+                const resultsCards = resolveCards(1, 'results', createFallbackCards('result', 'results', 10));
+                const admitCards = resolveCards(2, 'admit-cards', createFallbackCards('admit-card', 'admit-card', 10));
+                const answerKeys = resolveCards(3, 'answer-keys', createFallbackCards('answer-key', 'answer-key', 5));
+                const syllabus = resolveCards(4, 'syllabus', createFallbackCards('syllabus', 'syllabus', 5));
+                const admissions = resolveCards(5, 'admissions', createFallbackCards('admission', 'admission', 5));
+                const important = resolveCards(6, 'important', createFallbackCards('job', 'important', 5));
+                const certCards = resolveCards(7, 'certificates', createFallbackCards('result', 'certificate', 5));
+                const verifyCards = resolveCards(8, 'verifications', createFallbackCards('result', 'verification', 5));
+
+                const keywordCards = dedupeCards([...certCards, ...verifyCards]);
                 setSections({
-                    jobs: jobsRes.data,
-                    results: resultsRes.data,
-                    admitCards: admitRes.data,
-                    answerKeys: answerRes.data,
-                    syllabus: syllabusRes.data,
-                    admissions: admissionRes.data,
-                    important: importantRes.data,
-                    certificates: buildCertificateCards(keywordCards, admissionRes.data, resultsRes.data, importantRes.data, 10),
+                    jobs,
+                    results: resultsCards,
+                    admitCards,
+                    answerKeys,
+                    syllabus,
+                    admissions,
+                    important,
+                    certificates: buildCertificateCards(keywordCards, admissions, resultsCards, important, 10),
                 });
-                setSourceMode('live');
+
+                const usedFallback = results.some((result) => result.status === 'rejected');
+                setSourceMode(usedFallback ? 'fallback' : 'live');
                 setLastUpdatedAt(new Date().toISOString());
             } catch (err) {
                 console.error('Failed to fetch homepage sections:', err);

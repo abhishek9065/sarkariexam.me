@@ -191,7 +191,7 @@ export async function getOrFetch<T>(
 ): Promise<T | null> {
     // 1. Check cache first (Redis or memory)
     const cached = await get(key);
-    if (cached) {
+    if (cached !== null && cached !== undefined) {
         console.log(`[Cache HIT] ${key}`);
         return cached as T;
     }
@@ -202,7 +202,7 @@ export async function getOrFetch<T>(
     const data = await fetcher();
 
     // 3. Store in cache for future requests
-    if (data) {
+    if (data !== null && data !== undefined) {
         await set(key, data, ttlSeconds);
     }
 
