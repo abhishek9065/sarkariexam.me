@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { ConfirmDialogContext, type ConfirmDialogOptions } from './ConfirmDialogContext';
 
@@ -12,6 +12,7 @@ interface ConfirmDialogProviderProps {
 }
 
 export function ConfirmDialogProvider({ children }: ConfirmDialogProviderProps) {
+    const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
     const [dialog, setDialog] = useState<ConfirmDialogState>({
         isOpen: false,
         title: '',
@@ -50,6 +51,27 @@ export function ConfirmDialogProvider({ children }: ConfirmDialogProviderProps) 
         });
     }, []);
 
+    useEffect(() => {
+        if (!dialog.isOpen) return undefined;
+
+        const focusFrame = window.requestAnimationFrame(() => {
+            cancelButtonRef.current?.focus();
+        });
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            handleCancel();
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+
+        return () => {
+            window.cancelAnimationFrame(focusFrame);
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [dialog.isOpen, handleCancel]);
+
     return (
         <ConfirmDialogContext.Provider value={{ confirm }}>
             {children}
@@ -66,7 +88,7 @@ export function ConfirmDialogProvider({ children }: ConfirmDialogProviderProps) 
                         <h3 id="ops-confirm-title">{dialog.title}</h3>
                         <p id="ops-confirm-message" className="ops-inline-muted">{dialog.message}</p>
                         <div className="ops-actions">
-                            <button type="button" className="admin-btn" onClick={handleCancel}>{dialog.cancelText}</button>
+                            <button ref={cancelButtonRef} type="button" className="admin-btn" onClick={handleCancel}>{dialog.cancelText}</button>
                             <button type="button" className="admin-btn primary" onClick={handleConfirm}>{dialog.confirmText}</button>
                         </div>
                     </div>

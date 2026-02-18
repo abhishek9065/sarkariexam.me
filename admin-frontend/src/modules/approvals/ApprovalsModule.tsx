@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
@@ -34,6 +34,7 @@ export function ApprovalsModule() {
 
     const [status, setStatus] = useState<'pending' | 'all' | 'approved' | 'rejected' | 'executed' | 'expired'>('pending');
     const [modal, setModal] = useState<DecisionModalState | null>(null);
+    const decisionNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
     const query = useQuery({
         queryKey: ['admin-approvals', status],
@@ -83,6 +84,26 @@ export function ApprovalsModule() {
         }
         return null;
     }, [approveMutation.error, approveMutation.isError, rejectMutation.error, rejectMutation.isError]);
+
+    useEffect(() => {
+        if (!modal) return undefined;
+
+        const focusFrame = window.requestAnimationFrame(() => {
+            decisionNoteRef.current?.focus();
+        });
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            setModal(null);
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => {
+            window.cancelAnimationFrame(focusFrame);
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [modal]);
 
     return (
         <>
@@ -195,6 +216,7 @@ export function ApprovalsModule() {
                             </h3>
                             <p className="ops-inline-muted">Action: {modal.actionLabel}</p>
                             <textarea
+                                ref={decisionNoteRef}
                                 className="ops-textarea"
                                 value={modal.note}
                                 onChange={(event) => setModal((current) => current ? ({ ...current, note: event.target.value }) : current)}

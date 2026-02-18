@@ -116,6 +116,8 @@ VITE_ADMIN_BASENAME=/admin
 # Optional phased rollout gate for vNext modules
 # Example: dashboard,announcements,review,approvals
 VITE_ADMIN_VNEXT_MODULES=
+# Test-only: bypass step-up interaction in mocked Playwright flows
+VITE_ADMIN_E2E_STEPUP_BYPASS=false
 ```
 If `/api` is proxied on the same host as `/admin`, you can also leave `VITE_API_BASE` unset.
 If `VITE_ADMIN_VNEXT_MODULES` is empty or unset, all admin vNext modules are enabled.
@@ -147,6 +149,7 @@ npm audit --omit=dev --audit-level=high
 ```bash
 cd admin-frontend
 npm run lint
+npm run guard:ui
 npm run build
 npm run test:e2e:ci
 npm audit --omit=dev --audit-level=high
@@ -159,6 +162,33 @@ npm audit --omit=dev --audit-level=high
 - Admin routes are desktop-only (minimum viewport width: `1120px`)
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
+
+## Admin Stabilization Policy
+- `/admin` stays the only primary admin URL.
+- Keep `/admin-vnext` as transition alias for 30 days after production cutover.
+- Keep `/admin-legacy` rollback path for at least 90 days after production cutover.
+- Desktop-only policy for all admin entrypoints remains fixed at `1120px`.
+
+## Admin Rollback Procedure
+If a production rollback is required, switch `/admin` back to legacy frontend routing and redeploy:
+
+```bash
+# 1) Edit nginx mapping:
+#    in nginx/default.conf change /admin and /admin/* proxy target from:
+#    proxy_pass http://admin_frontend/;
+#    to:
+#    proxy_pass http://frontend/;
+
+# 2) Deploy updated routing and services
+cd ~/sarkari-result
+git pull --ff-only origin main
+docker compose up -d --build nginx backend frontend admin-frontend
+```
+
+Then verify:
+- `/admin` serves legacy admin.
+- `/admin-legacy` still serves legacy admin.
+- `/api/health` is healthy.
 
 ## Migration
 - Backfill admin identity records:
@@ -183,6 +213,8 @@ admin-frontend/tests/      Admin Playwright smoke suite
 - `docs/CLOUDFLARE_SETUP.md`
 - `docs/DIGITALOCEAN_DEPLOY.md`
 - `docs/GITHUB_GOVERNANCE_CHECKLIST.md`
+- `docs/ADMIN_CUTOVER_RUNBOOK.md`
+- `docs/ADMIN_STYLE_AUDIT_CHECKLIST.md`
 
 ## Production Deploy (Recommended)
 Use the guarded deploy script on server:

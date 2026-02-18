@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin';
+const escapedAdminBasename = adminBasename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const jsonResponse = (data: unknown) => ({
     status: 200,
     contentType: 'application/json',
@@ -60,7 +63,7 @@ test('admin protected routes redirect to login on desktop', async ({ page }) => 
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
-    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
 test('admin protected routes are blocked by desktop gate on mobile', async ({ page }) => {

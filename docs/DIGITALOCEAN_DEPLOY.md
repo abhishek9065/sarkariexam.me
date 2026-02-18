@@ -266,8 +266,8 @@ JWT_SECRET=K8xPqR2mN5vB7yC1dF4gH6jL9pS3wE0tU8iO2aZ5nM=
 ### 6.4: Build and Start Containers
 
 ```bash
-# Build and start all services (takes 3-5 minutes first time)
-docker compose up -d --build
+# Build and start production services (takes 3-5 minutes first time)
+docker compose up -d --build nginx backend frontend admin-frontend
 ```
 
 **What this does:**
@@ -436,8 +436,10 @@ docker compose restart
 
 ### Update application
 ```bash
-git pull origin main
-docker compose up -d --build
+git pull --ff-only origin main
+docker compose up -d --build nginx backend frontend admin-frontend
+# Recommended guarded path:
+# bash scripts/deploy-prod.sh
 ```
 
 ### View resource usage

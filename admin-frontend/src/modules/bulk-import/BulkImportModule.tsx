@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
@@ -24,6 +24,7 @@ export function BulkImportModule() {
     const [note, setNote] = useState('');
     const [preview, setPreview] = useState<AdminBulkPreview | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const closePreviewButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const ids = useMemo(() => parseIds(rawIds), [rawIds]);
 
@@ -65,6 +66,26 @@ export function BulkImportModule() {
             });
         },
     });
+
+    useEffect(() => {
+        if (!previewOpen) return undefined;
+
+        const focusFrame = window.requestAnimationFrame(() => {
+            closePreviewButtonRef.current?.focus();
+        });
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            setPreviewOpen(false);
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => {
+            window.cancelAnimationFrame(focusFrame);
+            window.removeEventListener('keydown', onKeyDown);
+        };
+    }, [previewOpen]);
 
     return (
         <>
@@ -183,7 +204,7 @@ export function BulkImportModule() {
                             ) : null}
 
                             <div className="ops-actions">
-                                <button type="button" className="admin-btn" onClick={() => setPreviewOpen(false)}>Close</button>
+                                <button ref={closePreviewButtonRef} type="button" className="admin-btn" onClick={() => setPreviewOpen(false)}>Close</button>
                                 <button
                                     type="button"
                                     className="admin-btn primary"

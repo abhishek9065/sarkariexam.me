@@ -29,6 +29,17 @@ body {
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.35s ease, color 0.35s ease;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Premium subtle mesh gradient background */
+    background-image:
+        radial-gradient(ellipse at 20% 0%, rgba(8, 145, 178, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(124, 58, 237, 0.03) 0%, transparent 50%);
+    background-attachment: fixed;
+}
+
+[data-theme="dark"] body {
+    background-image:
+        radial-gradient(ellipse at 20% 0%, rgba(8, 145, 178, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(124, 58, 237, 0.04) 0%, transparent 50%);
 }
 
 a {
@@ -366,15 +377,33 @@ h6 {
 .card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
     padding: var(--space-5);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), #7c3aed, #06b6d4);
+    opacity: 0;
+    transition: opacity 0.3s;
 }
 
 .card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--border-medium);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(8, 145, 178, 0.2);
+}
+
+.card:hover::before {
+    opacity: 1;
 }
 
 .card-clickable {
@@ -382,9 +411,8 @@ h6 {
 }
 
 .card-clickable:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
-    border-color: rgba(8, 145, 178, 0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(8, 145, 178, 0.1);
 }
 
 /* ─── Badges — Premium ─── */
@@ -670,20 +698,21 @@ h6 {
     background: rgba(103, 232, 249, 0.2);
 }
 
-/* ─── Header ─── */
+/* ─── Header (base — overridden by Premium Revamp section below) ─── */
 .header {
     position: sticky;
     top: 0;
-    z-index: 100;
-    height: var(--header-height);
+    z-index: 140;
+    height: auto;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-light);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 [data-theme="dark"] .header {
-    background: rgba(30, 41, 59, 0.92);
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .header-inner {
@@ -710,33 +739,56 @@ h6 {
 }
 
 .header-logo-icon {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .header-logo-accent {
-    color: var(--accent);
+    background: linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .header-nav {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 2px;
 }
 
+/* Generic nav link — overridden by premium block */
 .header-nav-link {
-    padding: var(--space-1) var(--space-3);
+    padding: var(--space-2) var(--space-3);
     font-size: var(--font-sm);
-    font-weight: var(--weight-medium);
+    font-weight: var(--weight-semibold);
     color: var(--text-secondary);
     border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
+    transition: all 0.2s;
     white-space: nowrap;
+    position: relative;
+}
+
+.header-nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), #06b6d4);
+    border-radius: 1px;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-nav-link:hover::after,
+.header-nav-link.active::after {
+    width: 70%;
 }
 
 .header-nav-link:hover,
 .header-nav-link.active {
     color: var(--accent);
-    background: var(--accent-50);
 }
 
 .header-actions {
@@ -793,9 +845,28 @@ h6 {
 /* ─── Footer — Premium ─── */
 .footer {
     background: var(--bg-secondary);
-    border-top: 1px solid var(--border-light);
+    border-top: none;
     padding: var(--space-12) 0 var(--space-6);
     margin-top: auto;
+    position: relative;
+}
+
+.footer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent), #7c3aed, #06b6d4, var(--accent));
+    background-size: 300% 100%;
+    animation: footerAccentSlide 6s ease infinite;
+}
+
+@keyframes footerAccentSlide {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 .footer-inner {
@@ -1042,26 +1113,28 @@ h6 {
     color: inherit;
     position: relative;
     overflow: hidden;
+    border-left: 4px solid var(--accent);
 }
 
 .announcement-card::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--primary));
-    opacity: 0;
-    transition: opacity 0.3s;
+    left: -4px;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--accent), #7c3aed);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .announcement-card:hover::before {
-    opacity: 1;
+    width: 6px;
+    box-shadow: 4px 0 16px rgba(8, 145, 178, 0.2);
 }
 
 .announcement-card:hover {
     color: inherit;
+    border-left-color: transparent;
 }
 
 .announcement-card-header {
@@ -1075,7 +1148,7 @@ h6 {
 .announcement-card-title {
     font-family: 'Outfit', 'Inter', sans-serif;
     font-size: var(--font-base);
-    font-weight: var(--weight-semibold);
+    font-weight: var(--weight-bold);
     line-height: 1.45;
     margin-bottom: var(--space-3);
     display: -webkit-box;
@@ -1084,6 +1157,11 @@ h6 {
     -webkit-box-orient: vertical;
     overflow: hidden;
     color: var(--text-primary);
+    transition: color 0.2s;
+}
+
+.announcement-card:hover .announcement-card-title {
+    color: var(--accent);
 }
 
 .announcement-card-meta {
@@ -1116,26 +1194,29 @@ h6 {
 
 /* Deadline badges */
 .announcement-deadline {
-    font-size: var(--font-xs);
-    font-weight: var(--weight-semibold);
-    padding: 1px var(--space-2);
+    font-size: 0.65rem;
+    font-weight: var(--weight-bold);
+    padding: 3px var(--space-3);
     border-radius: var(--radius-full);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
 }
 
 .deadline-expired {
-    background: var(--error-light);
-    color: var(--error);
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #b91c1c;
 }
 
 .deadline-urgent {
-    background: var(--error-light);
-    color: var(--error);
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #b91c1c;
     animation: pulse 1.5s infinite;
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.2);
 }
 
 .deadline-soon {
-    background: var(--warning-light);
-    color: var(--warning);
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
 }
 
 .deadline-normal {
@@ -2524,29 +2605,11 @@ h6 {
    ============================================= */
 
 :root {
-    --header-height: 122px;
+    --header-height: 136px;
 }
 
 .main-content {
     padding-top: var(--space-8);
-}
-
-/* Header shell — Premium Frosted Glass */
-.header {
-    position: sticky;
-    top: 0;
-    z-index: 140;
-    height: auto;
-    border-bottom: none;
-    background: var(--bg-secondary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-[data-theme="dark"] .header {
-    background: rgba(17, 24, 39, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .header-utility {

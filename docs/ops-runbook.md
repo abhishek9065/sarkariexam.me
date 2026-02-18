@@ -1,6 +1,7 @@
 # SarkariExams Ops Runbook
 
 This runbook is the single triage entrypoint for backend/frontend telemetry and runtime integrity incidents.
+For admin routing cutover checks and rollback policy, also use `docs/ADMIN_CUTOVER_RUNBOOK.md`.
 
 ## Fast Path (under 15 minutes)
 

@@ -10,14 +10,19 @@ import {
 import { AdminAuthContext } from './auth-context';
 import type { AdminPermissionSnapshot, AdminUser } from '../types';
 
+const E2E_STEP_UP_BYPASS = import.meta.env.VITE_ADMIN_E2E_STEPUP_BYPASS === 'true';
+const E2E_STEP_UP_TOKEN = 'e2e-step-up-token';
+const E2E_STEP_UP_EXPIRY = '2099-12-31T23:59:59.000Z';
+
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<AdminUser | null>(null);
     const [permissions, setPermissions] = useState<AdminPermissionSnapshot | null>(null);
     const [loading, setLoading] = useState(true);
-    const [stepUpToken, setStepUpToken] = useState<string | null>(null);
-    const [stepUpExpiresAt, setStepUpExpiresAt] = useState<string | null>(null);
+    const [stepUpToken, setStepUpToken] = useState<string | null>(E2E_STEP_UP_BYPASS ? E2E_STEP_UP_TOKEN : null);
+    const [stepUpExpiresAt, setStepUpExpiresAt] = useState<string | null>(E2E_STEP_UP_BYPASS ? E2E_STEP_UP_EXPIRY : null);
 
     const clearStepUp = useCallback(() => {
+        if (E2E_STEP_UP_BYPASS) return;
         setStepUpToken(null);
         setStepUpExpiresAt(null);
     }, []);
@@ -45,6 +50,12 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         void refresh();
     }, [refresh]);
 
+    useEffect(() => {
+        if (!E2E_STEP_UP_BYPASS) return;
+        setStepUpToken(E2E_STEP_UP_TOKEN);
+        setStepUpExpiresAt(E2E_STEP_UP_EXPIRY);
+    }, []);
+
     const login = useCallback(async (email: string, password: string, twoFactorCode?: string) => {
         await adminAuthLogin(email, password, twoFactorCode);
         await refresh();
@@ -67,6 +78,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     }, [user?.email]);
 
     const hasValidStepUp = useMemo(() => {
+        if (E2E_STEP_UP_BYPASS) return true;
         if (!stepUpToken || !stepUpExpiresAt) return false;
         const expiresAtMs = new Date(stepUpExpiresAt).getTime();
         if (Number.isNaN(expiresAtMs)) return false;
