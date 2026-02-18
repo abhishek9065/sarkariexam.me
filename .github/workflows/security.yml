@@ -84,6 +84,32 @@ jobs:
       - name: Audit prod dependencies
         run: npm audit --omit=dev --audit-level=high
 
+  analytics-health-probe:
+    name: Analytics Health Probe
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && secrets.ANALYTICS_HEALTH_URL != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Probe analytics health
+        run: npm run check:analytics-health
+        env:
+          ANALYTICS_HEALTH_URL: ${{ secrets.ANALYTICS_HEALTH_URL }}
+          ANALYTICS_HEALTH_TOKEN: ${{ secrets.ANALYTICS_HEALTH_TOKEN }}
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
@@ -107,3 +133,4 @@ jobs:
 
       - name: Analyze
         uses: github/codeql-action/analyze@v3
+

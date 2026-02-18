@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { OpsCard, OpsErrorState } from '../../components/ops';
+import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { getAnalyticsOverview } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 
@@ -52,21 +52,34 @@ export function AnalyticsModule() {
     return (
         <OpsCard title="Analytics" description="High-density operations analytics with trend windows and anomaly lane.">
             <div className="ops-stack">
-                <div className="ops-form-grid">
-                    <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
-                        <option value={7}>Last 7 days</option>
-                        <option value={14}>Last 14 days</option>
-                        <option value={30}>Last 30 days</option>
-                        <option value={60}>Last 60 days</option>
-                        <option value={90}>Last 90 days</option>
-                    </select>
-                    <select value={compareDays} onChange={(event) => setCompareDays(Number(event.target.value))}>
-                        <option value={7}>Compare 7 days</option>
-                        <option value={14}>Compare 14 days</option>
-                        <option value={30}>Compare 30 days</option>
-                        <option value={60}>Compare 60 days</option>
-                    </select>
-                </div>
+                <OpsToolbar
+                    compact
+                    controls={
+                        <>
+                            <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
+                                <option value={7}>Last 7 days</option>
+                                <option value={14}>Last 14 days</option>
+                                <option value={30}>Last 30 days</option>
+                                <option value={60}>Last 60 days</option>
+                                <option value={90}>Last 90 days</option>
+                            </select>
+                            <select value={compareDays} onChange={(event) => setCompareDays(Number(event.target.value))}>
+                                <option value={7}>Compare 7 days</option>
+                                <option value={14}>Compare 14 days</option>
+                                <option value={30}>Compare 30 days</option>
+                                <option value={60}>Compare 60 days</option>
+                            </select>
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">Window: {days}d vs {compareDays}d</span>
+                            <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                        </>
+                    }
+                />
 
                 {query.isPending ? <div className="admin-alert info">Loading analytics...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load analytics overview." /> : null}

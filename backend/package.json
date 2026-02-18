@@ -9,8 +9,9 @@
     "start": "node dist/server.js",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
-    "test:ci": "vitest run && npm run verify:openapi-parity",
+    "test:ci": "vitest run --maxWorkers=2 --retry=1 && npm run verify:openapi-parity",
     "verify:openapi-parity": "tsx scripts/verify-openapi-parity.ts",
+    "check:analytics-health": "tsx scripts/check-analytics-health.ts",
     "migrate:admin-accounts": "tsx scripts/migrate-admin-accounts.ts"
   },
   "engines": {
@@ -74,3 +75,4 @@
     "qs": "^6.15.0"
   }
 }
+

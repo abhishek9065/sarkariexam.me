@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsCard, OpsErrorState } from '../../components/ops';
+import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import { getBulkUpdatePreview, runBulkUpdate } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
@@ -71,28 +71,52 @@ export function BulkImportModule() {
             <AdminStepUpCard />
             <OpsCard title="Bulk Import" description="Bulk status changes with mandatory preview and controlled execution.">
                 <div className="ops-stack">
+                    <OpsToolbar
+                        compact
+                        controls={
+                            <>
+                                <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                                    <option value="draft">Status: Draft</option>
+                                    <option value="pending">Status: Pending</option>
+                                    <option value="scheduled">Status: Scheduled</option>
+                                    <option value="published">Status: Published</option>
+                                    <option value="archived">Status: Archived</option>
+                                </select>
+                                <input
+                                    value={note}
+                                    onChange={(event) => setNote(event.target.value)}
+                                    placeholder="Bulk operation note (optional)"
+                                />
+                            </>
+                        }
+                        actions={
+                            <>
+                                <span className="ops-inline-muted">{ids.length} IDs parsed</span>
+                                <button
+                                    type="button"
+                                    className="admin-btn small subtle"
+                                    onClick={() => {
+                                        setRawIds('');
+                                        setNote('');
+                                        setStatus('draft');
+                                        setPreview(null);
+                                        setPreviewOpen(false);
+                                        notifyInfo('Bulk form cleared', 'Cleared IDs and reset bulk action form.');
+                                    }}
+                                >
+                                    Clear all
+                                </button>
+                            </>
+                        }
+                    />
                     <textarea
                         value={rawIds}
                         onChange={(event) => setRawIds(event.target.value)}
                         placeholder="Paste announcement IDs (comma, space, or newline separated)"
                         className="ops-textarea"
                     />
-                    <div className="ops-form-grid">
-                        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-                            <option value="draft">Draft</option>
-                            <option value="pending">Pending</option>
-                            <option value="scheduled">Scheduled</option>
-                            <option value="published">Published</option>
-                            <option value="archived">Archived</option>
-                        </select>
-                        <input
-                            value={note}
-                            onChange={(event) => setNote(event.target.value)}
-                            placeholder="Bulk operation note (optional)"
-                        />
-                    </div>
 
-                    <div className="ops-actions">
+                    <div className="ops-actions ops-sticky-actions">
                         <button
                             type="button"
                             className="admin-btn"
@@ -101,6 +125,7 @@ export function BulkImportModule() {
                         >
                             {previewMutation.isPending ? 'Previewing...' : `Preview (${ids.length})`}
                         </button>
+                        <span className="ops-inline-muted">Preview before apply is mandatory.</span>
                     </div>
 
                     {previewMutation.isError ? (

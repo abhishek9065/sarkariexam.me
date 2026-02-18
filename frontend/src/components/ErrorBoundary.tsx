@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
+import { reportClientError } from '../utils/reportClientError';
+
 interface Props {
     children: ReactNode;
     fallback?: ReactNode;
@@ -22,6 +24,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
     componentDidCatch(error: Error, info: ErrorInfo) {
         console.error('ErrorBoundary caught:', error, info);
+        void reportClientError({
+            errorId: 'frontend_error_boundary',
+            message: error.message || 'Unhandled UI error',
+            note: 'React ErrorBoundary captured an exception.',
+            stack: error.stack,
+            componentStack: info.componentStack,
+            dedupeKey: `error_boundary:${error.name}:${error.message}`,
+        });
     }
 
     render() {

@@ -1,48 +1,54 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
 
 :root {
-    --font-body: 'Space Grotesk', 'Segoe UI', sans-serif;
-    --font-heading: 'Manrope', 'Space Grotesk', sans-serif;
+    --font-body: 'Outfit', 'Segoe UI', sans-serif;
+    --font-heading: 'Sora', 'Outfit', sans-serif;
 
-    --bg-canvas: #060b12;
-    --bg-elev-1: #0d1420;
-    --bg-elev-2: #111b2b;
-    --bg-elev-3: #162337;
-    --bg-elev-4: #1d3048;
-    --bg-input: #0f1a2b;
+    --bg-canvas: #04070d;
+    --bg-canvas-alt: #091220;
+    --bg-elev-1: #0a1422;
+    --bg-elev-2: #0f1a2e;
+    --bg-elev-3: #15253d;
+    --bg-elev-4: #1c3351;
+    --bg-input: #0b1930;
 
-    --text-primary: #e6edf8;
-    --text-secondary: #9ab0cf;
-    --text-muted: #7386a3;
+    --text-primary: #f1f7ff;
+    --text-secondary: #a5bedf;
+    --text-muted: #7993b8;
 
-    --accent: #0bc5ea;
-    --accent-strong: #06a5c6;
-    --accent-soft: rgba(11, 197, 234, 0.18);
+    --accent: #42e8ff;
+    --accent-strong: #12bdd9;
+    --accent-soft: rgba(66, 232, 255, 0.2);
 
-    --success: #3dd68c;
-    --warning: #ffbe5c;
-    --danger: #ff6b6b;
-    --info: #70b2ff;
+    --success: #4bd992;
+    --warning: #ffc56b;
+    --danger: #ff7272;
+    --info: #7eb8ff;
 
-    --border-soft: rgba(130, 170, 235, 0.2);
-    --border-strong: rgba(130, 170, 235, 0.34);
+    --border-soft: rgba(136, 183, 255, 0.24);
+    --border-strong: rgba(136, 183, 255, 0.42);
 
-    --shadow-1: 0 14px 34px rgba(2, 6, 23, 0.42);
-    --shadow-2: 0 24px 50px rgba(2, 6, 23, 0.55);
+    --shadow-1: 0 22px 46px rgba(1, 8, 22, 0.5);
+    --shadow-2: 0 36px 86px rgba(1, 8, 22, 0.68);
 
-    --radius-sm: 10px;
-    --radius-md: 14px;
-    --radius-lg: 20px;
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
 
     --space-1: 6px;
     --space-2: 10px;
     --space-3: 14px;
     --space-4: 18px;
     --space-5: 24px;
-    --space-6: 32px;
+    --space-6: 34px;
 
-    --sidebar-width: 300px;
-    --sidebar-collapsed-width: 108px;
+    --sidebar-width: 328px;
+    --sidebar-collapsed-width: 112px;
+    --control-height: 46px;
+    --control-height-compact: 40px;
+    --control-padding-inline: 14px;
+    --shell-max-width: 1840px;
+    --table-min-width: 980px;
 }
 
 body[data-admin-density='compact'] {
@@ -52,4 +58,5 @@ body[data-admin-density='compact'] {
     --space-4: 14px;
     --space-5: 18px;
     --space-6: 24px;
+    --control-height: var(--control-height-compact);
 }

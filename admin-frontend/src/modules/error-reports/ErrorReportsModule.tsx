@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
 import { getErrorReports, updateErrorReport } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
@@ -80,23 +80,47 @@ export function ErrorReportsModule() {
     return (
         <OpsCard title="Error Reports" description="Triage client error reports with fast state transitions and operator notes.">
             <div className="ops-stack">
-                <div className="ops-form-grid">
-                    <input
-                        type="search"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search by error ID"
-                    />
-                    <select
-                        value={status}
-                        onChange={(event) => setStatus(event.target.value as 'all' | 'new' | 'triaged' | 'resolved')}
-                    >
-                        <option value="all">All statuses</option>
-                        <option value="new">New</option>
-                        <option value="triaged">Triaged</option>
-                        <option value="resolved">Resolved</option>
-                    </select>
-                </div>
+                <OpsToolbar
+                    compact
+                    controls={
+                        <>
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search by error ID"
+                            />
+                            <select
+                                value={status}
+                                onChange={(event) => setStatus(event.target.value as 'all' | 'new' | 'triaged' | 'resolved')}
+                            >
+                                <option value="all">All statuses</option>
+                                <option value="new">New</option>
+                                <option value="triaged">Triaged</option>
+                                <option value="resolved">Resolved</option>
+                            </select>
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">{rows.length} reports loaded</span>
+                            <button
+                                type="button"
+                                className="admin-btn subtle small"
+                                onClick={() => {
+                                    setSearch('');
+                                    setStatus('all');
+                                    notifyInfo('Filters cleared', 'Showing all error reports.');
+                                }}
+                            >
+                                Clear
+                            </button>
+                            <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                        </>
+                    }
+                />
 
                 <div className="ops-kpi-grid">
                     <div className="ops-kpi-card">

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { OpsCard, OpsErrorState } from '../../components/ops';
+import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { getAdminAnnouncements, updateAdminAnnouncement } from '../../lib/api/client';
 import type { AdminAnnouncementListItem } from '../../types';
 
@@ -29,6 +30,7 @@ export function DetailedPostModule() {
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string>('');
     const [editable, setEditable] = useState<EditableAnnouncement>(defaultEditable);
+    const { notifyInfo } = useAdminNotifications();
 
     const query = useQuery({
         queryKey: ['detailed-post-list', search],
@@ -75,28 +77,61 @@ export function DetailedPostModule() {
     return (
         <OpsCard title="Detailed Post" description="Edit existing records with full field controls.">
             <div className="ops-stack">
-                <div className="ops-form-grid">
-                    <input
-                        type="search"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search by title"
-                    />
-                    <select
-                        value={selectedId}
-                        onChange={(event) => setSelectedId(event.target.value)}
-                    >
-                        <option value="">Select announcement...</option>
-                        {announcements.map((item) => {
-                            const id = item.id || item._id || '';
-                            return (
-                                <option key={id} value={id}>
-                                    {item.title || 'Untitled'} [{item.status || 'unknown'}]
-                                </option>
-                            );
-                        })}
-                    </select>
-                </div>
+                <OpsToolbar
+                    compact
+                    controls={
+                        <>
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search by title"
+                            />
+                            <select
+                                value={selectedId}
+                                onChange={(event) => setSelectedId(event.target.value)}
+                            >
+                                <option value="">Select announcement...</option>
+                                {announcements.map((item) => {
+                                    const id = item.id || item._id || '';
+                                    return (
+                                        <option key={id} value={id}>
+                                            {item.title || 'Untitled'} [{item.status || 'unknown'}]
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">{selected ? `Editing: ${selected.title || selectedId}` : 'Select a record to edit.'}</span>
+                            <button type="button" className="admin-btn small subtle" onClick={() => void query.refetch()}>
+                                Refresh list
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn small"
+                                onClick={() => {
+                                    if (!selected) return;
+                                    setEditable({
+                                        title: selected.title ?? '',
+                                        category: String(selected.category ?? ''),
+                                        organization: String(selected.organization ?? ''),
+                                        status: selected.status ?? 'draft',
+                                        content: String(selected.content ?? ''),
+                                        externalLink: String(selected.externalLink ?? ''),
+                                        location: String(selected.location ?? ''),
+                                    });
+                                    notifyInfo('Form restored', 'Unsaved edits reset to current record values.');
+                                }}
+                                disabled={!selected}
+                            >
+                                Restore values
+                            </button>
+                        </>
+                    }
+                />
                 {query.isPending ? <div className="admin-alert info">Loading announcements...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load announcement list." /> : null}
 

@@ -124,6 +124,28 @@ export function ReviewModule() {
                             />
                         </>
                     }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">
+                                Selected: {selectedIds.length} of {rows.length}
+                            </span>
+                            <button
+                                type="button"
+                                className="admin-btn small subtle"
+                                onClick={() => {
+                                    setSelectedIds([]);
+                                    setPreview(null);
+                                    setNote('');
+                                    setScheduleAt('');
+                                }}
+                            >
+                                Clear selection
+                            </button>
+                            <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                        </>
+                    }
                 />
 
                 {action === 'schedule' ? (

@@ -3,6 +3,26 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://localhost:5000';
+const disableProxy = process.env.VITE_DISABLE_PROXY === '1';
+const proxyConfig = disableProxy
+  ? undefined
+  : {
+      '/api': {
+        target: proxyTarget,
+        changeOrigin: true,
+        secure: false,
+        timeout: 5000,
+        proxyTimeout: 5000,
+      },
+      '/ws': {
+        target: proxyTarget,
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+        timeout: 5000,
+        proxyTimeout: 5000,
+      },
+    };
 
 export default defineConfig({
   plugins: [
@@ -104,22 +124,11 @@ export default defineConfig({
   ],
   server: {
     port: 4173,
-    proxy: {
-      '/api': {
-        target: proxyTarget,
-        changeOrigin: true,
-        secure: false,
-        timeout: 5000,
-        proxyTimeout: 5000,
-      },
-      '/ws': {
-        target: proxyTarget,
-        changeOrigin: true,
-        ws: true,
-        secure: false,
-        timeout: 5000,
-        proxyTimeout: 5000,
-      },
-    },
+    proxy: proxyConfig,
+  },
+  preview: {
+    port: 4173,
+    strictPort: true,
+    proxy: proxyConfig,
   },
 });

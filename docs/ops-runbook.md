@@ -1,124 +1,169 @@
-# Backend Analytics Ops Runbook
+# SarkariExams Ops Runbook
 
-This runbook covers telemetry failures and contract integrity checks for backend analytics.
+This runbook is the single triage entrypoint for backend/frontend telemetry and runtime integrity incidents.
 
-## Scope
+## Fast Path (under 15 minutes)
 
-- API surface: `/api/analytics/overview`, `/api/analytics/popular`, `/api/analytics/export/csv`
-- Core sources: `backend/src/services/analyticsOverview.ts`, `backend/src/services/analytics.ts`
-- Related cache path: `backend/src/middleware/cache.ts`, `backend/src/services/redis.ts`
-
-## Fast Triage Checklist
-
-1. Check overview health flags with fresh data:
+1. Verify API and health endpoints:
 ```bash
-curl -H "Authorization: Bearer <admin-token>" "http://localhost:5000/api/analytics/overview?days=30&nocache=1"
+curl -fsS http://localhost:5000/api/health
+curl -fsS http://localhost:5000/api/health/deep
 ```
-2. Inspect:
-   - `data.insights.healthFlags.zeroListingEvents`
-   - `data.insights.healthFlags.staleRollups`
-   - `data.insights.healthFlags.inAppClickCollapse`
-   - `data.insights.rollupAgeMinutes`
-3. Validate runtime integrity:
+2. Verify analytics health flags:
+```bash
+cd backend
+npm run check:analytics-health
+```
+3. Verify contract/build baseline:
 ```bash
 cd backend
 npm run build
 npm run verify:openapi-parity
 npm test -- src/tests/adminPostLogin.contract.test.ts
 npm test
+
+cd ../frontend
+npm run build
+npm run test:e2e:ci
+```
+4. If production issue is frontend proxy related, validate from frontend runtime:
+```bash
+curl -fsS http://localhost:4173/api/health
+curl -fsS "http://localhost:4173/api/announcements/v3/cards?type=job&limit=1"
 ```
 
-## Failure Playbooks
+## Incident Playbooks
 
-### 1) Zero Listing Events (`zeroListingEvents=true`)
+### 1) API Proxy Errors (`[vite] http proxy error: /api/...`)
 
-Meaning:
-- Listing events are not being persisted for the active window (`listingViews === 0`).
-
-Checks:
-1. Confirm listing routes are receiving traffic:
-   - `backend/src/routes/announcements.ts` (`/v3/cards`, `/search`, category/list routes).
-2. Confirm analytics event writes for `listing_view`:
-   - `recordListingAnalytics` in `backend/src/routes/announcements.ts`.
-3. Confirm DB write path:
-   - `recordAnalyticsEvent` in `backend/src/services/analytics.ts`.
-4. Verify filters are not suppressing events:
-   - Ignore prefetch requests only (`isPrefetchRequest` in announcements routes).
-
-Actions:
-1. Reproduce with a direct request to `/api/announcements/v3/cards?source=home`.
-2. Query `analytics_events` for recent `listing_view`.
-3. If absent, patch route instrumentation.
-4. If present but summary is zero, inspect rollup read path (`getRollupSummary`) and window boundaries.
-
-### 2) Stale Rollups (`staleRollups=true`)
-
-Meaning:
-- `rollupAgeMinutes` exceeds `staleThresholdMinutes` from `analyticsOverview`.
+Symptoms:
+- Local UI shows network failures for `/api/announcements`.
+- Vite console logs proxy target errors.
 
 Checks:
-1. Ensure scheduler starts at boot:
-   - `scheduleAnalyticsRollups()` in `backend/src/server.ts`.
-2. Verify DB connectivity:
-   - `/api/health/deep`
-   - `healthCheck` in `backend/src/services/cosmosdb.ts`.
-3. Confirm `analytics_rollups` has fresh entries.
-
-Actions:
-1. Restart backend and verify scheduler logs.
-2. Validate DB credentials and connectivity.
-3. Run a manual rollup in a controlled environment if needed.
-4. Keep `nocache=1` while validating recovery.
-
-### 3) In-App Click Collapse (`inAppClickCollapse=true`)
-
-Meaning:
-- In-app click signal is degraded relative to detail views, usually with unattributed/direct-heavy traffic.
-
-Checks:
-1. Validate source tagging and attribution normalization:
-   - `backend/src/services/attribution.ts`
-   - `backend/src/routes/announcements.ts` (query param normalization).
-2. Confirm `card_click` events still emit on detail reads.
-3. Inspect funnel split:
-   - `getFunnelAttributionSplit` in `backend/src/services/analytics.ts`.
-
-Actions:
-1. Sample recent `card_click` metadata source distribution.
-2. Verify in-app links still pass canonical `source`.
-3. If direct traffic dominates by design, classify as expected and monitor trend.
-4. If not expected, treat as instrumentation regression and patch source propagation.
-
-### 4) Redis Fallback Mode
-
-Signal:
-- Logs show Redis unavailable and in-memory fallback active.
-
-Checks:
-1. Verify Redis env/config values.
-2. Confirm fallback operation:
-   - `backend/src/services/redis.ts`
-   - `backend/src/utils/cache.ts`
-
-Actions:
-1. Restore Redis connectivity for stable distributed caching/rate limiting.
-2. While degraded, expect weaker multi-instance cache consistency.
-3. Re-check key API paths (`/api/announcements/v3/cards`, `/api/analytics/overview`) after recovery.
-
-## Contract and Parity Guardrails
-
-Run these before merge/deploy:
-
+1. Confirm backend is running on expected local port:
 ```bash
+curl -fsS http://localhost:5000/api/health
+```
+2. Confirm frontend proxy target settings:
+- `frontend/vite.config.ts`
+- `frontend/.env.example`
+3. Confirm dev mode:
+- Local backend mode: `VITE_PROXY_TARGET=http://localhost:5000`
+- Docker + nginx mode: `VITE_PROXY_TARGET=http://localhost`
+
+Actions:
+1. Restart frontend with explicit proxy target if needed.
+2. Keep `VITE_API_BASE` unset for proxy-based dev.
+3. Re-check `http://localhost:4173/api/health`.
+
+### 2) Homepage Fallback Mode Spikes
+
+Symptoms:
+- Homepage shows `Fallback mode` status frequently.
+- Admin support error reports increase (`/api/support/error-reports`).
+
+Checks:
+1. Inspect frontend runtime errors in support reports:
+```bash
+curl -H "Authorization: Bearer <admin-token>" \
+  "http://localhost:5000/api/support/error-reports?status=new&limit=20"
+```
+2. Confirm backend list endpoints respond:
+```bash
+curl -fsS "http://localhost:5000/api/announcements/v3/cards?type=job&limit=5"
+```
+3. Check frontend API helper behavior in `frontend/src/utils/api.ts` and `frontend/src/utils/reportClientError.ts`.
+
+Actions:
+1. Fix failing API route or network path.
+2. Re-test homepage retry action.
+3. Triage recurring deduped client error IDs first.
+
+### 3) Flaky Mongo/Vitest Hooks (teardown timeouts)
+
+Symptoms:
+- `afterAll`/hook timeout failures in backend tests.
+- Reconnect noise during teardown.
+
+Checks:
+1. Verify test harness settings:
+- `backend/vitest.config.ts` (`hookTimeout`, `retry`)
+- `backend/tests/setup.ts` (`DISABLE_DB_RECONNECT`, teardown path)
+2. Verify DB service guard behavior:
+- `backend/src/services/cosmosdb.ts` (`isClosing`, idempotent `closeConnection`)
+
+Actions:
+1. Run CI-mode backend tests locally:
+```bash
+cd backend
+npm run test:ci
+```
+2. If local MongoMemoryServer fails, set explicit `MONGODB_URI`.
+3. Capture failing suite logs before retrying.
+
+### 4) Analytics Health Alerts
+
+Source:
+- `backend/scripts/check-analytics-health.ts`
+- Scheduled security workflow probe.
+
+Flags:
+- `zeroListingEvents`
+- `staleRollups`
+- `inAppClickCollapse`
+
+Checks:
+```bash
+curl -H "Authorization: Bearer <admin-token>" \
+  "http://localhost:5000/api/analytics/overview?days=30&nocache=1"
+```
+
+Actions:
+1. If `zeroListingEvents=true`: validate `listing_view` instrumentation in announcements routes.
+2. If `staleRollups=true`: verify scheduler startup and DB connectivity.
+3. If `inAppClickCollapse=true`: validate attribution source propagation and in-app click events.
+
+### 5) Rollback Commands
+
+Use only after confirming rollback necessity.
+
+App rollback (server repo):
+```bash
+cd ~/sarkari-result
+git fetch --all --prune
+git log --oneline -n 5
+# choose <stable_sha>
+git checkout <stable_sha>
+bash scripts/deploy-prod.sh
+```
+
+Patch rollback (revert a bad commit on branch):
+```bash
+git revert <bad_commit_sha>
+git push origin main
+```
+
+After rollback:
+1. Re-run health checks (`/api/health`, `/api/health/deep`).
+2. Re-run analytics health probe.
+3. Validate frontend runtime API proxy path.
+
+## CI/Contract Guardrails
+
+Before merge:
+```bash
+node scripts/verify-config-consistency.mjs
+
 cd backend
 npm run build
 npm run verify:openapi-parity
-npm test -- src/tests/adminPostLogin.contract.test.ts
-npm test
+npm run test:ci
+
+cd ../frontend
+npm run build
+npm run check:bundle-size
+npm run test:e2e:ci
 ```
 
-If parity fails:
-1. Compare route mounts in `backend/src/server.ts`.
-2. Compare router methods in `backend/src/routes/*.ts`.
-3. Update `openapi.json` for missing/additive endpoints and rerun parity.
-
+If a check fails, do not deploy until the failing contract is resolved.

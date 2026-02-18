@@ -180,7 +180,8 @@ test.describe('Admin analytics local integrity', () => {
             });
         });
 
-        await page.goto('/admin', { waitUntil: 'domcontentloaded' });
+        // Pin deterministic local analytics checks to legacy path to avoid route-surface drift.
+        await page.goto('/admin-legacy', { waitUntil: 'domcontentloaded' });
 
         await expect(page.getByRole('heading', { name: /Operations Hub/i })).toBeVisible({ timeout: 15000 });
         await expect(page.getByText('Card clicks (in-app)')).toBeVisible({ timeout: 15000 });
@@ -201,3 +202,6 @@ test.describe('Admin analytics local integrity', () => {
         await expect(funnelInfoTooltip).toBeFocused();
     });
 });
+
+
+

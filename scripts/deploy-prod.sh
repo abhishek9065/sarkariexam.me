@@ -166,8 +166,8 @@ check_public_route() {
 }
 
 echo "Public route checks:"
-check_public_route "/admin" "legacy admin"
-check_public_route "/admin-vnext" "admin vNext preview"
-check_public_route "/admin-legacy" "legacy alias"
+check_public_route "/admin" "admin vNext default"
+check_public_route "/admin-vnext" "admin vNext alias"
+check_public_route "/admin-legacy" "legacy rollback"
 
 echo "Deploy completed successfully."

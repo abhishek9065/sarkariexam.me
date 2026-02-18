@@ -5,6 +5,7 @@ import { HomeMobileTabs } from '../components/home/HomeMobileTabs';
 import { HomeSectionPanel } from '../components/home/HomeSectionPanel';
 import { getAnnouncementCards } from '../utils/api';
 import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
+import { reportClientError } from '../utils/reportClientError';
 import type { AnnouncementCard } from '../types';
 
 import './HomePage.css';
@@ -145,10 +146,21 @@ export function HomePage() {
         jobs: [], results: [], admitCards: [], answerKeys: [],
         syllabus: [], admissions: [], important: [], certificates: [],
     });
+    const [refreshing, setRefreshing] = useState(false);
+    const [reloadToken, setReloadToken] = useState(0);
+    const [failedSections, setFailedSections] = useState<string[]>([]);
 
     /* ─── Data Fetching ─── */
     useEffect(() => {
         let mounted = true;
+        const isRetryAttempt = reloadToken > 0;
+
+        if (isRetryAttempt) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
+
         (async () => {
             try {
                 const results = await Promise.allSettled([
@@ -165,11 +177,13 @@ export function HomePage() {
 
                 if (!mounted) return;
 
+                const failedSectionNames: string[] = [];
                 const resolveCards = (index: number, sectionName: string, fallback: AnnouncementCard[]): AnnouncementCard[] => {
                     const result = results[index];
                     if (result && result.status === 'fulfilled') {
                         return result.value.data;
                     }
+                    failedSectionNames.push(sectionName);
                     console.error(`[Home] Failed to fetch section: ${sectionName}`, result && result.status === 'rejected' ? result.reason : null);
                     return fallback;
                 };
@@ -196,9 +210,19 @@ export function HomePage() {
                     certificates: buildCertificateCards(keywordCards, admissions, resultsCards, important, 10),
                 });
 
-                const usedFallback = results.some((result) => result.status === 'rejected');
+                setFailedSections(failedSectionNames);
+                const usedFallback = failedSectionNames.length > 0;
                 setSourceMode(usedFallback ? 'fallback' : 'live');
                 setLastUpdatedAt(new Date().toISOString());
+
+                if (usedFallback) {
+                    void reportClientError({
+                        errorId: 'home_partial_fallback',
+                        message: 'Homepage loaded with partial fallback data',
+                        note: `Failed sections: ${failedSectionNames.join(', ')}`,
+                        dedupeKey: `home_partial_fallback:${failedSectionNames.slice().sort().join('|') || 'unknown'}`,
+                    });
+                }
             } catch (err) {
                 console.error('Failed to fetch homepage sections:', err);
                 if (!mounted) return;
@@ -212,14 +236,29 @@ export function HomePage() {
                     important: createFallbackCards('job', 'important', 5),
                     certificates: createFallbackCards('result', 'certificate', 5),
                 });
+                setFailedSections(['all']);
                 setSourceMode('fallback');
                 setLastUpdatedAt(new Date().toISOString());
+
+                void reportClientError({
+                    errorId: 'home_full_fallback',
+                    message: err instanceof Error ? err.message : 'Homepage section fetch failed',
+                    note: 'Homepage switched to full fallback dataset',
+                    stack: err instanceof Error ? err.stack : undefined,
+                    dedupeKey: 'home_full_fallback',
+                });
             } finally {
-                if (mounted) setLoading(false);
+                if (mounted) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
             }
         })();
-        return () => { mounted = false; };
-    }, []);
+
+        return () => {
+            mounted = false;
+        };
+    }, [reloadToken]);
 
     const homepageReady = useMemo(
         () => !loading && Object.values(sections).some((s) => s.length > 0),
@@ -264,6 +303,11 @@ export function HomePage() {
         navigate(`/jobs?q=${encodeURIComponent(q)}&source=home`);
     }, [searchQuery, navigate]);
 
+    const handleRetryData = useCallback(() => {
+        if (loading || refreshing) return;
+        setReloadToken((current) => current + 1);
+    }, [loading, refreshing]);
+
     return (
         <Layout>
             <div className="home-v3" data-testid="home-v4-shell">
@@ -302,6 +346,34 @@ export function HomePage() {
                                 <span>{sourceMode === 'live' ? 'Live' : 'Cached'}</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div
+                    className={`home-data-status ${sourceMode === 'live' ? 'home-data-status-live' : 'home-data-status-fallback'}`}
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div className="home-data-status-text">
+                        <strong>{sourceMode === 'live' ? 'Live data' : 'Fallback mode'}</strong>
+                        <span>
+                            {sourceMode === 'live'
+                                ? 'Connected to live API feeds.'
+                                : 'Some homepage blocks are showing fallback data while live APIs recover.'}
+                        </span>
+                        {failedSections.length > 0 ? (
+                            <span className="home-data-status-failed">Affected: {failedSections.join(', ')}</span>
+                        ) : null}
+                    </div>
+                    <div className="home-data-status-actions">
+                        <span className="home-data-status-freshness">
+                            Freshness: {lastUpdatedAt
+                                ? new Date(lastUpdatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                : 'N/A'}
+                        </span>
+                        <button type="button" onClick={handleRetryData} disabled={loading || refreshing}>
+                            {refreshing ? 'Retrying...' : 'Retry Live Data'}
+                        </button>
                     </div>
                 </div>
 
@@ -497,3 +569,13 @@ export function HomePage() {
         </Layout>
     );
 }
+
+
+
+
+
+
+
+
+
+

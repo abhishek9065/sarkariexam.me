@@ -1,11 +1,19 @@
 .admin-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: var(--control-height);
+    padding: 0 14px;
     border: 1px solid var(--border-soft);
-    border-radius: 10px;
-    background: var(--bg-elev-3);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-elev-3) 86%, #0a1323 14%);
     color: var(--text-primary);
-    padding: 9px 12px;
+    text-decoration: none;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     cursor: pointer;
-    transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+    transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .admin-btn:hover {
@@ -17,31 +25,35 @@
     opacity: 0.56;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
 }
 
 .admin-btn.primary {
     border-color: color-mix(in srgb, var(--accent) 74%, #fff 26%);
     background: linear-gradient(120deg, var(--accent), var(--accent-strong));
-    color: #021118;
-    font-weight: 700;
+    color: #03131d;
+    box-shadow: 0 12px 24px rgba(11, 168, 194, 0.34);
 }
 
 .admin-btn.subtle {
-    background: color-mix(in srgb, var(--bg-elev-2) 88%, #000 12%);
+    background: color-mix(in srgb, var(--bg-elev-2) 88%, #02060f 12%);
 }
 
 .admin-btn.ghost {
     background: transparent;
+    border-color: rgba(142, 178, 230, 0.26);
 }
 
 .admin-btn.danger {
     border-color: color-mix(in srgb, var(--danger) 65%, #fff 35%);
     color: color-mix(in srgb, var(--danger) 85%, #fff 15%);
+    background: color-mix(in srgb, var(--danger) 14%, transparent 86%);
 }
 
 .admin-btn.small {
-    padding: 6px 10px;
-    font-size: 0.84rem;
+    min-height: var(--control-height-compact);
+    padding-inline: 12px;
+    font-size: 0.86rem;
 }
 
 .ops-card,
@@ -50,17 +62,17 @@
     border-radius: var(--radius-md);
     padding: var(--space-4);
     background:
-        radial-gradient(circle at top right, rgba(11, 197, 234, 0.06), transparent 42%),
-        var(--bg-elev-2);
+        radial-gradient(circle at top right, rgba(66, 232, 255, 0.08), transparent 42%),
+        linear-gradient(180deg, color-mix(in srgb, var(--bg-elev-2) 90%, #040811 10%), var(--bg-elev-2));
     box-shadow: var(--shadow-1);
 }
 
 .ops-card.muted {
-    background: color-mix(in srgb, var(--bg-elev-2) 78%, #0d1522 22%);
+    background: color-mix(in srgb, var(--bg-elev-2) 72%, #0d1522 28%);
 }
 
 .ops-card.danger {
-    border-color: rgba(255, 107, 107, 0.48);
+    border-color: rgba(255, 114, 114, 0.48);
 }
 
 .ops-card-header {
@@ -72,7 +84,7 @@
 }
 
 .ops-card-title {
-    font-size: 1.14rem;
+    font-size: 1.15rem;
 }
 
 .ops-card-description {
@@ -99,6 +111,10 @@
     display: grid;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-elev-3) 80%, #050d18 20%);
 }
 
 .ops-toolbar-grid {
@@ -128,17 +144,30 @@
     border-radius: var(--radius-sm);
     padding: 12px;
     background: color-mix(in srgb, var(--bg-elev-3) 78%, #12223a 22%);
+    text-align: left;
+}
+
+button.ops-kpi-card {
+    cursor: pointer;
+    transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+button.ops-kpi-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 52%, #fff 48%);
+    transform: translateY(-1px);
 }
 
 .ops-kpi-label {
-    font-size: 0.78rem;
+    font-size: 0.77rem;
     color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .ops-kpi-value {
-    font-size: 1.5rem;
+    font-size: clamp(1.25rem, 2vw, 1.52rem);
     font-weight: 800;
-    margin-top: 3px;
+    margin-top: 4px;
     letter-spacing: 0.01em;
 }
 
@@ -146,12 +175,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 28px;
     border-radius: 999px;
     border: 1px solid var(--border-soft);
-    padding: 3px 9px;
-    font-size: 0.73rem;
+    padding: 3px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
     text-transform: capitalize;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
 }
 
 .ops-badge.neutral {
@@ -192,27 +223,30 @@
 .ops-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 640px;
+    min-width: var(--table-min-width);
 }
 
 .ops-table th,
 .ops-table td {
     text-align: left;
-    padding: 10px 12px;
-    border-bottom: 1px solid rgba(130, 170, 235, 0.18);
+    padding: 12px 12px;
+    border-bottom: 1px solid rgba(130, 170, 235, 0.2);
     vertical-align: top;
 }
 
 .ops-table th {
-    font-size: 0.77rem;
-    letter-spacing: 0.08em;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-size: 0.74rem;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--text-muted);
     background: color-mix(in srgb, var(--bg-elev-4) 74%, #0d1a2c 26%);
 }
 
 .ops-table tr:hover td {
-    background: rgba(11, 197, 234, 0.06);
+    background: rgba(66, 232, 255, 0.06);
 }
 
 .ops-empty,
@@ -277,7 +311,7 @@
 }
 
 .ops-textarea {
-    min-height: 148px;
+    min-height: 160px;
 }
 
 .ops-count-grid {
@@ -295,24 +329,25 @@
 
 .admin-login-wrap {
     min-height: 100vh;
+    min-width: 1120px;
     display: grid;
     place-items: center;
     padding: var(--space-5);
 }
 
 .admin-login-card {
-    width: min(500px, 100%);
+    width: min(560px, 100%);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-soft);
     padding: var(--space-5);
     box-shadow: var(--shadow-2);
     background:
-        radial-gradient(circle at 100% 0%, rgba(11, 197, 234, 0.2), transparent 46%),
+        radial-gradient(circle at 100% 0%, rgba(66, 232, 255, 0.22), transparent 46%),
         var(--bg-elev-2);
 }
 
 .admin-login-title {
-    font-size: 1.64rem;
+    font-size: 1.72rem;
     margin-bottom: 4px;
 }
 
@@ -326,14 +361,14 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(5, 10, 18, 0.74);
+    background: rgba(5, 10, 18, 0.76);
     display: grid;
     place-items: start center;
     padding: 8vh 14px 14px;
 }
 
 .admin-palette {
-    width: min(760px, 100%);
+    width: min(780px, 100%);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -344,6 +379,7 @@
 .admin-palette-input {
     border: 0;
     border-radius: 0;
+    min-height: 54px;
     padding: 14px;
     border-bottom: 1px solid var(--border-soft);
     background: color-mix(in srgb, var(--bg-elev-3) 84%, #0b1524 16%);
@@ -356,6 +392,7 @@
 
 .admin-palette-item {
     width: 100%;
+    min-height: 56px;
     border: 0;
     border-bottom: 1px solid rgba(130, 170, 235, 0.16);
     padding: 12px 14px;
@@ -363,18 +400,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     color: var(--text-primary);
     text-align: left;
 }
 
-.admin-palette-item:hover {
-    background: rgba(11, 197, 234, 0.09);
+.admin-palette-item:hover,
+.admin-palette-item[aria-current='true'] {
+    background: rgba(66, 232, 255, 0.09);
 }
 
 .admin-stepup-grid {
     display: grid;
     gap: var(--space-2);
-    grid-template-columns: 2fr 1fr auto;
+    grid-template-columns: minmax(260px, 2fr) minmax(220px, 1fr) auto;
     align-items: center;
 }
 
@@ -392,7 +431,7 @@
     z-index: 140;
     display: grid;
     gap: 10px;
-    width: min(360px, calc(100vw - 24px));
+    width: min(380px, calc(100vw - 24px));
 }
 
 .ops-notification {
@@ -457,7 +496,7 @@
 }
 
 .ops-confirm-dialog {
-    width: min(460px, 100%);
+    width: min(480px, 100%);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
     background: var(--bg-elev-2);
@@ -498,7 +537,7 @@
     padding: 8px;
     display: grid;
     gap: 6px;
-    min-width: 170px;
+    min-width: 188px;
     z-index: 32;
 }
 
@@ -513,7 +552,7 @@
 }
 
 .ops-modal {
-    width: min(740px, 100%);
+    width: min(760px, 100%);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-soft);
     background: var(--bg-elev-2);
@@ -532,7 +571,14 @@
     box-shadow: var(--shadow-1);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1420px) {
+    .ops-form-grid.three,
+    .ops-count-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1240px) {
     .ops-toolbar-grid,
     .ops-toolbar-grid.two,
     .ops-form-grid,

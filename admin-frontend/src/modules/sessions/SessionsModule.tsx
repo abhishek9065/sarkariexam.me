@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import { getAdminSessions, terminateAdminSessionById, terminateOtherAdminSessions } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
@@ -85,57 +85,67 @@ export function SessionsModule() {
             <AdminStepUpCard />
             <OpsCard title="Sessions" description="Review active sessions, risk posture, and terminate suspicious logins safely.">
                 <div className="ops-stack">
-                    <div className="ops-form-grid three">
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search by email, device, browser, or IP"
-                        />
-                        <select
-                            value={riskFilter}
-                            onChange={(event) => setRiskFilter(event.target.value as 'all' | 'low' | 'medium' | 'high')}
-                        >
-                            <option value="all">All risk levels</option>
-                            <option value="high">High risk</option>
-                            <option value="medium">Medium risk</option>
-                            <option value="low">Low risk</option>
-                        </select>
-                        <div className="ops-actions">
-                            <button
-                                type="button"
-                                className="admin-btn danger"
-                                disabled={terminateOthersMutation.isPending || !hasValidStepUp}
-                                onClick={async () => {
-                                    const allowed = await confirm({
-                                        title: 'Terminate all other sessions?',
-                                        message: 'This will sign out every other active session for your account.',
-                                        confirmText: 'Terminate Others',
-                                        cancelText: 'Cancel',
-                                        variant: 'warning',
-                                    });
-                                    if (!allowed) return;
-                                    terminateOthersMutation.mutate(undefined, {
-                                        onSuccess: (result) => {
-                                            notifySuccess('Sessions terminated', `Removed ${result.removed ?? 0} session(s).`);
-                                            void trackAdminTelemetry('admin_session_action', {
-                                                action: 'terminate_others',
-                                                removed: result.removed ?? 0,
-                                            });
-                                        },
-                                        onError: (error) => {
-                                            notifyError('Terminate failed', error instanceof Error ? error.message : 'Failed to terminate sessions.');
-                                        },
-                                    });
-                                }}
-                            >
-                                Terminate Others
-                            </button>
-                            <button type="button" className="admin-btn subtle" onClick={() => void query.refetch()}>
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
+                    <OpsToolbar
+                        controls={
+                            <>
+                                <input
+                                    type="search"
+                                    value={search}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    placeholder="Search by email, device, browser, or IP"
+                                />
+                                <select
+                                    value={riskFilter}
+                                    onChange={(event) => setRiskFilter(event.target.value as 'all' | 'low' | 'medium' | 'high')}
+                                >
+                                    <option value="all">All risk levels</option>
+                                    <option value="high">High risk</option>
+                                    <option value="medium">Medium risk</option>
+                                    <option value="low">Low risk</option>
+                                </select>
+                                <span className="ops-inline-muted">
+                                    {filteredRows.length} of {rows.length} sessions
+                                </span>
+                            </>
+                        }
+                        actions={
+                            <>
+                                {!hasValidStepUp ? <span className="ops-inline-muted">Step-up required for session termination</span> : null}
+                                <button
+                                    type="button"
+                                    className="admin-btn danger small"
+                                    disabled={terminateOthersMutation.isPending || !hasValidStepUp}
+                                    onClick={async () => {
+                                        const allowed = await confirm({
+                                            title: 'Terminate all other sessions?',
+                                            message: 'This will sign out every other active session for your account.',
+                                            confirmText: 'Terminate Others',
+                                            cancelText: 'Cancel',
+                                            variant: 'warning',
+                                        });
+                                        if (!allowed) return;
+                                        terminateOthersMutation.mutate(undefined, {
+                                            onSuccess: (result) => {
+                                                notifySuccess('Sessions terminated', `Removed ${result.removed ?? 0} session(s).`);
+                                                void trackAdminTelemetry('admin_session_action', {
+                                                    action: 'terminate_others',
+                                                    removed: result.removed ?? 0,
+                                                });
+                                            },
+                                            onError: (error) => {
+                                                notifyError('Terminate failed', error instanceof Error ? error.message : 'Failed to terminate sessions.');
+                                            },
+                                        });
+                                    }}
+                                >
+                                    Terminate Others
+                                </button>
+                                <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                                    Refresh
+                                </button>
+                            </>
+                        }
+                    />
 
                     <div className="ops-kpi-grid">
                         <div className="ops-kpi-card">

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
 import { getAdminSecurityLogs } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
@@ -69,45 +69,54 @@ export function SecurityModule() {
     return (
         <OpsCard title="Security" description="Risk-forward security events with quick incident actions and filterable logs.">
             <div className="ops-stack">
-                <div className="ops-form-grid three">
-                    <input
-                        type="search"
-                        value={eventType}
-                        onChange={(event) => setEventType(event.target.value)}
-                        placeholder="Filter by event type"
-                    />
-                    <input
-                        type="search"
-                        value={ip}
-                        onChange={(event) => setIp(event.target.value)}
-                        placeholder="Filter by IP"
-                    />
-                    <input
-                        type="search"
-                        value={endpoint}
-                        onChange={(event) => setEndpoint(event.target.value)}
-                        placeholder="Filter by endpoint"
-                    />
-                    <input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} />
-                    <input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} />
-                    <div className="ops-actions">
-                        <button
-                            type="button"
-                            className="admin-btn subtle"
-                            onClick={() => {
-                                setEventType('');
-                                setIp('');
-                                setEndpoint('');
-                                setStart('');
-                                setEnd('');
-                                notifyInfo('Filters cleared', 'Security filters reset to defaults.');
-                            }}
-                        >
-                            Clear
-                        </button>
-                        <button type="button" className="admin-btn" onClick={() => void query.refetch()}>Refresh</button>
-                    </div>
-                </div>
+                <OpsToolbar
+                    controls={
+                        <>
+                            <input
+                                type="search"
+                                value={eventType}
+                                onChange={(event) => setEventType(event.target.value)}
+                                placeholder="Filter by event type"
+                            />
+                            <input
+                                type="search"
+                                value={ip}
+                                onChange={(event) => setIp(event.target.value)}
+                                placeholder="Filter by IP"
+                            />
+                            <input
+                                type="search"
+                                value={endpoint}
+                                onChange={(event) => setEndpoint(event.target.value)}
+                                placeholder="Filter by endpoint"
+                            />
+                            <input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} />
+                            <input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} />
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">{rows.length} events loaded</span>
+                            <button
+                                type="button"
+                                className="admin-btn subtle small"
+                                onClick={() => {
+                                    setEventType('');
+                                    setIp('');
+                                    setEndpoint('');
+                                    setStart('');
+                                    setEnd('');
+                                    notifyInfo('Filters cleared', 'Security filters reset to defaults.');
+                                }}
+                            >
+                                Clear
+                            </button>
+                            <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                        </>
+                    }
+                />
 
                 <div className="ops-kpi-grid">
                     <div className="ops-kpi-card">

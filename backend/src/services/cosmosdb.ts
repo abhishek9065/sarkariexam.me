@@ -8,6 +8,7 @@ import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 let client: MongoClient | null = null;
 let db: Db | null = null;
 let isConnecting = false;
+let isClosing = false;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
 
@@ -18,6 +19,7 @@ const getDatabaseName = (): string =>
     process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
 
 const isTestEnv = () => process.env.NODE_ENV === 'test';
+const isReconnectDisabledInTest = () => isTestEnv() && process.env.DISABLE_DB_RECONNECT === 'true';
 
 const formatErrorForTestLog = (error: unknown): string => {
     if (error instanceof Error) {
@@ -36,13 +38,27 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  */
 export async function connectToDatabase(): Promise<Db> {
     if (db) return db;
-    
+
+    if (isClosing) {
+        if (isTestEnv()) {
+            throw new Error('Database connection is closing');
+        }
+        while (isClosing) {
+            await sleep(50);
+        }
+        if (db) return db;
+    }
+
     // Prevent multiple concurrent connection attempts
     if (isConnecting) {
         while (isConnecting) {
             await sleep(100);
         }
         if (db) return db;
+    }
+
+    if (isReconnectDisabledInTest()) {
+        throw new Error('Database reconnect is disabled in test teardown');
     }
 
     isConnecting = true;
@@ -55,7 +71,9 @@ export async function connectToDatabase(): Promise<Db> {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            console.log(`[CosmosDB] Connection attempt ${attempt}/${MAX_RETRIES}...`);
+            if (!isTestEnv()) {
+                console.log(`[CosmosDB] Connection attempt ${attempt}/${MAX_RETRIES}...`);
+            }
 
             client = new MongoClient(connectionString, {
                 // Cosmos DB specific settings
@@ -75,8 +93,11 @@ export async function connectToDatabase(): Promise<Db> {
             // Test the connection
             await db.admin().ping();
 
-            console.log('[CosmosDB] Connected successfully to:', databaseName);
+            if (!isTestEnv()) {
+                console.log('[CosmosDB] Connected successfully to:', databaseName);
+            }
             isConnecting = false;
+            isClosing = false;
 
             // Create indexes
             try {
@@ -88,15 +109,23 @@ export async function connectToDatabase(): Promise<Db> {
 
             // Setup connection monitoring
             client.on('close', () => {
-                console.warn('[CosmosDB] Connection closed');
+                if (!isClosing && !isTestEnv()) {
+                    console.warn('[CosmosDB] Connection closed');
+                }
                 db = null;
                 client = null;
+                isConnecting = false;
             });
 
             client.on('error', (error) => {
-                console.error('[CosmosDB] Connection error:', error);
+                if (isTestEnv()) {
+                    console.error(`[CosmosDB] Connection error: ${formatErrorForTestLog(error)}`);
+                } else {
+                    console.error('[CosmosDB] Connection error:', error);
+                }
                 db = null;
                 client = null;
+                isConnecting = false;
             });
 
             return db;
@@ -106,7 +135,7 @@ export async function connectToDatabase(): Promise<Db> {
             } else {
                 console.error(`[CosmosDB] Connection attempt ${attempt} failed:`, error);
             }
-            
+
             // Clean up failed connection
             if (client) {
                 try {
@@ -124,7 +153,9 @@ export async function connectToDatabase(): Promise<Db> {
             }
 
             // Wait before retry
-            console.log(`[CosmosDB] Retrying in ${RETRY_DELAY}ms...`);
+            if (!isTestEnv()) {
+                console.log(`[CosmosDB] Retrying in ${RETRY_DELAY}ms...`);
+            }
             await sleep(RETRY_DELAY * attempt); // Exponential backoff
         }
     }
@@ -138,15 +169,23 @@ export async function connectToDatabase(): Promise<Db> {
  */
 export async function getDatabase(): Promise<Db> {
     if (!db) {
-        console.warn('[CosmosDB] Database not connected, attempting reconnection...');
+        if (isClosing || isReconnectDisabledInTest()) {
+            throw new Error('Database connection is not available during teardown');
+        }
+        if (!isTestEnv()) {
+            console.warn('[CosmosDB] Database not connected, attempting reconnection...');
+        }
         return await connectToDatabase();
     }
-    
+
     // Test connection health periodically
     try {
         await db.admin().ping();
         return db;
     } catch (error) {
+        if (isClosing || isReconnectDisabledInTest()) {
+            throw new Error('Database connection is not available during teardown');
+        }
         if (isTestEnv()) {
             console.warn(`[CosmosDB] Database connection unhealthy, reconnecting... ${formatErrorForTestLog(error)}`);
         } else {
@@ -291,7 +330,9 @@ async function createIndexes(): Promise<void> {
         await errorReports.createIndex({ errorId: 1, createdAt: -1 });
         await errorReports.createIndex({ status: 1, createdAt: -1 });
 
-        console.log('[CosmosDB] Indexes created successfully');
+        if (!isTestEnv()) {
+            console.log('[CosmosDB] Indexes created successfully');
+        }
     } catch (error) {
         console.error('[CosmosDB] Index creation error:', error);
         // Don't fail on index errors (might already exist)
@@ -302,10 +343,32 @@ async function createIndexes(): Promise<void> {
  * Close the database connection
  */
 export async function closeConnection(): Promise<void> {
-    if (client) {
-        await client.close();
-        client = null;
+    if (isClosing) {
+        return;
+    }
+
+    if (!client) {
         db = null;
+        return;
+    }
+
+    const closingClient = client;
+    isClosing = true;
+    isConnecting = false;
+    client = null;
+    db = null;
+
+    try {
+        await closingClient.close();
+    } catch (error) {
+        if (!isTestEnv()) {
+            console.error('[CosmosDB] Error while closing connection:', error);
+        }
+    } finally {
+        isClosing = false;
+    }
+
+    if (!isTestEnv()) {
         console.log('[CosmosDB] Connection closed');
     }
 }

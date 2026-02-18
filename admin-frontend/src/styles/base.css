@@ -5,18 +5,20 @@
 html,
 body,
 #root {
+    width: 100%;
     min-height: 100%;
 }
 
 body {
     margin: 0;
+    min-width: 1120px;
     font-family: var(--font-body);
     color: var(--text-primary);
     background:
-        radial-gradient(circle at 16% 4%, rgba(11, 197, 234, 0.14), transparent 34%),
-        radial-gradient(circle at 84% 0%, rgba(112, 178, 255, 0.12), transparent 30%),
-        linear-gradient(180deg, #050a10 0%, #060b12 100%);
-    line-height: 1.45;
+        radial-gradient(circle at 8% 0%, rgba(66, 232, 255, 0.16), transparent 32%),
+        radial-gradient(circle at 92% 4%, rgba(126, 184, 255, 0.14), transparent 34%),
+        linear-gradient(170deg, var(--bg-canvas) 0%, var(--bg-canvas-alt) 100%);
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
 }
@@ -50,11 +52,32 @@ input,
 select,
 textarea {
     width: 100%;
+    min-height: var(--control-height);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
-    padding: 10px 12px;
+    padding: 10px var(--control-padding-inline);
     color: var(--text-primary);
-    background: var(--bg-input);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-input) 90%, #0c1424 10%), var(--bg-input));
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+select {
+    appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+        linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(50% - 2px),
+        calc(100% - 12px) calc(50% - 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 34px;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+    border-color: color-mix(in srgb, var(--accent) 46%, var(--border-soft) 54%);
 }
 
 textarea {
@@ -63,27 +86,38 @@ textarea {
 
 input::placeholder,
 textarea::placeholder {
-    color: color-mix(in srgb, var(--text-muted) 92%, #000 8%);
+    color: color-mix(in srgb, var(--text-muted) 88%, #000 12%);
 }
 
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 button:focus-visible,
-a:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--accent) 86%, #fff 14%);
+a:focus-visible,
+summary:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 82%, #fff 18%);
     outline-offset: 2px;
+}
+
+input[type='checkbox'] {
+    width: 18px;
+    min-height: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 5px;
+    accent-color: var(--accent-strong);
+    cursor: pointer;
 }
 
 code {
     display: inline-block;
-    padding: 1px 7px;
+    padding: 1px 8px;
     border-radius: 999px;
     border: 1px solid var(--border-soft);
-    background: rgba(10, 22, 38, 0.7);
-    color: color-mix(in srgb, var(--info) 74%, #fff 26%);
+    background: rgba(8, 22, 38, 0.72);
+    color: color-mix(in srgb, var(--info) 76%, #fff 24%);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.79rem;
+    font-size: 0.78rem;
 }
 
 .admin-muted,

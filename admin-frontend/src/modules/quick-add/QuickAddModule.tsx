@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
-import { OpsCard, OpsErrorState } from '../../components/ops';
+import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { createAdminAnnouncement } from '../../lib/api/client';
 
 const defaultForm = {
@@ -21,6 +22,7 @@ const defaultForm = {
 export function QuickAddModule() {
     const [form, setForm] = useState(defaultForm);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const { notifyInfo } = useAdminNotifications();
 
     const mutation = useMutation({
         mutationFn: () => {
@@ -44,11 +46,53 @@ export function QuickAddModule() {
         onSuccess: (data) => {
             setSuccessMessage(`Created announcement: ${data.title || 'Untitled'}`);
             setForm(defaultForm);
+            notifyInfo('Quick Add reset', 'Form reset for next announcement.');
         },
     });
 
     return (
         <OpsCard title="Quick Add" description="Fast posting flow for operations teams.">
+            <OpsToolbar
+                compact
+                controls={
+                    <>
+                        <select
+                            value={form.type}
+                            onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
+                        >
+                            <option value="job">Type: Job</option>
+                            <option value="result">Type: Result</option>
+                            <option value="admit-card">Type: Admit Card</option>
+                            <option value="syllabus">Type: Syllabus</option>
+                            <option value="answer-key">Type: Answer Key</option>
+                            <option value="admission">Type: Admission</option>
+                        </select>
+                        <select
+                            value={form.status}
+                            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                        >
+                            <option value="draft">Status: Draft</option>
+                            <option value="pending">Status: Pending</option>
+                            <option value="scheduled">Status: Scheduled</option>
+                            <option value="published">Status: Published</option>
+                        </select>
+                    </>
+                }
+                actions={
+                    <>
+                        <span className="ops-inline-muted">
+                            {form.status === 'scheduled' ? 'Publish time required before submit.' : 'Create and send to workflow.'}
+                        </span>
+                        <button
+                            type="button"
+                            className="admin-btn small subtle"
+                            onClick={() => setForm(defaultForm)}
+                        >
+                            Reset form
+                        </button>
+                    </>
+                }
+            />
             <form
                 className="ops-form-grid"
                 onSubmit={(event) => {
@@ -65,26 +109,6 @@ export function QuickAddModule() {
                     minLength={10}
                     className="ops-span-full"
                 />
-                <select
-                    value={form.type}
-                    onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
-                >
-                    <option value="job">Job</option>
-                    <option value="result">Result</option>
-                    <option value="admit-card">Admit Card</option>
-                    <option value="syllabus">Syllabus</option>
-                    <option value="answer-key">Answer Key</option>
-                    <option value="admission">Admission</option>
-                </select>
-                <select
-                    value={form.status}
-                    onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                >
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="published">Published</option>
-                </select>
                 <input
                     value={form.category}
                     onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}

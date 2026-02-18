@@ -7,15 +7,24 @@ import { AppRoutes } from './routes/AppRoutes';
 import './styles.css';
 
 const queryClient = new QueryClient();
-const configuredAdminBasename = import.meta.env.VITE_ADMIN_BASENAME ?? '/admin';
-const adminBasename = configuredAdminBasename.endsWith('/')
-    ? configuredAdminBasename.slice(0, -1)
-    : configuredAdminBasename;
+
+const normalizeBasename = (value: string) => {
+    const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
+    return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
+};
+
+const configuredAdminBasename = normalizeBasename(import.meta.env.VITE_ADMIN_BASENAME ?? '/admin');
+const currentPath = typeof window !== 'undefined' ? window.location.pathname : configuredAdminBasename;
+const adminBasename = currentPath.startsWith('/admin-vnext') ? '/admin-vnext' : configuredAdminBasename;
+
+if (typeof document !== 'undefined') {
+    document.body.dataset.adminApp = 'vnext';
+}
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
-            <BrowserRouter basename={adminBasename || '/admin'}>
+            <BrowserRouter basename={adminBasename}>
                 <AppRoutes />
             </BrowserRouter>
         </QueryClientProvider>

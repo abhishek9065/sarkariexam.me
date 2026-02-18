@@ -1,13 +1,14 @@
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { beforeAll, afterAll, afterEach } from 'vitest';
+import { afterAll, afterEach, beforeAll } from 'vitest';
 
-import { connectToDatabase, closeConnection, getDatabase } from '../src/services/cosmosdb.js';
+import { closeConnection, connectToDatabase, getDatabase } from '../src/services/cosmosdb.js';
 
 let mongoServer: MongoMemoryServer | null = null;
 let skipMongoTests = false;
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+process.env.DISABLE_DB_RECONNECT = process.env.DISABLE_DB_RECONNECT || 'false';
 
 if (!process.env.MONGODB_URI) {
     try {
@@ -22,23 +23,32 @@ if (!process.env.MONGODB_URI) {
 
 beforeAll(async () => {
     if (skipMongoTests) return;
+    process.env.DISABLE_DB_RECONNECT = 'false';
     await connectToDatabase();
 });
 
 afterEach(async () => {
     if (skipMongoTests) return;
     try {
-        const db = getDatabase();
-        await db.dropDatabase();
+        const database = await getDatabase();
+        await database.dropDatabase();
     } catch {
-        // Ignore cleanup errors
+        // Ignore cleanup errors.
     }
 });
 
 afterAll(async () => {
     if (skipMongoTests) return;
+
+    // Avoid reconnect churn when suite teardown races with close events.
+    process.env.DISABLE_DB_RECONNECT = 'true';
     await closeConnection();
+
     if (mongoServer) {
-        await mongoServer.stop();
+        try {
+            await mongoServer.stop();
+        } catch {
+            // Ignore shutdown errors.
+        }
     }
 });

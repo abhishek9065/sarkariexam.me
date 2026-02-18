@@ -4,8 +4,9 @@ Government jobs and exam updates platform built with:
 - Frontend: React 19 + TypeScript + Vite
 - Backend: Express 5 + TypeScript + MongoDB/Cosmos DB
 - Admin:
-  - Stable legacy admin on `/admin`
-  - vNext preview app on `/admin-vnext`
+  - Premium vNext admin (desktop-only) on `/admin`
+  - Preview alias on `/admin-vnext`
+  - Legacy rollback on `/admin-legacy`
 
 ## Highlights
 - Latest jobs, results, admit cards, answer keys, syllabus, admissions
@@ -98,7 +99,12 @@ ADMIN_BACKUP_CODE_SALT=change-this-backup-salt
 ### Frontend (`frontend/.env`)
 ```env
 # Optional: use direct API origin (without nginx)
-VITE_API_BASE=http://localhost:5000
+VITE_API_BASE=
+
+# Vite proxy target for /api and /ws in local dev
+# Local backend mode (default): http://localhost:5000
+# Docker+nginx mode: http://localhost
+VITE_PROXY_TARGET=http://localhost:5000
 ```
 If you run with reverse proxy and `/api` on the same host, leave `VITE_API_BASE` unset.
 
@@ -115,6 +121,10 @@ If `/api` is proxied on the same host as `/admin`, you can also leave `VITE_API_
 If `VITE_ADMIN_VNEXT_MODULES` is empty or unset, all admin vNext modules are enabled.
 
 ## Quality Gates
+
+```bash
+node scripts/verify-config-consistency.mjs
+```
 
 ### Backend
 ```bash
@@ -143,10 +153,10 @@ npm audit --omit=dev --audit-level=high
 ```
 
 ## Admin Routing
-- `/admin` and `/admin/*`: stable legacy admin UI
-- `/admin-vnext` and `/admin-vnext/*`: preview `admin-frontend` app
-- `admin-vnext` is desktop-only (minimum viewport width: `1120px`)
-- `/admin-legacy` and `/admin-legacy/*`: legacy admin alias/rollback route
+- `/admin` and `/admin/*`: `admin-frontend` (premium vNext) default route
+- `/admin-vnext` and `/admin-vnext/*`: temporary vNext alias route
+- `/admin-legacy` and `/admin-legacy/*`: legacy admin rollback route
+- Admin routes are desktop-only (minimum viewport width: `1120px`)
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
 

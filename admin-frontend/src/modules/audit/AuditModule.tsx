@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { getAdminAuditIntegrity, getAdminAuditLogs } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAuditLog } from '../../types';
@@ -58,42 +58,49 @@ export function AuditModule() {
     return (
         <OpsCard title="Audit" description="Compliance timeline with filterable events and ledger integrity checks.">
             <div className="ops-stack">
-                <div className="ops-form-grid three">
-                    <input
-                        type="search"
-                        value={action}
-                        onChange={(event) => setAction(event.target.value)}
-                        placeholder="Filter by action"
-                    />
-                    <input
-                        type="search"
-                        value={userId}
-                        onChange={(event) => setUserId(event.target.value)}
-                        placeholder="Filter by actor id/email"
-                    />
-                    <div className="ops-actions">
-                        <button type="button" className="admin-btn subtle" onClick={() => void query.refetch()}>
-                            Refresh
-                        </button>
-                        <button type="button" className="admin-btn subtle" onClick={() => void integrityQuery.refetch()}>
-                            Recheck Integrity
-                        </button>
-                    </div>
-                    <input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} />
-                    <input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} />
-                    <button
-                        type="button"
-                        className="admin-btn"
-                        onClick={() => {
-                            setAction('');
-                            setUserId('');
-                            setStart('');
-                            setEnd('');
-                        }}
-                    >
-                        Clear
-                    </button>
-                </div>
+                <OpsToolbar
+                    controls={
+                        <>
+                            <input
+                                type="search"
+                                value={action}
+                                onChange={(event) => setAction(event.target.value)}
+                                placeholder="Filter by action"
+                            />
+                            <input
+                                type="search"
+                                value={userId}
+                                onChange={(event) => setUserId(event.target.value)}
+                                placeholder="Filter by actor id/email"
+                            />
+                            <input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} />
+                            <input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} />
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">{rows.length} events loaded</span>
+                            <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                            <button type="button" className="admin-btn subtle small" onClick={() => void integrityQuery.refetch()}>
+                                Recheck Integrity
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn small"
+                                onClick={() => {
+                                    setAction('');
+                                    setUserId('');
+                                    setStart('');
+                                    setEnd('');
+                                }}
+                            >
+                                Clear
+                            </button>
+                        </>
+                    }
+                />
 
                 <div className="ops-kpi-grid">
                     <div className="ops-kpi-card">

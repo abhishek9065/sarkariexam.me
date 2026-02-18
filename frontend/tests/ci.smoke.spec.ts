@@ -16,10 +16,20 @@ test.describe('CI smoke', () => {
         await expect(page.locator('[data-testid="home-educational-content"]')).toHaveCount(0);
     });
 
-    test('admin route redirects to login modal', async ({ page }) => {
+    test('admin route resolves to a valid auth or admin surface', async ({ page }) => {
         await page.goto(`${BASE_URL.replace(/\/$/, '')}/admin`, { waitUntil: 'domcontentloaded' });
-        await expect(page.locator('.auth-modal')).toBeVisible();
-        await expect(page.getByLabel('Email')).toBeVisible();
-        await expect(page.getByLabel('Password')).toBeVisible();
+
+        const surface = await Promise.race([
+            page.locator('.auth-modal').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => 'auth').catch(() => null),
+            page.getByRole('heading', { name: /Operations Hub/i }).first().waitFor({ state: 'visible', timeout: 8000 }).then(() => 'admin').catch(() => null),
+            page.getByRole('heading', { name: /Admin Command Center/i }).first().waitFor({ state: 'visible', timeout: 8000 }).then(() => 'admin').catch(() => null),
+        ]);
+
+        expect(surface).not.toBeNull();
+
+        if (surface === 'auth') {
+            await expect(page.getByLabel('Email')).toBeVisible();
+            await expect(page.getByLabel('Password')).toBeVisible();
+        }
     });
 });

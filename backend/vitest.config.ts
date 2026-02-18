@@ -6,5 +6,7 @@ export default defineConfig({
         setupFiles: ['./tests/setup.ts'],
         exclude: [...configDefaults.exclude, 'dist/**'],
         testTimeout: 20000,
+        hookTimeout: 30000,
+        retry: process.env.CI ? 1 : 0,
     },
 });

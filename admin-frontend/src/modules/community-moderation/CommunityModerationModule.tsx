@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
-import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { ActionOverflowMenu, useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import {
     getCommunityFlags,
     getCommunityForums,
@@ -117,26 +117,50 @@ export function CommunityModerationModule() {
 
                 {tab === 'flags' ? (
                     <>
-                        <div className="ops-form-grid">
-                            <select
-                                value={status}
-                                onChange={(event) => setStatus(event.target.value as 'all' | 'open' | 'reviewed' | 'resolved')}
-                            >
-                                <option value="all">All statuses</option>
-                                <option value="open">Open</option>
-                                <option value="reviewed">Reviewed</option>
-                                <option value="resolved">Resolved</option>
-                            </select>
-                            <select
-                                value={entityType}
-                                onChange={(event) => setEntityType(event.target.value as 'all' | 'forum' | 'qa' | 'group')}
-                            >
-                                <option value="all">All entity types</option>
-                                <option value="forum">Forum</option>
-                                <option value="qa">Q&A</option>
-                                <option value="group">Group</option>
-                            </select>
-                        </div>
+                        <OpsToolbar
+                            compact
+                            controls={
+                                <>
+                                    <select
+                                        value={status}
+                                        onChange={(event) => setStatus(event.target.value as 'all' | 'open' | 'reviewed' | 'resolved')}
+                                    >
+                                        <option value="all">All statuses</option>
+                                        <option value="open">Open</option>
+                                        <option value="reviewed">Reviewed</option>
+                                        <option value="resolved">Resolved</option>
+                                    </select>
+                                    <select
+                                        value={entityType}
+                                        onChange={(event) => setEntityType(event.target.value as 'all' | 'forum' | 'qa' | 'group')}
+                                    >
+                                        <option value="all">All entity types</option>
+                                        <option value="forum">Forum</option>
+                                        <option value="qa">Q&A</option>
+                                        <option value="group">Group</option>
+                                    </select>
+                                </>
+                            }
+                            actions={
+                                <>
+                                    <span className="ops-inline-muted">{rows.length} flags loaded</span>
+                                    <button
+                                        type="button"
+                                        className="admin-btn subtle small"
+                                        onClick={() => {
+                                            setStatus('open');
+                                            setEntityType('all');
+                                            notifyInfo('Filters reset', 'Showing open flags across all entity types.');
+                                        }}
+                                    >
+                                        Reset
+                                    </button>
+                                    <button type="button" className="admin-btn small" onClick={() => void flagsQuery.refetch()}>
+                                        Refresh
+                                    </button>
+                                </>
+                            }
+                        />
 
                         {flagsQuery.isPending ? <div className="admin-alert info">Loading moderation flags...</div> : null}
                         {flagsQuery.error ? <OpsErrorState message="Failed to load moderation flags." /> : null}
@@ -162,36 +186,51 @@ export function CommunityModerationModule() {
                                         <td><OpsBadge tone={statusTone(row.status)}>{row.status}</OpsBadge></td>
                                         <td>{formatDateTime(row.createdAt)}</td>
                                         <td>
-                                            <button
-                                                type="button"
-                                                className="admin-btn"
-                                                disabled={resolveMutation.isPending}
-                                                onClick={async () => {
-                                                    const allowed = await confirm({
-                                                        title: 'Resolve this moderation flag?',
-                                                        message: 'Resolved flags are removed from active moderation queue.',
-                                                        confirmText: 'Resolve',
-                                                        cancelText: 'Cancel',
-                                                        variant: 'warning',
-                                                    });
-                                                    if (!allowed) return;
-                                                    resolveMutation.mutate(row.id, {
-                                                        onSuccess: () => {
-                                                            notifySuccess('Resolved', 'Flag removed from active queue.');
-                                                            void trackAdminTelemetry('admin_triage_action', {
-                                                                module: 'community',
-                                                                action: 'resolve_flag',
-                                                                entityType: row.entityType,
+                                            <ActionOverflowMenu
+                                                itemLabel={`flag ${row.id}`}
+                                                actions={[
+                                                    {
+                                                        id: 'resolve-flag',
+                                                        label: 'Resolve',
+                                                        disabled: resolveMutation.isPending || row.status === 'resolved',
+                                                        onClick: async () => {
+                                                            const allowed = await confirm({
+                                                                title: 'Resolve this moderation flag?',
+                                                                message: 'Resolved flags are removed from active moderation queue.',
+                                                                confirmText: 'Resolve',
+                                                                cancelText: 'Cancel',
+                                                                variant: 'warning',
+                                                            });
+                                                            if (!allowed) return;
+                                                            resolveMutation.mutate(row.id, {
+                                                                onSuccess: () => {
+                                                                    notifySuccess('Resolved', 'Flag removed from active queue.');
+                                                                    void trackAdminTelemetry('admin_triage_action', {
+                                                                        module: 'community',
+                                                                        action: 'resolve_flag',
+                                                                        entityType: row.entityType,
+                                                                    });
+                                                                },
+                                                                onError: (error) => {
+                                                                    notifyError('Resolve failed', error instanceof Error ? error.message : 'Failed to resolve flag.');
+                                                                },
                                                             });
                                                         },
-                                                        onError: (error) => {
-                                                            notifyError('Resolve failed', error instanceof Error ? error.message : 'Failed to resolve flag.');
+                                                    },
+                                                    {
+                                                        id: 'copy-entity-id',
+                                                        label: 'Copy Entity ID',
+                                                        onClick: async () => {
+                                                            try {
+                                                                await navigator.clipboard.writeText(row.entityId);
+                                                                notifySuccess('Copied', `Entity ID copied: ${row.entityId}`);
+                                                            } catch {
+                                                                notifyError('Copy failed', 'Could not copy entity ID.');
+                                                            }
                                                         },
-                                                    });
-                                                }}
-                                            >
-                                                Resolve
-                                            </button>
+                                                    },
+                                                ]}
+                                            />
                                         </td>
                                     </tr>
                                 ))}

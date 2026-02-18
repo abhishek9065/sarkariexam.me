@@ -8,6 +8,7 @@ import type {
     SearchSuggestion,
     Tag,
 } from '../types';
+import { reportClientError } from './reportClientError';
 
 /* ─── Base URL ─── */
 const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
@@ -69,6 +70,15 @@ function isRetryableNetworkError(error: unknown): boolean {
     return error instanceof TypeError;
 }
 
+function reportApiClientError(path: string, message: string, note: string, dedupeKey: string) {
+    void reportClientError({
+        errorId: 'frontend_api_failure',
+        message,
+        note: `${note} (${path})`,
+        dedupeKey,
+    });
+}
+
 async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<Response> {
     let lastError: unknown = null;
 
@@ -84,8 +94,21 @@ async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<R
     }
 
     if (lastError instanceof Error) {
+        reportApiClientError(
+            path,
+            lastError.message || 'Network request failed',
+            'All API base candidates failed to respond',
+            `api_network:${path}`,
+        );
         throw lastError;
     }
+
+    reportApiClientError(
+        path,
+        'Failed to fetch',
+        'All API base candidates failed without a concrete error object',
+        `api_network:${path}`,
+    );
     throw new TypeError('Failed to fetch');
 }
 
@@ -138,6 +161,14 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
     if (!res.ok) {
         const body = await parseResponseBody(res);
+        if (res.status >= 500) {
+            reportApiClientError(
+                path,
+                `API responded with ${res.status}`,
+                'Server-side API error response',
+                `api_http_${res.status}:${path}`,
+            );
+        }
         throw new ApiRequestError(res.status, body);
     }
 
@@ -161,6 +192,14 @@ async function apiFetchWithCsrf<T>(path: string, options: RequestInit = {}): Pro
         const res = await fetchWithBaseFallback(path, { ...options, headers, credentials: 'include' });
         if (!res.ok) {
             const body = await parseResponseBody(res);
+            if (res.status >= 500) {
+                reportApiClientError(
+                    path,
+                    `API responded with ${res.status}`,
+                    'Server-side API error response (CSRF flow)',
+                    `api_http_csrf_${res.status}:${path}`,
+                );
+            }
             throw new ApiRequestError(res.status, body);
         }
 
@@ -177,7 +216,6 @@ async function apiFetchWithCsrf<T>(path: string, options: RequestInit = {}): Pro
         throw error;
     }
 }
-
 /* ─── Announcements ─── */
 export interface AnnouncementFilters {
     type?: ContentType;
@@ -355,3 +393,4 @@ export function getTrackedApplications() {
 /* ─── Re-export types for convenience ─── */
 import type { User } from '../types';
 export type { User };
+

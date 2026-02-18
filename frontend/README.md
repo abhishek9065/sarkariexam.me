@@ -21,8 +21,9 @@ npm run build          # Production build to dist/
 npm run preview        # Preview built app
 npm run lint           # ESLint (0 warnings allowed)
 
-npm run test:e2e       # Non-prod e2e
-npm run test:e2e:ci    # CI deterministic Chromium suite
+npm run test:e2e                    # Non-prod e2e
+npm run test:e2e:ci                 # CI deterministic Chromium suite
+npm run test:e2e:api:integration    # Frontend runtime -> backend API integration gate
 npm run test:e2e:nightly
 npm run test:e2e:prod
 ```
@@ -32,13 +33,30 @@ npm run test:e2e:prod
 ### API and proxy
 - `VITE_API_BASE`:
   - If set, frontend calls `${VITE_API_BASE}/api` directly.
+  - Keep unset for proxy-based local development.
 - `VITE_PROXY_TARGET`:
   - Used by Vite dev proxy for `/api` and `/ws`.
   - Default: `http://localhost:5000`.
 
+### Supported local dev modes
+1. Local backend mode (default):
+   - Backend runs on `http://localhost:5000`.
+   - No override needed.
+
+2. Docker + nginx mode:
+   - Set `VITE_PROXY_TARGET=http://localhost` before `npm run dev`.
+   - Example (PowerShell):
+   ```powershell
+   $env:VITE_PROXY_TARGET='http://localhost'; npm run dev
+   ```
+
+Quick verification endpoint:
+- `http://localhost:4173/api/health`
+
 ### Example `.env`
 ```env
-VITE_API_BASE=http://localhost:5000
+VITE_API_BASE=
+VITE_PROXY_TARGET=http://localhost:5000
 ```
 
 ## Development flow

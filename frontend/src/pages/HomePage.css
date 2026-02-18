@@ -1717,3 +1717,99 @@
         transition: none !important;
     }
 }
+/* ─── Homepage Data Source Status ─── */
+.home-data-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    margin: -6px 0 18px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-secondary);
+}
+
+.home-data-status-live {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.08), transparent);
+}
+
+.home-data-status-fallback {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), transparent);
+}
+
+.home-data-status-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.home-data-status-text strong {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.home-data-status-text span {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.home-data-status-failed {
+    font-variant-numeric: tabular-nums;
+}
+
+.home-data-status-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.home-data-status-freshness {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.home-data-status-actions button {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.home-data-status-actions button:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.home-data-status-actions button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .home-data-status {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .home-data-status-actions {
+        justify-content: space-between;
+    }
+
+    .home-data-status-freshness {
+        white-space: normal;
+    }
+}

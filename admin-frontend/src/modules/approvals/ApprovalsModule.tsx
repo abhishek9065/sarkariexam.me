@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { approveAdminApproval, getAdminApprovals, rejectAdminApproval } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
@@ -88,19 +88,32 @@ export function ApprovalsModule() {
         <>
             <AdminStepUpCard />
             <OpsCard title="Approvals" description="Pending approval queue with dual-control visibility.">
-                <div className="ops-form-grid two">
-                    <select
-                        value={status}
-                        onChange={(event) => setStatus(event.target.value as 'pending' | 'all' | 'approved' | 'rejected' | 'executed' | 'expired')}
-                    >
-                        <option value="pending">Pending</option>
-                        <option value="all">All</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="executed">Executed</option>
-                        <option value="expired">Expired</option>
-                    </select>
-                </div>
+                <OpsToolbar
+                    compact
+                    controls={
+                        <>
+                            <select
+                                value={status}
+                                onChange={(event) => setStatus(event.target.value as 'pending' | 'all' | 'approved' | 'rejected' | 'executed' | 'expired')}
+                            >
+                                <option value="pending">Pending</option>
+                                <option value="all">All</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="executed">Executed</option>
+                                <option value="expired">Expired</option>
+                            </select>
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">{rows.length} approvals loaded</span>
+                            <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                        </>
+                    }
+                />
 
                 {query.isPending ? <div className="admin-alert info">Loading approvals...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load approvals." /> : null}
