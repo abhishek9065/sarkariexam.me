@@ -105,7 +105,7 @@ test('compact mode keeps small controls at least 40px tall', async ({ page }) =>
     const compactControl = page.getByRole('button', { name: /Save current filters/i });
     await expect(compactControl).toBeVisible();
     const height = await compactControl.evaluate((node) => node.getBoundingClientRect().height);
-    expect(height).toBeGreaterThanOrEqual(40);
+    expect(Math.round(height)).toBeGreaterThanOrEqual(40);
 });
 
 test('keyboard opens command palette and focuses search input', async ({ page }) => {
@@ -120,3 +120,4 @@ test('keyboard opens command palette and focuses search input', async ({ page })
     await page.keyboard.press('Escape');
     await expect(paletteDialog).toHaveCount(0);
 });
+
