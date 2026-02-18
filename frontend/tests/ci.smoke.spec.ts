@@ -16,8 +16,8 @@ test.describe('CI smoke', () => {
         await expect(page.locator('[data-testid="home-educational-content"]')).toHaveCount(0);
     });
 
-    test('admin route resolves to a valid auth or admin surface', async ({ page }) => {
-        await page.goto(`${BASE_URL.replace(/\/$/, '')}/admin`, { waitUntil: 'domcontentloaded' });
+    test('admin-legacy rollback route resolves to a valid auth or admin surface', async ({ page }) => {
+        await page.goto(`${BASE_URL.replace(/\/$/, '')}/admin-legacy`, { waitUntil: 'domcontentloaded' });
 
         const surface = await Promise.race([
             page.locator('.auth-modal').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => 'auth').catch(() => null),

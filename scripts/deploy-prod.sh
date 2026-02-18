@@ -152,23 +152,36 @@ PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
 check_public_route() {
   local path="$1"
   local label="$2"
+  local expected_app_header="${3:-}"
   local url="${PUBLIC_BASE_URL}${path}"
-  local status
+  local status headers app_header
 
-  status="$(curl -k -sS -o /dev/null -w "%{http_code}" "$url" || true)"
-  if [[ "$status" =~ ^(2|3) ]]; then
-    echo "ok (${label} -> ${url}, status=${status})"
-    return 0
+  status="$(curl -k -sS -L -o /dev/null -w "%{http_code}" "$url" || true)"
+  if [[ ! "$status" =~ ^2 ]]; then
+    echo "ERROR: ${label} route check failed for ${url} (status=${status:-none})"
+    return 1
   fi
 
-  echo "ERROR: ${label} route check failed for ${url} (status=${status:-none})"
-  return 1
+  if [[ -n "$expected_app_header" ]]; then
+    headers="$(curl -k -sS -I -L "$url" || true)"
+    app_header="$(echo "$headers" | tr -d '\r' | grep -i '^X-Sarkari-App:' | tail -n1 | awk -F': ' '{print $2}')"
+    if [[ "$app_header" != "$expected_app_header" ]]; then
+      echo "ERROR: ${label} expected X-Sarkari-App=${expected_app_header}, got '${app_header:-missing}' for ${url}"
+      return 1
+    fi
+  fi
+
+  if [[ -n "$expected_app_header" ]]; then
+    echo "ok (${label} -> ${url}, status=${status}, x-sarkari-app=${expected_app_header})"
+  else
+    echo "ok (${label} -> ${url}, status=${status})"
+  fi
 }
 
 echo "Public route checks:"
-check_public_route "/admin" "admin vNext default"
-check_public_route "/admin-vnext" "admin vNext alias"
-check_public_route "/admin-legacy" "legacy rollback"
+check_public_route "/admin" "admin vNext default" "admin-vnext"
+check_public_route "/admin-vnext" "admin vNext alias" "admin-vnext-alias"
+check_public_route "/admin-legacy" "legacy rollback" "admin-legacy"
 
 # ── Cloudflare Cache Purge ──────────────────────────────────
 CF_ZONE_ID="$(read_env_var "CF_ZONE_ID")"

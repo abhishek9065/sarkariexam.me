@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -61,9 +61,9 @@ export default function App() {
                                     <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                                     <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
 
-                                    {/* Protected: Admin */}
-                                    <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminDesktopOnlyGate><AdminPage /></AdminDesktopOnlyGate></ProtectedRoute>} />
+                                    {/* Legacy rollback admin only (vNext owns /admin at edge) */}
                                     <Route path="/admin-legacy/*" element={<ProtectedRoute requireAdmin><AdminDesktopOnlyGate><AdminPage /></AdminDesktopOnlyGate></ProtectedRoute>} />
+                                    <Route path="/admin/*" element={<Navigate to="/" replace />} />
 
                                     {/* Static pages */}
                                     <Route path="/about" element={<StaticPage type="about" />} />

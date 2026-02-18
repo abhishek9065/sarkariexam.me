@@ -162,6 +162,15 @@ npm audit --omit=dev --audit-level=high
 - Admin routes are desktop-only (minimum viewport width: `1120px`)
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
+- Legacy public frontend no longer owns `/admin`; fallback legacy surface is `/admin-legacy`.
+
+### Route Verification
+After deploy, verify edge routing headers:
+```bash
+curl -I https://sarkariexams.me/admin/ | grep -i x-sarkari-app
+curl -I https://sarkariexams.me/admin-vnext/ | grep -i x-sarkari-app
+curl -I https://sarkariexams.me/admin-legacy/ | grep -i x-sarkari-app
+```
 
 ## Admin Stabilization Policy
 - `/admin` stays the only primary admin URL.
