@@ -2,6 +2,7 @@
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
     min-height: 100vh;
+    min-width: 1120px;
 }
 
 .admin-layout.sidebar-collapsed {
@@ -223,6 +224,26 @@
 
 .admin-layout.sidebar-collapsed .admin-nav-link {
     justify-content: center;
+}
+
+.admin-desktop-only {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: var(--space-5);
+}
+
+.admin-desktop-only-card {
+    width: min(520px, 100%);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    background:
+        radial-gradient(circle at top right, rgba(11, 197, 234, 0.15), transparent 48%),
+        var(--bg-elev-2);
+    box-shadow: var(--shadow-2);
+    display: grid;
+    gap: var(--space-3);
 }
 
 @media (max-width: 1080px) {

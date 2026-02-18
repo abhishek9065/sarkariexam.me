@@ -145,6 +145,7 @@ npm audit --omit=dev --audit-level=high
 ## Admin Routing
 - `/admin` and `/admin/*`: stable legacy admin UI
 - `/admin-vnext` and `/admin-vnext/*`: preview `admin-frontend` app
+- `admin-vnext` is desktop-only (minimum viewport width: `1120px`)
 - `/admin-legacy` and `/admin-legacy/*`: legacy admin alias/rollback route
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible

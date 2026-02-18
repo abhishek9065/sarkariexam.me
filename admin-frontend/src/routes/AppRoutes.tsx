@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AdminAuthProvider } from '../app/AdminAuthProvider';
 import { AdminLayout } from '../app/AdminLayout';
 import { AdminPreferencesProvider } from '../app/AdminPreferencesContext';
+import { DesktopOnlyGate } from '../app/DesktopOnlyGate';
 import { RequireAdminAuth } from '../app/RequireAdminAuth';
 import { OpsSkeleton } from '../components/ops';
 import { AdminNotificationsProvider, ConfirmDialogProvider } from '../components/ops/legacy-port';
@@ -51,84 +52,86 @@ export function AppRoutes() {
             <AdminPreferencesProvider>
                 <AdminNotificationsProvider>
                     <ConfirmDialogProvider>
-                        <Routes>
-                            <Route
-                                path="/login"
-                                element={
-                                    <Suspense fallback={<OpsSkeleton lines={2} />}>
-                                        <AdminLoginPage />
-                                    </Suspense>
-                                }
-                            />
+                        <DesktopOnlyGate>
+                            <Routes>
+                                <Route
+                                    path="/login"
+                                    element={
+                                        <Suspense fallback={<OpsSkeleton lines={2} />}>
+                                            <AdminLoginPage />
+                                        </Suspense>
+                                    }
+                                />
 
-                            <Route element={<RequireAdminAuth />}>
-                                <Route element={<AdminLayout />}>
-                                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                                    <Route
-                                        path="/dashboard"
-                                        element={gatedModule('dashboard', 'Dashboard', 'Operations metrics surface.', <DashboardPage />)}
-                                    />
-                                    <Route
-                                        path="/analytics"
-                                        element={gatedModule('analytics', 'Analytics', 'Summary analytics and trends.', <AnalyticsModule />)}
-                                    />
-                                    <Route
-                                        path="/announcements"
-                                        element={gatedModule('announcements', 'Announcements', 'Announcement listing and filtering.', <AnnouncementsListModule />)}
-                                    />
-                                    <Route
-                                        path="/announcements/list"
-                                        element={gatedModule('announcements', 'Announcements', 'Announcement listing and filtering.', <AnnouncementsListModule />)}
-                                    />
-                                    <Route
-                                        path="/review"
-                                        element={gatedModule('review', 'Review', 'Preview-first content review workflow.', <ReviewModule />)}
-                                    />
-                                    <Route
-                                        path="/create"
-                                        element={gatedModule('quick-add', 'Quick Add', 'Fast content posting flow.', <QuickAddModule />)}
-                                    />
-                                    <Route
-                                        path="/detailed"
-                                        element={gatedModule('detailed-post', 'Detailed Post', 'Deep edit controls for records.', <DetailedPostModule />)}
-                                    />
-                                    <Route
-                                        path="/bulk"
-                                        element={gatedModule('bulk-import', 'Bulk Import', 'Bulk updates with preview checks.', <BulkImportModule />)}
-                                    />
-                                    <Route
-                                        path="/queue"
-                                        element={gatedModule('queue', 'Queue', 'Pending publication queue.', <QueueModule />)}
-                                    />
-                                    <Route
-                                        path="/security"
-                                        element={gatedModule('security', 'Security', 'Security event visibility and triage.', <SecurityModule />)}
-                                    />
-                                    <Route
-                                        path="/sessions"
-                                        element={gatedModule('sessions', 'Sessions', 'Session management and termination.', <SessionsModule />)}
-                                    />
-                                    <Route
-                                        path="/audit"
-                                        element={gatedModule('audit', 'Audit', 'Audit event ledger and inspection.', <AuditModule />)}
-                                    />
-                                    <Route
-                                        path="/community"
-                                        element={gatedModule('community-moderation', 'Community', 'Community moderation workflows.', <CommunityModerationModule />)}
-                                    />
-                                    <Route
-                                        path="/errors"
-                                        element={gatedModule('error-reports', 'Errors', 'Client error report triage.', <ErrorReportsModule />)}
-                                    />
-                                    <Route
-                                        path="/approvals"
-                                        element={gatedModule('approvals', 'Approvals', 'Dual-control approvals queue.', <ApprovalsModule />)}
-                                    />
+                                <Route element={<RequireAdminAuth />}>
+                                    <Route element={<AdminLayout />}>
+                                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                                        <Route
+                                            path="/dashboard"
+                                            element={gatedModule('dashboard', 'Dashboard', 'Operations metrics surface.', <DashboardPage />)}
+                                        />
+                                        <Route
+                                            path="/analytics"
+                                            element={gatedModule('analytics', 'Analytics', 'Summary analytics and trends.', <AnalyticsModule />)}
+                                        />
+                                        <Route
+                                            path="/announcements"
+                                            element={gatedModule('announcements', 'Announcements', 'Announcement listing and filtering.', <AnnouncementsListModule />)}
+                                        />
+                                        <Route
+                                            path="/announcements/list"
+                                            element={gatedModule('announcements', 'Announcements', 'Announcement listing and filtering.', <AnnouncementsListModule />)}
+                                        />
+                                        <Route
+                                            path="/review"
+                                            element={gatedModule('review', 'Review', 'Preview-first content review workflow.', <ReviewModule />)}
+                                        />
+                                        <Route
+                                            path="/create"
+                                            element={gatedModule('quick-add', 'Quick Add', 'Fast content posting flow.', <QuickAddModule />)}
+                                        />
+                                        <Route
+                                            path="/detailed"
+                                            element={gatedModule('detailed-post', 'Detailed Post', 'Deep edit controls for records.', <DetailedPostModule />)}
+                                        />
+                                        <Route
+                                            path="/bulk"
+                                            element={gatedModule('bulk-import', 'Bulk Import', 'Bulk updates with preview checks.', <BulkImportModule />)}
+                                        />
+                                        <Route
+                                            path="/queue"
+                                            element={gatedModule('queue', 'Queue', 'Pending publication queue.', <QueueModule />)}
+                                        />
+                                        <Route
+                                            path="/security"
+                                            element={gatedModule('security', 'Security', 'Security event visibility and triage.', <SecurityModule />)}
+                                        />
+                                        <Route
+                                            path="/sessions"
+                                            element={gatedModule('sessions', 'Sessions', 'Session management and termination.', <SessionsModule />)}
+                                        />
+                                        <Route
+                                            path="/audit"
+                                            element={gatedModule('audit', 'Audit', 'Audit event ledger and inspection.', <AuditModule />)}
+                                        />
+                                        <Route
+                                            path="/community"
+                                            element={gatedModule('community-moderation', 'Community', 'Community moderation workflows.', <CommunityModerationModule />)}
+                                        />
+                                        <Route
+                                            path="/errors"
+                                            element={gatedModule('error-reports', 'Errors', 'Client error report triage.', <ErrorReportsModule />)}
+                                        />
+                                        <Route
+                                            path="/approvals"
+                                            element={gatedModule('approvals', 'Approvals', 'Dual-control approvals queue.', <ApprovalsModule />)}
+                                        />
+                                    </Route>
                                 </Route>
-                            </Route>
 
-                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                        </Routes>
+                                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                            </Routes>
+                        </DesktopOnlyGate>
                     </ConfirmDialogProvider>
                 </AdminNotificationsProvider>
             </AdminPreferencesProvider>

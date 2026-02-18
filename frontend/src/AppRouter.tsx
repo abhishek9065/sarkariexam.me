@@ -6,6 +6,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SkeletonLoader } from './components/SkeletonLoader';
+import { AdminDesktopOnlyGate } from './components/AdminDesktopOnlyGate';
 import { Layout } from './components/Layout';
 
 /* Lazy-loaded pages */
@@ -61,8 +62,8 @@ export default function App() {
                                     <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
 
                                     {/* Protected: Admin */}
-                                    <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
-                                    <Route path="/admin-legacy/*" element={<ProtectedRoute requireAdmin><AdminPage /></ProtectedRoute>} />
+                                    <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminDesktopOnlyGate><AdminPage /></AdminDesktopOnlyGate></ProtectedRoute>} />
+                                    <Route path="/admin-legacy/*" element={<ProtectedRoute requireAdmin><AdminDesktopOnlyGate><AdminPage /></AdminDesktopOnlyGate></ProtectedRoute>} />
 
                                     {/* Static pages */}
                                     <Route path="/about" element={<StaticPage type="about" />} />

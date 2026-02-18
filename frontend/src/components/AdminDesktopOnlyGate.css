@@ -1,0 +1,51 @@
+.admin-desktop-gate {
+    min-height: calc(100vh - 72px);
+    display: grid;
+    place-items: center;
+    padding: 2rem 1rem;
+}
+
+.admin-desktop-gate-card {
+    width: min(520px, 100%);
+    border: 1px solid rgba(80, 108, 143, 0.35);
+    border-radius: 16px;
+    padding: 1.25rem;
+    background: #ffffff;
+    box-shadow: 0 18px 48px rgba(12, 37, 67, 0.12);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.admin-desktop-gate-card h2 {
+    margin: 0;
+    color: #11325c;
+}
+
+.admin-desktop-gate-card p {
+    margin: 0;
+    color: #29435f;
+    line-height: 1.5;
+}
+
+.admin-desktop-gate-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.admin-desktop-gate-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    padding: 0.55rem 0.85rem;
+    text-decoration: none;
+    border: 1px solid #1e588f;
+    color: #1e588f;
+    font-weight: 600;
+}
+
+.admin-desktop-gate-link:hover {
+    background: #eef6ff;
+}
