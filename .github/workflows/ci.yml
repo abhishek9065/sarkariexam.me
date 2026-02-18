@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches:
@@ -258,6 +259,7 @@ jobs:
             admin-frontend/playwright-report
             admin-frontend/test-results
           if-no-files-found: ignore
+
 
 
 
