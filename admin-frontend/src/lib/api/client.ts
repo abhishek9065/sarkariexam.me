@@ -170,8 +170,15 @@ export async function getAdminDashboard() {
     return body?.data ?? null;
 }
 
-export async function getAnalyticsOverview(): Promise<Record<string, unknown> | null> {
-    const body = await request('/api/analytics/overview');
+export async function getAnalyticsOverview(input: {
+    days?: number;
+    compareDays?: number;
+} = {}): Promise<Record<string, unknown> | null> {
+    const params = new URLSearchParams();
+    if (input.days && Number.isFinite(input.days)) params.set('days', String(input.days));
+    if (input.compareDays && Number.isFinite(input.compareDays)) params.set('compareDays', String(input.compareDays));
+    const query = params.toString();
+    const body = await request(`/api/analytics/overview${query ? `?${query}` : ''}`);
     return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : null;
 }
 
@@ -180,11 +187,15 @@ export async function getAdminAnnouncements(input: {
     offset?: number;
     status?: string;
     search?: string;
+    type?: string;
+    sort?: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
 } = {}): Promise<AdminAnnouncementListItem[]> {
     const params = new URLSearchParams();
     params.set('limit', String(input.limit ?? 20));
     params.set('offset', String(input.offset ?? 0));
     if (input.status && input.status !== 'all') params.set('status', input.status);
+    if (input.type && input.type !== 'all') params.set('type', input.type);
+    if (input.sort) params.set('sort', input.sort);
     if (input.search && input.search.trim()) params.set('search', input.search.trim());
 
     const body = await request(`/api/admin/announcements?${params.toString()}`);
@@ -206,13 +217,59 @@ export async function terminateAdminSessionById(sessionId: string, stepUpToken: 
     return body?.data ?? { success: false };
 }
 
-export async function getAdminAuditLogs(limit = 30, offset = 0): Promise<AdminAuditLog[]> {
-    const body = await request(`/api/admin/audit-log?limit=${limit}&offset=${offset}`);
+export async function terminateOtherAdminSessions(stepUpToken: string): Promise<{ success: boolean; removed?: number }> {
+    const body = await request('/api/admin-auth/sessions/terminate-others', {
+        method: 'POST',
+        headers: mutationHeaders(stepUpToken, false),
+    }, true);
+
+    return body?.data ?? { success: false };
+}
+
+export async function getAdminAuditLogs(input: {
+    limit?: number;
+    offset?: number;
+    userId?: string;
+    action?: string;
+    start?: string;
+    end?: string;
+} = {}): Promise<AdminAuditLog[]> {
+    const params = new URLSearchParams();
+    params.set('limit', String(input.limit ?? 30));
+    params.set('offset', String(input.offset ?? 0));
+    if (input.userId && input.userId.trim()) params.set('userId', input.userId.trim());
+    if (input.action && input.action.trim()) params.set('action', input.action.trim());
+    if (input.start) params.set('start', input.start);
+    if (input.end) params.set('end', input.end);
+
+    const body = await request(`/api/admin/audit-log?${params.toString()}`);
     return toArray<AdminAuditLog>(body?.data);
 }
 
-export async function getAdminSecurityLogs(limit = 30, offset = 0): Promise<AdminSecurityLog[]> {
-    const body = await request(`/api/admin/security?limit=${limit}&offset=${offset}`);
+export async function getAdminAuditIntegrity(limit = 250): Promise<Record<string, unknown> | null> {
+    const body = await request(`/api/admin/audit-log/integrity?limit=${Math.max(10, Math.min(1000, limit))}`);
+    return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : null;
+}
+
+export async function getAdminSecurityLogs(input: {
+    limit?: number;
+    offset?: number;
+    eventType?: string;
+    ip?: string;
+    endpoint?: string;
+    start?: string;
+    end?: string;
+} = {}): Promise<AdminSecurityLog[]> {
+    const params = new URLSearchParams();
+    params.set('limit', String(input.limit ?? 30));
+    params.set('offset', String(input.offset ?? 0));
+    if (input.eventType && input.eventType.trim()) params.set('eventType', input.eventType.trim());
+    if (input.ip && input.ip.trim()) params.set('ip', input.ip.trim());
+    if (input.endpoint && input.endpoint.trim()) params.set('endpoint', input.endpoint.trim());
+    if (input.start) params.set('start', input.start);
+    if (input.end) params.set('end', input.end);
+
+    const body = await request(`/api/admin/security?${params.toString()}`);
     return toArray<AdminSecurityLog>(body?.data);
 }
 

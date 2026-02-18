@@ -2,6 +2,8 @@
 FROM node:22-alpine AS builder
 
 WORKDIR /app
+ARG VITE_ADMIN_BASENAME=/admin
+ENV VITE_ADMIN_BASENAME=${VITE_ADMIN_BASENAME}
 
 COPY package*.json ./
 RUN npm ci

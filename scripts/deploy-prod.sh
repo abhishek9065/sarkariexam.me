@@ -147,4 +147,27 @@ echo "Backend health (public edge):"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://sarkariexams.me/api/health}"
 curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null && echo "ok ($PUBLIC_HEALTH_URL)"
 
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
+
+check_public_route() {
+  local path="$1"
+  local label="$2"
+  local url="${PUBLIC_BASE_URL}${path}"
+  local status
+
+  status="$(curl -k -sS -o /dev/null -w "%{http_code}" "$url" || true)"
+  if [[ "$status" =~ ^(2|3) ]]; then
+    echo "ok (${label} -> ${url}, status=${status})"
+    return 0
+  fi
+
+  echo "ERROR: ${label} route check failed for ${url} (status=${status:-none})"
+  return 1
+}
+
+echo "Public route checks:"
+check_public_route "/admin" "legacy admin"
+check_public_route "/admin-vnext" "admin vNext preview"
+check_public_route "/admin-legacy" "legacy alias"
+
 echo "Deploy completed successfully."

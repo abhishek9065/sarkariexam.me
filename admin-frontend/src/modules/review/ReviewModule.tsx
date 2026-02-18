@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import {
     getAdminAnnouncements,
     getReviewPreview,
@@ -11,11 +12,14 @@ import {
     runBulkReject,
     runBulkUpdate,
 } from '../../lib/api/client';
+import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAnnouncementListItem, AdminReviewPreview } from '../../types';
 
 export function ReviewModule() {
     const queryClient = useQueryClient();
     const { hasValidStepUp, stepUpToken } = useAdminAuth();
+    const { notifyError, notifyInfo, notifySuccess } = useAdminNotifications();
+    const { confirm } = useConfirmDialog();
     const [search, setSearch] = useState('');
     const [action, setAction] = useState<'approve' | 'reject' | 'schedule'>('approve');
     const [scheduleAt, setScheduleAt] = useState('');
@@ -43,7 +47,17 @@ export function ReviewModule() {
             note: note || undefined,
             scheduleAt: action === 'schedule' ? (scheduleAt || undefined) : undefined,
         }),
-        onSuccess: (data) => setPreview(data),
+        onSuccess: (data) => {
+            setPreview(data);
+            notifyInfo('Preview generated', `${data.eligibleIds.length} eligible, ${data.blockedIds.length} blocked.`);
+            void trackAdminTelemetry('admin_bulk_preview_opened', {
+                module: 'review',
+                action,
+                selected: selectedIds.length,
+                eligible: data.eligibleIds.length,
+                blocked: data.blockedIds.length,
+            });
+        },
     });
 
     const executeMutation = useMutation({
@@ -70,6 +84,11 @@ export function ReviewModule() {
             setSelectedIds([]);
             setPreview(null);
             await queryClient.invalidateQueries({ queryKey: ['review-announcements'] });
+            notifySuccess('Review action applied', `Executed ${action} for selected announcements.`);
+            void trackAdminTelemetry('admin_review_decision_submitted', {
+                action,
+                selected: selectedIds.length,
+            });
         },
     });
 
@@ -168,7 +187,7 @@ export function ReviewModule() {
                     <OpsEmptyState message="No pending announcements found." />
                 ) : null}
 
-                <div className="ops-actions">
+                <div className="ops-actions ops-sticky-actions">
                     <button
                         type="button"
                         className="admin-btn"
@@ -181,7 +200,21 @@ export function ReviewModule() {
                         type="button"
                         className="admin-btn primary"
                         disabled={selectedIds.length === 0 || executeMutation.isPending || !hasValidStepUp}
-                        onClick={() => executeMutation.mutate()}
+                        onClick={async () => {
+                            const approved = await confirm({
+                                title: 'Apply review action',
+                                message: `Run ${action} for ${selectedIds.length} selected announcements?`,
+                                confirmText: 'Execute action',
+                                cancelText: 'Cancel',
+                                variant: action === 'reject' ? 'warning' : 'info',
+                            });
+                            if (!approved) return;
+                            executeMutation.mutate(undefined, {
+                                onError: (error) => {
+                                    notifyError('Execution failed', error instanceof Error ? error.message : 'Failed to execute action.');
+                                },
+                            });
+                        }}
                     >
                         {executeMutation.isPending ? 'Executing...' : 'Execute Action'}
                     </button>

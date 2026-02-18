@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 
 import { useAdminAuth } from './useAdminAuth';
+import { useAdminPreferences } from './useAdminPreferences';
 import { useLocalStorageState } from '../lib/useLocalStorageState';
+import { getAdminAnnouncements } from '../lib/api/client';
+import {
+    AdminCommandPalette,
+    useAdminNotifications,
+} from '../components/ops/legacy-port';
 import {
     adminModuleNavItems,
     getModuleByPath,
@@ -20,6 +27,9 @@ const GROUP_ORDER: ModuleGroupKey[] = ['core', 'publishing', 'risk'];
 
 export function AdminLayout() {
     const { user, logout, hasValidStepUp, stepUpExpiresAt } = useAdminAuth();
+    const { timeZoneMode, setTimeZoneMode, timeZoneLabel } = useAdminPreferences();
+    const { notifyInfo } = useAdminNotifications();
+
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -48,15 +58,11 @@ export function AdminLayout() {
         [enabledNavItems]
     );
 
-    const filteredPaletteItems = useMemo(() => {
-        const query = paletteQuery.trim().toLowerCase();
-        if (!query) {
-            return enabledNavItems;
-        }
-        return enabledNavItems.filter((item) => {
-            return item.label.toLowerCase().includes(query) || item.to.toLowerCase().includes(query);
-        });
-    }, [paletteQuery, enabledNavItems]);
+    const paletteAnnouncementsQuery = useQuery({
+        queryKey: ['admin-command-palette-announcements'],
+        queryFn: () => getAdminAnnouncements({ limit: 120, status: 'all' }),
+        staleTime: 60_000,
+    });
 
     useEffect(() => {
         document.body.dataset.adminDensity = density;
@@ -82,6 +88,36 @@ export function AdminLayout() {
     const stepUpLabel = hasValidStepUp
         ? `Step-up active${stepUpExpiresAt ? ` until ${new Date(stepUpExpiresAt).toLocaleTimeString()}` : ''}`
         : 'Step-up required for high-risk actions';
+
+    const commandPaletteCommands = useMemo(() => {
+        const moduleCommands = enabledNavItems.map((item) => ({
+            id: `nav-${item.key}`,
+            label: item.label,
+            description: item.summary,
+            onSelect: () => navigate(item.to),
+        }));
+
+        return [
+            ...moduleCommands,
+            {
+                id: 'legacy-admin',
+                label: 'Open Legacy Admin',
+                description: '/admin-legacy rollback route',
+                onSelect: () => {
+                    window.location.href = '/admin-legacy';
+                },
+            },
+            {
+                id: 'logout',
+                label: 'Logout',
+                description: 'Sign out from admin session',
+                onSelect: async () => {
+                    await logout();
+                    navigate('/login', { replace: true });
+                },
+            },
+        ];
+    }, [enabledNavItems, logout, navigate]);
 
     return (
         <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -143,6 +179,15 @@ export function AdminLayout() {
                         <div className="admin-topbar-meta">Role: {user?.role ?? 'none'} | {stepUpLabel}</div>
                     </div>
                     <div className="admin-topbar-actions">
+                        <select
+                            value={timeZoneMode}
+                            onChange={(event) => setTimeZoneMode(event.target.value as 'local' | 'ist' | 'utc')}
+                            aria-label="Admin timezone"
+                        >
+                            <option value="local">Timezone: Local</option>
+                            <option value="ist">Timezone: IST</option>
+                            <option value="utc">Timezone: UTC</option>
+                        </select>
                         <button
                             type="button"
                             className="admin-btn subtle"
@@ -171,6 +216,7 @@ export function AdminLayout() {
                     </div>
                     <div className="admin-context-pills">
                         <span className="admin-context-pill">Auth Boundary: /api/admin-auth</span>
+                        <span className="admin-context-pill">Timezone: {timeZoneLabel}</span>
                         <span className="admin-context-pill">Module: {activeModule ? 'Live' : 'Fallback'}</span>
                     </div>
                 </section>
@@ -180,52 +226,18 @@ export function AdminLayout() {
                 </div>
             </main>
 
-            {paletteOpen ? (
-                <div
-                    className="admin-palette-backdrop"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Command palette"
-                    onClick={() => setPaletteOpen(false)}
-                >
-                    <div className="admin-palette" onClick={(event) => event.stopPropagation()}>
-                        <input
-                            className="admin-palette-input"
-                            placeholder="Jump to module..."
-                            value={paletteQuery}
-                            autoFocus
-                            onChange={(event) => setPaletteQuery(event.target.value)}
-                        />
-                        <div className="admin-palette-list">
-                            {filteredPaletteItems.map((item) => (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    className="admin-palette-item"
-                                    onClick={() => {
-                                        navigate(item.to);
-                                        setPaletteOpen(false);
-                                        setPaletteQuery('');
-                                    }}
-                                >
-                                    <span>{item.label}</span>
-                                    <code>{item.to}</code>
-                                </button>
-                            ))}
-                            <button
-                                type="button"
-                                className="admin-palette-item"
-                                onClick={() => {
-                                    window.location.href = '/admin-legacy';
-                                }}
-                            >
-                                <span>Open Legacy Admin</span>
-                                <code>/admin-legacy</code>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
+            <AdminCommandPalette
+                open={paletteOpen}
+                query={paletteQuery}
+                onQueryChange={setPaletteQuery}
+                onClose={() => setPaletteOpen(false)}
+                commands={commandPaletteCommands}
+                announcements={paletteAnnouncementsQuery.data ?? []}
+                onOpenAnnouncement={(id) => {
+                    navigate('/announcements');
+                    notifyInfo('Announcement selected', `Jumped to announcement ${id}.`);
+                }}
+            />
         </div>
     );
 }

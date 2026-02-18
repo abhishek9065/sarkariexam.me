@@ -264,6 +264,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.ops-form-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .ops-form-grid.three {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -379,6 +383,153 @@
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
+}
+
+.ops-notification-stack {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 140;
+    display: grid;
+    gap: 10px;
+    width: min(360px, calc(100vw - 24px));
+}
+
+.ops-notification {
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    background: var(--bg-elev-2);
+    box-shadow: var(--shadow-2);
+    transform: translateY(-8px);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.ops-notification.visible {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.ops-notification.removing {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+.ops-notification.success {
+    border-color: color-mix(in srgb, var(--success) 58%, #fff 42%);
+}
+
+.ops-notification.error {
+    border-color: color-mix(in srgb, var(--danger) 58%, #fff 42%);
+}
+
+.ops-notification.warning {
+    border-color: color-mix(in srgb, var(--warning) 58%, #fff 42%);
+}
+
+.ops-notification.info {
+    border-color: color-mix(in srgb, var(--info) 58%, #fff 42%);
+}
+
+.ops-notification-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.ops-notification-icon {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.ops-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(4, 10, 18, 0.68);
+    display: grid;
+    place-items: center;
+    padding: 14px;
+}
+
+.ops-confirm-dialog {
+    width: min(460px, 100%);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    background: var(--bg-elev-2);
+    box-shadow: var(--shadow-2);
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-3);
+}
+
+.ops-confirm-dialog.danger {
+    border-color: color-mix(in srgb, var(--danger) 56%, #fff 44%);
+}
+
+.ops-confirm-dialog.warning {
+    border-color: color-mix(in srgb, var(--warning) 56%, #fff 44%);
+}
+
+.ops-action-menu {
+    position: relative;
+}
+
+.ops-action-menu summary {
+    list-style: none;
+}
+
+.ops-action-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.ops-action-panel {
+    position: absolute;
+    right: 0;
+    margin-top: 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elev-2);
+    box-shadow: var(--shadow-1);
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    min-width: 170px;
+    z-index: 32;
+}
+
+.ops-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: rgba(3, 10, 18, 0.72);
+    display: grid;
+    place-items: center;
+    padding: 16px;
+}
+
+.ops-modal {
+    width: min(740px, 100%);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-2);
+    box-shadow: var(--shadow-2);
+    padding: var(--space-4);
+}
+
+.ops-sticky-actions {
+    position: sticky;
+    bottom: 10px;
+    padding: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-elev-2) 92%, #000 8%);
+    backdrop-filter: blur(8px);
+    box-shadow: var(--shadow-1);
 }
 
 @media (max-width: 960px) {

@@ -3,7 +3,9 @@
 Government jobs and exam updates platform built with:
 - Frontend: React 19 + TypeScript + Vite
 - Backend: Express 5 + TypeScript + MongoDB/Cosmos DB
-- Admin vNext: separate React 19 + TypeScript + Vite app on `/admin`
+- Admin:
+  - Stable legacy admin on `/admin`
+  - vNext preview app on `/admin-vnext`
 
 ## Highlights
 - Latest jobs, results, admit cards, answer keys, syllabus, admissions
@@ -103,6 +105,8 @@ If you run with reverse proxy and `/api` on the same host, leave `VITE_API_BASE`
 ### Admin Frontend (`admin-frontend/.env`)
 ```env
 VITE_API_BASE=http://localhost:4000
+# Local router basename (dev default is /admin)
+VITE_ADMIN_BASENAME=/admin
 # Optional phased rollout gate for vNext modules
 # Example: dashboard,announcements,review,approvals
 VITE_ADMIN_VNEXT_MODULES=
@@ -138,9 +142,10 @@ npm run test:e2e:ci
 npm audit --omit=dev --audit-level=high
 ```
 
-## Admin vNext Routing
-- `/admin` and `/admin/*`: new `admin-frontend` app (via Nginx path routing)
-- `/admin-legacy` and `/admin-legacy/*`: legacy admin UI rollback route
+## Admin Routing
+- `/admin` and `/admin/*`: stable legacy admin UI
+- `/admin-vnext` and `/admin-vnext/*`: preview `admin-frontend` app
+- `/admin-legacy` and `/admin-legacy/*`: legacy admin alias/rollback route
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
 
@@ -175,6 +180,7 @@ cd ~/sarkari-result
 bash scripts/deploy-prod.sh
 ```
 It validates required production env vars before deploy and checks API health after startup.
+It also verifies public route health for `/admin`, `/admin-vnext`, and `/admin-legacy`.
 
 ## Notes
 - Mainline branch is `main`.

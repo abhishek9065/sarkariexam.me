@@ -1,11 +1,23 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
+import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { approveAdminApproval, getAdminApprovals, rejectAdminApproval } from '../../lib/api/client';
+import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminApprovalItem } from '../../types';
+
+type DecisionMode = 'approve' | 'reject';
+
+interface DecisionModalState {
+    id: string;
+    mode: DecisionMode;
+    actionLabel: string;
+    note: string;
+}
 
 const statusTone = (status?: string) => {
     if (status === 'approved' || status === 'executed') return 'success';
@@ -17,7 +29,11 @@ const statusTone = (status?: string) => {
 export function ApprovalsModule() {
     const queryClient = useQueryClient();
     const { hasValidStepUp, stepUpToken } = useAdminAuth();
+    const { formatDateTime } = useAdminPreferences();
+    const { notifyError, notifySuccess } = useAdminNotifications();
+
     const [status, setStatus] = useState<'pending' | 'all' | 'approved' | 'rejected' | 'executed' | 'expired'>('pending');
+    const [modal, setModal] = useState<DecisionModalState | null>(null);
 
     const query = useQuery({
         queryKey: ['admin-approvals', status],
@@ -25,28 +41,48 @@ export function ApprovalsModule() {
     });
 
     const approveMutation = useMutation({
-        mutationFn: async (id: string) => {
+        mutationFn: async ({ id, note }: { id: string; note?: string }) => {
             if (!hasValidStepUp || !stepUpToken) throw new Error('Step-up verification is required.');
-            const note = window.prompt('Approval note (optional):') || undefined;
             return approveAdminApproval(id, note, stepUpToken);
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['admin-approvals'] });
+            notifySuccess('Approval completed', 'Approval request has been approved.');
+            void trackAdminTelemetry('admin_review_decision_submitted', {
+                module: 'approvals',
+                action: 'approve',
+            });
+            setModal(null);
         },
     });
 
     const rejectMutation = useMutation({
-        mutationFn: async (id: string) => {
+        mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
             if (!hasValidStepUp || !stepUpToken) throw new Error('Step-up verification is required.');
-            const reason = window.prompt('Rejection reason (required by policy):') || '';
-            return rejectAdminApproval(id, reason || undefined, stepUpToken);
+            return rejectAdminApproval(id, reason, stepUpToken);
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['admin-approvals'] });
+            notifySuccess('Rejection completed', 'Approval request has been rejected.');
+            void trackAdminTelemetry('admin_review_decision_submitted', {
+                module: 'approvals',
+                action: 'reject',
+            });
+            setModal(null);
         },
     });
 
     const rows = query.data ?? [];
+
+    const activeMutationError = useMemo(() => {
+        if (approveMutation.isError) {
+            return approveMutation.error instanceof Error ? approveMutation.error.message : 'Failed to approve request.';
+        }
+        if (rejectMutation.isError) {
+            return rejectMutation.error instanceof Error ? rejectMutation.error.message : 'Failed to reject request.';
+        }
+        return null;
+    }, [approveMutation.error, approveMutation.isError, rejectMutation.error, rejectMutation.isError]);
 
     return (
         <>
@@ -65,6 +101,7 @@ export function ApprovalsModule() {
                         <option value="expired">Expired</option>
                     </select>
                 </div>
+
                 {query.isPending ? <div className="admin-alert info">Loading approvals...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load approvals." /> : null}
 
@@ -87,7 +124,7 @@ export function ApprovalsModule() {
                                     </OpsBadge>
                                 </td>
                                 <td>{String(row.requestedBy ?? row.requested_by ?? '-')}</td>
-                                <td>{row.requestedAt ? new Date(row.requestedAt).toLocaleString() : '-'}</td>
+                                <td>{formatDateTime(row.requestedAt)}</td>
                                 <td>
                                     {row.status === 'pending' && row.id ? (
                                         <div className="ops-actions">
@@ -95,7 +132,14 @@ export function ApprovalsModule() {
                                                 type="button"
                                                 className="admin-btn"
                                                 disabled={approveMutation.isPending || !hasValidStepUp}
-                                                onClick={() => approveMutation.mutate(row.id as string)}
+                                                onClick={() => {
+                                                    setModal({
+                                                        id: row.id as string,
+                                                        mode: 'approve',
+                                                        actionLabel: String(row.action ?? 'approval request'),
+                                                        note: '',
+                                                    });
+                                                }}
                                             >
                                                 Approve
                                             </button>
@@ -103,7 +147,14 @@ export function ApprovalsModule() {
                                                 type="button"
                                                 className="admin-btn danger"
                                                 disabled={rejectMutation.isPending || !hasValidStepUp}
-                                                onClick={() => rejectMutation.mutate(row.id as string)}
+                                                onClick={() => {
+                                                    setModal({
+                                                        id: row.id as string,
+                                                        mode: 'reject',
+                                                        actionLabel: String(row.action ?? 'approval request'),
+                                                        note: '',
+                                                    });
+                                                }}
                                             >
                                                 Reject
                                             </button>
@@ -116,15 +167,55 @@ export function ApprovalsModule() {
                         ))}
                     </OpsTable>
                 ) : null}
+
                 {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No approvals found." /> : null}
 
-                {approveMutation.isError ? (
-                    <OpsErrorState message={approveMutation.error instanceof Error ? approveMutation.error.message : 'Failed to approve request.'} />
-                ) : null}
-                {rejectMutation.isError ? (
-                    <OpsErrorState message={rejectMutation.error instanceof Error ? rejectMutation.error.message : 'Failed to reject request.'} />
-                ) : null}
+                {activeMutationError ? <OpsErrorState message={activeMutationError} /> : null}
             </OpsCard>
+
+            {modal ? (
+                <div className="ops-modal-overlay" role="presentation" onClick={() => setModal(null)}>
+                    <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="approval-decision-title" onClick={(event) => event.stopPropagation()}>
+                        <div className="ops-stack">
+                            <h3 id="approval-decision-title">
+                                {modal.mode === 'approve' ? 'Approve request' : 'Reject request'}
+                            </h3>
+                            <p className="ops-inline-muted">Action: {modal.actionLabel}</p>
+                            <textarea
+                                className="ops-textarea"
+                                value={modal.note}
+                                onChange={(event) => setModal((current) => current ? ({ ...current, note: event.target.value }) : current)}
+                                placeholder={modal.mode === 'approve' ? 'Approval note (optional)' : 'Rejection reason (required)'}
+                            />
+                            <div className="ops-actions">
+                                <button type="button" className="admin-btn" onClick={() => setModal(null)}>Cancel</button>
+                                <button
+                                    type="button"
+                                    className={`admin-btn ${modal.mode === 'approve' ? 'primary' : 'danger'}`}
+                                    disabled={approveMutation.isPending || rejectMutation.isPending}
+                                    onClick={() => {
+                                        if (modal.mode === 'reject' && !modal.note.trim()) {
+                                            notifyError('Reason required', 'Rejection reason is required by policy.');
+                                            return;
+                                        }
+                                        if (modal.mode === 'approve') {
+                                            approveMutation.mutate({ id: modal.id, note: modal.note.trim() || undefined }, {
+                                                onError: (error) => notifyError('Approve failed', error instanceof Error ? error.message : 'Failed to approve request.'),
+                                            });
+                                        } else {
+                                            rejectMutation.mutate({ id: modal.id, reason: modal.note.trim() }, {
+                                                onError: (error) => notifyError('Reject failed', error instanceof Error ? error.message : 'Failed to reject request.'),
+                                            });
+                                        }
+                                    }}
+                                >
+                                    {modal.mode === 'approve' ? (approveMutation.isPending ? 'Approving...' : 'Approve request') : (rejectMutation.isPending ? 'Rejecting...' : 'Reject request')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </>
     );
 }

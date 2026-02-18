@@ -7,11 +7,15 @@ import { AppRoutes } from './routes/AppRoutes';
 import './styles.css';
 
 const queryClient = new QueryClient();
+const configuredAdminBasename = import.meta.env.VITE_ADMIN_BASENAME ?? '/admin';
+const adminBasename = configuredAdminBasename.endsWith('/')
+    ? configuredAdminBasename.slice(0, -1)
+    : configuredAdminBasename;
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
-            <BrowserRouter basename="/admin">
+            <BrowserRouter basename={adminBasename || '/admin'}>
                 <AppRoutes />
             </BrowserRouter>
         </QueryClientProvider>

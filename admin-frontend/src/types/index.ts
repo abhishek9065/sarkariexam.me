@@ -1,4 +1,7 @@
 export type AdminPortalRole = 'admin' | 'editor' | 'reviewer' | 'viewer';
+export type AnnouncementTypeFilter = 'job' | 'admit-card' | 'result' | 'answer-key' | 'syllabus' | 'admission';
+export type AnnouncementStatusFilter = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
+export type AnnouncementSortOption = 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
 
 export type AdminPermission =
     | 'admin:read'
@@ -188,4 +191,13 @@ export interface ModuleHealthState {
     status: 'live' | 'gated' | 'degraded';
     updatedAt?: string;
     note?: string;
+}
+
+export interface AdminAnnouncementFilterPreset {
+    id: string;
+    label: string;
+    query: string;
+    type: AnnouncementTypeFilter | 'all';
+    status: AnnouncementStatusFilter | 'all';
+    sort: AnnouncementSortOption;
 }
