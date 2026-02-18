@@ -170,4 +170,26 @@ check_public_route "/admin" "admin vNext default"
 check_public_route "/admin-vnext" "admin vNext alias"
 check_public_route "/admin-legacy" "legacy rollback"
 
+# ── Cloudflare Cache Purge ──────────────────────────────────
+CF_ZONE_ID="$(read_env_var "CF_ZONE_ID")"
+CF_API_TOKEN="$(read_env_var "CF_API_TOKEN")"
+
+if [[ -n "$CF_ZONE_ID" && -n "$CF_API_TOKEN" ]]; then
+  echo "Purging Cloudflare edge cache..."
+  cf_resp="$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+    -H "Authorization: Bearer ${CF_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data '{"purge_everything":true}')"
+
+  if echo "$cf_resp" | grep -q '"success":true'; then
+    echo "Cloudflare cache purged successfully."
+  else
+    echo "WARNING: Cloudflare cache purge may have failed:"
+    echo "$cf_resp"
+  fi
+else
+  echo "NOTICE: CF_ZONE_ID or CF_API_TOKEN not set — skipping Cloudflare cache purge."
+  echo "  Set them in .env to auto-purge CDN cache on deploy."
+fi
+
 echo "Deploy completed successfully."
