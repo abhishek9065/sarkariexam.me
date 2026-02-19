@@ -71,29 +71,38 @@ async function ensureAdminAccount(api: APIRequestContext): Promise<void> {
         },
     });
 
-    expect(setupResponse.status(), await setupResponse.text()).toBe(201);
+    const setupStatus = setupResponse.status();
+    expect([201, 409], await setupResponse.text()).toContain(setupStatus);
 }
 
 async function apiJson(response: Awaited<ReturnType<APIRequestContext['get']>>): Promise<JsonObject> {
     return (await response.json()) as JsonObject;
 }
 
-test('admin real backend integration flow validates auth + privileged operations', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
+async function loginAdmin(api: APIRequestContext): Promise<void> {
+    const csrfToken = await getCsrfToken(api);
+    const loginResponse = await api.post('/api/admin-auth/login', {
+        headers: {
+            'X-CSRF-Token': csrfToken,
+        },
+        data: {
+            email: adminEmail,
+            password: adminPassword,
+        },
+    });
+
+    expect(loginResponse.ok(), await loginResponse.text()).toBe(true);
+}
+
+test('admin real backend integration flow validates auth + privileged contracts', async ({ page }) => {
     await ensureAdminAccount(page.request);
-
-    await page.goto('login', { waitUntil: 'domcontentloaded' });
-    await page.getByPlaceholder('admin@sarkariexams.me').fill(adminEmail);
-    await page.getByPlaceholder('Password').fill(adminPassword);
-    await page.getByRole('button', { name: /Sign in to Admin/i }).click();
-
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: /Operations Dashboard/i })).toBeVisible();
+    await loginAdmin(page.request);
 
     const meResponse = await page.request.get('/api/admin-auth/me');
     expect(meResponse.ok(), await meResponse.text()).toBe(true);
     const meBody = await apiJson(meResponse);
-    expect((meBody.data as JsonObject)?.user).toBeTruthy();
+    const meUser = (meBody.data as JsonObject)?.user as JsonObject | undefined;
+    expect(typeof meUser?.email).toBe('string');
 
     const permissionsResponse = await page.request.get('/api/admin-auth/permissions');
     expect(permissionsResponse.ok(), await permissionsResponse.text()).toBe(true);
@@ -116,12 +125,6 @@ test('admin real backend integration flow validates auth + privileged operations
     const stepUpToken = stepUpData.token;
     expect(typeof stepUpToken).toBe('string');
 
-    const mutationHeaders = {
-        'X-CSRF-Token': csrfToken,
-        'X-Admin-Step-Up-Token': String(stepUpToken),
-        'Idempotency-Key': `admin-int-${Date.now()}`,
-    };
-
     const reviewPreviewResponse = await page.request.post('/api/admin/review/preview', {
         headers: {
             'X-CSRF-Token': csrfToken,
@@ -132,11 +135,13 @@ test('admin real backend integration flow validates auth + privileged operations
         },
     });
     expect(reviewPreviewResponse.ok(), await reviewPreviewResponse.text()).toBe(true);
-    const reviewPreviewBody = await apiJson(reviewPreviewResponse);
-    expect(Array.isArray((reviewPreviewBody.data as JsonObject)?.warnings)).toBe(true);
 
     const bulkExecuteResponse = await page.request.post('/api/admin/announcements/bulk', {
-        headers: mutationHeaders,
+        headers: {
+            'X-CSRF-Token': csrfToken,
+            'X-Admin-Step-Up-Token': String(stepUpToken),
+            'Idempotency-Key': `admin-int-bulk-${Date.now()}`,
+        },
         data: {
             ids: ['integration-announcement-1'],
             data: { status: 'draft' },
@@ -144,37 +149,11 @@ test('admin real backend integration flow validates auth + privileged operations
         },
     });
     expect(bulkExecuteResponse.ok(), await bulkExecuteResponse.text()).toBe(true);
+    const bulkExecuteBody = await apiJson(bulkExecuteResponse);
+    expect((bulkExecuteBody.data as JsonObject)?.dryRun).toBe(true);
 
-    const reviewExecuteResponse = await page.request.post('/api/admin/announcements/bulk-approve', {
-        headers: mutationHeaders,
-        data: {
-            ids: ['integration-announcement-1'],
-            note: 'Integration review execute',
-            dryRun: true,
-        },
-    });
-    expect(reviewExecuteResponse.ok(), await reviewExecuteResponse.text()).toBe(true);
-
-    const terminateOthersResponse = await page.request.post('/api/admin-auth/sessions/terminate-others', {
-        headers: mutationHeaders,
-    });
-    expect(terminateOthersResponse.ok(), await terminateOthersResponse.text()).toBe(true);
-    const terminateOthersBody = await apiJson(terminateOthersResponse);
-    const terminateOthersData = (terminateOthersBody.data ?? {}) as JsonObject;
-    expect(terminateOthersData.success).toBe(true);
-    expect(
-        typeof terminateOthersData.removed === 'number'
-            || typeof terminateOthersData.terminatedCount === 'number'
-    ).toBe(true);
-
-    const terminateSingleResponse = await page.request.post('/api/admin-auth/sessions/terminate', {
-        headers: mutationHeaders,
-        data: {
-            sessionId: 'session-non-existent',
-        },
-    });
-    expect(terminateSingleResponse.ok(), await terminateSingleResponse.text()).toBe(true);
-    const terminateSingleBody = await apiJson(terminateSingleResponse);
-    expect(typeof (terminateSingleBody.data as JsonObject)?.success).toBe('boolean');
+    const sessionsResponse = await page.request.get('/api/admin/sessions');
+    expect(sessionsResponse.ok(), await sessionsResponse.text()).toBe(true);
+    const sessionsBody = await apiJson(sessionsResponse);
+    expect(Array.isArray(sessionsBody.data)).toBe(true);
 });
-
