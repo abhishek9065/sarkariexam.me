@@ -8,6 +8,7 @@ import type {
     AdminReviewPreview,
     AdminSecurityLog,
     AdminSession,
+    AdminSessionTerminateOthersResult,
     AdminStepUpGrant,
     AdminUser,
     CommunityFlag,
@@ -217,13 +218,25 @@ export async function terminateAdminSessionById(sessionId: string, stepUpToken: 
     return body?.data ?? { success: false };
 }
 
-export async function terminateOtherAdminSessions(stepUpToken: string): Promise<{ success: boolean; removed?: number }> {
+export async function terminateOtherAdminSessions(stepUpToken: string): Promise<AdminSessionTerminateOthersResult> {
     const body = await request('/api/admin-auth/sessions/terminate-others', {
         method: 'POST',
         headers: mutationHeaders(stepUpToken, false),
     }, true);
 
-    return body?.data ?? { success: false };
+    const data = (body?.data ?? { success: false }) as AdminSessionTerminateOthersResult;
+    const removed = typeof data.removed === 'number'
+        ? data.removed
+        : (typeof data.terminatedCount === 'number' ? data.terminatedCount : undefined);
+    const terminatedCount = typeof data.terminatedCount === 'number'
+        ? data.terminatedCount
+        : (typeof data.removed === 'number' ? data.removed : undefined);
+
+    return {
+        success: Boolean(data.success),
+        ...(removed !== undefined ? { removed } : {}),
+        ...(terminatedCount !== undefined ? { terminatedCount } : {}),
+    };
 }
 
 export async function getAdminAuditLogs(input: {

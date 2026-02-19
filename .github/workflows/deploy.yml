@@ -55,25 +55,8 @@ jobs:
             echo "=== Pulling latest code ==="
             git pull --ff-only origin main
 
-            echo "=== Building and restarting containers ==="
-            docker compose --env-file .env up -d --build nginx backend frontend admin-frontend
-
-            echo "=== Waiting for backend health ==="
-            for i in $(seq 1 30); do
-              if docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health >/dev/null 2>&1; then
-                echo "Backend healthy after $i attempts"
-                break
-              fi
-              if [ "$i" -eq 30 ]; then
-                echo "ERROR: Backend did not become healthy"
-                docker compose logs --tail=60 backend
-                exit 1
-              fi
-              sleep 2
-            done
-
-            echo "=== Container status ==="
-            docker compose ps
+            echo "=== Running guarded production deploy ==="
+            bash scripts/deploy-prod.sh
 
       - name: Purge Cloudflare Cache
         if: steps.deploy-config.outputs.enabled == 'true' && success()

@@ -3,13 +3,12 @@ import { defineConfig } from '@playwright/test';
 const configuredBasename = process.env.VITE_ADMIN_BASENAME || '/admin';
 const adminBasename = configuredBasename.startsWith('/') ? configuredBasename : `/${configuredBasename}`;
 const adminBasePath = adminBasename.endsWith('/') ? adminBasename : `${adminBasename}/`;
-const baseURL = `http://127.0.0.1:4174${adminBasePath}`;
-const e2eStepUpBypass = process.env.VITE_ADMIN_E2E_STEPUP_BYPASS ?? 'true';
+const baseURL = `http://127.0.0.1:4175${adminBasePath}`;
+const e2eStepUpBypass = process.env.VITE_ADMIN_E2E_STEPUP_BYPASS ?? 'false';
 
 export default defineConfig({
     testDir: './tests',
-    testIgnore: ['**/admin.integration.spec.ts'],
-    timeout: 30_000,
+    timeout: 60_000,
     use: {
         baseURL,
     },
@@ -20,7 +19,7 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: 'npm run dev -- --host 127.0.0.1 --port 4174',
+        command: 'npm run dev -- --host 127.0.0.1 --port 4175',
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         stdout: 'pipe',

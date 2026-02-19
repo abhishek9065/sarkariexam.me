@@ -155,6 +155,12 @@ npm run test:e2e:ci
 npm audit --omit=dev --audit-level=high
 ```
 
+### Admin Real-Backend Integration (CI Gate)
+```bash
+cd admin-frontend
+VITE_PROXY_TARGET=http://127.0.0.1:5000 npm run test:e2e:integration
+```
+
 ## Admin Routing
 - `/admin` and `/admin/*`: `admin-frontend` (premium vNext) default route
 - `/admin-vnext` and `/admin-vnext/*`: temporary vNext alias route
@@ -233,6 +239,10 @@ bash scripts/deploy-prod.sh
 ```
 It validates required production env vars before deploy and checks API health after startup.
 It also verifies public route health for `/admin`, `/admin-vnext`, and `/admin-legacy`.
+It automatically runs `backend` migration `migrate:admin-accounts` and fails deploy if migration fails.
+
+Optional:
+- Set `DEPLOY_SKIP_ADMIN_MIGRATION=true` only for emergency rollback deploys.
 
 ## Notes
 - Mainline branch is `main`.

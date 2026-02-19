@@ -134,6 +134,25 @@ wait_for_backend_endpoint() {
 wait_for_backend_health
 wait_for_backend_endpoint
 
+run_admin_accounts_migration() {
+  if [[ "${DEPLOY_SKIP_ADMIN_MIGRATION:-false}" == "true" ]]; then
+    echo "NOTICE: DEPLOY_SKIP_ADMIN_MIGRATION=true, skipping admin_accounts migration."
+    return 0
+  fi
+
+  echo "Running admin account migration (idempotent)..."
+  if docker compose exec -T backend npm run migrate:admin-accounts; then
+    echo "Admin account migration completed."
+    return 0
+  fi
+
+  echo "ERROR: admin account migration failed."
+  docker compose logs --tail=120 backend || true
+  return 1
+}
+
+run_admin_accounts_migration
+
 echo "Backend health (container internal):"
 docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
   echo

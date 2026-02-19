@@ -44,6 +44,12 @@ export interface AdminSession {
     actions: string[];
 }
 
+export interface AdminSessionTerminateOthersResult {
+    success: boolean;
+    removed?: number;
+    terminatedCount?: number;
+}
+
 export interface AdminPermissionSnapshot {
     role: AdminPortalRole;
     roles: Record<AdminPortalRole, string[]>;

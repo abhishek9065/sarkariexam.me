@@ -126,10 +126,11 @@ export function SessionsModule() {
                                         if (!allowed) return;
                                         terminateOthersMutation.mutate(undefined, {
                                             onSuccess: (result) => {
-                                                notifySuccess('Sessions terminated', `Removed ${result.removed ?? 0} session(s).`);
+                                                const removedCount = result.removed ?? result.terminatedCount ?? 0;
+                                                notifySuccess('Sessions terminated', `Removed ${removedCount} session(s).`);
                                                 void trackAdminTelemetry('admin_session_action', {
                                                     action: 'terminate_others',
-                                                    removed: result.removed ?? 0,
+                                                    removed: removedCount,
                                                 });
                                             },
                                             onError: (error) => {
@@ -249,7 +250,7 @@ export function SessionsModule() {
 
                     {terminateOthersMutation.isSuccess ? (
                         <div className="ops-inline-muted">
-                            Last bulk action removed {terminateOthersMutation.data?.removed ?? 0} session(s).
+                            Last bulk action removed {terminateOthersMutation.data?.removed ?? terminateOthersMutation.data?.terminatedCount ?? 0} session(s).
                         </div>
                     ) : null}
                 </div>

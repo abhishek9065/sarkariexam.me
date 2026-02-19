@@ -31,6 +31,7 @@ The script enforces required env vars, waits for backend readiness, checks publi
 - `/admin`
 - `/admin-vnext`
 - `/admin-legacy`
+- Runs `backend` migration `migrate:admin-accounts` (idempotent) and aborts deploy on migration failure.
 
 ## Rollback Procedure
 Use this if `/admin` must be returned to legacy quickly.
@@ -48,6 +49,9 @@ docker compose up -d --build nginx backend frontend admin-frontend
    - `/admin` now serves legacy.
    - `/admin-legacy` still serves legacy.
    - `/api/health` remains healthy.
+
+If rollback speed is critical, you can temporarily skip migration during redeploy:
+- `DEPLOY_SKIP_ADMIN_MIGRATION=true bash scripts/deploy-prod.sh`
 
 ## 24h Post-Deploy Monitoring Checklist
 Track during first 24 hours:

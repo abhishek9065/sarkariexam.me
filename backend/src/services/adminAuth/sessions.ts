@@ -14,5 +14,9 @@ export async function terminateSessionById(payload: unknown): Promise<{ success:
 
 export async function terminateAllOtherSessions(input: { userId: string; currentSessionId?: string | null }) {
     const terminatedCount = await terminateOtherSessions(input.userId, input.currentSessionId);
-    return { terminatedCount };
+    return {
+        success: true,
+        removed: terminatedCount,
+        terminatedCount,
+    };
 }
