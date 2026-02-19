@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/useAuth';
@@ -31,6 +31,53 @@ const MORE_LINKS: Array<{ to: string; label: string }> = [
 
 const TRENDING_FALLBACK = ['RRB ALP 2026', 'UPSC CSE', 'SSC CGL', 'NEET UG', 'India Post GDS'];
 
+const normalizeAdminPortalPath = (value?: string | null) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return withLeadingSlash.endsWith('/') && withLeadingSlash.length > 1
+        ? withLeadingSlash.slice(0, -1)
+        : withLeadingSlash;
+};
+
+const configuredAdminPortalPath = normalizeAdminPortalPath(import.meta.env.VITE_ADMIN_PORTAL_PATH as string | undefined);
+const adminPortalCandidates = Array.from(new Set([
+    configuredAdminPortalPath,
+    '/admin-vnext',
+    '/admin',
+    '/admin-legacy',
+].filter((item): item is string => Boolean(item))));
+
+async function resolveReachableAdminPortalPath(candidates: string[]): Promise<string> {
+    if (typeof window === 'undefined') {
+        return candidates[0] ?? '/admin';
+    }
+
+    for (const candidate of candidates) {
+        try {
+            const response = await fetch(candidate, {
+                method: 'HEAD',
+                credentials: 'include',
+                redirect: 'manual',
+                cache: 'no-store',
+            });
+            if (
+                (response.status >= 200 && response.status < 400)
+                || response.status === 401
+                || response.status === 403
+                || response.status === 405
+            ) {
+                return candidate;
+            }
+        } catch {
+            // Try next fallback.
+        }
+    }
+
+    return candidates[0] ?? '/admin';
+}
+
 export function Header() {
     const { theme, toggleTheme } = useTheme();
     const { user, logout, hasAdminPortalAccess } = useAuth();
@@ -44,6 +91,7 @@ export function Header() {
     const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
+    const [adminNavBusy, setAdminNavBusy] = useState(false);
     const [trendingTerms, setTrendingTerms] = useState<string[]>(TRENDING_FALLBACK);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -114,6 +162,24 @@ export function Header() {
         }
         return trendingTerms;
     }, [trendingTerms]);
+
+    const preferredAdminPortalPath = adminPortalCandidates[0] ?? '/admin';
+
+    const navigateToAdminPortal = async (event: MouseEvent<HTMLAnchorElement>) => {
+        event.preventDefault();
+        if (adminNavBusy) return;
+
+        setAdminNavBusy(true);
+        setUserMenuOpen(false);
+        setMobileOpen(false);
+
+        try {
+            const target = await resolveReachableAdminPortalPath(adminPortalCandidates);
+            window.location.assign(target);
+        } finally {
+            setAdminNavBusy(false);
+        }
+    };
 
     return (
         <>
@@ -226,7 +292,13 @@ export function Header() {
                                                 🔖 {t('header.bookmarks')}
                                             </Link>
                                             {hasAdminPortalAccess && (
-                                                <a href="/admin" className="user-dropdown-item" role="menuitem">
+                                                <a
+                                                    href={preferredAdminPortalPath}
+                                                    className="user-dropdown-item"
+                                                    role="menuitem"
+                                                    onClick={(event) => void navigateToAdminPortal(event)}
+                                                    aria-disabled={adminNavBusy}
+                                                >
                                                     ⚙️ {t('header.admin')}
                                                 </a>
                                             )}
@@ -338,7 +410,12 @@ export function Header() {
                                         🔖 {t('header.bookmarks')}
                                     </Link>
                                     {hasAdminPortalAccess && (
-                                        <a href="/admin" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
+                                        <a
+                                            href={preferredAdminPortalPath}
+                                            className="header-mobile-link"
+                                            onClick={(event) => void navigateToAdminPortal(event)}
+                                            aria-disabled={adminNavBusy}
+                                        >
                                             ⚙️ {t('header.admin')}
                                         </a>
                                     )}
