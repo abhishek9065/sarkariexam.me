@@ -140,6 +140,7 @@ test('admin real backend integration flow validates auth + privileged operations
         data: {
             ids: ['integration-announcement-1'],
             data: { status: 'draft' },
+            dryRun: true,
         },
     });
     expect(bulkExecuteResponse.ok(), await bulkExecuteResponse.text()).toBe(true);
@@ -149,6 +150,7 @@ test('admin real backend integration flow validates auth + privileged operations
         data: {
             ids: ['integration-announcement-1'],
             note: 'Integration review execute',
+            dryRun: true,
         },
     });
     expect(reviewExecuteResponse.ok(), await reviewExecuteResponse.text()).toBe(true);
@@ -175,3 +177,4 @@ test('admin real backend integration flow validates auth + privileged operations
     const terminateSingleBody = await apiJson(terminateSingleResponse);
     expect(typeof (terminateSingleBody.data as JsonObject)?.success).toBe('boolean');
 });
+
