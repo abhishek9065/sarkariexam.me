@@ -73,6 +73,21 @@ interface AnnouncementVersionDoc {
         tags: string[];
         importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
         jobDetails?: any;
+        typeDetails?: Record<string, unknown>;
+        seo?: {
+            metaTitle?: string;
+            metaDescription?: string;
+            canonical?: string;
+            indexPolicy?: 'index' | 'noindex';
+            ogImage?: string;
+        };
+        home?: {
+            section?: string;
+            stickyRank?: number;
+            highlight?: boolean;
+            trendingScore?: number;
+        };
+        schema?: Record<string, unknown>;
         status?: AnnouncementStatus;
         publishAt?: Date;
         approvedAt?: Date;
@@ -120,6 +135,21 @@ interface AnnouncementDoc extends Document {
     isActive: boolean;
     viewCount: number;
     jobDetails?: any;
+    typeDetails?: Record<string, unknown>;
+    seo?: {
+        metaTitle?: string;
+        metaDescription?: string;
+        canonical?: string;
+        indexPolicy?: 'index' | 'noindex';
+        ogImage?: string;
+    };
+    home?: {
+        section?: string;
+        stickyRank?: number;
+        highlight?: boolean;
+        trendingScore?: number;
+    };
+    schema?: Record<string, unknown>;
     importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
 }
 
@@ -283,6 +313,10 @@ function buildVersionSnapshot(doc: AnnouncementDoc): AnnouncementVersionDoc['sna
         tags: doc.tags || [],
         importantDates: doc.importantDates,
         jobDetails: doc.jobDetails,
+        typeDetails: doc.typeDetails,
+        seo: doc.seo,
+        home: doc.home,
+        schema: doc.schema,
         status: doc.status,
         publishAt: doc.publishAt,
         approvedAt: doc.approvedAt,
@@ -1027,6 +1061,10 @@ export class AnnouncementModelMongo {
             isActive: status !== 'archived',
             viewCount: 0,
             jobDetails: (data as any).jobDetails || undefined,
+            typeDetails: (data as any).typeDetails || undefined,
+            seo: (data as any).seo || undefined,
+            home: (data as any).home || undefined,
+            schema: (data as any).schema || undefined,
             importantDates: data.importantDates?.map(date => ({
                 eventName: date.eventName,
                 eventDate: new Date(date.eventDate),
@@ -1069,6 +1107,10 @@ export class AnnouncementModelMongo {
         if (data.totalPosts !== undefined) updateData.totalPosts = data.totalPosts;
         if (data.tags) updateData.tags = data.tags;
         if ((data as any).jobDetails !== undefined) updateData.jobDetails = (data as any).jobDetails;
+        if ((data as any).typeDetails !== undefined) updateData.typeDetails = (data as any).typeDetails;
+        if ((data as any).seo !== undefined) updateData.seo = (data as any).seo;
+        if ((data as any).home !== undefined) updateData.home = (data as any).home;
+        if ((data as any).schema !== undefined) updateData.schema = (data as any).schema;
         if (data.importantDates !== undefined) {
             updateData.importantDates = data.importantDates?.map(date => ({
                 eventName: date.eventName,
@@ -1472,6 +1514,10 @@ export class AnnouncementModelMongo {
                     description: date.description,
                 })) || [],
                 jobDetails: version.snapshot.jobDetails,
+                typeDetails: version.snapshot.typeDetails as Record<string, unknown> | undefined,
+                seo: version.snapshot.seo as Announcement['seo'] | undefined,
+                home: version.snapshot.home as Announcement['home'] | undefined,
+                schema: version.snapshot.schema as Record<string, unknown> | undefined,
                 status: normalizeStatus(version.snapshot.status),
                 publishAt: version.snapshot.publishAt?.toISOString() as any,
                 approvedAt: version.snapshot.approvedAt?.toISOString() as any,
@@ -1519,6 +1565,10 @@ export class AnnouncementModelMongo {
                 description: date.description,
             })) || [],
             jobDetails: doc.jobDetails,
+            typeDetails: doc.typeDetails,
+            seo: doc.seo,
+            home: doc.home,
+            schema: doc.schema,
         };
     }
 }

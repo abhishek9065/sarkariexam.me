@@ -88,6 +88,175 @@ export interface AdminAnnouncementListItem {
     warningCount?: number;
     approvalState?: string;
     updatedBy?: string;
+    typeDetails?: Record<string, unknown>;
+    seo?: {
+        metaTitle?: string;
+        metaDescription?: string;
+        canonical?: string;
+        indexPolicy?: 'index' | 'noindex';
+        ogImage?: string;
+    };
+    home?: {
+        section?: string;
+        stickyRank?: number;
+        highlight?: boolean;
+        trendingScore?: number;
+    };
+    schema?: Record<string, unknown>;
+}
+
+export interface AdminContentRecord extends AdminAnnouncementListItem {
+    id: string;
+    title: string;
+    type: string;
+    category?: string;
+    organization?: string;
+    status?: string;
+}
+
+export interface JobDetails {
+    importantDates?: Array<{ eventName: string; eventDate: string; description?: string }>;
+    applicationFee?: string;
+    ageLimit?: string;
+    vacancyDetails?: string;
+    eligibility?: string;
+    selectionProcess?: string;
+    salary?: string;
+}
+
+export interface ResultDetails {
+    examName?: string;
+    conductingBody?: string;
+    resultType?: string;
+    resultDate?: string;
+    resultLinks?: string[];
+    cutoffLink?: string;
+}
+
+export interface AdmitCardDetails {
+    examDate?: string;
+    releaseDate?: string;
+    downloadLink?: string;
+    instructions?: string;
+    regionalLinks?: string[];
+}
+
+export interface AnswerKeyDetails {
+    answerKeyLink?: string;
+    objectionStart?: string;
+    objectionEnd?: string;
+    objectionFee?: string;
+}
+
+export interface SyllabusDetails {
+    pdfLinks?: string[];
+    marksBreakdown?: string;
+}
+
+export interface AdmissionDetails {
+    courseName?: string;
+    collegeName?: string;
+    counselingDates?: string;
+    eligibility?: string;
+}
+
+export interface HomepageSectionConfig {
+    id?: string;
+    key: string;
+    title: string;
+    itemType: 'job' | 'result' | 'admit-card' | 'answer-key' | 'syllabus' | 'admission' | 'important';
+    sortRule: 'newest' | 'sticky' | 'trending';
+    pinnedIds: string[];
+    highlightIds: string[];
+    updatedAt?: string;
+    updatedBy?: string;
+}
+
+export interface LinkRecord {
+    id: string;
+    label: string;
+    url: string;
+    type: 'official' | 'pdf' | 'external';
+    status: 'active' | 'expired' | 'broken';
+    announcementId?: string;
+    notes?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    updatedBy?: string;
+}
+
+export interface LinkHealthReport {
+    id?: string;
+    url: string;
+    status: 'ok' | 'redirect' | 'broken' | 'error';
+    statusCode?: number;
+    redirectTarget?: string;
+    responseTimeMs?: number;
+}
+
+export interface MediaAsset {
+    id: string;
+    label: string;
+    fileName: string;
+    fileUrl: string;
+    mimeType: string;
+    category: 'notification' | 'result' | 'admit-card' | 'answer-key' | 'syllabus' | 'other';
+    keepStableUrl: boolean;
+    fileSizeBytes?: number;
+    status: 'active' | 'archived';
+    createdAt?: string;
+    updatedAt?: string;
+    updatedBy?: string;
+}
+
+export interface TemplateRecord {
+    id: string;
+    type: AnnouncementTypeFilter;
+    name: string;
+    description?: string;
+    shared: boolean;
+    sections: string[];
+    payload: Record<string, unknown>;
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
+}
+
+export interface AdminAlert {
+    id: string;
+    source: 'deadline' | 'schedule' | 'link' | 'traffic' | 'manual';
+    severity: 'info' | 'warning' | 'critical';
+    message: string;
+    status: 'open' | 'acknowledged' | 'resolved';
+    metadata?: Record<string, unknown>;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface AdminRoleUser {
+    id: string;
+    email: string;
+    username?: string;
+    role: AdminPortalRole;
+    isActive: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+    lastLoginAt?: string | null;
+}
+
+export interface AdminReportSnapshot {
+    summary: {
+        totalPosts: number;
+        pendingDrafts: number;
+        scheduled: number;
+        pendingReview: number;
+        brokenLinks: number;
+        expired: number;
+    };
+    mostViewed24h: Array<{ id: string; title: string; type: string; views: number; organization?: string }>;
+    upcomingDeadlines: Array<{ id: string; title: string; type: string; deadline?: string; organization?: string }>;
+    brokenLinkItems: Array<{ id: string; label: string; url: string; updatedAt?: string; announcementId?: string }>;
 }
 
 export interface AdminUser {

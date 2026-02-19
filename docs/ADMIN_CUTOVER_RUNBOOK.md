@@ -1,23 +1,24 @@
-# Admin vNext Cutover Runbook
+# Admin Routing Runbook
 
 This runbook locks operational policy for admin routing, rollback, and post-deploy validation.
 
 ## Route Contract
-- `/admin` and `/admin/*` -> `admin-frontend` (vNext default, desktop-only).
-- `/admin-vnext` and `/admin-vnext/*` -> `admin-frontend` transition alias.
-- `/admin-legacy` and `/admin-legacy/*` -> `frontend` rollback path.
+- `/admin` and `/admin/*` -> `frontend` robust legacy admin (default, desktop-only).
+- `/admin-vnext` and `/admin-vnext/*` -> `admin-frontend` premium preview.
+- `/admin-legacy` and `/admin-legacy/*` -> `frontend` explicit rollback alias.
 
 ## Stabilization Windows
-- Keep `/admin-vnext` alias for 30 days after production cutover.
-- Keep `/admin-legacy` rollback path for at least 90 days.
+- Keep `/admin-vnext` preview route active until full parity signoff.
+- Keep `/admin-legacy` rollback alias active for long-tail recovery.
 
 ## Deploy Verification Checklist
 After each production deploy:
-1. Verify `/admin` loads vNext on desktop viewport.
+1. Verify `/admin` loads legacy admin on desktop viewport.
 2. Verify `/admin` shows Desktop Required below `1120px`.
-3. Verify `/admin-legacy` is reachable.
-4. Verify `/api/health` responds healthy.
-5. Verify admin login flow works end-to-end.
+3. Verify `/admin-vnext` is reachable for preview validation.
+4. Verify `/admin-legacy` is reachable.
+5. Verify `/api/health` responds healthy.
+6. Verify admin login flow works end-to-end.
 
 ## Hard Gate Script
 Use:
@@ -34,9 +35,9 @@ The script enforces required env vars, waits for backend readiness, checks publi
 - Runs `backend` migration `migrate:admin-accounts` (idempotent) and aborts deploy on migration failure.
 
 ## Rollback Procedure
-Use this if `/admin` must be returned to legacy quickly.
+Use this if `/admin-vnext` preview must be returned to legacy quickly.
 
-1. Edit `nginx/default.conf` and change `/admin` + `/admin/*` proxy target to `frontend`.
+1. Edit `nginx/default.conf` and change `/admin-vnext` + `/admin-vnext/*` proxy target to `frontend`.
 2. Redeploy:
 
 ```bash
@@ -46,7 +47,8 @@ docker compose up -d --build nginx backend frontend admin-frontend
 ```
 
 3. Re-validate:
-   - `/admin` now serves legacy.
+   - `/admin` serves legacy.
+   - `/admin-vnext` now serves legacy.
    - `/admin-legacy` still serves legacy.
    - `/api/health` remains healthy.
 

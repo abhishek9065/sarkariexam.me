@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin';
+const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin-vnext';
 const escapedAdminBasename = adminBasename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const jsonResponse = (data: unknown) => ({
@@ -34,6 +34,26 @@ async function mockAuthenticatedAdmin(page: import('@playwright/test').Page) {
             activeSessions: 5,
             highRiskEvents: 2,
         }));
+    });
+
+    await page.route('**/api/admin/reports', async (route) => {
+        await route.fulfill(jsonResponse({
+            summary: {
+                totalPosts: 128,
+                pendingDrafts: 12,
+                scheduled: 5,
+                pendingReview: 17,
+                brokenLinks: 3,
+                expired: 9,
+            },
+            mostViewed24h: [],
+            upcomingDeadlines: [],
+            brokenLinkItems: [],
+        }));
+    });
+
+    await page.route('**/api/admin/alerts**', async (route) => {
+        await route.fulfill(jsonResponse([]));
     });
 
     await page.route('**/api/admin/announcements**', async (route) => {
@@ -126,6 +146,25 @@ test('sidebar collapse toggles desktop rail state', async ({ page }) => {
 
     await page.getByRole('button', { name: /Expand rail/i }).click();
     expect(await layout.evaluate((node) => node.classList.contains('sidebar-collapsed'))).toBe(false);
+});
+
+test('sidebar exposes full admin operations information architecture', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByRole('link', { name: /Dashboard/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Create Post/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Manage Posts/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Homepage Sections/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Link Manager/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Templates/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Alerts$/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Media \/ PDFs/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /SEO Tools/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Users & Roles/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Reports/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Settings/i })).toBeVisible();
 });
 
 test('admin-vnext alias serves login shell when basename is admin-vnext', async ({ page }) => {

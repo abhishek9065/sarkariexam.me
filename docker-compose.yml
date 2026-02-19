@@ -79,7 +79,7 @@ services:
       context: ./admin-frontend
       dockerfile: Dockerfile
       args:
-        VITE_ADMIN_BASENAME: ${VITE_ADMIN_BASENAME:-/admin}
+        VITE_ADMIN_BASENAME: ${VITE_ADMIN_BASENAME:-/admin-vnext}
     container_name: sarkari-admin-frontend
     expose:
       - "80"

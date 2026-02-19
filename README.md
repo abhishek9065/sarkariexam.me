@@ -4,9 +4,9 @@ Government jobs and exam updates platform built with:
 - Frontend: React 19 + TypeScript + Vite
 - Backend: Express 5 + TypeScript + MongoDB/Cosmos DB
 - Admin:
-  - Premium vNext admin (desktop-only) on `/admin`
-  - Preview alias on `/admin-vnext`
-  - Legacy rollback on `/admin-legacy`
+  - Robust legacy admin (desktop-only) on `/admin` (default)
+  - Premium vNext preview on `/admin-vnext`
+  - Legacy rollback alias on `/admin-legacy`
 
 ## Highlights
 - Latest jobs, results, admit cards, answer keys, syllabus, admissions
@@ -48,7 +48,7 @@ npm install
 npm run dev
 ```
 
-Admin frontend runs on `http://localhost:4174/admin`.
+Admin frontend runs on `http://localhost:4174/admin-vnext`.
 
 ## Environment Variables
 
@@ -111,15 +111,15 @@ If you run with reverse proxy and `/api` on the same host, leave `VITE_API_BASE`
 ### Admin Frontend (`admin-frontend/.env`)
 ```env
 VITE_API_BASE=http://localhost:5000
-# Local router basename (dev default is /admin)
-VITE_ADMIN_BASENAME=/admin
+# Local router basename (dev default is /admin-vnext)
+VITE_ADMIN_BASENAME=/admin-vnext
 # Optional phased rollout gate for vNext modules
 # Example: dashboard,announcements,review,approvals
 VITE_ADMIN_VNEXT_MODULES=
 # Test-only: bypass step-up interaction in mocked Playwright flows
 VITE_ADMIN_E2E_STEPUP_BYPASS=false
 ```
-If `/api` is proxied on the same host as `/admin`, you can also leave `VITE_API_BASE` unset.
+If `/api` is proxied on the same host as `/admin-vnext`, you can also leave `VITE_API_BASE` unset.
 If `VITE_ADMIN_VNEXT_MODULES` is empty or unset, all admin vNext modules are enabled.
 
 ## Quality Gates
@@ -162,13 +162,47 @@ VITE_PROXY_TARGET=http://127.0.0.1:5000 npm run test:e2e:integration
 ```
 
 ## Admin Routing
-- `/admin` and `/admin/*`: `admin-frontend` (premium vNext) default route
-- `/admin-vnext` and `/admin-vnext/*`: temporary vNext alias route
-- `/admin-legacy` and `/admin-legacy/*`: legacy admin rollback route
+- `/admin` and `/admin/*`: robust legacy admin route (default)
+- `/admin-vnext` and `/admin-vnext/*`: premium vNext preview route
+- `/admin-legacy` and `/admin-legacy/*`: explicit legacy rollback alias
 - Admin routes are desktop-only (minimum viewport width: `1120px`)
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
-- Legacy public frontend no longer owns `/admin`; fallback legacy surface is `/admin-legacy`.
+- Cutover back to vNext on `/admin` is deferred until full parity is proven.
+
+## Admin vNext Operational Modules (`/admin-vnext`)
+- Dashboard
+- Create Post
+- Job
+- Result
+- Admit Card
+- Answer Key
+- Syllabus
+- Admission
+- Manage Posts / Announcements
+- Homepage Sections
+- Link Manager
+- Templates
+- Alerts
+- Media / PDFs
+- SEO Tools
+- Users & Roles
+- Reports
+- Settings
+
+## New Additive Admin APIs
+- `GET/PUT /api/admin/homepage/sections`
+- `GET/POST/PATCH /api/admin/links`
+- `POST /api/admin/links/check`
+- `POST /api/admin/links/replace`
+- `GET/POST/PATCH /api/admin/media`
+- `GET/POST/PATCH /api/admin/templates`
+- `GET/POST/PATCH /api/admin/alerts`
+- `GET/PUT /api/admin/settings/{key}` where `{key}` in `states|boards|tags`
+- `GET /api/admin/users`
+- `PATCH /api/admin/users/{id}/role`
+- `GET /api/admin/reports`
+- `PATCH /api/admin/announcements/{id}/seo`
 
 ### Route Verification
 After deploy, verify edge routing headers:
@@ -179,17 +213,17 @@ curl -I https://sarkariexams.me/admin-legacy/ | grep -i x-sarkari-app
 ```
 
 ## Admin Stabilization Policy
-- `/admin` stays the only primary admin URL.
-- Keep `/admin-vnext` as transition alias for 30 days after production cutover.
-- Keep `/admin-legacy` rollback path for at least 90 days after production cutover.
+- `/admin` is the primary robust admin URL (legacy surface).
+- `/admin-vnext` remains preview until parity + ops signoff.
+- `/admin-legacy` remains available as explicit rollback alias.
 - Desktop-only policy for all admin entrypoints remains fixed at `1120px`.
 
 ## Admin Rollback Procedure
-If a production rollback is required, switch `/admin` back to legacy frontend routing and redeploy:
+If vNext preview routing needs emergency fallback, map `/admin-vnext` to legacy frontend and redeploy:
 
 ```bash
 # 1) Edit nginx mapping:
-#    in nginx/default.conf change /admin and /admin/* proxy target from:
+#    in nginx/default.conf change /admin-vnext and /admin-vnext/* proxy target from:
 #    proxy_pass http://admin_frontend/;
 #    to:
 #    proxy_pass http://frontend/;
@@ -202,7 +236,8 @@ docker compose up -d --build nginx backend frontend admin-frontend
 
 Then verify:
 - `/admin` serves legacy admin.
-- `/admin-legacy` still serves legacy admin.
+- `/admin-vnext` falls back to legacy admin.
+- `/admin-legacy` serves legacy admin.
 - `/api/health` is healthy.
 
 ## Migration

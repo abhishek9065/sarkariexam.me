@@ -1,20 +1,24 @@
 export type AdminModuleKey =
     | 'dashboard'
-    | 'analytics'
-    | 'announcements'
-    | 'review'
-    | 'quick-add'
-    | 'detailed-post'
-    | 'bulk-import'
-    | 'queue'
-    | 'security'
-    | 'sessions'
-    | 'audit'
-    | 'community-moderation'
-    | 'error-reports'
-    | 'approvals';
+    | 'create-post'
+    | 'job'
+    | 'result'
+    | 'admit-card'
+    | 'answer-key'
+    | 'syllabus'
+    | 'admission'
+    | 'manage-posts'
+    | 'homepage-sections'
+    | 'link-manager'
+    | 'templates'
+    | 'alerts'
+    | 'media-pdfs'
+    | 'seo-tools'
+    | 'users-roles'
+    | 'reports'
+    | 'settings';
 
-export type ModuleGroupKey = 'core' | 'publishing' | 'risk';
+export type ModuleGroupKey = 'overview' | 'content' | 'operations';
 
 export type AdminModuleNavItem = {
     key: AdminModuleKey;
@@ -31,112 +35,144 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/dashboard',
         label: 'Dashboard',
         shortLabel: 'DB',
-        group: 'core',
-        summary: 'Operations metrics and rollout insights.',
+        group: 'overview',
+        summary: 'Daily operations KPIs, deadlines and quick actions.',
     },
     {
-        key: 'announcements',
-        to: '/announcements',
-        label: 'Announcements',
-        shortLabel: 'AN',
-        group: 'core',
-        summary: 'Primary listing moderation and controls.',
+        key: 'create-post',
+        to: '/create-post',
+        label: 'Create Post',
+        shortLabel: 'CP',
+        group: 'overview',
+        summary: 'Unified create wizard with type blocks and workflow status.',
     },
     {
-        key: 'review',
-        to: '/review',
-        label: 'Review',
-        shortLabel: 'RV',
-        group: 'core',
-        summary: 'Preview-first approvals and scheduling decisions.',
+        key: 'job',
+        to: '/job',
+        label: 'Job',
+        shortLabel: 'JB',
+        group: 'content',
+        summary: 'Recruitment posts, vacancy details and timeline controls.',
     },
     {
-        key: 'approvals',
-        to: '/approvals',
-        label: 'Approvals',
-        shortLabel: 'AP',
-        group: 'core',
-        summary: 'Dual-control queue and decision actions.',
+        key: 'result',
+        to: '/result',
+        label: 'Result',
+        shortLabel: 'RS',
+        group: 'content',
+        summary: 'Result publishing, links and cutoff references.',
     },
     {
-        key: 'quick-add',
-        to: '/create',
-        label: 'Quick Add',
-        shortLabel: 'QA',
-        group: 'publishing',
-        summary: 'Rapid create flow for new announcements.',
+        key: 'admit-card',
+        to: '/admit-card',
+        label: 'Admit Card',
+        shortLabel: 'AC',
+        group: 'content',
+        summary: 'Admit card dates, downloads and region-wise links.',
     },
     {
-        key: 'detailed-post',
-        to: '/detailed',
-        label: 'Detailed Post',
-        shortLabel: 'DP',
-        group: 'publishing',
-        summary: 'Deep edit controls for existing records.',
+        key: 'answer-key',
+        to: '/answer-key',
+        label: 'Answer Key',
+        shortLabel: 'AK',
+        group: 'content',
+        summary: 'Answer key release and objection window management.',
     },
     {
-        key: 'bulk-import',
-        to: '/bulk',
-        label: 'Bulk Import',
-        shortLabel: 'BK',
-        group: 'publishing',
-        summary: 'Bulk preview and controlled execution.',
+        key: 'syllabus',
+        to: '/syllabus',
+        label: 'Syllabus',
+        shortLabel: 'SY',
+        group: 'content',
+        summary: 'Syllabus docs and marks-breakdown publishing.',
     },
     {
-        key: 'queue',
-        to: '/queue',
-        label: 'Queue',
-        shortLabel: 'QU',
-        group: 'publishing',
-        summary: 'Pending throughput and schedule visibility.',
+        key: 'admission',
+        to: '/admission',
+        label: 'Admission',
+        shortLabel: 'AD',
+        group: 'content',
+        summary: 'Admission workflows for course and counselling updates.',
     },
     {
-        key: 'security',
-        to: '/security',
-        label: 'Security',
-        shortLabel: 'SE',
-        group: 'risk',
-        summary: 'Security events and endpoint risk signals.',
+        key: 'manage-posts',
+        to: '/manage-posts',
+        label: 'Manage Posts / Announcements',
+        shortLabel: 'MP',
+        group: 'operations',
+        summary: 'Cross-type post listing, filters, status and actions.',
     },
     {
-        key: 'sessions',
-        to: '/sessions',
-        label: 'Sessions',
-        shortLabel: 'SS',
-        group: 'risk',
-        summary: 'Session inventory and termination actions.',
+        key: 'homepage-sections',
+        to: '/homepage-sections',
+        label: 'Homepage Sections',
+        shortLabel: 'HS',
+        group: 'operations',
+        summary: 'Pinning, ranking and section sort rule controls.',
     },
     {
-        key: 'audit',
-        to: '/audit',
-        label: 'Audit',
-        shortLabel: 'AU',
-        group: 'risk',
-        summary: 'Immutable audit trail for compliance checks.',
+        key: 'link-manager',
+        to: '/link-manager',
+        label: 'Link Manager',
+        shortLabel: 'LM',
+        group: 'operations',
+        summary: 'Centralized link records, checks and replace workflows.',
     },
     {
-        key: 'community-moderation',
-        to: '/community',
-        label: 'Community',
-        shortLabel: 'CM',
-        group: 'risk',
-        summary: 'Moderation triage for user content reports.',
+        key: 'templates',
+        to: '/templates',
+        label: 'Templates',
+        shortLabel: 'TP',
+        group: 'operations',
+        summary: 'Shared posting templates and section block presets.',
     },
     {
-        key: 'error-reports',
-        to: '/errors',
-        label: 'Errors',
-        shortLabel: 'ER',
-        group: 'risk',
-        summary: 'Frontend error triage and resolution tracking.',
-    },
-    {
-        key: 'analytics',
-        to: '/analytics',
-        label: 'Analytics',
+        key: 'alerts',
+        to: '/alerts',
+        label: 'Alerts',
         shortLabel: 'AL',
-        group: 'risk',
-        summary: 'Behavioral analytics and trend indicators.',
+        group: 'operations',
+        summary: 'Operational alerts feed for deadlines, schedules, and links.',
+    },
+    {
+        key: 'media-pdfs',
+        to: '/media-pdfs',
+        label: 'Media / PDFs',
+        shortLabel: 'MD',
+        group: 'operations',
+        summary: 'Manage uploaded PDF/media metadata and stable URLs.',
+    },
+    {
+        key: 'seo-tools',
+        to: '/seo-tools',
+        label: 'SEO Tools',
+        shortLabel: 'SEO',
+        group: 'operations',
+        summary: 'Meta/canonical/schema controls per content record.',
+    },
+    {
+        key: 'users-roles',
+        to: '/users-roles',
+        label: 'Users & Roles',
+        shortLabel: 'UR',
+        group: 'operations',
+        summary: 'Role matrix and admin account governance controls.',
+    },
+    {
+        key: 'reports',
+        to: '/reports',
+        label: 'Reports',
+        shortLabel: 'RP',
+        group: 'operations',
+        summary: 'Broken links, expiries, traffic and deadline snapshots.',
+    },
+    {
+        key: 'settings',
+        to: '/settings',
+        label: 'Settings',
+        shortLabel: 'ST',
+        group: 'operations',
+        summary: 'States, boards, tags and core admin configuration.',
     },
 ];
 
@@ -172,7 +208,7 @@ export function getModuleByPath(pathname: string): AdminModuleNavItem | undefine
 }
 
 export const groupedModuleLabels: Record<ModuleGroupKey, string> = {
-    core: 'Core Workflow',
-    publishing: 'Publishing Stack',
-    risk: 'Risk, Trust and Insights',
+    overview: 'Overview',
+    content: 'Content Modules',
+    operations: 'Operations',
 };

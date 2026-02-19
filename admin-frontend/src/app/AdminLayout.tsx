@@ -23,7 +23,7 @@ const DENSITY_KEY = 'admin-vnext-density';
 
 type AdminDensity = 'comfortable' | 'compact';
 
-const GROUP_ORDER: ModuleGroupKey[] = ['core', 'publishing', 'risk'];
+const GROUP_ORDER: ModuleGroupKey[] = ['overview', 'content', 'operations'];
 
 export function AdminLayout() {
     const { user, logout, hasValidStepUp, stepUpExpiresAt } = useAdminAuth();

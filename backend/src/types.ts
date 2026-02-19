@@ -45,6 +45,21 @@ export interface Announcement {
   tags?: Tag[];
   importantDates?: ImportantDate[];
   jobDetails?: any;
+  typeDetails?: Record<string, unknown>;
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    canonical?: string;
+    indexPolicy?: 'index' | 'noindex';
+    ogImage?: string;
+  };
+  home?: {
+    section?: string;
+    stickyRank?: number;
+    highlight?: boolean;
+    trendingScore?: number;
+  };
+  schema?: Record<string, unknown>;
 }
 
 export interface Tag {
@@ -86,6 +101,21 @@ export interface AnnouncementVersion {
     tags?: Tag[];
     importantDates?: ImportantDate[];
     jobDetails?: any;
+    typeDetails?: Record<string, unknown>;
+    seo?: {
+      metaTitle?: string;
+      metaDescription?: string;
+      canonical?: string;
+      indexPolicy?: 'index' | 'noindex';
+      ogImage?: string;
+    };
+    home?: {
+      section?: string;
+      stickyRank?: number;
+      highlight?: boolean;
+      trendingScore?: number;
+    };
+    schema?: Record<string, unknown>;
     status?: AnnouncementStatus;
     publishAt?: Date;
     approvedAt?: Date;
@@ -122,6 +152,21 @@ export interface CreateAnnouncementDto {
     description?: string;
   }>;
   jobDetails?: any;
+  typeDetails?: Record<string, unknown>;
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    canonical?: string;
+    indexPolicy?: 'index' | 'noindex';
+    ogImage?: string;
+  };
+  home?: {
+    section?: string;
+    stickyRank?: number;
+    highlight?: boolean;
+    trendingScore?: number;
+  };
+  schema?: Record<string, unknown>;
 }
 
 export interface JwtPayload {

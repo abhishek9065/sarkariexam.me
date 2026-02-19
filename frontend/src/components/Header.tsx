@@ -226,7 +226,7 @@ export function Header() {
                                                 🔖 {t('header.bookmarks')}
                                             </Link>
                                             {hasAdminPortalAccess && (
-                                                <a href="/admin-legacy" className="user-dropdown-item" role="menuitem">
+                                                <a href="/admin" className="user-dropdown-item" role="menuitem">
                                                     ⚙️ {t('header.admin')}
                                                 </a>
                                             )}
@@ -338,7 +338,7 @@ export function Header() {
                                         🔖 {t('header.bookmarks')}
                                     </Link>
                                     {hasAdminPortalAccess && (
-                                        <a href="/admin-legacy" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
+                                        <a href="/admin" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
                                             ⚙️ {t('header.admin')}
                                         </a>
                                     )}

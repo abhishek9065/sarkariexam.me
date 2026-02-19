@@ -13,7 +13,7 @@ const normalizeBasename = (value: string) => {
     return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
 };
 
-const configuredAdminBasename = normalizeBasename(import.meta.env.VITE_ADMIN_BASENAME ?? '/admin');
+const configuredAdminBasename = normalizeBasename(import.meta.env.VITE_ADMIN_BASENAME ?? '/admin-vnext');
 const currentPath = typeof window !== 'undefined' ? window.location.pathname : configuredAdminBasename;
 const adminBasename = currentPath.startsWith('/admin-vnext') ? '/admin-vnext' : configuredAdminBasename;
 const ADMIN_SW_CLEANUP_KEY = 'admin-vnext-sw-cleanup-ran';

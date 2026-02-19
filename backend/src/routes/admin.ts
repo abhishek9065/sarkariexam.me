@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 
 import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
@@ -41,6 +42,95 @@ interface SubscriptionDoc {
     verified: boolean;
 }
 
+interface HomeSectionDoc {
+    key: string;
+    title: string;
+    itemType: 'job' | 'result' | 'admit-card' | 'answer-key' | 'syllabus' | 'admission' | 'important';
+    sortRule: 'newest' | 'sticky' | 'trending';
+    pinnedIds: string[];
+    highlightIds: string[];
+    updatedAt: Date;
+    updatedBy?: string;
+}
+
+interface LinkRecordDoc {
+    label: string;
+    url: string;
+    type: 'official' | 'pdf' | 'external';
+    status: 'active' | 'expired' | 'broken';
+    announcementId?: string;
+    notes?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    updatedBy?: string;
+}
+
+interface LinkHealthEventDoc {
+    url: string;
+    status: 'ok' | 'redirect' | 'broken' | 'error';
+    statusCode?: number;
+    redirectTarget?: string;
+    responseTimeMs?: number;
+    checkedAt: Date;
+    checkedBy?: string;
+}
+
+interface MediaAssetDoc {
+    label: string;
+    fileName: string;
+    fileUrl: string;
+    mimeType: string;
+    category: 'notification' | 'result' | 'admit-card' | 'answer-key' | 'syllabus' | 'other';
+    keepStableUrl: boolean;
+    fileSizeBytes?: number;
+    status: 'active' | 'archived';
+    createdAt: Date;
+    updatedAt: Date;
+    updatedBy?: string;
+}
+
+interface AdminTemplateDoc {
+    type: ContentType;
+    name: string;
+    description?: string;
+    shared: boolean;
+    sections: string[];
+    payload: Record<string, unknown>;
+    createdAt: Date;
+    updatedAt: Date;
+    createdBy?: string;
+    updatedBy?: string;
+}
+
+interface AdminAlertDoc {
+    source: 'deadline' | 'schedule' | 'link' | 'traffic' | 'manual';
+    severity: 'info' | 'warning' | 'critical';
+    message: string;
+    status: 'open' | 'acknowledged' | 'resolved';
+    metadata?: Record<string, unknown>;
+    createdAt: Date;
+    updatedAt: Date;
+    createdBy?: string;
+    updatedBy?: string;
+}
+
+interface AdminSettingsDoc {
+    key: 'states' | 'boards' | 'tags';
+    values: string[];
+    updatedAt: Date;
+    updatedBy?: string;
+}
+
+interface AdminUserListDoc {
+    email: string;
+    username?: string;
+    role: string;
+    isActive: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
+    lastLoginAt?: Date;
+}
+
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
 const sessionIdSchema = z.object({
     sessionId: z.string().min(8),
@@ -80,6 +170,21 @@ const adminAnnouncementBaseSchema = z.object({
         description: z.string().optional(),
     })).optional(),
     jobDetails: z.any().optional(),
+    typeDetails: z.record(z.unknown()).optional(),
+    seo: z.object({
+        metaTitle: z.string().max(160).optional().or(z.literal('')),
+        metaDescription: z.string().max(320).optional().or(z.literal('')),
+        canonical: z.string().url().optional().or(z.literal('')),
+        indexPolicy: z.enum(['index', 'noindex']).optional(),
+        ogImage: z.string().url().optional().or(z.literal('')),
+    }).optional(),
+    home: z.object({
+        section: z.string().trim().max(80).optional().or(z.literal('')),
+        stickyRank: z.coerce.number().int().min(0).max(500).optional(),
+        highlight: z.boolean().optional(),
+        trendingScore: z.coerce.number().min(0).max(1_000_000).optional(),
+    }).optional(),
+    schema: z.record(z.unknown()).optional(),
 });
 
 const adminAnnouncementSchema = adminAnnouncementBaseSchema.superRefine((data, ctx) => {
@@ -208,6 +313,134 @@ const adminApprovalResolveSchema = z.object({
     reason: z.string().max(500).optional().or(z.literal('')),
 });
 
+const sectionItemSchema = z.object({
+    key: z.string().trim().min(2).max(80),
+    title: z.string().trim().min(2).max(120),
+    itemType: z.enum(['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission', 'important']),
+    sortRule: z.enum(['newest', 'sticky', 'trending']),
+    pinnedIds: z.array(z.string().trim().min(1)).max(50).optional().default([]),
+    highlightIds: z.array(z.string().trim().min(1)).max(50).optional().default([]),
+});
+
+const sectionUpsertSchema = z.object({
+    sections: z.array(sectionItemSchema).min(1).max(20),
+});
+
+const linkRecordCreateSchema = z.object({
+    label: z.string().trim().min(2).max(120),
+    url: z.string().url(),
+    type: z.enum(['official', 'pdf', 'external']),
+    status: z.enum(['active', 'expired', 'broken']).optional().default('active'),
+    announcementId: z.string().trim().optional(),
+    notes: z.string().trim().max(500).optional().or(z.literal('')),
+});
+
+const linkRecordPatchSchema = linkRecordCreateSchema.partial().extend({
+    status: z.enum(['active', 'expired', 'broken']).optional(),
+});
+
+const linkCheckSchema = z.object({
+    ids: z.array(z.string().trim().min(1)).max(200).optional(),
+    urls: z.array(z.string().url()).max(200).optional(),
+    timeoutMs: z.coerce.number().int().min(1000).max(15000).optional().default(5000),
+});
+
+const linkReplaceSchema = z.object({
+    fromUrl: z.string().url(),
+    toUrl: z.string().url(),
+    scope: z.enum(['all', 'announcements', 'links']).optional().default('all'),
+});
+
+const linkListQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+    type: z.enum(['official', 'pdf', 'external', 'all']).optional().default('all'),
+    status: z.enum(['active', 'expired', 'broken', 'all']).optional().default('all'),
+    announcementId: z.string().trim().optional(),
+    search: z.string().trim().optional(),
+});
+
+const mediaAssetCreateSchema = z.object({
+    label: z.string().trim().min(2).max(160),
+    fileName: z.string().trim().min(1).max(220),
+    fileUrl: z.string().url(),
+    mimeType: z.string().trim().min(3).max(120),
+    category: z.enum(['notification', 'result', 'admit-card', 'answer-key', 'syllabus', 'other']).optional().default('other'),
+    keepStableUrl: z.boolean().optional().default(true),
+    fileSizeBytes: z.coerce.number().int().min(0).optional(),
+});
+
+const mediaAssetPatchSchema = mediaAssetCreateSchema.partial().extend({
+    status: z.enum(['active', 'archived']).optional(),
+});
+
+const mediaListQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+    category: z.enum(['notification', 'result', 'admit-card', 'answer-key', 'syllabus', 'other', 'all']).optional().default('all'),
+    status: z.enum(['active', 'archived', 'all']).optional().default('all'),
+    search: z.string().trim().optional(),
+});
+
+const templateCreateSchema = z.object({
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]),
+    name: z.string().trim().min(2).max(120),
+    description: z.string().trim().max(500).optional().or(z.literal('')),
+    shared: z.boolean().optional().default(true),
+    sections: z.array(z.string().trim().min(2).max(80)).max(20).optional().default([]),
+    payload: z.record(z.unknown()).optional().default({}),
+});
+
+const templatePatchSchema = templateCreateSchema.partial();
+
+const templateListQuerySchema = z.object({
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission', 'all']).optional().default('all'),
+    shared: z
+        .enum(['true', 'false', 'all'])
+        .optional()
+        .default('all'),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+    offset: z.coerce.number().int().min(0).default(0),
+});
+
+const alertCreateSchema = z.object({
+    source: z.enum(['deadline', 'schedule', 'link', 'traffic', 'manual']),
+    severity: z.enum(['info', 'warning', 'critical']),
+    message: z.string().trim().min(3).max(500),
+    status: z.enum(['open', 'acknowledged', 'resolved']).optional().default('open'),
+    metadata: z.record(z.unknown()).optional(),
+});
+
+const alertPatchSchema = alertCreateSchema.partial();
+
+const alertListQuerySchema = z.object({
+    source: z.enum(['deadline', 'schedule', 'link', 'traffic', 'manual', 'all']).optional().default('all'),
+    severity: z.enum(['info', 'warning', 'critical', 'all']).optional().default('all'),
+    status: z.enum(['open', 'acknowledged', 'resolved', 'all']).optional().default('all'),
+    limit: z.coerce.number().int().min(1).max(200).default(60),
+    offset: z.coerce.number().int().min(0).default(0),
+});
+
+const settingValuesSchema = z.object({
+    values: z.array(z.string().trim().min(1).max(120)).max(500),
+});
+
+const adminRoleUpdateSchema = z.object({
+    role: z.enum(['admin', 'editor', 'reviewer', 'viewer']),
+    isActive: z.boolean().optional(),
+});
+
+const seoPatchSchema = z.object({
+    seo: z.object({
+        metaTitle: z.string().max(160).optional().or(z.literal('')),
+        metaDescription: z.string().max(320).optional().or(z.literal('')),
+        canonical: z.string().url().optional().or(z.literal('')),
+        indexPolicy: z.enum(['index', 'noindex']).optional(),
+        ogImage: z.string().url().optional().or(z.literal('')),
+    }),
+    schema: z.record(z.unknown()).optional(),
+});
+
 const mapApprovalResolveFailure = (reason?: string) => {
     if (reason === 'not_found') {
         return { status: 404, code: 'approval_not_found' };
@@ -265,6 +498,101 @@ const parseDateParam = (value?: string, boundary: 'start' | 'end' = 'start'): Da
 
     return parsed;
 };
+
+const normalizeStringList = (values: string[]) => {
+    const deduped = new Set<string>();
+    for (const raw of values) {
+        const next = raw.trim();
+        if (!next) continue;
+        deduped.add(next);
+    }
+    return Array.from(deduped);
+};
+
+const sanitizeOptionalString = (value?: string) => {
+    if (typeof value !== 'string') return undefined;
+    const next = value.trim();
+    return next ? next : undefined;
+};
+
+const upsertLinkHealthAlert = async (input: {
+    brokenUrls: string[];
+    checkedCount: number;
+    redirectCount: number;
+    actorId?: string;
+}) => {
+    if (input.brokenUrls.length === 0) return;
+
+    const alertsCollection = getCollection<AdminAlertDoc>('admin_alerts');
+    const now = new Date();
+    const signature = input.brokenUrls
+        .slice()
+        .sort()
+        .slice(0, 10)
+        .join('|');
+    const recentWindowStart = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+
+    const existing = await alertsCollection.findOne({
+        source: 'link',
+        status: 'open',
+        'metadata.signature': signature,
+        updatedAt: { $gte: recentWindowStart } as any,
+    } as any);
+
+    const alertMessage = `Link health check detected ${input.brokenUrls.length} broken/error URL(s) out of ${input.checkedCount} checked.`;
+    const metadata = {
+        signature,
+        checkedCount: input.checkedCount,
+        brokenCount: input.brokenUrls.length,
+        redirectCount: input.redirectCount,
+        sampleUrls: input.brokenUrls.slice(0, 8),
+    };
+
+    if (existing) {
+        await alertsCollection.updateOne(
+            { _id: (existing as any)._id },
+            {
+                $set: {
+                    message: alertMessage,
+                    severity: input.brokenUrls.length >= 10 ? 'critical' : 'warning',
+                    metadata,
+                    updatedAt: now,
+                    updatedBy: input.actorId,
+                },
+            }
+        );
+        return;
+    }
+
+    await alertsCollection.insertOne({
+        source: 'link',
+        severity: input.brokenUrls.length >= 10 ? 'critical' : 'warning',
+        message: alertMessage,
+        status: 'open',
+        metadata,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: input.actorId,
+        updatedBy: input.actorId,
+    });
+};
+
+const toMongoId = (id: string) => (ObjectId.isValid(id) ? new ObjectId(id) : id);
+const serializeId = (value: unknown) => {
+    if (value && typeof value === 'object' && typeof (value as any).toHexString === 'function') {
+        return (value as any).toHexString();
+    }
+    return typeof value === 'string' ? value : String(value ?? '');
+};
+
+const DEFAULT_HOME_SECTIONS: Omit<HomeSectionDoc, 'updatedAt' | 'updatedBy'>[] = [
+    { key: 'latest-jobs', title: 'Latest Jobs', itemType: 'job', sortRule: 'newest', pinnedIds: [], highlightIds: [] },
+    { key: 'results', title: 'Results', itemType: 'result', sortRule: 'newest', pinnedIds: [], highlightIds: [] },
+    { key: 'admit-card', title: 'Admit Card', itemType: 'admit-card', sortRule: 'newest', pinnedIds: [], highlightIds: [] },
+    { key: 'answer-key', title: 'Answer Key', itemType: 'answer-key', sortRule: 'newest', pinnedIds: [], highlightIds: [] },
+    { key: 'syllabus', title: 'Syllabus', itemType: 'syllabus', sortRule: 'newest', pinnedIds: [], highlightIds: [] },
+    { key: 'important', title: 'Important', itemType: 'important', sortRule: 'sticky', pinnedIds: [], highlightIds: [] },
+];
 
 const getEndpointPath = (url: string) => url.split('?')[0];
 
@@ -575,6 +903,1087 @@ router.get('/dashboard', async (_req, res) => {
     } catch (error) {
         console.error('Dashboard error:', error);
         return res.status(500).json({ error: 'Failed to load dashboard' });
+    }
+});
+
+/**
+ * GET /api/admin/homepage/sections
+ * Homepage section ordering and ranking configuration.
+ */
+router.get('/homepage/sections', requirePermission('announcements:read'), async (_req, res) => {
+    try {
+        const sectionsCollection = getCollection<HomeSectionDoc>('homepage_sections');
+        const docs = await sectionsCollection
+            .find({})
+            .sort({ key: 1 })
+            .toArray();
+
+        if (!docs.length) {
+            return res.json({
+                data: DEFAULT_HOME_SECTIONS.map((item) => ({
+                    ...item,
+                    updatedAt: new Date().toISOString(),
+                })),
+            });
+        }
+
+        return res.json({
+            data: docs.map((doc: any) => ({
+                id: serializeId(doc._id),
+                key: doc.key,
+                title: doc.title,
+                itemType: doc.itemType,
+                sortRule: doc.sortRule,
+                pinnedIds: Array.isArray(doc.pinnedIds) ? doc.pinnedIds : [],
+                highlightIds: Array.isArray(doc.highlightIds) ? doc.highlightIds : [],
+                updatedAt: doc.updatedAt,
+                updatedBy: doc.updatedBy,
+            })),
+        });
+    } catch (error) {
+        console.error('Homepage sections fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load homepage sections' });
+    }
+});
+
+/**
+ * PUT /api/admin/homepage/sections
+ * Upsert homepage section configs.
+ */
+router.put('/homepage/sections', requirePermission('admin:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = sectionUpsertSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const sectionsCollection = getCollection<HomeSectionDoc>('homepage_sections');
+        const now = new Date();
+        const sectionKeys = parsed.data.sections.map((section) => section.key);
+        const operations = parsed.data.sections.map((section) => ({
+            updateOne: {
+                filter: { key: section.key },
+                update: {
+                    $set: {
+                        key: section.key,
+                        title: section.title,
+                        itemType: section.itemType,
+                        sortRule: section.sortRule,
+                        pinnedIds: normalizeStringList(section.pinnedIds),
+                        highlightIds: normalizeStringList(section.highlightIds),
+                        updatedAt: now,
+                        updatedBy: req.user?.userId,
+                    },
+                },
+                upsert: true,
+            },
+        }));
+
+        if (operations.length > 0) {
+            await sectionsCollection.bulkWrite(operations, { ordered: false });
+        }
+
+        await sectionsCollection.deleteMany({ key: { $nin: sectionKeys } as any });
+        recordAdminAudit({
+            action: 'homepage_sections_update',
+            userId: req.user?.userId,
+            metadata: { count: sectionKeys.length },
+        }).catch(console.error);
+
+        const updated = await sectionsCollection.find({}).sort({ key: 1 }).toArray();
+        return res.json({
+            data: updated.map((doc: any) => ({
+                id: serializeId(doc._id),
+                key: doc.key,
+                title: doc.title,
+                itemType: doc.itemType,
+                sortRule: doc.sortRule,
+                pinnedIds: Array.isArray(doc.pinnedIds) ? doc.pinnedIds : [],
+                highlightIds: Array.isArray(doc.highlightIds) ? doc.highlightIds : [],
+                updatedAt: doc.updatedAt,
+                updatedBy: doc.updatedBy,
+            })),
+        });
+    } catch (error) {
+        console.error('Homepage sections update error:', error);
+        return res.status(500).json({ error: 'Failed to update homepage sections' });
+    }
+});
+
+/**
+ * GET /api/admin/links
+ * Link manager listing.
+ */
+router.get('/links', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = linkListQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { limit, offset, type, status, announcementId, search } = parsed.data;
+        const linksCollection = getCollection<LinkRecordDoc>('link_records');
+        const filter: Record<string, unknown> = {};
+        if (type !== 'all') filter.type = type;
+        if (status !== 'all') filter.status = status;
+        if (announcementId) filter.announcementId = announcementId;
+        if (search) {
+            const searchRegex = { $regex: search, $options: 'i' };
+            filter.$or = [{ label: searchRegex }, { url: searchRegex }, { notes: searchRegex }];
+        }
+
+        const [total, docs] = await Promise.all([
+            linksCollection.countDocuments(filter),
+            linksCollection.find(filter).sort({ updatedAt: -1 }).skip(offset).limit(limit).toArray(),
+        ]);
+
+        return res.json({
+            data: docs.map((doc: any) => ({
+                id: serializeId(doc._id),
+                label: doc.label,
+                url: doc.url,
+                type: doc.type,
+                status: doc.status,
+                announcementId: doc.announcementId,
+                notes: doc.notes,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+                updatedBy: doc.updatedBy,
+            })),
+            meta: { total, limit, offset },
+        });
+    } catch (error) {
+        console.error('Links list error:', error);
+        return res.status(500).json({ error: 'Failed to load links' });
+    }
+});
+
+/**
+ * POST /api/admin/links
+ * Create link record.
+ */
+router.post('/links', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = linkRecordCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const linksCollection = getCollection<LinkRecordDoc>('link_records');
+        const now = new Date();
+        const payload = parsed.data;
+        const result = await linksCollection.insertOne({
+            label: payload.label,
+            url: payload.url,
+            type: payload.type,
+            status: payload.status,
+            announcementId: sanitizeOptionalString(payload.announcementId),
+            notes: sanitizeOptionalString(payload.notes),
+            createdAt: now,
+            updatedAt: now,
+            updatedBy: req.user?.userId,
+        });
+
+        recordAdminAudit({
+            action: 'link_create',
+            userId: req.user?.userId,
+            metadata: { label: payload.label, type: payload.type },
+        }).catch(console.error);
+
+        return res.status(201).json({
+            data: {
+                id: serializeId(result.insertedId),
+                ...payload,
+                announcementId: sanitizeOptionalString(payload.announcementId),
+                notes: sanitizeOptionalString(payload.notes),
+                createdAt: now,
+                updatedAt: now,
+                updatedBy: req.user?.userId,
+            },
+        });
+    } catch (error) {
+        console.error('Create link error:', error);
+        return res.status(500).json({ error: 'Failed to create link record' });
+    }
+});
+
+/**
+ * PATCH /api/admin/links/:id
+ * Update link record.
+ */
+router.patch('/links/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = linkRecordPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const linkId = getPathParam(req.params.id);
+        const linksCollection = getCollection<LinkRecordDoc>('link_records');
+        const nextSet: Record<string, unknown> = {
+            updatedAt: new Date(),
+            updatedBy: req.user?.userId,
+        };
+        if (parsed.data.label !== undefined) nextSet.label = parsed.data.label;
+        if (parsed.data.url !== undefined) nextSet.url = parsed.data.url;
+        if (parsed.data.type !== undefined) nextSet.type = parsed.data.type;
+        if (parsed.data.status !== undefined) nextSet.status = parsed.data.status;
+        if (parsed.data.announcementId !== undefined) nextSet.announcementId = sanitizeOptionalString(parsed.data.announcementId);
+        if (parsed.data.notes !== undefined) nextSet.notes = sanitizeOptionalString(parsed.data.notes);
+
+        const result = await linksCollection.findOneAndUpdate(
+            { _id: toMongoId(linkId) as any },
+            { $set: nextSet },
+            { returnDocument: 'after' }
+        );
+        if (!result) {
+            return res.status(404).json({ error: 'Link record not found' });
+        }
+
+        recordAdminAudit({
+            action: 'link_update',
+            userId: req.user?.userId,
+            metadata: { id: linkId },
+        }).catch(console.error);
+
+        return res.json({
+            data: {
+                id: serializeId((result as any)._id),
+                ...(result as any),
+            },
+        });
+    } catch (error) {
+        console.error('Update link error:', error);
+        return res.status(500).json({ error: 'Failed to update link record' });
+    }
+});
+
+/**
+ * POST /api/admin/links/check
+ * Run link health checks.
+ */
+router.post('/links/check', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = linkCheckSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const linksCollection = getCollection<LinkRecordDoc>('link_records');
+        const healthEventsCollection = getCollection<LinkHealthEventDoc>('link_health_events');
+        let targets: Array<{ id?: string; url: string }> = [];
+
+        if (parsed.data.ids && parsed.data.ids.length > 0) {
+            const ids = parsed.data.ids.map((id) => toMongoId(id));
+            const docs = await linksCollection.find({ _id: { $in: ids as any[] } as any }).toArray();
+            targets = docs.map((doc: any) => ({ id: serializeId(doc._id), url: doc.url }));
+        } else if (parsed.data.urls && parsed.data.urls.length > 0) {
+            targets = parsed.data.urls.map((url) => ({ url }));
+        } else {
+            const docs = await linksCollection.find({}).sort({ updatedAt: -1 }).limit(100).toArray();
+            targets = docs.map((doc: any) => ({ id: serializeId(doc._id), url: doc.url }));
+        }
+
+        const timeoutMs = parsed.data.timeoutMs;
+        const results = await Promise.all(targets.map(async (target) => {
+            const startedAt = Date.now();
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(target.url, {
+                    method: 'HEAD',
+                    redirect: 'manual',
+                    signal: controller.signal,
+                });
+                clearTimeout(timeout);
+                const responseTimeMs = Date.now() - startedAt;
+                const statusCode = response.status;
+                const redirectTarget = response.headers.get('location') || undefined;
+                const status: LinkHealthEventDoc['status'] = statusCode >= 200 && statusCode < 300
+                    ? 'ok'
+                    : (statusCode >= 300 && statusCode < 400 ? 'redirect' : 'broken');
+                return {
+                    id: target.id,
+                    url: target.url,
+                    status,
+                    statusCode,
+                    redirectTarget,
+                    responseTimeMs,
+                };
+            } catch {
+                clearTimeout(timeout);
+                return {
+                    id: target.id,
+                    url: target.url,
+                    status: 'error' as const,
+                    responseTimeMs: Date.now() - startedAt,
+                };
+            }
+        }));
+
+        if (results.length > 0) {
+            await healthEventsCollection.insertMany(results.map((item) => ({
+                url: item.url,
+                status: item.status,
+                statusCode: item.statusCode,
+                redirectTarget: item.redirectTarget,
+                responseTimeMs: item.responseTimeMs,
+                checkedAt: new Date(),
+                checkedBy: req.user?.userId,
+            })));
+        }
+
+        const brokenByUrl = new Set(results.filter((item) => item.status === 'broken' || item.status === 'error').map((item) => item.url));
+        const redirectCount = results.filter((item) => item.status === 'redirect').length;
+        if (brokenByUrl.size > 0) {
+            await linksCollection.updateMany(
+                { url: { $in: Array.from(brokenByUrl) } as any },
+                { $set: { status: 'broken', updatedAt: new Date(), updatedBy: req.user?.userId } }
+            );
+            await upsertLinkHealthAlert({
+                brokenUrls: Array.from(brokenByUrl),
+                checkedCount: results.length,
+                redirectCount,
+                actorId: req.user?.userId,
+            });
+        }
+
+        return res.json({
+            data: results,
+            meta: {
+                checked: results.length,
+                broken: results.filter((item) => item.status === 'broken' || item.status === 'error').length,
+                redirects: redirectCount,
+            },
+        });
+    } catch (error) {
+        console.error('Link check error:', error);
+        return res.status(500).json({ error: 'Failed to check links' });
+    }
+});
+
+/**
+ * POST /api/admin/links/replace
+ * Replace a URL across link records and content.
+ */
+router.post('/links/replace', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const parsed = linkReplaceSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { fromUrl, toUrl, scope } = parsed.data;
+
+        const linksCollection = getCollection<LinkRecordDoc>('link_records');
+        const now = new Date();
+        let linksUpdated = 0;
+        let announcementsUpdated = 0;
+
+        if (scope === 'all' || scope === 'links') {
+            const result = await linksCollection.updateMany(
+                { url: fromUrl },
+                { $set: { url: toUrl, updatedAt: now, updatedBy: req.user?.userId, status: 'active' } }
+            );
+            linksUpdated = result.modifiedCount;
+        }
+
+        if (scope === 'all' || scope === 'announcements') {
+            const docs = await AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 });
+            const matched = docs.filter((item: any) => item.externalLink === fromUrl);
+            if (matched.length > 0) {
+                const updates = matched.map((item) => ({
+                    id: item.id,
+                    data: {
+                        externalLink: toUrl,
+                    } as Partial<CreateAnnouncementDto> & { isActive?: boolean },
+                }));
+                const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
+                announcementsUpdated = result.updated;
+            }
+        }
+
+        recordAdminAudit({
+            action: 'link_replace',
+            userId: req.user?.userId,
+            metadata: { fromUrl, toUrl, scope, linksUpdated, announcementsUpdated },
+        }).catch(console.error);
+
+        return res.json({
+            data: {
+                success: true,
+                fromUrl,
+                toUrl,
+                scope,
+                linksUpdated,
+                announcementsUpdated,
+            },
+        });
+    } catch (error) {
+        console.error('Link replace error:', error);
+        return res.status(500).json({ error: 'Failed to replace links' });
+    }
+});
+
+/**
+ * GET /api/admin/media
+ * Media/PDF listing.
+ */
+router.get('/media', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = mediaListQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const { limit, offset, category, status, search } = parsed.data;
+        const mediaCollection = getCollection<MediaAssetDoc>('media_assets');
+        const filter: Record<string, unknown> = {};
+        if (category !== 'all') filter.category = category;
+        if (status !== 'all') filter.status = status;
+        if (search) {
+            const searchRegex = { $regex: search, $options: 'i' };
+            filter.$or = [{ label: searchRegex }, { fileName: searchRegex }, { fileUrl: searchRegex }];
+        }
+        const [total, docs] = await Promise.all([
+            mediaCollection.countDocuments(filter),
+            mediaCollection.find(filter).sort({ updatedAt: -1 }).skip(offset).limit(limit).toArray(),
+        ]);
+        return res.json({
+            data: docs.map((doc: any) => ({
+                id: serializeId(doc._id),
+                ...doc,
+            })),
+            meta: { total, limit, offset },
+        });
+    } catch (error) {
+        console.error('Media list error:', error);
+        return res.status(500).json({ error: 'Failed to load media assets' });
+    }
+});
+
+/**
+ * POST /api/admin/media
+ * Add media/PDF metadata entry.
+ */
+router.post('/media', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = mediaAssetCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const mediaCollection = getCollection<MediaAssetDoc>('media_assets');
+        const now = new Date();
+        const payload = parsed.data;
+        const cleanFileName = payload.fileName
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9._-]/g, '');
+        const result = await mediaCollection.insertOne({
+            label: payload.label,
+            fileName: cleanFileName,
+            fileUrl: payload.fileUrl,
+            mimeType: payload.mimeType,
+            category: payload.category,
+            keepStableUrl: payload.keepStableUrl,
+            fileSizeBytes: payload.fileSizeBytes,
+            status: 'active',
+            createdAt: now,
+            updatedAt: now,
+            updatedBy: req.user?.userId,
+        });
+        recordAdminAudit({
+            action: 'media_create',
+            userId: req.user?.userId,
+            metadata: { fileName: cleanFileName, category: payload.category },
+        }).catch(console.error);
+        return res.status(201).json({
+            data: {
+                id: serializeId(result.insertedId),
+                label: payload.label,
+                fileName: cleanFileName,
+                fileUrl: payload.fileUrl,
+                mimeType: payload.mimeType,
+                category: payload.category,
+                keepStableUrl: payload.keepStableUrl,
+                fileSizeBytes: payload.fileSizeBytes,
+                status: 'active',
+                createdAt: now,
+                updatedAt: now,
+                updatedBy: req.user?.userId,
+            },
+        });
+    } catch (error) {
+        console.error('Media create error:', error);
+        return res.status(500).json({ error: 'Failed to create media asset' });
+    }
+});
+
+/**
+ * PATCH /api/admin/media/:id
+ * Update media metadata.
+ */
+router.patch('/media/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = mediaAssetPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const mediaId = getPathParam(req.params.id);
+        const mediaCollection = getCollection<MediaAssetDoc>('media_assets');
+        const updateSet: Record<string, unknown> = {
+            updatedAt: new Date(),
+            updatedBy: req.user?.userId,
+        };
+        if (parsed.data.label !== undefined) updateSet.label = parsed.data.label;
+        if (parsed.data.fileName !== undefined) updateSet.fileName = parsed.data.fileName;
+        if (parsed.data.fileUrl !== undefined) updateSet.fileUrl = parsed.data.fileUrl;
+        if (parsed.data.mimeType !== undefined) updateSet.mimeType = parsed.data.mimeType;
+        if (parsed.data.category !== undefined) updateSet.category = parsed.data.category;
+        if (parsed.data.keepStableUrl !== undefined) updateSet.keepStableUrl = parsed.data.keepStableUrl;
+        if (parsed.data.fileSizeBytes !== undefined) updateSet.fileSizeBytes = parsed.data.fileSizeBytes;
+        if (parsed.data.status !== undefined) updateSet.status = parsed.data.status;
+
+        const updated = await mediaCollection.findOneAndUpdate(
+            { _id: toMongoId(mediaId) as any },
+            { $set: updateSet },
+            { returnDocument: 'after' }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Media asset not found' });
+        }
+
+        recordAdminAudit({
+            action: 'media_update',
+            userId: req.user?.userId,
+            metadata: { id: mediaId },
+        }).catch(console.error);
+
+        return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
+    } catch (error) {
+        console.error('Media update error:', error);
+        return res.status(500).json({ error: 'Failed to update media asset' });
+    }
+});
+
+/**
+ * GET /api/admin/templates
+ * Fetch posting templates.
+ */
+router.get('/templates', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = templateListQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
+        const filter: Record<string, unknown> = {};
+        if (parsed.data.type !== 'all') filter.type = parsed.data.type;
+        if (parsed.data.shared !== 'all') filter.shared = parsed.data.shared === 'true';
+
+        const [total, docs] = await Promise.all([
+            templatesCollection.countDocuments(filter),
+            templatesCollection
+                .find(filter)
+                .sort({ updatedAt: -1 })
+                .skip(parsed.data.offset)
+                .limit(parsed.data.limit)
+                .toArray(),
+        ]);
+
+        return res.json({
+            data: docs.map((doc: any) => ({ id: serializeId(doc._id), ...doc })),
+            meta: { total, limit: parsed.data.limit, offset: parsed.data.offset },
+        });
+    } catch (error) {
+        console.error('Template list error:', error);
+        return res.status(500).json({ error: 'Failed to load templates' });
+    }
+});
+
+/**
+ * POST /api/admin/templates
+ * Create posting template.
+ */
+router.post('/templates', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = templateCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
+        const now = new Date();
+        const payload = parsed.data;
+        const result = await templatesCollection.insertOne({
+            type: payload.type,
+            name: payload.name,
+            description: sanitizeOptionalString(payload.description),
+            shared: payload.shared,
+            sections: normalizeStringList(payload.sections),
+            payload: payload.payload ?? {},
+            createdAt: now,
+            updatedAt: now,
+            createdBy: req.user?.userId,
+            updatedBy: req.user?.userId,
+        });
+
+        recordAdminAudit({
+            action: 'template_create',
+            userId: req.user?.userId,
+            metadata: { type: payload.type, name: payload.name },
+        }).catch(console.error);
+
+        return res.status(201).json({
+            data: {
+                id: serializeId(result.insertedId),
+                type: payload.type,
+                name: payload.name,
+                description: sanitizeOptionalString(payload.description),
+                shared: payload.shared,
+                sections: normalizeStringList(payload.sections),
+                payload: payload.payload ?? {},
+                createdAt: now,
+                updatedAt: now,
+            },
+        });
+    } catch (error) {
+        console.error('Template create error:', error);
+        return res.status(500).json({ error: 'Failed to create template' });
+    }
+});
+
+/**
+ * PATCH /api/admin/templates/:id
+ * Update posting template.
+ */
+router.patch('/templates/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = templatePatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const templateId = getPathParam(req.params.id);
+        const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
+        const setData: Record<string, unknown> = {
+            updatedAt: new Date(),
+            updatedBy: req.user?.userId,
+        };
+        if (parsed.data.type !== undefined) setData.type = parsed.data.type;
+        if (parsed.data.name !== undefined) setData.name = parsed.data.name;
+        if (parsed.data.description !== undefined) setData.description = sanitizeOptionalString(parsed.data.description);
+        if (parsed.data.shared !== undefined) setData.shared = parsed.data.shared;
+        if (parsed.data.sections !== undefined) setData.sections = normalizeStringList(parsed.data.sections);
+        if (parsed.data.payload !== undefined) setData.payload = parsed.data.payload;
+
+        const updated = await templatesCollection.findOneAndUpdate(
+            { _id: toMongoId(templateId) as any },
+            { $set: setData },
+            { returnDocument: 'after' }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+
+        recordAdminAudit({
+            action: 'template_update',
+            userId: req.user?.userId,
+            metadata: { id: templateId },
+        }).catch(console.error);
+
+        return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
+    } catch (error) {
+        console.error('Template update error:', error);
+        return res.status(500).json({ error: 'Failed to update template' });
+    }
+});
+
+/**
+ * GET /api/admin/alerts
+ * Notifications and alerts feed.
+ */
+router.get('/alerts', requirePermission('admin:read'), async (req, res) => {
+    try {
+        const parsed = alertListQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const alertsCollection = getCollection<AdminAlertDoc>('admin_alerts');
+        const filter: Record<string, unknown> = {};
+        if (parsed.data.source !== 'all') filter.source = parsed.data.source;
+        if (parsed.data.severity !== 'all') filter.severity = parsed.data.severity;
+        if (parsed.data.status !== 'all') filter.status = parsed.data.status;
+
+        const [total, docs] = await Promise.all([
+            alertsCollection.countDocuments(filter),
+            alertsCollection
+                .find(filter)
+                .sort({ createdAt: -1 })
+                .skip(parsed.data.offset)
+                .limit(parsed.data.limit)
+                .toArray(),
+        ]);
+
+        return res.json({
+            data: docs.map((doc: any) => ({ id: serializeId(doc._id), ...doc })),
+            meta: { total, limit: parsed.data.limit, offset: parsed.data.offset },
+        });
+    } catch (error) {
+        console.error('Alerts list error:', error);
+        return res.status(500).json({ error: 'Failed to load alerts' });
+    }
+});
+
+/**
+ * POST /api/admin/alerts
+ * Create manual/admin alert.
+ */
+router.post('/alerts', requirePermission('admin:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = alertCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const alertsCollection = getCollection<AdminAlertDoc>('admin_alerts');
+        const now = new Date();
+        const payload = parsed.data;
+        const result = await alertsCollection.insertOne({
+            source: payload.source,
+            severity: payload.severity,
+            message: payload.message,
+            status: payload.status,
+            metadata: payload.metadata,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: req.user?.userId,
+            updatedBy: req.user?.userId,
+        });
+
+        recordAdminAudit({
+            action: 'alert_create',
+            userId: req.user?.userId,
+            metadata: { source: payload.source, severity: payload.severity },
+        }).catch(console.error);
+
+        return res.status(201).json({
+            data: {
+                id: serializeId(result.insertedId),
+                source: payload.source,
+                severity: payload.severity,
+                message: payload.message,
+                status: payload.status,
+                metadata: payload.metadata,
+                createdAt: now,
+                updatedAt: now,
+            },
+        });
+    } catch (error) {
+        console.error('Alert create error:', error);
+        return res.status(500).json({ error: 'Failed to create alert' });
+    }
+});
+
+/**
+ * PATCH /api/admin/alerts/:id
+ * Update alert state.
+ */
+router.patch('/alerts/:id', requirePermission('admin:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = alertPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const alertId = getPathParam(req.params.id);
+        const alertsCollection = getCollection<AdminAlertDoc>('admin_alerts');
+        const setData: Record<string, unknown> = {
+            updatedAt: new Date(),
+            updatedBy: req.user?.userId,
+        };
+        if (parsed.data.source !== undefined) setData.source = parsed.data.source;
+        if (parsed.data.severity !== undefined) setData.severity = parsed.data.severity;
+        if (parsed.data.message !== undefined) setData.message = parsed.data.message;
+        if (parsed.data.status !== undefined) setData.status = parsed.data.status;
+        if (parsed.data.metadata !== undefined) setData.metadata = parsed.data.metadata;
+        const updated = await alertsCollection.findOneAndUpdate(
+            { _id: toMongoId(alertId) as any },
+            { $set: setData },
+            { returnDocument: 'after' }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'Alert not found' });
+        }
+        recordAdminAudit({
+            action: 'alert_update',
+            userId: req.user?.userId,
+            metadata: { id: alertId },
+        }).catch(console.error);
+        return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
+    } catch (error) {
+        console.error('Alert update error:', error);
+        return res.status(500).json({ error: 'Failed to update alert' });
+    }
+});
+
+/**
+ * GET /api/admin/settings/:key
+ * Read configurable taxonomy arrays.
+ */
+router.get('/settings/:key', requirePermission('admin:read'), async (req, res) => {
+    try {
+        const settingsKey = getPathParam(req.params.key);
+        if (settingsKey !== 'states' && settingsKey !== 'boards' && settingsKey !== 'tags') {
+            return res.status(400).json({ error: 'Invalid settings key' });
+        }
+        const typedKey = settingsKey as AdminSettingsDoc['key'];
+        const settingsCollection = getCollection<AdminSettingsDoc>('admin_settings');
+        const existing = await settingsCollection.findOne({ key: typedKey });
+        return res.json({
+            data: {
+                key: typedKey,
+                values: existing?.values ?? [],
+                updatedAt: existing?.updatedAt ?? null,
+                updatedBy: existing?.updatedBy ?? null,
+            },
+        });
+    } catch (error) {
+        console.error('Settings fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load settings' });
+    }
+});
+
+/**
+ * PUT /api/admin/settings/:key
+ * Update taxonomy arrays.
+ */
+router.put('/settings/:key', requirePermission('admin:write'), idempotency(), async (req, res) => {
+    try {
+        const settingsKey = getPathParam(req.params.key);
+        if (settingsKey !== 'states' && settingsKey !== 'boards' && settingsKey !== 'tags') {
+            return res.status(400).json({ error: 'Invalid settings key' });
+        }
+        const typedKey = settingsKey as AdminSettingsDoc['key'];
+        const parsed = settingValuesSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const settingsCollection = getCollection<AdminSettingsDoc>('admin_settings');
+        const values = normalizeStringList(parsed.data.values);
+        const now = new Date();
+        await settingsCollection.updateOne(
+            { key: typedKey },
+            {
+                $set: {
+                    key: typedKey,
+                    values,
+                    updatedAt: now,
+                    updatedBy: req.user?.userId,
+                },
+            },
+            { upsert: true }
+        );
+        recordAdminAudit({
+            action: `settings_${settingsKey}_update`,
+            userId: req.user?.userId,
+            metadata: { count: values.length },
+        }).catch(console.error);
+        return res.json({
+            data: {
+                key: typedKey,
+                values,
+                updatedAt: now,
+                updatedBy: req.user?.userId,
+            },
+        });
+    } catch (error) {
+        console.error('Settings update error:', error);
+        return res.status(500).json({ error: 'Failed to update settings' });
+    }
+});
+
+/**
+ * GET /api/admin/users
+ * Admin user roster with roles.
+ */
+router.get('/users', requirePermission('security:read'), async (_req, res) => {
+    try {
+        const usersCollection = getCollection<AdminUserListDoc>('users');
+        const docs = await usersCollection
+            .find({ role: { $in: ['admin', 'editor', 'reviewer', 'viewer'] } as any })
+            .sort({ updatedAt: -1 })
+            .limit(500)
+            .toArray();
+
+        return res.json({
+            data: docs.map((doc: any) => ({
+                id: serializeId(doc._id),
+                email: doc.email,
+                username: doc.username,
+                role: doc.role,
+                isActive: Boolean(doc.isActive),
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+                lastLoginAt: doc.lastLoginAt ?? null,
+            })),
+        });
+    } catch (error) {
+        console.error('Admin users list error:', error);
+        return res.status(500).json({ error: 'Failed to load users' });
+    }
+});
+
+/**
+ * PATCH /api/admin/users/:id/role
+ * Update admin user role / status.
+ */
+router.patch('/users/:id/role', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const userId = getPathParam(req.params.id);
+        const parsed = adminRoleUpdateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const usersCollection = getCollection<AdminUserListDoc>('users');
+        const setData: Record<string, unknown> = {
+            role: parsed.data.role,
+            updatedAt: new Date(),
+        };
+        if (parsed.data.isActive !== undefined) {
+            setData.isActive = parsed.data.isActive;
+        }
+        const updated = await usersCollection.findOneAndUpdate(
+            { _id: toMongoId(userId) as any },
+            { $set: setData },
+            { returnDocument: 'after' }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        recordAdminAudit({
+            action: 'admin_role_update',
+            userId: req.user?.userId,
+            metadata: { targetUserId: userId, role: parsed.data.role },
+        }).catch(console.error);
+
+        return res.json({
+            data: {
+                id: serializeId((updated as any)._id),
+                email: (updated as any).email,
+                username: (updated as any).username,
+                role: (updated as any).role,
+                isActive: Boolean((updated as any).isActive),
+                updatedAt: (updated as any).updatedAt,
+            },
+        });
+    } catch (error) {
+        console.error('Admin role update error:', error);
+        return res.status(500).json({ error: 'Failed to update admin role' });
+    }
+});
+
+/**
+ * PATCH /api/admin/announcements/:id/seo
+ * Update SEO/schema fields for a content record.
+ */
+router.patch('/announcements/:id/seo', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const announcementId = getPathParam(req.params.id);
+        const parsed = seoPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const payload: Partial<CreateAnnouncementDto> = {
+            seo: {
+                metaTitle: sanitizeOptionalString(parsed.data.seo.metaTitle),
+                metaDescription: sanitizeOptionalString(parsed.data.seo.metaDescription),
+                canonical: sanitizeOptionalString(parsed.data.seo.canonical),
+                indexPolicy: parsed.data.seo.indexPolicy,
+                ogImage: sanitizeOptionalString(parsed.data.seo.ogImage),
+            },
+            schema: parsed.data.schema,
+        } as Partial<CreateAnnouncementDto>;
+
+        const updated = await AnnouncementModelMongo.update(announcementId, payload, req.user?.userId);
+        if (!updated) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+        recordAdminAudit({
+            action: 'announcement_seo_update',
+            userId: req.user?.userId,
+            announcementId,
+            title: updated.title,
+        }).catch(console.error);
+        return res.json({ data: updated });
+    } catch (error) {
+        console.error('Announcement SEO update error:', error);
+        return res.status(500).json({ error: 'Failed to update SEO fields' });
+    }
+});
+
+/**
+ * GET /api/admin/reports
+ * Operational report snapshot for links, deadlines, traffic, and queue.
+ */
+router.get('/reports', requirePermission('analytics:read'), async (_req, res) => {
+    try {
+        const announcements = await AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 });
+        const now = Date.now();
+        const inSevenDays = now + 7 * 24 * 60 * 60 * 1000;
+        const expired = announcements.filter((item: any) => item.deadline && new Date(item.deadline).getTime() < now);
+        const upcoming = announcements
+            .filter((item: any) => {
+                if (!item.deadline) return false;
+                const ts = new Date(item.deadline).getTime();
+                return !Number.isNaN(ts) && ts >= now && ts <= inSevenDays;
+            })
+            .sort((a: any, b: any) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+            .slice(0, 25);
+
+        const topViewed24h = announcements
+            .slice()
+            .sort((a: any, b: any) => (b.viewCount || 0) - (a.viewCount || 0))
+            .slice(0, 10);
+
+        const linkRecords = await getCollection<LinkRecordDoc>('link_records').find({}).toArray();
+        const brokenLinks = linkRecords.filter((item) => item.status === 'broken');
+        const pendingDrafts = announcements.filter((item: any) => (item.status || 'published') === 'draft');
+        const scheduled = announcements.filter((item: any) => item.status === 'scheduled');
+        const pendingReview = announcements.filter((item: any) => item.status === 'pending');
+
+        return res.json({
+            data: {
+                summary: {
+                    totalPosts: announcements.length,
+                    pendingDrafts: pendingDrafts.length,
+                    scheduled: scheduled.length,
+                    pendingReview: pendingReview.length,
+                    brokenLinks: brokenLinks.length,
+                    expired: expired.length,
+                },
+                mostViewed24h: topViewed24h.map((item: any) => ({
+                    id: item.id,
+                    title: item.title,
+                    type: item.type,
+                    views: item.viewCount || 0,
+                    organization: item.organization,
+                })),
+                upcomingDeadlines: upcoming.map((item: any) => ({
+                    id: item.id,
+                    title: item.title,
+                    type: item.type,
+                    deadline: item.deadline,
+                    organization: item.organization,
+                })),
+                brokenLinkItems: brokenLinks.slice(0, 50).map((item: any) => ({
+                    id: serializeId((item as any)._id),
+                    label: item.label,
+                    url: item.url,
+                    updatedAt: item.updatedAt,
+                    announcementId: item.announcementId,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error('Reports fetch error:', error);
+        return res.status(500).json({ error: 'Failed to load reports' });
     }
 });
 
