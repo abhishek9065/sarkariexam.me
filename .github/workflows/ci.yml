@@ -184,16 +184,19 @@ jobs:
           JWT_SECRET=test-secret \
           node backend/dist/server.js > backend-integration.log 2>&1 &
 
-      - name: Wait for backend health
+      - name: Wait for backend deep health (DB ready)
         run: |
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:5000/api/health > /dev/null; then
-              echo "Backend is healthy"
+          for i in {1..60}; do
+            deep_health="$(curl -fsS http://127.0.0.1:5000/api/health/deep || true)"
+            if echo "$deep_health" | grep -q '"status":"ok"'; then
+              echo "Backend is healthy with database ready"
               exit 0
             fi
+            echo "Waiting for backend deep health... attempt $i/60"
             sleep 2
           done
-          echo "Backend did not become healthy in time"
+          echo "Backend deep health did not become ready in time"
+          curl -fsS http://127.0.0.1:5000/api/health/deep || true
           exit 1
 
       - name: Install frontend dependencies
@@ -247,7 +250,7 @@ jobs:
       - name: Run admin Playwright smoke
         run: npm run test:e2e:ci
         env:
-          VITE_ADMIN_BASENAME: /admin
+          VITE_ADMIN_BASENAME: /admin-vnext
           VITE_ADMIN_E2E_STEPUP_BYPASS: 'true'
 
       - name: Upload admin Playwright artifacts
@@ -313,16 +316,19 @@ jobs:
           ADMIN_DUAL_APPROVAL_REQUIRED=false \
           node backend/dist/server.js > backend-admin-integration.log 2>&1 &
 
-      - name: Wait for backend health
+      - name: Wait for backend deep health (DB ready)
         run: |
-          for i in {1..40}; do
-            if curl -fsS http://127.0.0.1:5000/api/health > /dev/null; then
-              echo "Backend is healthy"
+          for i in {1..60}; do
+            deep_health="$(curl -fsS http://127.0.0.1:5000/api/health/deep || true)"
+            if echo "$deep_health" | grep -q '"status":"ok"'; then
+              echo "Backend is healthy with database ready"
               exit 0
             fi
+            echo "Waiting for backend deep health... attempt $i/60"
             sleep 2
           done
-          echo "Backend did not become healthy in time"
+          echo "Backend deep health did not become ready in time"
+          curl -fsS http://127.0.0.1:5000/api/health/deep || true
           exit 1
 
       - name: Install admin frontend dependencies
@@ -338,7 +344,7 @@ jobs:
         working-directory: admin-frontend
         env:
           VITE_PROXY_TARGET: http://127.0.0.1:5000
-          VITE_ADMIN_BASENAME: /admin
+          VITE_ADMIN_BASENAME: /admin-vnext
           VITE_ADMIN_E2E_STEPUP_BYPASS: 'false'
           ADMIN_E2E_EMAIL: admin.integration@sarkariexams.me
           ADMIN_E2E_PASSWORD: Password#12345
@@ -354,8 +360,4 @@ jobs:
             admin-frontend/playwright-report
             admin-frontend/test-results
           if-no-files-found: ignore
-
-
-
-
 

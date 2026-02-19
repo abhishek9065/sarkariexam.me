@@ -5,6 +5,10 @@ const adminPassword = process.env.ADMIN_E2E_PASSWORD ?? 'Password#12345';
 const adminSetupKey = process.env.ADMIN_E2E_SETUP_KEY ?? 'setup-admin-123';
 
 type JsonObject = Record<string, unknown>;
+const setupStatusMaxAttempts = 20;
+const setupStatusRetryDelayMs = 1500;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function getCsrfToken(api: APIRequestContext): Promise<string> {
     const response = await api.get('/api/auth/csrf');
@@ -16,11 +20,43 @@ async function getCsrfToken(api: APIRequestContext): Promise<string> {
 }
 
 async function ensureAdminAccount(api: APIRequestContext): Promise<void> {
-    const statusResponse = await api.get('/api/auth/admin/setup-status');
-    expect(statusResponse.ok()).toBe(true);
-    const statusBody = (await statusResponse.json()) as { needsSetup?: boolean };
+    let needsSetup = false;
+    let setupStatusResolved = false;
+    let lastStatus = 0;
+    let lastBody = '';
 
-    if (!statusBody?.needsSetup) return;
+    for (let attempt = 1; attempt <= setupStatusMaxAttempts; attempt += 1) {
+        const statusResponse = await api.get('/api/auth/admin/setup-status');
+        lastStatus = statusResponse.status();
+        lastBody = await statusResponse.text();
+
+        if (!statusResponse.ok()) {
+            if (attempt < setupStatusMaxAttempts) {
+                await sleep(setupStatusRetryDelayMs);
+                continue;
+            }
+            break;
+        }
+
+        const statusBody = JSON.parse(lastBody) as { needsSetup?: boolean; data?: { needsSetup?: boolean } };
+        const parsedNeedsSetup = statusBody?.needsSetup ?? statusBody?.data?.needsSetup;
+        if (typeof parsedNeedsSetup === 'boolean') {
+            needsSetup = parsedNeedsSetup;
+            setupStatusResolved = true;
+            break;
+        }
+
+        if (attempt < setupStatusMaxAttempts) {
+            await sleep(setupStatusRetryDelayMs);
+        }
+    }
+
+    expect(
+        setupStatusResolved,
+        `Unable to resolve /api/auth/admin/setup-status after ${setupStatusMaxAttempts} attempts. Last status=${lastStatus}, body=${lastBody}`
+    ).toBe(true);
+
+    if (!needsSetup) return;
 
     const csrfToken = await getCsrfToken(api);
     const setupResponse = await api.post('/api/auth/admin/setup', {
