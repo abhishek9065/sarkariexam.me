@@ -313,7 +313,7 @@ export function Header() {
                             </div>
 
                             <div className="header-mobile-block">
-                                <span className="header-mobile-block-title">Apps & Channels</span>
+                                <span className="header-mobile-block-title">Channels</span>
                                 <a href="https://t.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-mobile-link">✈️ Telegram</a>
                                 <a href="https://wa.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-mobile-link">💬 WhatsApp</a>
                             </div>
