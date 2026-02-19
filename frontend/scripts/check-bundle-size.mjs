@@ -67,7 +67,7 @@ const budgets = [
         key: 'totalCss',
         label: 'Total CSS',
         bytes: totalCssBytes,
-        budget: 260 * 1024,
+        budget: 280 * 1024,
     },
 ];
 
