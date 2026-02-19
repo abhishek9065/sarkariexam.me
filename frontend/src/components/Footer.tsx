@@ -11,11 +11,6 @@ const SOCIAL_LINKS = [
     { label: 'YouTube', href: 'https://youtube.com/@sarkariexamsme', icon: '▶', platform: 'youtube' },
 ];
 
-const APP_LINKS = [
-    { label: 'Android App', href: 'https://play.google.com/store/apps', icon: '▶', store: 'Google Play', platform: 'android' },
-    { label: 'iOS App', href: 'https://apps.apple.com/', icon: '', store: 'App Store', platform: 'ios' },
-];
-
 const ORG_LINK_GROUPS: Array<Array<{ label: string; to: string }>> = [
     [
         { label: 'BPSC', to: '/jobs?q=BPSC' },
@@ -80,21 +75,6 @@ export function Footer() {
                             <a key={item.label} href={item.href} target="_blank" rel="noreferrer" className={`footer-social-link footer-social-${item.platform}`}>
                                 <span className="footer-social-icon">{item.icon}</span>
                                 <span>{item.label}</span>
-                            </a>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="footer-app-zone">
-                    <h3>Download Our Apps</h3>
-                    <div className="footer-app-buttons">
-                        {APP_LINKS.map((item) => (
-                            <a key={item.label} href={item.href} target="_blank" rel="noreferrer" className={`footer-app-btn footer-app-${item.platform}`}>
-                                <span className="footer-app-icon">{item.icon}</span>
-                                <span className="footer-app-text">
-                                    <span className="footer-app-small">Get it on</span>
-                                    <span className="footer-app-store">{item.store}</span>
-                                </span>
                             </a>
                         ))}
                     </div>

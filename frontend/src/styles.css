@@ -4079,7 +4079,6 @@ h6 {
 
 /* ── Section Headings ── */
 .footer-social-zone h3,
-.footer-app-zone h3,
 .footer-org-zone h3 {
     font-family: 'Outfit', 'Inter', sans-serif;
     font-size: var(--font-xl);
@@ -4135,71 +4134,6 @@ h6 {
 
 .footer-social-link:hover {
     transform: translateY(-4px) scale(1.02);
-}
-
-/* ── App Store Buttons ── */
-.footer-app-buttons {
-    display: flex;
-    gap: var(--space-4);
-    flex-wrap: wrap;
-}
-
-.footer-app-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-width: 200px;
-    padding: 14px var(--space-6);
-    border: 1.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: var(--radius-xl);
-    background: rgba(255, 255, 255, 0.06);
-    color: #e2e8f0;
-    font-weight: var(--weight-bold);
-    font-size: var(--font-sm);
-    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(8px);
-}
-
-.footer-app-icon {
-    font-size: 1.6rem;
-    flex-shrink: 0;
-}
-
-.footer-app-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.2;
-}
-
-.footer-app-small {
-    font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: var(--weight-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.footer-app-store {
-    font-size: 1.05rem;
-    font-weight: var(--weight-extrabold);
-    font-family: 'Outfit', 'Inter', sans-serif;
-    color: #f1f5f9;
-}
-
-.footer-app-android:hover {
-    background: linear-gradient(135deg, #34a853, #0f9d58);
-    border-color: transparent;
-    color: #fff;
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(52, 168, 83, 0.35);
-}
-
-.footer-app-ios:hover {
-    background: linear-gradient(135deg, #555, #333);
-    border-color: transparent;
-    color: #fff;
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
 }
 
 /* ── Org Links ── */
