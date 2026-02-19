@@ -122,8 +122,6 @@ export function Header() {
                     <div className="container header-utility-inner">
                         <p className="header-tagline">{t('header.tagline')}</p>
                         <div className="header-utility-links">
-                            <a href="https://play.google.com/store/apps" target="_blank" rel="noreferrer" className="header-utility-link">📱 Android</a>
-                            <a href="https://apps.apple.com/" target="_blank" rel="noreferrer" className="header-utility-link">🍎 iOS</a>
                             <a href="https://t.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-utility-link">✈️ Telegram</a>
                             <a href="https://youtube.com/@sarkariexamsme" target="_blank" rel="noreferrer" className="header-utility-link">▶️ YouTube</a>
                             <button
@@ -316,8 +314,6 @@ export function Header() {
 
                             <div className="header-mobile-block">
                                 <span className="header-mobile-block-title">Apps & Channels</span>
-                                <a href="https://play.google.com/store/apps" target="_blank" rel="noreferrer" className="header-mobile-link">📱 Android App</a>
-                                <a href="https://apps.apple.com/" target="_blank" rel="noreferrer" className="header-mobile-link">🍎 iOS App</a>
                                 <a href="https://t.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-mobile-link">✈️ Telegram</a>
                                 <a href="https://wa.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-mobile-link">💬 WhatsApp</a>
                             </div>
