@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { AnnouncementCard as CardType, ContentType } from '../types';
 import { buildAnnouncementDetailPath, type SourceTag } from '../utils/trackingLinks';
+import { trackEvent } from '../utils/analytics';
 
 const TYPE_LABELS: Record<ContentType, string> = {
     job: 'Job',
@@ -57,19 +58,26 @@ export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
     const deadlineInfo = getDeadlineStatus(card.deadline);
     const detailPath = buildAnnouncementDetailPath(card.type, card.slug, sourceTag);
 
+    const handleClick = () => {
+        trackEvent('card_click', { type: card.type, slug: card.slug, source: sourceTag || 'unknown' });
+    };
+
     return (
-        <Link to={detailPath} className="announcement-card card card-clickable" data-source={sourceTag}>
+        <Link to={detailPath} className="announcement-card card card-clickable" data-source={sourceTag} onClick={handleClick}>
             <div className="announcement-card-header">
                 {showType && (
                     <span className={`badge badge-${card.type}`}>
                         {TYPE_ICONS[card.type]} {TYPE_LABELS[card.type]}
                     </span>
                 )}
-                {deadlineInfo && (
-                    <span className={`announcement-deadline ${deadlineInfo.className}`}>
-                        {deadlineInfo.label}
-                    </span>
-                )}
+                <div className="announcement-card-badges">
+                    <span className="announcement-verified" title="From official source">✓ Official</span>
+                    {deadlineInfo && (
+                        <span className={`announcement-deadline ${deadlineInfo.className}`}>
+                            {deadlineInfo.label}
+                        </span>
+                    )}
+                </div>
             </div>
 
             <h3 className="announcement-card-title">{card.title}</h3>
@@ -88,12 +96,19 @@ export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
             </div>
 
             <div className="announcement-card-footer">
-                {card.totalPosts != null && card.totalPosts > 0 && (
-                    <span className="announcement-card-posts">
-                        👥 {card.totalPosts.toLocaleString()} posts
-                    </span>
-                )}
-                <span className="announcement-card-date">
+                <div className="announcement-card-stats">
+                    {card.totalPosts != null && card.totalPosts > 0 && (
+                        <span className="announcement-card-posts">
+                            👥 {card.totalPosts.toLocaleString()} posts
+                        </span>
+                    )}
+                    {card.viewCount != null && card.viewCount > 0 && (
+                        <span className="announcement-card-views">
+                            👁 {card.viewCount.toLocaleString()}
+                        </span>
+                    )}
+                </div>
+                <span className="announcement-card-date" title="Last updated">
                     {formatDate(card.postedAt)}
                 </span>
             </div>

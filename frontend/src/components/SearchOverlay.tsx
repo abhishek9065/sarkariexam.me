@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSearchSuggestions, getTrendingSearches } from '../utils/api';
 import type { SearchSuggestion, ContentType } from '../types';
 import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
+import { trackEvent } from '../utils/analytics';
 
 const TYPE_ICONS: Record<ContentType, string> = {
     job: '💼',
@@ -12,6 +13,36 @@ const TYPE_ICONS: Record<ContentType, string> = {
     admission: '🎓',
     syllabus: '📚',
 };
+
+const QUICK_FILTERS: Array<{ label: string; query: string }> = [
+    { label: 'SSC', query: 'SSC' },
+    { label: 'UPSC', query: 'UPSC' },
+    { label: 'Railway', query: 'Railway' },
+    { label: 'Bank', query: 'Bank' },
+    { label: 'Defence', query: 'Defence' },
+    { label: 'Police', query: 'Police' },
+];
+
+const RECENT_KEY = 'sr_recent_searches';
+const MAX_RECENT = 8;
+
+function getRecentSearches(): string[] {
+    try {
+        return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').slice(0, MAX_RECENT);
+    } catch { return []; }
+}
+
+function pushRecentSearch(term: string) {
+    try {
+        const existing = getRecentSearches().filter((t) => t.toLowerCase() !== term.toLowerCase());
+        existing.unshift(term);
+        localStorage.setItem(RECENT_KEY, JSON.stringify(existing.slice(0, MAX_RECENT)));
+    } catch { /* noop */ }
+}
+
+function clearRecentSearches() {
+    try { localStorage.removeItem(RECENT_KEY); } catch { /* noop */ }
+}
 
 interface Props {
     isOpen: boolean;
@@ -24,6 +55,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     const [query, setQuery] = useState('');
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
     const [trendingTerms, setTrendingTerms] = useState<string[]>(FALLBACK_TRENDING);
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedIdx, setSelectedIdx] = useState(-1);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +68,8 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
         setQuery('');
         setSuggestions([]);
         setSelectedIdx(-1);
+        setRecentSearches(getRecentSearches());
+        trackEvent('search_open');
 
         let mounted = true;
         (async () => {
@@ -89,6 +123,8 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     }, [query]);
 
     const goTo = useCallback((suggestion: SearchSuggestion) => {
+        pushRecentSearch(suggestion.title);
+        trackEvent('search_select', { type: suggestion.type, slug: suggestion.slug });
         navigate(buildAnnouncementDetailPath(suggestion.type, suggestion.slug, 'search_overlay'));
         onClose();
     }, [navigate, onClose]);
@@ -96,9 +132,16 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     const openSearchResults = useCallback((term: string) => {
         const cleaned = term.trim();
         if (!cleaned) return;
+        pushRecentSearch(cleaned);
+        trackEvent('search_submit', { query: cleaned });
         navigate(`/jobs?q=${encodeURIComponent(cleaned)}&source=search_overlay`);
         onClose();
     }, [navigate, onClose]);
+
+    const handleClearRecent = useCallback(() => {
+        clearRecentSearches();
+        setRecentSearches([]);
+    }, []);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'ArrowDown') {
@@ -152,19 +195,62 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
                 </div>
 
                 {query.trim().length === 0 && (
-                    <div className="search-trending-panel">
-                        <h3>Trending Searches</h3>
-                        <div className="search-trending-chips">
-                            {trendingTerms.map((term) => (
-                                <button
-                                    key={term}
-                                    type="button"
-                                    className="search-trending-chip"
-                                    onClick={() => openSearchResults(term)}
-                                >
-                                    {term}
-                                </button>
-                            ))}
+                    <div className="search-idle-panels">
+                        {/* Quick Filters */}
+                        <div className="search-quick-filters">
+                            <h3>Quick Filters</h3>
+                            <div className="search-quick-chips">
+                                {QUICK_FILTERS.map((f) => (
+                                    <button
+                                        key={f.query}
+                                        type="button"
+                                        className="search-quick-chip"
+                                        onClick={() => openSearchResults(f.query)}
+                                    >
+                                        {f.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Recent Searches */}
+                        {recentSearches.length > 0 && (
+                            <div className="search-recent-panel">
+                                <div className="search-panel-header">
+                                    <h3>Recent Searches</h3>
+                                    <button type="button" className="search-clear-btn" onClick={handleClearRecent}>Clear</button>
+                                </div>
+                                <div className="search-recent-list">
+                                    {recentSearches.map((term) => (
+                                        <button
+                                            key={term}
+                                            type="button"
+                                            className="search-recent-item"
+                                            onClick={() => openSearchResults(term)}
+                                        >
+                                            <span className="search-recent-icon">🕐</span>
+                                            {term}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Trending Searches */}
+                        <div className="search-trending-panel">
+                            <h3>🔥 Trending Searches</h3>
+                            <div className="search-trending-chips">
+                                {trendingTerms.map((term) => (
+                                    <button
+                                        key={term}
+                                        type="button"
+                                        className="search-trending-chip"
+                                        onClick={() => openSearchResults(term)}
+                                    >
+                                        {term}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}

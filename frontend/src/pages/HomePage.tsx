@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { getAnnouncementCards } from '../utils/api';
+import { getAnnouncementCards, getBookmarks } from '../utils/api';
 import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
+import { trackEvent, trackScrollDepth } from '../utils/analytics';
+import { AuthContext } from '../context/auth-context';
 import type { AnnouncementCard, ContentType } from '../types';
 
 import './HomePage.css';
 
-/* ─── Homepage v5 — Phase 1 Minimal MVP ─── */
+/* ─── Homepage v6 — Phase 2 Premium UX ─── */
 
 const CATEGORIES: Array<{ key: string; label: string; icon: string; to: string }> = [
     { key: 'jobs', label: 'Latest Jobs', icon: '💼', to: '/jobs' },
@@ -31,6 +33,27 @@ const FILTER_TABS: Array<{ key: 'all' | ContentType; label: string }> = [
     { key: 'answer-key', label: 'Answer Keys' },
 ];
 
+/* ─── Preference Picker (anonymous users) ─── */
+const PREF_KEY = 'sr_user_prefs';
+const PREF_OPTIONS: Array<{ key: ContentType; label: string; icon: string }> = [
+    { key: 'job', label: 'Government Jobs', icon: '💼' },
+    { key: 'result', label: 'Exam Results', icon: '📊' },
+    { key: 'admit-card', label: 'Admit Cards', icon: '🎫' },
+    { key: 'answer-key', label: 'Answer Keys', icon: '🔑' },
+];
+
+function getSavedPrefs(): ContentType[] {
+    try { return JSON.parse(localStorage.getItem(PREF_KEY) || '[]'); } catch { return []; }
+}
+
+function savePrefs(prefs: ContentType[]) {
+    try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch { /* noop */ }
+}
+
+function hasDismissedPicker(): boolean {
+    try { return localStorage.getItem(PREF_KEY) !== null; } catch { return true; }
+}
+
 /* ─── Helpers ─── */
 function timeAgo(dateStr?: string | null): string {
     if (!dateStr) return '';
@@ -49,6 +72,20 @@ function isNew(dateStr?: string | null): boolean {
     return Date.now() - new Date(dateStr).getTime() < 3 * 24 * 3600_000;
 }
 
+function dateGroup(dateStr?: string | null): 'today' | 'week' | 'older' {
+    if (!dateStr) return 'older';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    if (diff < 24 * 3600_000) return 'today';
+    if (diff < 7 * 24 * 3600_000) return 'week';
+    return 'older';
+}
+
+const GROUP_LABELS: Record<string, string> = {
+    today: '📌 Today',
+    week: '📅 This Week',
+    older: '📁 Earlier',
+};
+
 /* ─── Skeleton ─── */
 function UpdateSkeleton() {
     return (
@@ -64,15 +101,80 @@ function UpdateSkeleton() {
     );
 }
 
+/* ─── Preference Picker Component ─── */
+function PreferencePicker({ onDone }: { onDone: (prefs: ContentType[]) => void }) {
+    const [selected, setSelected] = useState<Set<ContentType>>(new Set());
+
+    const toggle = (key: ContentType) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
+
+    const handleSave = () => {
+        const prefs = Array.from(selected);
+        savePrefs(prefs);
+        trackEvent('pref_picker_done', { count: prefs.length, types: prefs.join(',') });
+        onDone(prefs);
+    };
+
+    const handleSkip = () => {
+        savePrefs([]);
+        trackEvent('pref_picker_skip');
+        onDone([]);
+    };
+
+    return (
+        <section className="hp-pref-picker">
+            <h2 className="hp-pref-title">What are you looking for?</h2>
+            <p className="hp-pref-desc">Select your interests to see personalized updates</p>
+            <div className="hp-pref-options">
+                {PREF_OPTIONS.map((opt) => (
+                    <button
+                        key={opt.key}
+                        type="button"
+                        className={`hp-pref-opt${selected.has(opt.key) ? ' active' : ''}`}
+                        onClick={() => toggle(opt.key)}
+                    >
+                        <span className="hp-pref-opt-icon">{opt.icon}</span>
+                        <span className="hp-pref-opt-label">{opt.label}</span>
+                        {selected.has(opt.key) && <span className="hp-pref-check">✓</span>}
+                    </button>
+                ))}
+            </div>
+            <div className="hp-pref-actions">
+                <button type="button" className="hp-pref-save" onClick={handleSave} disabled={selected.size === 0}>
+                    Show me updates →
+                </button>
+                <button type="button" className="hp-pref-skip" onClick={handleSkip}>
+                    Skip, show everything
+                </button>
+            </div>
+        </section>
+    );
+}
+
 /* ─── Page Component ─── */
 export function HomePage() {
     const navigate = useNavigate();
+    const { user } = useContext(AuthContext);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [updates, setUpdates] = useState<AnnouncementCard[]>([]);
+    const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
     const [activeFilter, setActiveFilter] = useState<'all' | ContentType>('all');
+    const [userPrefs, setUserPrefs] = useState<ContentType[]>(getSavedPrefs());
+    const [showPicker, setShowPicker] = useState(!user && !hasDismissedPicker());
 
-    /* Fetch only latest items — lightweight */
+    /* Track scroll depth */
+    useEffect(() => {
+        const cleanup = trackScrollDepth('home');
+        return cleanup;
+    }, []);
+
+    /* Fetch latest items */
     useEffect(() => {
         let mounted = true;
         setLoading(true);
@@ -107,17 +209,74 @@ export function HomePage() {
         return () => { mounted = false; };
     }, []);
 
+    /* Fetch bookmarks for logged-in user */
+    useEffect(() => {
+        if (!user) return;
+        let mounted = true;
+        (async () => {
+            try {
+                const res = await getBookmarks();
+                if (mounted) setBookmarkedIds(new Set((res.data || []).map((b: { announcementId?: string; id?: string }) => b.announcementId || b.id || '')));
+            } catch { /* noop */ }
+        })();
+        return () => { mounted = false; };
+    }, [user]);
+
+    /* Filter + personalization logic */
     const filteredUpdates = useMemo(() => {
-        const list = activeFilter === 'all' ? updates : updates.filter((u) => u.type === activeFilter);
-        return list.slice(0, 12);
+        let list = activeFilter === 'all' ? updates : updates.filter((u) => u.type === activeFilter);
+        return list.slice(0, 15);
     }, [updates, activeFilter]);
+
+    /* Group items by date */
+    const groupedUpdates = useMemo(() => {
+        const groups: Array<{ key: string; label: string; items: AnnouncementCard[] }> = [];
+        const groupMap = new Map<string, AnnouncementCard[]>();
+
+        for (const card of filteredUpdates) {
+            const g = dateGroup(card.postedAt);
+            if (!groupMap.has(g)) groupMap.set(g, []);
+            groupMap.get(g)!.push(card);
+        }
+
+        for (const key of ['today', 'week', 'older']) {
+            const items = groupMap.get(key);
+            if (items && items.length > 0) {
+                groups.push({ key, label: GROUP_LABELS[key], items });
+            }
+        }
+
+        return groups;
+    }, [filteredUpdates]);
+
+    /* Personalized "For You" items */
+    const forYouItems = useMemo(() => {
+        if (userPrefs.length === 0) return [];
+        return updates.filter((u) => userPrefs.includes(u.type)).slice(0, 6);
+    }, [updates, userPrefs]);
+
+    /* Continue reading (bookmarked) */
+    const continueReading = useMemo(() => {
+        if (bookmarkedIds.size === 0) return [];
+        return updates.filter((u) => bookmarkedIds.has(u.id)).slice(0, 4);
+    }, [updates, bookmarkedIds]);
 
     const handleSearch = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         const q = searchQuery.trim();
         if (!q) return;
+        trackEvent('home_search', { query: q });
         navigate(`/jobs?q=${encodeURIComponent(q)}&source=home`);
     }, [searchQuery, navigate]);
+
+    const handleCardClick = useCallback((card: AnnouncementCard) => {
+        trackEvent('card_click', { type: card.type, slug: card.slug, source: 'home_latest' });
+    }, []);
+
+    const handleFilterChange = useCallback((key: 'all' | ContentType) => {
+        setActiveFilter(key);
+        trackEvent('filter_change', { tab: key });
+    }, []);
 
     return (
         <Layout>
@@ -154,6 +313,63 @@ export function HomePage() {
                     ))}
                 </nav>
 
+                {/* ═══ PREFERENCE PICKER (anonymous, first visit) ═══ */}
+                {showPicker && (
+                    <PreferencePicker onDone={(prefs) => {
+                        setUserPrefs(prefs);
+                        setShowPicker(false);
+                        if (prefs.length > 0) setActiveFilter(prefs[0]);
+                    }} />
+                )}
+
+                {/* ═══ FOR YOU (personalized, when prefs exist) ═══ */}
+                {!showPicker && forYouItems.length > 0 && (
+                    <section className="hp-for-you">
+                        <div className="hp-section-header">
+                            <h2 className="hp-section-title">⚡ For You</h2>
+                            <span className="hp-section-badge">Personalized</span>
+                        </div>
+                        <div className="hp-for-you-grid">
+                            {forYouItems.map((card) => (
+                                <Link
+                                    key={card.id}
+                                    to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
+                                    className="hp-for-you-card"
+                                    onClick={() => handleCardClick(card)}
+                                >
+                                    <span className={`hp-type-badge hp-type-${card.type}`}>{TYPE_LABELS[card.type]}</span>
+                                    <span className="hp-for-you-title">{card.title}</span>
+                                    {card.organization && <span className="hp-for-you-org">🏛️ {card.organization}</span>}
+                                    <span className="hp-for-you-time">{timeAgo(card.postedAt)}</span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* ═══ CONTINUE READING (logged-in + bookmarked) ═══ */}
+                {user && continueReading.length > 0 && (
+                    <section className="hp-continue">
+                        <div className="hp-section-header">
+                            <h2 className="hp-section-title">📑 Continue Reading</h2>
+                            <Link to="/bookmarks" className="hp-section-link">View All →</Link>
+                        </div>
+                        <div className="hp-continue-list">
+                            {continueReading.map((card) => (
+                                <Link
+                                    key={card.id}
+                                    to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
+                                    className="hp-continue-item"
+                                    onClick={() => handleCardClick(card)}
+                                >
+                                    <span className={`hp-type-badge hp-type-${card.type}`}>{TYPE_LABELS[card.type]}</span>
+                                    <span className="hp-continue-title">{card.title}</span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
                 {/* ═══ LATEST UPDATES ═══ */}
                 <section className="hp-updates">
                     <div className="hp-updates-header">
@@ -166,7 +382,7 @@ export function HomePage() {
                                     role="tab"
                                     aria-selected={activeFilter === tab.key}
                                     className={`hp-filter-chip${activeFilter === tab.key ? ' active' : ''}`}
-                                    onClick={() => setActiveFilter(tab.key)}
+                                    onClick={() => handleFilterChange(tab.key)}
                                 >
                                     {tab.label}
                                 </button>
@@ -182,30 +398,41 @@ export function HomePage() {
                             <p>No updates found. Check back soon!</p>
                         </div>
                     ) : (
-                        <ul className="hp-update-list">
-                            {filteredUpdates.map((card) => (
-                                <li key={card.id}>
-                                    <Link
-                                        to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
-                                        className="hp-update-row"
-                                    >
-                                        <span className={`hp-type-badge hp-type-${card.type}`}>
-                                            {TYPE_LABELS[card.type]}
-                                        </span>
-                                        <span className="hp-update-title">
-                                            {isNew(card.postedAt) && <span className="hp-new-dot" aria-label="New" />}
-                                            {card.title}
-                                        </span>
-                                        <span className="hp-update-meta">
-                                            {card.organization && (
-                                                <span className="hp-update-org">{card.organization}</span>
-                                            )}
-                                            <time className="hp-update-time">{timeAgo(card.postedAt)}</time>
-                                        </span>
-                                    </Link>
-                                </li>
+                        <div className="hp-grouped-updates">
+                            {groupedUpdates.map((group) => (
+                                <div key={group.key} className="hp-date-group">
+                                    <h3 className="hp-date-label">{group.label}</h3>
+                                    <ul className="hp-update-list">
+                                        {group.items.map((card) => (
+                                            <li key={card.id}>
+                                                <Link
+                                                    to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
+                                                    className="hp-update-row"
+                                                    onClick={() => handleCardClick(card)}
+                                                >
+                                                    <span className={`hp-type-badge hp-type-${card.type}`}>
+                                                        {TYPE_LABELS[card.type]}
+                                                    </span>
+                                                    <span className="hp-update-title">
+                                                        {isNew(card.postedAt) && <span className="hp-new-dot" aria-label="New" />}
+                                                        {card.title}
+                                                    </span>
+                                                    <span className="hp-update-meta">
+                                                        {card.viewCount != null && card.viewCount > 0 && (
+                                                            <span className="hp-update-views" title="Views">👁 {card.viewCount.toLocaleString()}</span>
+                                                        )}
+                                                        {card.organization && (
+                                                            <span className="hp-update-org">{card.organization}</span>
+                                                        )}
+                                                        <time className="hp-update-time">{timeAgo(card.postedAt)}</time>
+                                                    </span>
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     )}
 
                     {!loading && filteredUpdates.length > 0 && (
@@ -215,6 +442,16 @@ export function HomePage() {
                         </div>
                     )}
                 </section>
+
+                {/* ═══ COMPACT DISCLAIMER ═══ */}
+                <details className="hp-disclaimer">
+                    <summary className="hp-disclaimer-summary">ℹ️ Disclaimer — Tap to expand</summary>
+                    <p className="hp-disclaimer-text">
+                        SarkariExams.me is not a government website. Information is sourced from official notifications and verified to the
+                        best of our ability. Always verify details from the official source before applying. We are not responsible for any
+                        discrepancy in the information provided.
+                    </p>
+                </details>
             </div>
         </Layout>
     );
