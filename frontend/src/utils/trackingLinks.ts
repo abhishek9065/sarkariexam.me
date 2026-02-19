@@ -29,7 +29,9 @@ export type SourceTag =
     | 'bookmarks_compact'
     | 'profile_notifications'
     | 'profile_tracked'
-    | 'header_trending';
+    | 'header_trending'
+    | 'home_latest'
+    | 'trending_popular';
 
 export function buildAnnouncementDetailPath(type: ContentType, slug: string, source?: SourceTag): string {
     const base = `/${type}/${slug}`;
