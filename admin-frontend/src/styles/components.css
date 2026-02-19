@@ -249,6 +249,10 @@ button.ops-kpi-card:hover {
     background: rgba(66, 232, 255, 0.06);
 }
 
+.ops-table tr.ops-row-highlight td {
+    background: rgba(66, 232, 255, 0.16);
+}
+
 .ops-empty,
 .ops-error,
 .ops-success,

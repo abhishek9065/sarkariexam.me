@@ -131,6 +131,20 @@ interface AdminUserListDoc {
     lastLoginAt?: Date;
 }
 
+interface AdminSavedViewDoc {
+    name: string;
+    module: string;
+    scope: 'private' | 'shared';
+    filters: Record<string, unknown>;
+    columns?: string[];
+    sort?: Record<string, unknown>;
+    isDefault?: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    createdBy?: string;
+    updatedBy?: string;
+}
+
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
 const sessionIdSchema = z.object({
     sessionId: z.string().min(8),
@@ -441,6 +455,56 @@ const seoPatchSchema = z.object({
     schema: z.record(z.unknown()).optional(),
 });
 
+const adminSearchQuerySchema = z.object({
+    q: z.string().trim().min(1).max(120),
+    limit: z.coerce.number().int().min(1).max(100).default(24),
+    entities: z.string().trim().optional(),
+});
+
+const adminViewsListQuerySchema = z.object({
+    module: z.string().trim().min(1).max(80).optional(),
+    scope: z.enum(['all', 'private', 'shared']).optional().default('all'),
+    search: z.string().trim().optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+    offset: z.coerce.number().int().min(0).default(0),
+});
+
+const adminViewCreateSchema = z.object({
+    name: z.string().trim().min(2).max(120),
+    module: z.string().trim().min(2).max(80),
+    scope: z.enum(['private', 'shared']).optional().default('private'),
+    filters: z.record(z.unknown()).optional().default({}),
+    columns: z.array(z.string().trim().min(1).max(80)).max(60).optional().default([]),
+    sort: z.record(z.unknown()).optional(),
+    isDefault: z.boolean().optional().default(false),
+});
+
+const adminViewPatchSchema = adminViewCreateSchema.partial();
+
+const announcementDraftSchema = z.object({
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional().default('job'),
+    title: z.string().trim().min(3).max(500).optional(),
+    category: z.string().trim().min(2).max(255).optional(),
+    organization: z.string().trim().min(2).max(255).optional(),
+    templateId: z.string().trim().max(120).optional(),
+});
+
+const announcementAutosaveSchema = adminAnnouncementPartialBaseSchema.extend({
+    autosave: z.object({
+        editorSessionId: z.string().trim().max(120).optional(),
+        clientUpdatedAt: z.string().datetime().optional(),
+        cursor: z.record(z.unknown()).optional(),
+    }).optional(),
+});
+
+const announcementRevisionsQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+const linkHealthSummaryQuerySchema = z.object({
+    days: z.coerce.number().int().min(1).max(90).default(7),
+});
+
 const mapApprovalResolveFailure = (reason?: string) => {
     if (reason === 'not_found') {
         return { status: 404, code: 'approval_not_found' };
@@ -514,6 +578,58 @@ const sanitizeOptionalString = (value?: string) => {
     const next = value.trim();
     return next ? next : undefined;
 };
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const DEFAULT_CATEGORY_BY_TYPE: Record<ContentType, string> = {
+    job: 'Latest Jobs',
+    result: 'Results',
+    'admit-card': 'Admit Card',
+    syllabus: 'Syllabus',
+    'answer-key': 'Answer Key',
+    admission: 'Admission',
+};
+
+const DEFAULT_ORGANIZATION_BY_TYPE: Record<ContentType, string> = {
+    job: 'Government Department',
+    result: 'Exam Authority',
+    'admit-card': 'Exam Authority',
+    syllabus: 'Exam Authority',
+    'answer-key': 'Exam Authority',
+    admission: 'Education Authority',
+};
+
+const canManageSharedViews = (role?: string) => role === 'admin';
+
+const diffComparableKeys = [
+    'title',
+    'type',
+    'category',
+    'organization',
+    'content',
+    'externalLink',
+    'location',
+    'deadline',
+    'status',
+    'publishAt',
+    'approvedAt',
+    'approvedBy',
+    'tags',
+    'importantDates',
+    'typeDetails',
+    'seo',
+    'home',
+    'schema',
+] as const;
+
+const calculateChangedKeys = (
+    previousSnapshot: Record<string, unknown>,
+    nextSnapshot: Record<string, unknown>
+) => diffComparableKeys.filter((key) => {
+    const prevSerialized = JSON.stringify(previousSnapshot[key] ?? null);
+    const nextSerialized = JSON.stringify(nextSnapshot[key] ?? null);
+    return prevSerialized !== nextSerialized;
+});
 
 const upsertLinkHealthAlert = async (input: {
     brokenUrls: string[];
@@ -907,9 +1023,691 @@ router.get('/dashboard', async (_req, res) => {
 });
 
 /**
+ * GET /api/admin/search
+ * Global search across posts, links, media, organizations and tags.
+ */
+router.get('/search', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = adminSearchQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const searchQuery = parsed.data.q.trim();
+        const limit = parsed.data.limit;
+        const requestedEntities = parsed.data.entities
+            ? normalizeStringList(parsed.data.entities.split(',').map((item) => item.toLowerCase()))
+            : ['all'];
+        const includeAll = requestedEntities.includes('all');
+        const includes = (entity: string) => includeAll || requestedEntities.includes(entity);
+
+        const regex = { $regex: escapeRegex(searchQuery), $options: 'i' };
+        const perEntityLimit = Math.max(5, Math.ceil(limit / 2));
+        const results: Array<{
+            key: string;
+            entity: 'post' | 'link' | 'media' | 'organization' | 'tag';
+            id: string;
+            title: string;
+            subtitle?: string;
+            route?: string;
+        }> = [];
+
+        if (includes('posts')) {
+            const posts = await AnnouncementModelMongo.findAllAdmin({
+                search: searchQuery,
+                limit: perEntityLimit,
+                includeInactive: true,
+                sort: 'updated',
+            });
+            for (const post of posts) {
+                results.push({
+                    key: `post:${post.id}`,
+                    entity: 'post',
+                    id: post.id,
+                    title: post.title,
+                    subtitle: `${post.type} · ${post.organization}`,
+                    route: `/manage-posts?focus=${encodeURIComponent(post.id)}`,
+                });
+            }
+        }
+
+        if (includes('links')) {
+            const links = await getCollection<LinkRecordDoc>('link_records')
+                .find({
+                    $or: [{ label: regex }, { url: regex }, { notes: regex }],
+                } as any)
+                .sort({ updatedAt: -1 })
+                .limit(perEntityLimit)
+                .toArray();
+            for (const link of links as any[]) {
+                const id = serializeId(link._id);
+                results.push({
+                    key: `link:${id}`,
+                    entity: 'link',
+                    id,
+                    title: link.label || link.url,
+                    subtitle: `${link.status || 'active'} · ${link.url}`,
+                    route: `/link-manager?focus=${encodeURIComponent(id)}`,
+                });
+            }
+        }
+
+        if (includes('media')) {
+            const media = await getCollection<MediaAssetDoc>('media_assets')
+                .find({
+                    $or: [{ label: regex }, { fileName: regex }, { fileUrl: regex }],
+                } as any)
+                .sort({ updatedAt: -1 })
+                .limit(perEntityLimit)
+                .toArray();
+            for (const asset of media as any[]) {
+                const id = serializeId(asset._id);
+                results.push({
+                    key: `media:${id}`,
+                    entity: 'media',
+                    id,
+                    title: asset.label || asset.fileName,
+                    subtitle: `${asset.category || 'other'} · ${asset.fileName}`,
+                    route: `/media-pdfs?focus=${encodeURIComponent(id)}`,
+                });
+            }
+        }
+
+        const announcementsCollection = getCollection<any>('announcements');
+
+        if (includes('organizations')) {
+            const organizations = await announcementsCollection.aggregate([
+                { $match: { organization: regex } },
+                { $group: { _id: '$organization', count: { $sum: 1 } } },
+                { $sort: { count: -1, _id: 1 } },
+                { $limit: perEntityLimit },
+            ]).toArray();
+            for (const item of organizations as any[]) {
+                const title = String(item._id || '').trim();
+                if (!title) continue;
+                results.push({
+                    key: `organization:${title.toLowerCase()}`,
+                    entity: 'organization',
+                    id: title,
+                    title,
+                    subtitle: `${item.count || 0} post(s)`,
+                    route: `/manage-posts?organization=${encodeURIComponent(title)}`,
+                });
+            }
+        }
+
+        if (includes('tags')) {
+            const tags = await announcementsCollection.aggregate([
+                { $match: { tags: { $exists: true, $ne: [] } } },
+                { $unwind: '$tags' },
+                { $match: { tags: regex } },
+                { $group: { _id: '$tags', count: { $sum: 1 } } },
+                { $sort: { count: -1, _id: 1 } },
+                { $limit: perEntityLimit },
+            ]).toArray();
+            for (const tag of tags as any[]) {
+                const title = String(tag._id || '').trim();
+                if (!title) continue;
+                results.push({
+                    key: `tag:${title.toLowerCase()}`,
+                    entity: 'tag',
+                    id: title,
+                    title,
+                    subtitle: `${tag.count || 0} post(s)`,
+                    route: `/manage-posts?tag=${encodeURIComponent(title)}`,
+                });
+            }
+        }
+
+        const deduped = Array.from(new Map(results.map((item) => [item.key, item])).values()).slice(0, limit);
+        return res.json({
+            data: deduped.map((item) => ({
+                entity: item.entity,
+                id: item.id,
+                title: item.title,
+                subtitle: item.subtitle,
+                route: item.route,
+            })),
+            meta: {
+                query: searchQuery,
+                limit,
+                total: deduped.length,
+                entities: includeAll ? ['posts', 'links', 'media', 'organizations', 'tags'] : requestedEntities,
+            },
+        });
+    } catch (error) {
+        console.error('Admin global search error:', error);
+        return res.status(500).json({ error: 'Failed to search admin data' });
+    }
+});
+
+/**
+ * GET /api/admin/views
+ * List saved filter views for the current admin.
+ */
+router.get('/views', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = adminViewsListQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const actorId = req.user?.userId ?? 'unknown';
+        const { module, scope, search, limit, offset } = parsed.data;
+        const viewsCollection = getCollection<AdminSavedViewDoc>('admin_saved_views');
+        const filter: Record<string, unknown> = {};
+
+        if (module) filter.module = module;
+        if (search) filter.name = { $regex: escapeRegex(search), $options: 'i' };
+
+        if (scope === 'private') {
+            filter.scope = 'private';
+            filter.createdBy = actorId;
+        } else if (scope === 'shared') {
+            filter.scope = 'shared';
+        } else {
+            filter.$or = [
+                { scope: 'shared' },
+                { scope: 'private', createdBy: actorId },
+            ];
+        }
+
+        const [total, docs] = await Promise.all([
+            viewsCollection.countDocuments(filter as any),
+            viewsCollection.find(filter as any).sort({ updatedAt: -1 }).skip(offset).limit(limit).toArray(),
+        ]);
+
+        return res.json({
+            data: docs.map((doc: any) => ({
+                id: serializeId(doc._id),
+                ...doc,
+            })),
+            meta: { total, limit, offset },
+        });
+    } catch (error) {
+        console.error('Admin views list error:', error);
+        return res.status(500).json({ error: 'Failed to load saved views' });
+    }
+});
+
+/**
+ * POST /api/admin/views
+ * Create saved view.
+ */
+router.post('/views', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = adminViewCreateSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        if (parsed.data.scope === 'shared' && !canManageSharedViews(req.user?.role)) {
+            return res.status(403).json({ error: 'Only admin can create shared views' });
+        }
+
+        const actorId = req.user?.userId ?? 'unknown';
+        const viewsCollection = getCollection<AdminSavedViewDoc>('admin_saved_views');
+        const now = new Date();
+
+        if (parsed.data.isDefault) {
+            const defaultFilter: Record<string, unknown> = {
+                module: parsed.data.module,
+                isDefault: true,
+            };
+            if (parsed.data.scope === 'private') {
+                defaultFilter.scope = 'private';
+                defaultFilter.createdBy = actorId;
+            } else {
+                defaultFilter.scope = 'shared';
+            }
+            await viewsCollection.updateMany(defaultFilter as any, { $set: { isDefault: false, updatedAt: now, updatedBy: actorId } as any });
+        }
+
+        const result = await viewsCollection.insertOne({
+            name: parsed.data.name,
+            module: parsed.data.module,
+            scope: parsed.data.scope,
+            filters: parsed.data.filters ?? {},
+            columns: normalizeStringList(parsed.data.columns ?? []),
+            sort: parsed.data.sort,
+            isDefault: parsed.data.isDefault ?? false,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: actorId,
+            updatedBy: actorId,
+        });
+
+        await recordAdminAudit({
+            action: 'admin_view_create',
+            userId: actorId,
+            metadata: { module: parsed.data.module, scope: parsed.data.scope },
+        });
+
+        return res.status(201).json({
+            data: {
+                id: serializeId(result.insertedId),
+                ...parsed.data,
+                columns: normalizeStringList(parsed.data.columns ?? []),
+                createdAt: now,
+                updatedAt: now,
+                createdBy: actorId,
+                updatedBy: actorId,
+            },
+        });
+    } catch (error) {
+        console.error('Admin view create error:', error);
+        return res.status(500).json({ error: 'Failed to create saved view' });
+    }
+});
+
+/**
+ * PATCH /api/admin/views/:id
+ * Update saved view.
+ */
+router.patch('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = adminViewPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const viewId = getPathParam(req.params.id);
+        const actorId = req.user?.userId ?? 'unknown';
+        const viewsCollection = getCollection<AdminSavedViewDoc>('admin_saved_views');
+        const existing = await viewsCollection.findOne({ _id: toMongoId(viewId) as any });
+        if (!existing) {
+            return res.status(404).json({ error: 'Saved view not found' });
+        }
+
+        const existingScope = (existing as any).scope as 'private' | 'shared';
+        const existingOwner = (existing as any).createdBy;
+        const adminScopeAccess = canManageSharedViews(req.user?.role);
+        if (existingScope === 'shared' && !adminScopeAccess) {
+            return res.status(403).json({ error: 'Only admin can edit shared views' });
+        }
+        if (existingScope === 'private' && existingOwner !== actorId && !adminScopeAccess) {
+            return res.status(403).json({ error: 'Only owner can edit private views' });
+        }
+
+        if (parsed.data.scope === 'shared' && !adminScopeAccess) {
+            return res.status(403).json({ error: 'Only admin can promote a view to shared scope' });
+        }
+
+        const nextScope = parsed.data.scope ?? existingScope;
+        if (parsed.data.isDefault) {
+            const resetFilter: Record<string, unknown> = {
+                module: parsed.data.module ?? (existing as any).module,
+                isDefault: true,
+            };
+            if (nextScope === 'private') {
+                resetFilter.scope = 'private';
+                resetFilter.createdBy = (existing as any).createdBy ?? actorId;
+            } else {
+                resetFilter.scope = 'shared';
+            }
+            await viewsCollection.updateMany(resetFilter as any, { $set: { isDefault: false, updatedAt: new Date(), updatedBy: actorId } as any });
+        }
+
+        const setData: Record<string, unknown> = {
+            updatedAt: new Date(),
+            updatedBy: actorId,
+        };
+        if (parsed.data.name !== undefined) setData.name = parsed.data.name;
+        if (parsed.data.module !== undefined) setData.module = parsed.data.module;
+        if (parsed.data.scope !== undefined) setData.scope = parsed.data.scope;
+        if (parsed.data.filters !== undefined) setData.filters = parsed.data.filters;
+        if (parsed.data.columns !== undefined) setData.columns = normalizeStringList(parsed.data.columns);
+        if (parsed.data.sort !== undefined) setData.sort = parsed.data.sort;
+        if (parsed.data.isDefault !== undefined) setData.isDefault = parsed.data.isDefault;
+
+        const updated = await viewsCollection.findOneAndUpdate(
+            { _id: toMongoId(viewId) as any },
+            { $set: setData },
+            { returnDocument: 'after' }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ error: 'Saved view not found' });
+        }
+
+        await recordAdminAudit({
+            action: 'admin_view_update',
+            userId: actorId,
+            metadata: { viewId },
+        });
+
+        return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
+    } catch (error) {
+        console.error('Admin view patch error:', error);
+        return res.status(500).json({ error: 'Failed to update saved view' });
+    }
+});
+
+/**
+ * DELETE /api/admin/views/:id
+ * Delete saved view.
+ */
+router.delete('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const viewId = getPathParam(req.params.id);
+        const actorId = req.user?.userId ?? 'unknown';
+        const viewsCollection = getCollection<AdminSavedViewDoc>('admin_saved_views');
+        const existing = await viewsCollection.findOne({ _id: toMongoId(viewId) as any });
+        if (!existing) {
+            return res.status(404).json({ error: 'Saved view not found' });
+        }
+
+        const existingScope = (existing as any).scope as 'private' | 'shared';
+        const existingOwner = (existing as any).createdBy;
+        const adminScopeAccess = canManageSharedViews(req.user?.role);
+        if (existingScope === 'shared' && !adminScopeAccess) {
+            return res.status(403).json({ error: 'Only admin can delete shared views' });
+        }
+        if (existingScope === 'private' && existingOwner !== actorId && !adminScopeAccess) {
+            return res.status(403).json({ error: 'Only owner can delete private views' });
+        }
+
+        await viewsCollection.deleteOne({ _id: toMongoId(viewId) as any });
+
+        await recordAdminAudit({
+            action: 'admin_view_delete',
+            userId: actorId,
+            metadata: { viewId },
+        });
+
+        return res.json({ data: { success: true, id: viewId } });
+    } catch (error) {
+        console.error('Admin view delete error:', error);
+        return res.status(500).json({ error: 'Failed to delete saved view' });
+    }
+});
+
+/**
+ * POST /api/admin/announcements/draft
+ * Create a draft-first announcement shell.
+ */
+router.post('/announcements/draft', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = announcementDraftSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const type = parsed.data.type;
+        const now = new Date();
+        const shortStamp = now.toISOString().slice(0, 16).replace('T', ' ');
+        const title = parsed.data.title?.trim() || `Untitled ${type.toUpperCase()} Draft ${shortStamp}`;
+
+        const draft = await AnnouncementModelMongo.create(
+            {
+                title,
+                type,
+                category: parsed.data.category?.trim() || DEFAULT_CATEGORY_BY_TYPE[type],
+                organization: parsed.data.organization?.trim() || DEFAULT_ORGANIZATION_BY_TYPE[type],
+                content: '',
+                status: 'draft',
+                tags: [],
+                typeDetails: parsed.data.templateId ? { templateId: parsed.data.templateId } : undefined,
+            },
+            req.user?.userId ?? 'system'
+        );
+
+        await recordAdminAudit({
+            action: 'announcement_draft_create',
+            userId: req.user?.userId,
+            announcementId: draft.id,
+            title: draft.title,
+            metadata: { type: draft.type, templateId: parsed.data.templateId },
+        });
+
+        return res.status(201).json({ data: draft });
+    } catch (error) {
+        console.error('Draft create error:', error);
+        return res.status(500).json({ error: 'Failed to create draft announcement' });
+    }
+});
+
+/**
+ * PATCH /api/admin/announcements/:id/autosave
+ * Autosave draft edits.
+ */
+router.patch('/announcements/:id/autosave', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const parsed = announcementAutosaveSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const announcementId = getPathParam(req.params.id);
+        const actorId = req.user?.userId ?? 'unknown';
+        const payload: Partial<CreateAnnouncementDto> = {};
+        const fieldsToCopy: Array<keyof CreateAnnouncementDto> = [
+            'title',
+            'type',
+            'category',
+            'organization',
+            'content',
+            'externalLink',
+            'location',
+            'deadline',
+            'minQualification',
+            'ageLimit',
+            'applicationFee',
+            'salaryMin',
+            'salaryMax',
+            'difficulty',
+            'cutoffMarks',
+            'totalPosts',
+            'status',
+            'publishAt',
+            'approvedAt',
+            'approvedBy',
+            'tags',
+            'importantDates',
+            'jobDetails',
+            'typeDetails',
+            'seo',
+            'home',
+            'schema',
+        ];
+
+        const parsedData = parsed.data as Record<string, unknown>;
+        for (const key of fieldsToCopy) {
+            if (parsedData[key] !== undefined) {
+                (payload as any)[key] = parsedData[key];
+            }
+        }
+        (payload as any).note = 'autosave';
+
+        const hasMutationFields = Object.keys(payload).some((key) => key !== 'note');
+        const updated = hasMutationFields
+            ? await AnnouncementModelMongo.update(announcementId, payload, actorId)
+            : await AnnouncementModelMongo.findById(announcementId);
+
+        if (!updated) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        const autosaveCollection = getCollection<any>('admin_autosaves');
+        await autosaveCollection.updateOne(
+            { announcementId, userId: actorId },
+            {
+                $set: {
+                    announcementId,
+                    userId: actorId,
+                    editorSessionId: parsed.data.autosave?.editorSessionId,
+                    clientUpdatedAt: parsed.data.autosave?.clientUpdatedAt ? new Date(parsed.data.autosave.clientUpdatedAt) : undefined,
+                    cursor: parsed.data.autosave?.cursor,
+                    title: updated.title,
+                    status: updated.status,
+                    version: updated.version,
+                    updatedAt: new Date(),
+                },
+            },
+            { upsert: true }
+        );
+
+        return res.json({
+            data: {
+                id: updated.id,
+                title: updated.title,
+                status: updated.status,
+                version: updated.version,
+                updatedAt: updated.updatedAt,
+                autosaved: true,
+            },
+        });
+    } catch (error) {
+        console.error('Autosave error:', error);
+        return res.status(500).json({ error: 'Failed to autosave announcement' });
+    }
+});
+
+/**
+ * GET /api/admin/announcements/:id/revisions
+ * Fetch revision timeline metadata.
+ */
+router.get('/announcements/:id/revisions', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = announcementRevisionsQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        const announcementId = getPathParam(req.params.id);
+        const announcement = await AnnouncementModelMongo.findById(announcementId);
+        if (!announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        const versions = Array.isArray(announcement.versions) ? announcement.versions.slice(0, parsed.data.limit) : [];
+        const currentSnapshot = {
+            title: announcement.title,
+            type: announcement.type,
+            category: announcement.category,
+            organization: announcement.organization,
+            content: announcement.content,
+            externalLink: announcement.externalLink,
+            location: announcement.location,
+            deadline: announcement.deadline,
+            status: announcement.status,
+            publishAt: announcement.publishAt,
+            approvedAt: announcement.approvedAt,
+            approvedBy: announcement.approvedBy,
+            tags: announcement.tags,
+            importantDates: announcement.importantDates,
+            typeDetails: announcement.typeDetails,
+            seo: announcement.seo,
+            home: announcement.home,
+            schema: announcement.schema,
+        } as Record<string, unknown>;
+
+        const revisions = versions.map((revision, index) => {
+            const newerSnapshot = index === 0
+                ? currentSnapshot
+                : (versions[index - 1]?.snapshot as Record<string, unknown>);
+            const revisionSnapshot = (revision.snapshot ?? {}) as Record<string, unknown>;
+            const changedKeys = calculateChangedKeys(revisionSnapshot, newerSnapshot || currentSnapshot);
+
+            return {
+                version: revision.version,
+                updatedAt: revision.updatedAt,
+                updatedBy: revision.updatedBy,
+                note: revision.note,
+                changedKeys,
+                snapshot: revision.snapshot,
+            };
+        });
+
+        return res.json({
+            data: {
+                announcementId: announcement.id,
+                currentVersion: announcement.version,
+                currentUpdatedAt: announcement.updatedAt,
+                revisions,
+            },
+        });
+    } catch (error) {
+        console.error('Announcement revisions error:', error);
+        return res.status(500).json({ error: 'Failed to load revision timeline' });
+    }
+});
+
+/**
+ * GET /api/admin/links/health/summary
+ * Link health summary for dashboard/reporting widgets.
+ */
+router.get('/links/health/summary', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = linkHealthSummaryQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const linksCollection = getCollection<LinkRecordDoc>('link_records');
+        const eventsCollection = getCollection<LinkHealthEventDoc>('link_health_events');
+        const now = new Date();
+        const since = new Date(now.getTime() - parsed.data.days * 24 * 60 * 60 * 1000);
+
+        const [totalLinks, statusBuckets, recentEvents, recentBroken] = await Promise.all([
+            linksCollection.countDocuments({}),
+            linksCollection.aggregate([
+                { $group: { _id: '$status', count: { $sum: 1 } } },
+            ]).toArray(),
+            eventsCollection.aggregate([
+                { $match: { checkedAt: { $gte: since } } },
+                {
+                    $group: {
+                        _id: '$status',
+                        count: { $sum: 1 },
+                        avgResponseTimeMs: { $avg: '$responseTimeMs' },
+                    },
+                },
+            ]).toArray(),
+            linksCollection.find({ status: 'broken' } as any).sort({ updatedAt: -1 }).limit(20).toArray(),
+        ]);
+
+        const byStatus: Record<string, number> = {
+            active: 0,
+            expired: 0,
+            broken: 0,
+        };
+        for (const bucket of statusBuckets as any[]) {
+            if (bucket?._id && typeof bucket.count === 'number') {
+                byStatus[String(bucket._id)] = bucket.count;
+            }
+        }
+
+        return res.json({
+            data: {
+                windowDays: parsed.data.days,
+                generatedAt: now.toISOString(),
+                totalLinks,
+                byStatus,
+                eventSummary: (recentEvents as any[]).map((item) => ({
+                    status: item._id,
+                    count: item.count,
+                    avgResponseTimeMs: typeof item.avgResponseTimeMs === 'number'
+                        ? Math.round(item.avgResponseTimeMs)
+                        : null,
+                })),
+                recentBroken: (recentBroken as any[]).map((item) => ({
+                    id: serializeId(item._id),
+                    label: item.label,
+                    url: item.url,
+                    announcementId: item.announcementId,
+                    updatedAt: item.updatedAt,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error('Link health summary error:', error);
+        return res.status(500).json({ error: 'Failed to load link health summary' });
+    }
+});
+
+/**
  * GET /api/admin/homepage/sections
  * Homepage section ordering and ranking configuration.
- */
+*/
 router.get('/homepage/sections', requirePermission('announcements:read'), async (_req, res) => {
     try {
         const sectionsCollection = getCollection<HomeSectionDoc>('homepage_sections');

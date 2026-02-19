@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
-import { getAdminAnnouncements, updateAdminAnnouncement } from '../../lib/api/client';
+import {
+    autosaveAnnouncementDraft,
+    createAnnouncementDraft,
+    getAdminAnnouncementsPaged,
+    getAnnouncementRevisions,
+    updateAdminAnnouncement,
+} from '../../lib/api/client';
 import type { AdminAnnouncementListItem } from '../../types';
 
 type EditableAnnouncement = {
@@ -26,26 +33,48 @@ const defaultEditable: EditableAnnouncement = {
     location: '',
 };
 
+const createSnapshot = (value: EditableAnnouncement) => JSON.stringify(value);
+
 export function DetailedPostModule() {
+    const location = useLocation();
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string>('');
     const [editable, setEditable] = useState<EditableAnnouncement>(defaultEditable);
-    const { notifyInfo } = useAdminNotifications();
+    const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState<string>(createSnapshot(defaultEditable));
+    const [lastAutosaveAt, setLastAutosaveAt] = useState<string>('');
+    const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+    const { notifyInfo, notifySuccess, notifyError } = useAdminNotifications();
 
     const query = useQuery({
         queryKey: ['detailed-post-list', search],
-        queryFn: () => getAdminAnnouncements({ limit: 100, search }),
+        queryFn: () => getAdminAnnouncementsPaged({ limit: 100, search, sort: 'updated', status: 'all' }),
     });
 
-    const announcements = useMemo(() => query.data ?? [], [query.data]);
+    const announcements = useMemo(() => query.data?.data ?? [], [query.data?.data]);
     const selected = useMemo(
         () => announcements.find((item) => (item.id || item._id) === selectedId) as (AdminAnnouncementListItem | undefined),
         [announcements, selectedId]
     );
 
+    const revisionsQuery = useQuery({
+        queryKey: ['announcement-revisions', selectedId],
+        queryFn: () => getAnnouncementRevisions(selectedId, 12),
+        enabled: Boolean(selectedId),
+        staleTime: 30_000,
+    });
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const focus = params.get('focus');
+        if (!focus) return;
+        if (focus !== selectedId) {
+            setSelectedId(focus);
+        }
+    }, [location.search, selectedId]);
+
     useEffect(() => {
         if (!selected) return;
-        setEditable({
+        const nextEditable: EditableAnnouncement = {
             title: selected.title ?? '',
             category: String(selected.category ?? ''),
             organization: String(selected.organization ?? ''),
@@ -53,7 +82,10 @@ export function DetailedPostModule() {
             content: String(selected.content ?? ''),
             externalLink: String(selected.externalLink ?? ''),
             location: String(selected.location ?? ''),
-        });
+        };
+        setEditable(nextEditable);
+        setLastSyncedSnapshot(createSnapshot(nextEditable));
+        setLastAutosaveAt('');
     }, [selected]);
 
     const mutation = useMutation({
@@ -70,12 +102,74 @@ export function DetailedPostModule() {
             });
         },
         onSuccess: () => {
+            const snapshot = createSnapshot(editable);
+            setLastSyncedSnapshot(snapshot);
+            setLastAutosaveAt(new Date().toISOString());
+            notifySuccess('Saved', 'Post changes were saved to server.');
             void query.refetch();
+            void revisionsQuery.refetch();
+        },
+        onError: (error) => {
+            notifyError('Save failed', error instanceof Error ? error.message : 'Unable to save post changes.');
         },
     });
 
+    const autosaveMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedId) throw new Error('Missing selected post for autosave.');
+            return autosaveAnnouncementDraft(selectedId, {
+                title: editable.title.trim(),
+                category: editable.category.trim(),
+                organization: editable.organization.trim(),
+                status: editable.status as 'draft' | 'pending' | 'scheduled' | 'published' | 'archived',
+                content: editable.content || undefined,
+                externalLink: editable.externalLink || undefined,
+                location: editable.location || undefined,
+                autosave: {
+                    editorSessionId: 'detailed-post-module',
+                    clientUpdatedAt: new Date().toISOString(),
+                },
+            });
+        },
+        onSuccess: (data) => {
+            setLastSyncedSnapshot(createSnapshot(editable));
+            setLastAutosaveAt(String(data.updatedAt || new Date().toISOString()));
+        },
+        onError: () => {
+            // Do not interrupt editor flow on autosave jitter.
+        },
+    });
+
+    const createDraftMutation = useMutation({
+        mutationFn: () => createAnnouncementDraft({ type: 'job' }),
+        onSuccess: async (draft) => {
+            await query.refetch();
+            setSelectedId(draft.id);
+            setSearch('');
+            notifySuccess('Draft created', `New draft ${draft.id} is ready in editor.`);
+        },
+        onError: (error) => {
+            notifyError('Create draft failed', error instanceof Error ? error.message : 'Unable to initialize draft.');
+        },
+    });
+
+    const currentSnapshot = createSnapshot(editable);
+    const isDirty = Boolean(selectedId) && currentSnapshot !== lastSyncedSnapshot;
+
+    useEffect(() => {
+        if (!autosaveEnabled) return;
+        if (!selectedId || !isDirty) return;
+
+        const timer = window.setInterval(() => {
+            if (autosaveMutation.isPending || mutation.isPending) return;
+            autosaveMutation.mutate();
+        }, 10_000);
+
+        return () => window.clearInterval(timer);
+    }, [autosaveEnabled, autosaveMutation, isDirty, mutation.isPending, selectedId]);
+
     return (
-        <OpsCard title="Detailed Post" description="Edit existing records with full field controls.">
+        <OpsCard title="Detailed Post" description="Deep editor with server autosave, revision timeline, and restore controls.">
             <div className="ops-stack">
                 <OpsToolbar
                     compact
@@ -101,20 +195,43 @@ export function DetailedPostModule() {
                                     );
                                 })}
                             </select>
+                            <button
+                                type="button"
+                                className="admin-btn small"
+                                onClick={() => createDraftMutation.mutate()}
+                                disabled={createDraftMutation.isPending}
+                            >
+                                {createDraftMutation.isPending ? 'Creating draft...' : 'New draft'}
+                            </button>
                         </>
                     }
                     actions={
                         <>
-                            <span className="ops-inline-muted">{selected ? `Editing: ${selected.title || selectedId}` : 'Select a record to edit.'}</span>
+                            <span className="ops-inline-muted">
+                                {selected ? `Editing: ${selected.title || selectedId}` : 'Select a record to edit.'}
+                            </span>
+                            <span className="ops-inline-muted">
+                                Autosave: {autosaveEnabled ? 'On' : 'Off'}
+                                {lastAutosaveAt ? ` | Last autosave ${new Date(lastAutosaveAt).toLocaleTimeString()}` : ''}
+                                {isDirty ? ' | Unsaved changes' : ' | Synced'}
+                            </span>
                             <button type="button" className="admin-btn small subtle" onClick={() => void query.refetch()}>
                                 Refresh list
+                            </button>
+                            <button
+                                type="button"
+                                className="admin-btn small subtle"
+                                onClick={() => setAutosaveEnabled((value) => !value)}
+                                disabled={!selected}
+                            >
+                                {autosaveEnabled ? 'Disable autosave' : 'Enable autosave'}
                             </button>
                             <button
                                 type="button"
                                 className="admin-btn small"
                                 onClick={() => {
                                     if (!selected) return;
-                                    setEditable({
+                                    const restored: EditableAnnouncement = {
                                         title: selected.title ?? '',
                                         category: String(selected.category ?? ''),
                                         organization: String(selected.organization ?? ''),
@@ -122,7 +239,9 @@ export function DetailedPostModule() {
                                         content: String(selected.content ?? ''),
                                         externalLink: String(selected.externalLink ?? ''),
                                         location: String(selected.location ?? ''),
-                                    });
+                                    };
+                                    setEditable(restored);
+                                    setLastSyncedSnapshot(createSnapshot(restored));
                                     notifyInfo('Form restored', 'Unsaved edits reset to current record values.');
                                 }}
                                 disabled={!selected}
@@ -196,6 +315,30 @@ export function DetailedPostModule() {
                             </button>
                         </div>
                     </form>
+                ) : null}
+
+                {selectedId ? (
+                    <div className="ops-card muted">
+                        <h4>Revision Timeline</h4>
+                        {revisionsQuery.isPending ? <div className="ops-inline-muted">Loading revisions...</div> : null}
+                        {revisionsQuery.error ? <OpsErrorState message="Failed to load revision timeline." /> : null}
+                        {!revisionsQuery.isPending && !revisionsQuery.error ? (
+                            <div className="ops-stack">
+                                {(revisionsQuery.data?.revisions ?? []).map((revision) => (
+                                    <div key={revision.version} className="ops-row wrap">
+                                        <strong>v{revision.version}</strong>
+                                        <span className="ops-inline-muted">
+                                            {revision.updatedAt ? new Date(revision.updatedAt).toLocaleString() : 'Unknown time'}
+                                        </span>
+                                        <code>{(revision.changedKeys || []).slice(0, 6).join(', ') || 'no-key-diff'}</code>
+                                    </div>
+                                ))}
+                                {(revisionsQuery.data?.revisions ?? []).length === 0 ? (
+                                    <div className="ops-inline-muted">No revision history available for this record yet.</div>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
                 ) : null}
 
                 {mutation.isError ? (

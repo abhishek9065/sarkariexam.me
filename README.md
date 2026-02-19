@@ -171,26 +171,38 @@ VITE_PROXY_TARGET=http://127.0.0.1:5000 npm run test:e2e:integration
 - Cutover back to vNext on `/admin` is deferred until full parity is proven.
 
 ## Admin vNext Operational Modules (`/admin-vnext`)
+Grouped IA (8 top-level):
 - Dashboard
-- Create Post
-- Job
-- Result
-- Admit Card
-- Answer Key
-- Syllabus
-- Admission
-- Manage Posts / Announcements
-- Homepage Sections
-- Link Manager
-- Templates
-- Alerts
-- Media / PDFs
-- SEO Tools
-- Users & Roles
-- Reports
+- Posts
+- Review
+- Homepage
+- Assets
+- Team
+- Logs
 - Settings
 
+Key module coverage:
+- `Posts`: All Posts, New Post, Quick Add, Detailed Post, Job, Result, Admit Card, Answer Key, Syllabus, Admission
+- `Review`: Review Queue, Approvals, Queue, Bulk Import
+- `Homepage`: Homepage Sections
+- `Assets`: Links, Media/PDFs, Templates, SEO Tools
+- `Team`: Users & Roles
+- `Logs`: Alerts, Security, Sessions, Audit, Reports, Community Moderation, Error Reports
+
+Premium operator features shipped in vNext:
+- Server-driven post table pagination + saved views
+- Bulk actions lane (review/publish/expire/pin)
+- Global admin search (`/` hotkey)
+- Detailed editor autosave (~10s cadence) + revision timeline
+
 ## New Additive Admin APIs
+- `GET /api/admin/search`
+- `GET/POST /api/admin/views`
+- `PATCH/DELETE /api/admin/views/{id}`
+- `POST /api/admin/announcements/draft`
+- `PATCH /api/admin/announcements/{id}/autosave`
+- `GET /api/admin/announcements/{id}/revisions`
+- `GET /api/admin/links/health/summary`
 - `GET/PUT /api/admin/homepage/sections`
 - `GET/POST/PATCH /api/admin/links`
 - `POST /api/admin/links/check`

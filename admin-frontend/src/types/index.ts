@@ -105,6 +105,15 @@ export interface AdminAnnouncementListItem {
     schema?: Record<string, unknown>;
 }
 
+export interface AdminAnnouncementListResponse {
+    data: AdminAnnouncementListItem[];
+    meta: {
+        total: number;
+        limit: number;
+        offset: number;
+    };
+}
+
 export interface AdminContentRecord extends AdminAnnouncementListItem {
     id: string;
     title: string;
@@ -375,4 +384,94 @@ export interface AdminAnnouncementFilterPreset {
     type: AnnouncementTypeFilter | 'all';
     status: AnnouncementStatusFilter | 'all';
     sort: AnnouncementSortOption;
+}
+
+export interface AdminSavedView {
+    id: string;
+    name: string;
+    module: string;
+    scope: 'private' | 'shared';
+    filters: Record<string, unknown>;
+    columns?: string[];
+    sort?: Record<string, unknown>;
+    isDefault?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
+}
+
+export interface AdminGlobalSearchResult {
+    entity: 'post' | 'link' | 'media' | 'organization' | 'tag';
+    id: string;
+    title: string;
+    subtitle?: string;
+    route?: string;
+}
+
+export interface AdminDraftRecord {
+    id: string;
+    title: string;
+    type: AnnouncementTypeFilter;
+    status: AnnouncementStatusFilter | 'draft';
+    updatedAt?: string;
+}
+
+export interface AdminAutosavePayload {
+    title?: string;
+    category?: string;
+    organization?: string;
+    content?: string;
+    externalLink?: string;
+    location?: string;
+    deadline?: string;
+    minQualification?: string;
+    ageLimit?: string;
+    applicationFee?: string;
+    salaryMin?: number;
+    salaryMax?: number;
+    difficulty?: 'easy' | 'medium' | 'hard';
+    cutoffMarks?: string;
+    totalPosts?: number;
+    status?: AnnouncementStatusFilter;
+    publishAt?: string;
+    approvedAt?: string;
+    approvedBy?: string;
+    tags?: string[];
+    importantDates?: Array<{ eventName: string; eventDate: string; description?: string }>;
+    typeDetails?: Record<string, unknown>;
+    seo?: {
+        metaTitle?: string;
+        metaDescription?: string;
+        canonical?: string;
+        indexPolicy?: 'index' | 'noindex';
+        ogImage?: string;
+    };
+    home?: {
+        section?: string;
+        stickyRank?: number;
+        highlight?: boolean;
+        trendingScore?: number;
+    };
+    schema?: Record<string, unknown>;
+    autosave?: {
+        editorSessionId?: string;
+        clientUpdatedAt?: string;
+        cursor?: Record<string, unknown>;
+    };
+}
+
+export interface AdminRevisionEntry {
+    version: number;
+    updatedAt?: string;
+    updatedBy?: string;
+    note?: string;
+    changedKeys: string[];
+    snapshot: Record<string, unknown>;
+}
+
+export interface WorkflowPolicyByType {
+    type: AnnouncementTypeFilter;
+    requiresReview: boolean;
+    requiresStepUpToPublish: boolean;
 }

@@ -17,7 +17,7 @@ interface AnalyticsEvent {
 
 const FLUSH_INTERVAL = 10_000; // 10s
 const MAX_BUFFER = 100;
-let buffer: AnalyticsEvent[] = [];
+const buffer: AnalyticsEvent[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 
 function getApiBase(): string {

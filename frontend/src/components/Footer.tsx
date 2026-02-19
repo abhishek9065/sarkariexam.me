@@ -5,11 +5,16 @@ const SOCIAL_LINKS = [
     { label: 'WhatsApp', href: 'https://wa.me/sarkariexamsme', icon: '💬' },
     { label: 'YouTube', href: 'https://youtube.com/@sarkariexamsme', icon: '▶' },
     { label: 'Instagram', href: 'https://instagram.com/sarkariexamsme', icon: '📸' },
+    { label: 'X', href: 'https://x.com/sarkariexamsme', icon: '𝕏' },
+    { label: 'Facebook', href: 'https://facebook.com/sarkariexamsme', icon: 'f' },
+    { label: 'LinkedIn', href: 'https://linkedin.com/company/sarkariexamsme', icon: 'in' },
+    { label: 'Threads', href: 'https://threads.net/@sarkariexamsme', icon: '@' },
 ];
 
 const FOOTER_LINKS = [
     { label: 'About', to: '/about' },
     { label: 'Contact', to: '/contact' },
+    { label: 'Advertise With Us', to: '/advertise' },
     { label: 'Privacy Policy', to: '/privacy' },
     { label: 'Disclaimer', to: '/disclaimer' },
 ];
@@ -29,7 +34,7 @@ export function Footer() {
                         </div>
                     </div>
 
-                    <div className="footer-social">
+                    <div className="footer-social footer-social-grid">
                         {SOCIAL_LINKS.map((item) => (
                             <a
                                 key={item.label}

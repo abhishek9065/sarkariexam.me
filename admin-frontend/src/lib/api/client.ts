@@ -2,13 +2,19 @@ import type {
     AnnouncementTypeFilter,
     AdminAlert,
     AdminAnnouncementListItem,
+    AdminAnnouncementListResponse,
+    AdminAutosavePayload,
     AdminContentRecord,
     AdminApprovalItem,
     AdminAuditLog,
     AdminBulkPreview,
+    AdminDraftRecord,
     AdminErrorReport,
+    AdminGlobalSearchResult,
     AdminRoleUser,
     AdminReportSnapshot,
+    AdminRevisionEntry,
+    AdminSavedView,
     AdminPermissionSnapshot,
     AdminReviewPreview,
     AdminSecurityLog,
@@ -193,14 +199,14 @@ export async function getAnalyticsOverview(input: {
     return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : null;
 }
 
-export async function getAdminAnnouncements(input: {
+export async function getAdminAnnouncementsPaged(input: {
     limit?: number;
     offset?: number;
     status?: string;
     search?: string;
     type?: string;
     sort?: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
-} = {}): Promise<AdminAnnouncementListItem[]> {
+} = {}): Promise<AdminAnnouncementListResponse> {
     const params = new URLSearchParams();
     params.set('limit', String(input.limit ?? 20));
     params.set('offset', String(input.offset ?? 0));
@@ -210,7 +216,137 @@ export async function getAdminAnnouncements(input: {
     if (input.search && input.search.trim()) params.set('search', input.search.trim());
 
     const body = await request(`/api/admin/announcements?${params.toString()}`);
-    return toArray<AdminAnnouncementListItem>(body?.data);
+    return {
+        data: toArray<AdminAnnouncementListItem>(body?.data),
+        meta: {
+            total: Number(body?.meta?.total ?? 0),
+            limit: Number(body?.meta?.limit ?? input.limit ?? 20),
+            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+        },
+    };
+}
+
+export async function getAdminAnnouncements(input: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+    search?: string;
+    type?: string;
+    sort?: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+} = {}): Promise<AdminAnnouncementListItem[]> {
+    const response = await getAdminAnnouncementsPaged(input);
+    return response.data;
+}
+
+export async function searchAdminEntities(input: {
+    q: string;
+    limit?: number;
+    entities?: Array<'posts' | 'links' | 'media' | 'organizations' | 'tags'>;
+}): Promise<{ data: AdminGlobalSearchResult[]; meta?: Record<string, unknown> }> {
+    const params = new URLSearchParams();
+    params.set('q', input.q.trim());
+    if (input.limit && Number.isFinite(input.limit)) params.set('limit', String(input.limit));
+    if (input.entities && input.entities.length > 0) params.set('entities', input.entities.join(','));
+    const body = await request(`/api/admin/search?${params.toString()}`);
+    return {
+        data: toArray<AdminGlobalSearchResult>(body?.data),
+        ...(body?.meta ? { meta: body.meta as Record<string, unknown> } : {}),
+    };
+}
+
+export async function getAdminSavedViews(input: {
+    module?: string;
+    scope?: 'all' | 'private' | 'shared';
+    search?: string;
+    limit?: number;
+    offset?: number;
+} = {}): Promise<{ data: AdminSavedView[]; meta: { total: number; limit: number; offset: number } }> {
+    const params = new URLSearchParams();
+    if (input.module?.trim()) params.set('module', input.module.trim());
+    if (input.scope && input.scope !== 'all') params.set('scope', input.scope);
+    if (input.search?.trim()) params.set('search', input.search.trim());
+    params.set('limit', String(input.limit ?? 100));
+    params.set('offset', String(input.offset ?? 0));
+
+    const body = await request(`/api/admin/views?${params.toString()}`);
+    return {
+        data: toArray<AdminSavedView>(body?.data),
+        meta: {
+            total: Number(body?.meta?.total ?? 0),
+            limit: Number(body?.meta?.limit ?? input.limit ?? 100),
+            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+        },
+    };
+}
+
+export async function createAdminSavedView(payload: Omit<AdminSavedView, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>): Promise<AdminSavedView> {
+    const body = await request('/api/admin/views', {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function updateAdminSavedView(
+    id: string,
+    payload: Partial<Omit<AdminSavedView, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>>
+): Promise<AdminSavedView> {
+    const body = await request(`/api/admin/views/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function deleteAdminSavedView(id: string): Promise<{ success: boolean; id: string }> {
+    const body = await request(`/api/admin/views/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: mutationHeaders(),
+    }, true);
+    return body?.data ?? { success: false, id };
+}
+
+export async function createAnnouncementDraft(input: {
+    type?: AnnouncementTypeFilter;
+    title?: string;
+    category?: string;
+    organization?: string;
+    templateId?: string;
+} = {}): Promise<AdminDraftRecord> {
+    const body = await request('/api/admin/announcements/draft', {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify(input),
+    }, true);
+    return body?.data;
+}
+
+export async function autosaveAnnouncementDraft(id: string, payload: AdminAutosavePayload): Promise<{
+    id: string;
+    title: string;
+    status: string;
+    version: number;
+    updatedAt?: string;
+    autosaved: boolean;
+}> {
+    const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/autosave`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function getAnnouncementRevisions(id: string, limit = 20): Promise<{
+    announcementId: string;
+    currentVersion: number;
+    currentUpdatedAt?: string;
+    revisions: AdminRevisionEntry[];
+}> {
+    const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/revisions?limit=${Math.max(1, Math.min(100, limit))}`);
+    return body?.data ?? { announcementId: id, currentVersion: 0, revisions: [] };
 }
 
 export async function getAdminSessions(): Promise<AdminSession[]> {
@@ -601,6 +737,26 @@ export async function checkLinks(payload: {
     return {
         data: toArray<LinkHealthReport>(body?.data),
         meta: body?.meta,
+    };
+}
+
+export async function getLinkHealthSummary(days = 7): Promise<{
+    windowDays: number;
+    generatedAt: string;
+    totalLinks: number;
+    byStatus: Record<string, number>;
+    eventSummary: Array<{ status: string; count: number; avgResponseTimeMs: number | null }>;
+    recentBroken: Array<{ id: string; label: string; url: string; announcementId?: string; updatedAt?: string }>;
+}> {
+    const boundedDays = Math.max(1, Math.min(90, days));
+    const body = await request(`/api/admin/links/health/summary?days=${boundedDays}`);
+    return body?.data ?? {
+        windowDays: boundedDays,
+        generatedAt: new Date().toISOString(),
+        totalLinks: 0,
+        byStatus: {},
+        eventSummary: [],
+        recentBroken: [],
     };
 }
 

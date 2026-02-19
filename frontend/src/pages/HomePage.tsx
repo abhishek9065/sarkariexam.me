@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { getAnnouncementCards, getBookmarks } from '../utils/api';
 import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
+import type { SourceTag } from '../utils/trackingLinks';
 import { trackEvent, trackScrollDepth } from '../utils/analytics';
 import { AuthContext } from '../context/auth-context';
 import type { AnnouncementCard, ContentType } from '../types';
@@ -32,6 +33,20 @@ const FILTER_TABS: Array<{ key: 'all' | ContentType; label: string }> = [
     { key: 'admit-card', label: 'Admit Cards' },
     { key: 'answer-key', label: 'Answer Keys' },
 ];
+
+const MOBILE_MAJOR_TABS: Array<{ key: 'job' | 'admit-card' | 'result'; label: string }> = [
+    { key: 'job', label: 'Latest Jobs' },
+    { key: 'admit-card', label: 'Admit Card' },
+    { key: 'result', label: 'Result' },
+];
+
+type DenseBoxItem = {
+    id: string;
+    title: string;
+    href: string;
+    meta: string;
+    badge: string;
+};
 
 /* ─── Preference Picker (anonymous users) ─── */
 const PREF_KEY = 'sr_user_prefs';
@@ -182,10 +197,10 @@ export function HomePage() {
         (async () => {
             try {
                 const [jobs, results, admits, answerKeys] = await Promise.all([
-                    getAnnouncementCards({ type: 'job', limit: 6, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'result', limit: 6, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'admit-card', limit: 6, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'answer-key', limit: 4, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'job', limit: 12, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'result', limit: 12, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'admit-card', limit: 12, sort: 'newest' }),
+                    getAnnouncementCards({ type: 'answer-key', limit: 12, sort: 'newest' }),
                 ]);
                 if (!mounted) return;
 
@@ -224,9 +239,71 @@ export function HomePage() {
 
     /* Filter + personalization logic */
     const filteredUpdates = useMemo(() => {
-        let list = activeFilter === 'all' ? updates : updates.filter((u) => u.type === activeFilter);
+        const list = activeFilter === 'all' ? updates : updates.filter((u) => u.type === activeFilter);
         return list.slice(0, 15);
     }, [updates, activeFilter]);
+
+    const updatesByType = useMemo(() => {
+        const map: Record<ContentType, AnnouncementCard[]> = {
+            job: [],
+            result: [],
+            'admit-card': [],
+            'answer-key': [],
+            syllabus: [],
+            admission: [],
+        };
+        for (const card of updates) {
+            map[card.type].push(card);
+        }
+        return map;
+    }, [updates]);
+
+    const makeDenseItems = useCallback((
+        cards: AnnouncementCard[],
+        source: SourceTag,
+        fallbackPath: string,
+        count = 10
+    ): DenseBoxItem[] => {
+        const normalized = cards.slice(0, count).map((card) => {
+            const fallbackHref = `${fallbackPath}?source=${source}`;
+            const href = card.slug ? buildAnnouncementDetailPath(card.type, card.slug, source) : fallbackHref;
+            return {
+                id: card.id,
+                title: card.title,
+                href,
+                meta: card.organization || timeAgo(card.postedAt),
+                badge: TYPE_LABELS[card.type],
+            };
+        });
+
+        while (normalized.length < count) {
+            const idx = normalized.length + 1;
+            normalized.push({
+                id: `fallback-${source}-${idx}`,
+                title: `View more updates (${idx})`,
+                href: `${fallbackPath}?source=${source}`,
+                meta: 'Official updates',
+                badge: 'Info',
+            });
+        }
+        return normalized;
+    }, []);
+
+    const denseJobs = useMemo(() => makeDenseItems(updatesByType.job, 'home_box_jobs', '/jobs'), [makeDenseItems, updatesByType.job]);
+    const denseResults = useMemo(() => makeDenseItems(updatesByType.result, 'home_box_results', '/results'), [makeDenseItems, updatesByType.result]);
+    const denseAdmit = useMemo(() => makeDenseItems(updatesByType['admit-card'], 'home_box_admit', '/admit-card'), [makeDenseItems, updatesByType['admit-card']]);
+    const denseAnswerKey = useMemo(() => makeDenseItems(updatesByType['answer-key'], 'home_box_answer_key', '/answer-key'), [makeDenseItems, updatesByType['answer-key']]);
+    const denseSyllabus = useMemo(() => makeDenseItems(updatesByType.syllabus, 'home_box_syllabus', '/syllabus'), [makeDenseItems, updatesByType.syllabus]);
+    const denseAdmission = useMemo(() => makeDenseItems(updatesByType.admission, 'home_box_admission', '/admission'), [makeDenseItems, updatesByType.admission]);
+    const denseImportant = useMemo(() => makeDenseItems(updates, 'home_box_important', '/jobs'), [makeDenseItems, updates]);
+    const denseCertificate = useMemo(() => makeDenseItems(updatesByType['admit-card'], 'home_box_certificate', '/admit-card'), [makeDenseItems, updatesByType['admit-card']]);
+
+    const [mobileMajorTab, setMobileMajorTab] = useState<'job' | 'admit-card' | 'result'>('job');
+    const mobileMajorItems = useMemo(() => {
+        if (mobileMajorTab === 'job') return denseJobs.slice(0, 10);
+        if (mobileMajorTab === 'admit-card') return denseAdmit.slice(0, 10);
+        return denseResults.slice(0, 10);
+    }, [denseAdmit, denseJobs, denseResults, mobileMajorTab]);
 
     /* Group items by date */
     const groupedUpdates = useMemo(() => {
@@ -281,6 +358,7 @@ export function HomePage() {
     return (
         <Layout>
             <div className="hp" data-testid="home-mvp">
+                <div className="home-v4-shell" data-testid="home-v4-shell">
                 {/* ═══ HERO ═══ */}
                 <section className="hp-hero">
                     <h1 className="hp-hero-title">
@@ -312,6 +390,180 @@ export function HomePage() {
                         </Link>
                     ))}
                 </nav>
+
+                <section className="home-v3-grid home-v3-top-grid" data-testid="home-v3-top-grid">
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-results">
+                        <div className="home-dense-box-header">
+                            <h2>Result</h2>
+                            <Link to="/results?source=home_box_results">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseResults.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-admit">
+                        <div className="home-dense-box-header">
+                            <h2>Admit Card</h2>
+                            <Link to="/admit-card?source=home_box_admit">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseAdmit.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-jobs">
+                        <div className="home-dense-box-header">
+                            <h2>Latest Jobs</h2>
+                            <Link to="/jobs?source=home_box_jobs">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseJobs.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+                </section>
+
+                <section className="home-v3-grid home-v3-middle-grid" data-testid="home-v3-middle-grid">
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-answer-key">
+                        <div className="home-dense-box-header">
+                            <h2>Answer Key</h2>
+                            <Link to="/answer-key?source=home_box_answer_key">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseAnswerKey.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-syllabus">
+                        <div className="home-dense-box-header">
+                            <h2>Syllabus</h2>
+                            <Link to="/syllabus?source=home_box_syllabus">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseSyllabus.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-admission">
+                        <div className="home-dense-box-header">
+                            <h2>Admission</h2>
+                            <Link to="/admission?source=home_box_admission">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseAdmission.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+                </section>
+
+                <section className="home-v3-grid home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-certificate">
+                        <div className="home-dense-box-header">
+                            <h2>Certificate Verification</h2>
+                            <Link to="/admit-card?source=home_box_certificate">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseCertificate.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+
+                    <article className="home-dense-box" data-testid="home-v3-dense-box-important">
+                        <div className="home-dense-box-header">
+                            <h2>Important</h2>
+                            <Link to="/jobs?source=home_box_important">View all</Link>
+                        </div>
+                        <ul className="section-card-list">
+                            {denseImportant.slice(0, 10).map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </article>
+                </section>
+
+                <section className="home-mobile-tabs" data-testid="home-mobile-tabs">
+                    <div className="home-mobile-tablist" role="tablist" aria-label="Homepage major sections">
+                        {MOBILE_MAJOR_TABS.map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                role="tab"
+                                aria-selected={mobileMajorTab === tab.key}
+                                className={`home-mobile-tab${mobileMajorTab === tab.key ? ' active' : ''}`}
+                                onClick={() => setMobileMajorTab(tab.key)}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="home-mobile-major-panel" data-testid="home-mobile-major-panel">
+                        <h3 data-testid="home-mobile-major-title">
+                            {MOBILE_MAJOR_TABS.find((tab) => tab.key === mobileMajorTab)?.label ?? 'Latest Jobs'}
+                        </h3>
+                        <ul className="home-mobile-major-list">
+                            {mobileMajorItems.map((item) => (
+                                <li key={item.id}>
+                                    <Link to={item.href} className="home-dense-box-link">
+                                        <span>{item.title}</span>
+                                        <small>{item.meta}</small>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </section>
 
                 {/* ═══ PREFERENCE PICKER (anonymous, first visit) ═══ */}
                 {showPicker && (
@@ -374,13 +626,12 @@ export function HomePage() {
                 <section className="hp-updates">
                     <div className="hp-updates-header">
                         <h2 className="hp-updates-title">Latest Updates</h2>
-                        <div className="hp-filter-chips" role="tablist" aria-label="Filter updates">
+                        <div className="hp-filter-chips" role="group" aria-label="Filter updates">
                             {FILTER_TABS.map((tab) => (
                                 <button
                                     key={tab.key}
                                     type="button"
-                                    role="tab"
-                                    aria-selected={activeFilter === tab.key}
+                                    aria-pressed={activeFilter === tab.key}
                                     className={`hp-filter-chip${activeFilter === tab.key ? ' active' : ''}`}
                                     onClick={() => handleFilterChange(tab.key)}
                                 >
@@ -452,6 +703,7 @@ export function HomePage() {
                         discrepancy in the information provided.
                     </p>
                 </details>
+                </div>
             </div>
         </Layout>
     );
