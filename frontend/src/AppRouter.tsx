@@ -17,6 +17,8 @@ const AdminPage = lazy(() => import('./pages/AdminPage'));
 const StaticPage = lazy(() => import('./pages/StaticPage').then((m) => ({ default: m.StaticPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })));
+const ExplorePage = lazy(() => import('./pages/ExplorePage').then((m) => ({ default: m.ExplorePage })));
+const TrendingPage = lazy(() => import('./pages/TrendingPage').then((m) => ({ default: m.TrendingPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 function SuspenseFallback() {
@@ -56,6 +58,10 @@ export default function App() {
                                     <Route path="/answer-key/:slug" element={<DetailPage type="answer-key" />} />
                                     <Route path="/admission/:slug" element={<DetailPage type="admission" />} />
                                     <Route path="/syllabus/:slug" element={<DetailPage type="syllabus" />} />
+
+                                    {/* Explore & Trending */}
+                                    <Route path="/explore" element={<ExplorePage />} />
+                                    <Route path="/trending" element={<TrendingPage />} />
 
                                     {/* Protected: User pages */}
                                     <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

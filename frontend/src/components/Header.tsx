@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/useAuth';
 import { useLanguage } from '../context/useLanguage';
 import { SearchOverlay } from './SearchOverlay';
 import { AuthModal } from './AuthModal';
-import { getTrendingSearches } from '../utils/api';
 
 interface NavLinkItem {
     to: string;
@@ -18,18 +17,18 @@ const PRIMARY_LINKS: NavLinkItem[] = [
     { to: '/results', labelKey: 'nav.results' },
     { to: '/admit-card', labelKey: 'nav.admitCard' },
     { to: '/answer-key', labelKey: 'nav.answerKey' },
-    { to: '/admission', labelKey: 'nav.admission' },
-    { to: '/syllabus', labelKey: 'nav.syllabus' },
 ];
 
 const MORE_LINKS: Array<{ to: string; label: string }> = [
+    { to: '/admission', label: '🎓 Admissions' },
+    { to: '/syllabus', label: '📚 Syllabus' },
     { to: '/about', label: 'About' },
     { to: '/contact', label: 'Contact' },
     { to: '/privacy', label: 'Privacy' },
     { to: '/disclaimer', label: 'Disclaimer' },
 ];
 
-const TRENDING_FALLBACK = ['RRB ALP 2026', 'UPSC CSE', 'SSC CGL', 'NEET UG', 'India Post GDS'];
+
 
 const normalizeAdminPortalPath = (value?: string | null) => {
     if (!value) return null;
@@ -92,7 +91,6 @@ export function Header() {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
     const [adminNavBusy, setAdminNavBusy] = useState(false);
-    const [trendingTerms, setTrendingTerms] = useState<string[]>(TRENDING_FALLBACK);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const moreMenuRef = useRef<HTMLDivElement>(null);
 
@@ -125,26 +123,7 @@ export function Header() {
         }
     }, [searchParams, setSearchParams]);
 
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            try {
-                const res = await getTrendingSearches(30, 6);
-                const terms = (res.data || [])
-                    .map((entry) => entry.query?.trim())
-                    .filter((query): query is string => Boolean(query));
-                if (mounted && terms.length > 0) {
-                    setTrendingTerms(terms);
-                }
-            } catch {
-                // Keep fallback terms.
-            }
-        })();
 
-        return () => {
-            mounted = false;
-        };
-    }, []);
 
     const openLogin = () => {
         setAuthTab('login');
@@ -155,13 +134,6 @@ export function Header() {
         setAuthTab('register');
         setAuthOpen(true);
     };
-
-    const tickerItems = useMemo(() => {
-        if (trendingTerms.length === 0) {
-            return TRENDING_FALLBACK;
-        }
-        return trendingTerms;
-    }, [trendingTerms]);
 
     const preferredAdminPortalPath = adminPortalCandidates[0] ?? '/admin';
 
@@ -184,24 +156,6 @@ export function Header() {
     return (
         <>
             <header className="header" data-testid="app-header">
-                <div className="header-utility">
-                    <div className="container header-utility-inner">
-                        <p className="header-tagline">{t('header.tagline')}</p>
-                        <div className="header-utility-links">
-                            <a href="https://t.me/sarkariexamsme" target="_blank" rel="noreferrer" className="header-utility-link">✈️ Telegram</a>
-                            <a href="https://youtube.com/@sarkariexamsme" target="_blank" rel="noreferrer" className="header-utility-link">▶️ YouTube</a>
-                            <button
-                                type="button"
-                                className="header-lang-toggle"
-                                onClick={toggleLanguage}
-                                aria-label="Toggle language"
-                            >
-                                {language === 'en' ? t('language.hi') : t('language.en')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
                 <div className="header-main">
                     <div className="container header-main-inner">
                         <Link to="/" className="header-logo" onClick={() => setMobileOpen(false)}>
@@ -263,6 +217,14 @@ export function Header() {
                                 aria-label="Toggle theme"
                             >
                                 {theme === 'light' ? '🌙' : '☀️'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-ghost header-lang-btn hide-mobile"
+                                onClick={toggleLanguage}
+                                aria-label="Toggle language"
+                            >
+                                {language === 'en' ? 'हि' : 'En'}
                             </button>
 
                             {user ? (
@@ -333,25 +295,6 @@ export function Header() {
                             >
                                 {mobileOpen ? '✕' : '☰'}
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="header-ticker" aria-label="Trending links">
-                    <div className="container header-ticker-inner">
-                        <span className="header-ticker-label">🔥 {t('header.trending')}:</span>
-                        <div className="header-ticker-window">
-                            <div className="header-ticker-track">
-                                {[...tickerItems, ...tickerItems].map((term, index) => (
-                                    <Link
-                                        key={`${term}-${index}`}
-                                        className="header-ticker-item"
-                                        to={`/jobs?q=${encodeURIComponent(term)}&source=header_trending`}
-                                    >
-                                        {term}
-                                    </Link>
-                                ))}
-                            </div>
                         </div>
                     </div>
                 </div>
