@@ -219,17 +219,23 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
     return (
         <Layout>
-            <section className="category-header animate-fade-in">
-                <div className="category-header-title">
-                    <span className="category-header-icon">{meta.icon}</span>
-                    <div>
-                        <h1>{meta.title}</h1>
-                        <p className="text-muted">{meta.description}</p>
+            {/* Premium Category Header */}
+            <section className="cat-hero animate-fade-in">
+                <div className="cat-hero-inner">
+                    <div className="cat-hero-icon-wrap">
+                        <span className="cat-hero-icon">{meta.icon}</span>
                     </div>
+                    <div className="cat-hero-text">
+                        <h1 className="cat-hero-title">{meta.title}</h1>
+                        <p className="cat-hero-desc">{meta.description}</p>
+                    </div>
+                    {total !== undefined && (
+                        <div className="cat-hero-count">
+                            <span className="cat-hero-count-num">{total.toLocaleString()}</span>
+                            <span className="cat-hero-count-label">Total</span>
+                        </div>
+                    )}
                 </div>
-                {total !== undefined && (
-                    <span className="category-count">{total.toLocaleString()} found</span>
-                )}
             </section>
 
             {type === 'job' ? (
@@ -245,31 +251,34 @@ export function CategoryPage({ type }: { type: ContentType }) {
                     onViewModeChange={(value) => updateFilter('view', value)}
                 />
             ) : (
-                <section className="filters-bar filters-bar-sticky">
-                    <div className="filters-row">
+                <section className="cat-filter-bar">
+                    <div className="cat-filter-row">
+                        <div className="cat-filter-input-wrap">
+                            <span className="cat-filter-search-icon">🔍</span>
+                            <input
+                                className="cat-filter-input"
+                                type="text"
+                                placeholder={`Search ${meta.title.toLowerCase()}...`}
+                                value={search}
+                                onChange={(event) => updateFilter('q', event.target.value)}
+                            />
+                        </div>
                         <input
-                            className="input filter-search"
+                            className="cat-filter-field"
                             type="text"
-                            placeholder="Search within results..."
-                            value={search}
-                            onChange={(event) => updateFilter('q', event.target.value)}
-                        />
-                        <input
-                            className="input filter-field"
-                            type="text"
-                            placeholder="Location"
+                            placeholder="📍 Location"
                             value={location}
                             onChange={(event) => updateFilter('location', event.target.value)}
                         />
                         <input
-                            className="input filter-field"
+                            className="cat-filter-field"
                             type="text"
-                            placeholder="Qualification"
+                            placeholder="🎓 Qualification"
                             value={qualification}
                             onChange={(event) => updateFilter('qualification', event.target.value)}
                         />
                         <select
-                            className="input filter-sort"
+                            className="cat-filter-select"
                             value={sort}
                             onChange={(event) => updateFilter('sort', event.target.value)}
                         >
@@ -277,40 +286,43 @@ export function CategoryPage({ type }: { type: ContentType }) {
                                 <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                         </select>
-                        <div className="category-view-toggle" role="group" aria-label="Toggle category view">
+                        <div className="cat-view-toggle" role="group" aria-label="Toggle view">
                             <button
                                 type="button"
-                                className={`category-view-btn${viewMode === 'compact' ? ' active' : ''}`}
+                                className={`cat-view-btn${viewMode === 'compact' ? ' active' : ''}`}
                                 onClick={() => updateFilter('view', 'compact')}
+                                title="List view"
                             >
-                                Compact
+                                ☰
                             </button>
                             <button
                                 type="button"
-                                className={`category-view-btn${viewMode === 'card' ? ' active' : ''}`}
+                                className={`cat-view-btn${viewMode === 'card' ? ' active' : ''}`}
                                 onClick={() => updateFilter('view', 'card')}
+                                title="Card view"
                             >
-                                Cards
+                                ▦
                             </button>
                         </div>
                     </div>
                 </section>
             )}
 
-            <section className="category-listing">
-                <div className="category-quick-chips">
+            <section className="cat-listing">
+                <div className="cat-quick-chips">
+                    <span className="cat-chips-label">Popular:</span>
                     {meta.chips.map((chip) => (
                         <button
                             key={chip}
                             type="button"
-                            className="category-chip"
+                            className={`cat-chip${search === chip ? ' cat-chip-active' : ''}`}
                             onClick={() => {
                                 if (type === 'job') {
                                     const next = { ...jobFilters, search: chip };
                                     setJobFilters(next);
                                     applyJobFilters(next);
                                 } else {
-                                    updateFilter('q', chip);
+                                    updateFilter('q', search === chip ? '' : chip);
                                 }
                             }}
                         >
@@ -320,17 +332,17 @@ export function CategoryPage({ type }: { type: ContentType }) {
                 </div>
 
                 {loading ? (
-                    <div className="grid-auto">
+                    <div className="cat-skeleton-grid">
                         {Array.from({ length: 8 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
                     </div>
                 ) : viewMode === 'compact' ? (
-                    <div className="category-compact-list" data-testid="category-compact-list">
-                        {cards.map((card) => (
-                            <CategoryListRow key={card.id} card={card} sourceTag="category_compact" />
+                    <div className="cat-compact-list" data-testid="category-compact-list">
+                        {cards.map((card, index) => (
+                            <CategoryListRow key={card.id} card={card} sourceTag="category_compact" index={index + 1} />
                         ))}
                     </div>
                 ) : (
-                    <div className="grid-auto">
+                    <div className="cat-cards-grid">
                         {cards.map((card) => (
                             <AnnouncementCard key={card.id} card={card} showType={false} sourceTag="category_list" />
                         ))}
@@ -338,27 +350,27 @@ export function CategoryPage({ type }: { type: ContentType }) {
                 )}
 
                 {!loading && cards.length === 0 && !fetchError && (
-                    <div className="empty-state">
-                        <span className="empty-state-icon">📭</span>
+                    <div className="cat-empty">
+                        <span className="cat-empty-icon">📭</span>
                         <h3>No {meta.title.toLowerCase()} found</h3>
-                        <p className="text-muted">Try adjusting your filters or check back later.</p>
+                        <p>Try adjusting your search filters or check back later for new updates.</p>
                     </div>
                 )}
 
                 {!loading && fetchError && (
-                    <div className="empty-state">
-                        <span className="empty-state-icon">⚠️</span>
+                    <div className="cat-empty cat-empty-error">
+                        <span className="cat-empty-icon">⚠️</span>
                         <h3>Something went wrong</h3>
-                        <p className="text-muted">Could not load {meta.title.toLowerCase()}. Please try again.</p>
+                        <p>Could not load {meta.title.toLowerCase()}. Please try again.</p>
                         <button type="button" className="btn btn-accent" onClick={() => void fetchCards()}>Retry</button>
                     </div>
                 )}
 
                 {hasMore && !loading && (
-                    <div className="load-more">
+                    <div className="cat-load-more">
                         <button
                             type="button"
-                            className="btn btn-outline btn-lg"
+                            className="cat-load-more-btn"
                             onClick={() => fetchCards(nextCursor)}
                             disabled={loadingMore}
                         >
@@ -368,7 +380,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
                                     Loading...
                                 </>
                             ) : (
-                                type === 'job' ? 'Load Next Batch' : 'Load More'
+                                type === 'job' ? 'Load Next Batch →' : 'Load More →'
                             )}
                         </button>
                     </div>
