@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { ObjectId, WithId, Document } from 'mongodb';
 
-import { getCollection } from '../services/cosmosdb.js';
+import { getCollection, getCollectionAsync } from '../services/cosmosdb.js';
 
 /**
  * User document interface for MongoDB
@@ -255,10 +255,10 @@ export class UserModelMongo {
         try {
             const { role, isActive, skip = 0, limit = 20 } = filters || {};
             const query: any = {};
-            
+
             if (role) query.role = role;
             if (isActive !== undefined) query.isActive = isActive;
-            
+
             const docs = await this.collection
                 .find(query)
                 .sort({ createdAt: -1 })
@@ -323,7 +323,8 @@ export class UserModelMongo {
 
     static async hasAdminPortalUser(): Promise<boolean> {
         try {
-            const doc = await this.collection.findOne(
+            const collection = await getCollectionAsync<UserDoc>('users');
+            const doc = await collection.findOne(
                 { role: { $in: ['admin', 'editor', 'reviewer', 'viewer'] } },
                 { projection: { _id: 1 } }
             );
