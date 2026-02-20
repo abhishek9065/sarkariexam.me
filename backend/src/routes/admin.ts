@@ -4035,8 +4035,11 @@ interface AdminUserDoc {
 }
 
 const adminUserFormatDoc = (doc: any) => {
-    const { _id, password, passwordHash, ...rest } = doc;
-    return { id: _id?.toString?.() || _id, ...rest };
+    const out = { ...doc, id: doc._id?.toString?.() || doc._id };
+    delete out._id;
+    delete out.password;
+    delete out.passwordHash;
+    return out;
 };
 
 router.get('/users', requirePermission('admin:read'), async (req, res) => {
