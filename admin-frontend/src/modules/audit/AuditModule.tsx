@@ -37,6 +37,7 @@ export function AuditModule() {
     const integrityQuery = useQuery({
         queryKey: ['admin-audit-integrity'],
         queryFn: () => getAdminAuditIntegrity(300),
+        refetchInterval: 5 * 60 * 1000,
     });
 
     const rows = query.data ?? [];

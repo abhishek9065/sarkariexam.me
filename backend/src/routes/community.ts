@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { authenticateToken, optionalAuth, requirePermission } from '../middleware/auth.js';
-import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
+import { getCollectionAsync, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
@@ -46,10 +46,10 @@ interface FlagDoc {
     updatedAt: Date;
 }
 
-const forumsCollection = () => getCollection<ForumDoc>('community_forums');
-const qaCollection = () => getCollection<QaDoc>('community_qa');
-const groupsCollection = () => getCollection<GroupDoc>('community_groups');
-const flagsCollection = () => getCollection<FlagDoc>('community_flags');
+const forumsCollection = () => getCollectionAsync<ForumDoc>('community_forums');
+const qaCollection = () => getCollectionAsync<QaDoc>('community_qa');
+const groupsCollection = () => getCollectionAsync<GroupDoc>('community_groups');
+const flagsCollection = () => getCollectionAsync<FlagDoc>('community_flags');
 
 const listQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(50).optional(),
@@ -106,14 +106,15 @@ router.get('/forums', async (req, res) => {
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
+        const col = await forumsCollection();
         const [items, total] = await Promise.all([
-            forumsCollection()
+            col
                 .find({})
                 .sort({ createdAt: -1 })
                 .skip(offset)
                 .limit(limit)
                 .toArray(),
-            forumsCollection().countDocuments(),
+            col.countDocuments(),
         ]);
 
         return res.json({ data: items.map(formatDoc), count: total });
@@ -140,7 +141,8 @@ router.post('/forums', async (req, res) => {
             createdAt: now,
             updatedAt: now,
         };
-        const result = await forumsCollection().insertOne(doc as any);
+        const col = await forumsCollection();
+        const result = await col.insertOne(doc as any);
         return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
     } catch (error) {
         console.error('Forum create error:', error);
@@ -155,7 +157,8 @@ router.delete('/forums/:id', authenticateToken, requirePermission('admin:write')
     }
 
     try {
-        const result = await forumsCollection().deleteOne({ _id: toObjectId(id) } as any);
+        const col = await forumsCollection();
+        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
         if (!result.deletedCount) {
             return res.status(404).json({ error: 'Forum post not found' });
         }
@@ -175,14 +178,15 @@ router.get('/qa', async (req, res) => {
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
+        const col = await qaCollection();
         const [items, total] = await Promise.all([
-            qaCollection()
+            col
                 .find({})
                 .sort({ createdAt: -1 })
                 .skip(offset)
                 .limit(limit)
                 .toArray(),
-            qaCollection().countDocuments(),
+            col.countDocuments(),
         ]);
 
         return res.json({ data: items.map(formatDoc), count: total });
@@ -208,7 +212,8 @@ router.post('/qa', async (req, res) => {
             createdAt: now,
             updatedAt: now,
         };
-        const result = await qaCollection().insertOne(doc as any);
+        const col = await qaCollection();
+        const result = await col.insertOne(doc as any);
         return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
     } catch (error) {
         console.error('QA create error:', error);
@@ -233,14 +238,15 @@ router.patch('/qa/:id/answer', authenticateToken, requirePermission('admin:write
             updatedAt: now,
             answeredBy: parseResult.data.answeredBy ?? null,
         };
-        const updateResult = await qaCollection().updateOne(
+        const col = await qaCollection();
+        const updateResult = await col.updateOne(
             { _id: toObjectId(id) } as any,
             { $set: update }
         );
         if (!updateResult.matchedCount) {
             return res.status(404).json({ error: 'Question not found' });
         }
-        const updatedDoc = await qaCollection().findOne({ _id: toObjectId(id) } as any);
+        const updatedDoc = await col.findOne({ _id: toObjectId(id) } as any);
         if (!updatedDoc) {
             return res.status(404).json({ error: 'Question not found' });
         }
@@ -258,7 +264,8 @@ router.delete('/qa/:id', authenticateToken, requirePermission('admin:write'), as
     }
 
     try {
-        const result = await qaCollection().deleteOne({ _id: toObjectId(id) } as any);
+        const col = await qaCollection();
+        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
         if (!result.deletedCount) {
             return res.status(404).json({ error: 'Question not found' });
         }
@@ -278,14 +285,15 @@ router.get('/groups', async (req, res) => {
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
+        const col = await groupsCollection();
         const [items, total] = await Promise.all([
-            groupsCollection()
+            col
                 .find({})
                 .sort({ createdAt: -1 })
                 .skip(offset)
                 .limit(limit)
                 .toArray(),
-            groupsCollection().countDocuments(),
+            col.countDocuments(),
         ]);
 
         return res.json({ data: items.map(formatDoc), count: total });
@@ -312,7 +320,8 @@ router.post('/groups', async (req, res) => {
             createdAt: now,
             updatedAt: now,
         };
-        const result = await groupsCollection().insertOne(doc as any);
+        const col = await groupsCollection();
+        const result = await col.insertOne(doc as any);
         return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
     } catch (error) {
         console.error('Group create error:', error);
@@ -327,7 +336,8 @@ router.delete('/groups/:id', authenticateToken, requirePermission('admin:write')
     }
 
     try {
-        const result = await groupsCollection().deleteOne({ _id: toObjectId(id) } as any);
+        const col = await groupsCollection();
+        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
         if (!result.deletedCount) {
             return res.status(404).json({ error: 'Study group not found' });
         }
@@ -350,14 +360,15 @@ router.get('/flags', authenticateToken, requirePermission('admin:read'), async (
         const query: Partial<FlagDoc> = {};
         if (parseResult.data.status) query.status = parseResult.data.status;
         if (parseResult.data.entityType) query.entityType = parseResult.data.entityType;
+        const col = await flagsCollection();
         const [items, total] = await Promise.all([
-            flagsCollection()
+            col
                 .find(query as any)
                 .sort({ createdAt: -1 })
                 .skip(offset)
                 .limit(limit)
                 .toArray(),
-            flagsCollection().countDocuments(query as any),
+            col.countDocuments(query as any),
         ]);
         return res.json({ data: items.map(formatDoc), count: total });
     } catch (error) {
@@ -384,7 +395,8 @@ router.post('/flags', optionalAuth, async (req, res) => {
             createdAt: now,
             updatedAt: now,
         };
-        const result = await flagsCollection().insertOne(doc as any);
+        const col = await flagsCollection();
+        const result = await col.insertOne(doc as any);
         return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
     } catch (error) {
         console.error('Flag create error:', error);
@@ -399,7 +411,8 @@ router.delete('/flags/:id', authenticateToken, requirePermission('admin:write'),
     }
 
     try {
-        const result = await flagsCollection().deleteOne({ _id: toObjectId(id) } as any);
+        const col = await flagsCollection();
+        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
         if (!result.deletedCount) {
             return res.status(404).json({ error: 'Flag not found' });
         }
