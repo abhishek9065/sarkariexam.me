@@ -353,16 +353,16 @@ export function AdminLayout() {
 
                 <div className="admin-sidebar-footer">
                     <a className="admin-nav-link" href="/admin" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">ST</span>
-                        <span className="admin-nav-label">Open Stable Admin</span>
+                        <span className="admin-nav-short">LG</span>
+                        <span className="admin-nav-label">Open Legacy Admin</span>
                     </a>
                     <a className="admin-nav-link" href="/admin-vnext" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">VN</span>
-                        <span className="admin-nav-label">Open vNext Preview</span>
+                        <span className="admin-nav-short">PR</span>
+                        <span className="admin-nav-label">Open Premium Admin</span>
                     </a>
                     <a className="admin-nav-link" href="/admin-legacy" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">LG</span>
-                        <span className="admin-nav-label">Open Legacy Alias</span>
+                        <span className="admin-nav-short">RB</span>
+                        <span className="admin-nav-label">Open Rollback Alias</span>
                     </a>
                 </div>
             </aside>

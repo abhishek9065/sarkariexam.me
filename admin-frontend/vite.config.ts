@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const configuredBase = process.env.VITE_ADMIN_BASENAME || '/admin';
+const configuredBase = process.env.VITE_ADMIN_BASENAME || '/admin-vnext';
 const normalizedBase = configuredBase.endsWith('/') ? configuredBase : `${configuredBase}/`;
 const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://localhost:5000';
 
