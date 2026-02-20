@@ -1,0 +1,41 @@
+[2m[WebServer] [22m
+[2m[WebServer] [22m> sarkari-admin-frontend@0.1.0 dev
+[2m[WebServer] [22m> vite --host 127.0.0.1 --port 4174
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m  [32m[1mVITE[22m v7.3.1[39m  [2mready in [0m[1m407[22m[2m[0m ms[22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m  [32mΓ₧£[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4174[22m/admin-vnext/[39m
+
+Running 1 test using 1 worker
+
+  Γ£ÿ  1 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:151:1 ΓÇ║ sidebar exposes full admin operations information architecture (5.7s)
+
+
+  1) [chromium] ΓÇ║ tests\admin.smoke.spec.ts:151:1 ΓÇ║ sidebar exposes full admin operations information architecture 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByRole('link', { name: /Link Manager/i })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('link', { name: /Link Manager/i })[22m
+
+
+      158 |     await expect(page.getByRole('link', { name: /New Post/i })).toBeVisible();
+      159 |     await expect(page.getByRole('link', { name: /Homepage/i })).toBeVisible();
+    > 160 |     await expect(page.getByRole('link', { name: /Link Manager/i })).toBeVisible();
+          |                                                                     ^
+      161 |     await expect(page.getByRole('link', { name: /Templates/i })).toBeVisible();
+      162 |     await expect(page.getByRole('link', { name: /^Alerts$/i })).toBeVisible();
+      163 |     await expect(page.getByRole('link', { name: /Media \/ PDFs/i })).toBeVisible();
+        at C:\Users\abhis\Downloads\sarkari-result-git-clean\admin-frontend\tests\admin.smoke.spec.ts:160:69
+
+    Error Context: test-results\admin.smoke-sidebar-expose-05f7e-ns-information-architecture-chromium\error-context.md
+
+  1 failed
+    [chromium] ΓÇ║ tests\admin.smoke.spec.ts:151:1 ΓÇ║ sidebar exposes full admin operations information architecture 

@@ -3396,6 +3396,48 @@ router.get('/announcements/export/csv', requirePermission('announcements:read'),
     }
 });
 
+async function validateForPublish(data: any, announcementId?: string): Promise<string | null> {
+    let attachedLinks: any[] = [];
+    if (announcementId) {
+        const linksCollection = getCollection<any>('link_records');
+        attachedLinks = await linksCollection.find({ announcementId, status: 'active' }).toArray();
+    }
+
+    const hasInPayload = (keyword: string) => {
+        const contentStr = (data.content || '').toLowerCase();
+        if (contentStr.includes(keyword)) return true;
+
+        const links = data.jobDetails?.importantLinks || [];
+        if (links.some((l: any) => (l.label || '').toLowerCase().includes(keyword) || l.type === keyword)) return true;
+
+        return false;
+    };
+
+    const hasInAttached = (keyword: string) => {
+        return attachedLinks.some((l: any) => (l.label || '').toLowerCase().includes(keyword) || l.type === keyword);
+    };
+
+    if (data.type === 'job') {
+        const hasApply = !!data.externalLink || hasInPayload('apply') || hasInAttached('apply');
+        if (!hasApply) return 'Validation Failed: Missing "Apply Online" link for Job post.';
+
+        const hasNotif = hasInPayload('notification') || hasInAttached('notification') || hasInAttached('pdf');
+        if (!hasNotif) return 'Validation Failed: Missing Notification PDF link for Job post.';
+
+        const hasDates = (data.jobDetails?.importantDates?.length > 0) || (data.importantDates?.length > 0) || (data.content || '').toLowerCase().includes('important dates');
+        if (!hasDates) return 'Validation Failed: Must specify "Important Dates".';
+
+        if (!data.deadline) return 'Validation Failed: Must specify a Deadline for Job post.';
+    } else if (data.type === 'result') {
+        const hasResultLink = !!data.externalLink || hasInPayload('result') || hasInAttached('result');
+        if (!hasResultLink) return 'Validation Failed: Must have at least 1 result link or PDF.';
+    } else if (data.type === 'admit-card') {
+        const hasAdmitLink = !!data.externalLink || hasInPayload('admit') || hasInAttached('admit');
+        if (!hasAdmitLink) return 'Validation Failed: Must have a download link for Admit Card.';
+    }
+    return null;
+}
+
 /**
  * POST /api/admin/announcements
  * Create new announcement
@@ -3405,6 +3447,25 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
         const parseResult = adminAnnouncementSchema.safeParse(req.body);
         if (!parseResult.success) {
             return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const role = req.user?.role;
+        const status = parseResult.data.status || 'draft';
+        if (role === 'contributor' && status !== 'draft') {
+            return res.status(403).json({ error: 'Contributors can only save drafts.' });
+        }
+        if (role === 'editor' && !['draft', 'pending'].includes(status)) {
+            return res.status(403).json({ error: 'Editors cannot publish or schedule announcements.' });
+        }
+        if (['published', 'scheduled'].includes(status) && !hasPermission(role as any, 'announcements:approve')) {
+            return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
+        }
+
+        if (['published', 'scheduled'].includes(status)) {
+            const validationError = await validateForPublish(parseResult.data);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
+            }
         }
 
         const userId = req.user?.userId ?? 'system';
@@ -3772,6 +3833,30 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
         if (!existing) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
+
+        const role = req.user?.role;
+        const newStatus = parseResult.data.status;
+        const targetStatus = newStatus || existing.status;
+
+        if (role === 'contributor' && targetStatus !== 'draft') {
+            return res.status(403).json({ error: 'Contributors can only work with drafts.' });
+        }
+        if (role === 'editor' && !['draft', 'pending'].includes(targetStatus)) {
+            return res.status(403).json({ error: 'Editors cannot save or edit published announcements. Must be draft or pending.' });
+        }
+        if (newStatus && ['published', 'scheduled'].includes(newStatus) && !hasPermission(role as any, 'announcements:approve')) {
+            return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
+        }
+
+        if (['published', 'scheduled'].includes(targetStatus)) {
+            // merge data before testing (as partial updates might not contain the full data payload)
+            const validationData = { ...existing, ...parseResult.data };
+            const validationError = await validateForPublish(validationData, announcementId);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
+            }
+        }
+
         const announcement = await AnnouncementModelMongo.update(
             announcementId,
             parseResult.data as unknown as Partial<CreateAnnouncementDto> & { note?: string },
@@ -3804,6 +3889,55 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
 });
 
 /**
+ * POST /api/admin/announcements/:id/revert/:version
+ * Revert announcement to a previous version
+ */
+router.post('/announcements/:id/revert/:version', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const announcementId = getPathParam(req.params.id);
+        const version = parseInt(getPathParam(req.params.version), 10);
+
+        const existing = await AnnouncementModelMongo.findById(announcementId);
+        if (!existing) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        const targetVersion = (existing as any).versions?.find((v: any) => v.version === version);
+        if (!targetVersion) {
+            return res.status(404).json({ error: 'Version not found' });
+        }
+
+        const snapshot = targetVersion.snapshot;
+
+        const announcement = await AnnouncementModelMongo.update(
+            announcementId,
+            { ...snapshot, note: `Reverted to version ${version}` } as any,
+            req.user?.userId
+        );
+
+        if (!announcement) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        recordAdminAudit({
+            action: 'revert' as any,
+            announcementId: announcement.id,
+            title: announcement.title,
+            userId: req.user?.userId,
+            metadata: { revertedToVersion: version },
+        }).catch(console.error);
+
+        await invalidateAnnouncementCaches().catch(err => {
+            console.error('Failed to invalidate caches after admin revert:', err);
+        });
+        return res.json({ data: announcement });
+    } catch (error) {
+        console.error('Revert announcement error:', error);
+        return res.status(500).json({ error: 'Failed to revert announcement' });
+    }
+});
+
+/**
  * POST /api/admin/announcements/:id/approve
  * Approve and publish an announcement
  */
@@ -3824,6 +3958,12 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
         if (!approvalGate.allowed) return;
 
         const now = new Date().toISOString();
+
+        const validationError = await validateForPublish(existing, announcementId);
+        if (validationError) {
+            return res.status(400).json({ error: validationError });
+        }
+
         const announcement = await AnnouncementModelMongo.update(
             announcementId,
             {

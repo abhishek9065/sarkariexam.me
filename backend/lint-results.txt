@@ -1,0 +1,17 @@
+
+> sarkari-backend@0.1.0 lint
+> eslint . --max-warnings=0
+
+
+C:\Users\abhis\Downloads\sarkari-result-git-clean\backend\src\server.ts
+  49:1  warning  `./services/automationJobs.js` import should occur before import of `./services/cosmosdb.js`  import/order
+
+C:\Users\abhis\Downloads\sarkari-result-git-clean\backend\src\services\automationJobs.ts
+   1:1   warning  There should be at least one empty line between import groups                 import/order
+   1:1   warning  `./cosmosdb.js` import should occur after import of `./cacheInvalidation.js`  import/order
+   2:1   warning  There should be at least one empty line between import groups                 import/order
+  27:14  warning  'e' is defined but never used                                                 @typescript-eslint/no-unused-vars
+
+Γ£û 5 problems (0 errors, 5 warnings)
+  0 errors and 4 warnings potentially fixable with the `--fix` option.
+

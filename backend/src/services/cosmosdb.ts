@@ -250,6 +250,7 @@ async function createIndexes(): Promise<void> {
         await announcements.createIndex({ isActive: 1 });
         await announcements.createIndex({ status: 1 });
         await announcements.createIndex({ publishAt: 1 });
+        await announcements.createIndex({ type: 1, status: 1, publishAt: -1 });
         await announcements.createIndex({ postedAt: -1 });
         await announcements.createIndex({ updatedAt: -1 });
         await announcements.createIndex({ viewCount: -1 });

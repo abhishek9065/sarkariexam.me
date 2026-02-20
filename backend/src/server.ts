@@ -42,6 +42,7 @@ import supportRouter from './routes/support.js';
 import { scheduleAdminApprovalsCleanup } from './services/adminApprovals.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { startAnalyticsWebSocket } from './services/analyticsStream.js';
+import { scheduleAutomationJobs } from './services/automationJobs.js';
 import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
@@ -299,7 +300,7 @@ app.use(errorHandler);
 export async function startServer() {
   try {
     ErrorTracking.init();
-    
+
     if (process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI) {
       await connectToDatabase();
       logger.info('[Server] MongoDB connected successfully');
@@ -310,6 +311,7 @@ export async function startServer() {
       scheduleDigestSender();
       scheduleTrackerReminders();
       scheduleSavedSearchAlerts();
+      scheduleAutomationJobs();
     } else {
       logger.info('[Server] No MongoDB configured, using fallback data');
     }

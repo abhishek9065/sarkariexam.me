@@ -1,0 +1,10 @@
+
+> sarkari-backend@0.1.0 lint
+> eslint . --max-warnings=0
+
+
+C:\Users\abhis\Downloads\sarkari-result-git-clean\backend\src\services\automationJobs.ts
+  28:14  warning  '_e' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 1 problem (0 errors, 1 warning)
+

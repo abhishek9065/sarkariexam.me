@@ -1,4 +1,4 @@
-export type AdminPortalRole = 'admin' | 'editor' | 'reviewer' | 'viewer';
+export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer';
 export type AnnouncementTypeFilter = 'job' | 'admit-card' | 'result' | 'answer-key' | 'syllabus' | 'admission';
 export type AnnouncementStatusFilter = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type AnnouncementSortOption = 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';

@@ -1,6 +1,6 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
-export type UserRole = 'user' | 'viewer' | 'reviewer' | 'editor' | 'admin';
+export type UserRole = 'user' | 'viewer' | 'reviewer' | 'contributor' | 'editor' | 'admin';
 export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
 
 export interface User {

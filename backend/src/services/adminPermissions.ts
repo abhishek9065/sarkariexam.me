@@ -1,6 +1,6 @@
 import type { UserRole } from '../types.js';
 
-export type AdminPortalRole = 'admin' | 'editor' | 'reviewer' | 'viewer';
+export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer';
 export type AdminPermission =
   | 'admin:read'
   | 'admin:write'
@@ -27,7 +27,7 @@ export type AdminTab =
   | 'errors'
   | 'approvals';
 
-export const ADMIN_PORTAL_ROLES: AdminPortalRole[] = ['admin', 'editor', 'reviewer', 'viewer'];
+export const ADMIN_PORTAL_ROLES: AdminPortalRole[] = ['admin', 'editor', 'contributor', 'reviewer', 'viewer'];
 export const ADMIN_PORTAL_ROLE_SET = new Set<AdminPortalRole>(ADMIN_PORTAL_ROLES);
 
 export const ADMIN_ROLE_PERMISSIONS: Record<AdminPortalRole, string[]> = {
@@ -35,6 +35,12 @@ export const ADMIN_ROLE_PERMISSIONS: Record<AdminPortalRole, string[]> = {
   editor: [
     'admin:read',
     'admin:write',
+    'analytics:read',
+    'announcements:read',
+    'announcements:write',
+  ],
+  contributor: [
+    'admin:read',
     'analytics:read',
     'announcements:read',
     'announcements:write',
