@@ -168,6 +168,19 @@ export function DetailedPostModule() {
         return () => window.clearInterval(timer);
     }, [autosaveEnabled, autosaveMutation, isDirty, mutation.isPending, selectedId]);
 
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && (event.key === 's' || event.key === 'Enter')) {
+                event.preventDefault();
+                if (selectedId && !mutation.isPending) {
+                    mutation.mutate();
+                }
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [mutation, selectedId]);
+
     return (
         <OpsCard title="Detailed Post" description="Deep editor with server autosave, revision timeline, and restore controls.">
             <div className="ops-stack">
@@ -256,63 +269,98 @@ export function DetailedPostModule() {
 
                 {selected ? (
                     <form
-                        className="ops-form-grid"
+                        className="ops-editor-layout"
                         onSubmit={(event) => {
                             event.preventDefault();
                             mutation.mutate();
                         }}
                     >
-                        <input
-                            value={editable.title}
-                            onChange={(event) => setEditable((current) => ({ ...current, title: event.target.value }))}
-                            placeholder="Title"
-                            required
-                            minLength={10}
-                            className="ops-span-full"
-                        />
-                        <input
-                            value={editable.category}
-                            onChange={(event) => setEditable((current) => ({ ...current, category: event.target.value }))}
-                            placeholder="Category"
-                            required
-                        />
-                        <input
-                            value={editable.organization}
-                            onChange={(event) => setEditable((current) => ({ ...current, organization: event.target.value }))}
-                            placeholder="Organization"
-                            required
-                        />
-                        <select
-                            value={editable.status}
-                            onChange={(event) => setEditable((current) => ({ ...current, status: event.target.value }))}
-                        >
-                            <option value="draft">Draft</option>
-                            <option value="pending">Pending</option>
-                            <option value="scheduled">Scheduled</option>
-                            <option value="published">Published</option>
-                            <option value="archived">Archived</option>
-                        </select>
-                        <input
-                            value={editable.location}
-                            onChange={(event) => setEditable((current) => ({ ...current, location: event.target.value }))}
-                            placeholder="Location"
-                        />
-                        <input
-                            value={editable.externalLink}
-                            onChange={(event) => setEditable((current) => ({ ...current, externalLink: event.target.value }))}
-                            placeholder="External link"
-                            className="ops-span-full"
-                        />
-                        <textarea
-                            value={editable.content}
-                            onChange={(event) => setEditable((current) => ({ ...current, content: event.target.value }))}
-                            placeholder="Content"
-                            className="ops-span-full ops-textarea"
-                        />
-                        <div className="ops-actions ops-span-full">
-                            <button type="submit" className="admin-btn primary" disabled={mutation.isPending}>
-                                {mutation.isPending ? 'Saving...' : 'Save Changes'}
-                            </button>
+                        <div className="ops-editor-main">
+                            <input
+                                value={editable.title}
+                                onChange={(event) => setEditable((current) => ({ ...current, title: event.target.value }))}
+                                placeholder="Title"
+                                required
+                                minLength={10}
+                                className="ops-span-full"
+                            />
+                            <div className="ops-form-grid">
+                                <input
+                                    value={editable.category}
+                                    onChange={(event) => setEditable((current) => ({ ...current, category: event.target.value }))}
+                                    placeholder="Category"
+                                    required
+                                />
+                                <input
+                                    value={editable.organization}
+                                    onChange={(event) => setEditable((current) => ({ ...current, organization: event.target.value }))}
+                                    placeholder="Organization"
+                                    required
+                                />
+                                <input
+                                    value={editable.location}
+                                    onChange={(event) => setEditable((current) => ({ ...current, location: event.target.value }))}
+                                    placeholder="Location"
+                                    className="ops-span-full"
+                                />
+                            </div>
+                            <input
+                                value={editable.externalLink}
+                                onChange={(event) => setEditable((current) => ({ ...current, externalLink: event.target.value }))}
+                                placeholder="External link"
+                                className="ops-span-full"
+                            />
+                            <textarea
+                                value={editable.content}
+                                onChange={(event) => setEditable((current) => ({ ...current, content: event.target.value }))}
+                                placeholder="Content"
+                                className="ops-span-full ops-textarea"
+                            />
+                        </div>
+
+                        <div className="ops-editor-rail">
+                            <OpsCard title="Publish Checklist" tone="muted">
+                                <div className="ops-stack">
+                                    <select
+                                        value={editable.status}
+                                        onChange={(event) => setEditable((current) => ({ ...current, status: event.target.value }))}
+                                        style={{ width: '100%', padding: '8px', cursor: 'pointer' }}
+                                    >
+                                        <option value="draft">Draft</option>
+                                        <option value="pending">Pending Review</option>
+                                        <option value="scheduled">Scheduled</option>
+                                        <option value="published">Published</option>
+                                        <option value="archived">Archived</option>
+                                    </select>
+
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={Boolean(editable.title && editable.category && editable.organization)} readOnly />
+                                        <span className="ops-inline-muted">Basic info complete</span>
+                                    </div>
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={Boolean(editable.content)} readOnly />
+                                        <span className="ops-inline-muted">Content provided</span>
+                                    </div>
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={!isDirty} readOnly />
+                                        <span className="ops-inline-muted">{isDirty ? 'Unsaved changes' : 'All changes saved'}</span>
+                                    </div>
+
+                                    <div className="ops-actions" style={{ marginTop: 'var(--space-2)' }}>
+                                        <button type="submit" className="admin-btn primary" disabled={mutation.isPending} style={{ width: '100%' }}>
+                                            {mutation.isPending ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="admin-btn subtle"
+                                            style={{ width: '100%' }}
+                                            onClick={() => window.open(`/post/${selectedId}`, '_blank')}
+                                        >
+                                            Preview as user
+                                        </button>
+                                    </div>
+                                </div>
+                            </OpsCard>
                         </div>
                     </form>
                 ) : null}

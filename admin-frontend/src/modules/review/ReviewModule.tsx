@@ -26,6 +26,7 @@ export function ReviewModule() {
     const [note, setNote] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [preview, setPreview] = useState<AdminReviewPreview | null>(null);
+    const [activeTab, setActiveTab] = useState<'all' | 'job' | 'result' | 'admit-card' | 'other'>('all');
 
     const query = useQuery({
         queryKey: ['review-announcements', search],
@@ -34,11 +35,24 @@ export function ReviewModule() {
 
     const rows = useMemo(() => query.data ?? [], [query.data]);
 
-    const toggleSelect = (id: string) => {
-        setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    const filteredRows = useMemo(() => {
+        if (activeTab === 'all') return rows;
+        if (activeTab === 'other') return rows.filter((r) => !['job', 'result', 'admit-card'].includes(r.type || ''));
+        return rows.filter((r) => r.type === activeTab);
+    }, [rows, activeTab]);
+
+    const allSelected = useMemo(() => filteredRows.length > 0 && filteredRows.every((item) => selectedIds.includes(item.id || item._id || '')), [filteredRows, selectedIds]);
+
+    const renderRisk = (item: AdminAnnouncementListItem) => {
+        const risks = [];
+        if (!item.externalLink) risks.push('Missing Link');
+        const deadline = (item as any).deadline;
+        if (deadline && new Date(deadline) < new Date()) risks.push('Expired deadline');
+        if (risks.length === 0) return <span className="ops-badge success" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>Low</span>;
+        return <span className="ops-badge danger" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>{risks.join(', ')}</span>;
     };
 
-    const allSelected = useMemo(() => rows.length > 0 && rows.every((item) => selectedIds.includes(item.id || item._id || '')), [rows, selectedIds]);
+
 
     const previewMutation = useMutation({
         mutationFn: () => getReviewPreview({
@@ -127,7 +141,7 @@ export function ReviewModule() {
                     actions={
                         <>
                             <span className="ops-inline-muted">
-                                Selected: {selectedIds.length} of {rows.length}
+                                Selected: {selectedIds.length} of {filteredRows.length}
                             </span>
                             <button
                                 type="button"
@@ -148,6 +162,14 @@ export function ReviewModule() {
                     }
                 />
 
+                <div className="ops-actions" style={{ marginBottom: 'var(--space-3)' }}>
+                    <button className={`admin-btn small ${activeTab === 'all' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('all')}>All ({rows.length})</button>
+                    <button className={`admin-btn small ${activeTab === 'job' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('job')}>Jobs</button>
+                    <button className={`admin-btn small ${activeTab === 'result' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('result')}>Results</button>
+                    <button className={`admin-btn small ${activeTab === 'admit-card' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('admit-card')}>Admit Cards</button>
+                    <button className={`admin-btn small ${activeTab === 'other' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('other')}>Other</button>
+                </div>
+
                 {action === 'schedule' ? (
                     <input
                         type="text"
@@ -160,13 +182,15 @@ export function ReviewModule() {
                 {query.isPending ? <div className="admin-alert info">Loading review queue...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load review queue." /> : null}
 
-                {rows.length > 0 ? (
+                {filteredRows.length > 0 ? (
                     <OpsTable
                         columns={[
                             { key: 'select', label: 'Select' },
                             { key: 'title', label: 'Title' },
+                            { key: 'risk', label: 'Risk Flags' },
                             { key: 'status', label: 'Status' },
                             { key: 'type', label: 'Type' },
+                            { key: 'actions', label: 'Diff' }
                         ]}
                     >
                         <tr>
@@ -178,35 +202,40 @@ export function ReviewModule() {
                                         if (allSelected) {
                                             setSelectedIds([]);
                                         } else {
-                                            setSelectedIds(rows.map((item) => item.id || item._id || '').filter(Boolean));
+                                            setSelectedIds(filteredRows.map((item) => item.id || item._id || '').filter(Boolean));
                                         }
                                     }}
                                 />
                             </td>
-                            <td colSpan={3} className="ops-inline-muted">Select all rows</td>
+                            <td colSpan={5} className="ops-inline-muted">Select all {activeTab} rows</td>
                         </tr>
-                        {rows.map((item: AdminAnnouncementListItem) => {
+                        {filteredRows.map((item: AdminAnnouncementListItem) => {
                             const id = item.id || item._id || '';
+                            const toggleSelect = () => setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
                             return (
                                 <tr key={id}>
                                     <td>
                                         <input
                                             type="checkbox"
                                             checked={selectedIds.includes(id)}
-                                            onChange={() => toggleSelect(id)}
+                                            onChange={toggleSelect}
                                         />
                                     </td>
                                     <td>{item.title || 'Untitled'}</td>
+                                    <td>{renderRisk(item)}</td>
                                     <td>{item.status || '-'}</td>
                                     <td>{item.type || '-'}</td>
+                                    <td>
+                                        <a href={`/manage/posts?focus=${id}`} target="_blank" rel="noreferrer" className="admin-btn small subtle">Review Diffs</a>
+                                    </td>
                                 </tr>
                             );
                         })}
                     </OpsTable>
                 ) : null}
 
-                {!query.isPending && !query.error && rows.length === 0 ? (
-                    <OpsEmptyState message="No pending announcements found." />
+                {!query.isPending && !query.error && filteredRows.length === 0 ? (
+                    <OpsEmptyState message={`No pending announcements found in ${activeTab}.`} />
                 ) : null}
 
                 <div className="ops-actions ops-sticky-actions">

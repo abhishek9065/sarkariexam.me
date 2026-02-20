@@ -314,6 +314,31 @@ button.ops-kpi-card:hover {
     grid-column: 1 / -1;
 }
 
+.ops-editor-layout {
+    display: grid;
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.ops-editor-main {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.ops-editor-rail {
+    display: grid;
+    gap: var(--space-3);
+    position: sticky;
+    top: var(--space-4);
+}
+
+@media (min-width: 1120px) {
+    .ops-editor-layout {
+        grid-template-columns: 7fr 3fr;
+    }
+}
+
 .ops-textarea {
     min-height: 160px;
 }
@@ -576,6 +601,7 @@ button.ops-kpi-card:hover {
 }
 
 @media (max-width: 1420px) {
+
     .ops-form-grid.three,
     .ops-count-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -583,6 +609,7 @@ button.ops-kpi-card:hover {
 }
 
 @media (max-width: 1240px) {
+
     .ops-toolbar-grid,
     .ops-toolbar-grid.two,
     .ops-form-grid,

@@ -13,6 +13,7 @@ import {
 } from '../components/ops/legacy-port';
 import {
     createAdminSavedView,
+    createAnnouncementDraft,
     deleteAdminSavedView,
     getAdminAnnouncementsPaged,
     getAdminSavedViews,
@@ -109,6 +110,9 @@ export function AnnouncementsPage() {
     const [limit, setLimit] = useLocalStorageState<number>(LIMIT_KEY, 40, (raw) => parseBoundedInt(raw, 40, 20, 100));
     const [offset, setOffset] = useLocalStorageState<number>(OFFSET_KEY, 0, (raw) => parseBoundedInt(raw, 0, 0, 100000));
     const [sortOption, setSortOption] = useLocalStorageState<AnnouncementSortOption>(SORT_KEY, 'newest');
+    const [dateStart, setDateStart] = useLocalStorageState<string>('admin-vnext-announcements-date-start', '');
+    const [dateEnd, setDateEnd] = useLocalStorageState<string>('admin-vnext-announcements-date-end', '');
+    const [author, setAuthor] = useLocalStorageState<string>('admin-vnext-announcements-author', '');
     const [selectedViewId, setSelectedViewId] = useLocalStorageState<string>(VIEW_SELECTED_KEY, '');
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -123,7 +127,7 @@ export function AnnouncementsPage() {
     }, [location.search]);
 
     const query = useQuery({
-        queryKey: ['admin-announcements', status, type, search, limit, offset, sortOption],
+        queryKey: ['admin-announcements', status, type, search, limit, offset, sortOption, dateStart, dateEnd, author],
         queryFn: () => getAdminAnnouncementsPaged({
             limit,
             offset,
@@ -131,6 +135,9 @@ export function AnnouncementsPage() {
             type,
             search,
             sort: sortOption,
+            dateStart,
+            dateEnd,
+            author,
         }),
     });
 
@@ -144,6 +151,18 @@ export function AnnouncementsPage() {
         mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) => updateAdminAnnouncement(id, payload),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['admin-announcements'] });
+        },
+    });
+
+    const createDraftMutation = useMutation({
+        mutationFn: (input: { type?: any; title?: string; category?: string; organization?: string }) => createAnnouncementDraft(input),
+        onSuccess: async (draft) => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-announcements'] });
+            notifySuccess('Draft created', `Duplicated as draft ${draft.id}`);
+            navigate(`/detailed-post?focus=${encodeURIComponent(draft.id)}`);
+        },
+        onError: (error) => {
+            notifyError('Duplicate failed', error instanceof Error ? error.message : 'Unable to duplicate post.');
         },
     });
 
@@ -165,6 +184,9 @@ export function AnnouncementsPage() {
                 status,
                 type,
                 limit,
+                dateStart,
+                dateEnd,
+                author,
             },
             sort: { option: sortOption },
             columns: ['title', 'status', 'type', 'updatedAt'],
@@ -293,6 +315,9 @@ export function AnnouncementsPage() {
         if (Number.isFinite(nextLimit) && LIMIT_OPTIONS.includes(nextLimit)) {
             setLimit(nextLimit);
         }
+        setDateStart(applySafeString(filters.dateStart));
+        setDateEnd(applySafeString(filters.dateEnd));
+        setAuthor(applySafeString(filters.author));
         setSortOption(applySafeSort((view.sort as Record<string, unknown> | undefined)?.option));
         setOffset(0);
 
@@ -304,6 +329,9 @@ export function AnnouncementsPage() {
         setType('all');
         setStatus('all');
         setSortOption('newest');
+        setDateStart('');
+        setDateEnd('');
+        setAuthor('');
         setOffset(0);
         setSelectedViewId('');
     };
@@ -397,6 +425,12 @@ export function AnnouncementsPage() {
                 ]}
                 presets={presets}
                 selectedPresetId={selectedViewId}
+                dateStart={dateStart}
+                onDateStartChange={(v) => { setDateStart(v); setOffset(0); }}
+                dateEnd={dateEnd}
+                onDateEndChange={(v) => { setDateEnd(v); setOffset(0); }}
+                authorFilter={author}
+                onAuthorFilterChange={(v) => { setAuthor(v); setOffset(0); }}
                 onSelectPreset={applyPreset}
                 onSavePreset={() => {
                     if (!saveViewName.trim()) {
@@ -556,6 +590,20 @@ export function AnnouncementsPage() {
                                                     if (!id) return;
                                                     navigate(`/detailed-post?focus=${encodeURIComponent(id)}`);
                                                     void trackAdminTelemetry('admin_row_action_clicked', { action: 'open_detailed', id });
+                                                },
+                                            },
+                                            {
+                                                id: 'duplicate',
+                                                label: 'Duplicate',
+                                                disabled: !id || createDraftMutation.isPending,
+                                                onClick: () => {
+                                                    if (!id) return;
+                                                    createDraftMutation.mutate({
+                                                        type: item.type as any,
+                                                        title: `${item.title || 'Untitled'} (Copy)`,
+                                                        category: item.category,
+                                                        organization: item.organization,
+                                                    });
                                                 },
                                             },
                                             {

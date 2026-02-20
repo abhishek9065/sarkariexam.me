@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
@@ -170,6 +170,19 @@ export function CreatePostModule() {
         },
     });
 
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && (event.key === 's' || event.key === 'Enter')) {
+                event.preventDefault();
+                if (!createMutation.isPending && form.title && form.category && form.organization) {
+                    createMutation.mutate();
+                }
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [createMutation, form.title, form.category, form.organization]);
+
     const applyTemplate = (template: TemplateRecord) => {
         const payload = template.payload ?? {};
         setForm((current) => ({
@@ -211,15 +224,7 @@ export function CreatePostModule() {
                             <option value="syllabus">Syllabus</option>
                             <option value="admission">Admission</option>
                         </select>
-                        <select
-                            value={form.status}
-                            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as FormState['status'] }))}
-                        >
-                            <option value="draft">Draft</option>
-                            <option value="pending">Pending Review</option>
-                            <option value="scheduled">Scheduled</option>
-                            <option value="published">Published</option>
-                        </select>
+
                         <select
                             value={templateId}
                             onChange={(event) => {
@@ -271,176 +276,214 @@ export function CreatePostModule() {
             />
 
             <form
-                className="ops-form-grid"
+                className="ops-editor-layout"
                 onSubmit={(event) => {
                     event.preventDefault();
                     setSuccess('');
                     createMutation.mutate();
                 }}
             >
-                <input
-                    className="ops-span-full"
-                    value={form.title}
-                    onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                    placeholder="Post title"
-                    minLength={10}
-                    required
-                />
-                <input
-                    value={form.category}
-                    onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-                    placeholder="Category"
-                    required
-                />
-                <input
-                    value={form.organization}
-                    onChange={(event) => setForm((current) => ({ ...current, organization: event.target.value }))}
-                    placeholder="Organization"
-                    required
-                />
-                <input
-                    type="date"
-                    value={form.deadline}
-                    onChange={(event) => setForm((current) => ({ ...current, deadline: event.target.value }))}
-                />
-                {form.status === 'scheduled' ? (
+                <div className="ops-editor-main">
                     <input
-                        type="datetime-local"
-                        value={form.publishAt}
-                        onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
+                        className="ops-span-full"
+                        value={form.title}
+                        onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                        placeholder="Post title"
+                        minLength={10}
                         required
                     />
-                ) : null}
-                <input
-                    className="ops-span-full"
-                    value={form.externalLink}
-                    onChange={(event) => setForm((current) => ({ ...current, externalLink: event.target.value }))}
-                    placeholder="Primary external link (Apply / Result / Download)"
-                />
-                <textarea
-                    className="ops-span-full ops-textarea"
-                    value={form.summary}
-                    onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
-                    placeholder="Main post content / summary"
-                />
-                <textarea
-                    className="ops-span-full"
-                    value={form.tags}
-                    onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
-                    placeholder="Tags (one per line or comma-separated)"
-                />
+                    <div className="ops-form-grid">
+                        <input
+                            value={form.category}
+                            onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+                            placeholder="Category"
+                            required
+                        />
+                        <input
+                            value={form.organization}
+                            onChange={(event) => setForm((current) => ({ ...current, organization: event.target.value }))}
+                            placeholder="Organization"
+                            required
+                        />
+                    </div>
+                    <div className="ops-form-grid">
+                        <input
+                            type="date"
+                            value={form.deadline}
+                            onChange={(event) => setForm((current) => ({ ...current, deadline: event.target.value }))}
+                        />
+                        {form.status === 'scheduled' ? (
+                            <input
+                                type="datetime-local"
+                                value={form.publishAt}
+                                onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
+                                required
+                            />
+                        ) : null}
+                    </div>
+                    <input
+                        className="ops-span-full"
+                        value={form.externalLink}
+                        onChange={(event) => setForm((current) => ({ ...current, externalLink: event.target.value }))}
+                        placeholder="Primary external link (Apply / Result / Download)"
+                    />
+                    <textarea
+                        className="ops-span-full ops-textarea"
+                        value={form.summary}
+                        onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
+                        placeholder="Main post content / summary"
+                    />
+                    <textarea
+                        className="ops-span-full"
+                        value={form.tags}
+                        onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
+                        placeholder="Tags (one per line or comma-separated)"
+                    />
 
-                {form.type === 'job' ? (
-                    <>
-                        <textarea
-                            value={form.importantDates}
-                            onChange={(event) => setForm((current) => ({ ...current, importantDates: event.target.value }))}
-                            placeholder="Important dates (one per line)"
-                        />
-                        <input
-                            value={form.applicationFee}
-                            onChange={(event) => setForm((current) => ({ ...current, applicationFee: event.target.value }))}
-                            placeholder="Application fee details"
-                        />
-                        <input
-                            value={form.ageLimit}
-                            onChange={(event) => setForm((current) => ({ ...current, ageLimit: event.target.value }))}
-                            placeholder="Age limit + relaxation"
-                        />
-                        <input
-                            value={form.salary}
-                            onChange={(event) => setForm((current) => ({ ...current, salary: event.target.value }))}
-                            placeholder="Salary / Pay level"
-                        />
-                        <textarea
-                            value={form.vacancyDetails}
-                            onChange={(event) => setForm((current) => ({ ...current, vacancyDetails: event.target.value }))}
-                            placeholder="Vacancy table / details"
-                        />
-                        <textarea
-                            value={form.eligibility}
-                            onChange={(event) => setForm((current) => ({ ...current, eligibility: event.target.value }))}
-                            placeholder="Eligibility / qualification"
-                        />
+                    {form.type === 'job' ? (
+                        <>
+                            <textarea
+                                value={form.importantDates}
+                                onChange={(event) => setForm((current) => ({ ...current, importantDates: event.target.value }))}
+                                placeholder="Important dates (one per line)"
+                            />
+                            <input
+                                value={form.applicationFee}
+                                onChange={(event) => setForm((current) => ({ ...current, applicationFee: event.target.value }))}
+                                placeholder="Application fee details"
+                            />
+                            <input
+                                value={form.ageLimit}
+                                onChange={(event) => setForm((current) => ({ ...current, ageLimit: event.target.value }))}
+                                placeholder="Age limit + relaxation"
+                            />
+                            <input
+                                value={form.salary}
+                                onChange={(event) => setForm((current) => ({ ...current, salary: event.target.value }))}
+                                placeholder="Salary / Pay level"
+                            />
+                            <textarea
+                                value={form.vacancyDetails}
+                                onChange={(event) => setForm((current) => ({ ...current, vacancyDetails: event.target.value }))}
+                                placeholder="Vacancy table / details"
+                            />
+                            <textarea
+                                value={form.eligibility}
+                                onChange={(event) => setForm((current) => ({ ...current, eligibility: event.target.value }))}
+                                placeholder="Eligibility / qualification"
+                            />
+                            <textarea
+                                className="ops-span-full"
+                                value={form.selectionProcess}
+                                onChange={(event) => setForm((current) => ({ ...current, selectionProcess: event.target.value }))}
+                                placeholder="Selection process"
+                            />
+                        </>
+                    ) : null}
+
+                    {form.type === 'result' ? (
+                        <>
+                            <input
+                                value={form.resultType}
+                                onChange={(event) => setForm((current) => ({ ...current, resultType: event.target.value }))}
+                                placeholder="Result type (Final / Tier-1 / Merit)"
+                            />
+                            <input
+                                type="date"
+                                value={form.resultDate}
+                                onChange={(event) => setForm((current) => ({ ...current, resultDate: event.target.value }))}
+                            />
+                        </>
+                    ) : null}
+
+                    {form.type === 'admit-card' ? (
+                        <>
+                            <input
+                                type="date"
+                                value={form.examDate}
+                                onChange={(event) => setForm((current) => ({ ...current, examDate: event.target.value }))}
+                            />
+                            <input
+                                type="date"
+                                value={form.admitCardReleaseDate}
+                                onChange={(event) => setForm((current) => ({ ...current, admitCardReleaseDate: event.target.value }))}
+                            />
+                        </>
+                    ) : null}
+
+                    {form.type === 'answer-key' ? (
+                        <>
+                            <input
+                                type="datetime-local"
+                                value={form.objectionStart}
+                                onChange={(event) => setForm((current) => ({ ...current, objectionStart: event.target.value }))}
+                            />
+                            <input
+                                type="datetime-local"
+                                value={form.objectionEnd}
+                                onChange={(event) => setForm((current) => ({ ...current, objectionEnd: event.target.value }))}
+                            />
+                        </>
+                    ) : null}
+
+                    {form.type === 'syllabus' ? (
                         <textarea
                             className="ops-span-full"
-                            value={form.selectionProcess}
-                            onChange={(event) => setForm((current) => ({ ...current, selectionProcess: event.target.value }))}
-                            placeholder="Selection process"
+                            value={form.syllabusMarks}
+                            onChange={(event) => setForm((current) => ({ ...current, syllabusMarks: event.target.value }))}
+                            placeholder="Section and marks breakdown"
                         />
-                    </>
-                ) : null}
+                    ) : null}
 
-                {form.type === 'result' ? (
-                    <>
-                        <input
-                            value={form.resultType}
-                            onChange={(event) => setForm((current) => ({ ...current, resultType: event.target.value }))}
-                            placeholder="Result type (Final / Tier-1 / Merit)"
+                    {form.type === 'admission' ? (
+                        <textarea
+                            className="ops-span-full"
+                            value={form.counselingDates}
+                            onChange={(event) => setForm((current) => ({ ...current, counselingDates: event.target.value }))}
+                            placeholder="Counselling / admission timeline"
                         />
-                        <input
-                            type="date"
-                            value={form.resultDate}
-                            onChange={(event) => setForm((current) => ({ ...current, resultDate: event.target.value }))}
-                        />
-                    </>
-                ) : null}
+                    ) : null}
 
-                {form.type === 'admit-card' ? (
-                    <>
-                        <input
-                            type="date"
-                            value={form.examDate}
-                            onChange={(event) => setForm((current) => ({ ...current, examDate: event.target.value }))}
-                        />
-                        <input
-                            type="date"
-                            value={form.admitCardReleaseDate}
-                            onChange={(event) => setForm((current) => ({ ...current, admitCardReleaseDate: event.target.value }))}
-                        />
-                    </>
-                ) : null}
+                </div>
 
-                {form.type === 'answer-key' ? (
-                    <>
-                        <input
-                            type="datetime-local"
-                            value={form.objectionStart}
-                            onChange={(event) => setForm((current) => ({ ...current, objectionStart: event.target.value }))}
-                        />
-                        <input
-                            type="datetime-local"
-                            value={form.objectionEnd}
-                            onChange={(event) => setForm((current) => ({ ...current, objectionEnd: event.target.value }))}
-                        />
-                    </>
-                ) : null}
+                <div className="ops-editor-rail">
+                    <OpsCard title="Publish Checklist" tone="muted">
+                        <div className="ops-stack">
+                            <select
+                                value={form.status}
+                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as FormState['status'] }))}
+                                style={{ width: '100%', padding: '8px', cursor: 'pointer' }}
+                            >
+                                <option value="draft">Draft</option>
+                                <option value="pending">Pending Review</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="published">Published</option>
+                            </select>
 
-                {form.type === 'syllabus' ? (
-                    <textarea
-                        className="ops-span-full"
-                        value={form.syllabusMarks}
-                        onChange={(event) => setForm((current) => ({ ...current, syllabusMarks: event.target.value }))}
-                        placeholder="Section and marks breakdown"
-                    />
-                ) : null}
+                            <div className="ops-row">
+                                <input type="checkbox" checked={Boolean(form.title && form.category && form.organization)} readOnly />
+                                <span className="ops-inline-muted">Basic info complete</span>
+                            </div>
+                            <div className="ops-row">
+                                <input type="checkbox" checked={Boolean(form.summary)} readOnly />
+                                <span className="ops-inline-muted">Summary provided</span>
+                            </div>
 
-                {form.type === 'admission' ? (
-                    <textarea
-                        className="ops-span-full"
-                        value={form.counselingDates}
-                        onChange={(event) => setForm((current) => ({ ...current, counselingDates: event.target.value }))}
-                        placeholder="Counselling / admission timeline"
-                    />
-                ) : null}
-
-                <div className="ops-actions ops-span-full">
-                    <button type="submit" className="admin-btn primary" disabled={createMutation.isPending}>
-                        {createMutation.isPending ? 'Creating...' : 'Create Post'}
-                    </button>
-                    <button type="button" className="admin-btn" onClick={() => setForm(defaultForm)}>
-                        Clear
-                    </button>
+                            <div className="ops-actions" style={{ marginTop: 'var(--space-2)' }}>
+                                <button type="submit" className="admin-btn primary" disabled={createMutation.isPending} style={{ width: '100%' }}>
+                                    {createMutation.isPending ? 'Creating...' : 'Create Post'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="admin-btn subtle"
+                                    onClick={() => setForm(defaultForm)}
+                                    style={{ width: '100%' }}
+                                >
+                                    Clear Form
+                                </button>
+                            </div>
+                        </div>
+                    </OpsCard>
                 </div>
             </form>
 

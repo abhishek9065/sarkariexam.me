@@ -28,24 +28,18 @@ type GroupCollapseState = Record<ModuleGroupKey, boolean>;
 
 const GROUP_ORDER: ModuleGroupKey[] = [
     'dashboard',
-    'posts',
-    'review',
-    'homepage',
-    'assets',
-    'team',
-    'logs',
-    'settings',
+    'content',
+    'management',
+    'admin',
+    'ops'
 ];
 
 const defaultGroupCollapseState: GroupCollapseState = {
     dashboard: false,
-    posts: false,
-    review: false,
-    homepage: false,
-    assets: false,
-    team: false,
-    logs: false,
-    settings: false,
+    content: false,
+    management: false,
+    admin: false,
+    ops: false,
 };
 
 const parseGroupCollapseState = (raw: string): GroupCollapseState => {
@@ -53,13 +47,10 @@ const parseGroupCollapseState = (raw: string): GroupCollapseState => {
         const parsed = JSON.parse(raw) as Partial<GroupCollapseState>;
         return {
             dashboard: Boolean(parsed.dashboard),
-            posts: Boolean(parsed.posts),
-            review: Boolean(parsed.review),
-            homepage: Boolean(parsed.homepage),
-            assets: Boolean(parsed.assets),
-            team: Boolean(parsed.team),
-            logs: Boolean(parsed.logs),
-            settings: Boolean(parsed.settings),
+            content: Boolean(parsed.content),
+            management: Boolean(parsed.management),
+            admin: Boolean(parsed.admin),
+            ops: Boolean(parsed.ops),
         };
     } catch {
         return defaultGroupCollapseState;
@@ -181,6 +172,19 @@ export function AdminLayout() {
                 event.preventDefault();
                 searchInputRef.current?.focus();
                 setTopSearchFocused(true);
+                return;
+            }
+
+            if (
+                event.key.toLowerCase() === 'n'
+                && !event.ctrlKey
+                && !event.metaKey
+                && !event.altKey
+                && !event.shiftKey
+                && !inTypingContext
+            ) {
+                event.preventDefault();
+                navigate('/create-post');
                 return;
             }
 

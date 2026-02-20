@@ -26,6 +26,12 @@ interface TableToolbarProps {
     onStatusFilterChange: (value: AnnouncementStatusFilter | 'all') => void;
     sortOption: AnnouncementSortOption;
     onSortChange: (value: AnnouncementSortOption) => void;
+    dateStart?: string;
+    onDateStartChange?: (value: string) => void;
+    dateEnd?: string;
+    onDateEndChange?: (value: string) => void;
+    authorFilter?: string;
+    onAuthorFilterChange?: (value: string) => void;
     filterSummary?: string;
     onClearFilters?: () => void;
     quickChips?: Array<{
@@ -49,6 +55,12 @@ export function TableToolbar({
     onStatusFilterChange,
     sortOption,
     onSortChange,
+    dateStart,
+    onDateStartChange,
+    dateEnd,
+    onDateEndChange,
+    authorFilter,
+    onAuthorFilterChange,
     filterSummary,
     onClearFilters,
     quickChips = [],
@@ -122,6 +134,32 @@ export function TableToolbar({
                     </div>
                 ) : null}
             </div>
+
+            {onDateStartChange && onDateEndChange && onAuthorFilterChange ? (
+                <div className="ops-toolbar-grid three">
+                    <input
+                        type="date"
+                        value={dateStart || ''}
+                        onChange={(event) => onDateStartChange(event.target.value)}
+                        aria-label="Filter by Start Date"
+                        title="Start Date"
+                    />
+                    <input
+                        type="date"
+                        value={dateEnd || ''}
+                        onChange={(event) => onDateEndChange(event.target.value)}
+                        aria-label="Filter by End Date"
+                        title="End Date"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Created by (Username or ID)"
+                        value={authorFilter || ''}
+                        onChange={(event) => onAuthorFilterChange(event.target.value)}
+                        aria-label="Filter by author"
+                    />
+                </div>
+            ) : null}
 
             {quickChips.length > 0 ? (
                 <div className="ops-actions" aria-label="Quick list modes">

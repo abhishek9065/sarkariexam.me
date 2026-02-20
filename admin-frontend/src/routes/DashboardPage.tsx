@@ -29,39 +29,53 @@ export function DashboardPage() {
         ? dashboardQuery.data as Record<string, unknown>
         : {};
 
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const urgentDeadlines = deadlines.filter((d) => d.deadline && new Date(d.deadline) <= threeDaysFromNow);
+
+    const staleDrafts = summary?.pendingDrafts ?? dashboardData.pendingReview ?? 0;
+    const brokenLinksCount = summary?.brokenLinks ?? 0;
+
     const quickStats = [
-        { label: 'Today Posts', value: summary?.totalPosts ?? dashboardData.totalAnnouncements ?? '-' },
-        { label: 'Pending Drafts', value: summary?.pendingDrafts ?? dashboardData.pendingReview ?? '-' },
-        { label: 'Scheduled Queue', value: summary?.scheduled ?? '-' },
-        { label: 'Broken Links', value: summary?.brokenLinks ?? '-' },
-        { label: 'Pending Review', value: summary?.pendingReview ?? '-' },
+        { label: 'Needs Review', value: summary?.pendingReview ?? dashboardData.pendingReview ?? 0 },
+        {
+            label: 'Broken Links',
+            value: brokenLinksCount > 0
+                ? <span style={{ color: 'var(--ops-danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{brokenLinksCount} <Link to="/link-manager" style={{ fontSize: '0.875rem' }}>(Fix)</Link></span>
+                : 0
+        },
+        { label: 'Deadlines in 3 days', value: urgentDeadlines.length },
+        { label: 'Stale / Pending Drafts', value: staleDrafts },
+        { label: 'Today Posts', value: summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0 },
         { label: 'Open Alerts', value: openAlertsCount },
-        { label: 'Expired', value: summary?.expired ?? '-' },
     ];
+
+    const quickActions = (
+        <div className="ops-actions">
+            <Link className="admin-btn primary" to="/create-post">New Job</Link>
+            <Link className="admin-btn" to="/result">New Result</Link>
+            <Link className="admin-btn" to="/admit-card">New Admit Card</Link>
+        </div>
+    );
 
     return (
         <>
-            <OpsCard title="Operations Dashboard" description="Daily operations snapshot with shortcuts and deadline-aware workflow.">
+            <OpsCard
+                title="Operations Dashboard"
+                description="Daily operations snapshot with shortcuts and deadline-aware workflow."
+                actions={quickActions}
+            >
                 {dashboardQuery.isPending || reportsQuery.isPending || alertsQuery.isPending ? <OpsSkeleton lines={2} /> : null}
                 {dashboardQuery.error || reportsQuery.error || alertsQuery.error ? <OpsErrorState message="Failed to load dashboard metrics." /> : null}
                 {!dashboardQuery.isPending && !reportsQuery.isPending && !alertsQuery.isPending && !dashboardQuery.error && !reportsQuery.error && !alertsQuery.error ? (
-                    <>
-                        <div className="ops-kpi-grid">
-                            {quickStats.map((metric) => (
-                                <div key={metric.label} className="ops-kpi-card">
-                                    <div className="ops-kpi-label">{metric.label}</div>
-                                    <div className="ops-kpi-value">{String(metric.value)}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="ops-actions">
-                            <Link className="admin-btn primary" to="/create-post">New Job</Link>
-                            <Link className="admin-btn" to="/result">New Result</Link>
-                            <Link className="admin-btn" to="/admit-card">New Admit Card</Link>
-                            <Link className="admin-btn" to="/answer-key">New Answer Key</Link>
-                            <Link className="admin-btn subtle" to="/alerts">Alerts Feed</Link>
-                        </div>
-                    </>
+                    <div className="ops-kpi-grid">
+                        {quickStats.map((metric) => (
+                            <div key={metric.label} className="ops-kpi-card">
+                                <div className="ops-kpi-label">{metric.label}</div>
+                                <div className="ops-kpi-value">{metric.value as import('react').ReactNode}</div>
+                            </div>
+                        ))}
+                    </div>
                 ) : null}
             </OpsCard>
 
