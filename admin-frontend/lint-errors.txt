@@ -1,0 +1,17 @@
+
+> sarkari-admin-frontend@0.1.0 lint
+> eslint src --ext ts,tsx --max-warnings=0
+
+
+C:\Users\abhis\Downloads\sarkari-result-git-clean\admin-frontend\src\app\AdminLayout.tsx
+  200:8  warning  React Hook useEffect has a missing dependency: 'navigate'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\abhis\Downloads\sarkari-result-git-clean\admin-frontend\src\modules\review\ReviewModule.tsx
+  49:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\abhis\Downloads\sarkari-result-git-clean\admin-frontend\src\routes\AnnouncementsPage.tsx
+  158:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  602:76  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 4 problems (3 errors, 1 warning)
+

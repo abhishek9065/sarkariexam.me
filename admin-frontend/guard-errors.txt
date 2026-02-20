@@ -1,0 +1,5 @@
+Admin UI guard failed:
+
+- admin-frontend/src/modules/create-post/CreatePostModule.tsx: inline style prop found (style={...}) in routes/modules.
+- admin-frontend/src/modules/detailed-post/DetailedPostModule.tsx: inline style prop found (style={...}) in routes/modules.
+- admin-frontend/src/modules/review/ReviewModule.tsx: inline style prop found (style={...}) in routes/modules.

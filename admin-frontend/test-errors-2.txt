@@ -1,0 +1,145 @@
+
+> sarkari-admin-frontend@0.1.0 test:e2e:ci
+> playwright test --config playwright.config.ts
+
+[2m[WebServer] [22m
+[2m[WebServer] [22m> sarkari-admin-frontend@0.1.0 dev
+[2m[WebServer] [22m> vite --host 127.0.0.1 --port 4174
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m  [32m[1mVITE[22m v7.3.1[39m  [2mready in [0m[1m377[22m[2m[0m ms[22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m  [32mΓ₧£[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4174[22m/admin-vnext/[39m
+
+Running 17 tests using 2 workers
+
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+  Γ£ô   1 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:64:1 ΓÇ║ admin login screen renders on desktop (929ms)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:09 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+  Γ£ô   3 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:72:1 ΓÇ║ admin shows desktop-required gate on mobile viewport (531ms)
+[WebServer] 10:18:10 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:10 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:10 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:10 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+  Γ£ô   4 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:81:1 ΓÇ║ admin protected routes redirect to login on desktop (749ms)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+  Γ£ô   5 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:89:1 ΓÇ║ admin protected routes are blocked by desktop gate on mobile (332ms)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/me
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+[WebServer] 10:18:11 am [vite] http proxy error: /api/admin-auth/permissions
+[WebServer] AggregateError [ECONNREFUSED]: 
+[WebServer]     at internalConnectMultiple (node:net:1134:18)
+[WebServer]     at afterConnectMultiple (node:net:1715:7)
+  Γ£ô   6 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:97:1 ΓÇ║ primary login action keeps desktop button size standard (777ms)
+  Γ£ô   7 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:108:1 ΓÇ║ authenticated dashboard renders premium desktop shell (834ms)
+  Γ£ô   8 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:122:1 ΓÇ║ command palette opens from shell action in authenticated session (585ms)
+  Γ£ô   9 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:136:1 ΓÇ║ sidebar collapse toggles desktop rail state (709ms)
+  Γ£ô  10 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:151:1 ΓÇ║ sidebar exposes full admin operations information architecture (505ms)
+  -  11 [chromium] ΓÇ║ tests\admin.smoke.spec.ts:170:1 ΓÇ║ admin-vnext alias serves login shell when basename is admin-vnext
+  Γ£ÿ   2 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:13:1 ΓÇ║ announcements supports filter presets and row actions (6.6s)
+  Γ£ô  12 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:26:1 ΓÇ║ review supports preview and execute flow with escape-close confirm dialog (1.7s)
+  Γ£ô  13 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:51:1 ΓÇ║ bulk import enforces preview modal and confirm flow (1.8s)
+  Γ£ô  14 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:71:1 ΓÇ║ sessions supports terminate flow with step-up and confirm dialog (1.2s)
+  Γ£ô  15 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:81:1 ΓÇ║ approvals uses structured decision modal with focus and escape-close (1.5s)
+  Γ£ô  16 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:100:1 ΓÇ║ compact mode keeps small controls at least 40px tall (1.3s)
+  Γ£ô  17 [chromium] ΓÇ║ tests\admin.workflow.spec.ts:112:1 ΓÇ║ keyboard opens command palette and focuses search input (536ms)
+
+
+  1) [chromium] ΓÇ║ tests\admin.workflow.spec.ts:13:1 ΓÇ║ announcements supports filter presets and row actions 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).not.[22mtoHaveValue[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  locator('#admin-preset-select')
+    Expected: not [32m""[39m
+    Received: [31m""[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "not toHaveValue" with timeout 5000ms[22m
+    [2m  - waiting for locator('#admin-preset-select')[22m
+    [2m    9 ├ù locator resolved to <select id="admin-preset-select">ΓÇª</select>[22m
+    [2m      - unexpected value ""[22m
+
+
+      17 |     await page.getByRole('button', { name: /Save current filters/i }).click();
+      18 |     await page.getByRole('button', { name: /^Save view$/i }).click();
+    > 19 |     await expect(page.locator('#admin-preset-select')).not.toHaveValue('');
+         |                                                            ^
+      20 |
+      21 |     await page.getByRole('button', { name: /More actions for Assistant Clerk Recruitment 2026/i }).click();
+      22 |     await page.getByRole('button', { name: /Mark Draft/i }).click();
+        at C:\Users\abhis\Downloads\sarkari-result-git-clean\admin-frontend\tests\admin.workflow.spec.ts:19:60
+
+    Error Context: test-results\admin.workflow-announcemen-16f35-ter-presets-and-row-actions-chromium\error-context.md
+
+  1 failed
+    [chromium] ΓÇ║ tests\admin.workflow.spec.ts:13:1 ΓÇ║ announcements supports filter presets and row actions 
+  1 skipped
+  15 passed (20.0s)
