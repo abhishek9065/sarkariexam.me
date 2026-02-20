@@ -8,7 +8,8 @@ export type AdminTelemetryEventType =
     | 'admin_module_viewed'
     | 'admin_incident_action'
     | 'admin_session_action'
-    | 'admin_triage_action';
+    | 'admin_triage_action'
+    | 'admin_bulk_action';
 
 export async function trackAdminTelemetry(type: AdminTelemetryEventType, metadata?: Record<string, unknown>) {
     try {

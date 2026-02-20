@@ -41,12 +41,12 @@ export function AnalyticsModule() {
     }, [data]);
 
     const cards = [
-        { label: 'Listing Views', value: readNumber(data, 'totalListingViews') },
-        { label: 'Card Clicks', value: readNumber(data, 'totalCardClicksInApp') || readNumber(data, 'totalCardClicks') },
-        { label: 'Bookmarks', value: readNumber(data, 'totalBookmarks') },
-        { label: 'Searches', value: readNumber(data, 'totalSearches') },
-        { label: 'CTR %', value: readNestedNumber(data, ['insights', 'clickThroughRate']) },
-        { label: 'Drop-off %', value: readNestedNumber(data, ['insights', 'funnelDropRate']) },
+        { label: 'Listing Views', value: readNumber(data ?? null, 'totalListingViews') },
+        { label: 'Card Clicks', value: readNumber(data ?? null, 'totalCardClicksInApp') || readNumber(data ?? null, 'totalCardClicks') },
+        { label: 'Bookmarks', value: readNumber(data ?? null, 'totalBookmarks') },
+        { label: 'Searches', value: readNumber(data ?? null, 'totalSearches') },
+        { label: 'CTR %', value: readNestedNumber(data ?? null, ['insights', 'clickThroughRate']) },
+        { label: 'Drop-off %', value: readNestedNumber(data ?? null, ['insights', 'funnelDropRate']) },
     ];
 
     return (

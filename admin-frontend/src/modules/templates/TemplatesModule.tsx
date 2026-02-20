@@ -278,7 +278,7 @@ export function TemplatesModule() {
             ) : null}
 
             {!query.isPending && !query.error && templates.length === 0 ? (
-                <OpsEmptyState title="No templates available" description="Create shared templates to speed up posting workflows." />
+                <OpsEmptyState message="No templates available: Create shared templates to speed up posting workflows." />
             ) : null}
 
             {templates.length > 0 ? (

@@ -197,7 +197,7 @@ export function AlertsModule() {
             ) : null}
 
             {!query.isPending && !query.error && alerts.length === 0 ? (
-                <OpsEmptyState title="No alerts in feed" description="All clear right now. Create manual alerts when operational action is required." />
+                <OpsEmptyState message="No alerts in feed: All clear right now. Create manual alerts when operational action is required." />
             ) : null}
 
             {alerts.length > 0 ? (

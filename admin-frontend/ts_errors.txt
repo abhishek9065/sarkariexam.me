@@ -1,0 +1,19 @@
+src/modules/alerts/AlertsModule.tsx(200,32): error TS2322: Type '{ title: string; description: string; }' is not assignable to type 'IntrinsicAttributes & OpsEmptyStateProps'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & OpsEmptyStateProps'.
+src/modules/analytics/AnalyticsModule.tsx(44,53): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/analytics/AnalyticsModule.tsx(45,51): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/analytics/AnalyticsModule.tsx(45,95): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/analytics/AnalyticsModule.tsx(46,49): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/analytics/AnalyticsModule.tsx(47,48): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/analytics/AnalyticsModule.tsx(48,51): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/analytics/AnalyticsModule.tsx(49,56): error TS2345: Argument of type 'Record<string, unknown> | null | undefined' is not assignable to parameter of type 'Record<string, unknown> | null'.
+  Type 'undefined' is not assignable to type 'Record<string, unknown> | null'.
+src/modules/templates/TemplatesModule.tsx(281,32): error TS2322: Type '{ title: string; description: string; }' is not assignable to type 'IntrinsicAttributes & OpsEmptyStateProps'.
+  Property 'title' does not exist on type 'IntrinsicAttributes & OpsEmptyStateProps'.
+src/routes/AnnouncementsPage.tsx(361,42): error TS2345: Argument of type '"admin_bulk_action"' is not assignable to parameter of type 'AdminTelemetryEventType'.
