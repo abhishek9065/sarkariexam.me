@@ -619,3 +619,167 @@ button.ops-kpi-card:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* ─── Status Chips ─── */
+
+.ops-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    border-radius: 999px;
+    border: 1px solid var(--border-soft);
+    padding: 3px 12px 3px 10px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.ops-status-chip::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ops-status-chip.draft {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--bg-elev-4) 60%, transparent 40%);
+}
+
+.ops-status-chip.draft::before {
+    background: var(--text-muted);
+}
+
+.ops-status-chip.review {
+    color: var(--warning);
+    border-color: color-mix(in srgb, var(--warning) 48%, transparent 52%);
+    background: color-mix(in srgb, var(--warning) 10%, transparent 90%);
+}
+
+.ops-status-chip.review::before {
+    background: var(--warning);
+}
+
+.ops-status-chip.published {
+    color: var(--success);
+    border-color: color-mix(in srgb, var(--success) 48%, transparent 52%);
+    background: color-mix(in srgb, var(--success) 10%, transparent 90%);
+}
+
+.ops-status-chip.published::before {
+    background: var(--success);
+}
+
+.ops-status-chip.expired {
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 48%, transparent 52%);
+    background: color-mix(in srgb, var(--danger) 10%, transparent 90%);
+}
+
+.ops-status-chip.expired::before {
+    background: var(--danger);
+}
+
+.ops-status-chip.scheduled {
+    color: var(--info);
+    border-color: color-mix(in srgb, var(--info) 48%, transparent 52%);
+    background: color-mix(in srgb, var(--info) 10%, transparent 90%);
+}
+
+.ops-status-chip.scheduled::before {
+    background: var(--info);
+}
+
+/* ─── Skeleton Loaders ─── */
+
+.ops-skeleton {
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg,
+            color-mix(in srgb, var(--bg-elev-3) 60%, transparent 40%) 0%,
+            color-mix(in srgb, var(--bg-elev-4) 60%, transparent 40%) 50%,
+            color-mix(in srgb, var(--bg-elev-3) 60%, transparent 40%) 100%);
+    background-size: 200% 100%;
+    animation: ops-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.ops-skeleton.line {
+    height: 16px;
+    border-radius: 8px;
+}
+
+.ops-skeleton.line.short {
+    width: 40%;
+}
+
+.ops-skeleton.line.medium {
+    width: 70%;
+}
+
+.ops-skeleton.row {
+    height: var(--control-height);
+}
+
+.ops-skeleton.card {
+    height: 120px;
+}
+
+.ops-skeleton-table {
+    display: grid;
+    gap: 8px;
+    padding: var(--space-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg-elev-3) 74%, #0b1526 26%);
+}
+
+.ops-skeleton-table-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 80px;
+    gap: 12px;
+    align-items: center;
+}
+
+.ops-skeleton-table-row .ops-skeleton.line {
+    width: 100%;
+}
+
+/* ─── Empty States ─── */
+
+.ops-empty-state {
+    display: grid;
+    place-items: center;
+    gap: var(--space-2);
+    padding: var(--space-5) var(--space-3);
+    border: 1px dashed var(--border-soft);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--bg-elev-2) 60%, transparent 40%);
+    text-align: center;
+}
+
+.ops-empty-state-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--bg-elev-4) 80%, transparent 20%);
+    border: 1px solid var(--border-soft);
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    color: var(--text-muted);
+}
+
+.ops-empty-state-title {
+    font-size: 1.08rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ops-empty-state-description {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    max-width: 42ch;
+}

@@ -28,6 +28,7 @@
     --border-soft: rgba(136, 183, 255, 0.24);
     --border-strong: rgba(136, 183, 255, 0.42);
 
+    --shadow-0: 0 2px 8px rgba(1, 8, 22, 0.22);
     --shadow-1: 0 22px 46px rgba(1, 8, 22, 0.5);
     --shadow-2: 0 36px 86px rgba(1, 8, 22, 0.68);
 
@@ -35,12 +36,13 @@
     --radius-md: 16px;
     --radius-lg: 22px;
 
-    --space-1: 6px;
-    --space-2: 10px;
-    --space-3: 14px;
-    --space-4: 18px;
-    --space-5: 24px;
-    --space-6: 34px;
+    /* 8px spacing grid */
+    --space-1: 8px;
+    --space-2: 16px;
+    --space-3: 24px;
+    --space-4: 32px;
+    --space-5: 40px;
+    --space-6: 48px;
 
     --sidebar-width: 328px;
     --sidebar-collapsed-width: 112px;
@@ -54,9 +56,9 @@
 body[data-admin-density='compact'] {
     --space-1: 4px;
     --space-2: 8px;
-    --space-3: 10px;
-    --space-4: 14px;
-    --space-5: 18px;
-    --space-6: 24px;
+    --space-3: 16px;
+    --space-4: 24px;
+    --space-5: 32px;
+    --space-6: 40px;
     --control-height: var(--control-height-compact);
 }
