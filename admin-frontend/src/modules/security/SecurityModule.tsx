@@ -8,9 +8,16 @@ import { getAdminSecurityLogs } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminSecurityLog } from '../../types';
 
-const toEventType = (row: AdminSecurityLog) => String(row.eventType ?? row.event_type ?? 'unknown');
-const toIp = (row: AdminSecurityLog) => String(row.ipAddress ?? row.ip_address ?? '-');
+const toEventType = (row: AdminSecurityLog) => String(row.eventType ?? (row as Record<string, unknown>).event_type ?? 'unknown');
+const toIp = (row: AdminSecurityLog) => String(row.ipAddress ?? (row as Record<string, unknown>).ip_address ?? '-');
 const toEndpoint = (row: AdminSecurityLog) => String(row.endpoint ?? '-');
+const toWhen = (row: AdminSecurityLog): string | undefined => {
+    const raw = row.createdAt ?? (row as Record<string, unknown>).created_at;
+    if (!raw) return undefined;
+    if (raw instanceof Date) return raw.toISOString();
+    if (typeof raw === 'string') return raw;
+    return String(raw);
+};
 
 const eventTone = (eventType: string): 'neutral' | 'success' | 'warning' | 'danger' => {
     const normalized = eventType.toLowerCase();
@@ -49,7 +56,7 @@ export function SecurityModule() {
     });
 
     const rows = useMemo(() => query.data ?? [], [query.data]);
-    const riskyCount = useMemo(() => rows.filter((row) => eventTone(toEventType(row)) === 'danger').length, [rows]);
+    const riskyCount = useMemo(() => rows.filter((row) => { const tone = eventTone(toEventType(row)); return tone === 'danger' || tone === 'warning'; }).length, [rows]);
 
     useEffect(() => {
         void trackAdminTelemetry('admin_module_viewed', { module: 'security', count: rows.length });
@@ -152,7 +159,7 @@ export function SecurityModule() {
                                     <td><OpsBadge tone={eventTone(eventLabel)}>{eventLabel}</OpsBadge></td>
                                     <td><code>{rowEndpoint}</code></td>
                                     <td>{rowIp}</td>
-                                    <td>{formatDateTime(row.createdAt)}</td>
+                                    <td>{formatDateTime(toWhen(row))}</td>
                                     <td>
                                         <ActionOverflowMenu
                                             itemLabel={eventLabel}

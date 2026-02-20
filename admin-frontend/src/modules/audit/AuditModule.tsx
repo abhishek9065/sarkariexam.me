@@ -40,7 +40,10 @@ export function AuditModule() {
     });
 
     const rows = query.data ?? [];
-    const integrityStatus = String(integrityQuery.data?.status ?? integrityQuery.data?.state ?? 'unknown');
+    const integrityData = integrityQuery.data;
+    const integrityStatus = integrityData
+        ? (integrityData.valid === true ? 'verified' : integrityData.valid === false ? 'invalid' : String(integrityData.status ?? integrityData.state ?? 'unknown'))
+        : 'unknown';
     const integrityTone = integrityStatus === 'verified' || integrityStatus === 'valid'
         ? 'success'
         : integrityStatus === 'unknown'
@@ -130,7 +133,7 @@ export function AuditModule() {
                             <tr key={row.id || `${row.action}-${index}`}>
                                 <td><OpsBadge tone={actionTone(String(row.action || ''))}>{String(row.action ?? '-')}</OpsBadge></td>
                                 <td>{String(row.actorEmail ?? row.actorId ?? '-')}</td>
-                                <td>{formatDateTime(row.createdAt)}</td>
+                                <td>{formatDateTime(typeof row.createdAt === 'string' ? row.createdAt : (row.createdAt as unknown) instanceof Date ? (row.createdAt as unknown as Date).toISOString() : undefined)}</td>
                                 <td><code>{String(row.id ?? '-')}</code></td>
                             </tr>
                         ))}

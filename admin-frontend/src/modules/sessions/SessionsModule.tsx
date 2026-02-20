@@ -163,6 +163,10 @@ export function SessionsModule() {
                         </div>
                     </div>
 
+                    {!hasValidStepUp ? (
+                        <div className="admin-alert info">Step-up verification is required before terminating sessions.</div>
+                    ) : null}
+
                     {query.isPending ? <div className="admin-alert info">Loading sessions...</div> : null}
                     {query.error ? <OpsErrorState message="Failed to load sessions." /> : null}
                     {terminateMutation.isError ? (
@@ -238,9 +242,7 @@ export function SessionsModule() {
                         <OpsEmptyState message={rows.length === 0 ? 'No active sessions found.' : 'No sessions match current filters.'} />
                     ) : null}
 
-                    {!hasValidStepUp ? (
-                        <div className="admin-alert info">Step-up verification is required before terminating sessions.</div>
-                    ) : null}
+
 
                     {rows.length > 0 && filteredRows.length !== rows.length ? (
                         <div className="ops-inline-muted">
