@@ -11,12 +11,11 @@ body,
 
 body {
     margin: 0;
-    min-width: 1120px;
     font-family: var(--font-body);
     color: var(--text-primary);
     background:
-        radial-gradient(circle at 8% 0%, rgba(66, 232, 255, 0.16), transparent 32%),
-        radial-gradient(circle at 92% 4%, rgba(126, 184, 255, 0.14), transparent 34%),
+        radial-gradient(circle at 8% 0%, var(--accent-soft), transparent 32%),
+        radial-gradient(circle at 92% 4%, var(--accent-soft), transparent 34%),
         linear-gradient(170deg, var(--bg-canvas) 0%, var(--bg-canvas-alt) 100%);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -57,7 +56,7 @@ textarea {
     border-radius: var(--radius-sm);
     padding: 10px var(--control-padding-inline);
     color: var(--text-primary);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-input) 90%, #0c1424 10%), var(--bg-input));
+    background: linear-gradient(180deg, var(--bg-input), var(--bg-elev-1));
     transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
 }
 

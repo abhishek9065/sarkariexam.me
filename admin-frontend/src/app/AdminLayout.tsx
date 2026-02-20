@@ -72,6 +72,8 @@ export function AdminLayout() {
         defaultGroupCollapseState,
         parseGroupCollapseState
     );
+    const [theme, setTheme] = useLocalStorageState<'dark' | 'light'>('admin-vnext-theme', 'dark');
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [paletteQuery, setPaletteQuery] = useState('');
@@ -120,6 +122,10 @@ export function AdminLayout() {
     }, [density]);
 
     useEffect(() => {
+        document.body.dataset.theme = theme;
+    }, [theme]);
+
+    useEffect(() => {
         setAlertsOpen(false);
         setTopSearchFocused(false);
     }, [location.pathname]);
@@ -134,11 +140,14 @@ export function AdminLayout() {
             if (!target.closest('.admin-topbar-alerts')) {
                 setAlertsOpen(false);
             }
+            if (mobileMenuOpen && !target.closest('.admin-sidebar') && !target.closest('.admin-mobile-menu-btn')) {
+                setMobileMenuOpen(false);
+            }
         };
 
         document.addEventListener('click', onDocumentClick);
         return () => document.removeEventListener('click', onDocumentClick);
-    }, []);
+    }, [mobileMenuOpen]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -255,7 +264,7 @@ export function AdminLayout() {
     const alerts = alertsQuery.data?.data ?? [];
 
     return (
-        <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileMenuOpen ? 'mobile-menu-open' : ''}`}>
             <aside className="admin-sidebar" aria-label="Admin navigation shell">
                 <div className="admin-brand">
                     <h1 className="admin-brand-title">SarkariExams Admin</h1>
@@ -269,6 +278,14 @@ export function AdminLayout() {
                         onClick={() => setSidebarCollapsed((current) => !current)}
                     >
                         {sidebarCollapsed ? 'Expand rail' : 'Collapse rail'}
+                    </button>
+                    <button
+                        type="button"
+                        className="admin-btn subtle"
+                        onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+                        aria-label="Toggle theme"
+                    >
+                        {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                     </button>
                     <button
                         type="button"
@@ -353,6 +370,14 @@ export function AdminLayout() {
             <main className="admin-main">
                 <header className="admin-topbar">
                     <div className="admin-topbar-left">
+                        <button
+                            type="button"
+                            className="admin-btn subtle admin-mobile-menu-btn"
+                            onClick={() => setMobileMenuOpen((current) => !current)}
+                            aria-label="Toggle mobile menu"
+                        >
+                            ☰
+                        </button>
                         <div className="admin-topbar-search">
                             <input
                                 ref={searchInputRef}

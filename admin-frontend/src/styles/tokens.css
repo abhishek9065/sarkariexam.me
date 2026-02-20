@@ -62,3 +62,33 @@ body[data-admin-density='compact'] {
     --space-6: 40px;
     --control-height: var(--control-height-compact);
 }
+
+[data-theme='light'] {
+    --bg-canvas: #f4f6f9;
+    --bg-canvas-alt: #ffffff;
+    --bg-elev-1: #ffffff;
+    --bg-elev-2: #f8fafc;
+    --bg-elev-3: #eef2f6;
+    --bg-elev-4: #e2e8f0;
+    --bg-input: #ffffff;
+
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+
+    --accent: #2563eb;
+    --accent-strong: #1d4ed8;
+    --accent-soft: rgba(37, 99, 235, 0.1);
+
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+
+    --border-soft: rgba(0, 0, 0, 0.08);
+    --border-strong: rgba(0, 0, 0, 0.16);
+
+    --shadow-0: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --shadow-2: 0 10px 24px rgba(0, 0, 0, 0.08);
+}

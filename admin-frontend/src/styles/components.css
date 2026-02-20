@@ -7,7 +7,7 @@
     padding: 0 14px;
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--bg-elev-3) 86%, #0a1323 14%);
+    background: var(--bg-elev-3);
     color: var(--text-primary);
     text-decoration: none;
     font-weight: 600;
@@ -31,12 +31,12 @@
 .admin-btn.primary {
     border-color: color-mix(in srgb, var(--accent) 74%, #fff 26%);
     background: linear-gradient(120deg, var(--accent), var(--accent-strong));
-    color: #03131d;
-    box-shadow: 0 12px 24px rgba(11, 168, 194, 0.34);
+    color: var(--bg-canvas);
+    box-shadow: 0 12px 24px var(--accent-soft);
 }
 
 .admin-btn.subtle {
-    background: color-mix(in srgb, var(--bg-elev-2) 88%, #02060f 12%);
+    background: var(--bg-elev-2);
 }
 
 .admin-btn.ghost {
@@ -62,13 +62,13 @@
     border-radius: var(--radius-md);
     padding: var(--space-4);
     background:
-        radial-gradient(circle at top right, rgba(66, 232, 255, 0.08), transparent 42%),
-        linear-gradient(180deg, color-mix(in srgb, var(--bg-elev-2) 90%, #040811 10%), var(--bg-elev-2));
+        radial-gradient(circle at top right, var(--accent-soft), transparent 42%),
+        linear-gradient(180deg, var(--bg-elev-2) 90%, var(--bg-canvas) 10%);
     box-shadow: var(--shadow-1);
 }
 
 .ops-card.muted {
-    background: color-mix(in srgb, var(--bg-elev-2) 72%, #0d1522 28%);
+    background: var(--bg-elev-1);
 }
 
 .ops-card.danger {
@@ -114,7 +114,7 @@
     padding: var(--space-3);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--bg-elev-3) 80%, #050d18 20%);
+    background: var(--bg-elev-3);
 }
 
 .ops-toolbar-grid {
@@ -143,7 +143,7 @@
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
     padding: 12px;
-    background: color-mix(in srgb, var(--bg-elev-3) 78%, #12223a 22%);
+    background: var(--bg-elev-2);
     text-align: left;
 }
 
@@ -162,6 +162,27 @@ button.ops-kpi-card:hover {
     color: var(--text-muted);
     letter-spacing: 0.06em;
     text-transform: uppercase;
+}
+
+.ops-kpi-trend {
+    margin-top: 8px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ops-kpi-trend.positive {
+    color: var(--success);
+}
+
+.ops-kpi-trend.negative {
+    color: var(--danger);
+}
+
+.ops-kpi-trend.neutral {
+    color: var(--text-muted);
 }
 
 .ops-kpi-value {
@@ -204,6 +225,47 @@ button.ops-kpi-card:hover {
     letter-spacing: 0.05em;
 }
 
+/* Pure CSS Chart */
+.ops-chart-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 180px;
+    padding-top: var(--space-3);
+    gap: 8px;
+    width: 100%;
+}
+
+.ops-chart-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+    height: 100%;
+    gap: 6px;
+}
+
+.ops-chart-bar {
+    width: 100%;
+    max-width: 48px;
+    background: linear-gradient(0deg, var(--accent-strong), var(--accent));
+    border-radius: 4px 4px 0 0;
+    transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease;
+    opacity: 0.85;
+}
+
+.ops-chart-bar:hover {
+    opacity: 1;
+    transform: scaleY(1.02);
+    transform-origin: bottom;
+}
+
+.ops-chart-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
 .ops-badge.neutral {
     color: var(--text-secondary);
 }
@@ -236,7 +298,7 @@ button.ops-kpi-card:hover {
     overflow: auto;
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--bg-elev-3) 74%, #0b1526 26%);
+    background: var(--bg-elev-3);
 }
 
 .ops-table {
@@ -249,7 +311,7 @@ button.ops-kpi-card:hover {
 .ops-table td {
     text-align: left;
     padding: 12px 12px;
-    border-bottom: 1px solid rgba(130, 170, 235, 0.2);
+    border-bottom: 1px solid var(--border-soft);
     vertical-align: top;
 }
 
@@ -261,15 +323,15 @@ button.ops-kpi-card:hover {
     letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--text-muted);
-    background: color-mix(in srgb, var(--bg-elev-4) 74%, #0d1a2c 26%);
+    background: var(--bg-elev-4);
 }
 
 .ops-table tr:hover td {
-    background: rgba(66, 232, 255, 0.06);
+    background: var(--accent-soft);
 }
 
 .ops-table tr.ops-row-highlight td {
-    background: rgba(66, 232, 255, 0.16);
+    background: var(--accent-soft);
 }
 
 .ops-empty,
@@ -284,7 +346,7 @@ button.ops-kpi-card:hover {
 
 .ops-empty {
     color: var(--text-secondary);
-    background: color-mix(in srgb, var(--bg-elev-3) 86%, #000 14%);
+    background: var(--bg-elev-1);
 }
 
 .ops-error,
@@ -390,7 +452,7 @@ button.ops-kpi-card:hover {
     padding: var(--space-5);
     box-shadow: var(--shadow-2);
     background:
-        radial-gradient(circle at 100% 0%, rgba(66, 232, 255, 0.22), transparent 46%),
+        radial-gradient(circle at 100% 0%, var(--accent-soft), transparent 46%),
         var(--bg-elev-2);
 }
 
@@ -409,7 +471,7 @@ button.ops-kpi-card:hover {
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(5, 10, 18, 0.76);
+    background: rgba(0, 0, 0, 0.6);
     display: grid;
     place-items: start center;
     padding: 8vh 14px 14px;
@@ -430,7 +492,7 @@ button.ops-kpi-card:hover {
     min-height: 54px;
     padding: 14px;
     border-bottom: 1px solid var(--border-soft);
-    background: color-mix(in srgb, var(--bg-elev-3) 84%, #0b1524 16%);
+    background: var(--bg-elev-3);
 }
 
 .admin-palette-list {
@@ -442,7 +504,7 @@ button.ops-kpi-card:hover {
     width: 100%;
     min-height: 56px;
     border: 0;
-    border-bottom: 1px solid rgba(130, 170, 235, 0.16);
+    border-bottom: 1px solid var(--border-soft);
     padding: 12px 14px;
     background: transparent;
     display: flex;
@@ -455,7 +517,7 @@ button.ops-kpi-card:hover {
 
 .admin-palette-item:hover,
 .admin-palette-item[aria-current='true'] {
-    background: rgba(66, 232, 255, 0.09);
+    background: var(--accent-soft);
 }
 
 .admin-stepup-grid {
@@ -537,7 +599,7 @@ button.ops-kpi-card:hover {
     position: fixed;
     inset: 0;
     z-index: 120;
-    background: rgba(4, 10, 18, 0.68);
+    background: rgba(0, 0, 0, 0.68);
     display: grid;
     place-items: center;
     padding: 14px;
@@ -593,7 +655,7 @@ button.ops-kpi-card:hover {
     position: fixed;
     inset: 0;
     z-index: 110;
-    background: rgba(3, 10, 18, 0.72);
+    background: rgba(0, 0, 0, 0.72);
     display: grid;
     place-items: center;
     padding: 16px;

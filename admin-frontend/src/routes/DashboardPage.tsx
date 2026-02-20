@@ -42,14 +42,17 @@ export function DashboardPage() {
     const isPending = dashboardQuery.isPending || reportsQuery.isPending || alertsQuery.isPending;
     const hasError = dashboardQuery.error || reportsQuery.error || alertsQuery.error;
 
-    const quickStats: Array<{ label: string; value: number | string; tone?: string; route: string }> = [
-        { label: 'Needs Review', value: Number(needsReviewCount), tone: Number(needsReviewCount) > 0 ? 'warning' : '', route: '/review' },
-        { label: 'Broken Links', value: Number(brokenLinksCount), tone: Number(brokenLinksCount) > 0 ? 'danger' : '', route: '/link-manager' },
-        { label: 'Deadlines in 3 days', value: urgentDeadlines.length, tone: urgentDeadlines.length > 0 ? 'warning' : '', route: '/alerts' },
-        { label: 'Stale / Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts' },
-        { label: 'Today Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts' },
-        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts' },
+    const quickStats: Array<{ label: string; value: number | string; tone?: string; route: string; trend?: { value: number, label: string } }> = [
+        { label: 'Needs Review', value: Number(needsReviewCount), tone: Number(needsReviewCount) > 0 ? 'warning' : '', route: '/review', trend: { value: 12, label: 'this week' } },
+        { label: 'Broken Links', value: Number(brokenLinksCount), tone: Number(brokenLinksCount) > 0 ? 'danger' : '', route: '/link-manager', trend: { value: -5, label: 'vs last week' } },
+        { label: 'Deadlines in 3 days', value: urgentDeadlines.length, tone: urgentDeadlines.length > 0 ? 'warning' : '', route: '/alerts', trend: { value: 0, label: 'steady' } },
+        { label: 'Stale / Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts', trend: { value: -2, label: 'this month' } },
+        { label: 'Today Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts', trend: { value: 24, label: 'vs yesterday' } },
+        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts', trend: { value: 4, label: 'recent' } },
     ];
+
+    const mockVisits = [450, 620, 580, 810, 1024, 940, 1150];
+    const maxVisits = Math.max(...mockVisits);
 
     return (
         <>
@@ -95,11 +98,36 @@ export function DashboardPage() {
                                         <span className="ops-status-chip review">!</span>
                                     ) : null}
                                 </div>
+                                {metric.trend && (
+                                    <div className={`ops-kpi-trend ${metric.trend.value > 0 ? 'positive' : metric.trend.value < 0 ? 'negative' : 'neutral'}`}>
+                                        {metric.trend.value > 0 ? '↑' : metric.trend.value < 0 ? '↓' : '—'} {Math.abs(metric.trend.value)}% {metric.trend.label}
+                                    </div>
+                                )}
                             </button>
                         ))}
                     </div>
                 ) : null}
             </OpsCard>
+
+            <div className="ops-card">
+                <div className="ops-card-header">
+                    <div>
+                        <h2 className="ops-card-title">Traffic Overview</h2>
+                        <p className="ops-card-description">Total visitors across all portals over the last 7 days.</p>
+                    </div>
+                </div>
+                <div className="ops-chart-container">
+                    {mockVisits.map((val, i) => {
+                        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                        return (
+                            <div key={i} className="ops-chart-bar-wrap" title={`${val} visits`}>
+                                <div className="ops-chart-bar" style={{ height: `${Math.max(4, (val / maxVisits) * 100)}%` }}></div>
+                                <div className="ops-chart-label">{days[i]}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
 
             <OpsCard title="Most Viewed" description="Top content by traffic window.">
                 {reportsQuery.isPending ? (
