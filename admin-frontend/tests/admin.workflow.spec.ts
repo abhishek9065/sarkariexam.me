@@ -15,6 +15,7 @@ test('announcements supports filter presets and row actions', async ({ page }) =
 
     await page.getByPlaceholder(/Search by title/i).fill('Assistant Clerk');
     await page.getByRole('button', { name: /Save current filters/i }).click();
+    await page.getByRole('button', { name: /^Save view$/i }).click();
     await expect(page.locator('#admin-preset-select')).not.toHaveValue('');
 
     await page.getByRole('button', { name: /More actions for Assistant Clerk Recruitment 2026/i }).click();
@@ -100,7 +101,7 @@ test('compact mode keeps small controls at least 40px tall', async ({ page }) =>
     await bootAuthenticatedShell(page, 'dashboard');
 
     await page.getByRole('button', { name: /Density: Comfortable/i }).click();
-    await page.getByRole('link', { name: /Announcements/i }).click();
+    await page.getByRole('link', { name: /Manage Posts/i }).click();
 
     const compactControl = page.getByRole('button', { name: /Save current filters/i });
     await expect(compactControl).toBeVisible();

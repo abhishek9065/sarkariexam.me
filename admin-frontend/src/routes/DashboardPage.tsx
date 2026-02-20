@@ -41,7 +41,7 @@ export function DashboardPage() {
         {
             label: 'Broken Links',
             value: brokenLinksCount > 0
-                ? <span style={{ color: 'var(--ops-danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{brokenLinksCount} <Link to="/link-manager" style={{ fontSize: '0.875rem' }}>(Fix)</Link></span>
+                ? <span className="ops-badge danger">{brokenLinksCount} <Link to="/link-manager" className="ops-inline-muted">(Fix)</Link></span>
                 : 0
         },
         { label: 'Deadlines in 3 days', value: urgentDeadlines.length },

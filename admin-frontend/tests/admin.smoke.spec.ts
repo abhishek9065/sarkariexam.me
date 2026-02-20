@@ -163,7 +163,7 @@ test('sidebar exposes full admin operations information architecture', async ({ 
     await expect(page.getByRole('link', { name: /Media \/ PDFs/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /SEO Tools/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Users & Roles/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Reports/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Reports$/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Settings/i })).toBeVisible();
 });
 

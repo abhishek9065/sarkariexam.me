@@ -155,7 +155,7 @@ export function AnnouncementsPage() {
     });
 
     const createDraftMutation = useMutation({
-        mutationFn: (input: { type?: any; title?: string; category?: string; organization?: string }) => createAnnouncementDraft(input),
+        mutationFn: (input: { type?: AnnouncementTypeFilter; title?: string; category?: string; organization?: string }) => createAnnouncementDraft(input),
         onSuccess: async (draft) => {
             await queryClient.invalidateQueries({ queryKey: ['admin-announcements'] });
             notifySuccess('Draft created', `Duplicated as draft ${draft.id}`);
@@ -599,7 +599,7 @@ export function AnnouncementsPage() {
                                                 onClick: () => {
                                                     if (!id) return;
                                                     createDraftMutation.mutate({
-                                                        type: item.type as any,
+                                                        type: item.type as AnnouncementTypeFilter,
                                                         title: `${item.title || 'Untitled'} (Copy)`,
                                                         category: item.category,
                                                         organization: item.organization,

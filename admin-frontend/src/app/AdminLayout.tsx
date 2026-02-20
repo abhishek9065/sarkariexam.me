@@ -197,7 +197,7 @@ export function AdminLayout() {
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, []);
+    }, [navigate]);
 
     const stepUpLabel = hasValidStepUp
         ? `Step-up active${stepUpExpiresAt ? ` until ${new Date(stepUpExpiresAt).toLocaleTimeString()}` : ''}`

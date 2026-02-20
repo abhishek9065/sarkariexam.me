@@ -46,10 +46,10 @@ export function ReviewModule() {
     const renderRisk = (item: AdminAnnouncementListItem) => {
         const risks = [];
         if (!item.externalLink) risks.push('Missing Link');
-        const deadline = (item as any).deadline;
+        const deadline = (item as { deadline?: string }).deadline;
         if (deadline && new Date(deadline) < new Date()) risks.push('Expired deadline');
-        if (risks.length === 0) return <span className="ops-badge success" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>Low</span>;
-        return <span className="ops-badge danger" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>{risks.join(', ')}</span>;
+        if (risks.length === 0) return <span className="ops-badge success">Low</span>;
+        return <span className="ops-badge danger">{risks.join(', ')}</span>;
     };
 
 
@@ -162,7 +162,7 @@ export function ReviewModule() {
                     }
                 />
 
-                <div className="ops-actions" style={{ marginBottom: 'var(--space-3)' }}>
+                <div className="ops-actions">
                     <button className={`admin-btn small ${activeTab === 'all' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('all')}>All ({rows.length})</button>
                     <button className={`admin-btn small ${activeTab === 'job' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('job')}>Jobs</button>
                     <button className={`admin-btn small ${activeTab === 'result' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('result')}>Results</button>

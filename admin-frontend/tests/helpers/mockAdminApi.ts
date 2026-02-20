@@ -385,6 +385,16 @@ export async function mockAdminApi(page: Page, options: AdminMockOptions = {}) {
             return;
         }
 
+        if (pathname === '/api/admin/views' && method === 'GET') {
+            await route.fulfill(okJson([{ id: 'mock-preset-id', name: 'Saved Preset' }]));
+            return;
+        }
+
+        if (pathname === '/api/admin/views' && method === 'POST') {
+            await route.fulfill(okJson({ id: 'mock-preset-id', name: 'Saved Preset' }));
+            return;
+        }
+
         await route.fulfill(okJson({}));
     });
 }

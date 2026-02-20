@@ -452,7 +452,7 @@ export function CreatePostModule() {
                             <select
                                 value={form.status}
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as FormState['status'] }))}
-                                style={{ width: '100%', padding: '8px', cursor: 'pointer' }}
+                                className="ops-span-full"
                             >
                                 <option value="draft">Draft</option>
                                 <option value="pending">Pending Review</option>
@@ -469,15 +469,14 @@ export function CreatePostModule() {
                                 <span className="ops-inline-muted">Summary provided</span>
                             </div>
 
-                            <div className="ops-actions" style={{ marginTop: 'var(--space-2)' }}>
-                                <button type="submit" className="admin-btn primary" disabled={createMutation.isPending} style={{ width: '100%' }}>
+                            <div className="ops-actions">
+                                <button type="submit" className="admin-btn primary">
                                     {createMutation.isPending ? 'Creating...' : 'Create Post'}
                                 </button>
                                 <button
                                     type="button"
                                     className="admin-btn subtle"
                                     onClick={() => setForm(defaultForm)}
-                                    style={{ width: '100%' }}
                                 >
                                     Clear Form
                                 </button>
