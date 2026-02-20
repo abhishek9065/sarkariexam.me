@@ -1,10 +1,12 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
-import { OpsCard, OpsErrorState, OpsSkeleton } from '../components/ops';
+import { OpsCard, OpsErrorState } from '../components/ops';
 import { getAdminAlerts, getAdminDashboard, getAdminReports } from '../lib/api/client';
 
 export function DashboardPage() {
+    const navigate = useNavigate();
+
     const dashboardQuery = useQuery({
         queryKey: ['admin-dashboard'],
         queryFn: () => getAdminDashboard(),
@@ -35,72 +37,164 @@ export function DashboardPage() {
 
     const staleDrafts = summary?.pendingDrafts ?? dashboardData.pendingReview ?? 0;
     const brokenLinksCount = summary?.brokenLinks ?? 0;
+    const needsReviewCount = summary?.pendingReview ?? dashboardData.pendingReview ?? 0;
 
-    const quickStats = [
-        { label: 'Needs Review', value: summary?.pendingReview ?? dashboardData.pendingReview ?? 0 },
-        {
-            label: 'Broken Links',
-            value: brokenLinksCount > 0
-                ? <span className="ops-badge danger">{brokenLinksCount} <Link to="/link-manager" className="ops-inline-muted">(Fix)</Link></span>
-                : 0
-        },
-        { label: 'Deadlines in 3 days', value: urgentDeadlines.length },
-        { label: 'Stale / Pending Drafts', value: staleDrafts },
-        { label: 'Today Posts', value: summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0 },
-        { label: 'Open Alerts', value: openAlertsCount },
+    const isPending = dashboardQuery.isPending || reportsQuery.isPending || alertsQuery.isPending;
+    const hasError = dashboardQuery.error || reportsQuery.error || alertsQuery.error;
+
+    const quickStats: Array<{ label: string; value: number | string; tone?: string; route: string }> = [
+        { label: 'Needs Review', value: Number(needsReviewCount), tone: Number(needsReviewCount) > 0 ? 'warning' : '', route: '/review' },
+        { label: 'Broken Links', value: Number(brokenLinksCount), tone: Number(brokenLinksCount) > 0 ? 'danger' : '', route: '/link-manager' },
+        { label: 'Deadlines in 3 days', value: urgentDeadlines.length, tone: urgentDeadlines.length > 0 ? 'warning' : '', route: '/alerts' },
+        { label: 'Stale / Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts' },
+        { label: 'Today Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts' },
+        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts' },
     ];
-
-    const quickActions = (
-        <div className="ops-actions">
-            <Link className="admin-btn primary" to="/create-post">New Job</Link>
-            <Link className="admin-btn" to="/result">New Result</Link>
-            <Link className="admin-btn" to="/admit-card">New Admit Card</Link>
-        </div>
-    );
 
     return (
         <>
             <OpsCard
                 title="Operations Dashboard"
                 description="Daily operations snapshot with shortcuts and deadline-aware workflow."
-                actions={quickActions}
+                actions={
+                    <div className="ops-actions">
+                        <Link className="admin-btn primary" to="/create-post">New Job</Link>
+                        <Link className="admin-btn" to="/result">New Result</Link>
+                        <Link className="admin-btn" to="/admit-card">New Admit Card</Link>
+                        <Link className="admin-btn ghost" to="/answer-key">Answer Key</Link>
+                    </div>
+                }
             >
-                {dashboardQuery.isPending || reportsQuery.isPending || alertsQuery.isPending ? <OpsSkeleton lines={2} /> : null}
-                {dashboardQuery.error || reportsQuery.error || alertsQuery.error ? <OpsErrorState message="Failed to load dashboard metrics." /> : null}
-                {!dashboardQuery.isPending && !reportsQuery.isPending && !alertsQuery.isPending && !dashboardQuery.error && !reportsQuery.error && !alertsQuery.error ? (
+                {isPending ? (
+                    <div className="ops-kpi-grid">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="ops-kpi-card">
+                                <div className="ops-skeleton line short" />
+                                <div className="ops-skeleton line medium" />
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+                {hasError ? <OpsErrorState message="Failed to load dashboard metrics." /> : null}
+                {!isPending && !hasError ? (
                     <div className="ops-kpi-grid">
                         {quickStats.map((metric) => (
-                            <div key={metric.label} className="ops-kpi-card">
+                            <button
+                                key={metric.label}
+                                type="button"
+                                className="ops-kpi-card"
+                                onClick={() => navigate(metric.route)}
+                            >
                                 <div className="ops-kpi-label">{metric.label}</div>
-                                <div className="ops-kpi-value">{metric.value as import('react').ReactNode}</div>
-                            </div>
+                                <div className={`ops-kpi-value${metric.tone ? ` ops-kpi-${metric.tone}` : ''}`}>
+                                    {metric.value}
+                                    {metric.tone === 'danger' && Number(metric.value) > 0 ? (
+                                        <span className="ops-status-chip expired">Fix</span>
+                                    ) : null}
+                                    {metric.tone === 'warning' && Number(metric.value) > 0 ? (
+                                        <span className="ops-status-chip review">!</span>
+                                    ) : null}
+                                </div>
+                            </button>
                         ))}
                     </div>
                 ) : null}
             </OpsCard>
 
             <OpsCard title="Most Viewed" description="Top content by traffic window.">
-                {topViewed.length === 0 ? <div className="ops-empty">No top-viewed data available.</div> : (
-                    <ul className="ops-list">
-                        {topViewed.slice(0, 10).map((item) => (
-                            <li key={item.id}>
-                                <strong>{item.title}</strong> - {item.views} views ({item.type})
-                            </li>
+                {reportsQuery.isPending ? (
+                    <div className="ops-skeleton-table">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="ops-skeleton-table-row">
+                                <div className="ops-skeleton line" />
+                                <div className="ops-skeleton line" />
+                                <div className="ops-skeleton line" />
+                                <div className="ops-skeleton line" />
+                            </div>
                         ))}
-                    </ul>
-                )}
+                    </div>
+                ) : null}
+                {!reportsQuery.isPending && topViewed.length === 0 ? (
+                    <div className="ops-empty-state">
+                        <div className="ops-empty-state-icon">📊</div>
+                        <div className="ops-empty-state-title">No traffic data yet</div>
+                        <div className="ops-empty-state-description">Post views will appear here once content is published and receiving traffic.</div>
+                    </div>
+                ) : null}
+                {topViewed.length > 0 ? (
+                    <div className="ops-table-wrap">
+                        <table className="ops-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Views</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {topViewed.slice(0, 10).map((item) => (
+                                    <tr key={item.id}>
+                                        <td><strong>{item.title}</strong></td>
+                                        <td>{item.views}</td>
+                                        <td><span className="ops-status-chip published">{item.type}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : null}
             </OpsCard>
 
             <OpsCard title="Upcoming Deadlines" description="Application/exam deadlines in next 7 days.">
-                {deadlines.length === 0 ? <div className="ops-empty">No upcoming deadlines.</div> : (
-                    <ul className="ops-list">
-                        {deadlines.slice(0, 10).map((item) => (
-                            <li key={item.id}>
-                                <strong>{item.title}</strong> - {item.deadline ? new Date(item.deadline).toLocaleString() : 'No deadline'}
-                            </li>
+                {reportsQuery.isPending ? (
+                    <div className="ops-skeleton-table">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="ops-skeleton-table-row">
+                                <div className="ops-skeleton line" />
+                                <div className="ops-skeleton line" />
+                                <div className="ops-skeleton line" />
+                                <div className="ops-skeleton line" />
+                            </div>
                         ))}
-                    </ul>
-                )}
+                    </div>
+                ) : null}
+                {!reportsQuery.isPending && deadlines.length === 0 ? (
+                    <div className="ops-empty-state">
+                        <div className="ops-empty-state-icon">📅</div>
+                        <div className="ops-empty-state-title">No upcoming deadlines</div>
+                        <div className="ops-empty-state-description">Posts with application or exam deadlines in the next 7 days will appear here.</div>
+                    </div>
+                ) : null}
+                {deadlines.length > 0 ? (
+                    <div className="ops-table-wrap">
+                        <table className="ops-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Deadline</th>
+                                    <th>Urgency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {deadlines.slice(0, 10).map((item) => {
+                                    const isUrgent = item.deadline && new Date(item.deadline) <= threeDaysFromNow;
+                                    return (
+                                        <tr key={item.id} className={isUrgent ? 'ops-row-highlight' : ''}>
+                                            <td><strong>{item.title}</strong></td>
+                                            <td>{item.deadline ? new Date(item.deadline).toLocaleDateString() : '—'}</td>
+                                            <td>
+                                                {isUrgent
+                                                    ? <span className="ops-status-chip expired">Urgent</span>
+                                                    : <span className="ops-status-chip scheduled">Upcoming</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : null}
             </OpsCard>
         </>
     );

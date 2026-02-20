@@ -169,6 +169,25 @@ button.ops-kpi-card:hover {
     font-weight: 800;
     margin-top: 4px;
     letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ops-kpi-value.ops-kpi-warning {
+    color: var(--warning);
+}
+
+.ops-kpi-value.ops-kpi-danger {
+    color: var(--danger);
+}
+
+.ops-kpi-value.ops-kpi-info {
+    color: var(--info);
+}
+
+.ops-kpi-value.ops-kpi-success {
+    color: var(--success);
 }
 
 .ops-badge {

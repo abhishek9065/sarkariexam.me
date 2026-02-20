@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAdminAuth } from '../app/useAdminAuth';
 import { useAdminPreferences } from '../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../components/ops';
+import { OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../components/ops';
 import {
     ActionOverflowMenu,
     TableToolbar,
@@ -47,11 +47,14 @@ const parseBoundedInt = (raw: string, fallback: number, min: number, max: number
     return fallback;
 };
 
-const statusTone = (status?: string) => {
-    if (status === 'published') return 'success';
-    if (status === 'pending' || status === 'scheduled') return 'warning';
-    if (status === 'archived') return 'danger';
-    return 'neutral';
+
+
+const statusChipClass = (status?: string) => {
+    if (status === 'published') return 'published';
+    if (status === 'pending') return 'review';
+    if (status === 'scheduled') return 'scheduled';
+    if (status === 'archived') return 'expired';
+    return 'draft';
 };
 
 const applySafeString = (value: unknown, fallback = '') => {
@@ -557,11 +560,11 @@ export function AnnouncementsPage() {
                                     {id ? <div className="ops-inline-muted">ID: <code>{id}</code></div> : null}
                                 </td>
                                 <td>
-                                    <OpsBadge tone={statusTone(item.status) as 'neutral' | 'success' | 'warning' | 'danger'}>
-                                        {item.status || '-'}
-                                    </OpsBadge>
+                                    <span className={`ops-status-chip ${statusChipClass(item.status)}`}>
+                                        {item.status || 'draft'}
+                                    </span>
                                 </td>
-                                <td>{item.type || '-'}</td>
+                                <td><span className="ops-status-chip scheduled">{item.type || '-'}</span></td>
                                 <td>{formatDateTime(item.updatedAt || item.publishedAt)}</td>
                                 <td>
                                     <ActionOverflowMenu
