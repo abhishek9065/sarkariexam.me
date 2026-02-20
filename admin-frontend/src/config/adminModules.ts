@@ -30,12 +30,23 @@ export type AdminModuleKey =
     | 'error-reports'
     | 'settings';
 
+/**
+ * Consolidated sidebar groups (9 items)
+ * ─────────────────────────────────────
+ * Dashboard · Posts · Review & Approvals
+ * Homepage · Links · Media
+ * Users & Roles · Logs · Settings
+ */
 export type ModuleGroupKey =
     | 'dashboard'
-    | 'content'
-    | 'management'
-    | 'admin'
-    | 'ops';
+    | 'posts'
+    | 'review'
+    | 'homepage'
+    | 'links'
+    | 'media'
+    | 'users'
+    | 'logs'
+    | 'settings';
 
 export type AdminModuleNavItem = {
     key: AdminModuleKey;
@@ -47,7 +58,7 @@ export type AdminModuleNavItem = {
 };
 
 export const adminModuleNavItems: AdminModuleNavItem[] = [
-    // --- Dashboard Group ---
+    // ─── Dashboard ───
     {
         key: 'dashboard',
         to: '/dashboard',
@@ -57,45 +68,53 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         summary: 'Daily operations KPIs, deadlines and quick actions.',
     },
 
-    // --- Content Group ---
+    // ─── Posts ───
+    {
+        key: 'manage-posts',
+        to: '/manage-posts',
+        label: 'All Posts',
+        shortLabel: 'AP',
+        group: 'posts',
+        summary: 'High-volume listing with filters, saved views, and bulk actions.',
+    },
     {
         key: 'create-post',
         to: '/create-post',
-        label: 'Create Post',
+        label: 'New Post',
         shortLabel: 'NP',
-        group: 'content',
+        group: 'posts',
         summary: 'Unified create wizard for all Sarkari content types.',
     },
     {
         key: 'job',
         to: '/job',
-        label: 'Job',
+        label: 'Jobs',
         shortLabel: 'JB',
-        group: 'content',
+        group: 'posts',
         summary: 'Recruitment posts, vacancy details and timeline controls.',
     },
     {
         key: 'result',
         to: '/result',
-        label: 'Result',
+        label: 'Results',
         shortLabel: 'RS',
-        group: 'content',
+        group: 'posts',
         summary: 'Result publication, links and cutoff references.',
     },
     {
         key: 'admit-card',
         to: '/admit-card',
-        label: 'Admit Card',
+        label: 'Admit Cards',
         shortLabel: 'AC',
-        group: 'content',
+        group: 'posts',
         summary: 'Admit card dates, downloads and region-wise links.',
     },
     {
         key: 'answer-key',
         to: '/answer-key',
-        label: 'Answer Key',
+        label: 'Answer Keys',
         shortLabel: 'AK',
-        group: 'content',
+        group: 'posts',
         summary: 'Answer key releases and objection window management.',
     },
     {
@@ -103,31 +122,23 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/syllabus',
         label: 'Syllabus',
         shortLabel: 'SY',
-        group: 'content',
+        group: 'posts',
         summary: 'Syllabus docs and marks-breakdown publishing.',
     },
     {
         key: 'admission',
         to: '/admission',
-        label: 'Admission',
+        label: 'Admissions',
         shortLabel: 'AD',
-        group: 'content',
+        group: 'posts',
         summary: 'Admission and counseling workflow updates.',
-    },
-    {
-        key: 'manage-posts',
-        to: '/manage-posts',
-        label: 'Manage Posts',
-        shortLabel: 'AP',
-        group: 'content',
-        summary: 'High-volume listing with filters, saved views, and bulk actions.',
     },
     {
         key: 'quick-add',
         to: '/quick-add',
         label: 'Quick Add',
         shortLabel: 'QA',
-        group: 'content',
+        group: 'posts',
         summary: 'Fast lightweight posting flow for urgent updates.',
     },
     {
@@ -135,85 +146,33 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/detailed-post',
         label: 'Detailed Post',
         shortLabel: 'DP',
-        group: 'content',
+        group: 'posts',
         summary: 'Deep editor with autosave and revision timeline support.',
-    },
-
-    // --- Site Management Group ---
-    {
-        key: 'homepage-sections',
-        to: '/homepage-sections',
-        label: 'Homepage Sections',
-        shortLabel: 'HS',
-        group: 'management',
-        summary: 'Homepage pinning, ranking and section sort controls.',
-    },
-    {
-        key: 'link-manager',
-        to: '/link-manager',
-        label: 'Link Manager',
-        shortLabel: 'LK',
-        group: 'management',
-        summary: 'Centralized link records, health checks and replace workflows.',
-    },
-    {
-        key: 'media-pdfs',
-        to: '/media-pdfs',
-        label: 'Media / PDFs',
-        shortLabel: 'MD',
-        group: 'management',
-        summary: 'Manage uploaded PDF/media metadata and stable URLs.',
     },
     {
         key: 'templates',
         to: '/templates',
         label: 'Templates',
         shortLabel: 'TP',
-        group: 'management',
+        group: 'posts',
         summary: 'Shared posting templates and section block presets.',
     },
     {
-        key: 'seo-tools',
-        to: '/seo-tools',
-        label: 'SEO Tools',
-        shortLabel: 'SEO',
-        group: 'management',
-        summary: 'Meta/canonical/schema controls per content record.',
+        key: 'bulk',
+        to: '/bulk',
+        label: 'Bulk Import',
+        shortLabel: 'BK',
+        group: 'posts',
+        summary: 'Preview and execute batch operations safely.',
     },
 
-    // --- Admin Group ---
-    {
-        key: 'users-roles',
-        to: '/users-roles',
-        label: 'Users & Roles',
-        shortLabel: 'UR',
-        group: 'admin',
-        summary: 'Role matrix and admin account governance controls.',
-    },
-    {
-        key: 'reports',
-        to: '/reports',
-        label: 'Reports',
-        shortLabel: 'RP',
-        group: 'admin',
-        summary: 'Broken links, expiries, and traffic snapshots.',
-    },
-    {
-        key: 'settings',
-        to: '/settings',
-        label: 'Settings',
-        shortLabel: 'ST',
-        group: 'admin',
-        summary: 'States, boards, tags and core admin configuration.',
-    },
-
-    // --- Advanced Ops Group ---
+    // ─── Review & Approvals ───
     {
         key: 'review',
         to: '/review',
         label: 'Review Queue',
         shortLabel: 'RQ',
-        group: 'ops',
+        group: 'review',
         summary: 'Policy-aware review queue with preview-first workflow.',
     },
     {
@@ -221,80 +180,140 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/approvals',
         label: 'Approvals',
         shortLabel: 'AR',
-        group: 'ops',
+        group: 'review',
         summary: 'Approval decisions and change requests with notes.',
     },
     {
         key: 'queue',
         to: '/queue',
-        label: 'Queue',
+        label: 'Scheduled Queue',
         shortLabel: 'QU',
-        group: 'ops',
+        group: 'review',
         summary: 'Scheduled/pending ownership and execution queue states.',
     },
+
+    // ─── Homepage ───
     {
-        key: 'bulk',
-        to: '/bulk',
-        label: 'Bulk Import',
-        shortLabel: 'BK',
-        group: 'ops',
-        summary: 'Preview and execute batch operations safely.',
+        key: 'homepage-sections',
+        to: '/homepage-sections',
+        label: 'Homepage Sections',
+        shortLabel: 'HS',
+        group: 'homepage',
+        summary: 'Homepage pinning, ranking and section sort controls.',
     },
+
+    // ─── Links ───
     {
-        key: 'analytics',
-        to: '/analytics',
-        label: 'Analytics',
-        shortLabel: 'AN',
-        group: 'ops',
-        summary: 'Traffic and trend snapshots for operational decision support.',
+        key: 'link-manager',
+        to: '/link-manager',
+        label: 'Link Manager',
+        shortLabel: 'LK',
+        group: 'links',
+        summary: 'Centralized link records, health checks and replace workflows.',
     },
+
+    // ─── Media / PDFs ───
     {
-        key: 'alerts',
-        to: '/alerts',
-        label: 'Alerts',
-        shortLabel: 'AL',
-        group: 'ops',
-        summary: 'Operational alerts for deadlines, schedules and link failures.',
+        key: 'media-pdfs',
+        to: '/media-pdfs',
+        label: 'Media / PDFs',
+        shortLabel: 'MD',
+        group: 'media',
+        summary: 'Manage uploaded PDF/media metadata and stable URLs.',
     },
+
+    // ─── Users & Roles ───
+    {
+        key: 'users-roles',
+        to: '/users-roles',
+        label: 'Users & Roles',
+        shortLabel: 'UR',
+        group: 'users',
+        summary: 'Role matrix and admin account governance controls.',
+    },
+
+    // ─── Logs (merged: Security + Sessions + Audit + Alerts + Errors + Community + Reports) ───
     {
         key: 'security',
         to: '/security',
-        label: 'Security',
+        label: 'Security Log',
         shortLabel: 'SC',
-        group: 'ops',
+        group: 'logs',
         summary: 'Security event log and filterable incident visibility.',
+    },
+    {
+        key: 'audit',
+        to: '/audit',
+        label: 'Audit Log',
+        shortLabel: 'AU',
+        group: 'logs',
+        summary: 'Audit timeline for publish, edit, and role operations.',
     },
     {
         key: 'sessions',
         to: '/sessions',
         label: 'Sessions',
         shortLabel: 'SS',
-        group: 'ops',
+        group: 'logs',
         summary: 'Admin session controls and terminations.',
     },
     {
-        key: 'audit',
-        to: '/audit',
-        label: 'Audit',
-        shortLabel: 'AU',
-        group: 'ops',
-        summary: 'Audit timeline for publish, edit, and role operations.',
-    },
-    {
-        key: 'community-moderation',
-        to: '/community',
-        label: 'Community',
-        shortLabel: 'CM',
-        group: 'ops',
-        summary: 'Moderation queue for community reports and flags.',
+        key: 'alerts',
+        to: '/alerts',
+        label: 'Alerts',
+        shortLabel: 'AL',
+        group: 'logs',
+        summary: 'Operational alerts for deadlines, schedules and link failures.',
     },
     {
         key: 'error-reports',
         to: '/errors',
         label: 'Error Reports',
         shortLabel: 'ER',
-        group: 'ops',
+        group: 'logs',
         summary: 'Application error triage and resolution workflows.',
+    },
+    {
+        key: 'analytics',
+        to: '/analytics',
+        label: 'Analytics',
+        shortLabel: 'AN',
+        group: 'logs',
+        summary: 'Traffic and trend snapshots for operational decision support.',
+    },
+    {
+        key: 'reports',
+        to: '/reports',
+        label: 'Reports',
+        shortLabel: 'RP',
+        group: 'logs',
+        summary: 'Broken links, expiries, and traffic snapshots.',
+    },
+    {
+        key: 'community-moderation',
+        to: '/community',
+        label: 'Community',
+        shortLabel: 'CM',
+        group: 'logs',
+        summary: 'Moderation queue for community reports and flags.',
+    },
+
+    // ─── Settings ───
+    {
+        key: 'settings',
+        to: '/settings',
+        label: 'Configuration',
+        shortLabel: 'ST',
+        group: 'settings',
+        summary: 'States, boards, tags and core admin configuration.',
+    },
+    {
+        key: 'seo-tools',
+        to: '/seo-tools',
+        label: 'SEO Tools',
+        shortLabel: 'SEO',
+        group: 'settings',
+        summary: 'Meta/canonical/schema controls per content record.',
     },
 ];
 
@@ -329,10 +348,27 @@ export function getModuleByPath(pathname: string): AdminModuleNavItem | undefine
     return adminModuleNavItems.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`));
 }
 
+/** Sidebar group metadata — ordered as they appear in the sidebar */
+export const MODULE_GROUP_ORDER: ModuleGroupKey[] = [
+    'dashboard',
+    'posts',
+    'review',
+    'homepage',
+    'links',
+    'media',
+    'users',
+    'logs',
+    'settings',
+];
+
 export const groupedModuleLabels: Record<ModuleGroupKey, string> = {
     dashboard: 'Dashboard',
-    content: 'Content Modules',
-    management: 'Site Management',
-    admin: 'Admin',
-    ops: 'Advanced Ops',
+    posts: 'Posts',
+    review: 'Review & Approvals',
+    homepage: 'Homepage',
+    links: 'Links',
+    media: 'Media / PDFs',
+    users: 'Users & Roles',
+    logs: 'Logs',
+    settings: 'Settings',
 };

@@ -101,7 +101,7 @@ test('compact mode keeps small controls at least 40px tall', async ({ page }) =>
     await bootAuthenticatedShell(page, 'dashboard');
 
     await page.getByRole('button', { name: /Density: Comfortable/i }).click();
-    await page.getByRole('link', { name: /Manage Posts/i }).click();
+    await page.getByRole('link', { name: /All Posts/i }).click();
 
     const compactControl = page.getByRole('button', { name: /Save current filters/i });
     await expect(compactControl).toBeVisible();

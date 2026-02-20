@@ -15,6 +15,7 @@ import {
     getModuleByPath,
     groupedModuleLabels,
     isAdminModuleEnabled,
+    MODULE_GROUP_ORDER,
     type ModuleGroupKey,
 } from '../config/adminModules';
 
@@ -26,32 +27,26 @@ type AdminDensity = 'comfortable' | 'compact';
 
 type GroupCollapseState = Record<ModuleGroupKey, boolean>;
 
-const GROUP_ORDER: ModuleGroupKey[] = [
-    'dashboard',
-    'content',
-    'management',
-    'admin',
-    'ops'
-];
-
 const defaultGroupCollapseState: GroupCollapseState = {
     dashboard: false,
-    content: false,
-    management: false,
-    admin: false,
-    ops: false,
+    posts: false,
+    review: false,
+    homepage: false,
+    links: false,
+    media: false,
+    users: false,
+    logs: false,
+    settings: false,
 };
 
 const parseGroupCollapseState = (raw: string): GroupCollapseState => {
     try {
         const parsed = JSON.parse(raw) as Partial<GroupCollapseState>;
-        return {
-            dashboard: Boolean(parsed.dashboard),
-            content: Boolean(parsed.content),
-            management: Boolean(parsed.management),
-            admin: Boolean(parsed.admin),
-            ops: Boolean(parsed.ops),
-        };
+        const result: GroupCollapseState = { ...defaultGroupCollapseState };
+        for (const key of MODULE_GROUP_ORDER) {
+            if (key in parsed) result[key] = Boolean(parsed[key]);
+        }
+        return result;
     } catch {
         return defaultGroupCollapseState;
     }
@@ -92,7 +87,7 @@ export function AdminLayout() {
     );
 
     const navGroups = useMemo(
-        () => GROUP_ORDER.map((group) => ({
+        () => MODULE_GROUP_ORDER.map((group) => ({
             key: group,
             label: groupedModuleLabels[group],
             items: enabledNavItems.filter((item) => item.group === group),
@@ -286,6 +281,23 @@ export function AdminLayout() {
 
                 <nav className="admin-nav" aria-label="Admin modules">
                     {navGroups.map((group) => {
+                        /* Single-item groups render as a direct link (no collapsible wrapper) */
+                        if (group.items.length === 1) {
+                            const item = group.items[0];
+                            return (
+                                <NavLink
+                                    key={group.key}
+                                    to={item.to}
+                                    className={({ isActive }) => `admin-nav-link admin-nav-solo${isActive ? ' active' : ''}`}
+                                    title={item.summary}
+                                >
+                                    <span className="admin-nav-short">{item.shortLabel}</span>
+                                    <span className="admin-nav-label">{group.label}</span>
+                                </NavLink>
+                            );
+                        }
+
+                        /* Multi-item groups render with a collapsible toggle */
                         const isCollapsed = collapsedGroups[group.key];
                         return (
                             <section key={group.key} className={`admin-nav-group${isCollapsed ? ' collapsed' : ''}`}>

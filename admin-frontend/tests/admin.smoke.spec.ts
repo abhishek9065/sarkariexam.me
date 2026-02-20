@@ -154,17 +154,17 @@ test('sidebar exposes full admin operations information architecture', async ({ 
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('link', { name: /Dashboard/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Create Post/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Manage Posts/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Homepage Sections/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Link Manager/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /All Posts/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /New Post/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Homepage/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Links$/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /Templates/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Alerts$/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Media \/ PDFs/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Media/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /SEO Tools/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Users & Roles/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Users/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /^Reports$/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Settings/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Configuration/i })).toBeVisible();
 });
 
 test('admin-vnext alias serves login shell when basename is admin-vnext', async ({ page }) => {

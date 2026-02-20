@@ -132,6 +132,20 @@
     box-shadow: 0 10px 28px rgba(6, 30, 52, 0.32);
 }
 
+.admin-nav-link.admin-nav-solo {
+    font-weight: 600;
+    border-left: 3px solid rgba(66, 232, 255, 0.35);
+    padding-left: 14px;
+}
+
+.admin-nav-link.admin-nav-solo:hover {
+    border-left-color: rgba(66, 232, 255, 0.65);
+}
+
+.admin-nav-link.admin-nav-solo.active {
+    border-left-color: rgba(66, 232, 255, 0.85);
+}
+
 .admin-nav-short {
     display: none;
     min-width: 28px;
