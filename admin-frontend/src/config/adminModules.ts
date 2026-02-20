@@ -32,13 +32,10 @@ export type AdminModuleKey =
 
 export type ModuleGroupKey =
     | 'dashboard'
-    | 'posts'
-    | 'review'
-    | 'homepage'
-    | 'assets'
-    | 'team'
-    | 'logs'
-    | 'settings';
+    | 'content'
+    | 'management'
+    | 'admin'
+    | 'ops';
 
 export type AdminModuleNavItem = {
     key: AdminModuleKey;
@@ -50,6 +47,7 @@ export type AdminModuleNavItem = {
 };
 
 export const adminModuleNavItems: AdminModuleNavItem[] = [
+    // --- Dashboard Group ---
     {
         key: 'dashboard',
         to: '/dashboard',
@@ -58,52 +56,22 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         group: 'dashboard',
         summary: 'Daily operations KPIs, deadlines and quick actions.',
     },
-    {
-        key: 'analytics',
-        to: '/analytics',
-        label: 'Analytics',
-        shortLabel: 'AN',
-        group: 'dashboard',
-        summary: 'Traffic and trend snapshots for operational decision support.',
-    },
-    {
-        key: 'manage-posts',
-        to: '/manage-posts',
-        label: 'All Posts',
-        shortLabel: 'AP',
-        group: 'posts',
-        summary: 'High-volume listing with filters, saved views, and bulk actions.',
-    },
+
+    // --- Content Group ---
     {
         key: 'create-post',
         to: '/create-post',
-        label: 'New Post',
+        label: 'Create Post',
         shortLabel: 'NP',
-        group: 'posts',
+        group: 'content',
         summary: 'Unified create wizard for all Sarkari content types.',
-    },
-    {
-        key: 'quick-add',
-        to: '/quick-add',
-        label: 'Quick Add',
-        shortLabel: 'QA',
-        group: 'posts',
-        summary: 'Fast lightweight posting flow for urgent updates.',
-    },
-    {
-        key: 'detailed-post',
-        to: '/detailed-post',
-        label: 'Detailed Post',
-        shortLabel: 'DP',
-        group: 'posts',
-        summary: 'Deep editor with autosave and revision timeline support.',
     },
     {
         key: 'job',
         to: '/job',
         label: 'Job',
         shortLabel: 'JB',
-        group: 'posts',
+        group: 'content',
         summary: 'Recruitment posts, vacancy details and timeline controls.',
     },
     {
@@ -111,7 +79,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/result',
         label: 'Result',
         shortLabel: 'RS',
-        group: 'posts',
+        group: 'content',
         summary: 'Result publication, links and cutoff references.',
     },
     {
@@ -119,7 +87,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/admit-card',
         label: 'Admit Card',
         shortLabel: 'AC',
-        group: 'posts',
+        group: 'content',
         summary: 'Admit card dates, downloads and region-wise links.',
     },
     {
@@ -127,7 +95,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/answer-key',
         label: 'Answer Key',
         shortLabel: 'AK',
-        group: 'posts',
+        group: 'content',
         summary: 'Answer key releases and objection window management.',
     },
     {
@@ -135,7 +103,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/syllabus',
         label: 'Syllabus',
         shortLabel: 'SY',
-        group: 'posts',
+        group: 'content',
         summary: 'Syllabus docs and marks-breakdown publishing.',
     },
     {
@@ -143,55 +111,49 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/admission',
         label: 'Admission',
         shortLabel: 'AD',
-        group: 'posts',
+        group: 'content',
         summary: 'Admission and counseling workflow updates.',
     },
     {
-        key: 'review',
-        to: '/review',
-        label: 'Review Queue',
-        shortLabel: 'RQ',
-        group: 'review',
-        summary: 'Policy-aware review queue with preview-first workflow.',
+        key: 'manage-posts',
+        to: '/manage-posts',
+        label: 'Manage Posts',
+        shortLabel: 'AP',
+        group: 'content',
+        summary: 'High-volume listing with filters, saved views, and bulk actions.',
     },
     {
-        key: 'approvals',
-        to: '/approvals',
-        label: 'Approvals',
-        shortLabel: 'AR',
-        group: 'review',
-        summary: 'Approval decisions and change requests with notes.',
+        key: 'quick-add',
+        to: '/quick-add',
+        label: 'Quick Add',
+        shortLabel: 'QA',
+        group: 'content',
+        summary: 'Fast lightweight posting flow for urgent updates.',
     },
     {
-        key: 'queue',
-        to: '/queue',
-        label: 'Queue',
-        shortLabel: 'QU',
-        group: 'review',
-        summary: 'Scheduled/pending ownership and execution queue states.',
+        key: 'detailed-post',
+        to: '/detailed-post',
+        label: 'Detailed Post',
+        shortLabel: 'DP',
+        group: 'content',
+        summary: 'Deep editor with autosave and revision timeline support.',
     },
-    {
-        key: 'bulk',
-        to: '/bulk',
-        label: 'Bulk Import',
-        shortLabel: 'BK',
-        group: 'review',
-        summary: 'Preview and execute batch operations safely.',
-    },
+
+    // --- Site Management Group ---
     {
         key: 'homepage-sections',
         to: '/homepage-sections',
-        label: 'Sections',
+        label: 'Homepage Sections',
         shortLabel: 'HS',
-        group: 'homepage',
+        group: 'management',
         summary: 'Homepage pinning, ranking and section sort controls.',
     },
     {
         key: 'link-manager',
         to: '/link-manager',
-        label: 'Links',
+        label: 'Link Manager',
         shortLabel: 'LK',
-        group: 'assets',
+        group: 'management',
         summary: 'Centralized link records, health checks and replace workflows.',
     },
     {
@@ -199,7 +161,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/media-pdfs',
         label: 'Media / PDFs',
         shortLabel: 'MD',
-        group: 'assets',
+        group: 'management',
         summary: 'Manage uploaded PDF/media metadata and stable URLs.',
     },
     {
@@ -207,7 +169,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/templates',
         label: 'Templates',
         shortLabel: 'TP',
-        group: 'assets',
+        group: 'management',
         summary: 'Shared posting templates and section block presets.',
     },
     {
@@ -215,23 +177,83 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/seo-tools',
         label: 'SEO Tools',
         shortLabel: 'SEO',
-        group: 'assets',
+        group: 'management',
         summary: 'Meta/canonical/schema controls per content record.',
     },
+
+    // --- Admin Group ---
     {
         key: 'users-roles',
         to: '/users-roles',
         label: 'Users & Roles',
         shortLabel: 'UR',
-        group: 'team',
+        group: 'admin',
         summary: 'Role matrix and admin account governance controls.',
+    },
+    {
+        key: 'reports',
+        to: '/reports',
+        label: 'Reports',
+        shortLabel: 'RP',
+        group: 'admin',
+        summary: 'Broken links, expiries, and traffic snapshots.',
+    },
+    {
+        key: 'settings',
+        to: '/settings',
+        label: 'Settings',
+        shortLabel: 'ST',
+        group: 'admin',
+        summary: 'States, boards, tags and core admin configuration.',
+    },
+
+    // --- Advanced Ops Group ---
+    {
+        key: 'review',
+        to: '/review',
+        label: 'Review Queue',
+        shortLabel: 'RQ',
+        group: 'ops',
+        summary: 'Policy-aware review queue with preview-first workflow.',
+    },
+    {
+        key: 'approvals',
+        to: '/approvals',
+        label: 'Approvals',
+        shortLabel: 'AR',
+        group: 'ops',
+        summary: 'Approval decisions and change requests with notes.',
+    },
+    {
+        key: 'queue',
+        to: '/queue',
+        label: 'Queue',
+        shortLabel: 'QU',
+        group: 'ops',
+        summary: 'Scheduled/pending ownership and execution queue states.',
+    },
+    {
+        key: 'bulk',
+        to: '/bulk',
+        label: 'Bulk Import',
+        shortLabel: 'BK',
+        group: 'ops',
+        summary: 'Preview and execute batch operations safely.',
+    },
+    {
+        key: 'analytics',
+        to: '/analytics',
+        label: 'Analytics',
+        shortLabel: 'AN',
+        group: 'ops',
+        summary: 'Traffic and trend snapshots for operational decision support.',
     },
     {
         key: 'alerts',
         to: '/alerts',
         label: 'Alerts',
         shortLabel: 'AL',
-        group: 'logs',
+        group: 'ops',
         summary: 'Operational alerts for deadlines, schedules and link failures.',
     },
     {
@@ -239,7 +261,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/security',
         label: 'Security',
         shortLabel: 'SC',
-        group: 'logs',
+        group: 'ops',
         summary: 'Security event log and filterable incident visibility.',
     },
     {
@@ -247,7 +269,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/sessions',
         label: 'Sessions',
         shortLabel: 'SS',
-        group: 'logs',
+        group: 'ops',
         summary: 'Admin session controls and terminations.',
     },
     {
@@ -255,23 +277,15 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/audit',
         label: 'Audit',
         shortLabel: 'AU',
-        group: 'logs',
+        group: 'ops',
         summary: 'Audit timeline for publish, edit, and role operations.',
-    },
-    {
-        key: 'reports',
-        to: '/reports',
-        label: 'Reports',
-        shortLabel: 'RP',
-        group: 'logs',
-        summary: 'Broken links, expiries, and traffic snapshots.',
     },
     {
         key: 'community-moderation',
         to: '/community',
         label: 'Community',
         shortLabel: 'CM',
-        group: 'logs',
+        group: 'ops',
         summary: 'Moderation queue for community reports and flags.',
     },
     {
@@ -279,16 +293,8 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         to: '/errors',
         label: 'Error Reports',
         shortLabel: 'ER',
-        group: 'logs',
+        group: 'ops',
         summary: 'Application error triage and resolution workflows.',
-    },
-    {
-        key: 'settings',
-        to: '/settings',
-        label: 'Settings',
-        shortLabel: 'ST',
-        group: 'settings',
-        summary: 'States, boards, tags and core admin configuration.',
     },
 ];
 
@@ -325,11 +331,8 @@ export function getModuleByPath(pathname: string): AdminModuleNavItem | undefine
 
 export const groupedModuleLabels: Record<ModuleGroupKey, string> = {
     dashboard: 'Dashboard',
-    posts: 'Posts',
-    review: 'Review',
-    homepage: 'Homepage',
-    assets: 'Assets',
-    team: 'Team',
-    logs: 'Logs',
-    settings: 'Settings',
+    content: 'Content Modules',
+    management: 'Site Management',
+    admin: 'Admin',
+    ops: 'Advanced Ops',
 };
