@@ -355,7 +355,7 @@ export async function getAnnouncementRevisions(id: string, limit = 20): Promise<
     return body?.data ?? { announcementId: id, currentVersion: 0, revisions: [] };
 }
 
-export async function restoreRevision(id: string, version: number, note?: string): Promise<any> {
+export async function restoreRevision(id: string, version: number, note?: string): Promise<Record<string, unknown>> {
     const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/rollback`, {
         method: 'POST',
         headers: mutationHeaders(),

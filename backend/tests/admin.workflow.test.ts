@@ -144,6 +144,10 @@ describeOrSkip('admin workflow integration', () => {
                 location: 'All India',
                 deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                 status: 'pending',
+                externalLink: 'https://example.com/apply',
+                content: 'Apply online for this position. Download official notification PDF.',
+                importantDates: [{ eventName: 'Last Date to Apply', eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }],
+                minQualification: 'Graduate from a recognized university',
             })
             .expect(201);
 
