@@ -10,6 +10,11 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 process.env.DISABLE_DB_RECONNECT = process.env.DISABLE_DB_RECONNECT || 'false';
 
+// Relax rate limits during tests so integration test suites don't hit 429s
+process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || '10000';
+process.env.AUTH_RATE_LIMIT_MAX = process.env.AUTH_RATE_LIMIT_MAX || '10000';
+process.env.ADMIN_RATE_LIMIT_MAX = process.env.ADMIN_RATE_LIMIT_MAX || '10000';
+
 if (!process.env.MONGODB_URI) {
     try {
         mongoServer = await MongoMemoryServer.create();
