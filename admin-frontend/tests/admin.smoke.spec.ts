@@ -69,13 +69,12 @@ test('admin login screen renders on desktop', async ({ page }) => {
     await expect(page.getByRole('button', { name: /Sign in to Admin/i })).toBeVisible();
 });
 
-test('admin shows desktop-required gate on mobile viewport', async ({ page }) => {
+test('admin shows login screen on mobile viewport (responsive)', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 1200 });
     await page.goto('login', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /Desktop Required/i })).toBeVisible();
-    await expect(page.getByText(/desktop-only/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Sign in to Admin/i })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Sign in to Admin/i })).toBeVisible();
 });
 
 test('admin protected routes redirect to login on desktop', async ({ page }) => {
@@ -86,12 +85,12 @@ test('admin protected routes redirect to login on desktop', async ({ page }) => 
     await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
-test('admin protected routes are blocked by desktop gate on mobile', async ({ page }) => {
+test('admin protected routes redirect to login on mobile (responsive)', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 1200 });
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /Desktop Required/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Sign in to Admin/i })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
 test('primary login action keeps desktop button size standard', async ({ page }) => {
