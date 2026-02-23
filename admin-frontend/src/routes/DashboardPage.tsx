@@ -119,9 +119,10 @@ export function DashboardPage() {
                 <div className="ops-chart-container">
                     {mockVisits.map((val, i) => {
                         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                        const pct = `${Math.max(4, (val / maxVisits) * 100)}%`;
                         return (
                             <div key={i} className="ops-chart-bar-wrap" title={`${val} visits`}>
-                                <div className="ops-chart-bar" style={{ height: `${Math.max(4, (val / maxVisits) * 100)}%` }}></div>
+                                <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = pct; }}></div>
                                 <div className="ops-chart-label">{days[i]}</div>
                             </div>
                         );

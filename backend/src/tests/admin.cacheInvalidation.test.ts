@@ -107,10 +107,22 @@ vi.mock('../services/activeUsers.js', () => ({
 
 vi.mock('../services/analytics.js', () => ({
     getDailyRollups: vi.fn(),
+    recordAnalyticsEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
+const fakeCollection = () => ({
+    find: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]), sort: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis() })),
+    findOne: vi.fn().mockResolvedValue(null),
+    insertOne: vi.fn().mockResolvedValue({ insertedId: 'fake' }),
+    updateOne: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
+    deleteOne: vi.fn().mockResolvedValue({ deletedCount: 1 }),
+    countDocuments: vi.fn().mockResolvedValue(0),
+    aggregate: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]) })),
+});
+
 vi.mock('../services/cosmosdb.js', () => ({
-    getCollection: vi.fn(),
+    getCollection: vi.fn(() => fakeCollection()),
+    getCollectionAsync: vi.fn(async () => fakeCollection()),
     healthCheck: vi.fn().mockResolvedValue(true),
 }));
 
