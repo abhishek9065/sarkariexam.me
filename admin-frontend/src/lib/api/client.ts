@@ -355,6 +355,15 @@ export async function getAnnouncementRevisions(id: string, limit = 20): Promise<
     return body?.data ?? { announcementId: id, currentVersion: 0, revisions: [] };
 }
 
+export async function restoreRevision(id: string, version: number, note?: string): Promise<any> {
+    const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/rollback`, {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify({ version, note: note || `Restored to v${version}` }),
+    });
+    return body?.data;
+}
+
 export async function getAdminSessions(): Promise<AdminSession[]> {
     const body = await request('/api/admin/sessions');
     return toArray<AdminSession>(body?.data);

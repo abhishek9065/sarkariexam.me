@@ -3890,13 +3890,23 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
+        // Ticket 2: Determine the precise audit action based on status transition
+        let auditAction = 'update';
+        if (newStatus === 'pending' && existing.status !== 'pending') {
+            auditAction = 'submit_review';
+        } else if (existing.status === 'published' && newStatus && newStatus !== 'published') {
+            auditAction = 'unpublish';
+        } else if (newStatus === 'published' && existing.status !== 'published') {
+            auditAction = 'publish';
+        }
+
         recordAdminAudit({
-            action: 'update',
+            action: auditAction,
             announcementId: announcement.id,
             title: announcement.title,
             userId: req.user?.userId,
             note,
-            metadata: { fields: Object.keys(parseResult.data) },
+            metadata: { fields: Object.keys(parseResult.data), previousStatus: existing.status, newStatus: targetStatus },
         }).catch(console.error);
         if (existing.status !== 'published' && announcement.status === 'published' && announcement.isActive) {
             await dispatchPublishNotifications([announcement]).catch((err) => {
