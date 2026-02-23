@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
@@ -9,6 +9,7 @@ import {
     createAnnouncementDraft,
     getAdminAnnouncementsPaged,
     getAnnouncementRevisions,
+    restoreRevision,
     updateAdminAnnouncement,
 } from '../../lib/api/client';
 import type { AdminAnnouncementListItem } from '../../types';
@@ -150,6 +151,20 @@ export function DetailedPostModule() {
         },
         onError: (error) => {
             notifyError('Create draft failed', error instanceof Error ? error.message : 'Unable to initialize draft.');
+        },
+    });
+
+    const restoreMutation = useMutation({
+        mutationFn: async ({ id, version }: { id: string; version: number }) => {
+            return restoreRevision(id, version);
+        },
+        onSuccess: () => {
+            notifySuccess('Restored', 'Revision has been restored. The previous state was saved as a new revision.');
+            void query.refetch();
+            void revisionsQuery.refetch();
+        },
+        onError: (error) => {
+            notifyError('Restore failed', error instanceof Error ? error.message : 'Unable to restore revision.');
         },
     });
 
@@ -372,12 +387,25 @@ export function DetailedPostModule() {
                         {!revisionsQuery.isPending && !revisionsQuery.error ? (
                             <div className="ops-stack">
                                 {(revisionsQuery.data?.revisions ?? []).map((revision) => (
-                                    <div key={revision.version} className="ops-row wrap">
+                                    <div key={revision.version} className="ops-row wrap" style={{ gap: '0.5rem', alignItems: 'center' }}>
                                         <strong>v{revision.version}</strong>
                                         <span className="ops-inline-muted">
                                             {revision.updatedAt ? new Date(revision.updatedAt).toLocaleString() : 'Unknown time'}
                                         </span>
                                         <code>{(revision.changedKeys || []).slice(0, 6).join(', ') || 'no-key-diff'}</code>
+                                        <button
+                                            type="button"
+                                            className="admin-btn subtle"
+                                            style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                                            disabled={restoreMutation.isPending}
+                                            onClick={() => {
+                                                if (window.confirm(`Restore this announcement to version ${revision.version}? The current state will be saved as a new revision.`)) {
+                                                    restoreMutation.mutate({ id: selectedId, version: revision.version });
+                                                }
+                                            }}
+                                        >
+                                            {restoreMutation.isPending ? '...' : '⏪ Restore'}
+                                        </button>
                                     </div>
                                 ))}
                                 {(revisionsQuery.data?.revisions ?? []).length === 0 ? (
@@ -387,6 +415,11 @@ export function DetailedPostModule() {
                         ) : null}
                     </div>
                 ) : null}
+
+                {restoreMutation.isError ? (
+                    <OpsErrorState message={restoreMutation.error instanceof Error ? restoreMutation.error.message : 'Failed to restore revision.'} />
+                ) : null}
+                {restoreMutation.isSuccess ? <div className="ops-success">Revision restored successfully.</div> : null}
 
                 {mutation.isError ? (
                     <OpsErrorState message={mutation.error instanceof Error ? mutation.error.message : 'Failed to update announcement.'} />
