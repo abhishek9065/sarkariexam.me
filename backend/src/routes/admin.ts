@@ -3445,6 +3445,17 @@ async function validateForPublish(data: any, announcementId?: string, isApproveG
         const hasAdmitLink = !!data.externalLink || hasInPayload('admit') || hasInAttached('admit') || hasInAttached('pdf');
         if (!hasAdmitLink) return 'MISSING_REQUIRED_LINK: Admit Card Download link is required.';
     }
+
+    // Ticket 3: Block publishing when critical attached links are broken
+    if (announcementId) {
+        const linksCollection = getCollection<any>('link_records');
+        const brokenLinks = await linksCollection.find({ announcementId, status: 'broken' }).toArray();
+        if (brokenLinks.length > 0) {
+            const brokenLabels = brokenLinks.map((l: any) => l.label || l.url).slice(0, 3).join(', ');
+            return `BROKEN_LINK_DETECTED: ${brokenLinks.length} broken link(s) found: ${brokenLabels}. Fix or remove them before publishing.`;
+        }
+    }
+
     return null;
 }
 

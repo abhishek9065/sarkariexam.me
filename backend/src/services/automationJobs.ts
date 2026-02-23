@@ -49,8 +49,24 @@ export async function runAutomationJobs() {
             const status = await checkLinkHealth(link.url);
             await linksCollection.updateOne(
                 { _id: link._id },
-                { $set: { status, updatedAt: new Date() } }
+                { $set: { status, updatedAt: new Date(), lastCheckedAt: new Date() } }
             );
+        }
+
+        // Persist health events for the reporting dashboard
+        if (linksToCheck.length > 0) {
+            const healthEventsCollection = getCollection<any>('link_health_events');
+            const events = linksToCheck.map((link: any) => ({
+                url: link.url,
+                linkId: link._id?.toHexString?.() || String(link._id),
+                announcementId: link.announcementId,
+                status: link.status === 'broken' ? 'broken' : 'ok',
+                checkedAt: new Date(),
+                checkedBy: 'system',
+            }));
+            await healthEventsCollection.insertMany(events).catch((err: any) => {
+                console.error('[Automation] Failed to persist link health events:', err);
+            });
         }
 
         const announcementsCollection = getCollection<any>('announcements');
