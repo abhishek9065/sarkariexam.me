@@ -3396,7 +3396,14 @@ router.get('/announcements/export/csv', requirePermission('announcements:read'),
     }
 });
 
-async function validateForPublish(data: any, announcementId?: string): Promise<string | null> {
+async function validateForPublish(data: any, announcementId?: string, isApproveGate: boolean = false): Promise<string | null> {
+    const isStrictType = ['job', 'result', 'admit-card'].includes(data.type);
+
+    // Ticket 1: Enforce review gates. Jobs, Results, and Admit Cards must require approval.
+    if (isStrictType && !isApproveGate && (!data.approvedBy || !data.approvedAt)) {
+        return 'MISSING_REVIEW_APPROVAL: Job/Result/Admit Card must go through the formal review and approval process.';
+    }
+
     let attachedLinks: any[] = [];
     if (announcementId) {
         const linksCollection = getCollection<any>('link_records');
@@ -3419,21 +3426,24 @@ async function validateForPublish(data: any, announcementId?: string): Promise<s
 
     if (data.type === 'job') {
         const hasApply = !!data.externalLink || hasInPayload('apply') || hasInAttached('apply');
-        if (!hasApply) return 'Validation Failed: Missing "Apply Online" link for Job post.';
+        if (!hasApply) return 'MISSING_REQUIRED_LINK: Apply Online link is required for Job posts.';
 
         const hasNotif = hasInPayload('notification') || hasInAttached('notification') || hasInAttached('pdf');
-        if (!hasNotif) return 'Validation Failed: Missing Notification PDF link for Job post.';
+        if (!hasNotif) return 'MISSING_REQUIRED_LINK: Notification PDF link is required for Job posts.';
 
         const hasDates = (data.jobDetails?.importantDates?.length > 0) || (data.importantDates?.length > 0) || (data.content || '').toLowerCase().includes('important dates');
-        if (!hasDates) return 'Validation Failed: Must specify "Important Dates".';
+        if (!hasDates) return 'MISSING_REQUIRED_FIELD: Important Dates are required for Job posts.';
 
-        if (!data.deadline) return 'Validation Failed: Must specify a Deadline for Job post.';
+        if (!data.deadline) return 'MISSING_REQUIRED_FIELD: Deadline is required for Job posts.';
+
+        const hasEligibility = data.minQualification || data.jobDetails?.eligibility?.education || hasInPayload('eligibility') || hasInPayload('qualification');
+        if (!hasEligibility) return 'MISSING_REQUIRED_FIELD: Eligibility / Qualification details are required for Job posts.';
     } else if (data.type === 'result') {
-        const hasResultLink = !!data.externalLink || hasInPayload('result') || hasInAttached('result');
-        if (!hasResultLink) return 'Validation Failed: Must have at least 1 result link or PDF.';
+        const hasResultLink = !!data.externalLink || hasInPayload('result') || hasInAttached('result') || hasInAttached('pdf');
+        if (!hasResultLink) return 'MISSING_REQUIRED_LINK: Result Download link or PDF is required.';
     } else if (data.type === 'admit-card') {
-        const hasAdmitLink = !!data.externalLink || hasInPayload('admit') || hasInAttached('admit');
-        if (!hasAdmitLink) return 'Validation Failed: Must have a download link for Admit Card.';
+        const hasAdmitLink = !!data.externalLink || hasInPayload('admit') || hasInAttached('admit') || hasInAttached('pdf');
+        if (!hasAdmitLink) return 'MISSING_REQUIRED_LINK: Admit Card Download link is required.';
     }
     return null;
 }
@@ -3668,6 +3678,13 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
         }
         let approvalId: string | undefined;
         if (data.status === 'published') {
+            for (const doc of existingDocs) {
+                const validationData = { ...doc, ...data };
+                const validationError = await validateForPublish(validationData, doc._id?.toString(), false);
+                if (validationError) {
+                    return res.status(400).json({ error: `Validation failed for "${doc.title}": ${validationError}` });
+                }
+            }
             publishTransitionIds = existingDocs
                 .filter((doc) => !isPublishedStatus(doc.status as any))
                 .map((doc) => doc._id?.toString())
@@ -3724,6 +3741,14 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
             });
         }
         const existingDocs = await AnnouncementModelMongo.findByIdsAdmin(ids);
+
+        for (const doc of existingDocs) {
+            const validationError = await validateForPublish(doc, doc._id?.toString(), true);
+            if (validationError) {
+                return res.status(400).json({ error: `Validation failed for "${doc.title}": ${validationError}` });
+            }
+        }
+
         const publishTransitionIds = existingDocs
             .filter((doc) => !isPublishedStatus(doc.status as any))
             .map((doc) => doc._id?.toString())
@@ -3959,7 +3984,7 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
 
         const now = new Date().toISOString();
 
-        const validationError = await validateForPublish(existing, announcementId);
+        const validationError = await validateForPublish(existing, announcementId, true);
         if (validationError) {
             return res.status(400).json({ error: validationError });
         }
