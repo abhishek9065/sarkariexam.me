@@ -1,42 +1,67 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 :root {
-    --font-body: 'Outfit', 'Segoe UI', sans-serif;
-    --font-heading: 'Sora', 'Outfit', sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Space Grotesk', 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
-    --bg-canvas: #04070d;
-    --bg-canvas-alt: #091220;
-    --bg-elev-1: #0a1422;
-    --bg-elev-2: #0f1a2e;
-    --bg-elev-3: #15253d;
-    --bg-elev-4: #1c3351;
-    --bg-input: #0b1930;
+    /* ─── Canvas & Elevation (dark) ─── */
+    --bg-canvas: #06090f;
+    --bg-canvas-alt: #0a1018;
+    --bg-elev-1: #0d1520;
+    --bg-elev-2: #111d2e;
+    --bg-elev-3: #162640;
+    --bg-elev-4: #1d3354;
+    --bg-input: #0c1524;
+    --bg-glass: rgba(14, 22, 38, 0.72);
+    --bg-glass-strong: rgba(14, 22, 38, 0.88);
 
-    --text-primary: #f1f7ff;
-    --text-secondary: #a5bedf;
-    --text-muted: #7993b8;
+    /* ─── Text ─── */
+    --text-primary: #f0f6ff;
+    --text-secondary: #94b0d4;
+    --text-muted: #5f7d9f;
 
-    --accent: #42e8ff;
-    --accent-strong: #12bdd9;
-    --accent-soft: rgba(66, 232, 255, 0.2);
+    /* ─── Accent - Electric Cyan-Violet ─── */
+    --accent: #22d3ee;
+    --accent-strong: #06b6d4;
+    --accent-soft: rgba(34, 211, 238, 0.12);
+    --accent-glow: rgba(34, 211, 238, 0.25);
+    --accent-gradient: linear-gradient(135deg, #22d3ee, #818cf8);
+    --accent-gradient-vivid: linear-gradient(135deg, #06b6d4, #6366f1, #a855f7);
 
-    --success: #4bd992;
-    --warning: #ffc56b;
-    --danger: #ff7272;
-    --info: #7eb8ff;
+    /* ─── Semantic ─── */
+    --success: #34d399;
+    --success-soft: rgba(52, 211, 153, 0.12);
+    --warning: #fbbf24;
+    --warning-soft: rgba(251, 191, 36, 0.12);
+    --danger: #f87171;
+    --danger-soft: rgba(248, 113, 113, 0.12);
+    --info: #60a5fa;
+    --info-soft: rgba(96, 165, 250, 0.12);
 
-    --border-soft: rgba(136, 183, 255, 0.24);
-    --border-strong: rgba(136, 183, 255, 0.42);
+    /* ─── Borders ─── */
+    --border-soft: rgba(148, 176, 212, 0.10);
+    --border-medium: rgba(148, 176, 212, 0.18);
+    --border-strong: rgba(148, 176, 212, 0.30);
+    --border-glow: rgba(34, 211, 238, 0.35);
 
-    --shadow-0: 0 2px 8px rgba(1, 8, 22, 0.22);
-    --shadow-1: 0 22px 46px rgba(1, 8, 22, 0.5);
-    --shadow-2: 0 36px 86px rgba(1, 8, 22, 0.68);
+    /* ─── Shadows & Glow ─── */
+    --shadow-0: 0 1px 4px rgba(0, 0, 0, 0.12);
+    --shadow-1: 0 8px 32px rgba(0, 0, 0, 0.28);
+    --shadow-2: 0 24px 64px rgba(0, 0, 0, 0.40);
+    --shadow-glow-sm: 0 0 20px rgba(34, 211, 238, 0.08);
+    --shadow-glow-md: 0 0 40px rgba(34, 211, 238, 0.12);
+    --shadow-glow-lg: 0 4px 60px rgba(34, 211, 238, 0.18);
 
+    /* ─── Radius ─── */
+    --radius-xs: 8px;
     --radius-sm: 12px;
     --radius-md: 16px;
-    --radius-lg: 22px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
+    --radius-full: 9999px;
 
-    /* 8px spacing grid */
+    /* ─── Spacing (4px base) ─── */
     --space-1: 8px;
     --space-2: 16px;
     --space-3: 24px;
@@ -44,13 +69,23 @@
     --space-5: 40px;
     --space-6: 48px;
 
-    --sidebar-width: 328px;
-    --sidebar-collapsed-width: 112px;
-    --control-height: 46px;
-    --control-height-compact: 40px;
-    --control-padding-inline: 14px;
+    /* ─── Layout ─── */
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 72px;
+    --control-height: 44px;
+    --control-height-compact: 38px;
+    --control-padding-inline: 16px;
     --shell-max-width: 1840px;
     --table-min-width: 980px;
+    --topbar-height: 64px;
+
+    /* ─── Timing ─── */
+    --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --duration-fast: 0.15s;
+    --duration-normal: 0.25s;
+    --duration-slow: 0.4s;
 }
 
 body[data-admin-density='compact'] {
@@ -64,31 +99,45 @@ body[data-admin-density='compact'] {
 }
 
 [data-theme='light'] {
-    --bg-canvas: #f4f6f9;
+    --bg-canvas: #f8fafc;
     --bg-canvas-alt: #ffffff;
     --bg-elev-1: #ffffff;
-    --bg-elev-2: #f8fafc;
-    --bg-elev-3: #eef2f6;
-    --bg-elev-4: #e2e8f0;
+    --bg-elev-2: #f1f5f9;
+    --bg-elev-3: #e2e8f0;
+    --bg-elev-4: #cbd5e1;
     --bg-input: #ffffff;
+    --bg-glass: rgba(255, 255, 255, 0.78);
+    --bg-glass-strong: rgba(255, 255, 255, 0.92);
 
-    --text-primary: #111827;
-    --text-secondary: #4b5563;
-    --text-muted: #9ca3af;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
 
-    --accent: #2563eb;
-    --accent-strong: #1d4ed8;
-    --accent-soft: rgba(37, 99, 235, 0.1);
+    --accent: #0891b2;
+    --accent-strong: #0e7490;
+    --accent-soft: rgba(8, 145, 178, 0.08);
+    --accent-glow: rgba(8, 145, 178, 0.15);
+    --accent-gradient: linear-gradient(135deg, #06b6d4, #6366f1);
+    --accent-gradient-vivid: linear-gradient(135deg, #0891b2, #4f46e5, #9333ea);
 
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --info: #3b82f6;
+    --success: #059669;
+    --success-soft: rgba(5, 150, 105, 0.08);
+    --warning: #d97706;
+    --warning-soft: rgba(217, 119, 6, 0.08);
+    --danger: #dc2626;
+    --danger-soft: rgba(220, 38, 38, 0.08);
+    --info: #2563eb;
+    --info-soft: rgba(37, 99, 235, 0.08);
 
-    --border-soft: rgba(0, 0, 0, 0.08);
+    --border-soft: rgba(0, 0, 0, 0.06);
+    --border-medium: rgba(0, 0, 0, 0.10);
     --border-strong: rgba(0, 0, 0, 0.16);
+    --border-glow: rgba(8, 145, 178, 0.25);
 
-    --shadow-0: 0 1px 3px rgba(0, 0, 0, 0.04);
-    --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.06);
-    --shadow-2: 0 10px 24px rgba(0, 0, 0, 0.08);
+    --shadow-0: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-1: 0 4px 16px rgba(0, 0, 0, 0.06);
+    --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.08);
+    --shadow-glow-sm: 0 0 16px rgba(8, 145, 178, 0.06);
+    --shadow-glow-md: 0 0 32px rgba(8, 145, 178, 0.08);
+    --shadow-glow-lg: 0 4px 48px rgba(8, 145, 178, 0.12);
 }

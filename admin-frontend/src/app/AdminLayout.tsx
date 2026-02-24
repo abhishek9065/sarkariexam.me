@@ -57,7 +57,7 @@ const parseGroupCollapseState = (raw: string): GroupCollapseState => {
 };
 
 export function AdminLayout() {
-    const { user, permissions, logout, hasValidStepUp, stepUpExpiresAt } = useAdminAuth();
+    const { user, permissions, logout, hasValidStepUp } = useAdminAuth();
     const { timeZoneMode, setTimeZoneMode, timeZoneLabel } = useAdminPreferences();
     const { notifyInfo, notifyError } = useAdminNotifications();
 
@@ -215,10 +215,6 @@ export function AdminLayout() {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [navigate]);
 
-    const stepUpLabel = hasValidStepUp
-        ? `Step-up active${stepUpExpiresAt ? ` until ${new Date(stepUpExpiresAt).toLocaleTimeString()}` : ''}`
-        : 'Step-up required for high-risk actions';
-
     const commandPaletteCommands = useMemo(() => {
         const moduleCommands = enabledNavItems.map((item) => ({
             id: `nav-${item.key}`,
@@ -268,8 +264,14 @@ export function AdminLayout() {
                     navigate('/login', { replace: true });
                 },
             },
+            {
+                id: 'toggle-density',
+                label: 'Toggle Density',
+                description: density === 'comfortable' ? 'Switch to compact' : 'Switch to comfortable',
+                onSelect: () => setDensity((current) => (current === 'comfortable' ? 'compact' : 'comfortable')),
+            },
         ];
-    }, [enabledNavItems, logout, navigate]);
+    }, [enabledNavItems, logout, navigate, density, setDensity]);
 
     const searchResults = globalSearchQuery.data?.data ?? [];
     const openSearchResults = topSearchFocused && (globalSearchQuery.isFetching || topSearch.trim().length >= 2);
@@ -279,8 +281,11 @@ export function AdminLayout() {
         <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileMenuOpen ? 'mobile-menu-open' : ''}`}>
             <aside className="admin-sidebar" aria-label="Admin navigation shell">
                 <div className="admin-brand">
-                    <h1 className="admin-brand-title">SarkariExams Admin</h1>
-                    <span className="admin-brand-subtitle">Premium Ops Center</span>
+                    <div className="admin-brand-mark">SE</div>
+                    <div className="admin-brand-text">
+                        <h1 className="admin-brand-title">SarkariExams</h1>
+                        <span className="admin-brand-subtitle">Admin Console</span>
+                    </div>
                 </div>
 
                 <div className="admin-sidebar-controls">
@@ -288,23 +293,25 @@ export function AdminLayout() {
                         type="button"
                         className="admin-btn subtle"
                         onClick={() => setSidebarCollapsed((current) => !current)}
+                        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                     >
-                        {sidebarCollapsed ? 'Expand rail' : 'Collapse rail'}
+                        {sidebarCollapsed ? '\u25B8' : '\u25C2'}
                     </button>
                     <button
                         type="button"
                         className="admin-btn subtle"
                         onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
-                        aria-label="Toggle theme"
+                        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                     >
-                        {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                        {theme === 'dark' ? '\u263C' : '\u263E'}
                     </button>
                     <button
                         type="button"
                         className="admin-btn subtle"
                         onClick={() => setPaletteOpen(true)}
+                        aria-label="Command palette"
                     >
-                        Palette (Ctrl/Cmd + K)
+                        {'\u2318'}K
                     </button>
                 </div>
 
@@ -364,17 +371,9 @@ export function AdminLayout() {
                 </nav>
 
                 <div className="admin-sidebar-footer">
-                    <a className="admin-nav-link" href="/admin" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">LG</span>
-                        <span className="admin-nav-label">Open Legacy Admin</span>
-                    </a>
-                    <a className="admin-nav-link" href="/admin-vnext" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">PR</span>
-                        <span className="admin-nav-label">Open Premium Admin</span>
-                    </a>
-                    <a className="admin-nav-link" href="/admin-legacy" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">RB</span>
-                        <span className="admin-nav-label">Open Rollback Alias</span>
+                    <a className="admin-nav-link" href="/" target="_blank" rel="noreferrer">
+                        <span className="admin-nav-short">{'\u2197'}</span>
+                        <span className="admin-nav-label">View Live Site</span>
                     </a>
                 </div>
             </aside>
@@ -437,30 +436,16 @@ export function AdminLayout() {
                             className="admin-btn primary"
                             onClick={() => navigate('/create-post')}
                         >
-                            Create
-                        </button>
-                        <button
-                            type="button"
-                            className="admin-btn subtle"
-                            onClick={() => setPaletteOpen(true)}
-                        >
-                            Palette
-                        </button>
-                        <button
-                            type="button"
-                            className="admin-btn subtle"
-                            onClick={() => setDensity((current) => (current === 'comfortable' ? 'compact' : 'comfortable'))}
-                        >
-                            Density: {density === 'comfortable' ? 'Comfortable' : 'Compact'}
+                            + New Post
                         </button>
                         <div className="admin-topbar-alerts">
                             <button
                                 type="button"
-                                className="admin-btn subtle"
+                                className="admin-btn subtle admin-topbar-alerts-btn"
                                 onClick={() => setAlertsOpen((current) => !current)}
                                 aria-expanded={alertsOpen}
                             >
-                                Alerts ({alerts.length})
+                                {'\uD83D\uDD14'}{alerts.length > 0 ? ` ${alerts.length}` : ''}
                             </button>
                             {alertsOpen ? (
                                 <div className="admin-topbar-alerts-panel" role="dialog" aria-label="Open alerts">
@@ -486,21 +471,34 @@ export function AdminLayout() {
                             ) : null}
                         </div>
                         <select
+                            className="admin-topbar-tz"
                             value={timeZoneMode}
                             onChange={(event) => setTimeZoneMode(event.target.value as 'local' | 'ist' | 'utc')}
                             aria-label="Admin timezone"
                         >
-                            <option value="local">Timezone: Local</option>
-                            <option value="ist">Timezone: IST</option>
-                            <option value="utc">Timezone: UTC</option>
+                            <option value="local">Local</option>
+                            <option value="ist">IST</option>
+                            <option value="utc">UTC</option>
                         </select>
                         <div className="admin-topbar-profile">
-                            <div className="admin-topbar-title">{user?.email ?? 'Unknown admin'}</div>
-                            <div className="admin-topbar-meta">Role: {user?.role ?? 'none'} | {stepUpLabel}</div>
+                            <div className="admin-topbar-avatar">
+                                {(user?.email ?? 'A').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="admin-topbar-identity">
+                                <div className="admin-topbar-title">{user?.email ?? 'Unknown admin'}</div>
+                                <div className="admin-topbar-meta">
+                                    <span className="admin-topbar-role">{user?.role ?? 'none'}</span>
+                                    {hasValidStepUp ? (
+                                        <span className="admin-chiplet success">{'\u2713'} Step-up</span>
+                                    ) : (
+                                        <span className="admin-chiplet warning">{'\u26A0'} No step-up</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                         <button
                             type="button"
-                            className="admin-btn"
+                            className="admin-btn subtle"
                             onClick={async () => {
                                 try {
                                     await logout();
@@ -510,21 +508,20 @@ export function AdminLayout() {
                                 }
                             }}
                         >
-                            Logout
+                            Sign Out
                         </button>
                     </div>
                 </header>
 
                 <section className="admin-context" aria-live="polite">
                     <div className="admin-context-main">
-                        <span className="admin-context-kicker">Operations Workspace</span>
+                        <span className="admin-context-kicker">Admin Console</span>
                         <h2 className="admin-context-title">{activeModule?.label ?? 'Dashboard'}</h2>
-                        <p className="admin-context-summary">{activeModule?.summary ?? 'Admin workflow and operations control surface.'}</p>
+                        <p className="admin-context-summary">{activeModule?.summary ?? 'Overview of activity, traffic, and operations.'}</p>
                     </div>
                     <div className="admin-context-pills">
-                        <span className="admin-context-pill">Auth Boundary: /api/admin-auth</span>
-                        <span className="admin-context-pill">Timezone: {timeZoneLabel}</span>
-                        <span className="admin-context-pill">Module: {activeModule ? 'Live' : 'Fallback'}</span>
+                        <span className="admin-context-pill">{'\u23F1'} {timeZoneLabel}</span>
+                        <span className="admin-context-pill">{activeModule ? '\u2713 Live' : '\u2302 Home'}</span>
                     </div>
                 </section>
 
