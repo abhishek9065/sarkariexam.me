@@ -12,6 +12,23 @@ const joinParts = (parts: string[]): string => {
     return `${cleaned[0]}. ${cleaned.slice(1).join(' ')}`;
 };
 
+const extractFlattenMessages = (value: unknown): string => {
+    if (!value || typeof value !== 'object') return '';
+    const payload = value as {
+        formErrors?: unknown;
+        fieldErrors?: unknown;
+    };
+    const formErrors = Array.isArray(payload.formErrors)
+        ? payload.formErrors.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        : [];
+    const fieldErrors = payload.fieldErrors && typeof payload.fieldErrors === 'object'
+        ? Object.values(payload.fieldErrors as Record<string, unknown>)
+            .flatMap((entry) => Array.isArray(entry) ? entry : [])
+            .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        : [];
+    return joinParts([...formErrors, ...fieldErrors]);
+};
+
 export function getApiErrorMessage(payload: unknown, fallback: string): string {
     if (!payload) return fallback;
     const data = payload as ErrorPayload;
@@ -22,20 +39,11 @@ export function getApiErrorMessage(payload: unknown, fallback: string): string {
     const combined = joinParts([errorText, messageText].filter(Boolean));
     if (combined) return combined;
 
-    if (data.error && typeof data.error === 'object') {
-        const errorObj = data.error as {
-            formErrors?: string[];
-            fieldErrors?: Record<string, string[]>;
-        };
-        const formErrors = Array.isArray(errorObj.formErrors)
-            ? errorObj.formErrors.filter(Boolean)
-            : [];
-        const fieldErrors = errorObj.fieldErrors && typeof errorObj.fieldErrors === 'object'
-            ? Object.values(errorObj.fieldErrors).flat().filter(Boolean)
-            : [];
-        const derived = joinParts([...formErrors, ...fieldErrors].filter(Boolean));
-        if (derived) return derived;
-    }
+    const derivedFromError = extractFlattenMessages(data.error);
+    if (derivedFromError) return derivedFromError;
+
+    const derivedFromMessage = extractFlattenMessages(data.message);
+    if (derivedFromMessage) return derivedFromMessage;
 
     return fallback;
 }
