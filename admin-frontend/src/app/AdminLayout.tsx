@@ -7,7 +7,8 @@ import { useAdminPreferences } from './useAdminPreferences';
 import { useLocalStorageState } from '../lib/useLocalStorageState';
 import { getAdminAlerts, getAdminAnnouncements, searchAdminEntities } from '../lib/api/client';
 import { hasAdminPermission } from '../lib/adminRbac';
-import { OpsCard } from '../components/ops';
+import { OpsCard, KeyboardShortcutsOverlay } from '../components/ops';
+import { OpsBreadcrumb } from '../components/ops/OpsBreadcrumb';
 import {
     AdminCommandPalette,
     useAdminNotifications,
@@ -16,6 +17,7 @@ import {
     adminModuleNavItems,
     getModuleByPath,
     getModuleRequiredPermission,
+    groupedModuleIcons,
     groupedModuleLabels,
     isAdminModuleEnabled,
     MODULE_GROUP_ORDER,
@@ -327,7 +329,7 @@ export function AdminLayout() {
                                     className={({ isActive }) => `admin-nav-link admin-nav-solo${isActive ? ' active' : ''}`}
                                     title={item.summary}
                                 >
-                                    <span className="admin-nav-short">{item.shortLabel}</span>
+                                    <span className="admin-nav-icon">{item.icon}</span>
                                     <span className="admin-nav-label">{group.label}</span>
                                 </NavLink>
                             );
@@ -349,6 +351,7 @@ export function AdminLayout() {
                                     aria-expanded={!isCollapsed}
                                     aria-controls={`admin-nav-group-${group.key}`}
                                 >
+                                    <span className="admin-nav-icon">{groupedModuleIcons[group.key]}</span>
                                     <span className="admin-nav-group-title">{group.label}</span>
                                     <span className="admin-nav-group-count">{group.items.length}</span>
                                 </button>
@@ -360,7 +363,7 @@ export function AdminLayout() {
                                             className={({ isActive }) => `admin-nav-link${isActive ? ' active' : ''}`}
                                             title={item.summary}
                                         >
-                                            <span className="admin-nav-short">{item.shortLabel}</span>
+                                            <span className="admin-nav-icon">{item.icon}</span>
                                             <span className="admin-nav-label">{item.label}</span>
                                         </NavLink>
                                     ))}
@@ -372,7 +375,7 @@ export function AdminLayout() {
 
                 <div className="admin-sidebar-footer">
                     <a className="admin-nav-link" href="/" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-short">{'\u2197'}</span>
+                        <span className="admin-nav-icon">{'\u2197'}</span>
                         <span className="admin-nav-label">View Live Site</span>
                     </a>
                 </div>
@@ -513,6 +516,8 @@ export function AdminLayout() {
                     </div>
                 </header>
 
+                <OpsBreadcrumb />
+
                 <section className="admin-context" aria-live="polite">
                     <div className="admin-context-main">
                         <span className="admin-context-kicker">Admin Console</span>
@@ -537,7 +542,9 @@ export function AdminLayout() {
                             </div>
                         </OpsCard>
                     ) : (
-                        <Outlet />
+                        <div key={location.pathname} className="admin-page-transition">
+                            <Outlet />
+                        </div>
                     )}
                 </div>
             </main>
@@ -554,6 +561,7 @@ export function AdminLayout() {
                     notifyInfo('Announcement selected', `Jumped to announcement ${id}.`);
                 }}
             />
+            <KeyboardShortcutsOverlay />
         </div>
     );
 }

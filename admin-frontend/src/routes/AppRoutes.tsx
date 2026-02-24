@@ -5,7 +5,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AdminAuthProvider } from '../app/AdminAuthProvider';
 import { AdminLayout } from '../app/AdminLayout';
 import { AdminPreferencesProvider } from '../app/AdminPreferencesContext';
-import { DesktopOnlyGate } from '../app/DesktopOnlyGate';
 import { RequireAdminAuth } from '../app/RequireAdminAuth';
 import { OpsSkeleton } from '../components/ops';
 import { AdminNotificationsProvider, ConfirmDialogProvider } from '../components/ops/legacy-port';
@@ -63,8 +62,7 @@ export function AppRoutes() {
             <AdminPreferencesProvider>
                 <AdminNotificationsProvider>
                     <ConfirmDialogProvider>
-                        <DesktopOnlyGate>
-                            <Routes>
+                        <Routes>
                                 <Route
                                     path="/login"
                                     element={(
@@ -114,8 +112,7 @@ export function AppRoutes() {
                                 </Route>
 
                                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                            </Routes>
-                        </DesktopOnlyGate>
+                        </Routes>
                     </ConfirmDialogProvider>
                 </AdminNotificationsProvider>
             </AdminPreferencesProvider>

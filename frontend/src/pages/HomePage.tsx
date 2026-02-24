@@ -117,6 +117,29 @@ function UpdateSkeleton() {
     );
 }
 
+/* ─── Error State ─── */
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+    return (
+        <section className="hp-error-state">
+            <span className="hp-error-icon">⚡</span>
+            <h3>Unable to load updates</h3>
+            <p>Something went wrong while fetching the latest data. Please try again.</p>
+            <button type="button" className="hp-error-retry" onClick={onRetry}>🔄 Retry</button>
+        </section>
+    );
+}
+
+/* ─── Empty Box State ─── */
+function EmptyBoxState({ label, href }: { label: string; href: string }) {
+    return (
+        <div className="hp-empty-box">
+            <span className="hp-empty-icon">📭</span>
+            <p>No {label} updates yet</p>
+            <Link to={href} className="hp-empty-link">Browse {label} →</Link>
+        </div>
+    );
+}
+
 /* ─── Preference Picker Component ─── */
 function PreferencePicker({ onDone }: { onDone: (prefs: ContentType[]) => void }) {
     const [selected, setSelected] = useState<Set<ContentType>>(new Set());
@@ -179,6 +202,7 @@ export function HomePage() {
     const user = authContext?.user;
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
     const [updates, setUpdates] = useState<AnnouncementCard[]>([]);
     const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
     const [activeFilter, setActiveFilter] = useState<'all' | ContentType>('all');
@@ -192,37 +216,45 @@ export function HomePage() {
     }, []);
 
     /* Fetch latest items */
-    useEffect(() => {
-        let mounted = true;
+    const fetchData = useCallback(async (mounted: { current: boolean }) => {
         setLoading(true);
+        setError(false);
+        try {
+            const contentTypes: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
+            const results = await Promise.allSettled(
+                contentTypes.map(t => getAnnouncementCards({ type: t, limit: 12, sort: 'newest' }))
+            );
 
-        (async () => {
-            try {
-                // Fetch basic content types in parallel
-                const contentTypes: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
-                const results = await Promise.all(
-                    contentTypes.map(t => getAnnouncementCards({ type: t, limit: 12, sort: 'newest' }))
-                );
+            if (!mounted.current) return;
 
-                if (!mounted) return;
-
-                const all = results.flatMap(res => res.data).sort((a, b) => {
+            const all = results
+                .filter((r): r is PromiseFulfilledResult<{ data: AnnouncementCard[] }> => r.status === 'fulfilled')
+                .flatMap(r => r.value.data)
+                .sort((a, b) => {
                     const da = a.postedAt ? new Date(a.postedAt).getTime() : 0;
                     const db = b.postedAt ? new Date(b.postedAt).getTime() : 0;
                     return db - da;
                 });
 
-                const seen = new Set<string>();
-                setUpdates(all.filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; }));
-            } catch (err) {
-                console.error('Homepage fetch error:', err);
-            } finally {
-                if (mounted) setLoading(false);
+            if (all.length === 0) {
+                setError(true);
             }
-        })();
 
-        return () => { mounted = false; };
+            const seen = new Set<string>();
+            setUpdates(all.filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; }));
+        } catch (err) {
+            console.error('Homepage fetch error:', err);
+            if (mounted.current) setError(true);
+        } finally {
+            if (mounted.current) setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        const mounted = { current: true };
+        fetchData(mounted);
+        return () => { mounted.current = false; };
+    }, [fetchData]);
 
     /* Fetch bookmarks for logged-in user */
     useEffect(() => {
@@ -261,11 +293,11 @@ export function HomePage() {
     const makeDenseItems = useCallback((
         cards: AnnouncementCard[],
         source: SourceTag,
-        fallbackPath: string,
+        _fallbackPath: string,
         count = 10
     ): DenseBoxItem[] => {
-        const normalized = cards.slice(0, count).map((card) => {
-            const fallbackHref = `${fallbackPath}?source=${source}`;
+        return cards.slice(0, count).map((card) => {
+            const fallbackHref = `${_fallbackPath}?source=${source}`;
             const href = card.slug ? buildAnnouncementDetailPath(card.type, card.slug, source) : fallbackHref;
             return {
                 id: card.id,
@@ -275,18 +307,6 @@ export function HomePage() {
                 badge: TYPE_LABELS[card.type],
             };
         });
-
-        while (normalized.length < count) {
-            const idx = normalized.length + 1;
-            normalized.push({
-                id: `fallback-${source}-${idx}`,
-                title: `View more updates (${idx})`,
-                href: `${fallbackPath}?source=${source}`,
-                meta: 'Official updates',
-                badge: 'Info',
-            });
-        }
-        return normalized;
     }, []);
 
     const denseJobs = useMemo(() => makeDenseItems(updatesByType.job, 'home_box_jobs', '/jobs'), [makeDenseItems, updatesByType.job]);
@@ -395,22 +415,29 @@ export function HomePage() {
                         ))}
                     </nav>
 
+                    {/* ═══ ERROR STATE ═══ */}
+                    {!loading && error && <ErrorState onRetry={() => fetchData({ current: true })} />}
+
                     <section className="home-v3-grid home-v3-top-grid" data-testid="home-v3-top-grid">
                         <article className="home-dense-box" data-testid="home-v3-dense-box-results">
                             <div className="home-dense-box-header">
                                 <h2>Result</h2>
                                 <Link to="/results?source=home_box_results">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseResults.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseResults.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseResults.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Result" href="/results" />
+                            )}
                         </article>
 
                         <article className="home-dense-box" data-testid="home-v3-dense-box-admit">
@@ -418,16 +445,20 @@ export function HomePage() {
                                 <h2>Admit Card</h2>
                                 <Link to="/admit-card?source=home_box_admit">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseAdmit.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseAdmit.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseAdmit.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Admit Card" href="/admit-card" />
+                            )}
                         </article>
 
                         <article className="home-dense-box" data-testid="home-v3-dense-box-jobs">
@@ -435,16 +466,20 @@ export function HomePage() {
                                 <h2>Latest Jobs</h2>
                                 <Link to="/jobs?source=home_box_jobs">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseJobs.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseJobs.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseJobs.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Latest Jobs" href="/jobs" />
+                            )}
                         </article>
                     </section>
 
@@ -454,16 +489,20 @@ export function HomePage() {
                                 <h2>Answer Key</h2>
                                 <Link to="/answer-key?source=home_box_answer_key">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseAnswerKey.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseAnswerKey.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseAnswerKey.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Answer Key" href="/answer-key" />
+                            )}
                         </article>
 
                         <article className="home-dense-box" data-testid="home-v3-dense-box-syllabus">
@@ -471,16 +510,20 @@ export function HomePage() {
                                 <h2>Syllabus</h2>
                                 <Link to="/syllabus?source=home_box_syllabus">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseSyllabus.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseSyllabus.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseSyllabus.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Syllabus" href="/syllabus" />
+                            )}
                         </article>
 
                         <article className="home-dense-box" data-testid="home-v3-dense-box-admission">
@@ -488,16 +531,20 @@ export function HomePage() {
                                 <h2>Admission</h2>
                                 <Link to="/admission?source=home_box_admission">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseAdmission.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseAdmission.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseAdmission.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Admission" href="/admission" />
+                            )}
                         </article>
                     </section>
 
@@ -507,16 +554,20 @@ export function HomePage() {
                                 <h2>Certificate Verification</h2>
                                 <Link to="/admit-card?source=home_box_certificate">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseCertificate.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseCertificate.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseCertificate.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Certificate" href="/admit-card" />
+                            )}
                         </article>
 
                         <article className="home-dense-box" data-testid="home-v3-dense-box-important">
@@ -524,16 +575,20 @@ export function HomePage() {
                                 <h2>Important</h2>
                                 <Link to="/jobs?source=home_box_important">View all</Link>
                             </div>
-                            <ul className="section-card-list">
-                                {denseImportant.slice(0, 10).map((item) => (
-                                    <li key={item.id}>
-                                        <Link to={item.href} className="home-dense-box-link">
-                                            <span>{item.title}</span>
-                                            <small>{item.meta}</small>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
+                            {denseImportant.length > 0 ? (
+                                <ul className="section-card-list">
+                                    {denseImportant.slice(0, 10).map((item) => (
+                                        <li key={item.id}>
+                                            <Link to={item.href} className="home-dense-box-link">
+                                                <span>{item.title}</span>
+                                                <small>{item.meta}</small>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : !loading && (
+                                <EmptyBoxState label="Important" href="/jobs" />
+                            )}
                         </article>
                     </section>
 

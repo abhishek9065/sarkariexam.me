@@ -191,6 +191,25 @@
     animation: ops-fade-in-scale 0.5s var(--ease-spring);
 }
 
+/* ─── Page content transition ─── */
+
+@keyframes ops-page-enter {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.admin-page-transition {
+    animation: ops-page-enter var(--duration-normal) var(--ease-spring);
+    animation-fill-mode: backwards;
+}
+
 /* ─── Reduced motion ─── */
 
 @media (prefers-reduced-motion: reduce) {

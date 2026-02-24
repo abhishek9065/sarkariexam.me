@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AdminAnnouncementListItem } from '../../../types';
 
@@ -9,21 +9,15 @@ type PaletteCommand = {
     onSelect: () => void;
 };
 
-type PaletteItem =
-    | {
-        key: string;
-        kind: 'command';
-        label: string;
-        description?: string;
-        onSelect: () => void;
-    }
-    | {
-        key: string;
-        kind: 'announcement';
-        label: string;
-        description?: string;
-        onSelect: () => void;
-    };
+type PaletteItem = {
+    key: string;
+    kind: 'command' | 'announcement' | 'recent';
+    label: string;
+    description?: string;
+    icon?: string;
+    score: number;
+    onSelect: () => void;
+};
 
 interface AdminCommandPaletteProps {
     open: boolean;
@@ -33,6 +27,67 @@ interface AdminCommandPaletteProps {
     commands: PaletteCommand[];
     announcements: AdminAnnouncementListItem[];
     onOpenAnnouncement: (id: string) => void;
+}
+
+const RECENT_KEY = 'admin-palette-recent';
+const MAX_RECENT = 5;
+
+function getRecent(): string[] {
+    try {
+        const raw = localStorage.getItem(RECENT_KEY);
+        return raw ? (JSON.parse(raw) as string[]).slice(0, MAX_RECENT) : [];
+    } catch {
+        return [];
+    }
+}
+
+function pushRecent(id: string) {
+    try {
+        const prev = getRecent().filter((item) => item !== id);
+        localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...prev].slice(0, MAX_RECENT)));
+    } catch { /* ignore */ }
+}
+
+/**
+ * Simple fuzzy scorer — returns 0 (no match) or positive value (higher = better).
+ * Rewards: consecutive matches, match at word-start, exact substring.
+ */
+function fuzzyScore(needle: string, haystack: string): number {
+    if (!needle) return 1;
+    const lower = haystack.toLowerCase();
+    const n = needle.toLowerCase();
+
+    // Exact substring — high score
+    const substringIdx = lower.indexOf(n);
+    if (substringIdx !== -1) {
+        return 100 + (substringIdx === 0 ? 50 : 0);
+    }
+
+    // Character-by-character fuzzy
+    let score = 0;
+    let hIdx = 0;
+    let consecutive = 0;
+    for (let nIdx = 0; nIdx < n.length; nIdx++) {
+        const char = n[nIdx];
+        let found = false;
+        while (hIdx < lower.length) {
+            if (lower[hIdx] === char) {
+                score += 1 + consecutive;
+                // Bonus for word-start match
+                if (hIdx === 0 || lower[hIdx - 1] === ' ' || lower[hIdx - 1] === '-' || lower[hIdx - 1] === '/') {
+                    score += 3;
+                }
+                consecutive++;
+                hIdx++;
+                found = true;
+                break;
+            }
+            consecutive = 0;
+            hIdx++;
+        }
+        if (!found) return 0;
+    }
+    return score;
 }
 
 export function AdminCommandPalette({
@@ -45,6 +100,7 @@ export function AdminCommandPalette({
     onOpenAnnouncement,
 }: AdminCommandPaletteProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const listRef = useRef<HTMLDivElement | null>(null);
     const [activeIndex, setActiveIndex] = useState(0);
 
     useEffect(() => {
@@ -58,26 +114,34 @@ export function AdminCommandPalette({
 
     const normalizedQuery = query.trim().toLowerCase();
 
+    const recentIds = useMemo(() => (open ? getRecent() : []), [open]);
+
     const commandItems = useMemo<PaletteItem[]>(() => {
         return commands
-            .filter((command) => {
-                if (!normalizedQuery) return true;
-                return (
-                    command.label.toLowerCase().includes(normalizedQuery) ||
-                    command.description?.toLowerCase().includes(normalizedQuery)
-                );
+            .map((cmd) => {
+                const labelScore = fuzzyScore(normalizedQuery, cmd.label);
+                const descScore = fuzzyScore(normalizedQuery, cmd.description ?? '');
+                const best = Math.max(labelScore, descScore * 0.7);
+                return {
+                    key: `cmd-${cmd.id}`,
+                    kind: 'command' as const,
+                    label: cmd.label,
+                    description: cmd.description,
+                    icon: '\u2318',
+                    score: best,
+                    onSelect: () => {
+                        pushRecent(cmd.id);
+                        cmd.onSelect();
+                    },
+                };
             })
-            .slice(0, 8)
-            .map((command) => ({
-                key: `cmd-${command.id}`,
-                kind: 'command' as const,
-                label: command.label,
-                description: command.description,
-                onSelect: command.onSelect,
-            }));
+            .filter((item) => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
     }, [commands, normalizedQuery]);
 
     const announcementItems = useMemo<PaletteItem[]>(() => {
+        if (!normalizedQuery) return [];
         const unique = new Map<string, AdminAnnouncementListItem>();
         for (const item of announcements) {
             const id = item.id || item._id;
@@ -86,44 +150,95 @@ export function AdminCommandPalette({
         }
 
         return Array.from(unique.values())
-            .filter((item) => {
-                if (!normalizedQuery) return false;
-                const id = item.id || item._id || '';
-                return (
-                    (item.title || '').toLowerCase().includes(normalizedQuery) ||
-                    (item.slug || '').toLowerCase().includes(normalizedQuery) ||
-                    (item.organization || '').toLowerCase().includes(normalizedQuery) ||
-                    id.toLowerCase().includes(normalizedQuery)
-                );
-            })
-            .slice(0, 12)
             .map((item) => {
                 const id = item.id || item._id || '';
+                const titleScore = fuzzyScore(normalizedQuery, item.title || '');
+                const slugScore = fuzzyScore(normalizedQuery, item.slug || '');
+                const orgScore = fuzzyScore(normalizedQuery, item.organization || '');
+                const idScore = fuzzyScore(normalizedQuery, id);
+                const best = Math.max(titleScore, slugScore * 0.8, orgScore * 0.7, idScore * 0.5);
                 return {
-                    key: `announcement-${id}`,
+                    key: `ann-${id}`,
                     kind: 'announcement' as const,
                     label: item.title || 'Untitled',
-                    description: `${item.organization || 'Unknown'} · ${item.type || '-'} · ${id}`,
-                    onSelect: () => onOpenAnnouncement(id),
+                    description: `${item.organization || 'Unknown'} \u00B7 ${item.type || '-'}`,
+                    icon: '\uD83D\uDCDD',
+                    score: best,
+                    onSelect: () => {
+                        pushRecent(`ann-${id}`);
+                        onOpenAnnouncement(id);
+                    },
                 };
-            });
+            })
+            .filter((item) => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 12);
     }, [announcements, normalizedQuery, onOpenAnnouncement]);
 
-    const items = useMemo(() => [...commandItems, ...announcementItems], [announcementItems, commandItems]);
+    const recentItems = useMemo<PaletteItem[]>(() => {
+        if (normalizedQuery) return [];
+        return recentIds
+            .map((recentId) => {
+                const cmd = commands.find((c) => c.id === recentId);
+                if (!cmd) return null;
+                return {
+                    key: `recent-${cmd.id}`,
+                    kind: 'recent' as const,
+                    label: cmd.label,
+                    description: cmd.description,
+                    icon: '\uD83D\uDD52',
+                    score: 0,
+                    onSelect: () => {
+                        pushRecent(cmd.id);
+                        cmd.onSelect();
+                    },
+                };
+            })
+            .filter((item): item is PaletteItem => item !== null);
+    }, [recentIds, commands, normalizedQuery]);
+
+    // Build grouped flat list
+    type SectionItem = { type: 'header'; label: string } | { type: 'item'; item: PaletteItem };
+    const sections = useMemo<SectionItem[]>(() => {
+        const result: SectionItem[] = [];
+        if (recentItems.length > 0) {
+            result.push({ type: 'header', label: 'Recent' });
+            for (const item of recentItems) result.push({ type: 'item', item });
+        }
+        if (commandItems.length > 0) {
+            result.push({ type: 'header', label: normalizedQuery ? 'Commands' : 'All Commands' });
+            for (const item of commandItems) result.push({ type: 'item', item });
+        }
+        if (announcementItems.length > 0) {
+            result.push({ type: 'header', label: 'Content' });
+            for (const item of announcementItems) result.push({ type: 'item', item });
+        }
+        return result;
+    }, [recentItems, commandItems, announcementItems, normalizedQuery]);
+
+    const flatItems = useMemo(() => sections.filter((s): s is { type: 'item'; item: PaletteItem } => s.type === 'item'), [sections]);
 
     useEffect(() => {
         if (!open) return;
         setActiveIndex(0);
     }, [open, query]);
 
-    if (!open) return null;
+    // Scroll active item into view
+    useEffect(() => {
+        const list = listRef.current;
+        if (!list) return;
+        const active = list.querySelector('[aria-current="true"]');
+        active?.scrollIntoView({ block: 'nearest' });
+    }, [activeIndex]);
 
-    const selectItem = (item: PaletteItem | undefined) => {
+    const selectItem = useCallback((item: PaletteItem | undefined) => {
         if (!item) return;
         item.onSelect();
         onClose();
         onQueryChange('');
-    };
+    }, [onClose, onQueryChange]);
+
+    if (!open) return null;
 
     return (
         <div className="admin-palette-backdrop" role="presentation" onClick={onClose}>
@@ -141,47 +256,77 @@ export function AdminCommandPalette({
                     }
                     if (event.key === 'ArrowDown') {
                         event.preventDefault();
-                        setActiveIndex((prev) => (items.length === 0 ? 0 : (prev + 1) % items.length));
+                        setActiveIndex((prev) => (flatItems.length === 0 ? 0 : (prev + 1) % flatItems.length));
                         return;
                     }
                     if (event.key === 'ArrowUp') {
                         event.preventDefault();
-                        setActiveIndex((prev) => (items.length === 0 ? 0 : (prev - 1 + items.length) % items.length));
+                        setActiveIndex((prev) => (flatItems.length === 0 ? 0 : (prev - 1 + flatItems.length) % flatItems.length));
                         return;
                     }
                     if (event.key === 'Enter') {
                         event.preventDefault();
-                        selectItem(items[activeIndex]);
+                        selectItem(flatItems[activeIndex]?.item);
                     }
                 }}
             >
-                <input
-                    ref={inputRef}
-                    className="admin-palette-input"
-                    type="search"
-                    value={query}
-                    onChange={(event) => onQueryChange(event.target.value)}
-                    placeholder="Jump to module or search announcement"
-                    aria-label="Search admin commands"
-                />
-                <div className="admin-palette-list">
-                    {items.length === 0 ? (
-                        <div className="ops-empty">No matching command. Try title, slug, or ID.</div>
+                <div className="admin-palette-header">
+                    <span className="admin-palette-icon">{'\u2318'}</span>
+                    <input
+                        ref={inputRef}
+                        className="admin-palette-input"
+                        type="search"
+                        value={query}
+                        onChange={(event) => onQueryChange(event.target.value)}
+                        placeholder="Search commands, modules, or content\u2026"
+                        aria-label="Search admin commands"
+                    />
+                    <kbd className="admin-palette-kbd">ESC</kbd>
+                </div>
+                <div className="admin-palette-list" ref={listRef}>
+                    {flatItems.length === 0 ? (
+                        <div className="admin-palette-empty">
+                            <span className="admin-palette-empty-icon">{'\uD83D\uDD0E'}</span>
+                            <span>No results found. Try a different keyword.</span>
+                        </div>
                     ) : (
-                        items.map((item, index) => (
-                            <button
-                                key={item.key}
-                                type="button"
-                                className="admin-palette-item"
-                                onMouseEnter={() => setActiveIndex(index)}
-                                onClick={() => selectItem(item)}
-                                aria-current={index === activeIndex ? 'true' : undefined}
-                            >
-                                <span>{item.label}</span>
-                                <code>{item.description || (item.kind === 'command' ? 'CMD' : 'ANN')}</code>
-                            </button>
-                        ))
+                        sections.map((section, sIdx) => {
+                            if (section.type === 'header') {
+                                return (
+                                    <div key={`hdr-${sIdx}`} className="admin-palette-section">
+                                        {section.label}
+                                    </div>
+                                );
+                            }
+                            const flatIdx = flatItems.indexOf(section);
+                            return (
+                                <button
+                                    key={section.item.key}
+                                    type="button"
+                                    className={`admin-palette-item${flatIdx === activeIndex ? ' active' : ''}`}
+                                    onMouseEnter={() => setActiveIndex(flatIdx)}
+                                    onClick={() => selectItem(section.item)}
+                                    aria-current={flatIdx === activeIndex ? 'true' : undefined}
+                                >
+                                    <span className="admin-palette-item-icon">{section.item.icon}</span>
+                                    <span className="admin-palette-item-body">
+                                        <span className="admin-palette-item-label">{section.item.label}</span>
+                                        {section.item.description ? (
+                                            <span className="admin-palette-item-desc">{section.item.description}</span>
+                                        ) : null}
+                                    </span>
+                                    <span className="admin-palette-item-badge">
+                                        {section.item.kind === 'recent' ? 'Recent' : section.item.kind === 'announcement' ? 'Content' : 'Cmd'}
+                                    </span>
+                                </button>
+                            );
+                        })
                     )}
+                </div>
+                <div className="admin-palette-footer">
+                    <span><kbd>{'\u2191'}</kbd><kbd>{'\u2193'}</kbd> navigate</span>
+                    <span><kbd>{'\u23CE'}</kbd> select</span>
+                    <span><kbd>esc</kbd> close</span>
                 </div>
             </div>
         </div>

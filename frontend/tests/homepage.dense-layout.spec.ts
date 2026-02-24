@@ -39,9 +39,16 @@ test.describe('Homepage v3 premium layout', () => {
         await expect(bottomHeaders.nth(0)).toContainText('Certificate Verification');
         await expect(bottomHeaders.nth(1)).toContainText('Important');
 
-        // Data loads
-        await expect(page.locator('[data-testid="home-v3-dense-box-jobs"] .section-card-list li').first()).toBeVisible();
-        await expect(page.locator('[data-testid="home-v3-dense-box-results"] .section-card-list li').first()).toBeVisible();
+        // Data loads OR empty state shows
+        const jobsBox = page.locator('[data-testid="home-v3-dense-box-jobs"]');
+        const resultsBox = page.locator('[data-testid="home-v3-dense-box-results"]');
+        // Either cards load OR empty state is shown
+        const jobsList = jobsBox.locator('.section-card-list li');
+        const jobsEmpty = jobsBox.locator('.hp-empty-box');
+        await expect(jobsList.or(jobsEmpty).first()).toBeVisible();
+        const resultsList = resultsBox.locator('.section-card-list li');
+        const resultsEmpty = resultsBox.locator('.hp-empty-box');
+        await expect(resultsList.or(resultsEmpty).first()).toBeVisible();
 
         // Education content removed
         await expect(page.locator('[data-testid="home-educational-content"]')).toHaveCount(0);
