@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 
+import { config } from '../config.js';
 import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
 import { getAdminSloSnapshot } from '../middleware/responseTime.js';
@@ -30,6 +31,18 @@ import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
+const ADMIN_APPROVAL_ID_HEADER = 'x-admin-approval-id';
+const ADMIN_BREAK_GLASS_REASON_HEADER = 'x-admin-break-glass-reason';
+
+interface ApprovalGateResult {
+    allowed: boolean;
+    approvalId?: string;
+    breakGlassUsed?: boolean;
+    breakGlassReason?: string;
+    breakGlassEndpoint?: string;
+    breakGlassActionType?: AdminApprovalActionType;
+    breakGlassActor?: string;
+}
 
 interface UserDoc {
     createdAt: Date;
@@ -811,6 +824,33 @@ const ensureConditionalStepUp = async (req: any, res: any): Promise<boolean> => 
     });
 };
 
+const normalizeBreakGlassReason = (value: unknown): string => {
+    if (typeof value !== 'string') return '';
+    return value.trim();
+};
+
+const resolveApprovalInvalidMessage = (reason?: string): string => {
+    if (reason === 'invalid_status:pending') {
+        return 'Approval request is still pending secondary approval.';
+    }
+    if (reason === 'invalid_status:expired') {
+        return 'Approval request expired. Retry the action to create a new request.';
+    }
+    if (reason === 'invalid_status:rejected') {
+        return 'Approval request was rejected. Retry the action to submit a new request.';
+    }
+    if (reason === 'invalid_status:executed') {
+        return 'Approval request has already been executed.';
+    }
+    if (reason === 'request_mismatch') {
+        return 'Approval no longer matches this action payload. Retry the action.';
+    }
+    if (reason === 'not_found') {
+        return 'Approval request was not found.';
+    }
+    return 'Approval is missing, expired, or does not match this action.';
+};
+
 const requireDualApproval = async (
     req: any,
     res: any,
@@ -820,7 +860,7 @@ const requireDualApproval = async (
         payload?: Record<string, any>;
         note?: string;
     }
-): Promise<{ allowed: boolean; approvalId?: string }> => {
+): Promise<ApprovalGateResult> => {
     const policyEvaluation = evaluateAdminApprovalRequirement({
         actionType: input.actionType,
         actorRole: req.user?.role,
@@ -833,8 +873,50 @@ const requireDualApproval = async (
     }
 
     const endpoint = getEndpointPath(req.originalUrl || req.url || '');
-    const approvalIdHeader = req.get('x-admin-approval-id');
+    const approvalIdHeader = req.get(ADMIN_APPROVAL_ID_HEADER)?.trim() || '';
+    const breakGlassReason = normalizeBreakGlassReason(req.get(ADMIN_BREAK_GLASS_REASON_HEADER));
     const payload = input.payload ?? {};
+
+    if (breakGlassReason) {
+        if (!config.adminBreakGlassEnabled) {
+            res.status(403).json({
+                error: 'break_glass_disabled',
+                code: 'BREAK_GLASS_DISABLED',
+                message: 'Emergency override is disabled by policy.',
+            });
+            return { allowed: false };
+        }
+        if (breakGlassReason.length < config.adminBreakGlassMinReasonLength) {
+            res.status(403).json({
+                error: 'break_glass_reason_invalid',
+                code: 'BREAK_GLASS_REASON_INVALID',
+                message: `Break-glass reason must be at least ${config.adminBreakGlassMinReasonLength} characters.`,
+            });
+            return { allowed: false };
+        }
+
+        SecurityLogger.log({
+            ip_address: req.ip,
+            event_type: 'admin_break_glass_used',
+            endpoint,
+            metadata: {
+                actionType: input.actionType,
+                actor: req.user?.email,
+                actorRole: req.user?.role,
+                reason: breakGlassReason,
+                risk: policyEvaluation.risk,
+            },
+        });
+
+        return {
+            allowed: true,
+            breakGlassUsed: true,
+            breakGlassReason,
+            breakGlassEndpoint: endpoint,
+            breakGlassActionType: input.actionType,
+            breakGlassActor: req.user?.email ?? req.user?.userId ?? 'unknown',
+        };
+    }
 
     if (!approvalIdHeader) {
         const approval = await createAdminApprovalRequest({
@@ -867,6 +949,10 @@ const requireDualApproval = async (
             requiresApproval: true,
             approvalId: approval.id,
             message: 'Action queued for secondary approval.',
+            breakGlass: {
+                enabled: config.adminBreakGlassEnabled,
+                minReasonLength: config.adminBreakGlassMinReasonLength,
+            },
             data: approval,
         });
         return { allowed: false };
@@ -881,16 +967,28 @@ const requireDualApproval = async (
         payload,
     });
     if (!validation.ok) {
+        const message = resolveApprovalInvalidMessage(validation.reason);
         res.status(409).json({
             error: 'approval_invalid',
             code: 'APPROVAL_INVALID',
             reason: validation.reason,
-            message: 'Approval is missing, expired, or does not match this action.',
+            message,
         });
         return { allowed: false };
     }
 
     return { allowed: true, approvalId: approvalIdHeader };
+};
+
+const approvalGateAuditMetadata = (gate?: ApprovalGateResult): Record<string, unknown> => {
+    if (!gate?.breakGlassUsed) return {};
+    return {
+        breakGlassUsed: true,
+        breakGlassReason: gate.breakGlassReason,
+        breakGlassEndpoint: gate.breakGlassEndpoint,
+        breakGlassActionType: gate.breakGlassActionType,
+        breakGlassActor: gate.breakGlassActor,
+    };
 };
 
 const finalizeApprovalExecution = async (req: any, approvalId?: string) => {
@@ -3536,6 +3634,9 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
 
         const role = req.user?.role;
         const status = parseResult.data.status || 'draft';
+        const note = typeof (parseResult.data as any).note === 'string'
+            ? (parseResult.data as any).note.trim() || undefined
+            : undefined;
         if (role === 'contributor' && status !== 'draft') {
             return res.status(403).json({ error: 'Contributors can only save drafts.' });
         }
@@ -3553,6 +3654,22 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
             }
         }
 
+        let approvalId: string | undefined;
+        let approvalGate: ApprovalGateResult | undefined;
+        if (status === 'published') {
+            const hasStepUp = await ensureConditionalStepUp(req, res);
+            if (!hasStepUp) return;
+
+            approvalGate = await requireDualApproval(req, res, {
+                actionType: 'announcement_publish',
+                targetIds: ['new-announcement'],
+                payload: parseResult.data as Record<string, any>,
+                note,
+            });
+            if (!approvalGate.allowed) return;
+            approvalId = approvalGate.approvalId;
+        }
+
         const userId = req.user?.userId ?? 'system';
         const announcement = await AnnouncementModelMongo.create(parseResult.data as unknown as CreateAnnouncementDto, userId);
         recordAdminAudit({
@@ -3560,8 +3677,13 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
             announcementId: announcement.id,
             title: announcement.title,
             userId,
-            metadata: { status: announcement.status },
+            note,
+            metadata: {
+                status: announcement.status,
+                ...approvalGateAuditMetadata(approvalGate),
+            },
         }).catch(console.error);
+        await finalizeApprovalExecution(req, approvalId);
         await dispatchPublishNotifications([announcement]).catch((err) => {
             console.error('Failed to dispatch publish notifications after admin create:', err);
         });
@@ -3752,6 +3874,7 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
             return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
         }
         let approvalId: string | undefined;
+        let approvalGate: ApprovalGateResult | undefined;
         if (data.status === 'published') {
             for (const doc of existingDocs) {
                 const validationData = { ...doc, ...data };
@@ -3764,7 +3887,7 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
                 .filter((doc) => !isPublishedStatus(doc.status as any))
                 .map((doc) => doc._id?.toString())
                 .filter(Boolean);
-            const approvalGate = await requireDualApproval(req, res, {
+            approvalGate = await requireDualApproval(req, res, {
                 actionType: 'announcement_bulk_publish',
                 targetIds: ids,
                 payload: data,
@@ -3779,7 +3902,11 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
         recordAdminAudit({
             action: 'bulk_update',
             userId: req.user?.userId,
-            metadata: { count: ids.length, status: data.status },
+            metadata: {
+                count: ids.length,
+                status: data.status,
+                ...approvalGateAuditMetadata(approvalGate),
+            },
         }).catch(console.error);
 
         await finalizeApprovalExecution(req, approvalId);
@@ -3851,7 +3978,10 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
             action: 'bulk_approve',
             userId: req.user?.userId,
             note: note?.trim() || undefined,
-            metadata: { count: ids.length },
+            metadata: {
+                count: ids.length,
+                ...approvalGateAuditMetadata(approvalGate),
+            },
         }).catch(console.error);
 
         await finalizeApprovalExecution(req, approvalGate.approvalId);
@@ -3939,6 +4069,7 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
         const targetStatus = newStatus || existing.status;
         const isPublishTransition = targetStatus === 'published' && existing.status !== 'published';
         let approvalId: string | undefined;
+        let approvalGate: ApprovalGateResult | undefined;
 
         if (role === 'contributor' && targetStatus !== 'draft') {
             return res.status(403).json({ error: 'Contributors can only work with drafts.' });
@@ -3958,7 +4089,7 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
             const hasStepUp = await ensureConditionalStepUp(req, res);
             if (!hasStepUp) return;
 
-            const approvalGate = await requireDualApproval(req, res, {
+            approvalGate = await requireDualApproval(req, res, {
                 actionType: 'announcement_publish',
                 targetIds: [announcementId],
                 payload: parseResult.data as Record<string, any>,
@@ -4014,7 +4145,12 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
             title: announcement.title,
             userId: req.user?.userId,
             note,
-            metadata: { fields: Object.keys(parseResult.data), previousStatus: existing.status, newStatus: targetStatus },
+            metadata: {
+                fields: Object.keys(parseResult.data),
+                previousStatus: existing.status,
+                newStatus: targetStatus,
+                ...approvalGateAuditMetadata(approvalGate),
+            },
         }).catch(console.error);
         if (existing.status !== 'published' && announcement.status === 'published' && announcement.isActive) {
             await dispatchPublishNotifications([announcement]).catch((err) => {
@@ -4066,6 +4202,7 @@ router.post('/announcements/:id/revert/:version', requirePermission('announcemen
         const rollbackPayload = buildRollbackPayloadFromSnapshot(snapshot, note);
         const rollbackStatus = normalizeAnnouncementStatus(snapshot?.status);
         let approvalId: string | undefined;
+        let approvalGate: ApprovalGateResult | undefined;
 
         if (rollbackStatus === 'published') {
             const validationData = { ...existing, ...rollbackPayload, status: 'published' };
@@ -4074,7 +4211,7 @@ router.post('/announcements/:id/revert/:version', requirePermission('announcemen
                 return res.status(400).json({ error: validationError });
             }
 
-            const approvalGate = await requireDualApproval(req, res, {
+            approvalGate = await requireDualApproval(req, res, {
                 actionType: 'announcement_publish',
                 targetIds: [announcementId],
                 payload: { version, note: rollbackPayload.note },
@@ -4111,6 +4248,7 @@ router.post('/announcements/:id/revert/:version', requirePermission('announcemen
             metadata: {
                 revertedToVersion: version,
                 targetStatus: rollbackStatus,
+                ...approvalGateAuditMetadata(approvalGate),
             },
         }).catch(console.error);
 
@@ -4172,6 +4310,9 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
             title: announcement.title,
             userId: req.user?.userId,
             note,
+            metadata: {
+                ...approvalGateAuditMetadata(approvalGate),
+            },
         }).catch(console.error);
         if (existing.status !== 'published' && announcement.status === 'published' && announcement.isActive) {
             await dispatchPublishNotifications([announcement]).catch((err) => {
@@ -4262,6 +4403,7 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
         const rollbackPayload = buildRollbackPayloadFromSnapshot(snapshot, parsed.data.note);
         const rollbackStatus = normalizeAnnouncementStatus(snapshot?.status);
         let approvalId: string | undefined;
+        let approvalGate: ApprovalGateResult | undefined;
 
         if (rollbackStatus === 'published') {
             if (!hasPermission(req.user?.role as any, 'announcements:approve')) {
@@ -4278,7 +4420,7 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
                 return res.status(400).json({ error: validationError });
             }
 
-            const approvalGate = await requireDualApproval(req, res, {
+            approvalGate = await requireDualApproval(req, res, {
                 actionType: 'announcement_publish',
                 targetIds: [announcementId],
                 payload: {
@@ -4313,6 +4455,7 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
             metadata: {
                 targetVersion: parsed.data.version,
                 targetStatus: rollbackStatus,
+                ...approvalGateAuditMetadata(approvalGate),
             },
         }).catch(console.error);
 
@@ -4350,6 +4493,9 @@ router.delete('/announcements/:id', requirePermission('announcements:delete'), r
             action: 'delete',
             announcementId,
             userId: req.user?.userId,
+            metadata: {
+                ...approvalGateAuditMetadata(approvalGate),
+            },
         }).catch(console.error);
         await finalizeApprovalExecution(req, approvalGate.approvalId);
         await invalidateAnnouncementCaches().catch(err => {

@@ -32,6 +32,9 @@ const apiBase = import.meta.env.VITE_API_BASE ?? '';
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const ADMIN_STEP_UP_HEADER_NAME = 'X-Admin-Step-Up-Token';
+const ADMIN_APPROVAL_HEADER_NAME = 'X-Admin-Approval-Id';
+const ADMIN_BREAK_GLASS_REASON_HEADER_NAME = 'X-Admin-Break-Glass-Reason';
+const DEFAULT_BREAK_GLASS_REASON_MIN_LENGTH = 12;
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const readCookieValue = (name: string): string | null => {
@@ -44,6 +47,12 @@ const readCookieValue = (name: string): string | null => {
     } catch {
         return match[1];
     }
+};
+
+const requestBodyFingerprint = (body: BodyInit | null | undefined): string => {
+    if (typeof body === 'string') return body;
+    if (body instanceof URLSearchParams) return body.toString();
+    return '';
 };
 
 const AnalyticsDashboard = lazy(() =>
@@ -521,7 +530,7 @@ const DEFAULT_FORM_DATA = {
     salaryMax: '',
     difficulty: '' as '' | 'easy' | 'medium' | 'hard',
     cutoffMarks: '',
-    status: 'published' as AnnouncementStatus,
+    status: 'draft' as AnnouncementStatus,
     publishAt: '',
 };
 
@@ -646,6 +655,7 @@ export function AdminPage() {
     const hasTrackedFilterRef = useRef(false);
     const csrfTokenRef = useRef<string | null>(null);
     const adminStepUpRef = useRef<{ token: string; expiresAt: string } | null>(null);
+    const approvalReplayRef = useRef<Map<string, string>>(new Map());
     const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
     const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
     const [communityTab, setCommunityTab] = useState<'flags' | 'forums' | 'qa' | 'groups'>('flags');
@@ -753,6 +763,7 @@ export function AdminPage() {
         setBackupCodesModal(null);
         csrfTokenRef.current = null;
         adminStepUpRef.current = null;
+        approvalReplayRef.current.clear();
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
@@ -1010,16 +1021,30 @@ export function AdminPage() {
 
         const isMutating = MUTATING_METHODS.has(method);
         const stepUpRequired = requiresStepUpForRequest(method, path);
+        const approvalFingerprint = isMutating
+            ? `${method}:${path}:${requestBodyFingerprint(init?.body ?? null)}`
+            : '';
 
         let retriedCsrf = false;
         let retriedStepUp = false;
+        let retriedBreakGlass = false;
         let forceCsrfRefresh = false;
         let forceStepUpRefresh = false;
+        let breakGlassReason: string | null = null;
 
         while (true) {
             const headers = new Headers(init?.headers ?? {});
             if (isMutating && !headers.has('Idempotency-Key')) {
                 headers.set('Idempotency-Key', crypto.randomUUID());
+            }
+            if (isMutating && approvalFingerprint) {
+                const cachedApprovalId = approvalReplayRef.current.get(approvalFingerprint);
+                if (cachedApprovalId && !headers.has(ADMIN_APPROVAL_HEADER_NAME)) {
+                    headers.set(ADMIN_APPROVAL_HEADER_NAME, cachedApprovalId);
+                }
+            }
+            if (isMutating && breakGlassReason && !headers.has(ADMIN_BREAK_GLASS_REASON_HEADER_NAME)) {
+                headers.set(ADMIN_BREAK_GLASS_REASON_HEADER_NAME, breakGlassReason);
             }
 
             if (isMutating) {
@@ -1071,6 +1096,89 @@ export function AdminPage() {
                 return response;
             }
 
+            if (isMutating && response.status === 202) {
+                const errorBody = await readResponseBodySafe(response);
+                const error = typeof errorBody.error === 'string' ? errorBody.error : '';
+                if (error === 'approval_required') {
+                    const approvalId = typeof errorBody.approvalId === 'string' ? errorBody.approvalId.trim() : '';
+                    if (approvalFingerprint && approvalId) {
+                        approvalReplayRef.current.set(approvalFingerprint, approvalId);
+                    }
+
+                    const breakGlassMeta = errorBody.breakGlass && typeof errorBody.breakGlass === 'object'
+                        ? (errorBody.breakGlass as Record<string, unknown>)
+                        : null;
+                    const breakGlassEnabled = breakGlassMeta?.enabled === true;
+                    const minReasonLengthRaw = breakGlassMeta?.minReasonLength;
+                    const minReasonLength = typeof minReasonLengthRaw === 'number'
+                        && Number.isFinite(minReasonLengthRaw)
+                        ? Math.max(8, Math.floor(minReasonLengthRaw))
+                        : DEFAULT_BREAK_GLASS_REASON_MIN_LENGTH;
+
+                    if (!retriedBreakGlass && breakGlassEnabled) {
+                        const promptInput = window.prompt(
+                            `Secondary approval is required. For emergency single-operator execution, enter break-glass reason (${minReasonLength}+ chars):`
+                        );
+                        const normalizedReason = (promptInput ?? '').trim();
+                        if (normalizedReason.length >= minReasonLength) {
+                            breakGlassReason = normalizedReason;
+                            retriedBreakGlass = true;
+                            continue;
+                        }
+                        if (promptInput && normalizedReason.length < minReasonLength) {
+                            const validationMessage = `Break-glass reason must be at least ${minReasonLength} characters.`;
+                            setMessage(validationMessage);
+                            pushToast(validationMessage, 'error');
+                        }
+                    }
+
+                    const approvalMessage = getApiErrorMessage(
+                        errorBody,
+                        'Action queued for secondary approval. Approve it, then retry execution.'
+                    );
+                    setMessage(approvalMessage);
+                    pushToast(approvalMessage, 'info');
+                    return new Response(
+                        JSON.stringify({
+                            ...errorBody,
+                            message: approvalMessage,
+                        }),
+                        { status: 409, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+            }
+
+            if (isMutating && response.status === 409) {
+                const errorBody = await readResponseBodySafe(response);
+                const error = typeof errorBody.error === 'string' ? errorBody.error : '';
+                if (error === 'approval_invalid') {
+                    const reason = typeof errorBody.reason === 'string' ? errorBody.reason : '';
+                    const approvalInvalidMessage = reason === 'invalid_status:pending'
+                        ? 'Approval request is still pending secondary approval.'
+                        : reason === 'invalid_status:expired'
+                            ? 'Approval request expired. Retry to create a new approval request.'
+                            : reason === 'invalid_status:rejected'
+                                ? 'Approval request was rejected. Retry to submit a new request.'
+                                : reason === 'request_mismatch'
+                                    ? 'Approval no longer matches this action payload. Retry the action.'
+                                    : getApiErrorMessage(errorBody, 'Approval validation failed. Retry the action.');
+
+                    if (approvalFingerprint && reason !== 'invalid_status:approved') {
+                        approvalReplayRef.current.delete(approvalFingerprint);
+                    }
+
+                    setMessage(approvalInvalidMessage);
+                    pushToast(approvalInvalidMessage, 'error');
+                    return new Response(
+                        JSON.stringify({
+                            ...errorBody,
+                            message: approvalInvalidMessage,
+                        }),
+                        { status: 409, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+            }
+
             if (isMutating && response.status === 403) {
                 const errorBody = await readResponseBodySafe(response);
                 const error = typeof errorBody.error === 'string' ? errorBody.error : '';
@@ -1089,9 +1197,13 @@ export function AdminPage() {
                 }
             }
 
+            if (isMutating && approvalFingerprint && response.ok) {
+                approvalReplayRef.current.delete(approvalFingerprint);
+            }
             return response;
         }
     }, [
+        pushToast,
         canMutateEndpoint,
         ensureCsrfToken,
         handleUnauthorized,
