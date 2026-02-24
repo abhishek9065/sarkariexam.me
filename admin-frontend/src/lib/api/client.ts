@@ -693,10 +693,13 @@ export async function getBulkUpdatePreview(input: {
     };
 }
 
-export async function createAdminAnnouncement(payload: Record<string, unknown>): Promise<AdminAnnouncementListItem> {
+export async function createAdminAnnouncement(
+    payload: Record<string, unknown>,
+    stepUpToken?: string
+): Promise<AdminAnnouncementListItem> {
     const body = await request('/api/admin/announcements', {
         method: 'POST',
-        headers: mutationHeaders(),
+        headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
     }, true);
     return body?.data ?? {};
