@@ -25,6 +25,7 @@ export interface SecurityEvent {
       | 'admin_step_up_success'
       | 'admin_step_up_failed'
       | 'admin_approval_requested'
+      | 'admin_break_glass_used'
       | 'admin_approval_approved'
       | 'admin_approval_rejected'
       | 'admin_approval_executed'
