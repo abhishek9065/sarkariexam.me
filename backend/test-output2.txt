@@ -1,0 +1,419 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90mC:/Users/abhis/Downloads/sarkari-result-git-clean/backend[39m
+
+[90mstdout[2m | src/tests/adminApprovals.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ΓÜÖ∩╕Å  override existing env vars with { override: true }
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+stderr | src/tests/adminApprovals.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+
+[90mstdout[2m | src/tests/adminStepUp.test.ts
+stderr | src/tests/adminStepUp.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Running in development mode
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+[CONFIG] Database: local MongoDB
+
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+stderr | tests/admin.workflow.test.ts
+[90mstdout[2m | tests/admin.workflow.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+[90mstdout[2m | src/tests/adminStepUp.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | src/tests/csrfAuthGuardrail.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ≡ƒñû agentic secret storage: https://dotenvx.com/as2
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+stderr | src/tests/csrfAuthGuardrail.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+stderr | tests/auth.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+[90mstdout[2m | tests/auth.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+[90mstdout[2m | tests/admin.workflow.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | tests/auth.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | src/tests/adminPostLogin.contract.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+stderr | src/tests/adminPostLogin.contract.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+[90mstdout[2m | src/tests/adminPostLogin.contract.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+stderr | src/tests/adminPostLogin.contract.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+[90mstdout[2m | src/tests/errorEnvelope.requestId.test.ts
+stderr | src/tests/errorEnvelope.requestId.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+
+[90mstdout[2m | src/tests/errorEnvelope.requestId.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+stderr | tests/auth.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+stderr | tests/admin.workflow.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+stderr | src/tests/errorEnvelope.requestId.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+[2026-02-23 21:32:55.386 +0530] [32mINFO[39m: [36m[Server] Swagger UI available at /api/docs[39m
+    [35mservice[39m: "sarkari-api"
+[2026-02-23 21:32:55.386 +0530] [32mINFO[39m: [36m[Server] Swagger UI available at /api/docs[39m
+    [35mservice[39m: "sarkari-api"
+[2026-02-23 21:32:55.387 +0530] [32mINFO[39m: [36m[Server] Swagger UI available at /api/docs[39m
+    [35mservice[39m: "sarkari-api"
+stderr | src/tests/adminApprovals.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/adminStepUp.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/csrfAuthGuardrail.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/adminPostLogin.contract.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/admin.workflow.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/errorEnvelope.requestId.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/auth.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/adminApprovals.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/adminStepUp.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/csrfAuthGuardrail.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | src/tests/adminPostLogin.contract.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+ [31mΓ¥»[39m src/tests/adminApprovals.test.ts [2m([22m[2m5 tests[22m[2m | [22m[33m5 skipped[39m[2m)[22m[33m 30155[2mms[22m[39m
+     [2m[90mΓåô[39m[22m validates approved requests and rejects mismatched execution payload
+     [2m[90mΓåô[39m[22m marks approved requests as executed and blocks re-validation
+     [2m[90mΓåô[39m[22m marks expired pending approvals as expired when fetched
+     [2m[90mΓåô[39m[22m blocks execution validation for expired approvals
+     [2m[90mΓåô[39m[22m cleans up old resolved approvals and expires overdue active ones
+stderr | src/tests/errorEnvelope.requestId.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/admin.workflow.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/auth.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+ [31mΓ¥»[39m src/tests/adminStepUp.test.ts [2m([22m[2m4 tests[22m[2m | [22m[33m4 skipped[39m[2m)[22m[33m 30179[2mms[22m[39m
+     [2m[90mΓåô[39m[22m validates issued step-up tokens
+     [2m[90mΓåô[39m[22m rejects invalid token payloads
+     [2m[90mΓåô[39m[22m rejects expired step-up tokens
+     [2m[90mΓåô[39m[22m rejects tokens for another user
+ [31mΓ¥»[39m src/tests/csrfAuthGuardrail.test.ts [2m([22m[2m4 tests[22m[2m | [22m[33m4 skipped[39m[2m)[22m[33m 30207[2mms[22m[39m
+     [2m[90mΓåô[39m[22m allows POST /api/auth/login without CSRF header for stale protected cookie
+     [2m[90mΓåô[39m[22m allows POST /api/auth/register without CSRF header for stale protected cookie
+     [2m[90mΓåô[39m[22m rejects POST /api/auth/logout without CSRF header when protected cookie is present
+     [2m[90mΓåô[39m[22m allows POST /api/auth/logout with matching CSRF cookie and header
+[90mstdout[2m | tests/bookmarks.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ΓÜÖ∩╕Å  enable debug logging with { debug: true }
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+stderr | tests/bookmarks.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+[90mstdout[2m | tests/bookmarks.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | tests/subscriptions.test.ts
+stderr | tests/subscriptions.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ≡ƒñû agentic secret storage: https://dotenvx.com/as2
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+
+[90mstdout[2m | tests/subscriptions.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+ [31mΓ¥»[39m src/tests/adminPostLogin.contract.test.ts [2m([22m[2m12 tests[22m[2m | [22m[33m12 skipped[39m[2m)[22m[33m 30155[2mms[22m[39m
+     [2m[90mΓåô[39m[22m validates bulk schedule payloads and reports publishAt errors
+     [2m[90mΓåô[39m[22m accepts bulk scheduling with publishAt and returns updated data
+     [2m[90mΓåô[39m[22m supports dry-run previews for bulk updates without mutating data
+     [2m[90mΓåô[39m[22m supports dry-run previews for bulk approve and reject actions
+     [2m[90mΓåô[39m[22m returns admin SLO snapshot and dependency status
+     [2m[90mΓåô[39m[22m returns workflow overview with queue, approval, and session summaries
+     [2m[90mΓåô[39m[22m returns audit ledger integrity report
+     [2m[90mΓåô[39m[22m supports rollback dry-run previews and executes rollback updates
+     [2m[90mΓåô[39m[22m returns approvals list with stable pagination metadata
+     [2m[90mΓåô[39m[22m maps approval resolve failures to precise status codes
+     [2m[90mΓåô[39m[22m maps rejection failures to precise status codes
+     [2m[90mΓåô[39m[22m blocks terminating the current session and supports terminate-others
+[90mstdout[2m | src/tests/rateLimit.middleware.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+stderr | src/tests/rateLimit.middleware.test.ts
+[CONFIG] Warning: Using default value for ADMIN_SETUP_KEY (development only)
+[CONFIG] Warning: Using default value for TOTP_ENCRYPTION_KEY (development only)
+
+[90mstdout[2m | src/tests/rateLimit.middleware.test.ts
+[22m[39m[dotenv@17.3.1] injecting env (25) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+[CONFIG] Running in development mode
+[CONFIG] Database: local MongoDB
+[CONFIG] Push notifications: disabled
+[CONFIG] Email notifications: disabled
+[CONFIG] Telegram notifications: disabled
+
+stderr | tests/bookmarks.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+stderr | tests/subscriptions.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+[2026-02-23 21:33:23.662 +0530] [32mINFO[39m: [36m[Server] Swagger UI available at /api/docs[39m
+    [35mservice[39m: "sarkari-api"
+[2026-02-23 21:33:23.971 +0530] [32mINFO[39m: [36m[Server] Swagger UI available at /api/docs[39m
+    [35mservice[39m: "sarkari-api"
+stderr | src/tests/adminAuth.contract.test.ts > admin-auth contract > returns standardized envelope for terminate-others failures
+Admin-auth terminate-others error: Error: mongo unavailable
+    at C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/src/tests/adminAuth.contract.test.ts:224:54
+    at file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/@vitest/runner/dist/index.js:145:11
+    at file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/@vitest/runner/dist/index.js:915:26
+    at file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/@vitest/runner/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/@vitest/runner/dist/index.js:1209:10)
+    at file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/@vitest/runner/dist/index.js:1653:37
+    at Traces.$ (file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/vitest/dist/chunks/traces.U4xDYhzZ.js:115:27)
+    at trace (file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/vitest/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///C:/Users/abhis/Downloads/sarkari-result-git-clean/backend/node_modules/@vitest/runner/dist/index.js:1653:12)
+
+ [32mΓ£ô[39m src/tests/adminAuth.contract.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1127[2mms[22m[39m
+ [31mΓ¥»[39m tests/auth.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 30145[2mms[22m[39m
+     [2m[90mΓåô[39m[22m registers and logs in a user
+ [31mΓ¥»[39m src/tests/errorEnvelope.requestId.test.ts [2m([22m[2m3 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[33m 30171[2mms[22m[39m
+     [2m[90mΓåô[39m[22m returns standardized envelope for unhandled errors
+     [2m[90mΓåô[39m[22m returns standardized envelope for operational AppError responses
+     [2m[90mΓåô[39m[22m returns API fallback with code and request id under Express 5
+ [31mΓ¥»[39m tests/admin.workflow.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 30196[2mms[22m[39m
+     [2m[90mΓåô[39m[22m requires step-up for sensitive session actions
+     [2m[90mΓåô[39m[22m enforces dual approval and blocks self-approval
+[90mstdout[2m | src/tests/cacheMiddleware.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | src/tests/auth.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+stderr | src/tests/auth.test.ts
+SENDGRID_API_KEY not configured. Email notifications disabled.
+
+[90mstdout[2m | src/tests/adminSetup.test.ts[2m > [22m[2mAdmin setup routes[2m > [22m[2mcreates first admin account with valid setup key
+[22m[39m[Auth] First admin account created: admin@example.com
+
+ [32mΓ£ô[39m src/tests/adminSetup.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1231[2mms[22m[39m
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/login[2m > [22m[2mshould login successfully with valid credentials
+[22m[39m[Auth] Login success: test@example.com from 127.0.0.1
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/login[2m > [22m[2mshould fail with invalid credentials
+[22m[39m[Security] admin_login_failure: 127.0.0.1 -> /api/auth/login
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/login[2m > [22m[2mthrottles repeated invalid login attempts
+[22m[39m[Security] admin_login_failure: 127.0.0.1 -> /api/auth/login
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/login[2m > [22m[2mthrottles repeated invalid login attempts
+[22m[39m[Security] admin_login_failure: 127.0.0.1 -> /api/auth/login
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/login[2m > [22m[2mthrottles repeated invalid login attempts
+[22m[39m[Security] admin_login_failure: 127.0.0.1 -> /api/auth/login
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/login[2m > [22m[2mthrottles repeated invalid login attempts
+[22m[39m[Security] admin_login_failure: 127.0.0.1 -> /api/auth/login
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/reset-password[2m > [22m[2mshould reset password with a valid reset token
+[22m[39m[Security] admin_password_reset_completed: 127.0.0.1 -> /api/auth/admin/reset-password
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/reset-password[2m > [22m[2mthrottles repeated reset-password failures
+[22m[39m[Security] admin_password_reset_failed: 127.0.0.1 -> /api/auth/admin/reset-password
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/reset-password[2m > [22m[2mthrottles repeated reset-password failures
+[22m[39m[Security] admin_password_reset_failed: 127.0.0.1 -> /api/auth/admin/reset-password
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/reset-password[2m > [22m[2mthrottles repeated reset-password failures
+[22m[39m[Security] admin_password_reset_failed: 127.0.0.1 -> /api/auth/admin/reset-password
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/reset-password[2m > [22m[2mthrottles repeated reset-password failures
+[22m[39m[Security] admin_password_reset_failed: 127.0.0.1 -> /api/auth/admin/reset-password
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/step-up[2m > [22m[2missues step-up token for valid admin credentials
+[22m[39m[Security] admin_step_up_success: 127.0.0.1 -> /api/auth/admin/step-up
+
+ [32mΓ£ô[39m src/tests/cacheMiddleware.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1321[2mms[22m[39m
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/step-up[2m > [22m[2mthrottles repeated invalid step-up attempts
+[22m[39m[Security] admin_step_up_failed: 127.0.0.1 -> /api/auth/admin/step-up
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/step-up[2m > [22m[2mthrottles repeated invalid step-up attempts
+[22m[39m[Security] admin_step_up_failed: 127.0.0.1 -> /api/auth/admin/step-up
+
+ [32mΓ£ô[39m src/tests/admin.cacheInvalidation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1292[2mms[22m[39m
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/step-up[2m > [22m[2mthrottles repeated invalid step-up attempts
+[22m[39m[Security] admin_step_up_failed: 127.0.0.1 -> /api/auth/admin/step-up
+
+[90mstdout[2m | src/tests/auth.test.ts[2m > [22m[2mAuth Routes[2m > [22m[2mPOST /auth/admin/step-up[2m > [22m[2mthrottles repeated invalid step-up attempts
+[22m[39m[Security] admin_step_up_failed: 127.0.0.1 -> /api/auth/admin/step-up
+
+ [32mΓ£ô[39m src/tests/auth.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 1447[2mms[22m[39m
+[90mstdout[2m | src/tests/idempotency.middleware.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | src/tests/announcements.cache.analytics.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+[90mstdout[2m | src/tests/announcements.analytics.contract.test.ts
+[22m[39mΓÜá∩╕Å Redis not configured. Using in-memory cache fallback.
+
+ [32mΓ£ô[39m src/tests/analyticsOverview.funnelSemantics.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1104[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/announcements.cache.analytics.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1123[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/idempotency.middleware.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1224[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/announcements.analytics.contract.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1149[2mms[22m[39m
+stderr | src/tests/rateLimit.middleware.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/bookmarks.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/subscriptions.test.ts
+[CosmosDB] Connection attempt 1 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+ [32mΓ£ô[39m src/tests/savedSearchAlerts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1280[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/admin.vnext.preview.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1355[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/push.analytics.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1357[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/subscriberDispatch.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1202[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/analyticsOverview.healthFlags.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 1128[2mms[22m[39m
+[90mstdout[2m | src/tests/securityLogger.test.ts[2m > [22m[2mSecurityLogger filtering[2m > [22m[2mfilters paged logs by event type and endpoint
+[22m[39m[Security] admin_login_failure: 10.10.10.10 -> /api/auth/login?marker=evt-1771862617176-u9vb9c
+[Security] admin_step_up_failed: 10.10.10.11 -> /api/auth/admin/step-up?marker=evt-1771862617176-u9vb9c
+
+ [32mΓ£ô[39m src/tests/trackerReminders.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1159[2mms[22m[39m
+[90mstdout[2m | src/tests/securityLogger.test.ts[2m > [22m[2mSecurityLogger filtering[2m > [22m[2msupports ip filtering, pagination, and date ranges
+[22m[39m[Security] admin_login_failure: 203.0.113.65 -> /api/auth/login?marker=ip-1771862617190-pqpusw
+[Security] admin_step_up_failed: 203.0.113.65 -> /api/auth/admin/step-up?marker=ip-1771862617190-pqpusw
+
+ [32mΓ£ô[39m src/tests/securityLogger.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1115[2mms[22m[39m
+ [32mΓ£ô[39m src/tests/analyticsAttribution.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1139[2mms[22m[39m
+stderr | src/tests/rateLimit.middleware.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/bookmarks.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+stderr | tests/subscriptions.test.ts
+[CosmosDB] Connection attempt 2 failed: MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
+
+ [31mΓ¥»[39m src/tests/rateLimit.middleware.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 30161[2mms[22m[39m
+     [2m[90mΓåô[39m[22m enforces request caps and emits rate limit headers
+     [2m[90mΓåô[39m[22m keeps counters isolated by key prefix
+ [31mΓ¥»[39m tests/bookmarks.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 30153[2mms[22m[39m
+     [2m[90mΓåô[39m[22m adds and removes bookmarks
+ [31mΓ¥»[39m tests/subscriptions.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 30168[2mms[22m[39m
+     [2m[90mΓåô[39m[22m verifies and unsubscribes using tokens
+     [2m[90mΓåô[39m[22m returns 404 for invalid tokens
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Suites 10 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/admin.workflow.test.ts [ tests/admin.workflow.test.ts ]
+ FAIL  tests/auth.test.ts [ tests/auth.test.ts ]
+ FAIL  tests/bookmarks.test.ts [ tests/bookmarks.test.ts ]
+ FAIL  tests/subscriptions.test.ts [ tests/subscriptions.test.ts ]
+ FAIL  src/tests/adminApprovals.test.ts [ src/tests/adminApprovals.test.ts ]
+ FAIL  src/tests/adminPostLogin.contract.test.ts [ src/tests/adminPostLogin.contract.test.ts ]
+ FAIL  src/tests/adminStepUp.test.ts [ src/tests/adminStepUp.test.ts ]
+ FAIL  src/tests/csrfAuthGuardrail.test.ts [ src/tests/csrfAuthGuardrail.test.ts ]
+ FAIL  src/tests/errorEnvelope.requestId.test.ts [ src/tests/errorEnvelope.requestId.test.ts ]
+ FAIL  src/tests/rateLimit.middleware.test.ts [ src/tests/rateLimit.middleware.test.ts ]
+Error: Hook timed out in 30000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ Γ¥» tests/setup.ts:29:1
+     27| }
+     28| 
+     29| beforeAll(async () => {
+       | ^
+     30|     if (skipMongoTests) return;
+     31|     process.env.DISABLE_DB_RECONNECT = 'false';
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/10]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m10 failed[39m[22m[2m | [22m[1m[32m17 passed[39m[22m[90m (27)[39m
+[2m      Tests [22m [1m[32m70 passed[39m[22m[2m | [22m[33m36 skipped[39m[90m (106)[39m
+[2m   Start at [22m 21:32:46
+[2m   Duration [22m 67.69s[2m (transform 7.19s, setup 39.84s, import 32.54s, tests 322.45s, environment 8ms)[22m
+
