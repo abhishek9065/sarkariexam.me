@@ -29,6 +29,32 @@ import { AdminShellSearch } from '../components/admin/AdminShellSearch';
 import './AdminPage.css';
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
+const CSRF_COOKIE_NAME = 'csrf_token';
+const CSRF_HEADER_NAME = 'X-CSRF-Token';
+const ADMIN_STEP_UP_HEADER_NAME = 'X-Admin-Step-Up-Token';
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+const readCookieValue = (name: string): string | null => {
+    if (typeof document === 'undefined') return null;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+    if (!match) return null;
+    try {
+        return decodeURIComponent(match[1]);
+    } catch {
+        return match[1];
+    }
+};
+
+const parseJsonBody = (body: BodyInit | null | undefined): Record<string, unknown> | null => {
+    if (!body || typeof body !== 'string') return null;
+    try {
+        const parsed = JSON.parse(body);
+        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    } catch {
+        return null;
+    }
+};
 
 const AnalyticsDashboard = lazy(() =>
     import('../components/admin/AnalyticsDashboard').then((module) => ({ default: module.AnalyticsDashboard }))
@@ -352,7 +378,7 @@ const TAB_PERMISSION_MAP: Record<AdminTab, AdminPermission> = {
     bulk: 'announcements:write',
     queue: 'announcements:read',
     security: 'security:read',
-    users: 'analytics:read',
+    users: 'admin:read',
     audit: 'audit:read',
     community: 'admin:read',
     errors: 'admin:read',
@@ -628,6 +654,8 @@ export function AdminPage() {
     const listLastFetchAt = useRef(0);
     const listRateLimitUntil = useRef(0);
     const hasTrackedFilterRef = useRef(false);
+    const csrfTokenRef = useRef<string | null>(null);
+    const adminStepUpRef = useRef<{ token: string; expiresAt: string } | null>(null);
     const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
     const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
     const [communityTab, setCommunityTab] = useState<'flags' | 'forums' | 'qa' | 'groups'>('flags');
@@ -733,6 +761,8 @@ export function AdminPage() {
         setSessionsError(null);
         setBackupCodesStatus(null);
         setBackupCodesModal(null);
+        csrfTokenRef.current = null;
+        adminStepUpRef.current = null;
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
@@ -854,6 +884,131 @@ export function AdminPage() {
         return '';
     }, []);
 
+    const readResponseBodySafe = useCallback(async (response: Response): Promise<Record<string, unknown>> => {
+        try {
+            const parsed = await response.clone().json();
+            return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+        } catch {
+            return {};
+        }
+    }, []);
+
+    const ensureCsrfToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
+        if (!forceRefresh) {
+            const cookieToken = readCookieValue(CSRF_COOKIE_NAME);
+            if (cookieToken) {
+                csrfTokenRef.current = cookieToken;
+                return cookieToken;
+            }
+            if (csrfTokenRef.current) return csrfTokenRef.current;
+        }
+
+        const response = await adminRequest(`${apiBase}/api/auth/csrf`, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-store',
+            },
+            maxRetries: 1,
+        });
+
+        if (!response.ok) {
+            return readCookieValue(CSRF_COOKIE_NAME) ?? csrfTokenRef.current;
+        }
+
+        const payload = await response.json().catch(() => ({} as Record<string, any>));
+        const bodyToken = typeof payload?.data?.csrfToken === 'string' ? payload.data.csrfToken : null;
+        const cookieToken = readCookieValue(CSRF_COOKIE_NAME);
+        const token = bodyToken || cookieToken;
+        if (token) {
+            csrfTokenRef.current = token;
+            return token;
+        }
+        return null;
+    }, []);
+
+    const getValidStepUpToken = useCallback((): string | null => {
+        const grant = adminStepUpRef.current;
+        if (!grant) return null;
+        const expiresAtMs = new Date(grant.expiresAt).getTime();
+        if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+            adminStepUpRef.current = null;
+            return null;
+        }
+        return grant.token;
+    }, []);
+
+    const requestAdminStepUpToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
+        if (!forceRefresh) {
+            const cached = getValidStepUpToken();
+            if (cached) return cached;
+        }
+
+        if (!user?.email) {
+            setMessage('Authentication context missing. Please log in again.');
+            return null;
+        }
+
+        const password = window.prompt('Step-up verification is required. Enter your admin password:');
+        if (!password) return null;
+
+        const twoFactorCode = window.prompt('Enter your 2FA code or backup code (leave blank if not required):') ?? '';
+        const csrfToken = await ensureCsrfToken(false);
+        const headers = new Headers({
+            'Content-Type': 'application/json',
+        });
+        if (csrfToken) {
+            headers.set(CSRF_HEADER_NAME, csrfToken);
+        }
+
+        const response = await adminRequest(`${apiBase}/api/auth/admin/step-up`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                email: user.email,
+                password,
+                ...(twoFactorCode.trim() ? { twoFactorCode: twoFactorCode.trim() } : {}),
+            }),
+            maxRetries: 0,
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            const errorMessage = getApiErrorMessage(errorBody, 'Step-up verification failed.');
+            setMessage(errorMessage);
+            pushToast(errorMessage, 'error');
+            return null;
+        }
+
+        const payload = await response.json().catch(() => ({} as Record<string, any>));
+        const token = typeof payload?.data?.token === 'string' ? payload.data.token : '';
+        const expiresAt = typeof payload?.data?.expiresAt === 'string' ? payload.data.expiresAt : '';
+        if (!token || !expiresAt) {
+            const errorMessage = 'Step-up verification failed.';
+            setMessage(errorMessage);
+            pushToast(errorMessage, 'error');
+            return null;
+        }
+
+        adminStepUpRef.current = { token, expiresAt };
+        return token;
+    }, [ensureCsrfToken, getValidStepUpToken, pushToast, user?.email]);
+
+    const requiresStepUpForRequest = useCallback((
+        method: string,
+        pathname: string,
+        requestBody: Record<string, unknown> | null
+    ): boolean => {
+        if (!MUTATING_METHODS.has(method)) return false;
+        if (/\/api\/admin\/sessions\/terminate(?:-others)?$/.test(pathname)) return true;
+        if (/\/api\/admin\/announcements\/[^/]+\/(approve|reject|rollback)$/.test(pathname)) return true;
+        if (pathname.includes('/api/admin/announcements/bulk')) return true;
+        if (method === 'DELETE' && /\/api\/admin\/announcements\/[^/]+$/.test(pathname)) return true;
+        if (method === 'PUT' && /\/api\/admin\/announcements\/[^/]+$/.test(pathname)) {
+            return requestBody?.status === 'published';
+        }
+        return false;
+    }, []);
+
     const adminFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
         const method = (init?.method ?? 'GET').toUpperCase();
         const path = resolveRequestPath(input);
@@ -867,34 +1022,99 @@ export function AdminPage() {
             );
         }
 
-        const headers = new Headers(init?.headers ?? {});
-        if (method !== 'GET' && method !== 'HEAD' && !headers.has('Idempotency-Key')) {
-            headers.set('Idempotency-Key', crypto.randomUUID());
+        const isMutating = MUTATING_METHODS.has(method);
+        const requestBody = parseJsonBody(init?.body);
+        const stepUpRequired = requiresStepUpForRequest(method, path, requestBody);
+
+        let retriedCsrf = false;
+        let retriedStepUp = false;
+        let forceCsrfRefresh = false;
+        let forceStepUpRefresh = false;
+
+        while (true) {
+            const headers = new Headers(init?.headers ?? {});
+            if (isMutating && !headers.has('Idempotency-Key')) {
+                headers.set('Idempotency-Key', crypto.randomUUID());
+            }
+
+            if (isMutating) {
+                const csrfToken = await ensureCsrfToken(forceCsrfRefresh);
+                forceCsrfRefresh = false;
+                if (csrfToken) {
+                    headers.set(CSRF_HEADER_NAME, csrfToken);
+                }
+            }
+
+            if (stepUpRequired || forceStepUpRefresh) {
+                const stepUpToken = await requestAdminStepUpToken(forceStepUpRefresh);
+                forceStepUpRefresh = false;
+                if (!stepUpToken) {
+                    return new Response(
+                        JSON.stringify({
+                            error: 'step_up_required',
+                            code: 'STEP_UP_REQUIRED',
+                            message: 'Step-up verification required for this action.',
+                        }),
+                        { status: 403, headers: { 'Content-Type': 'application/json' } }
+                    );
+                }
+                headers.set(ADMIN_STEP_UP_HEADER_NAME, stepUpToken);
+            }
+
+            const response = await adminRequest(input, {
+                ...init,
+                headers,
+                maxRetries: method === 'GET' ? 2 : 0,
+                onRateLimit: (rateLimitResponse) => {
+                    const retryAfter = rateLimitResponse.headers.get('Retry-After');
+                    const retrySeconds = retryAfter && Number.isFinite(Number(retryAfter))
+                        ? Number(retryAfter)
+                        : 60;
+                    const message = retryAfter
+                        ? `Too many requests. Try again in ${retrySeconds}s.`
+                        : 'Too many requests. Please wait and try again.';
+                    setRateLimitUntil((current) => {
+                        const nextUntil = Date.now() + retrySeconds * 1000;
+                        return current ? Math.max(current, nextUntil) : nextUntil;
+                    });
+                    setMessage(message);
+                },
+            });
+
+            if (response.status === 401) {
+                handleUnauthorized();
+                return response;
+            }
+
+            if (isMutating && response.status === 403) {
+                const errorBody = await readResponseBodySafe(response);
+                const error = typeof errorBody.error === 'string' ? errorBody.error : '';
+
+                if (!retriedCsrf && error === 'csrf_invalid') {
+                    retriedCsrf = true;
+                    forceCsrfRefresh = true;
+                    continue;
+                }
+
+                if (!retriedStepUp && (error === 'step_up_required' || error === 'step_up_invalid')) {
+                    retriedStepUp = true;
+                    adminStepUpRef.current = null;
+                    forceStepUpRefresh = true;
+                    continue;
+                }
+            }
+
+            return response;
         }
-        const response = await adminRequest(input, {
-            ...init,
-            headers,
-            maxRetries: method === 'GET' ? 2 : 0,
-            onRateLimit: (rateLimitResponse) => {
-                const retryAfter = rateLimitResponse.headers.get('Retry-After');
-                const retrySeconds = retryAfter && Number.isFinite(Number(retryAfter))
-                    ? Number(retryAfter)
-                    : 60;
-                const message = retryAfter
-                    ? `Too many requests. Try again in ${retrySeconds}s.`
-                    : 'Too many requests. Please wait and try again.';
-                setRateLimitUntil((current) => {
-                    const nextUntil = Date.now() + retrySeconds * 1000;
-                    return current ? Math.max(current, nextUntil) : nextUntil;
-                });
-                setMessage(message);
-            },
-        });
-        if (response.status === 401) {
-            handleUnauthorized();
-        }
-        return response;
-    }, [canMutateEndpoint, handleUnauthorized, pushToast, resolveRequestPath]);
+    }, [
+        canMutateEndpoint,
+        ensureCsrfToken,
+        handleUnauthorized,
+        readResponseBodySafe,
+        requestAdminStepUpToken,
+        requiresStepUpForRequest,
+        resolveRequestPath,
+    ]);
 
     useEffect(() => {
         if (!rateLimitUntil) {

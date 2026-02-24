@@ -226,7 +226,7 @@ export function ReviewModule() {
                                     <td>{item.status || '-'}</td>
                                     <td>{item.type || '-'}</td>
                                     <td>
-                                        <a href={`/manage/posts?focus=${id}`} target="_blank" rel="noreferrer" className="admin-btn small subtle">Review Diffs</a>
+                                        <a href={`/manage-posts?focus=${id}`} target="_blank" rel="noreferrer" className="admin-btn small subtle">Review Diffs</a>
                                     </td>
                                 </tr>
                             );

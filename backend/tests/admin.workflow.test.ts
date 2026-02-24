@@ -1,9 +1,11 @@
+import { ObjectId } from 'mongodb';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { config } from '../src/config.js';
 import { UserModelMongo } from '../src/models/users.mongo.js';
 import { app } from '../src/server.js';
+import { getCollection } from '../src/services/cosmosdb.js';
 
 const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
 
@@ -207,5 +209,150 @@ describeOrSkip('admin workflow integration', () => {
             .expect(200);
 
         expect(executed.body?.data?.status).toBe('published');
+    });
+
+    it('blocks publish transition updates without step-up and queues approval with step-up', async () => {
+        const suffix = Date.now();
+        const password = `Publ1sh!${suffix}Strong`;
+        const admin = await UserModelMongo.create({
+            email: `publish-guard-${suffix}@example.com`,
+            username: 'Publish Guard Admin',
+            password,
+            role: 'admin',
+        });
+
+        const session = await loginAdmin(admin.email, password);
+
+        const createResponse = await request(app)
+            .post('/api/admin/announcements')
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .send({
+                title: `Syllabus Update ${suffix}`,
+                type: 'syllabus',
+                category: 'Education',
+                organization: 'State Board',
+                status: 'pending',
+                content: 'Updated syllabus details for upcoming exam cycle.',
+            })
+            .expect(201);
+
+        const announcementId = createResponse.body?.data?.id as string;
+        expect(announcementId).toBeTruthy();
+
+        const blocked = await request(app)
+            .put(`/api/admin/announcements/${announcementId}`)
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .send({ status: 'published' });
+
+        expect(blocked.status).toBe(403);
+        expect(blocked.body?.error).toBe('step_up_required');
+
+        const stepUpToken = await issueStepUp({
+            email: admin.email,
+            password,
+            cookies: session.cookies,
+            csrfToken: session.csrfToken,
+        });
+
+        const queued = await request(app)
+            .put(`/api/admin/announcements/${announcementId}`)
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .set('X-Admin-Step-Up-Token', stepUpToken)
+            .send({ status: 'published' });
+
+        if (config.adminDualApprovalRequired) {
+            expect(queued.status).toBe(202);
+            expect(queued.body?.error).toBe('approval_required');
+        } else {
+            expect(queued.status).toBe(200);
+            expect(queued.body?.data?.status).toBe('published');
+        }
+    });
+
+    it('requires step-up for revert and enforces approval on rollback-to-published snapshots', async () => {
+        const suffix = Date.now();
+        const password = `Rev3rt!${suffix}Strong`;
+        const admin = await UserModelMongo.create({
+            email: `revert-guard-${suffix}@example.com`,
+            username: 'Revert Guard Admin',
+            password,
+            role: 'admin',
+        });
+
+        const session = await loginAdmin(admin.email, password);
+
+        const createResponse = await request(app)
+            .post('/api/admin/announcements')
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .send({
+                title: `Rollback Candidate ${suffix}`,
+                type: 'syllabus',
+                category: 'Education',
+                organization: 'State Board',
+                status: 'draft',
+                content: 'Initial draft content.',
+            })
+            .expect(201);
+
+        const announcementId = createResponse.body?.data?.id as string;
+        expect(announcementId).toBeTruthy();
+
+        const revertBlocked = await request(app)
+            .post(`/api/admin/announcements/${announcementId}/revert/1`)
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .send({});
+        expect(revertBlocked.status).toBe(403);
+        expect(revertBlocked.body?.error).toBe('step_up_required');
+
+        const versionsCollection = getCollection<any>('announcements');
+        await versionsCollection.updateOne(
+            { _id: new ObjectId(announcementId) },
+            {
+                $set: {
+                    versions: [{
+                        version: 1,
+                        updatedAt: new Date(),
+                        updatedBy: admin.id,
+                        snapshot: {
+                            title: `Rollback Candidate ${suffix}`,
+                            type: 'syllabus',
+                            category: 'Education',
+                            organization: 'State Board',
+                            content: 'Historical published snapshot.',
+                            status: 'published',
+                            isActive: true,
+                            publishAt: new Date(),
+                        },
+                    }],
+                },
+            }
+        );
+
+        const stepUpToken = await issueStepUp({
+            email: admin.email,
+            password,
+            cookies: session.cookies,
+            csrfToken: session.csrfToken,
+        });
+
+        const rollbackAttempt = await request(app)
+            .post(`/api/admin/announcements/${announcementId}/rollback`)
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .set('X-Admin-Step-Up-Token', stepUpToken)
+            .send({ version: 1 });
+
+        if (config.adminDualApprovalRequired) {
+            expect(rollbackAttempt.status).toBe(202);
+            expect(rollbackAttempt.body?.error).toBe('approval_required');
+        } else {
+            expect(rollbackAttempt.status).toBe(200);
+            expect(rollbackAttempt.body?.data?.status).toBe('published');
+        }
     });
 });

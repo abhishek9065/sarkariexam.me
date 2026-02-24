@@ -788,6 +788,29 @@ const getDueSoonCount = (docs: any[], days = 7): number => {
     }).length;
 };
 
+const ensureConditionalStepUp = async (req: any, res: any): Promise<boolean> => {
+    return new Promise((resolve) => {
+        let settled = false;
+
+        const finalize = (value: boolean) => {
+            if (settled) return;
+            settled = true;
+            res.off('finish', onFinish);
+            resolve(value);
+        };
+
+        const onFinish = () => finalize(false);
+        res.once('finish', onFinish);
+
+        try {
+            requireAdminStepUp(req, res, () => finalize(true));
+        } catch (error) {
+            console.error('Step-up verification middleware error:', error);
+            finalize(false);
+        }
+    });
+};
+
 const requireDualApproval = async (
     req: any,
     res: any,
@@ -839,6 +862,8 @@ const requireDualApproval = async (
             },
         });
         res.status(202).json({
+            error: 'approval_required',
+            code: 'APPROVAL_REQUIRED',
             requiresApproval: true,
             approvalId: approval.id,
             message: 'Action queued for secondary approval.',
@@ -858,6 +883,7 @@ const requireDualApproval = async (
     if (!validation.ok) {
         res.status(409).json({
             error: 'approval_invalid',
+            code: 'APPROVAL_INVALID',
             reason: validation.reason,
             message: 'Approval is missing, expired, or does not match this action.',
         });
@@ -882,6 +908,44 @@ const finalizeApprovalExecution = async (req: any, approvalId?: string) => {
         endpoint: getEndpointPath(req.originalUrl || req.url || ''),
         metadata: { approvalId, actor: req.user?.email },
     });
+};
+
+const buildRollbackPayloadFromSnapshot = (
+    snapshot: any,
+    note?: string
+): Partial<CreateAnnouncementDto> & { isActive?: boolean; note?: string } => {
+    const rollbackPayload: Partial<CreateAnnouncementDto> & { isActive?: boolean; note?: string } = {
+        title: snapshot.title,
+        type: snapshot.type,
+        category: snapshot.category,
+        organization: snapshot.organization,
+        content: snapshot.content,
+        externalLink: snapshot.externalLink,
+        location: snapshot.location,
+        minQualification: snapshot.minQualification,
+        ageLimit: snapshot.ageLimit,
+        applicationFee: snapshot.applicationFee,
+        salaryMin: snapshot.salaryMin,
+        salaryMax: snapshot.salaryMax,
+        difficulty: snapshot.difficulty,
+        cutoffMarks: snapshot.cutoffMarks,
+        totalPosts: snapshot.totalPosts,
+        status: snapshot.status,
+        publishAt: normalizeRollbackDateField(snapshot.publishAt),
+        approvedAt: normalizeRollbackDateField(snapshot.approvedAt),
+        approvedBy: typeof snapshot.approvedBy === 'string' ? snapshot.approvedBy : undefined,
+        tags: normalizeRollbackTags(snapshot.tags),
+        importantDates: normalizeRollbackImportantDates(snapshot.importantDates),
+        jobDetails: snapshot.jobDetails,
+        isActive: typeof snapshot.isActive === 'boolean' ? snapshot.isActive : undefined,
+        note: note?.trim() || undefined,
+    };
+
+    if (typeof snapshot.deadline === 'string') {
+        rollbackPayload.deadline = snapshot.deadline || '';
+    }
+
+    return rollbackPayload;
 };
 // All admin dashboard routes require admin-level read access
 router.use(authenticateToken, requirePermission('admin:read'));
@@ -3873,6 +3937,8 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
         const role = req.user?.role;
         const newStatus = parseResult.data.status;
         const targetStatus = newStatus || existing.status;
+        const isPublishTransition = targetStatus === 'published' && existing.status !== 'published';
+        let approvalId: string | undefined;
 
         if (role === 'contributor' && targetStatus !== 'draft') {
             return res.status(403).json({ error: 'Contributors can only work with drafts.' });
@@ -3881,21 +3947,52 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
             return res.status(403).json({ error: 'Editors cannot save or edit published announcements. Must be draft or pending.' });
         }
         if (newStatus && ['published', 'scheduled'].includes(newStatus) && !hasPermission(role as any, 'announcements:approve')) {
-            return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
+            return res.status(403).json({
+                error: 'insufficient_permissions',
+                code: 'INSUFFICIENT_PERMISSIONS',
+                message: 'Insufficient permissions to publish announcements.',
+            });
+        }
+
+        if (isPublishTransition) {
+            const hasStepUp = await ensureConditionalStepUp(req, res);
+            if (!hasStepUp) return;
+
+            const approvalGate = await requireDualApproval(req, res, {
+                actionType: 'announcement_publish',
+                targetIds: [announcementId],
+                payload: parseResult.data as Record<string, any>,
+                note,
+            });
+            if (!approvalGate.allowed) return;
+            approvalId = approvalGate.approvalId;
         }
 
         if (['published', 'scheduled'].includes(targetStatus)) {
             // merge data before testing (as partial updates might not contain the full data payload)
             const validationData = { ...existing, ...parseResult.data };
-            const validationError = await validateForPublish(validationData, announcementId);
+            const validationError = await validateForPublish(validationData, announcementId, isPublishTransition);
             if (validationError) {
                 return res.status(400).json({ error: validationError });
             }
         }
 
+        const updatePayload = {
+            ...(parseResult.data as unknown as Partial<CreateAnnouncementDto> & { note?: string }),
+        };
+        if (isPublishTransition) {
+            const now = new Date().toISOString();
+            updatePayload.status = 'published';
+            if (!updatePayload.publishAt || !String(updatePayload.publishAt).trim()) {
+                updatePayload.publishAt = now;
+            }
+            updatePayload.approvedAt = now;
+            updatePayload.approvedBy = req.user?.userId;
+        }
+
         const announcement = await AnnouncementModelMongo.update(
             announcementId,
-            parseResult.data as unknown as Partial<CreateAnnouncementDto> & { note?: string },
+            updatePayload,
             req.user?.userId
         );
         if (!announcement) {
@@ -3924,6 +4021,7 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
                 console.error('Failed to dispatch publish notifications after admin update:', err);
             });
         }
+        await finalizeApprovalExecution(req, approvalId);
         await invalidateAnnouncementCaches().catch(err => {
             console.error('Failed to invalidate caches after admin update:', err);
         });
@@ -3938,10 +4036,21 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
  * POST /api/admin/announcements/:id/revert/:version
  * Revert announcement to a previous version
  */
-router.post('/announcements/:id/revert/:version', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+router.post('/announcements/:id/revert/:version', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const version = parseInt(getPathParam(req.params.version), 10);
+        const note = typeof req.body?.note === 'string'
+            ? req.body.note.trim() || `Reverted to version ${version}`
+            : `Reverted to version ${version}`;
+
+        if (!hasPermission(req.user?.role as any, 'announcements:approve')) {
+            return res.status(403).json({
+                error: 'insufficient_permissions',
+                code: 'INSUFFICIENT_PERMISSIONS',
+                message: 'Approval permissions are required to revert announcement versions.',
+            });
+        }
 
         const existing = await AnnouncementModelMongo.findById(announcementId);
         if (!existing) {
@@ -3953,11 +4062,39 @@ router.post('/announcements/:id/revert/:version', requirePermission('announcemen
             return res.status(404).json({ error: 'Version not found' });
         }
 
-        const snapshot = targetVersion.snapshot;
+        const snapshot = targetVersion.snapshot as any;
+        const rollbackPayload = buildRollbackPayloadFromSnapshot(snapshot, note);
+        const rollbackStatus = normalizeAnnouncementStatus(snapshot?.status);
+        let approvalId: string | undefined;
+
+        if (rollbackStatus === 'published') {
+            const validationData = { ...existing, ...rollbackPayload, status: 'published' };
+            const validationError = await validateForPublish(validationData, announcementId, true);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
+            }
+
+            const approvalGate = await requireDualApproval(req, res, {
+                actionType: 'announcement_publish',
+                targetIds: [announcementId],
+                payload: { version, note: rollbackPayload.note },
+                note: rollbackPayload.note,
+            });
+            if (!approvalGate.allowed) return;
+            approvalId = approvalGate.approvalId;
+
+            const now = new Date().toISOString();
+            rollbackPayload.status = 'published';
+            if (!rollbackPayload.publishAt || !String(rollbackPayload.publishAt).trim()) {
+                rollbackPayload.publishAt = now;
+            }
+            rollbackPayload.approvedAt = now;
+            rollbackPayload.approvedBy = req.user?.userId;
+        }
 
         const announcement = await AnnouncementModelMongo.update(
             announcementId,
-            { ...snapshot, note: `Reverted to version ${version}` } as any,
+            rollbackPayload,
             req.user?.userId
         );
 
@@ -3970,9 +4107,14 @@ router.post('/announcements/:id/revert/:version', requirePermission('announcemen
             announcementId: announcement.id,
             title: announcement.title,
             userId: req.user?.userId,
-            metadata: { revertedToVersion: version },
+            note: rollbackPayload.note,
+            metadata: {
+                revertedToVersion: version,
+                targetStatus: rollbackStatus,
+            },
         }).catch(console.error);
 
+        await finalizeApprovalExecution(req, approvalId);
         await invalidateAnnouncementCaches().catch(err => {
             console.error('Failed to invalidate caches after admin revert:', err);
         });
@@ -4117,35 +4259,44 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
         }
 
         const snapshot = targetVersion.snapshot as any;
-        const rollbackPayload: Partial<CreateAnnouncementDto> & { isActive?: boolean; note?: string } = {
-            title: snapshot.title,
-            type: snapshot.type,
-            category: snapshot.category,
-            organization: snapshot.organization,
-            content: snapshot.content,
-            externalLink: snapshot.externalLink,
-            location: snapshot.location,
-            minQualification: snapshot.minQualification,
-            ageLimit: snapshot.ageLimit,
-            applicationFee: snapshot.applicationFee,
-            salaryMin: snapshot.salaryMin,
-            salaryMax: snapshot.salaryMax,
-            difficulty: snapshot.difficulty,
-            cutoffMarks: snapshot.cutoffMarks,
-            totalPosts: snapshot.totalPosts,
-            status: snapshot.status,
-            publishAt: normalizeRollbackDateField(snapshot.publishAt),
-            approvedAt: normalizeRollbackDateField(snapshot.approvedAt),
-            approvedBy: typeof snapshot.approvedBy === 'string' ? snapshot.approvedBy : undefined,
-            tags: normalizeRollbackTags(snapshot.tags),
-            importantDates: normalizeRollbackImportantDates(snapshot.importantDates),
-            jobDetails: snapshot.jobDetails,
-            isActive: typeof snapshot.isActive === 'boolean' ? snapshot.isActive : undefined,
-            note: parsed.data.note?.trim() || undefined,
-        };
+        const rollbackPayload = buildRollbackPayloadFromSnapshot(snapshot, parsed.data.note);
+        const rollbackStatus = normalizeAnnouncementStatus(snapshot?.status);
+        let approvalId: string | undefined;
 
-        if (typeof snapshot.deadline === 'string') {
-            rollbackPayload.deadline = snapshot.deadline || '';
+        if (rollbackStatus === 'published') {
+            if (!hasPermission(req.user?.role as any, 'announcements:approve')) {
+                return res.status(403).json({
+                    error: 'insufficient_permissions',
+                    code: 'INSUFFICIENT_PERMISSIONS',
+                    message: 'Approval permissions are required to rollback to a published version.',
+                });
+            }
+
+            const validationData = { ...announcement, ...rollbackPayload, status: 'published' };
+            const validationError = await validateForPublish(validationData, announcementId, true);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
+            }
+
+            const approvalGate = await requireDualApproval(req, res, {
+                actionType: 'announcement_publish',
+                targetIds: [announcementId],
+                payload: {
+                    version: parsed.data.version,
+                    note: rollbackPayload.note,
+                },
+                note: rollbackPayload.note,
+            });
+            if (!approvalGate.allowed) return;
+            approvalId = approvalGate.approvalId;
+
+            const now = new Date().toISOString();
+            rollbackPayload.status = 'published';
+            if (!rollbackPayload.publishAt || !String(rollbackPayload.publishAt).trim()) {
+                rollbackPayload.publishAt = now;
+            }
+            rollbackPayload.approvedAt = now;
+            rollbackPayload.approvedBy = req.user?.userId;
         }
 
         const updated = await AnnouncementModelMongo.update(announcementId, rollbackPayload, req.user?.userId);
@@ -4161,9 +4312,11 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
             note: parsed.data.note?.trim() || undefined,
             metadata: {
                 targetVersion: parsed.data.version,
+                targetStatus: rollbackStatus,
             },
         }).catch(console.error);
 
+        await finalizeApprovalExecution(req, approvalId);
         await invalidateAnnouncementCaches().catch((err) => {
             console.error('Failed to invalidate caches after admin rollback:', err);
         });

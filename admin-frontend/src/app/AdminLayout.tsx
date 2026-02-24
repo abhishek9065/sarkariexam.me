@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
@@ -6,6 +6,8 @@ import { useAdminAuth } from './useAdminAuth';
 import { useAdminPreferences } from './useAdminPreferences';
 import { useLocalStorageState } from '../lib/useLocalStorageState';
 import { getAdminAlerts, getAdminAnnouncements, searchAdminEntities } from '../lib/api/client';
+import { hasAdminPermission } from '../lib/adminRbac';
+import { OpsCard } from '../components/ops';
 import {
     AdminCommandPalette,
     useAdminNotifications,
@@ -13,9 +15,11 @@ import {
 import {
     adminModuleNavItems,
     getModuleByPath,
+    getModuleRequiredPermission,
     groupedModuleLabels,
     isAdminModuleEnabled,
     MODULE_GROUP_ORDER,
+    type AdminModuleKey,
     type ModuleGroupKey,
 } from '../config/adminModules';
 
@@ -53,7 +57,7 @@ const parseGroupCollapseState = (raw: string): GroupCollapseState => {
 };
 
 export function AdminLayout() {
-    const { user, logout, hasValidStepUp, stepUpExpiresAt } = useAdminAuth();
+    const { user, permissions, logout, hasValidStepUp, stepUpExpiresAt } = useAdminAuth();
     const { timeZoneMode, setTimeZoneMode, timeZoneLabel } = useAdminPreferences();
     const { notifyInfo, notifyError } = useAdminNotifications();
 
@@ -82,10 +86,18 @@ export function AdminLayout() {
     const [topSearchFocused, setTopSearchFocused] = useState(false);
 
     const activeModule = getModuleByPath(location.pathname);
+    const canAccessModule = useCallback((moduleKey: AdminModuleKey): boolean => {
+        const requiredPermission = getModuleRequiredPermission(moduleKey);
+        return hasAdminPermission(permissions, user?.role, requiredPermission);
+    }, [permissions, user?.role]);
+    const moduleAccessDenied = Boolean(activeModule && !canAccessModule(activeModule.key));
+    const activeModuleRequiredPermission = activeModule
+        ? getModuleRequiredPermission(activeModule.key)
+        : null;
 
     const enabledNavItems = useMemo(
-        () => adminModuleNavItems.filter((item) => isAdminModuleEnabled(item.key)),
-        []
+        () => adminModuleNavItems.filter((item) => isAdminModuleEnabled(item.key) && canAccessModule(item.key)),
+        [canAccessModule]
     );
 
     const navGroups = useMemo(
@@ -517,7 +529,19 @@ export function AdminLayout() {
                 </section>
 
                 <div className="admin-shell-content">
-                    <Outlet />
+                    {moduleAccessDenied && activeModule ? (
+                        <OpsCard
+                            title="Access Restricted"
+                            description="You do not have access to this module."
+                            tone="danger"
+                        >
+                            <div className="admin-alert warning">
+                                You do not have access. Required permission: <code>{activeModuleRequiredPermission}</code>.
+                            </div>
+                        </OpsCard>
+                    ) : (
+                        <Outlet />
+                    )}
                 </div>
             </main>
 

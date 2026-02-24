@@ -355,12 +355,17 @@ export async function getAnnouncementRevisions(id: string, limit = 20): Promise<
     return body?.data ?? { announcementId: id, currentVersion: 0, revisions: [] };
 }
 
-export async function restoreRevision(id: string, version: number, note?: string): Promise<Record<string, unknown>> {
+export async function restoreRevision(
+    id: string,
+    version: number,
+    stepUpToken: string,
+    note?: string
+): Promise<Record<string, unknown>> {
     const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/rollback`, {
         method: 'POST',
-        headers: mutationHeaders(),
+        headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ version, note: note || `Restored to v${version}` }),
-    });
+    }, true);
     return body?.data;
 }
 

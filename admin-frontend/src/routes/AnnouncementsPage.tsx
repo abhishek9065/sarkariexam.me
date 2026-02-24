@@ -291,6 +291,10 @@ export function AnnouncementsPage() {
                     notifyInfo('No selection', 'Select at least one row for bulk submit.');
                     return;
                 }
+                if (!hasValidStepUp || !stepUpToken) {
+                    notifyError('Step-up required', 'All bulk actions require active step-up verification.');
+                    return;
+                }
                 const token = stepUpToken ?? '';
                 bulkMutation.mutate({ ids: selectedIds, payload: { status: 'pending' }, token }, {
                     onSuccess: () => notifySuccess('Submitted', `${selectedIds.length} item(s) moved to pending review.`),
@@ -301,7 +305,7 @@ export function AnnouncementsPage() {
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [bulkMutation, navigate, notifyError, notifyInfo, notifySuccess, saveViewName, selectedIds, stepUpToken]);
+    }, [bulkMutation, hasValidStepUp, navigate, notifyError, notifyInfo, notifySuccess, saveViewName, selectedIds, stepUpToken]);
 
     const applyPreset = (presetId: string) => {
         setSelectedViewId(presetId);
@@ -352,8 +356,8 @@ export function AnnouncementsPage() {
             'pin-home': { home: { section: 'important', highlight: true, stickyRank: 1 } },
         };
 
-        if (action === 'publish' && !hasValidStepUp) {
-            notifyError('Step-up required', 'Publishing in bulk requires active step-up verification.');
+        if (!hasValidStepUp || !stepUpToken) {
+            notifyError('Step-up required', 'All bulk actions require active step-up verification.');
             return;
         }
 
@@ -461,16 +465,16 @@ export function AnnouncementsPage() {
                         <option key={value} value={value}>{value}</option>
                     ))}
                 </select>
-                <button type="button" className="admin-btn small" onClick={() => runBulkAction('submit-review')} disabled={selectedIds.length === 0 || bulkMutation.isPending}>
+                <button type="button" className="admin-btn small" onClick={() => runBulkAction('submit-review')} disabled={selectedIds.length === 0 || bulkMutation.isPending || !hasValidStepUp}>
                     Submit for review
                 </button>
                 <button type="button" className="admin-btn small" onClick={() => runBulkAction('publish')} disabled={selectedIds.length === 0 || bulkMutation.isPending || !hasValidStepUp}>
                     Publish (step-up)
                 </button>
-                <button type="button" className="admin-btn small subtle" onClick={() => runBulkAction('mark-expired')} disabled={selectedIds.length === 0 || bulkMutation.isPending}>
+                <button type="button" className="admin-btn small subtle" onClick={() => runBulkAction('mark-expired')} disabled={selectedIds.length === 0 || bulkMutation.isPending || !hasValidStepUp}>
                     Mark expired
                 </button>
-                <button type="button" className="admin-btn small subtle" onClick={() => runBulkAction('pin-home')} disabled={selectedIds.length === 0 || bulkMutation.isPending}>
+                <button type="button" className="admin-btn small subtle" onClick={() => runBulkAction('pin-home')} disabled={selectedIds.length === 0 || bulkMutation.isPending || !hasValidStepUp}>
                     Pin to homepage
                 </button>
                 {selectedView ? (
