@@ -46,16 +46,6 @@ const readCookieValue = (name: string): string | null => {
     }
 };
 
-const parseJsonBody = (body: BodyInit | null | undefined): Record<string, unknown> | null => {
-    if (!body || typeof body !== 'string') return null;
-    try {
-        const parsed = JSON.parse(body);
-        return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-    } catch {
-        return null;
-    }
-};
-
 const AnalyticsDashboard = lazy(() =>
     import('../components/admin/AnalyticsDashboard').then((module) => ({ default: module.AnalyticsDashboard }))
 );
@@ -995,17 +985,13 @@ export function AdminPage() {
 
     const requiresStepUpForRequest = useCallback((
         method: string,
-        pathname: string,
-        requestBody: Record<string, unknown> | null
+        pathname: string
     ): boolean => {
         if (!MUTATING_METHODS.has(method)) return false;
         if (/\/api\/admin\/sessions\/terminate(?:-others)?$/.test(pathname)) return true;
         if (/\/api\/admin\/announcements\/[^/]+\/(approve|reject|rollback)$/.test(pathname)) return true;
-        if (pathname.includes('/api/admin/announcements/bulk')) return true;
+        if (/\/api\/admin\/announcements\/(bulk|bulk-approve|bulk-reject)$/.test(pathname)) return true;
         if (method === 'DELETE' && /\/api\/admin\/announcements\/[^/]+$/.test(pathname)) return true;
-        if (method === 'PUT' && /\/api\/admin\/announcements\/[^/]+$/.test(pathname)) {
-            return requestBody?.status === 'published';
-        }
         return false;
     }, []);
 
@@ -1023,8 +1009,7 @@ export function AdminPage() {
         }
 
         const isMutating = MUTATING_METHODS.has(method);
-        const requestBody = parseJsonBody(init?.body);
-        const stepUpRequired = requiresStepUpForRequest(method, path, requestBody);
+        const stepUpRequired = requiresStepUpForRequest(method, path);
 
         let retriedCsrf = false;
         let retriedStepUp = false;
