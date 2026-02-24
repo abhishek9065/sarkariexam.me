@@ -235,11 +235,11 @@ const normalizeAnalyticsData = (value: unknown): AnalyticsData => {
         funnel: {
             ...DEFAULT_ANALYTICS.funnel,
             ...(incoming.funnel ?? {}),
-        },
+        } as NonNullable<AnalyticsData['funnel']>,
         insights: {
             ...DEFAULT_ANALYTICS.insights,
             ...(incoming.insights ?? {}),
-        },
+        } as NonNullable<AnalyticsData['insights']>,
         comparison: {
             ...(DEFAULT_ANALYTICS.comparison ?? {}),
             ...((incoming.comparison ?? {}) as AnalyticsComparison),

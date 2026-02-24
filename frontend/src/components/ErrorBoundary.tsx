@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
             message: error.message || 'Unhandled UI error',
             note: 'React ErrorBoundary captured an exception.',
             stack: error.stack,
-            componentStack: info.componentStack,
+            componentStack: info.componentStack || undefined,
             dedupeKey: `error_boundary:${error.name}:${error.message}`,
         });
     }

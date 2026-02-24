@@ -174,7 +174,8 @@ function PreferencePicker({ onDone }: { onDone: (prefs: ContentType[]) => void }
 /* ─── Page Component ─── */
 export function HomePage() {
     const navigate = useNavigate();
-    const { user } = useContext(AuthContext);
+    const authContext = useContext(AuthContext);
+    const user = authContext?.user;
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [updates, setUpdates] = useState<AnnouncementCard[]>([]);
