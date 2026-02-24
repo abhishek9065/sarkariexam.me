@@ -15,7 +15,33 @@ const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
 const configuredApiBase = import.meta.env.VITE_API_BASE
     ? `${normalizeBase(String(import.meta.env.VITE_API_BASE))}/api`
     : null;
-const API_BASE_CANDIDATES = configuredApiBase ? [configuredApiBase, '/api'] : ['/api'];
+
+const resolveSiblingApiBase = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    const host = window.location.hostname.toLowerCase();
+    if (host === 'www.sarkariexams.me') return 'https://sarkariexams.me/api';
+    if (host === 'sarkariexams.me') return 'https://www.sarkariexams.me/api';
+    return null;
+};
+
+const API_BASE_CANDIDATES = (() => {
+    const siblingApiBase = resolveSiblingApiBase();
+    const candidates = [
+        ...(configuredApiBase ? [configuredApiBase] : []),
+        '/api',
+        ...(siblingApiBase ? [siblingApiBase] : []),
+    ];
+
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const candidate of candidates) {
+        const normalized = normalizeBase(candidate);
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        unique.push(normalized);
+    }
+    return unique;
+})();
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
@@ -81,6 +107,8 @@ function reportApiClientError(path: string, message: string, note: string, dedup
 
 async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<Response> {
     let lastError: unknown = null;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'unknown_origin';
+    const candidateSummary = API_BASE_CANDIDATES.join(', ');
 
     for (const base of API_BASE_CANDIDATES) {
         try {
@@ -97,7 +125,7 @@ async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<R
         reportApiClientError(
             path,
             lastError.message || 'Network request failed',
-            'All API base candidates failed to respond',
+            `All API base candidates failed to respond. origin=${origin}, candidates=${candidateSummary}`,
             `api_network:${path}`,
         );
         throw lastError;
@@ -106,7 +134,7 @@ async function fetchWithBaseFallback(path: string, init: RequestInit): Promise<R
     reportApiClientError(
         path,
         'Failed to fetch',
-        'All API base candidates failed without a concrete error object',
+        `All API base candidates failed without a concrete error object. origin=${origin}, candidates=${candidateSummary}`,
         `api_network:${path}`,
     );
     throw new TypeError('Failed to fetch');
