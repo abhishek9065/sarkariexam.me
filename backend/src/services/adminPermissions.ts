@@ -68,7 +68,7 @@ export const ADMIN_TAB_PERMISSIONS: Record<AdminTab, AdminPermission> = {
   bulk: 'announcements:write',
   queue: 'announcements:read',
   security: 'security:read',
-  users: 'analytics:read',
+  users: 'admin:read',
   audit: 'audit:read',
   community: 'admin:read',
   errors: 'admin:read',

@@ -28,7 +28,7 @@ export function UsersRolesModule() {
     const updateMutation = useMutation({
         mutationFn: async (payload: {
             id: string;
-            role: 'admin' | 'editor' | 'reviewer' | 'viewer';
+            role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor';
             isActive?: boolean;
         }) => {
             if (!stepUpToken || !hasValidStepUp) {
@@ -80,13 +80,14 @@ export function UsersRolesModule() {
                                             defaultValue={row.role}
                                             onChange={(event) => updateMutation.mutate({
                                                 id: row.id,
-                                                role: event.target.value as 'admin' | 'editor' | 'reviewer' | 'viewer',
+                                                role: event.target.value as 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer',
                                                 isActive: row.isActive,
                                             })}
                                             disabled={updateMutation.isPending || !hasValidStepUp}
                                         >
                                             <option value="admin">Admin</option>
                                             <option value="editor">Editor</option>
+                                            <option value="contributor">Contributor</option>
                                             <option value="reviewer">Reviewer</option>
                                             <option value="viewer">Viewer</option>
                                         </select>

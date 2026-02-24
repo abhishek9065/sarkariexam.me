@@ -76,8 +76,16 @@ const validateSecret = (key: string, value: string, insecureDefaults: string[]):
 
 // Get MongoDB connection string (Cosmos DB)
 const getDbConnectionString = (): string => {
-  // Prefer Cosmos DB if configured
-  const cosmosUrl = process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
+  const mongoUrl = process.env.MONGODB_URI;
+  const cosmosUrl = process.env.COSMOS_CONNECTION_STRING;
+
+  // In tests, prefer explicit test Mongo URI to avoid .env collisions.
+  if (process.env.NODE_ENV === 'test' && mongoUrl) {
+    return mongoUrl;
+  }
+
+  // Prefer explicit Mongo URI first when provided, then Cosmos connection.
+  if (mongoUrl) return mongoUrl;
   if (cosmosUrl) return cosmosUrl;
 
   // In production, require MongoDB connection

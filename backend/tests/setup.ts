@@ -9,6 +9,8 @@ let skipMongoTests = false;
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 process.env.DISABLE_DB_RECONNECT = process.env.DISABLE_DB_RECONNECT || 'false';
+// Ensure tests do not accidentally use COSMOS_CONNECTION_STRING from .env.
+process.env.COSMOS_CONNECTION_STRING = '';
 
 // Relax rate limits during tests so integration test suites don't hit 429s
 process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || '10000';

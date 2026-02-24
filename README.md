@@ -5,7 +5,7 @@ Government jobs and exam updates platform built with:
 - Backend: Express 5 + TypeScript + MongoDB/Cosmos DB
 - Admin:
   - Robust legacy admin (desktop-only) on `/admin` (default)
-  - Premium vNext preview on `/admin-vnext`
+  - Premium vNext preview on `/admin-vnext` (responsive)
   - Legacy rollback alias on `/admin-legacy`
 
 ## Highlights
@@ -165,7 +165,8 @@ VITE_PROXY_TARGET=http://127.0.0.1:5000 npm run test:e2e:integration
 - `/admin` and `/admin/*`: robust legacy admin route (default)
 - `/admin-vnext` and `/admin-vnext/*`: premium vNext preview route
 - `/admin-legacy` and `/admin-legacy/*`: explicit legacy rollback alias
-- Admin routes are desktop-only (minimum viewport width: `1120px`)
+- Legacy admin routes (`/admin`, `/admin-legacy`) are desktop-only (minimum viewport width: `1120px`)
+- Admin vNext (`/admin-vnext`) is responsive
 - `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
 - Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
 - Cutover back to vNext on `/admin` is deferred until full parity is proven.
@@ -228,7 +229,8 @@ curl -I https://sarkariexams.me/admin-legacy/ | grep -i x-sarkari-app
 - `/admin` is the primary robust admin URL (legacy surface).
 - `/admin-vnext` remains preview until parity + ops signoff.
 - `/admin-legacy` remains available as explicit rollback alias.
-- Desktop-only policy for all admin entrypoints remains fixed at `1120px`.
+- Desktop-only policy remains fixed at `1120px` for legacy admin entrypoints (`/admin`, `/admin-legacy`).
+- vNext (`/admin-vnext`) remains responsive.
 
 ## Admin Rollback Procedure
 If vNext preview routing needs emergency fallback, map `/admin-vnext` to legacy frontend and redeploy:

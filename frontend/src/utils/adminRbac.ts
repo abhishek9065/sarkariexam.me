@@ -1,6 +1,6 @@
 import type { AdminPermission, AdminPermissionsSnapshot, AdminPortalRole } from '../types';
 
-export const ADMIN_PORTAL_ROLES: AdminPortalRole[] = ['admin', 'editor', 'reviewer', 'viewer'];
+export const ADMIN_PORTAL_ROLES: AdminPortalRole[] = ['admin', 'editor', 'contributor', 'reviewer', 'viewer'];
 
 const ADMIN_PORTAL_ROLE_SET = new Set<AdminPortalRole>(ADMIN_PORTAL_ROLES);
 
@@ -9,6 +9,12 @@ export const FALLBACK_ADMIN_ROLE_PERMISSIONS: Record<AdminPortalRole, string[]> 
     editor: [
         'admin:read',
         'admin:write',
+        'analytics:read',
+        'announcements:read',
+        'announcements:write',
+    ],
+    contributor: [
+        'admin:read',
         'analytics:read',
         'announcements:read',
         'announcements:write',
@@ -57,7 +63,7 @@ export function fallbackPermissionsSnapshot(role: AdminPortalRole): AdminPermiss
             bulk: 'announcements:write',
             queue: 'announcements:read',
             security: 'security:read',
-            users: 'analytics:read',
+            users: 'admin:read',
             audit: 'audit:read',
             community: 'admin:read',
             errors: 'admin:read',
