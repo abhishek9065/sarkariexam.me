@@ -203,7 +203,7 @@ export function HomePage() {
                 const results = await Promise.all(
                     contentTypes.map(t => getAnnouncementCards({ type: t, limit: 12, sort: 'newest' }))
                 );
-                
+
                 if (!mounted) return;
 
                 const all = results.flatMap(res => res.data).sort((a, b) => {
@@ -359,361 +359,359 @@ export function HomePage() {
         <Layout>
             <div className="hp" data-testid="home-mvp">
                 <div className="home-v4-shell" data-testid="home-v4-shell">
-                {/* ═══ HERO ═══ */}
-                <section className="hp-hero">
-                    <h1 className="hp-hero-title">
-                        Sarkari<span className="hp-hero-accent">Exams</span>.me
-                    </h1>
-                    <p className="hp-hero-sub">
-                        Government Jobs, Results &amp; Exam Updates — All in One Place
-                    </p>
-                    <form className="hp-search" onSubmit={handleSearch} role="search">
-                        <span className="hp-search-icon" aria-hidden="true">🔍</span>
-                        <input
-                            className="hp-search-input"
-                            type="search"
-                            placeholder="Search jobs, exams, results..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            aria-label="Search government exams and jobs"
-                        />
-                        <button className="hp-search-btn" type="submit">Search</button>
-                    </form>
-                </section>
-
-                {/* ═══ CATEGORY CARDS ═══ */}
-                <nav className="hp-cats" aria-label="Browse by category">
-                    {CATEGORIES.map((cat) => (
-                        <Link key={cat.key} to={cat.to} className="hp-cat-card">
-                            <span className="hp-cat-icon">{cat.icon}</span>
-                            <span className="hp-cat-label">{cat.label}</span>
-                        </Link>
-                    ))}
-                </nav>
-
-                <section className="home-v3-grid home-v3-top-grid" data-testid="home-v3-top-grid">
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-results">
-                        <div className="home-dense-box-header">
-                            <h2>Result</h2>
-                            <Link to="/results?source=home_box_results">View all</Link>
+                    {/* ═══ HERO ═══ */}
+                    <section className="hp-hero">
+                        <div className="hp-hero-glow" />
+                        <div className="hp-hero-orbs">
+                            <span /><span /><span />
                         </div>
-                        <ul className="section-card-list">
-                            {denseResults.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
+                        <h1 className="hp-hero-title">
+                            Sarkari<span className="hp-hero-accent">Exams</span>.me
+                        </h1>
+                        <p className="hp-hero-sub">
+                            Government Jobs, Results &amp; Exam Updates — All in One Place
+                        </p>
+                        <form className="hp-search" onSubmit={handleSearch} role="search">
+                            <span className="hp-search-icon" aria-hidden="true">🔍</span>
+                            <input
+                                className="hp-search-input"
+                                type="search"
+                                placeholder="Search jobs, exams, results..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                aria-label="Search government exams and jobs"
+                            />
+                            <button className="hp-search-btn" type="submit">Search</button>
+                        </form>
+                    </section>
 
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-admit">
-                        <div className="home-dense-box-header">
-                            <h2>Admit Card</h2>
-                            <Link to="/admit-card?source=home_box_admit">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseAdmit.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-jobs">
-                        <div className="home-dense-box-header">
-                            <h2>Latest Jobs</h2>
-                            <Link to="/jobs?source=home_box_jobs">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseJobs.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-                </section>
-
-                <section className="home-v3-grid home-v3-middle-grid" data-testid="home-v3-middle-grid">
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-answer-key">
-                        <div className="home-dense-box-header">
-                            <h2>Answer Key</h2>
-                            <Link to="/answer-key?source=home_box_answer_key">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseAnswerKey.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-syllabus">
-                        <div className="home-dense-box-header">
-                            <h2>Syllabus</h2>
-                            <Link to="/syllabus?source=home_box_syllabus">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseSyllabus.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-admission">
-                        <div className="home-dense-box-header">
-                            <h2>Admission</h2>
-                            <Link to="/admission?source=home_box_admission">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseAdmission.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-                </section>
-
-                <section className="home-v3-grid home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-certificate">
-                        <div className="home-dense-box-header">
-                            <h2>Certificate Verification</h2>
-                            <Link to="/admit-card?source=home_box_certificate">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseCertificate.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-
-                    <article className="home-dense-box" data-testid="home-v3-dense-box-important">
-                        <div className="home-dense-box-header">
-                            <h2>Important</h2>
-                            <Link to="/jobs?source=home_box_important">View all</Link>
-                        </div>
-                        <ul className="section-card-list">
-                            {denseImportant.slice(0, 10).map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </article>
-                </section>
-
-                <section className="home-mobile-tabs" data-testid="home-mobile-tabs">
-                    <div className="home-mobile-tablist" role="tablist" aria-label="Homepage major sections">
-                        {MOBILE_MAJOR_TABS.map((tab) => (
-                            <button
-                                key={tab.key}
-                                type="button"
-                                role="tab"
-                                aria-selected={mobileMajorTab === tab.key}
-                                className={`home-mobile-tab${mobileMajorTab === tab.key ? ' active' : ''}`}
-                                onClick={() => setMobileMajorTab(tab.key)}
-                            >
-                                {tab.label}
-                            </button>
+                    {/* ═══ CATEGORY CARDS ═══ */}
+                    <nav className="hp-cats" aria-label="Browse by category">
+                        {CATEGORIES.map((cat) => (
+                            <Link key={cat.key} to={cat.to} className="hp-cat-card">
+                                <span className="hp-cat-icon">{cat.icon}</span>
+                                <span className="hp-cat-label">{cat.label}</span>
+                            </Link>
                         ))}
-                    </div>
-                    <div className="home-mobile-major-panel" data-testid="home-mobile-major-panel">
-                        <h3 data-testid="home-mobile-major-title">
-                            {MOBILE_MAJOR_TABS.find((tab) => tab.key === mobileMajorTab)?.label ?? 'Latest Jobs'}
-                        </h3>
-                        <ul className="home-mobile-major-list">
-                            {mobileMajorItems.map((item) => (
-                                <li key={item.id}>
-                                    <Link to={item.href} className="home-dense-box-link">
-                                        <span>{item.title}</span>
-                                        <small>{item.meta}</small>
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </section>
+                    </nav>
 
-                {/* ═══ PREFERENCE PICKER (anonymous, first visit) ═══ */}
-                {showPicker && (
-                    <PreferencePicker onDone={(prefs) => {
-                        setUserPrefs(prefs);
-                        setShowPicker(false);
-                        if (prefs.length > 0) setActiveFilter(prefs[0]);
-                    }} />
-                )}
+                    <section className="home-v3-grid home-v3-top-grid" data-testid="home-v3-top-grid">
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-results">
+                            <div className="home-dense-box-header">
+                                <h2>Result</h2>
+                                <Link to="/results?source=home_box_results">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseResults.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
 
-                {/* ═══ FOR YOU (personalized, when prefs exist) ═══ */}
-                {!showPicker && forYouItems.length > 0 && (
-                    <section className="hp-for-you">
-                        <div className="hp-section-header">
-                            <h2 className="hp-section-title">⚡ For You</h2>
-                            <span className="hp-section-badge">Personalized</span>
-                        </div>
-                        <div className="hp-for-you-grid">
-                            {forYouItems.map((card) => (
-                                <Link
-                                    key={card.id}
-                                    to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
-                                    className="hp-for-you-card"
-                                    onClick={() => handleCardClick(card)}
-                                >
-                                    <span className={`hp-type-badge hp-type-${card.type}`}>{TYPE_LABELS[card.type]}</span>
-                                    <span className="hp-for-you-title">{card.title}</span>
-                                    {card.organization && <span className="hp-for-you-org">🏛️ {card.organization}</span>}
-                                    <span className="hp-for-you-time">{timeAgo(card.postedAt)}</span>
-                                </Link>
-                            ))}
-                        </div>
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-admit">
+                            <div className="home-dense-box-header">
+                                <h2>Admit Card</h2>
+                                <Link to="/admit-card?source=home_box_admit">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseAdmit.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
+
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-jobs">
+                            <div className="home-dense-box-header">
+                                <h2>Latest Jobs</h2>
+                                <Link to="/jobs?source=home_box_jobs">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseJobs.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
                     </section>
-                )}
 
-                {/* ═══ CONTINUE READING (logged-in + bookmarked) ═══ */}
-                {user && continueReading.length > 0 && (
-                    <section className="hp-continue">
-                        <div className="hp-section-header">
-                            <h2 className="hp-section-title">📑 Continue Reading</h2>
-                            <Link to="/bookmarks" className="hp-section-link">View All →</Link>
-                        </div>
-                        <div className="hp-continue-list">
-                            {continueReading.map((card) => (
-                                <Link
-                                    key={card.id}
-                                    to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
-                                    className="hp-continue-item"
-                                    onClick={() => handleCardClick(card)}
-                                >
-                                    <span className={`hp-type-badge hp-type-${card.type}`}>{TYPE_LABELS[card.type]}</span>
-                                    <span className="hp-continue-title">{card.title}</span>
-                                </Link>
-                            ))}
-                        </div>
+                    <section className="home-v3-grid home-v3-middle-grid" data-testid="home-v3-middle-grid">
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-answer-key">
+                            <div className="home-dense-box-header">
+                                <h2>Answer Key</h2>
+                                <Link to="/answer-key?source=home_box_answer_key">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseAnswerKey.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
+
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-syllabus">
+                            <div className="home-dense-box-header">
+                                <h2>Syllabus</h2>
+                                <Link to="/syllabus?source=home_box_syllabus">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseSyllabus.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
+
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-admission">
+                            <div className="home-dense-box-header">
+                                <h2>Admission</h2>
+                                <Link to="/admission?source=home_box_admission">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseAdmission.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
                     </section>
-                )}
 
-                {/* ═══ LATEST UPDATES ═══ */}
-                <section className="hp-updates">
-                    <div className="hp-updates-header">
-                        <h2 className="hp-updates-title">Latest Updates</h2>
-                        <div className="hp-filter-chips" role="group" aria-label="Filter updates">
-                            {FILTER_TABS.map((tab) => (
+                    <section className="home-v3-grid home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-certificate">
+                            <div className="home-dense-box-header">
+                                <h2>Certificate Verification</h2>
+                                <Link to="/admit-card?source=home_box_certificate">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseCertificate.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
+
+                        <article className="home-dense-box" data-testid="home-v3-dense-box-important">
+                            <div className="home-dense-box-header">
+                                <h2>Important</h2>
+                                <Link to="/jobs?source=home_box_important">View all</Link>
+                            </div>
+                            <ul className="section-card-list">
+                                {denseImportant.slice(0, 10).map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </article>
+                    </section>
+
+                    <section className="home-mobile-tabs" data-testid="home-mobile-tabs">
+                        <div className="home-mobile-tablist" role="tablist" aria-label="Homepage major sections">
+                            {MOBILE_MAJOR_TABS.map((tab) => (
                                 <button
                                     key={tab.key}
                                     type="button"
-                                    aria-pressed={activeFilter === tab.key}
-                                    className={`hp-filter-chip${activeFilter === tab.key ? ' active' : ''}`}
-                                    onClick={() => handleFilterChange(tab.key)}
+                                    role="tab"
+                                    aria-selected={mobileMajorTab === tab.key}
+                                    className={`home-mobile-tab${mobileMajorTab === tab.key ? ' active' : ''}`}
+                                    onClick={() => setMobileMajorTab(tab.key)}
                                 >
                                     {tab.label}
                                 </button>
                             ))}
                         </div>
-                    </div>
+                        <div className="home-mobile-major-panel" data-testid="home-mobile-major-panel">
+                            <h3 data-testid="home-mobile-major-title">
+                                {MOBILE_MAJOR_TABS.find((tab) => tab.key === mobileMajorTab)?.label ?? 'Latest Jobs'}
+                            </h3>
+                            <ul className="home-mobile-major-list">
+                                {mobileMajorItems.map((item) => (
+                                    <li key={item.id}>
+                                        <Link to={item.href} className="home-dense-box-link">
+                                            <span>{item.title}</span>
+                                            <small>{item.meta}</small>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </section>
 
-                    {loading ? (
-                        <UpdateSkeleton />
-                    ) : filteredUpdates.length === 0 ? (
-                        <div className="hp-empty">
-                            <span>📭</span>
-                            <p>No updates found. Check back soon!</p>
-                        </div>
-                    ) : (
-                        <div className="hp-grouped-updates animate-fade-in">
-                            {groupedUpdates.map((group) => (
-                                <div key={group.key} className="hp-date-group">
-                                    <h3 className="hp-date-label">{group.label}</h3>
-                                    <ul className="hp-update-list">
-                                        {group.items.map((card) => (
-                                            <li key={card.id}>
-                                                <Link
-                                                    to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
-                                                    className="hp-update-row"
-                                                    onClick={() => handleCardClick(card)}
-                                                >
-                                                    <span className={`hp-type-badge hp-type-${card.type}`}>
-                                                        {TYPE_LABELS[card.type]}
-                                                    </span>
-                                                    <span className="hp-update-title">
-                                                        {isNew(card.postedAt) && <span className="hp-new-dot" aria-label="New" />}
-                                                        {card.title}
-                                                    </span>
-                                                    <span className="hp-update-meta">
-                                                        {card.viewCount != null && card.viewCount > 0 && (
-                                                            <span className="hp-update-views" title="Views">👁 {card.viewCount.toLocaleString()}</span>
-                                                        )}
-                                                        {card.organization && (
-                                                            <span className="hp-update-org">{card.organization}</span>
-                                                        )}
-                                                        <time className="hp-update-time">{timeAgo(card.postedAt)}</time>
-                                                    </span>
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
+                    {/* ═══ PREFERENCE PICKER (anonymous, first visit) ═══ */}
+                    {showPicker && (
+                        <PreferencePicker onDone={(prefs) => {
+                            setUserPrefs(prefs);
+                            setShowPicker(false);
+                            if (prefs.length > 0) setActiveFilter(prefs[0]);
+                        }} />
                     )}
 
-                    {!loading && filteredUpdates.length > 0 && (
-                        <div className="hp-view-all">
-                            <Link to="/jobs" className="hp-view-all-btn">View All Jobs →</Link>
-                            <Link to="/results" className="hp-view-all-btn hp-view-all-sec">View All Results →</Link>
-                        </div>
+                    {/* ═══ FOR YOU (personalized, when prefs exist) ═══ */}
+                    {!showPicker && forYouItems.length > 0 && (
+                        <section className="hp-for-you">
+                            <div className="hp-section-header">
+                                <h2 className="hp-section-title">⚡ For You</h2>
+                                <span className="hp-section-badge">Personalized</span>
+                            </div>
+                            <div className="hp-for-you-grid">
+                                {forYouItems.map((card) => (
+                                    <Link
+                                        key={card.id}
+                                        to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
+                                        className="hp-for-you-card"
+                                        onClick={() => handleCardClick(card)}
+                                    >
+                                        <span className={`hp-type-badge hp-type-${card.type}`}>{TYPE_LABELS[card.type]}</span>
+                                        <span className="hp-for-you-title">{card.title}</span>
+                                        {card.organization && <span className="hp-for-you-org">🏛️ {card.organization}</span>}
+                                        <span className="hp-for-you-time">{timeAgo(card.postedAt)}</span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </section>
                     )}
-                </section>
 
-                {/* ═══ COMPACT DISCLAIMER ═══ */}
-                <details className="hp-disclaimer">
-                    <summary className="hp-disclaimer-summary">ℹ️ Disclaimer — Tap to expand</summary>
-                    <p className="hp-disclaimer-text">
-                        SarkariExams.me is not a government website. Information is sourced from official notifications and verified to the
-                        best of our ability. Always verify details from the official source before applying. We are not responsible for any
-                        discrepancy in the information provided.
-                    </p>
-                </details>
+                    {/* ═══ CONTINUE READING (logged-in + bookmarked) ═══ */}
+                    {user && continueReading.length > 0 && (
+                        <section className="hp-continue">
+                            <div className="hp-section-header">
+                                <h2 className="hp-section-title">📑 Continue Reading</h2>
+                                <Link to="/bookmarks" className="hp-section-link">View All →</Link>
+                            </div>
+                            <div className="hp-continue-list">
+                                {continueReading.map((card) => (
+                                    <Link
+                                        key={card.id}
+                                        to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
+                                        className="hp-continue-item"
+                                        onClick={() => handleCardClick(card)}
+                                    >
+                                        <span className={`hp-type-badge hp-type-${card.type}`}>{TYPE_LABELS[card.type]}</span>
+                                        <span className="hp-continue-title">{card.title}</span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ═══ LATEST UPDATES ═══ */}
+                    <section className="hp-updates">
+                        <div className="hp-updates-header">
+                            <h2 className="hp-updates-title">Latest Updates</h2>
+                            <div className="hp-filter-chips" role="group" aria-label="Filter updates">
+                                {FILTER_TABS.map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        aria-pressed={activeFilter === tab.key}
+                                        className={`hp-filter-chip${activeFilter === tab.key ? ' active' : ''}`}
+                                        onClick={() => handleFilterChange(tab.key)}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {loading ? (
+                            <UpdateSkeleton />
+                        ) : filteredUpdates.length === 0 ? (
+                            <div className="hp-empty">
+                                <span>📭</span>
+                                <p>No updates found. Check back soon!</p>
+                            </div>
+                        ) : (
+                            <div className="hp-grouped-updates animate-fade-in">
+                                {groupedUpdates.map((group) => (
+                                    <div key={group.key} className="hp-date-group">
+                                        <h3 className="hp-date-label">{group.label}</h3>
+                                        <ul className="hp-update-list">
+                                            {group.items.map((card) => (
+                                                <li key={card.id}>
+                                                    <Link
+                                                        to={buildAnnouncementDetailPath(card.type, card.slug, 'home_latest')}
+                                                        className="hp-update-row"
+                                                        onClick={() => handleCardClick(card)}
+                                                    >
+                                                        <span className={`hp-type-badge hp-type-${card.type}`}>
+                                                            {TYPE_LABELS[card.type]}
+                                                        </span>
+                                                        <span className="hp-update-title">
+                                                            {isNew(card.postedAt) && <span className="hp-new-dot" aria-label="New" />}
+                                                            {card.title}
+                                                        </span>
+                                                        <span className="hp-update-meta">
+                                                            {card.viewCount != null && card.viewCount > 0 && (
+                                                                <span className="hp-update-views" title="Views">👁 {card.viewCount.toLocaleString()}</span>
+                                                            )}
+                                                            {card.organization && (
+                                                                <span className="hp-update-org">{card.organization}</span>
+                                                            )}
+                                                            <time className="hp-update-time">{timeAgo(card.postedAt)}</time>
+                                                        </span>
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {!loading && filteredUpdates.length > 0 && (
+                            <div className="hp-view-all">
+                                <Link to="/jobs" className="hp-view-all-btn">View All Jobs →</Link>
+                                <Link to="/results" className="hp-view-all-btn hp-view-all-sec">View All Results →</Link>
+                            </div>
+                        )}
+                    </section>
+
+                    {/* ═══ COMPACT DISCLAIMER ═══ */}
+                    <details className="hp-disclaimer">
+                        <summary className="hp-disclaimer-summary">ℹ️ Disclaimer — Tap to expand</summary>
+                        <p className="hp-disclaimer-text">
+                            SarkariExams.me is not a government website. Information is sourced from official notifications and verified to the
+                            best of our ability. Always verify details from the official source before applying. We are not responsible for any
+                            discrepancy in the information provided.
+                        </p>
+                    </details>
                 </div>
             </div>
         </Layout>
     );
 }
-
-
-
-
-
-
 
 
 
