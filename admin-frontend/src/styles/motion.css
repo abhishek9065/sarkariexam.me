@@ -1,3 +1,7 @@
+/* ═══════════════════════════════════════════════════
+   Motion — 2026 Micro-interactions
+   ═══════════════════════════════════════════════════ */
+
 @keyframes ops-skeleton-pulse {
     0% {
         background-position: 200% 0;
@@ -11,6 +15,67 @@
 @keyframes ops-fade-in {
     from {
         opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes ops-fade-in-scale {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes ops-slide-in-right {
+    from {
+        opacity: 0;
+        transform: translateX(-16px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes ops-glow-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 20px rgba(34, 211, 238, 0.05);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(34, 211, 238, 0.12);
+    }
+}
+
+@keyframes ops-gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+@keyframes ops-count-up {
+    from {
+        opacity: 0;
         transform: translateY(8px);
     }
 
@@ -20,11 +85,113 @@
     }
 }
 
-.ops-card,
-.admin-topbar,
-.admin-context {
-    animation: ops-fade-in 0.28s ease-out;
+/* ─── Entry animations ─── */
+
+.ops-card {
+    animation: ops-fade-in var(--duration-normal) var(--ease-spring);
 }
+
+.admin-topbar {
+    animation: ops-fade-in var(--duration-normal) var(--ease-spring);
+}
+
+.admin-context {
+    animation: ops-fade-in var(--duration-normal) var(--ease-spring);
+    animation-delay: 0.05s;
+    animation-fill-mode: backwards;
+}
+
+.ops-kpi-card {
+    animation: ops-fade-in-scale var(--duration-normal) var(--ease-spring);
+    animation-fill-mode: backwards;
+}
+
+.ops-kpi-card:nth-child(1) { animation-delay: 0s; }
+.ops-kpi-card:nth-child(2) { animation-delay: 0.04s; }
+.ops-kpi-card:nth-child(3) { animation-delay: 0.08s; }
+.ops-kpi-card:nth-child(4) { animation-delay: 0.12s; }
+.ops-kpi-card:nth-child(5) { animation-delay: 0.16s; }
+.ops-kpi-card:nth-child(6) { animation-delay: 0.20s; }
+
+.ops-kpi-value {
+    animation: ops-count-up var(--duration-slow) var(--ease-spring);
+    animation-fill-mode: backwards;
+    animation-delay: 0.15s;
+}
+
+/* ─── Chart bar entrance ─── */
+
+.ops-chart-bar {
+    animation: ops-bar-grow 0.8s var(--ease-spring);
+    animation-fill-mode: backwards;
+    transform-origin: bottom;
+}
+
+@keyframes ops-bar-grow {
+    from {
+        transform: scaleY(0);
+        opacity: 0;
+    }
+
+    to {
+        transform: scaleY(1);
+        opacity: 0.75;
+    }
+}
+
+.ops-chart-bar-wrap:nth-child(1) .ops-chart-bar { animation-delay: 0.1s; }
+.ops-chart-bar-wrap:nth-child(2) .ops-chart-bar { animation-delay: 0.16s; }
+.ops-chart-bar-wrap:nth-child(3) .ops-chart-bar { animation-delay: 0.22s; }
+.ops-chart-bar-wrap:nth-child(4) .ops-chart-bar { animation-delay: 0.28s; }
+.ops-chart-bar-wrap:nth-child(5) .ops-chart-bar { animation-delay: 0.34s; }
+.ops-chart-bar-wrap:nth-child(6) .ops-chart-bar { animation-delay: 0.40s; }
+.ops-chart-bar-wrap:nth-child(7) .ops-chart-bar { animation-delay: 0.46s; }
+
+/* ─── Nav link entrance ─── */
+
+.admin-nav-link {
+    animation: ops-slide-in-right var(--duration-normal) var(--ease-spring);
+    animation-fill-mode: backwards;
+}
+
+.admin-nav-group-items .admin-nav-link:nth-child(1) { animation-delay: 0.02s; }
+.admin-nav-group-items .admin-nav-link:nth-child(2) { animation-delay: 0.05s; }
+.admin-nav-group-items .admin-nav-link:nth-child(3) { animation-delay: 0.08s; }
+.admin-nav-group-items .admin-nav-link:nth-child(4) { animation-delay: 0.11s; }
+.admin-nav-group-items .admin-nav-link:nth-child(5) { animation-delay: 0.14s; }
+
+/* ─── Dialogs ─── */
+
+.admin-palette-backdrop {
+    animation: ops-backdrop-in var(--duration-fast) ease-out;
+}
+
+@keyframes ops-backdrop-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.admin-palette {
+    animation: ops-fade-in-scale var(--duration-normal) var(--ease-spring);
+}
+
+.ops-confirm-dialog,
+.ops-modal {
+    animation: ops-fade-in-scale var(--duration-normal) var(--ease-spring);
+}
+
+/* ─── Login card entrance ─── */
+
+.admin-login-card {
+    animation: ops-fade-in-scale 0.5s var(--ease-spring);
+}
+
+/* ─── Reduced motion ─── */
 
 @media (prefers-reduced-motion: reduce) {
 
@@ -32,6 +199,7 @@
     *::before,
     *::after {
         animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 1ms !important;
         scroll-behavior: auto !important;

@@ -18,12 +18,13 @@ export function AdminLoginPage() {
     return (
         <div className="admin-login-wrap">
             <div className="admin-login-card">
-                <div className="ops-row wrap">
+                <div className="admin-login-logo">SE</div>
+                <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
+                <p className="admin-login-subtitle">Secure operations console with dedicated auth boundaries.</p>
+                <div className="ops-row wrap admin-login-badges">
                     <OpsBadge tone="info">Admin Auth Boundary</OpsBadge>
                     <OpsBadge tone="warning">2FA Ready</OpsBadge>
                 </div>
-                <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
-                <p className="admin-muted">Sign in to the operations console with dedicated admin auth and session boundaries.</p>
 
                 <form
                     className="admin-login-form"
@@ -42,31 +43,46 @@ export function AdminLoginPage() {
                         }
                     }}
                 >
-                    <input
-                        type="email"
-                        placeholder="admin@sarkariexams.me"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        required
-                    />
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        required
-                    />
-                    <input
-                        type="text"
-                        placeholder="2FA or backup code"
-                        value={twoFactorCode}
-                        onChange={(event) => setTwoFactorCode(event.target.value)}
-                    />
+                    <div className="admin-login-field">
+                        <label className="admin-login-label" htmlFor="admin-email">Email address</label>
+                        <input
+                            id="admin-email"
+                            type="email"
+                            placeholder="admin@sarkariexams.me"
+                            value={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                            autoComplete="email"
+                            required
+                        />
+                    </div>
+                    <div className="admin-login-field">
+                        <label className="admin-login-label" htmlFor="admin-password">Password</label>
+                        <input
+                            id="admin-password"
+                            type="password"
+                            placeholder="Enter your password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            autoComplete="current-password"
+                            required
+                        />
+                    </div>
+                    <div className="admin-login-field">
+                        <label className="admin-login-label" htmlFor="admin-2fa">Two-factor code <span className="admin-login-optional">(optional)</span></label>
+                        <input
+                            id="admin-2fa"
+                            type="text"
+                            placeholder="6-digit code or backup key"
+                            value={twoFactorCode}
+                            onChange={(event) => setTwoFactorCode(event.target.value)}
+                            autoComplete="one-time-code"
+                        />
+                    </div>
 
                     {error ? <div className="admin-alert error">{error}</div> : null}
 
-                    <button className="admin-btn primary" type="submit" disabled={submitting}>
-                        {submitting ? 'Signing in...' : 'Sign in to Admin'}
+                    <button className="admin-btn primary admin-login-submit" type="submit" disabled={submitting}>
+                        {submitting ? 'Authenticating...' : 'Sign in'}
                     </button>
                 </form>
             </div>
