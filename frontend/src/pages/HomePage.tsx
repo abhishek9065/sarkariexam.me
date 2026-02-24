@@ -197,17 +197,15 @@ export function HomePage() {
 
         (async () => {
             try {
-                const [jobs, results, admits, answerKeys] = await Promise.all([
-                    getAnnouncementCards({ type: 'job', limit: 12, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'result', limit: 12, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'admit-card', limit: 12, sort: 'newest' }),
-                    getAnnouncementCards({ type: 'answer-key', limit: 12, sort: 'newest' }),
-                ]);
+                // Fetch basic content types in parallel
+                const contentTypes: ContentType[] = ['job', 'result', 'admit-card', 'answer-key'];
+                const results = await Promise.all(
+                    contentTypes.map(t => getAnnouncementCards({ type: t, limit: 12, sort: 'newest' }))
+                );
+                
                 if (!mounted) return;
 
-                const all = [
-                    ...jobs.data, ...results.data, ...admits.data, ...answerKeys.data,
-                ].sort((a, b) => {
+                const all = results.flatMap(res => res.data).sort((a, b) => {
                     const da = a.postedAt ? new Date(a.postedAt).getTime() : 0;
                     const db = b.postedAt ? new Date(b.postedAt).getTime() : 0;
                     return db - da;

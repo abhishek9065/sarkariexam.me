@@ -188,7 +188,15 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
                         }}
                         onKeyDown={handleKeyDown}
                         aria-label="Search announcements"
+                        aria-controls="search-results-list"
+                        aria-expanded={suggestions.length > 0}
+                        role="combobox"
                     />
+                    <div className="sr-only" aria-live="polite">
+                        {loading ? 'Searching...' : ''}
+                        {!loading && suggestions.length > 0 ? `${suggestions.length} suggestions found. Use up and down arrows to review.` : ''}
+                        {!loading && query.length >= 2 && suggestions.length === 0 ? 'No results found.' : ''}
+                    </div>
                     <button type="button" className="search-close-btn" onClick={onClose} aria-label="Close search">
                         ✕
                     </button>
@@ -262,7 +270,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
                 )}
 
                 {suggestions.length > 0 && (
-                    <ul className="search-suggestions" role="listbox" aria-label="Search suggestions">
+                    <ul id="search-results-list" className="search-suggestions" role="listbox" aria-label="Search suggestions">
                         {suggestions.map((item, index) => (
                             <li
                                 key={`${item.type}-${item.slug}`}

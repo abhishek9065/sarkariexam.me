@@ -125,7 +125,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
 
                         <form className="auth-form" onSubmit={handle2FASubmit}>
                             {displayError && (
-                                <div className="auth-error">{displayError}</div>
+                                <div id="auth-error-2fa" className="auth-error" aria-live="assertive">{displayError}</div>
                             )}
 
                             <label className="auth-label">
@@ -142,6 +142,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
                                     autoComplete="one-time-code"
                                     inputMode="numeric"
                                     pattern="[0-9a-zA-Z\-]*"
+                                    aria-describedby={displayError ? "auth-error-2fa" : undefined}
                                 />
                             </label>
 
@@ -184,7 +185,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
                         {tab === 'login' ? (
                             <form className="auth-form" onSubmit={handleLoginSubmit}>
                                 {displayError && (
-                                    <div className="auth-error">{displayError}</div>
+                                    <div id="auth-error-login" className="auth-error" aria-live="assertive">{displayError}</div>
                                 )}
 
                                 <label className="auth-label">
@@ -197,6 +198,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
                                         onChange={(e) => setEmail(e.target.value)}
                                         autoComplete="email"
                                         placeholder="you@example.com"
+                                        aria-describedby={displayError ? "auth-error-login" : undefined}
                                     />
                                 </label>
 
@@ -225,7 +227,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
                         ) : (
                             <form className="auth-form" onSubmit={handleRegisterSubmit}>
                                 {displayError && (
-                                    <div className="auth-error">{displayError}</div>
+                                    <div id="auth-error-register" className="auth-error" aria-live="assertive">{displayError}</div>
                                 )}
 
                                 <label className="auth-label">
@@ -238,6 +240,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
                                         onChange={(e) => setEmail(e.target.value)}
                                         autoComplete="email"
                                         placeholder="you@example.com"
+                                        aria-describedby={displayError ? "auth-error-register" : undefined}
                                     />
                                 </label>
 
