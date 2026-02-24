@@ -105,11 +105,12 @@ const GROUP_LABELS: Record<string, string> = {
 function UpdateSkeleton() {
     return (
         <div className="hp-update-skeleton" aria-busy="true">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="hp-update-skeleton-row">
-                    <div className="skeleton" style={{ width: 56, height: 24, borderRadius: 12 }} />
+                    <div className="skeleton" style={{ width: 64, height: 24, borderRadius: 12 }} />
                     <div className="skeleton" style={{ flex: 1, height: 18, borderRadius: 6 }} />
-                    <div className="skeleton" style={{ width: 48, height: 14, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ width: 40, height: 14, borderRadius: 6 }} />
+                    <div className="skeleton" style={{ width: 56, height: 14, borderRadius: 6 }} />
                 </div>
             ))}
         </div>
@@ -648,7 +649,7 @@ export function HomePage() {
                             <p>No updates found. Check back soon!</p>
                         </div>
                     ) : (
-                        <div className="hp-grouped-updates">
+                        <div className="hp-grouped-updates animate-fade-in">
                             {groupedUpdates.map((group) => (
                                 <div key={group.key} className="hp-date-group">
                                     <h3 className="hp-date-label">{group.label}</h3>

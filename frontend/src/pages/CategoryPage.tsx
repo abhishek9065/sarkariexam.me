@@ -451,11 +451,11 @@ export function CategoryPage({ type }: { type: ContentType }) {
                             {Array.from({ length: 8 }).map((_, i) => <AnnouncementCardSkeleton key={i} />)}
                         </div>
                     ) : viewMode === 'compact' ? (
-                        <div className="cat-compact-list" data-testid="category-compact-list">
+                        <div className="cat-compact-list animate-fade-in" data-testid="category-compact-list">
                             {cards.map((card, i) => <CategoryListRow key={card.id} card={card} sourceTag="category_compact" index={i + 1} />)}
                         </div>
                     ) : (
-                        <div className="cat-cards-grid">
+                        <div className="cat-cards-grid animate-fade-in">
                             {cards.map((card) => <AnnouncementCard key={card.id} card={card} showType={false} sourceTag="category_list" />)}
                         </div>
                     )}

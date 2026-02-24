@@ -121,13 +121,17 @@ export function AnnouncementCardSkeleton() {
     return (
         <div className="announcement-card card">
             <div className="announcement-card-header">
-                <div className="skeleton" style={{ width: 80, height: 20 }} />
+                <div className="skeleton" style={{ width: 100, height: 24, borderRadius: 12 }} />
+                <div className="skeleton" style={{ width: 60, height: 20, borderRadius: 10 }} />
             </div>
-            <div className="skeleton" style={{ width: '90%', height: 18, marginTop: 12 }} />
-            <div className="skeleton" style={{ width: '60%', height: 14, marginTop: 8 }} />
-            <div className="announcement-card-footer" style={{ marginTop: 16 }}>
-                <div className="skeleton" style={{ width: 70, height: 14 }} />
-                <div className="skeleton" style={{ width: 80, height: 14 }} />
+            <div className="skeleton" style={{ width: '90%', height: 22, marginTop: 16, borderRadius: 6 }} />
+            <div className="skeleton" style={{ width: '70%', height: 18, marginTop: 12, borderRadius: 6 }} />
+            <div className="announcement-card-footer" style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <div className="skeleton" style={{ width: 60, height: 14, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ width: 50, height: 14, borderRadius: 4 }} />
+                </div>
+                <div className="skeleton" style={{ width: 80, height: 14, borderRadius: 4 }} />
             </div>
         </div>
     );
