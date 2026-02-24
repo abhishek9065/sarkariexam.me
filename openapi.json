@@ -5369,6 +5369,54 @@
           }
         }
       }
+    },
+    "/api/admin/announcements/{id}/revert/{version}": {
+      "post": {
+        "summary": "POST /api/admin/announcements/{id}/revert/{version}",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAnnouncementsIdRevertVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
     }
   },
   "components": {

@@ -22,7 +22,7 @@ import { getAdminAuditLogsPaged, recordAdminAudit, verifyAdminAuditLedger } from
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { getDailyRollups, recordAnalyticsEvent } from '../services/analytics.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
-import { getCollection, getCollectionAsync, healthCheck } from '../services/cosmosdb.js';
+import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { hasPermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
@@ -440,7 +440,7 @@ const settingValuesSchema = z.object({
 });
 
 const adminRoleUpdateSchema = z.object({
-    role: z.enum(['admin', 'editor', 'reviewer', 'viewer']),
+    role: z.enum(['admin', 'editor', 'reviewer', 'viewer', 'contributor']),
     isActive: z.boolean().optional(),
 });
 
@@ -2599,11 +2599,11 @@ router.put('/settings/:key', requirePermission('admin:write'), idempotency(), as
  * GET /api/admin/users
  * Admin user roster with roles.
  */
-router.get('/users', requirePermission('security:read'), async (_req, res) => {
+router.get('/users', requirePermission('admin:read'), async (_req, res) => {
     try {
         const usersCollection = getCollection<AdminUserListDoc>('users');
         const docs = await usersCollection
-            .find({ role: { $in: ['admin', 'editor', 'reviewer', 'viewer'] } as any })
+            .find({ role: { $in: ['admin', 'editor', 'reviewer', 'viewer', 'contributor'] } as any })
             .sort({ updatedAt: -1 })
             .limit(500)
             .toArray();
@@ -4206,162 +4206,6 @@ router.delete('/announcements/:id', requirePermission('announcements:delete'), r
     } catch (error) {
         console.error('Delete announcement error:', error);
         return res.status(500).json({ error: 'Failed to delete announcement' });
-    }
-});
-
-/* ─── Admin Users & Roles ─── */
-
-interface AdminUserDoc {
-    email: string;
-    username?: string;
-    role: 'admin' | 'editor' | 'reviewer' | 'viewer';
-    isActive: boolean;
-    lastLoginAt?: Date;
-    createdAt: Date;
-}
-
-const adminUserFormatDoc = (doc: any) => {
-    const out = { ...doc, id: doc._id?.toString?.() || doc._id };
-    delete out._id;
-    delete out.password;
-    delete out.passwordHash;
-    return out;
-};
-
-router.get('/users', requirePermission('admin:read'), async (req, res) => {
-    try {
-        const col = await getCollectionAsync<AdminUserDoc>('users');
-        const users = await col
-            .find({ role: { $in: ['admin', 'editor', 'reviewer', 'viewer'] } } as any)
-            .sort({ createdAt: -1 })
-            .limit(100)
-            .toArray();
-        return res.json({ data: users.map(adminUserFormatDoc) });
-    } catch (error) {
-        console.error('Admin users fetch error:', error);
-        return res.status(500).json({ error: 'Failed to load admin users' });
-    }
-});
-
-const roleUpdateSchema = z.object({
-    role: z.enum(['admin', 'editor', 'reviewer', 'viewer']),
-    isActive: z.boolean().optional(),
-});
-
-router.patch('/users/:id/role', requirePermission('admin:write'), requireAdminStepUp, async (req, res) => {
-    const id = getPathParam(req.params.id);
-    if (!id || !ObjectId.isValid(id)) {
-        return res.status(400).json({ error: 'Invalid user id' });
-    }
-    const parsed = roleUpdateSchema.safeParse(req.body);
-    if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.flatten() });
-    }
-
-    try {
-        const col = await getCollectionAsync<AdminUserDoc>('users');
-        const update: Record<string, unknown> = { role: parsed.data.role };
-        if (parsed.data.isActive !== undefined) {
-            update.isActive = parsed.data.isActive;
-        }
-        const result = await col.updateOne(
-            { _id: new ObjectId(id) } as any,
-            { $set: update }
-        );
-        if (!result.matchedCount) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        const updated = await col.findOne({ _id: new ObjectId(id) } as any);
-        recordAdminAudit({
-            action: 'role_change',
-            userId: req.user?.userId,
-            metadata: { targetUserId: id, newRole: parsed.data.role, isActive: parsed.data.isActive },
-        }).catch(console.error);
-        return res.json({ data: updated ? adminUserFormatDoc(updated) : { id } });
-    } catch (error) {
-        console.error('Admin role update error:', error);
-        return res.status(500).json({ error: 'Failed to update user role' });
-    }
-});
-
-/* ─── Admin Settings (Taxonomy) ─── */
-
-interface AdminSettingDoc {
-    key: string;
-    values: string[];
-    updatedAt: Date;
-    updatedBy?: string;
-}
-
-const settingKeySchema = z.enum(['states', 'boards', 'tags']);
-
-const settingUpdateSchema = z.object({
-    values: z.array(z.string().trim().min(1)).max(500),
-});
-
-router.get('/settings/:key', requirePermission('admin:read'), async (req, res) => {
-    const key = getPathParam(req.params.key);
-    const parsed = settingKeySchema.safeParse(key);
-    if (!parsed.success) {
-        return res.status(400).json({ error: 'Invalid setting key. Must be one of: states, boards, tags' });
-    }
-
-    try {
-        const col = await getCollectionAsync<AdminSettingDoc>('admin_settings');
-        const doc = await col.findOne({ key: parsed.data });
-        return res.json({
-            data: doc
-                ? { key: doc.key, values: doc.values, updatedAt: doc.updatedAt?.toISOString?.(), updatedBy: doc.updatedBy }
-                : { key: parsed.data, values: [] },
-        });
-    } catch (error) {
-        console.error('Admin setting fetch error:', error);
-        return res.status(500).json({ error: 'Failed to load setting' });
-    }
-});
-
-router.put('/settings/:key', requirePermission('admin:write'), idempotency(), async (req, res) => {
-    const key = getPathParam(req.params.key);
-    const keyParsed = settingKeySchema.safeParse(key);
-    if (!keyParsed.success) {
-        return res.status(400).json({ error: 'Invalid setting key. Must be one of: states, boards, tags' });
-    }
-    const bodyParsed = settingUpdateSchema.safeParse(req.body);
-    if (!bodyParsed.success) {
-        return res.status(400).json({ error: bodyParsed.error.flatten() });
-    }
-
-    try {
-        const col = await getCollectionAsync<AdminSettingDoc>('admin_settings');
-        const now = new Date();
-        await col.updateOne(
-            { key: keyParsed.data },
-            {
-                $set: {
-                    key: keyParsed.data,
-                    values: bodyParsed.data.values,
-                    updatedAt: now,
-                    updatedBy: req.user?.email ?? req.user?.userId,
-                },
-            },
-            { upsert: true }
-        );
-        recordAdminAudit({
-            action: 'settings_update',
-            userId: req.user?.userId,
-            metadata: { settingKey: keyParsed.data, valueCount: bodyParsed.data.values.length },
-        }).catch(console.error);
-        return res.json({
-            data: {
-                key: keyParsed.data,
-                values: bodyParsed.data.values,
-                updatedAt: now.toISOString(),
-                updatedBy: req.user?.email ?? req.user?.userId,
-            },
-        });
-    } catch (error) {
-        console.error('Admin setting update error:', error);
-        return res.status(500).json({ error: 'Failed to save setting' });
     }
 });
 

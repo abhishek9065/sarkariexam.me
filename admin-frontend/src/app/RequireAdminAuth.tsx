@@ -14,7 +14,7 @@ export function RequireAdminAuth() {
             </div>
         );
     }
-    if (!user || !['admin', 'editor', 'reviewer', 'viewer'].includes(user.role)) {
+    if (!user || !['admin', 'editor', 'contributor', 'reviewer', 'viewer'].includes(user.role)) {
         return <Navigate to="/login" replace />;
     }
 

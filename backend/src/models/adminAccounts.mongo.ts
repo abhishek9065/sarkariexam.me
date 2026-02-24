@@ -2,7 +2,7 @@ import type { Document, ObjectId, WithId } from 'mongodb';
 
 import { getCollection } from '../services/cosmosdb.js';
 
-export type AdminAccountRole = 'admin' | 'editor' | 'reviewer' | 'viewer';
+export type AdminAccountRole = 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor';
 export type AdminAccountStatus = 'active' | 'suspended';
 
 interface AdminAccountDoc extends Document {
@@ -31,7 +31,7 @@ export interface AdminAccount {
     metadata?: Record<string, unknown>;
 }
 
-const ADMIN_ROLES: AdminAccountRole[] = ['admin', 'editor', 'reviewer', 'viewer'];
+const ADMIN_ROLES: AdminAccountRole[] = ['admin', 'editor', 'reviewer', 'viewer', 'contributor'];
 
 export class AdminAccountsModelMongo {
     private static get collection() {

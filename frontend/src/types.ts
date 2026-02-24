@@ -2,7 +2,7 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
-export type AdminPortalRole = 'admin' | 'editor' | 'reviewer' | 'viewer';
+export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer';
 export type AdminPermission =
     | 'admin:read'
     | 'admin:write'
