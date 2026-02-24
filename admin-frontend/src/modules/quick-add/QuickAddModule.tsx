@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
+import { useAdminAuth } from '../../app/useAdminAuth';
+import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { createAdminAnnouncement } from '../../lib/api/client';
@@ -22,6 +24,7 @@ const defaultForm = {
 export function QuickAddModule() {
     const [form, setForm] = useState(defaultForm);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const { hasValidStepUp, stepUpToken } = useAdminAuth();
     const { notifyInfo } = useAdminNotifications();
     const visibilityHint = form.status === 'published'
         ? 'Published posts are visible on homepage (after cache refresh).'
@@ -46,7 +49,11 @@ export function QuickAddModule() {
             if (form.status === 'scheduled') {
                 payload.publishAt = form.publishAt || undefined;
             }
-            return createAdminAnnouncement(payload);
+            const requiresPublishStepUp = form.status === 'published';
+            if (requiresPublishStepUp && (!hasValidStepUp || !stepUpToken)) {
+                throw new Error('Step-up verification is required before creating a published post.');
+            }
+            return createAdminAnnouncement(payload, requiresPublishStepUp ? stepUpToken ?? undefined : undefined);
         },
         onSuccess: (data) => {
             const createdStatus = typeof data?.status === 'string' ? data.status : form.status;
@@ -60,127 +67,135 @@ export function QuickAddModule() {
     });
 
     return (
-        <OpsCard title="Quick Add" description="Fast posting flow for operations teams.">
-            <OpsToolbar
-                compact
-                controls={
-                    <>
-                        <select
-                            value={form.type}
-                            onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
-                        >
-                            <option value="job">Type: Job</option>
-                            <option value="result">Type: Result</option>
-                            <option value="admit-card">Type: Admit Card</option>
-                            <option value="syllabus">Type: Syllabus</option>
-                            <option value="answer-key">Type: Answer Key</option>
-                            <option value="admission">Type: Admission</option>
-                        </select>
-                        <select
-                            value={form.status}
-                            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                        >
-                            <option value="draft">Status: Draft</option>
-                            <option value="pending">Status: Pending</option>
-                            <option value="scheduled">Status: Scheduled</option>
-                            <option value="published">Status: Published</option>
-                        </select>
-                    </>
-                }
-                actions={
-                    <>
-                        <span className="ops-inline-muted">
-                            {form.status === 'scheduled'
-                                ? 'Publish time required before submit.'
-                                : visibilityHint}
-                        </span>
-                        <button
-                            type="button"
-                            className="admin-btn small subtle"
-                            onClick={() => setForm(defaultForm)}
-                        >
-                            Reset form
-                        </button>
-                    </>
-                }
+        <>
+            <AdminStepUpCard
+                title="Step-up Verification"
+                description="Required before creating published posts from Quick Add."
             />
-            <form
-                className="ops-form-grid"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    setSuccessMessage(null);
-                    mutation.mutate();
-                }}
-            >
-                <input
-                    value={form.title}
-                    onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                    placeholder="Title"
-                    required
-                    minLength={10}
-                    className="ops-span-full"
+            <OpsCard title="Quick Add" description="Fast posting flow for operations teams.">
+                <OpsToolbar
+                    compact
+                    controls={
+                        <>
+                            <select
+                                value={form.type}
+                                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
+                            >
+                                <option value="job">Type: Job</option>
+                                <option value="result">Type: Result</option>
+                                <option value="admit-card">Type: Admit Card</option>
+                                <option value="syllabus">Type: Syllabus</option>
+                                <option value="answer-key">Type: Answer Key</option>
+                                <option value="admission">Type: Admission</option>
+                            </select>
+                            <select
+                                value={form.status}
+                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                            >
+                                <option value="draft">Status: Draft</option>
+                                <option value="pending">Status: Pending</option>
+                                <option value="scheduled">Status: Scheduled</option>
+                                <option value="published">Status: Published</option>
+                            </select>
+                        </>
+                    }
+                    actions={
+                        <>
+                            <span className="ops-inline-muted">
+                                {form.status === 'scheduled'
+                                    ? 'Publish time required before submit.'
+                                    : form.status === 'published' && !hasValidStepUp
+                                        ? 'Verify step-up first, then create published post.'
+                                        : visibilityHint}
+                            </span>
+                            <button
+                                type="button"
+                                className="admin-btn small subtle"
+                                onClick={() => setForm(defaultForm)}
+                            >
+                                Reset form
+                            </button>
+                        </>
+                    }
                 />
-                <input
-                    value={form.category}
-                    onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-                    placeholder="Category"
-                    required
-                />
-                <input
-                    value={form.organization}
-                    onChange={(event) => setForm((current) => ({ ...current, organization: event.target.value }))}
-                    placeholder="Organization"
-                    required
-                />
-                <input
-                    value={form.location}
-                    onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
-                    placeholder="Location"
-                />
-                <input
-                    type="date"
-                    value={form.deadline}
-                    onChange={(event) => setForm((current) => ({ ...current, deadline: event.target.value }))}
-                />
-                {form.status === 'scheduled' ? (
+                <form
+                    className="ops-form-grid"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        setSuccessMessage(null);
+                        mutation.mutate();
+                    }}
+                >
                     <input
-                        type="datetime-local"
-                        value={form.publishAt}
-                        onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
+                        value={form.title}
+                        onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                        placeholder="Title"
+                        required
+                        minLength={10}
+                        className="ops-span-full"
+                    />
+                    <input
+                        value={form.category}
+                        onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
+                        placeholder="Category"
                         required
                     />
+                    <input
+                        value={form.organization}
+                        onChange={(event) => setForm((current) => ({ ...current, organization: event.target.value }))}
+                        placeholder="Organization"
+                        required
+                    />
+                    <input
+                        value={form.location}
+                        onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
+                        placeholder="Location"
+                    />
+                    <input
+                        type="date"
+                        value={form.deadline}
+                        onChange={(event) => setForm((current) => ({ ...current, deadline: event.target.value }))}
+                    />
+                    {form.status === 'scheduled' ? (
+                        <input
+                            type="datetime-local"
+                            value={form.publishAt}
+                            onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
+                            required
+                        />
+                    ) : null}
+                    <input
+                        value={form.externalLink}
+                        onChange={(event) => setForm((current) => ({ ...current, externalLink: event.target.value }))}
+                        placeholder="External link (optional)"
+                        className="ops-span-full"
+                    />
+                    <input
+                        value={form.minQualification}
+                        onChange={(event) => setForm((current) => ({ ...current, minQualification: event.target.value }))}
+                        placeholder="Minimum qualification"
+                        className="ops-span-full"
+                    />
+                    <textarea
+                        value={form.content}
+                        onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
+                        placeholder="Content / summary"
+                        className="ops-span-full ops-textarea"
+                    />
+                    <div className="ops-actions ops-span-full">
+                        <button type="submit" className="admin-btn primary" disabled={mutation.isPending}>
+                            {mutation.isPending ? 'Creating...' : 'Create Announcement'}
+                        </button>
+                        <button type="button" className="admin-btn" onClick={() => setForm(defaultForm)}>
+                            Reset
+                        </button>
+                    </div>
+                </form>
+                {mutation.isError ? (
+                    <OpsErrorState message={mutation.error instanceof Error ? mutation.error.message : 'Failed to create announcement.'} />
                 ) : null}
-                <input
-                    value={form.externalLink}
-                    onChange={(event) => setForm((current) => ({ ...current, externalLink: event.target.value }))}
-                    placeholder="External link (optional)"
-                    className="ops-span-full"
-                />
-                <input
-                    value={form.minQualification}
-                    onChange={(event) => setForm((current) => ({ ...current, minQualification: event.target.value }))}
-                    placeholder="Minimum qualification"
-                    className="ops-span-full"
-                />
-                <textarea
-                    value={form.content}
-                    onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
-                    placeholder="Content / summary"
-                    className="ops-span-full ops-textarea"
-                />
-                <div className="ops-actions ops-span-full">
-                    <button type="submit" className="admin-btn primary" disabled={mutation.isPending}>
-                        {mutation.isPending ? 'Creating...' : 'Create Announcement'}
-                    </button>
-                    <button type="button" className="admin-btn" onClick={() => setForm(defaultForm)}>
-                        Reset
-                    </button>
-                </div>
-            </form>
-            {mutation.isError ? (
-                <OpsErrorState message={mutation.error instanceof Error ? mutation.error.message : 'Failed to create announcement.'} />
-            ) : null}
-            {successMessage ? <div className="ops-success">{successMessage}</div> : null}
-        </OpsCard>
+                {successMessage ? <div className="ops-success">{successMessage}</div> : null}
+            </OpsCard>
+        </>
     );
 }
