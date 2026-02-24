@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 
+import { useAdminAuth } from '../../app/useAdminAuth';
+import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import {
@@ -38,6 +40,7 @@ const createSnapshot = (value: EditableAnnouncement) => JSON.stringify(value);
 
 export function DetailedPostModule() {
     const location = useLocation();
+    const { hasValidStepUp, stepUpToken } = useAdminAuth();
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string>('');
     const [editable, setEditable] = useState<EditableAnnouncement>(defaultEditable);
@@ -56,6 +59,14 @@ export function DetailedPostModule() {
         () => announcements.find((item) => (item.id || item._id) === selectedId) as (AdminAnnouncementListItem | undefined),
         [announcements, selectedId]
     );
+    const previewUrl = useMemo(() => {
+        if (!selected?.slug || !selected?.type) return null;
+        const allowedTypes = new Set(['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission']);
+        const normalizedType = String(selected.type).trim();
+        const normalizedSlug = String(selected.slug).trim();
+        if (!normalizedSlug || !allowedTypes.has(normalizedType)) return null;
+        return `/${normalizedType}/${normalizedSlug}`;
+    }, [selected?.slug, selected?.type]);
 
     const revisionsQuery = useQuery({
         queryKey: ['announcement-revisions', selectedId],
@@ -156,7 +167,10 @@ export function DetailedPostModule() {
 
     const restoreMutation = useMutation({
         mutationFn: async ({ id, version }: { id: string; version: number }) => {
-            return restoreRevision(id, version);
+            if (!hasValidStepUp || !stepUpToken) {
+                throw new Error('Step-up verification is required before restoring a revision.');
+            }
+            return restoreRevision(id, version, stepUpToken);
         },
         onSuccess: () => {
             notifySuccess('Restored', 'Revision has been restored. The previous state was saved as a new revision.');
@@ -197,8 +211,13 @@ export function DetailedPostModule() {
     }, [mutation, selectedId]);
 
     return (
-        <OpsCard title="Detailed Post" description="Deep editor with server autosave, revision timeline, and restore controls.">
-            <div className="ops-stack">
+        <>
+            <AdminStepUpCard
+                title="Step-up Verification"
+                description="Required for revision restore and other high-risk detailed-post actions."
+            />
+            <OpsCard title="Detailed Post" description="Deep editor with server autosave, revision timeline, and restore controls.">
+                <div className="ops-stack">
                 <OpsToolbar
                     compact
                     controls={
@@ -368,7 +387,14 @@ export function DetailedPostModule() {
                                         <button
                                             type="button"
                                             className="admin-btn subtle"
-                                            onClick={() => window.open(`/post/${selectedId}`, '_blank')}
+                                            onClick={() => {
+                                                if (!previewUrl) {
+                                                    notifyInfo('Preview unavailable', 'Preview is available after type and slug are set.');
+                                                    return;
+                                                }
+                                                window.open(previewUrl, '_blank', 'noopener,noreferrer');
+                                            }}
+                                            disabled={!previewUrl}
                                         >
                                             Preview as user
                                         </button>
@@ -397,7 +423,7 @@ export function DetailedPostModule() {
                                             type="button"
                                             className="admin-btn subtle"
                                             ref={(el) => { if (el) { el.style.marginLeft = 'auto'; el.style.fontSize = '0.75rem'; el.style.padding = '0.2rem 0.5rem'; } }}
-                                            disabled={restoreMutation.isPending}
+                                            disabled={restoreMutation.isPending || !hasValidStepUp}
                                             onClick={() => {
                                                 if (window.confirm(`Restore this announcement to version ${revision.version}? The current state will be saved as a new revision.`)) {
                                                     restoreMutation.mutate({ id: selectedId, version: revision.version });
@@ -426,6 +452,7 @@ export function DetailedPostModule() {
                 ) : null}
                 {mutation.isSuccess ? <div className="ops-success">Changes saved.</div> : null}
             </div>
-        </OpsCard>
+            </OpsCard>
+        </>
     );
 }

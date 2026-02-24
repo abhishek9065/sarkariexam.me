@@ -1,3 +1,5 @@
+import type { AdminPermission } from '../types';
+
 export type AdminModuleKey =
     | 'dashboard'
     | 'analytics'
@@ -317,6 +319,43 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
     },
 ];
 
+const MODULE_PERMISSION_MAP: Partial<Record<AdminModuleKey, AdminPermission>> = {
+    dashboard: 'admin:read',
+    analytics: 'analytics:read',
+    'manage-posts': 'announcements:read',
+    'create-post': 'announcements:write',
+    'quick-add': 'announcements:write',
+    'detailed-post': 'announcements:write',
+    job: 'announcements:write',
+    result: 'announcements:write',
+    'admit-card': 'announcements:write',
+    'answer-key': 'announcements:write',
+    syllabus: 'announcements:write',
+    admission: 'announcements:write',
+    review: 'announcements:approve',
+    approvals: 'announcements:approve',
+    queue: 'announcements:read',
+    bulk: 'announcements:write',
+    'homepage-sections': 'announcements:write',
+    'link-manager': 'announcements:write',
+    'media-pdfs': 'announcements:write',
+    templates: 'announcements:write',
+    'seo-tools': 'announcements:write',
+    'users-roles': 'admin:read',
+    alerts: 'admin:read',
+    security: 'security:read',
+    sessions: 'security:read',
+    audit: 'audit:read',
+    reports: 'announcements:read',
+    'community-moderation': 'admin:read',
+    'error-reports': 'admin:read',
+    settings: 'admin:write',
+};
+
+export function getModuleRequiredPermission(key: AdminModuleKey): AdminPermission {
+    return MODULE_PERMISSION_MAP[key] ?? 'admin:read';
+}
+
 const allModuleKeys = new Set<AdminModuleKey>(adminModuleNavItems.map((item) => item.key));
 
 const configuredModulesRaw = (import.meta.env.VITE_ADMIN_VNEXT_MODULES as string | undefined)?.trim();
@@ -345,6 +384,9 @@ export function isAdminModuleEnabled(key: AdminModuleKey): boolean {
 }
 
 export function getModuleByPath(pathname: string): AdminModuleNavItem | undefined {
+    if (pathname === '/announcements' || pathname.startsWith('/announcements/')) {
+        return adminModuleNavItems.find((item) => item.key === 'manage-posts');
+    }
     return adminModuleNavItems.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`));
 }
 

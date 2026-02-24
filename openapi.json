@@ -356,6 +356,7 @@
     "/api/admin/announcements/{id}": {
       "put": {
         "summary": "PUT /api/admin/announcements/{id}",
+        "description": "Updates an announcement. If this request transitions the record to `published`, step-up and approval workflow controls are enforced.",
         "tags": [
           "admin"
         ],
@@ -376,6 +377,9 @@
           "404": {
             "description": "Not found"
           },
+          "202": {
+            "description": "Approval required before publish transition can execute"
+          },
           "500": {
             "description": "Internal server error"
           }
@@ -388,6 +392,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Admin-Step-Up-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required when this update performs a publish transition."
+          },
+          {
+            "name": "X-Admin-Approval-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required to execute a previously approved publish transition."
           }
         ]
       },
@@ -3561,6 +3583,7 @@
     "/api/admin/announcements/{id}/rollback": {
       "post": {
         "summary": "POST /api/admin/announcements/{id}/rollback",
+        "description": "Rolls back an announcement to a version snapshot. Step-up is required. If the target snapshot is `published`, approval workflow controls are also required.",
         "tags": [
           "admin"
         ],
@@ -3573,6 +3596,24 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Admin-Step-Up-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fresh admin step-up token."
+          },
+          {
+            "name": "X-Admin-Approval-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required when executing an approved rollback to a published snapshot."
           }
         ],
         "requestBody": {
@@ -3615,6 +3656,9 @@
           },
           "404": {
             "description": "Not found"
+          },
+          "202": {
+            "description": "Approval required before rollback-to-published can execute"
           },
           "500": {
             "description": "Internal server error"
@@ -5373,6 +5417,7 @@
     "/api/admin/announcements/{id}/revert/{version}": {
       "post": {
         "summary": "POST /api/admin/announcements/{id}/revert/{version}",
+        "description": "Reverts to a historical version. Step-up and approval-grade permissions are required. If the target snapshot is `published`, approval workflow controls are enforced.",
         "tags": [
           "admin"
         ],
@@ -5394,6 +5439,24 @@
               "type": "integer",
               "minimum": 1
             }
+          },
+          {
+            "name": "X-Admin-Step-Up-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fresh admin step-up token."
+          },
+          {
+            "name": "X-Admin-Approval-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required when executing an approved revert to a published snapshot."
           }
         ],
         "responses": {
@@ -5411,6 +5474,9 @@
           },
           "404": {
             "description": "Not found"
+          },
+          "202": {
+            "description": "Approval required before revert-to-published can execute"
           },
           "500": {
             "description": "Internal server error"
