@@ -218,17 +218,15 @@
     border-color: var(--border-glow);
 }
 
-.admin-nav-short {
-    display: none;
-    min-width: 28px;
-    height: 28px;
+.admin-nav-icon {
+    display: inline-flex;
+    min-width: 24px;
+    height: 24px;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-xs);
-    background: var(--bg-elev-3);
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--text-muted);
+    font-size: 1rem;
+    flex-shrink: 0;
+    line-height: 1;
 }
 
 .admin-nav-label {
@@ -562,8 +560,8 @@
     text-align: center;
 }
 
-.admin-layout.sidebar-collapsed .admin-nav-short {
-    display: inline-flex;
+.admin-layout.sidebar-collapsed .admin-nav-icon {
+    font-size: 1.15rem;
 }
 
 .admin-layout.sidebar-collapsed .admin-nav-link {
@@ -609,26 +607,4 @@
     .admin-mobile-menu-btn {
         display: flex;
     }
-}
-
-/* ─── Desktop-Only Gate (legacy placeholder) ─── */
-
-.admin-desktop-only {
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    padding: var(--space-5);
-}
-
-.admin-desktop-only-card {
-    width: min(480px, 100%);
-    border: 1px solid var(--border-medium);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5);
-    background: var(--bg-glass-strong);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: var(--shadow-2), var(--shadow-glow-md);
-    display: grid;
-    gap: var(--space-3);
 }

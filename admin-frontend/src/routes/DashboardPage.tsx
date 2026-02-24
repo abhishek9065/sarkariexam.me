@@ -2,7 +2,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { OpsCard, OpsErrorState } from '../components/ops';
-import { getAdminAlerts, getAdminDashboard, getAdminReports } from '../lib/api/client';
+import { getAdminAlerts, getAdminAuditLogs, getAdminDashboard, getAdminReports } from '../lib/api/client';
+
+function formatRelativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
 
 export function DashboardPage() {
     const navigate = useNavigate();
@@ -20,6 +32,12 @@ export function DashboardPage() {
     const alertsQuery = useQuery({
         queryKey: ['admin-alerts-dashboard'],
         queryFn: () => getAdminAlerts({ status: 'open', limit: 10 }),
+    });
+
+    const activityQuery = useQuery({
+        queryKey: ['admin-activity-feed'],
+        queryFn: () => getAdminAuditLogs({ limit: 12 }),
+        staleTime: 60_000,
     });
 
     const summary = reportsQuery.data?.summary;
@@ -167,6 +185,43 @@ export function DashboardPage() {
                     ) : null}
                 </OpsCard>
             </div>
+
+            {/* ─── Recent Activity Feed ─── */}
+            <OpsCard title="Recent Activity" description="Latest admin actions from the audit log.">
+                {activityQuery.isPending ? (
+                    <div className="dash-activity-list">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="dash-activity-item">
+                                <div className="ops-skeleton-shimmer ops-skeleton-line short" />
+                                <div className="ops-skeleton-shimmer ops-skeleton-line medium" />
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+                {!activityQuery.isPending && (!activityQuery.data || activityQuery.data.length === 0) ? (
+                    <div className="ops-empty-state">
+                        <div className="ops-empty-state-icon">{'\uD83D\uDCCB'}</div>
+                        <div className="ops-empty-state-title">No recent activity</div>
+                        <div className="ops-empty-state-description">Admin actions will appear here as they happen.</div>
+                    </div>
+                ) : null}
+                {activityQuery.data && activityQuery.data.length > 0 ? (
+                    <div className="dash-activity-list">
+                        {activityQuery.data.slice(0, 10).map((log, idx) => (
+                            <div key={log.id ?? idx} className="dash-activity-item">
+                                <span className="dash-activity-dot" />
+                                <div className="dash-activity-body">
+                                    <span className="dash-activity-action">{log.action ?? 'Unknown action'}</span>
+                                    <span className="dash-activity-meta">
+                                        {log.actorEmail ? <span className="dash-activity-actor">{log.actorEmail}</span> : null}
+                                        {log.createdAt ? <time className="dash-activity-time">{formatRelativeTime(log.createdAt)}</time> : null}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </OpsCard>
 
             {/* ─── Deadlines ─── */}
             <OpsCard title="Upcoming Deadlines" description="Application/exam deadlines in next 7 days.">
