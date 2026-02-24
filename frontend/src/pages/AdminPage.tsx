@@ -5296,8 +5296,8 @@ export function AdminPage() {
 
                                                     setActiveAdminTab('list');
                                                 } else {
-                                                    const error = await response.json();
-                                                    setMessage(error.message || 'Failed to save');
+                                                    const errorBody = await response.json().catch(() => ({}));
+                                                    setMessage(getApiErrorMessage(errorBody, 'Failed to save'));
                                                 }
                                             } catch (error) {
                                                 console.error(error);
@@ -6233,8 +6233,8 @@ export function AdminPage() {
 
                                             setActiveAdminTab('list');
                                         } else {
-                                            const error = await response.json();
-                                            setMessage(error.message || 'Failed to publish');
+                                            const errorBody = await response.json().catch(() => ({}));
+                                            setMessage(getApiErrorMessage(errorBody, 'Failed to publish'));
                                         }
                                     } catch (error) {
                                         console.error(error);
