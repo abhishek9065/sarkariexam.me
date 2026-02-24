@@ -5,7 +5,7 @@ import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { getAnalyticsOverview } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 
-const readNumber = (payload: Record<string, unknown> | null, key: string): number => {
+const readNumber = (payload: Record<string, unknown> | null | undefined, key: string): number => {
     if (!payload) return 0;
     const value = payload[key];
     if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -13,7 +13,7 @@ const readNumber = (payload: Record<string, unknown> | null, key: string): numbe
     return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const readNestedNumber = (payload: Record<string, unknown> | null, path: string[]): number => {
+const readNestedNumber = (payload: Record<string, unknown> | null | undefined, path: string[]): number => {
     if (!payload) return 0;
     let current: unknown = payload;
     for (const key of path) {

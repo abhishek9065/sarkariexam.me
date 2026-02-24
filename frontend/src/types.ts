@@ -128,7 +128,7 @@ export interface User {
     id: string;
     email: string;
     username: string;
-    role: 'user' | AdminPortalRole;
+    role: 'user' | AdminPortalRole | string;
     isActive?: boolean;
     createdAt?: string;
     lastLogin?: string;
