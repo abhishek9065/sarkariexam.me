@@ -174,6 +174,17 @@ describeOrSkip('admin workflow integration', () => {
         const approvalId = queued.body.approvalId as string;
         expect(approvalId).toBeTruthy();
 
+        const pendingReplay = await request(app)
+            .post(`/api/admin/announcements/${announcementId}/approve`)
+            .set('Cookie', requesterSession.cookies)
+            .set('X-CSRF-Token', requesterSession.csrfToken)
+            .set('X-Admin-Step-Up-Token', requesterStepUpToken)
+            .set('X-Admin-Approval-Id', approvalId)
+            .send({});
+        expect(pendingReplay.status).toBe(409);
+        expect(pendingReplay.body?.error).toBe('approval_invalid');
+        expect(String(pendingReplay.body?.reason)).toContain('invalid_status:pending');
+
         const selfApprove = await request(app)
             .post(`/api/admin/approvals/${approvalId}/approve`)
             .set('Cookie', requesterSession.cookies)
@@ -209,6 +220,167 @@ describeOrSkip('admin workflow integration', () => {
             .expect(200);
 
         expect(executed.body?.data?.status).toBe('published');
+    });
+
+    it('enforces approval workflow for create->published transitions', async () => {
+        if (!config.adminDualApprovalRequired) {
+            return;
+        }
+
+        const suffix = Date.now();
+        const password = `CreatePubl1sh!${suffix}Strong`;
+        const admin = await UserModelMongo.create({
+            email: `create-publish-${suffix}@example.com`,
+            username: 'Create Publish Admin',
+            password,
+            role: 'admin',
+        });
+        const session = await loginAdmin(admin.email, password);
+
+        const stepUpToken = await issueStepUp({
+            email: admin.email,
+            password,
+            cookies: session.cookies,
+            csrfToken: session.csrfToken,
+        });
+
+        const queued = await request(app)
+            .post('/api/admin/announcements')
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .set('X-Admin-Step-Up-Token', stepUpToken)
+            .send({
+                title: `Direct Publish Candidate ${suffix}`,
+                type: 'admission',
+                category: 'Admissions',
+                organization: 'UPSC',
+                status: 'published',
+                externalLink: 'https://example.com/result.pdf',
+                content: 'Result notice details.',
+            });
+        expect(queued.status).toBe(202);
+        expect(queued.body?.error).toBe('approval_required');
+        expect(queued.body?.approvalId).toBeTruthy();
+    });
+
+    it('rejects break-glass override when policy is disabled', async () => {
+        if (config.adminBreakGlassEnabled) {
+            return;
+        }
+
+        const suffix = Date.now();
+        const password = `NoGlass!${suffix}Strong`;
+        const admin = await UserModelMongo.create({
+            email: `breakglass-disabled-${suffix}@example.com`,
+            username: 'BreakGlass Disabled Admin',
+            password,
+            role: 'admin',
+        });
+        const session = await loginAdmin(admin.email, password);
+        const stepUpToken = await issueStepUp({
+            email: admin.email,
+            password,
+            cookies: session.cookies,
+            csrfToken: session.csrfToken,
+        });
+
+        const createResponse = await request(app)
+            .post('/api/admin/announcements')
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .send({
+                title: `BreakGlass Disabled Target ${suffix}`,
+                type: 'result',
+                category: 'Results',
+                organization: 'UPSC',
+                status: 'pending',
+                content: 'Result notice details.',
+            })
+            .expect(201);
+
+        const announcementId = createResponse.body?.data?.id as string;
+        expect(announcementId).toBeTruthy();
+
+        const blocked = await request(app)
+            .post(`/api/admin/announcements/${announcementId}/approve`)
+            .set('Cookie', session.cookies)
+            .set('X-CSRF-Token', session.csrfToken)
+            .set('X-Admin-Step-Up-Token', stepUpToken)
+            .set('X-Admin-Break-Glass-Reason', 'Emergency single operator execution for critical correction')
+            .send({});
+        expect(blocked.status).toBe(403);
+        expect(blocked.body?.error).toBe('break_glass_disabled');
+    });
+
+    it('allows break-glass execution when enabled and records audit metadata', async () => {
+        const previousEnabled = config.adminBreakGlassEnabled;
+        const previousMinReasonLength = config.adminBreakGlassMinReasonLength;
+        config.adminBreakGlassEnabled = true;
+        config.adminBreakGlassMinReasonLength = 12;
+
+        try {
+            const suffix = Date.now();
+            const password = `YesGlass!${suffix}Strong`;
+            const admin = await UserModelMongo.create({
+                email: `breakglass-enabled-${suffix}@example.com`,
+                username: 'BreakGlass Enabled Admin',
+                password,
+                role: 'admin',
+            });
+            const session = await loginAdmin(admin.email, password);
+            const stepUpToken = await issueStepUp({
+                email: admin.email,
+                password,
+                cookies: session.cookies,
+                csrfToken: session.csrfToken,
+            });
+
+            const createResponse = await request(app)
+                .post('/api/admin/announcements')
+                .set('Cookie', session.cookies)
+                .set('X-CSRF-Token', session.csrfToken)
+                .send({
+                    title: `BreakGlass Enabled Target ${suffix}`,
+                    type: 'job',
+                    category: 'Central Government',
+                    organization: 'Railway Board',
+                    status: 'pending',
+                    location: 'All India',
+                    deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+                    externalLink: 'https://example.com/apply',
+                    content: 'Apply online and refer to official notification PDF.',
+                    importantDates: [{ eventName: 'Last Date to Apply', eventDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }],
+                    minQualification: 'Graduate',
+                })
+                .expect(201);
+
+            const announcementId = createResponse.body?.data?.id as string;
+            expect(announcementId).toBeTruthy();
+
+            const breakGlassReason = 'Emergency single-operator publish required due outage.';
+            const executed = await request(app)
+                .post(`/api/admin/announcements/${announcementId}/approve`)
+                .set('Cookie', session.cookies)
+                .set('X-CSRF-Token', session.csrfToken)
+                .set('X-Admin-Step-Up-Token', stepUpToken)
+                .set('X-Admin-Break-Glass-Reason', breakGlassReason)
+                .send({});
+            expect(executed.status).toBe(200);
+            expect(executed.body?.data?.status).toBe('published');
+
+            const auditCollection = getCollection<any>('admin_audit_logs');
+            const auditEntry = await auditCollection.findOne({
+                action: 'approve',
+                announcementId,
+                userId: admin.id,
+            });
+            expect(auditEntry).toBeTruthy();
+            expect(auditEntry?.metadata?.breakGlassUsed).toBe(true);
+            expect(auditEntry?.metadata?.breakGlassReason).toBe(breakGlassReason);
+        } finally {
+            config.adminBreakGlassEnabled = previousEnabled;
+            config.adminBreakGlassMinReasonLength = previousMinReasonLength;
+        }
     });
 
     it('blocks publish transition updates without step-up and queues approval with step-up', async () => {

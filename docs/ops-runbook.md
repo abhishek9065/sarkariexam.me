@@ -150,6 +150,51 @@ After rollback:
 2. Re-run analytics health probe.
 3. Validate frontend runtime API proxy path.
 
+### 6) Admin Mutations Stuck On `approval_required`
+
+Symptoms:
+- Admin create/edit/delete/publish returns `approval_required`.
+- Action appears queued but never executes.
+
+Checks:
+1. Confirm dual-approval policy is enabled:
+```bash
+echo "$ADMIN_DUAL_APPROVAL_REQUIRED"
+```
+2. Confirm whether a second approver is available.
+3. Inspect pending approvals:
+```bash
+curl -H "Authorization: Bearer <admin-token>" \
+  "http://localhost:5000/api/admin/approvals?status=pending&limit=20"
+```
+4. For execution replay, confirm request includes:
+- `X-Admin-Approval-Id`
+- `X-Admin-Step-Up-Token` (for sensitive routes)
+
+Single-operator emergency path (break-glass):
+1. Enable emergency mode:
+```bash
+ADMIN_BREAK_GLASS_ENABLED=true
+ADMIN_BREAK_GLASS_MIN_REASON_LENGTH=12
+```
+2. Provide a reason in admin UI:
+- Legacy `/admin`: reason prompt appears on blocked mutation retry.
+- `/admin-vnext`: set once in browser console:
+```js
+localStorage.setItem('admin_break_glass_reason', 'Emergency reason with enough detail')
+```
+3. Retry the blocked mutation with:
+- `X-Admin-Break-Glass-Reason: <clear incident reason>`
+- Valid step-up token.
+4. Verify audit trail:
+- `admin_audit_logs.metadata.breakGlassUsed=true`
+- `admin_audit_logs.metadata.breakGlassReason=<reason>`
+
+Return to strict mode:
+1. Set `ADMIN_BREAK_GLASS_ENABLED=false`.
+2. Confirm two-operator approval flow is functioning.
+3. Review break-glass events in audit/security logs for post-incident signoff.
+
 ## CI/Contract Guardrails
 
 Before merge:
