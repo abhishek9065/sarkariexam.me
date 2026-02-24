@@ -23,6 +23,11 @@ export function QuickAddModule() {
     const [form, setForm] = useState(defaultForm);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const { notifyInfo } = useAdminNotifications();
+    const visibilityHint = form.status === 'published'
+        ? 'Published posts are visible on homepage (after cache refresh).'
+        : form.status === 'scheduled'
+            ? 'Scheduled posts appear only after publish time.'
+            : 'Draft and pending posts are not visible on homepage.';
 
     const mutation = useMutation({
         mutationFn: () => {
@@ -44,7 +49,11 @@ export function QuickAddModule() {
             return createAdminAnnouncement(payload);
         },
         onSuccess: (data) => {
-            setSuccessMessage(`Created announcement: ${data.title || 'Untitled'}`);
+            const createdStatus = typeof data?.status === 'string' ? data.status : form.status;
+            const visibilityMessage = createdStatus === 'published'
+                ? 'It should appear on homepage shortly.'
+                : 'Publish it to show on homepage.';
+            setSuccessMessage(`Created announcement (${createdStatus}): ${data.title || 'Untitled'}. ${visibilityMessage}`);
             setForm(defaultForm);
             notifyInfo('Quick Add reset', 'Form reset for next announcement.');
         },
@@ -81,7 +90,9 @@ export function QuickAddModule() {
                 actions={
                     <>
                         <span className="ops-inline-muted">
-                            {form.status === 'scheduled' ? 'Publish time required before submit.' : 'Create and send to workflow.'}
+                            {form.status === 'scheduled'
+                                ? 'Publish time required before submit.'
+                                : visibilityHint}
                         </span>
                         <button
                             type="button"

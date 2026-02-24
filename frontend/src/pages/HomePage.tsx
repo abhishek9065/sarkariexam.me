@@ -199,7 +199,7 @@ export function HomePage() {
         (async () => {
             try {
                 // Fetch basic content types in parallel
-                const contentTypes: ContentType[] = ['job', 'result', 'admit-card', 'answer-key'];
+                const contentTypes: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
                 const results = await Promise.all(
                     contentTypes.map(t => getAnnouncementCards({ type: t, limit: 12, sort: 'newest' }))
                 );
