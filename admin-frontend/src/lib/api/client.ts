@@ -932,7 +932,7 @@ export async function getAdminRoleUsers(): Promise<AdminRoleUser[]> {
 
 export async function updateAdminRoleUser(
     id: string,
-    payload: { role: 'admin' | 'editor' | 'reviewer' | 'viewer'; isActive?: boolean },
+    payload: { role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor'; isActive?: boolean },
     stepUpToken: string
 ): Promise<AdminRoleUser> {
     const body = await request(`/api/admin/users/${encodeURIComponent(id)}/role`, {

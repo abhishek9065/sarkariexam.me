@@ -1,9 +1,10 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 
 type PageType = 'about' | 'contact' | 'privacy' | 'disclaimer' | 'advertise';
 
-const CONTENT: Record<PageType, { title: string; icon: string; body: JSX.Element }> = {
+const CONTENT: Record<PageType, { title: string; icon: string; body: React.ReactNode }> = {
     about: {
         title: 'About Us',
         icon: 'ℹ️',

@@ -30,6 +30,12 @@ async function ensureAdminAccount(api: APIRequestContext): Promise<void> {
         lastStatus = statusResponse.status();
         lastBody = await statusResponse.text();
 
+        if (lastStatus === 429) {
+            const retryAfter = parseInt(statusResponse.headers()['retry-after'] || '5', 10);
+            await sleep(retryAfter * 1000 + 500); // Wait suggested time + small buffer
+            continue;
+        }
+
         if (!statusResponse.ok()) {
             if (attempt < setupStatusMaxAttempts) {
                 await sleep(setupStatusRetryDelayMs);

@@ -1648,7 +1648,7 @@ export function AdminPage() {
 
         // Load jobDetails if available for detailed editing
         if (item.jobDetails && Object.keys(item.jobDetails).length > 0) {
-            setJobDetails(item.jobDetails);
+            setJobDetails(item.jobDetails as unknown as JobDetails | null);
             setActiveAdminTab('detailed');
             setMessage(`Editing (Detailed): ${item.title}`);
         } else {
@@ -1691,7 +1691,7 @@ export function AdminPage() {
         });
         setSubmitAttempted(false);
         const hasDetails = item.jobDetails && Object.keys(item.jobDetails).length > 0;
-        setJobDetails(hasDetails ? item.jobDetails ?? null : null);
+        setJobDetails(hasDetails ? (item.jobDetails as unknown as JobDetails) ?? null : null);
         setEditingId(null);
         setShowPreview(false);
         setPreviewData(null);
@@ -4491,17 +4491,17 @@ export function AdminPage() {
                                             disabled={reviewLoading}
                                         />
                                         {canApproveAnnouncements && (
-                                            <button className="admin-btn success" onClick={handleBulkApprove} disabled={reviewLoading}>
+                                            <button className="admin-btn success" onClick={() => handleBulkApprove()} disabled={reviewLoading}>
                                                 {reviewLoading ? 'Working...' : 'Approve selected'}
                                             </button>
                                         )}
                                         {canApproveAnnouncements && (
-                                            <button className="admin-btn warning" onClick={handleBulkReject} disabled={reviewLoading}>
+                                            <button className="admin-btn warning" onClick={() => handleBulkReject()} disabled={reviewLoading}>
                                                 Reject selected
                                             </button>
                                         )}
                                         {canWriteAnnouncements && (
-                                            <button className="admin-btn primary" onClick={handleBulkSchedule} disabled={reviewLoading}>
+                                            <button className="admin-btn primary" onClick={() => handleBulkSchedule()} disabled={reviewLoading}>
                                                 Schedule selected
                                             </button>
                                         )}
@@ -4587,7 +4587,7 @@ export function AdminPage() {
                                                                         <span className="meta-sep">|</span>
                                                                         <span>{item.category || 'Uncategorized'}</span>
                                                                         <span className="meta-sep">|</span>
-                                                                        <span>v{item.version ?? 1}</span>
+                                                                        <span>v{(item as any).version ?? 1}</span>
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -4706,7 +4706,7 @@ export function AdminPage() {
                                                                         <span className="meta-sep">|</span>
                                                                         <span>{item.category || 'Uncategorized'}</span>
                                                                         <span className="meta-sep">|</span>
-                                                                        <span>v{item.version ?? 1}</span>
+                                                                        <span>v{(item as any).version ?? 1}</span>
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -4893,7 +4893,7 @@ export function AdminPage() {
                                             <DatePicker
                                                 id="detailed-deadline"
                                                 selected={parseDateOnly(formData.deadline)}
-                                                onChange={(date) => {
+                                                onChange={(date: Date | null) => {
                                                     setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
                                                     setTouchedFields((prev) => ({ ...prev, deadline: true }));
                                                 }}
@@ -4986,7 +4986,7 @@ export function AdminPage() {
                                             <DatePicker
                                                 id="detailed-publish-at"
                                                 selected={parseDateTime(formData.publishAt)}
-                                                onChange={(date) => {
+                                                onChange={(date: Date | null) => {
                                                     setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
                                                     setTouchedFields((prev) => ({ ...prev, publishAt: true }));
                                                 }}
@@ -5562,7 +5562,7 @@ export function AdminPage() {
                                             <DatePicker
                                                 id="quick-deadline"
                                                 selected={parseDateOnly(formData.deadline)}
-                                                onChange={(date) => {
+                                                onChange={(date: Date | null) => {
                                                     setFormData({ ...formData, deadline: date ? formatDateInput(date) : '' });
                                                     setTouchedFields((prev) => ({ ...prev, deadline: true }));
                                                 }}
@@ -5709,7 +5709,7 @@ export function AdminPage() {
                                             <DatePicker
                                                 id="quick-publish-at"
                                                 selected={parseDateTime(formData.publishAt)}
-                                                onChange={(date) => {
+                                                onChange={(date: Date | null) => {
                                                     setFormData({ ...formData, publishAt: date ? date.toISOString() : '' });
                                                     setTouchedFields((prev) => ({ ...prev, publishAt: true }));
                                                 }}
@@ -6072,9 +6072,9 @@ export function AdminPage() {
                             <button className="admin-btn secondary small" onClick={() => setVersionTarget(null)}>Close</button>
                         </div>
                         <div className="admin-modal-body">
-                            {versionTarget.versions && versionTarget.versions.length > 0 ? (
+                            {(versionTarget as any).versions && (versionTarget as any).versions.length > 0 ? (
                                 <div className="version-list">
-                                    {versionTarget.versions.map((version) => (
+                                    {(versionTarget as any).versions.map((version: any) => (
                                         <div key={`${versionTarget.id}-${version.version}`} className="version-card">
                                             <div className="version-meta">
                                                 <span>Version {version.version}</span>

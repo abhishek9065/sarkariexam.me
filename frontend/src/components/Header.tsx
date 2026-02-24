@@ -102,7 +102,7 @@ export function Header() {
 
     // Close dropdowns on outside click
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
+        const handleClickOutside = (e: globalThis.MouseEvent) => {
             if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
                 setUserMenuOpen(false);
             }
