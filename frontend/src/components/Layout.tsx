@@ -13,8 +13,9 @@ export function Layout({ children }: { children: ReactNode }) {
 
     return (
         <div className="app">
+            <a href="#main-content" className="skip-link">Skip to main content</a>
             <Header />
-            <main className="main-content container animate-fade-in">
+            <main id="main-content" className="main-content container animate-fade-in">
                 {children}
             </main>
             <Footer />

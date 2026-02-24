@@ -603,7 +603,7 @@
 
 .hp-update-row:hover {
     background: var(--bg-tertiary);
-    transform: translateX(2px);
+    transform: translateX(2px) scale(1.005);
 }
 
 /* Type Badges */
