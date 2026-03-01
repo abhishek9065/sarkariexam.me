@@ -5,10 +5,15 @@ on:
     - cron: '30 2 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: admin-vnext-alias-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   admin-alias-playwright:
     name: Admin Playwright Alias Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: admin-frontend
@@ -26,6 +31,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Print runtime versions
+        run: |
+          node -v
+          npm -v
+          echo "Playwright project listing:"
+          npx playwright test --config playwright.config.ts --list || true
+
       - name: Lint admin frontend
         run: npm run lint
 
@@ -42,10 +54,20 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run admin Playwright alias suite
-        run: npm run test:e2e:ci
+        run: npm run test:e2e:nightly:smoke
         env:
           VITE_ADMIN_BASENAME: /admin-vnext
           VITE_ADMIN_E2E_STEPUP_BYPASS: 'true'
+
+      - name: Print test diagnostics on failure
+        if: failure()
+        run: |
+          echo "First lines of test-results/results.json:"
+          if [ -f test-results/results.json ]; then
+            sed -n '1,120p' test-results/results.json
+          else
+            echo "results.json not found"
+          fi
 
       - name: Upload admin alias artifacts
         if: always()
