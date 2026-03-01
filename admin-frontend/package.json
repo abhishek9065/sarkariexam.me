@@ -13,8 +13,9 @@
     "lint": "eslint src --ext ts,tsx --max-warnings=0",
     "guard:ui": "node ../scripts/admin-ui-guard.mjs",
     "generate:api": "openapi-typescript ../openapi.json -o src/types/api.generated.ts",
-    "test:e2e:ci": "playwright test --config playwright.config.ts",
-    "test:e2e:nightly:smoke": "playwright test --config playwright.config.ts",
+    "test:e2e:ci": "playwright test --config playwright.config.ts tests/admin.alias.smoke.spec.ts",
+    "test:e2e:nightly:smoke": "playwright test --config playwright.config.ts tests/admin.alias.smoke.spec.ts",
+    "test:e2e:full": "playwright test --config playwright.config.ts",
     "test:e2e:integration": "playwright test --config playwright.integration.config.ts tests/admin.integration.spec.ts"
   },
   "dependencies": {
