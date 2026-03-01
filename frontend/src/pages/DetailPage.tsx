@@ -269,46 +269,30 @@ export function DetailPage({ type }: { type: ContentType }) {
     if (a.ageLimit) keyFacts.push({ label: 'Age Limit', value: a.ageLimit });
     if (a.externalLink) keyFacts.push({ label: 'Official Website', value: 'Visit →', isLink: true, href: a.externalLink });
 
-    /* Quick-info grid items */
-    const quickInfoItems: Array<{ icon: string; label: string; value: string; highlight?: boolean }> = [];
-    if (a.deadline) quickInfoItems.push({ icon: '📅', label: 'Last Date', value: formatDate(a.deadline), highlight: !!deadlineStatus && deadlineStatus.className !== 'detail-deadline-normal' });
-    if (a.minQualification) quickInfoItems.push({ icon: '🎓', label: 'Qualification', value: a.minQualification });
-    if (a.totalPosts) quickInfoItems.push({ icon: '👥', label: 'Total Posts', value: a.totalPosts.toLocaleString() });
-    if (salary) quickInfoItems.push({ icon: '💰', label: 'Salary', value: salary });
-    if (a.ageLimit) quickInfoItems.push({ icon: '📋', label: 'Age Limit', value: a.ageLimit });
-    if (a.applicationFee) quickInfoItems.push({ icon: '💳', label: 'Fee', value: a.applicationFee });
-    if (a.cutoffMarks) quickInfoItems.push({ icon: '📊', label: 'Cut-off', value: a.cutoffMarks });
-    if (a.difficulty) quickInfoItems.push({ icon: '🎯', label: 'Difficulty', value: a.difficulty.charAt(0).toUpperCase() + a.difficulty.slice(1) });
+    /* Key Facts Box (Scanning Friendly TL;DR) */
+    const quickInfoItems: Array<{ label: string; value: string; highlight?: boolean }> = [];
+    if (a.organization) quickInfoItems.push({ label: 'Organization', value: a.organization });
+    quickInfoItems.push({ label: 'Post Name', value: a.title });
+    if (a.totalPosts) quickInfoItems.push({ label: 'Total Vacancies', value: a.totalPosts.toLocaleString() });
+    if (a.deadline) quickInfoItems.push({ label: 'Last Date', value: formatDate(a.deadline), highlight: !!deadlineStatus && deadlineStatus.className !== 'detail-deadline-normal' });
 
     return (
         <Layout>
             <article className="detail-premium animate-fade-in">
-                {/* Breadcrumb */}
-                <nav className="detail-breadcrumb-premium">
-                    <Link to="/">Home</Link>
-                    <span className="breadcrumb-chevron">›</span>
-                    <Link to={TYPE_ROUTES[type]}>{TYPE_LABELS[type]}</Link>
-                    <span className="breadcrumb-chevron">›</span>
-                    <span className="breadcrumb-current">{a.title}</span>
-                </nav>
-
-                {/* Hero Section */}
+                {/* 1) Top Header & Key Facts */}
                 <header className="detail-hero" style={{ '--detail-accent': typeColor } as React.CSSProperties}>
-                    <div className="detail-hero-top">
-                        <span className={`detail-type-badge detail-type-${a.type}`}>
-                            {TYPE_ICONS[a.type]} {TYPE_LABELS[a.type]}
-                        </span>
-                        {deadlineStatus && (
-                            <span className={`detail-deadline-badge ${deadlineStatus.className}`}>
-                                {deadlineStatus.icon} {deadlineStatus.label}
-                            </span>
-                        )}
-                    </div>
+                    {/* A. Breadcrumb */}
+                    <nav className="detail-breadcrumb-premium" style={{ marginBottom: '16px' }}>
+                        <Link to="/">Home</Link>
+                        <span className="breadcrumb-chevron">›</span>
+                        <Link to={TYPE_ROUTES[type]}>{TYPE_LABELS[type]}</Link>
+                        <span className="breadcrumb-chevron">›</span>
+                        <span className="breadcrumb-current">{a.title}</span>
+                    </nav>
 
+                    {/* B. Title + Trust Line */}
                     <h1 className="detail-hero-title">{a.title}</h1>
-
-                    {/* Trust line */}
-                    <div className="detail-trust-line">
+                    <div className="detail-trust-line" style={{ marginBottom: '24px' }}>
                         <span>Updated: {formatDate(a.updatedAt)}</span>
                         {a.externalLink && (
                             <>
@@ -318,53 +302,43 @@ export function DetailPage({ type }: { type: ContentType }) {
                         )}
                     </div>
 
-                    <div className="detail-hero-meta">
-                        {a.organization && (
-                            <span className="detail-meta-chip"><span className="detail-meta-icon">🏛️</span> {a.organization}</span>
-                        )}
-                        {a.location && (
-                            <span className="detail-meta-chip"><span className="detail-meta-icon">📍</span> {a.location}</span>
-                        )}
-                        <span className="detail-meta-chip">
-                            <span className="detail-meta-icon">👁️</span> {(a.viewCount ?? 0).toLocaleString()} views
-                        </span>
-                        {relativeDate && (
-                            <span className="detail-meta-chip detail-meta-time"><span className="detail-meta-icon">🕐</span> {relativeDate}</span>
-                        )}
-                    </div>
-
-                    {/* Hero CTA row (desktop) */}
-                    <div className="detail-hero-cta-row">
-                        {a.externalLink ? (
-                            <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-hero-cta-primary"
-                                onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
-                                ✅ {TYPE_CTA[a.type]} <span>↗</span>
-                            </a>
-                        ) : (
-                            <span className="detail-hero-cta-disabled">Link Not Available Yet</span>
-                        )}
-                        <button type="button" className="detail-hero-cta-secondary" onClick={toggleBookmark}>
-                            {bookmarked ? '🔖 Saved' : '🔖 Save'}
-                        </button>
-                        <button type="button" className="detail-hero-cta-secondary" onClick={handleCopyLink}>
-                            {copied ? '✅ Copied!' : '🔗 Share'}
-                        </button>
-                    </div>
-
-                    {/* Quick Info Grid */}
+                    {/* 2) Key Facts Box */}
                     {quickInfoItems.length > 0 && (
-                        <div className="detail-quick-grid">
+                        <div className="detail-key-facts-grid">
                             {quickInfoItems.map((item, i) => (
-                                <div key={i} className={`detail-quick-card${item.highlight ? ' detail-quick-highlight' : ''}`}>
-                                    <span className="detail-quick-icon">{item.icon}</span>
-                                    <div className="detail-quick-text">
-                                        <span className="detail-quick-label">{item.label}</span>
-                                        <strong className="detail-quick-value">{item.value}</strong>
-                                    </div>
+                                <div key={i} className={`detail-key-fact${item.highlight ? ' highlight' : ''}`}>
+                                    <span className="detail-key-fact-label">{item.label}</span>
+                                    <strong className="detail-key-fact-value">{item.value}</strong>
                                 </div>
                             ))}
                         </div>
                     )}
+
+                    {/* C. Primary CTA (Desktop & Mobile Sticky) */}
+                    <div className="detail-hero-cta-wrapper">
+                        <div className="detail-hero-cta-row">
+                            {a.externalLink ? (
+                                <>
+                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-hero-cta-primary"
+                                        onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
+                                        ✅ {TYPE_CTA[a.type]}
+                                    </a>
+                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-hero-cta-secondary"
+                                        onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'download_pdf' })}>
+                                        📄 Download PDF
+                                    </a>
+                                </>
+                            ) : (
+                                <span className="detail-hero-cta-disabled">Link Not Available Yet</span>
+                            )}
+                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={toggleBookmark} title={bookmarked ? "Saved" : "Save"}>
+                                {bookmarked ? <>🔖 <span className="hide-mobile">Saved</span></> : <>🔖 <span className="hide-mobile">Save</span></>}
+                            </button>
+                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={handleCopyLink} title="Share">
+                                {copied ? <>✅ <span className="hide-mobile">Copied!</span></> : <>🔗 <span className="hide-mobile">Share</span></>}
+                            </button>
+                        </div>
+                    </div>
                 </header>
 
                 {/* Jump Navigation */}

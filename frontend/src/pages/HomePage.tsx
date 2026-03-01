@@ -1,12 +1,12 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { getAnnouncementCards, getBookmarks } from '../utils/api';
+import { getAnnouncementCards, getBookmarks, getSearchSuggestions } from '../utils/api';
 import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
 import type { SourceTag } from '../utils/trackingLinks';
 import { trackEvent, trackScrollDepth } from '../utils/analytics';
 import { AuthContext } from '../context/auth-context';
-import type { AnnouncementCard, ContentType } from '../types';
+import type { AnnouncementCard, ContentType, SearchSuggestion } from '../types';
 
 import './HomePage.css';
 
@@ -208,11 +208,49 @@ export function HomePage() {
     const [activeFilter, setActiveFilter] = useState<'all' | ContentType>('all');
     const [userPrefs, setUserPrefs] = useState<ContentType[]>(getSavedPrefs());
     const [showPicker, setShowPicker] = useState(!user && !hasDismissedPicker());
+
+    // Predictive Search State
+    const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchRef = useRef<HTMLFormElement>(null);
     const mountedRef = useRef(true);
 
     useEffect(() => {
         mountedRef.current = true;
         return () => { mountedRef.current = false; };
+    }, []);
+
+    // Fetch predictive search suggestions
+    useEffect(() => {
+        const q = searchQuery.trim();
+        if (!q || q.length < 2) {
+            setSuggestions([]);
+            return;
+        }
+        let active = true;
+        const timer = setTimeout(async () => {
+            try {
+                const res = await getSearchSuggestions(q);
+                if (active && mountedRef.current) setSuggestions(res.data || []);
+            } catch {
+                if (active && mountedRef.current) setSuggestions([]);
+            }
+        }, 300);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [searchQuery]);
+
+    // Handle click outside for suggestions dropdown
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     /* Track scroll depth */
@@ -395,17 +433,48 @@ export function HomePage() {
                         <p className="hp-hero-sub">
                             Government Jobs, Results &amp; Exam Updates — All in One Place
                         </p>
-                        <form className="hp-search" onSubmit={handleSearch} role="search">
+                        <form className="hp-search" onSubmit={handleSearch} role="search" ref={searchRef}>
                             <span className="hp-search-icon" aria-hidden="true">🔍</span>
                             <input
                                 className="hp-search-input"
                                 type="search"
                                 placeholder="Search jobs, exams, results..."
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setShowSuggestions(true);
+                                }}
+                                onFocus={() => setShowSuggestions(true)}
                                 aria-label="Search government exams and jobs"
                             />
                             <button className="hp-search-btn" type="submit">Search</button>
+
+                            {/* Predictive Search Dropdown */}
+                            {showSuggestions && searchQuery.trim().length >= 2 && (
+                                <div className="hp-search-suggestions">
+                                    {suggestions.length > 0 ? (
+                                        <ul className="hp-search-suggest-list">
+                                            {suggestions.map((s, idx) => (
+                                                <li key={idx}>
+                                                    <Link
+                                                        to={buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay' as SourceTag)}
+                                                        className="hp-search-suggest-link"
+                                                        onClick={() => trackEvent('search_suggest_click', { slug: s.slug })}
+                                                    >
+                                                        <span className="hp-suggest-icon">{CATEGORIES.find(c => c.key === s.type || c.to.includes(s.type))?.icon || '📄'}</span>
+                                                        <div className="hp-suggest-text">
+                                                            <strong className="hp-suggest-title">{s.title}</strong>
+                                                            <span className="hp-suggest-meta">{TYPE_LABELS[s.type] || s.type} {s.organization ? `• ${s.organization}` : ''}</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <div className="hp-search-suggest-empty">No exact matches found</div>
+                                    )}
+                                </div>
+                            )}
                         </form>
                     </section>
 

@@ -81,12 +81,18 @@
 }
 
 /* ─── CTA row — Enhanced ─── */
+.detail-hero-cta-wrapper {
+    display: flex;
+    justify-content: flex-start;
+}
+
 .detail-hero-cta-row {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    margin-top: var(--space-5);
+    margin-top: var(--space-2);
     flex-wrap: wrap;
+    width: 100%;
 }
 
 .detail-hero-cta-primary {
@@ -139,8 +145,37 @@
 
 .detail-hero-cta-secondary.bookmarked {
     background: rgba(8, 145, 178, 0.06);
-    border-color: var(--accent);
+    border-color: rgba(8, 145, 178, 0.4);
     color: var(--accent);
+}
+
+/* Mobile Sticky CTA */
+@media (max-width: 768px) {
+    .detail-hero-cta-wrapper {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        padding: var(--space-3) var(--space-4);
+        border-top: 1px solid var(--border-light);
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+        z-index: 50;
+    }
+
+    .detail-hero-cta-row {
+        margin-top: 0;
+        justify-content: space-between;
+    }
+
+    .detail-hero-cta-primary {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .detail-hero-cta-icon .hide-mobile {
+        display: none;
+    }
 }
 
 .detail-hero-cta-disabled {
