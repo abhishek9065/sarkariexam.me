@@ -36,6 +36,9 @@ COPY --from=builder /app/dist ./dist
 # Copy scripts for seeding (optional)
 COPY --from=builder /app/scripts ./scripts
 
+# Copy source files for tsx-based runtime scripts that import from src/*
+COPY --from=builder /app/src ./src
+
 # Install tsx for running TypeScript scripts
 RUN npm install -g tsx
 

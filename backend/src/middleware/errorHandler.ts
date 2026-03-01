@@ -31,6 +31,7 @@ export const errorHandler = (
   next: NextFunction
 ) => {
   const requestId = req.requestId ?? 'unknown';
+  const isCorsRejection = err.message === 'Not allowed by CORS';
 
   if (res.headersSent) {
     return next(err);
@@ -61,6 +62,19 @@ export const errorHandler = (
         requestId,
       });
     }
+  }
+
+  // Expected CORS rejection from cors() origin callback.
+  // Do not treat this as an unhandled 500/Sentry exception.
+  if (isCorsRejection) {
+    logger.warn({ err: err.message, path: req.path, origin: req.headers.origin, requestId }, 'CORS Rejection');
+    return res.status(403).json({
+      status: 'fail',
+      error: 'Not allowed by CORS',
+      code: 'FORBIDDEN',
+      message: 'Origin is not allowed',
+      requestId,
+    });
   }
 
   // Fallback for unknown/programming errors
