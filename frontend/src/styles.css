@@ -2223,84 +2223,39 @@ h6 {
     background: rgba(8, 145, 178, 0.08);
 }
 
-/* Quick Info Grid — Clean Cards */
-.detail-quick-grid {
+/* Key Facts Box (TL;DR) */
+.detail-key-facts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: var(--space-3);
-}
-
-.detail-quick-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3);
-    background: var(--bg-secondary);
+    margin-bottom: var(--space-6);
+    background: var(--bg-tertiary);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
-/* No shimmer */
-.detail-quick-card::before {
-    display: none;
-}
-
-.detail-quick-card:hover {
-    border-color: var(--accent);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-2px);
-}
-
-.detail-quick-highlight {
-    border-color: rgba(245, 158, 11, 0.3);
-    background: rgba(245, 158, 11, 0.05);
-}
-
-.detail-quick-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(8, 145, 178, 0.08), rgba(124, 58, 237, 0.06));
-    border-radius: var(--radius-lg);
-    position: relative;
-    z-index: 1;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.detail-quick-card:hover .detail-quick-icon {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.12);
-}
-
-.detail-quick-text {
+.detail-key-fact {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    position: relative;
-    z-index: 1;
+    gap: 4px;
 }
 
-.detail-quick-label {
-    font-size: var(--font-xs);
-    color: var(--text-muted);
+.detail-key-fact-label {
+    font-size: 12px;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    font-weight: var(--weight-medium);
+    font-weight: 600;
 }
 
-.detail-quick-value {
-    font-size: var(--font-sm);
-    font-weight: var(--weight-bold);
+.detail-key-fact-value {
+    font-size: 15px;
     color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+.detail-key-fact.highlight .detail-key-fact-value {
+    color: #d97706;
 }
 
 /* ── Body Grid ── */
