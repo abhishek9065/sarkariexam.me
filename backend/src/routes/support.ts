@@ -76,11 +76,11 @@ router.post('/error-report', optionalAuth, async (req, res) => {
 
         const result = await reportsCollection().insertOne(doc as any);
 
-        ErrorTracking.captureMessage('Client error report', 'error');
+        ErrorTracking.captureMessage(`Client error report: ${doc.errorId}`, 'warning');
         ErrorTracking.addBreadcrumb({
             category: 'error_report',
             message: `${doc.errorId} ${doc.message}`,
-            level: 'error',
+            level: 'warning',
         });
 
         return res.status(201).json({ message: 'Report received', id: result.insertedId });
