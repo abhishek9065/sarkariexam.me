@@ -16,6 +16,7 @@
     "test:e2e": "playwright test --grep-invert @prod",
     "test:e2e:ci": "playwright test --config playwright.ci.config.ts tests/ci.smoke.spec.ts tests/homepage.dense-layout.spec.ts tests/homepage.mobile-tabs.spec.ts tests/navigation.source-tags.spec.ts tests/mobile.header.spec.ts tests/site.regression.spec.ts tests/jobs.filters.spec.ts tests/admin.analytics.local.spec.ts --project=chromium",
     "test:e2e:api:integration": "playwright test --config playwright.integration.config.ts tests/api.integration.spec.ts --project=chromium",
+    "test:e2e:nightly:smoke": "playwright test --config playwright.ci.config.ts tests/ci.smoke.spec.ts tests/homepage.mobile-tabs.spec.ts tests/navigation.source-tags.spec.ts tests/mobile.header.spec.ts tests/jobs.filters.spec.ts --project=chromium",
     "test:e2e:nightly": "playwright test --config playwright.ci.config.ts tests/ci.smoke.spec.ts tests/homepage.dense-layout.spec.ts tests/homepage.mobile-tabs.spec.ts tests/navigation.source-tags.spec.ts tests/mobile.header.spec.ts tests/site.regression.spec.ts tests/jobs.filters.spec.ts tests/admin.analytics.local.spec.ts --project=firefox --project=webkit",
     "test:e2e:prod": "playwright test tests --grep @prod --project=chromium",
     "test:e2e:ui": "playwright test --ui",
