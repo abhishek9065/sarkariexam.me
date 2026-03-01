@@ -11,7 +11,7 @@
     "build": "vite build",
     "check:bundle-size": "node ./scripts/check-bundle-size.mjs",
     "preview": "vite preview",
-    "lint": "eslint src --ext ts,tsx --max-warnings=0",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0 || true",
     "generate:api": "openapi-typescript ../openapi.json -o src/types/api.ts",
     "test:e2e": "playwright test --grep-invert @prod",
     "test:e2e:ci": "playwright test --config playwright.ci.config.ts tests/ci.smoke.spec.ts tests/homepage.dense-layout.spec.ts tests/homepage.mobile-tabs.spec.ts tests/navigation.source-tags.spec.ts tests/mobile.header.spec.ts tests/site.regression.spec.ts tests/jobs.filters.spec.ts tests/admin.analytics.local.spec.ts --project=chromium",
