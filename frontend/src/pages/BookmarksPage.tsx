@@ -34,7 +34,7 @@ export function BookmarksPage() {
                 title: item.title,
                 slug: item.slug,
                 type: item.type,
-                category: item.category,
+                category: item.category || '',
                 organization: item.organization,
                 location: item.location,
                 deadline: item.deadline,
@@ -66,7 +66,7 @@ export function BookmarksPage() {
         return items.sort((a, b) => toTimestamp(b.postedAt) - toTimestamp(a.postedAt));
     }, [bookmarks, sort]);
 
-    const handleRemove = async (id: string) => {
+    const handleRemove = useCallback(async (id: string) => {
         setRemoving((value) => new Set(value).add(id));
         try {
             await removeBookmark(id);
@@ -80,7 +80,7 @@ export function BookmarksPage() {
                 return next;
             });
         }
-    };
+    }, []);
 
     return (
         <Layout>

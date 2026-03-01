@@ -37,7 +37,7 @@ export function ProfilePage() {
         (async () => {
             setLoadingUtilities(true);
             try {
-                const [widgetsRes, savedRes, notificationsRes, trackedRes] = await Promise.all([
+                const [widgetsRes, savedRes, notificationsRes, trackedRes] = await Promise.allSettled([
                     getProfileWidgets(7),
                     getProfileSavedSearches(),
                     getProfileNotifications(8),
@@ -45,10 +45,10 @@ export function ProfilePage() {
                 ]);
 
                 if (!mounted) return;
-                setWidgets(widgetsRes.data);
-                setSavedSearches(savedRes.data || []);
-                setNotifications(notificationsRes.data || []);
-                setTrackedApps(trackedRes.data || []);
+                if (widgetsRes.status === 'fulfilled') setWidgets(widgetsRes.value.data);
+                if (savedRes.status === 'fulfilled') setSavedSearches(savedRes.value.data || []);
+                if (notificationsRes.status === 'fulfilled') setNotifications(notificationsRes.value.data || []);
+                if (trackedRes.status === 'fulfilled') setTrackedApps(trackedRes.value.data || []);
             } catch (error) {
                 console.error('Failed to fetch profile utilities:', error);
             } finally {

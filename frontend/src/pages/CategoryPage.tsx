@@ -1,4 +1,4 @@
- import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '../components/AnnouncementCard';
@@ -159,6 +159,11 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
     /* Mobile bottom-sheet */
     const [sheetOpen, setSheetOpen] = useState(false);
+
+    useEffect(() => {
+        if (sheetOpen) document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = ''; };
+    }, [sheetOpen]);
 
     const filterAriaLabelByKey: Record<'organization' | 'location' | 'qualification', string> = {
         organization: 'Organization',

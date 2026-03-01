@@ -62,7 +62,6 @@ export function LazyImage({
             alt={alt}
             onLoad={handleLoad}
             onError={handleError}
-            loading="lazy"
             decoding="async"
             className={`lazy-image ${placeholderClass} ${isLoaded ? 'loaded' : ''} ${className}`}
             {...props}
