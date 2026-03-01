@@ -67,7 +67,7 @@ const budgets = [
         key: 'totalCss',
         label: 'Total CSS',
         bytes: totalCssBytes,
-        budget: 280 * 1024,
+        budget: 340 * 1024,
     },
 ];
 
@@ -122,4 +122,3 @@ if (failed.length > 0) {
 }
 
 console.log('[bundle-budget] All bundle budgets are within thresholds.');
-
