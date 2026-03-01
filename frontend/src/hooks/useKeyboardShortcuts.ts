@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface KeyboardShortcut {
     key: string;
@@ -10,7 +10,8 @@ export interface KeyboardShortcut {
 }
 
 /**
- * Hook to register keyboard shortcuts
+ * Hook to register keyboard shortcuts.
+ * Uses a ref internally so callers don't need to memoize the shortcuts array.
  * @param shortcuts Array of shortcut definitions
  * @param enabled Whether shortcuts are active (disable when modals/inputs are focused)
  */
@@ -18,9 +19,14 @@ export function useKeyboardShortcuts(
     shortcuts: KeyboardShortcut[],
     enabled: boolean = true
 ) {
-    const handleKeyDown = useCallback(
-        (event: KeyboardEvent) => {
-            if (!enabled) return;
+    const shortcutsRef = useRef(shortcuts);
+    shortcutsRef.current = shortcuts;
+    const enabledRef = useRef(enabled);
+    enabledRef.current = enabled;
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!enabledRef.current) return;
 
             // Don't trigger shortcuts when typing in inputs/textareas
             const target = event.target as HTMLElement;
@@ -33,7 +39,7 @@ export function useKeyboardShortcuts(
                 if (event.key !== 'Escape') return;
             }
 
-            for (const shortcut of shortcuts) {
+            for (const shortcut of shortcutsRef.current) {
                 const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase();
                 const ctrlMatch = !!shortcut.ctrl === (event.ctrlKey || event.metaKey);
                 const shiftMatch = !!shortcut.shift === event.shiftKey;
@@ -45,14 +51,11 @@ export function useKeyboardShortcuts(
                     break;
                 }
             }
-        },
-        [shortcuts, enabled]
-    );
+        };
 
-    useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleKeyDown]);
+    }, []);
 }
 
 export default useKeyboardShortcuts;

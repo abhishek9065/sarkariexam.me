@@ -108,7 +108,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
     const displayError = localError || error;
 
     return (
-        <div className="auth-overlay" onClick={onClose}>
+        <div className="auth-overlay" role="dialog" aria-modal="true" aria-label="Authentication" onClick={onClose}>
             <div className="auth-modal card" onClick={(e) => e.stopPropagation()}>
                 <button className="auth-close" onClick={onClose} aria-label="Close">✕</button>
 

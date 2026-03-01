@@ -34,21 +34,18 @@
     font-weight: var(--weight-semibold);
 }
 
-/* ─── Hero v2 — Glassmorphic ─── */
+/* ─── Hero v2 — Clean ─── */
 .cat-hero-v2 {
     margin-bottom: var(--space-5);
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    border: 1px solid rgba(226, 232, 240, 0.5);
-    border-radius: var(--radius-xl);
-    padding: var(--space-5) var(--space-6);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
     position: relative;
     overflow: hidden;
-    animation: sectionReveal 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
-/* Animated gradient top accent */
+/* Simple accent top bar */
 .cat-hero-v2::before {
     content: '';
     position: absolute;
@@ -56,37 +53,12 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, var(--accent), #7c3aed, #06b6d4, var(--accent));
-    background-size: 300% 100%;
-    animation: catHeroAccent 4s ease infinite;
+    background: var(--accent);
 }
 
-@keyframes catHeroAccent {
-    0% {
-        background-position: 0% 50%;
-    }
-
-    50% {
-        background-position: 100% 50%;
-    }
-
-    100% {
-        background-position: 0% 50%;
-    }
-}
-
-/* Subtle ambient glow */
+/* No ambient glow */
 .cat-hero-v2::after {
-    content: '';
-    position: absolute;
-    top: -60%;
-    left: -20%;
-    right: -20%;
-    height: 160%;
-    background: radial-gradient(ellipse at 30% 20%, rgba(8, 145, 178, 0.06) 0%, transparent 60%),
-        radial-gradient(ellipse at 70% 80%, rgba(124, 58, 237, 0.04) 0%, transparent 60%);
-    pointer-events: none;
-    z-index: 0;
+    display: none;
 }
 
 .cat-hero-v2-inner {

@@ -7,53 +7,96 @@ import { AuthLoadingIndicator } from '../components/admin/AuthLoadingIndicator';
 import { AdminNotificationSystem } from '../components/admin/AdminNotification';
 import { useAdminNotifications } from '../components/admin/useAdminNotifications';
 import { AdminCommandPalette } from '../components/admin/AdminCommandPalette';
+import { StepUpModal } from '../components/admin/StepUpModal';
+import type { StepUpCredentials } from '../components/admin/StepUpModal';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/useAuth';
-import type {
-    Announcement,
-    AnnouncementStatus,
-    BulkPreviewResult,
-    ContentType,
-    AdminPermission,
-    ReviewPreviewResult,
-} from '../types';
 import { isAdminPortalRole } from '../utils/adminRbac';
 import { getApiErrorMessage } from '../utils/errors';
 import { formatNumber } from '../utils/formatters';
 import { maskIpAddress } from '../utils/maskIpAddress';
-import { adminRequest } from '../utils/adminRequest';
 import { useAdminUiFlags } from '../utils/adminFlags';
 import { trackAdminTelemetry } from '../utils/adminTelemetry';
 import { AdminShellSearch } from '../components/admin/AdminShellSearch';
+
+// ── Extracted admin modules ─────────────────────────────────────────────────
+import type {
+    AdminTab,
+    AdminAuditLog,
+    AdminSession,
+    AdminSummary,
+    AdminUserProfile,
+    Announcement,
+    AnnouncementStatus,
+    BackupCodesStatus,
+    BulkPreviewResult,
+    BulkPreviewState,
+    CommunityEntityType,
+    CommunityFlag,
+    CommunityForumPost,
+    CommunityQaThread,
+    CommunityStudyGroup,
+    ContentType,
+    DashboardData,
+    ErrorReport,
+    ErrorReportStatus,
+    ListFilterPreset,
+    ListFilterState,
+    ReviewPreviewResult,
+    ReviewPreviewState,
+    TimeZoneMode,
+    Toast,
+    ToastTone,
+} from './admin/adminTypes';
+import {
+    API_BASE,
+    CONTENT_TYPES,
+    CATEGORY_OPTIONS,
+    STATUS_OPTIONS,
+    ADMIN_TAB_META,
+    TAB_PERMISSION_MAP,
+    READ_ONLY_MESSAGE,
+    REVIEW_NOTE_TEMPLATES,
+    DEFAULT_FORM_DATA,
+    LIST_FILTER_STORAGE_KEY,
+    LIST_FILTER_PRESETS_KEY,
+    ADMIN_USER_STORAGE_KEY,
+    ADMIN_TIMEZONE_KEY,
+    ADMIN_SIDEBAR_KEY,
+} from './admin/adminConstants';
+import {
+    asArray,
+    getNumber,
+    normalizeDashboardData,
+    normalizeAdminSummary,
+    loadAdminUser,
+    loadTimeZoneMode,
+    loadSidebarCollapsed,
+    loadListFilters,
+    loadListFilterPresets,
+    isValidUrl,
+    getAnnouncementWarnings,
+    getReviewRisk,
+    getFixableWarnings,
+    buildQaFixPatch,
+    getFormWarnings,
+    getWarningTone,
+    createDateFormatter,
+    normalizeDateTime,
+    formatLastUpdated,
+    parseDateOnly,
+    parseDateTime,
+    formatDateInput,
+} from './admin/adminHelpers';
+import { useAdminFetch } from './admin/useAdminFetch';
+import { UsersTab } from './admin/tabs/UsersTab';
+import { CommunityTab } from './admin/tabs/CommunityTab';
+import { ErrorsTab } from './admin/tabs/ErrorsTab';
+import { AuditTab } from './admin/tabs/AuditTab';
+import { SecurityTab } from './admin/tabs/SecurityTab';
+import { BulkTab } from './admin/tabs/BulkTab';
 import './AdminPage.css';
-
-const apiBase = import.meta.env.VITE_API_BASE ?? '';
-const CSRF_COOKIE_NAME = 'csrf_token';
-const CSRF_HEADER_NAME = 'X-CSRF-Token';
-const ADMIN_STEP_UP_HEADER_NAME = 'X-Admin-Step-Up-Token';
-const ADMIN_APPROVAL_HEADER_NAME = 'X-Admin-Approval-Id';
-const ADMIN_BREAK_GLASS_REASON_HEADER_NAME = 'X-Admin-Break-Glass-Reason';
-const DEFAULT_BREAK_GLASS_REASON_MIN_LENGTH = 12;
-const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-const readCookieValue = (name: string): string | null => {
-    if (typeof document === 'undefined') return null;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
-    if (!match) return null;
-    try {
-        return decodeURIComponent(match[1]);
-    } catch {
-        return match[1];
-    }
-};
-
-const requestBodyFingerprint = (body: BodyInit | null | undefined): string => {
-    if (typeof body === 'string') return body;
-    if (body instanceof URLSearchParams) return body.toString();
-    return '';
-};
 
 const AnalyticsDashboard = lazy(() =>
     import('../components/admin/AnalyticsDashboard').then((module) => ({ default: module.AnalyticsDashboard }))
@@ -61,478 +104,14 @@ const AnalyticsDashboard = lazy(() =>
 const JobPostingForm = lazy(() =>
     import('../components/admin/JobPostingForm').then((module) => ({ default: module.JobPostingForm }))
 );
-const SecurityLogsTable = lazy(() =>
-    import('../components/admin/SecurityLogsTable').then((module) => ({ default: module.SecurityLogsTable }))
-);
 const AdminContentList = lazy(() =>
     import('../components/admin/AdminContentList').then((module) => ({ default: module.AdminContentList }))
 );
 const AdminQueue = lazy(() =>
     import('../components/admin/AdminQueue').then((module) => ({ default: module.AdminQueue }))
 );
-const SessionManager = lazy(() =>
-    import('../components/admin/SessionManager').then((module) => ({ default: module.SessionManager }))
-);
 
-type DashboardOverview = {
-    totalAnnouncements: number;
-    totalViews: number;
-    totalBookmarks: number;
-    activeJobs: number;
-    expiringSoon: number;
-    newToday: number;
-    newThisWeek: number;
-};
-
-type DashboardUsers = {
-    totalUsers: number;
-    newToday: number;
-    newThisWeek: number;
-    activeSubscribers: number;
-};
-
-type DashboardData = {
-    overview: DashboardOverview;
-    users: DashboardUsers;
-};
-
-type AdminAuditLog = {
-    id: string;
-    action: string;
-    announcementId?: string;
-    title?: string;
-    userId?: string;
-    note?: string;
-    metadata?: Record<string, any>;
-    createdAt: string;
-};
-
-type AdminSummary = {
-    counts: {
-        total: number;
-        byStatus: Record<AnnouncementStatus, number>;
-        byType: Record<ContentType, number>;
-        totalQaIssues?: number;
-        pendingQaIssues?: number;
-    };
-    pendingSla: {
-        pendingTotal: number;
-        averageDays: number;
-        buckets: { lt1: number; d1_3: number; d3_7: number; gt7: number };
-        stale: Array<Announcement & { ageDays: number }>;
-    };
-};
-
-type CommunityEntityType = 'forum' | 'qa' | 'group';
-
-type CommunityFlag = {
-    id: string;
-    entityType: CommunityEntityType;
-    entityId: string;
-    reason: string;
-    reporter?: string | null;
-    status: 'open' | 'reviewed' | 'resolved';
-    createdAt: string;
-};
-
-type CommunityForumPost = {
-    id: string;
-    title: string;
-    content: string;
-    category: string;
-    author: string;
-    createdAt: string;
-};
-
-type CommunityQaThread = {
-    id: string;
-    question: string;
-    answer?: string | null;
-    answeredBy?: string | null;
-    author: string;
-    createdAt: string;
-};
-
-type CommunityStudyGroup = {
-    id: string;
-    name: string;
-    topic: string;
-    language: string;
-    link?: string | null;
-    createdAt: string;
-};
-
-type ToastTone = 'success' | 'error' | 'info';
-type Toast = {
-    id: string;
-    message: string;
-    tone: ToastTone;
-};
-
-type ErrorReportStatus = 'new' | 'triaged' | 'resolved';
-type ErrorReport = {
-    id: string;
-    errorId: string;
-    message: string;
-    pageUrl?: string | null;
-    userAgent?: string | null;
-    note?: string | null;
-    adminNote?: string | null;
-    stack?: string | null;
-    componentStack?: string | null;
-    createdAt: string;
-    updatedAt?: string | null;
-    status: ErrorReportStatus;
-    userId?: string | null;
-    userEmail?: string | null;
-    resolvedAt?: string | null;
-    resolvedBy?: string | null;
-};
-
-type AdminSession = {
-    id: string;
-    userId: string;
-    email?: string;
-    ip: string;
-    userAgent: string;
-    device: string;
-    browser: string;
-    os: string;
-    lastActivity: string;
-    loginTime: string;
-    expiresAt?: string | null;
-    isCurrentSession: boolean;
-    isActive: boolean;
-    riskScore: 'low' | 'medium' | 'high';
-    actions: string[];
-};
-
-type BackupCodesStatus = {
-    total: number;
-    remaining: number;
-    updatedAt: string | null;
-};
-
-const CONTENT_TYPES: { value: ContentType; label: string }[] = [
-    { value: 'job', label: 'Latest Jobs' },
-    { value: 'admit-card', label: 'Admit Cards' },
-    { value: 'result', label: 'Latest Results' },
-    { value: 'admission', label: 'Admissions' },
-    { value: 'syllabus', label: 'Syllabus' },
-    { value: 'answer-key', label: 'Answer Keys' },
-];
-
-const CATEGORY_OPTIONS: Array<{ value: string; label: string; icon: string }> = [
-    { value: 'Central Government', label: 'Central Government', icon: '🏛️' },
-    { value: 'State Government', label: 'State Government', icon: '🏢' },
-    { value: 'Banking', label: 'Banking', icon: '🏦' },
-    { value: 'Railways', label: 'Railways', icon: '🚆' },
-    { value: 'Defence', label: 'Defence', icon: '🛡️' },
-    { value: 'PSU', label: 'PSU', icon: '⚡' },
-    { value: 'University', label: 'University', icon: '🎓' },
-    { value: 'Police', label: 'Police', icon: '🚓' },
-];
-
-const LIST_FILTER_STORAGE_KEY = 'adminListFilters';
-const LIST_FILTER_PRESETS_KEY = 'adminListFilterPresets';
-const ADMIN_USER_STORAGE_KEY = 'adminUserProfile';
-const ADMIN_TIMEZONE_KEY = 'adminTimezoneMode';
-const ADMIN_SIDEBAR_KEY = 'adminSidebarCollapsed';
-
-type TimeZoneMode = 'local' | 'ist' | 'utc';
-
-type ListFilterState = {
-    query?: string;
-    type?: ContentType | 'all';
-    status?: AnnouncementStatus | 'all';
-    sort?: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
-};
-
-type ListFilterPreset = ListFilterState & {
-    id: string;
-    label: string;
-};
-
-type ReviewPreviewState = {
-    action: 'approve' | 'reject' | 'schedule';
-    payload: { ids: string[]; note?: string; scheduleAt?: string };
-    result: ReviewPreviewResult;
-};
-
-type BulkPreviewState = {
-    payload: Record<string, any>;
-    result: BulkPreviewResult;
-};
-
-const loadListFilters = (): ListFilterState | null => {
-    try {
-        const raw = localStorage.getItem(LIST_FILTER_STORAGE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as ListFilterState;
-    } catch {
-        return null;
-    }
-};
-
-const loadListFilterPresets = (): ListFilterPreset[] => {
-    try {
-        const raw = localStorage.getItem(LIST_FILTER_PRESETS_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-            .filter((preset) => preset && typeof preset === 'object')
-            .map((preset) => ({
-                id: String(preset.id || crypto.randomUUID()),
-                label: String(preset.label || 'Untitled preset'),
-                query: typeof preset.query === 'string' ? preset.query : '',
-                type: preset.type === 'all' || CONTENT_TYPES.some((item) => item.value === preset.type) ? preset.type : 'all',
-                status: preset.status === 'all' || STATUS_OPTIONS.some((item) => item.value === preset.status) ? preset.status : 'all',
-                sort: preset.sort === 'updated' || preset.sort === 'deadline' || preset.sort === 'views' || preset.sort === 'oldest' ? preset.sort : 'newest',
-            }));
-    } catch {
-        return [];
-    }
-};
-
-type AdminUserProfile = {
-    name?: string;
-    email?: string;
-    role?: string;
-};
-
-type AdminTab =
-    | 'analytics'
-    | 'list'
-    | 'review'
-    | 'add'
-    | 'detailed'
-    | 'bulk'
-    | 'queue'
-    | 'security'
-    | 'users'
-    | 'audit'
-    | 'community'
-    | 'errors';
-
-const ADMIN_TAB_META: Record<AdminTab, { label: string; description: string }> = {
-    analytics: {
-        label: 'Analytics Command Center',
-        description: 'Track traffic, conversions, and listing performance in real time.',
-    },
-    list: {
-        label: 'All Announcements',
-        description: 'Filter, audit, and edit every listing across categories.',
-    },
-    review: {
-        label: 'Review Queue',
-        description: 'Triage pending posts, QA alerts, and approvals in one pipeline.',
-    },
-    add: {
-        label: 'Quick Add',
-        description: 'Publish fast updates with lightweight form controls.',
-    },
-    detailed: {
-        label: 'Detailed Post',
-        description: 'Craft full listings with structured details, eligibility, and links.',
-    },
-    bulk: {
-        label: 'Bulk Import',
-        description: 'Apply bulk updates, scheduling, and status changes safely.',
-    },
-    queue: {
-        label: 'Schedule Queue',
-        description: 'Monitor scheduled releases and publish time-sensitive notices.',
-    },
-    users: {
-        label: 'User Insights',
-        description: 'Understand subscriber growth, activity, and cohorts.',
-    },
-    community: {
-        label: 'Community Moderation',
-        description: 'Resolve flags, forums, QA, and study group activity.',
-    },
-    errors: {
-        label: 'Error Reports',
-        description: 'Review client error logs and respond quickly to regressions.',
-    },
-    audit: {
-        label: 'Audit Log',
-        description: 'Trace admin actions for accountability and compliance.',
-    },
-    security: {
-        label: 'Security Center',
-        description: 'Manage access policies, sessions, and risk alerts.',
-    },
-};
-
-const READ_ONLY_MESSAGE = 'Read-only role: changes are restricted for your account.';
-
-const TAB_PERMISSION_MAP: Record<AdminTab, AdminPermission> = {
-    analytics: 'analytics:read',
-    list: 'announcements:read',
-    review: 'announcements:approve',
-    add: 'announcements:write',
-    detailed: 'announcements:write',
-    bulk: 'announcements:write',
-    queue: 'announcements:read',
-    security: 'security:read',
-    users: 'admin:read',
-    audit: 'audit:read',
-    community: 'admin:read',
-    errors: 'admin:read',
-};
-
-const getNumber = (value: unknown, fallback = 0): number => {
-    const parsed = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const asArray = <T,>(value: unknown): T[] => {
-    return Array.isArray(value) ? (value as T[]) : [];
-};
-
-const normalizeDashboardData = (value: unknown): DashboardData => {
-    const data = (value ?? {}) as Partial<DashboardData>;
-    const overview = (data.overview ?? {}) as Partial<DashboardOverview>;
-    const users = (data.users ?? {}) as Partial<DashboardUsers>;
-    return {
-        overview: {
-            totalAnnouncements: getNumber(overview.totalAnnouncements),
-            totalViews: getNumber(overview.totalViews),
-            totalBookmarks: getNumber(overview.totalBookmarks),
-            activeJobs: getNumber(overview.activeJobs),
-            expiringSoon: getNumber(overview.expiringSoon),
-            newToday: getNumber(overview.newToday),
-            newThisWeek: getNumber(overview.newThisWeek),
-        },
-        users: {
-            totalUsers: getNumber(users.totalUsers),
-            newToday: getNumber(users.newToday),
-            newThisWeek: getNumber(users.newThisWeek),
-            activeSubscribers: getNumber(users.activeSubscribers),
-        },
-    };
-};
-
-const normalizeAdminSummary = (value: unknown): AdminSummary => {
-    const data = (value ?? {}) as Partial<AdminSummary>;
-    const counts = (data.counts ?? {}) as Partial<AdminSummary['counts']>;
-    const pendingSla = (data.pendingSla ?? {}) as Partial<AdminSummary['pendingSla']>;
-    const byStatusSource = (counts.byStatus ?? {}) as Partial<Record<AnnouncementStatus, number>>;
-    const byTypeSource = (counts.byType ?? {}) as Partial<Record<ContentType, number>>;
-    return {
-        counts: {
-            total: getNumber(counts.total),
-            byStatus: {
-                draft: getNumber(byStatusSource.draft),
-                pending: getNumber(byStatusSource.pending),
-                scheduled: getNumber(byStatusSource.scheduled),
-                published: getNumber(byStatusSource.published),
-                archived: getNumber(byStatusSource.archived),
-            },
-            byType: {
-                job: getNumber(byTypeSource.job),
-                result: getNumber(byTypeSource.result),
-                'admit-card': getNumber(byTypeSource['admit-card']),
-                syllabus: getNumber(byTypeSource.syllabus),
-                'answer-key': getNumber(byTypeSource['answer-key']),
-                admission: getNumber(byTypeSource.admission),
-            },
-            totalQaIssues: getNumber(counts.totalQaIssues),
-            pendingQaIssues: getNumber(counts.pendingQaIssues),
-        },
-        pendingSla: {
-            pendingTotal: getNumber(pendingSla.pendingTotal),
-            averageDays: getNumber(pendingSla.averageDays),
-            buckets: {
-                lt1: getNumber(pendingSla.buckets?.lt1),
-                d1_3: getNumber(pendingSla.buckets?.d1_3),
-                d3_7: getNumber(pendingSla.buckets?.d3_7),
-                gt7: getNumber(pendingSla.buckets?.gt7),
-            },
-            stale: asArray<Announcement & { ageDays: number }>(pendingSla.stale),
-        },
-    };
-};
-
-const loadAdminUser = (): AdminUserProfile | null => {
-    try {
-        const raw = localStorage.getItem(ADMIN_USER_STORAGE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw) as AdminUserProfile;
-    } catch {
-        return null;
-    }
-};
-
-const loadTimeZoneMode = (): TimeZoneMode => {
-    try {
-        const raw = localStorage.getItem(ADMIN_TIMEZONE_KEY);
-        if (raw === 'local' || raw === 'ist' || raw === 'utc') return raw;
-    } catch {
-        // ignore
-    }
-    return 'local';
-};
-
-const loadSidebarCollapsed = (): boolean => {
-    try {
-        const raw = localStorage.getItem(ADMIN_SIDEBAR_KEY);
-        return raw === '1';
-    } catch {
-        return false;
-    }
-};
-
-
-const STATUS_OPTIONS: { value: AnnouncementStatus; label: string }[] = [
-    { value: 'draft', label: 'Draft' },
-    { value: 'pending', label: 'Pending Review' },
-    { value: 'scheduled', label: 'Scheduled' },
-    { value: 'published', label: 'Published' },
-    { value: 'archived', label: 'Archived' },
-];
-
-const AUDIT_ACTIONS = [
-    'create',
-    'update',
-    'delete',
-    'approve',
-    'reject',
-    'bulk_update',
-    'bulk_approve',
-    'bulk_reject',
-];
-
-const ACTIVE_USER_WINDOWS = [15, 30, 60, 120];
-
-const REVIEW_NOTE_TEMPLATES = [
-    { id: 'approve_clean', label: 'Approve: QA verified', value: 'QA verified. Ready for publish.' },
-    { id: 'approve_fast', label: 'Approve: Time-sensitive', value: 'Time-sensitive update. Publishing now.' },
-    { id: 'reject_missing_docs', label: 'Reject: Missing details', value: 'Rejected: Missing mandatory details and official references.' },
-    { id: 'reject_link_invalid', label: 'Reject: Invalid link', value: 'Rejected: Official link invalid or unreachable.' },
-];
-
-const DEFAULT_FORM_DATA = {
-    title: '',
-    type: 'job' as ContentType,
-    category: 'Central Government',
-    organization: '',
-    externalLink: '',
-    location: 'All India',
-    deadline: '',
-    totalPosts: '',
-    minQualification: '',
-    ageLimit: '',
-    applicationFee: '',
-    salaryMin: '',
-    salaryMax: '',
-    difficulty: '' as '' | 'easy' | 'medium' | 'hard',
-    cutoffMarks: '',
-    status: 'draft' as AnnouncementStatus,
-    publishAt: '',
-};
+const apiBase = API_BASE;
 
 
 export function AdminPage() {
@@ -640,12 +219,6 @@ export function AdminPage() {
     const [auditLimit, setAuditLimit] = useState(50);
     const [auditPage, setAuditPage] = useState(1);
     const [auditTotal, setAuditTotal] = useState(0);
-    const [auditFilters, setAuditFilters] = useState({
-        userId: '',
-        action: '',
-        start: '',
-        end: '',
-    });
     const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [pendingEditId, setPendingEditId] = useState<string | null>(null);
@@ -653,12 +226,11 @@ export function AdminPage() {
     const listLastFetchAt = useRef(0);
     const listRateLimitUntil = useRef(0);
     const hasTrackedFilterRef = useRef(false);
-    const csrfTokenRef = useRef<string | null>(null);
-    const adminStepUpRef = useRef<{ token: string; expiresAt: string } | null>(null);
-    const approvalReplayRef = useRef<Map<string, string>>(new Map());
+    const clearFetchRefsRef = useRef<(() => void) | null>(null);
+    const stepUpResolverRef = useRef<{ resolve: (value: StepUpCredentials | null) => void } | null>(null);
+    const [stepUpModalOpen, setStepUpModalOpen] = useState(false);
     const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
-    const [rateLimitRemaining, setRateLimitRemaining] = useState<number | null>(null);
-    const [communityTab, setCommunityTab] = useState<'flags' | 'forums' | 'qa' | 'groups'>('flags');
+    const [message, setMessage] = useState('');
     const [communityFlags, setCommunityFlags] = useState<CommunityFlag[]>([]);
     const [communityForums, setCommunityForums] = useState<CommunityForumPost[]>([]);
     const [communityQa, setCommunityQa] = useState<CommunityQaThread[]>([]);
@@ -685,8 +257,6 @@ export function AdminPage() {
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
-    const auditStartIndex = auditTotal === 0 ? 0 : (auditPage - 1) * auditLimit + 1;
-    const auditEndIndex = Math.min(auditTotal, auditPage * auditLimit);
     const overview = dashboard?.overview;
     const heroTotalPosts = overview?.totalAnnouncements ?? announcements.length;
     const heroTotalViews = overview?.totalViews ?? 0;
@@ -761,9 +331,7 @@ export function AdminPage() {
         setSessionsError(null);
         setBackupCodesStatus(null);
         setBackupCodesModal(null);
-        csrfTokenRef.current = null;
-        adminStepUpRef.current = null;
-        approvalReplayRef.current.clear();
+        clearFetchRefsRef.current?.();
         localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
@@ -868,350 +436,47 @@ export function AdminPage() {
         return canWriteAnnouncements || canApproveAnnouncements || canDeleteAnnouncements || canWriteAdmin;
     }, [canApproveAnnouncements, canDeleteAnnouncements, canWriteAdmin, canWriteAnnouncements]);
 
-    const resolveRequestPath = useCallback((input: RequestInfo | URL): string => {
-        try {
-            if (typeof input === 'string') {
-                return new URL(input, window.location.origin).pathname;
-            }
-            if (input instanceof URL) {
-                return input.pathname;
-            }
-            if (input instanceof Request) {
-                return new URL(input.url, window.location.origin).pathname;
-            }
-        } catch {
-            // ignore parse errors
-        }
-        return '';
-    }, []);
-
-    const readResponseBodySafe = useCallback(async (response: Response): Promise<Record<string, unknown>> => {
-        try {
-            const parsed = await response.clone().json();
-            return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
-        } catch {
-            return {};
-        }
-    }, []);
-
-    const ensureCsrfToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
-        if (!forceRefresh) {
-            const cookieToken = readCookieValue(CSRF_COOKIE_NAME);
-            if (cookieToken) {
-                csrfTokenRef.current = cookieToken;
-                return cookieToken;
-            }
-            if (csrfTokenRef.current) return csrfTokenRef.current;
-        }
-
-        const response = await adminRequest(`${apiBase}/api/auth/csrf`, {
-            method: 'GET',
-            headers: {
-                'Cache-Control': 'no-store',
-            },
-            maxRetries: 1,
-        });
-
-        if (!response.ok) {
-            return readCookieValue(CSRF_COOKIE_NAME) ?? csrfTokenRef.current;
-        }
-
-        const payload = await response.json().catch(() => ({} as Record<string, any>));
-        const bodyToken = typeof payload?.data?.csrfToken === 'string' ? payload.data.csrfToken : null;
-        const cookieToken = readCookieValue(CSRF_COOKIE_NAME);
-        const token = bodyToken || cookieToken;
-        if (token) {
-            csrfTokenRef.current = token;
-            return token;
-        }
-        return null;
-    }, []);
-
-    const getValidStepUpToken = useCallback((): string | null => {
-        const grant = adminStepUpRef.current;
-        if (!grant) return null;
-        const expiresAtMs = new Date(grant.expiresAt).getTime();
-        if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
-            adminStepUpRef.current = null;
-            return null;
-        }
-        return grant.token;
-    }, []);
-
-    const requestAdminStepUpToken = useCallback(async (forceRefresh = false): Promise<string | null> => {
-        if (!forceRefresh) {
-            const cached = getValidStepUpToken();
-            if (cached) return cached;
-        }
-
-        if (!user?.email) {
-            setMessage('Authentication context missing. Please log in again.');
-            return null;
-        }
-
-        const password = window.prompt('Step-up verification is required. Enter your admin password:');
-        if (!password) return null;
-
-        const twoFactorCode = window.prompt('Enter your 2FA code or backup code (leave blank if not required):') ?? '';
-        const csrfToken = await ensureCsrfToken(false);
-        const headers = new Headers({
-            'Content-Type': 'application/json',
-        });
-        if (csrfToken) {
-            headers.set(CSRF_HEADER_NAME, csrfToken);
-        }
-
-        const response = await adminRequest(`${apiBase}/api/auth/admin/step-up`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                email: user.email,
-                password,
-                ...(twoFactorCode.trim() ? { twoFactorCode: twoFactorCode.trim() } : {}),
-            }),
-            maxRetries: 0,
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.json().catch(() => ({}));
-            const errorMessage = getApiErrorMessage(errorBody, 'Step-up verification failed.');
-            setMessage(errorMessage);
-            pushToast(errorMessage, 'error');
-            return null;
-        }
-
-        const payload = await response.json().catch(() => ({} as Record<string, any>));
-        const token = typeof payload?.data?.token === 'string' ? payload.data.token : '';
-        const expiresAt = typeof payload?.data?.expiresAt === 'string' ? payload.data.expiresAt : '';
-        if (!token || !expiresAt) {
-            const errorMessage = 'Step-up verification failed.';
-            setMessage(errorMessage);
-            pushToast(errorMessage, 'error');
-            return null;
-        }
-
-        adminStepUpRef.current = { token, expiresAt };
-        return token;
-    }, [ensureCsrfToken, getValidStepUpToken, pushToast, user?.email]);
-
-    const requiresStepUpForRequest = useCallback((
-        method: string,
-        pathname: string
-    ): boolean => {
-        if (!MUTATING_METHODS.has(method)) return false;
-        if (/\/api\/admin\/sessions\/terminate(?:-others)?$/.test(pathname)) return true;
-        if (/\/api\/admin\/announcements\/[^/]+\/(approve|reject|rollback)$/.test(pathname)) return true;
-        if (/\/api\/admin\/announcements\/(bulk|bulk-approve|bulk-reject)$/.test(pathname)) return true;
-        if (method === 'DELETE' && /\/api\/admin\/announcements\/[^/]+$/.test(pathname)) return true;
-        return false;
-    }, []);
-
-    const adminFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const method = (init?.method ?? 'GET').toUpperCase();
-        const path = resolveRequestPath(input);
-
-        if (!canMutateEndpoint(method, path)) {
-            setMessage(READ_ONLY_MESSAGE);
-            pushToast(READ_ONLY_MESSAGE, 'error');
-            return new Response(
-                JSON.stringify({ error: 'forbidden', message: READ_ONLY_MESSAGE }),
-                { status: 403, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
-
-        const isMutating = MUTATING_METHODS.has(method);
-        const stepUpRequired = requiresStepUpForRequest(method, path);
-        const approvalFingerprint = isMutating
-            ? `${method}:${path}:${requestBodyFingerprint(init?.body ?? null)}`
-            : '';
-
-        let retriedCsrf = false;
-        let retriedStepUp = false;
-        let retriedBreakGlass = false;
-        let forceCsrfRefresh = false;
-        let forceStepUpRefresh = false;
-        let breakGlassReason: string | null = null;
-
-        while (true) {
-            const headers = new Headers(init?.headers ?? {});
-            if (isMutating && !headers.has('Idempotency-Key')) {
-                headers.set('Idempotency-Key', crypto.randomUUID());
-            }
-            if (isMutating && approvalFingerprint) {
-                const cachedApprovalId = approvalReplayRef.current.get(approvalFingerprint);
-                if (cachedApprovalId && !headers.has(ADMIN_APPROVAL_HEADER_NAME)) {
-                    headers.set(ADMIN_APPROVAL_HEADER_NAME, cachedApprovalId);
-                }
-            }
-            if (isMutating && breakGlassReason && !headers.has(ADMIN_BREAK_GLASS_REASON_HEADER_NAME)) {
-                headers.set(ADMIN_BREAK_GLASS_REASON_HEADER_NAME, breakGlassReason);
-            }
-
-            if (isMutating) {
-                const csrfToken = await ensureCsrfToken(forceCsrfRefresh);
-                forceCsrfRefresh = false;
-                if (csrfToken) {
-                    headers.set(CSRF_HEADER_NAME, csrfToken);
-                }
-            }
-
-            if (stepUpRequired || forceStepUpRefresh) {
-                const stepUpToken = await requestAdminStepUpToken(forceStepUpRefresh);
-                forceStepUpRefresh = false;
-                if (!stepUpToken) {
-                    return new Response(
-                        JSON.stringify({
-                            error: 'step_up_required',
-                            code: 'STEP_UP_REQUIRED',
-                            message: 'Step-up verification required for this action.',
-                        }),
-                        { status: 403, headers: { 'Content-Type': 'application/json' } }
-                    );
-                }
-                headers.set(ADMIN_STEP_UP_HEADER_NAME, stepUpToken);
-            }
-
-            const response = await adminRequest(input, {
-                ...init,
-                headers,
-                maxRetries: method === 'GET' ? 2 : 0,
-                onRateLimit: (rateLimitResponse) => {
-                    const retryAfter = rateLimitResponse.headers.get('Retry-After');
-                    const retrySeconds = retryAfter && Number.isFinite(Number(retryAfter))
-                        ? Number(retryAfter)
-                        : 60;
-                    const message = retryAfter
-                        ? `Too many requests. Try again in ${retrySeconds}s.`
-                        : 'Too many requests. Please wait and try again.';
-                    setRateLimitUntil((current) => {
-                        const nextUntil = Date.now() + retrySeconds * 1000;
-                        return current ? Math.max(current, nextUntil) : nextUntil;
-                    });
-                    setMessage(message);
-                },
+    // ── Step-up modal (Promise-based credential collection) ─────────────
+    const requestStepUpCredentials = useCallback(
+        async (_forceRefresh: boolean): Promise<StepUpCredentials | null> => {
+            return new Promise<StepUpCredentials | null>((resolve) => {
+                stepUpResolverRef.current = { resolve };
+                setStepUpModalOpen(true);
             });
+        },
+        [],
+    );
 
-            if (response.status === 401) {
-                handleUnauthorized();
-                return response;
-            }
+    const handleStepUpSubmit = useCallback((credentials: StepUpCredentials) => {
+        stepUpResolverRef.current?.resolve(credentials);
+        stepUpResolverRef.current = null;
+        setStepUpModalOpen(false);
+    }, []);
 
-            if (isMutating && response.status === 202) {
-                const errorBody = await readResponseBodySafe(response);
-                const error = typeof errorBody.error === 'string' ? errorBody.error : '';
-                if (error === 'approval_required') {
-                    const approvalId = typeof errorBody.approvalId === 'string' ? errorBody.approvalId.trim() : '';
-                    if (approvalFingerprint && approvalId) {
-                        approvalReplayRef.current.set(approvalFingerprint, approvalId);
-                    }
+    const handleStepUpCancel = useCallback(() => {
+        stepUpResolverRef.current?.resolve(null);
+        stepUpResolverRef.current = null;
+        setStepUpModalOpen(false);
+    }, []);
 
-                    const breakGlassMeta = errorBody.breakGlass && typeof errorBody.breakGlass === 'object'
-                        ? (errorBody.breakGlass as Record<string, unknown>)
-                        : null;
-                    const breakGlassEnabled = breakGlassMeta?.enabled === true;
-                    const minReasonLengthRaw = breakGlassMeta?.minReasonLength;
-                    const minReasonLength = typeof minReasonLengthRaw === 'number'
-                        && Number.isFinite(minReasonLengthRaw)
-                        ? Math.max(8, Math.floor(minReasonLengthRaw))
-                        : DEFAULT_BREAK_GLASS_REASON_MIN_LENGTH;
-
-                    if (!retriedBreakGlass && breakGlassEnabled) {
-                        const promptInput = window.prompt(
-                            `Secondary approval is required. For emergency single-operator execution, enter break-glass reason (${minReasonLength}+ chars):`
-                        );
-                        const normalizedReason = (promptInput ?? '').trim();
-                        if (normalizedReason.length >= minReasonLength) {
-                            breakGlassReason = normalizedReason;
-                            retriedBreakGlass = true;
-                            continue;
-                        }
-                        if (promptInput && normalizedReason.length < minReasonLength) {
-                            const validationMessage = `Break-glass reason must be at least ${minReasonLength} characters.`;
-                            setMessage(validationMessage);
-                            pushToast(validationMessage, 'error');
-                        }
-                    }
-
-                    const approvalMessage = getApiErrorMessage(
-                        errorBody,
-                        'Action queued for secondary approval. Approve it, then retry execution.'
-                    );
-                    setMessage(approvalMessage);
-                    pushToast(approvalMessage, 'info');
-                    return new Response(
-                        JSON.stringify({
-                            ...errorBody,
-                            message: approvalMessage,
-                        }),
-                        { status: 409, headers: { 'Content-Type': 'application/json' } }
-                    );
-                }
-            }
-
-            if (isMutating && response.status === 409) {
-                const errorBody = await readResponseBodySafe(response);
-                const error = typeof errorBody.error === 'string' ? errorBody.error : '';
-                if (error === 'approval_invalid') {
-                    const reason = typeof errorBody.reason === 'string' ? errorBody.reason : '';
-                    const approvalInvalidMessage = reason === 'invalid_status:pending'
-                        ? 'Approval request is still pending secondary approval.'
-                        : reason === 'invalid_status:expired'
-                            ? 'Approval request expired. Retry to create a new approval request.'
-                            : reason === 'invalid_status:rejected'
-                                ? 'Approval request was rejected. Retry to submit a new request.'
-                                : reason === 'request_mismatch'
-                                    ? 'Approval no longer matches this action payload. Retry the action.'
-                                    : getApiErrorMessage(errorBody, 'Approval validation failed. Retry the action.');
-
-                    if (approvalFingerprint && reason !== 'invalid_status:approved') {
-                        approvalReplayRef.current.delete(approvalFingerprint);
-                    }
-
-                    setMessage(approvalInvalidMessage);
-                    pushToast(approvalInvalidMessage, 'error');
-                    return new Response(
-                        JSON.stringify({
-                            ...errorBody,
-                            message: approvalInvalidMessage,
-                        }),
-                        { status: 409, headers: { 'Content-Type': 'application/json' } }
-                    );
-                }
-            }
-
-            if (isMutating && response.status === 403) {
-                const errorBody = await readResponseBodySafe(response);
-                const error = typeof errorBody.error === 'string' ? errorBody.error : '';
-
-                if (!retriedCsrf && error === 'csrf_invalid') {
-                    retriedCsrf = true;
-                    forceCsrfRefresh = true;
-                    continue;
-                }
-
-                if (!retriedStepUp && (error === 'step_up_required' || error === 'step_up_invalid')) {
-                    retriedStepUp = true;
-                    adminStepUpRef.current = null;
-                    forceStepUpRefresh = true;
-                    continue;
-                }
-            }
-
-            if (isMutating && approvalFingerprint && response.ok) {
-                approvalReplayRef.current.delete(approvalFingerprint);
-            }
-            return response;
-        }
-    }, [
+    // ── Admin fetch hook (CSRF, step-up, approval, break-glass) ─────────
+    const {
+        adminFetch,
+        clearRefs: clearFetchRefs,
+        rateLimitRemaining,
+        setRateLimitRemaining,
+    } = useAdminFetch({
+        userEmail: user?.email,
         pushToast,
-        canMutateEndpoint,
-        ensureCsrfToken,
+        setMessage,
+        setRateLimitUntil,
         handleUnauthorized,
-        readResponseBodySafe,
-        requestAdminStepUpToken,
-        requiresStepUpForRequest,
-        resolveRequestPath,
-    ]);
+        canMutateEndpoint,
+        requestStepUpCredentials,
+    });
+
+    // Sync clearRefs into the mutable ref so clearAdminSession can call it
+    clearFetchRefsRef.current = clearFetchRefs;
 
     useEffect(() => {
         if (!rateLimitUntil) {
@@ -1230,7 +495,7 @@ export function AdminPage() {
         tick();
         const timer = window.setInterval(tick, 1000);
         return () => window.clearInterval(timer);
-    }, [rateLimitUntil]);
+    }, [rateLimitUntil, setRateLimitRemaining]);
 
     const handleLogout = useCallback(async () => {
         setMessage('');
@@ -1270,7 +535,6 @@ export function AdminPage() {
     }, [canReadAdmin, clearAdminSession, user]);
 
     const [formData, setFormData] = useState(() => ({ ...DEFAULT_FORM_DATA }));
-    const [message, setMessage] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [bulkJson, setBulkJson] = useState('');
 
@@ -1610,7 +874,7 @@ export function AdminPage() {
         }
     };
 
-    const refreshAuditLogs = async (pageOverride?: number) => {
+    const refreshAuditLogs = async (pageOverride?: number, filters?: { userId: string; action: string; start: string; end: string }) => {
         if (!isLoggedIn) return;
         setAuditLoading(true);
         setAuditError(null);
@@ -1620,10 +884,10 @@ export function AdminPage() {
                 limit: String(auditLimit),
                 offset: String(Math.max(0, (page - 1) * auditLimit)),
             });
-            if (auditFilters.userId) params.set('userId', auditFilters.userId);
-            if (auditFilters.action) params.set('action', auditFilters.action);
-            if (auditFilters.start) params.set('start', auditFilters.start);
-            if (auditFilters.end) params.set('end', auditFilters.end);
+            if (filters?.userId) params.set('userId', filters.userId);
+            if (filters?.action) params.set('action', filters.action);
+            if (filters?.start) params.set('start', filters.start);
+            if (filters?.end) params.set('end', filters.end);
 
             const res = await adminFetch(`${apiBase}/api/admin/audit-log?${params.toString()}`);
             if (!res.ok) {
@@ -3181,26 +2445,7 @@ export function AdminPage() {
         handleEditById(id);
     }, [handleEditById, trackAdminEvent]);
 
-    const parseDateOnly = (value?: string) => {
-        if (!value) return null;
-        const date = new Date(`${value}T00:00:00`);
-        if (Number.isNaN(date.getTime())) return null;
-        return date;
-    };
-
-    const parseDateTime = (value?: string) => {
-        if (!value) return null;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return date;
-    };
-
-    const formatDateInput = (date: Date) => {
-        const pad = (num: number) => String(num).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-    };
-
-    const formWarnings = useMemo(() => getFormWarnings(), [formData]);
+    const formWarnings = useMemo(() => getFormWarnings(formData), [formData]);
     const titleMissing = !formData.title.trim();
     const titleTooShort = formData.title.trim().length > 0 && formData.title.trim().length < 10;
     const titleInvalid = titleMissing || titleTooShort;
@@ -3381,195 +2626,13 @@ export function AdminPage() {
         }
     }, []);
 
-    function isValidUrl(value?: string | null) {
-        if (!value) return true;
-        try {
-            new URL(value);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    function getAnnouncementWarnings(item: Announcement) {
-        const warnings: string[] = [];
-        if (!item.title || item.title.trim().length < 10) {
-            warnings.push('Title is too short');
-        }
-        if (!item.category || !item.category.trim()) {
-            warnings.push('Category is missing');
-        }
-        if (!item.organization || !item.organization.trim()) {
-            warnings.push('Organization is missing');
-        }
-        if (item.status === 'scheduled' && !item.publishAt) {
-            warnings.push('Scheduled without publish time');
-        }
-        if (item.deadline) {
-            const deadlineTime = new Date(item.deadline).getTime();
-            if (!Number.isNaN(deadlineTime) && deadlineTime < Date.now()) {
-                warnings.push('Deadline is expired');
-            }
-        }
-        if (item.externalLink && !isValidUrl(item.externalLink)) {
-            warnings.push('External link is invalid');
-        }
-        return warnings;
-    }
-
-    function getReviewRisk(item: Announcement) {
-        const warnings = getAnnouncementWarnings(item);
-        const now = Date.now();
-        const baseDate = new Date(item.updatedAt || item.postedAt).getTime();
-        const ageDays = Number.isNaN(baseDate) ? 0 : Math.max(0, Math.floor((now - baseDate) / (1000 * 60 * 60 * 24)));
-        const deadlineTime = item.deadline ? new Date(item.deadline).getTime() : NaN;
-        const dueSoon = !Number.isNaN(deadlineTime) && deadlineTime > now && deadlineTime <= now + (7 * 24 * 60 * 60 * 1000);
-        const score = ageDays * 2 + warnings.length * 8 + (dueSoon ? 12 : 0);
-        const severity: 'high' | 'medium' | 'low' = score >= 30 ? 'high' : score >= 18 ? 'medium' : 'low';
-        return { score, severity, ageDays, warnings, dueSoon };
-    }
-
-    function getFixableWarnings(item: Announcement) {
-        const fixes: string[] = [];
-        if (item.externalLink && !isValidUrl(item.externalLink)) {
-            fixes.push('Clear invalid external link');
-        }
-        if (item.status === 'scheduled' && !item.publishAt) {
-            fixes.push('Move scheduled item back to pending');
-        }
-        if (item.deadline) {
-            const deadlineTime = new Date(item.deadline).getTime();
-            const isExpired = !Number.isNaN(deadlineTime) && deadlineTime < Date.now();
-            const isExpirableType = item.type === 'job' || item.type === 'admission';
-            if (isExpired && isExpirableType && item.isActive !== false) {
-                fixes.push('Deactivate expired listing');
-            }
-        }
-        return fixes;
-    }
-
-    function buildQaFixPatch(item: Announcement) {
-        const patch: Record<string, any> = {};
-        const fixes = getFixableWarnings(item);
-
-        if (item.externalLink && !isValidUrl(item.externalLink)) {
-            patch.externalLink = '';
-        }
-        if (item.status === 'scheduled' && !item.publishAt) {
-            patch.status = 'pending';
-            patch.publishAt = '';
-        }
-        if (item.deadline) {
-            const deadlineTime = new Date(item.deadline).getTime();
-            const isExpired = !Number.isNaN(deadlineTime) && deadlineTime < Date.now();
-            const isExpirableType = item.type === 'job' || item.type === 'admission';
-            if (isExpired && isExpirableType && item.isActive !== false) {
-                patch.isActive = false;
-            }
-        }
-
-        return { patch, fixes };
-    }
-
-    function getFormWarnings() {
-        const warnings: string[] = [];
-        if (!formData.title.trim() || formData.title.trim().length < 10) {
-            warnings.push('Title should be at least 10 characters.');
-        }
-        if (!formData.organization.trim()) {
-            warnings.push('Organization is required.');
-        }
-        if (!formData.category.trim()) {
-            warnings.push('Category is required.');
-        }
-        if (formData.status === 'scheduled' && !formData.publishAt) {
-            warnings.push('Scheduled posts need a publish time.');
-        }
-        if (formData.deadline) {
-            const deadlineDate = parseDateOnly(formData.deadline);
-            if (deadlineDate && deadlineDate.getTime() < Date.now()) {
-                warnings.push('Deadline is in the past.');
-            }
-        }
-        if (formData.externalLink && !isValidUrl(formData.externalLink)) {
-            warnings.push('External link is not a valid URL.');
-        }
-        return warnings;
-    }
-
-    const getWarningTone = (warning: string) => {
-        const lower = warning.toLowerCase();
-        if (lower.includes('required') || lower.includes('at least') || lower.includes('need a publish')) {
-            return 'critical';
-        }
-        if (lower.includes('past') || lower.includes('invalid')) {
-            return 'warning';
-        }
-        return 'warning';
-    };
-
-    const toDate = (value?: string | Date | null) => {
-        if (!value) return null;
-        const date = value instanceof Date ? value : new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return date;
-    };
-
-    const formatDate = (value?: string | Date | null) => {
-        const date = toDate(value);
-        if (!date) return 'N/A';
-        return new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            timeZone: timeZoneId,
-        }).format(date);
-    };
-
-    const formatTime = (value?: string | Date | null) => {
-        const date = toDate(value);
-        if (!date) return '-';
-        return new Intl.DateTimeFormat('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: timeZoneId,
-        }).format(date);
-    };
-
-    const formatDateTime = (value?: string | Date | null) => {
-        const date = toDate(value);
-        if (!date) return '-';
-        return new Intl.DateTimeFormat('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: timeZoneId,
-        }).format(date);
-    };
-
+    const { formatDate, formatTime, formatDateTime } = useMemo(
+        () => createDateFormatter(timeZoneId),
+        [timeZoneId],
+    );
     const renderDateCell = (value?: string) => {
         const label = formatDate(value);
         return label === 'N/A' ? <span className="cell-muted" title="No deadline set">No deadline</span> : label;
-    };
-
-    const normalizeDateTime = (value?: string | Date) => {
-        if (!value) return undefined;
-        const date = value instanceof Date ? value : new Date(value);
-        if (Number.isNaN(date.getTime())) return value instanceof Date ? value.toISOString() : value;
-        return date.toISOString();
-    };
-
-    const formatLastUpdated = (value?: string | null, label = 'Updated') => {
-        if (!value) return 'Not updated yet';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'Not updated yet';
-        const diffMs = Date.now() - date.getTime();
-        if (diffMs < 60 * 1000) return `${label} just now`;
-        if (diffMs < 60 * 60 * 1000) return `${label} ${Math.round(diffMs / 60000)}m ago`;
-        if (diffMs < 24 * 60 * 60 * 1000) return `${label} ${Math.round(diffMs / (60 * 60 * 1000))}h ago`;
-        return `${label} ${Math.round(diffMs / (24 * 60 * 60 * 1000))}d ago`;
     };
 
     useEffect(() => {
@@ -4261,437 +3324,57 @@ export function AdminPage() {
                                 />
                             </Suspense>
                         ) : activeAdminTab === 'users' ? (
-                            <div className="admin-users">
-                                <div className="admin-list-header">
-                                    <div>
-                                        <h3>User analytics</h3>
-                                        <p className="admin-subtitle">Track subscriber growth and engagement.</p>
-                                    </div>
-                                    <div className="admin-list-actions">
-                                        <span className="admin-updated">{formatLastUpdated(dashboardUpdatedAt)}</span>
-                                        <button className="admin-btn secondary" onClick={refreshDashboard} disabled={dashboardLoading}>
-                                            {dashboardLoading ? 'Refreshing...' : 'Refresh'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {dashboardLoading ? (
-                                    <div className="admin-loading">Loading user analytics...</div>
-                                ) : dashboardError ? (
-                                    <div className="admin-error">{dashboardError}</div>
-                                ) : (
-                                    <div className="admin-user-grid">
-                                        <div className="user-card">
-                                            <div className="card-label">Total users</div>
-                                            <div className="card-value">{dashboard?.users?.totalUsers ?? 0}</div>
-                                        </div>
-                                        <div className="user-card">
-                                            <div className="card-label">New today</div>
-                                            <div className="card-value accent">{dashboard?.users?.newToday ?? 0}</div>
-                                        </div>
-                                        <div className="user-card">
-                                            <div className="card-label">New this week</div>
-                                            <div className="card-value accent">{dashboard?.users?.newThisWeek ?? 0}</div>
-                                        </div>
-                                        <div className="user-card">
-                                            <div className="card-label">Active subscribers</div>
-                                            <div className="card-value">{dashboard?.users?.activeSubscribers ?? 0}</div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="admin-section-panel">
-                                    <div className="admin-list-header">
-                                        <div>
-                                            <h4>Current users</h4>
-                                            <p className="admin-subtitle">Activity in the last {activeUsersWindow} minutes.</p>
-                                        </div>
-                                        <div className="admin-list-actions">
-                                            <label htmlFor="activeWindow" className="admin-inline-label">Window</label>
-                                            <select
-                                                id="activeWindow"
-                                                value={activeUsersWindow}
-                                                onChange={(e) => setActiveUsersWindow(parseInt(e.target.value))}
-                                            >
-                                                {ACTIVE_USER_WINDOWS.map((window) => (
-                                                    <option key={window} value={window}>{window}m</option>
-                                                ))}
-                                            </select>
-                                            <span className="admin-updated">{formatLastUpdated(activeUsersUpdatedAt)}</span>
-                                            <button className="admin-btn secondary" onClick={refreshActiveUsers} disabled={activeUsersLoading}>
-                                                {activeUsersLoading ? 'Refreshing...' : 'Refresh'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {activeUsersLoading ? (
-                                        <div className="admin-loading">Loading active users...</div>
-                                    ) : activeUsers ? (
-                                        <div className="admin-user-grid">
-                                            <div className="user-card">
-                                                <div className="card-label">Active now</div>
-                                                <div className="card-value">{activeUsers.total}</div>
-                                            </div>
-                                            <div className="user-card">
-                                                <div className="card-label">Authenticated</div>
-                                                <div className="card-value">{activeUsers.authenticated}</div>
-                                            </div>
-                                            <div className="user-card">
-                                                <div className="card-label">Anonymous</div>
-                                                <div className="card-value">{activeUsers.anonymous}</div>
-                                            </div>
-                                            <div className="user-card">
-                                                <div className="card-label">Admins</div>
-                                                <div className="card-value">{activeUsers.admins}</div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="admin-error">{activeUsersError ?? 'Unable to load active users.'}</div>
-                                    )}
-                                </div>
-                            </div>
+                            <UsersTab
+                                dashboard={dashboard}
+                                dashboardLoading={dashboardLoading}
+                                dashboardError={dashboardError}
+                                dashboardUpdatedAt={dashboardUpdatedAt}
+                                refreshDashboard={refreshDashboard}
+                                activeUsers={activeUsers}
+                                activeUsersWindow={activeUsersWindow}
+                                setActiveUsersWindow={setActiveUsersWindow}
+                                activeUsersLoading={activeUsersLoading}
+                                activeUsersError={activeUsersError}
+                                activeUsersUpdatedAt={activeUsersUpdatedAt}
+                                refreshActiveUsers={refreshActiveUsers}
+                            />
                         ) : activeAdminTab === 'community' ? (
-                            <div className="admin-list">
-                                <div className="admin-list-header">
-                                    <div>
-                                        <h3>Community moderation</h3>
-                                        <p className="admin-subtitle">Review reports, answer Q&amp;A, and remove abusive content.</p>
-                                    </div>
-                                    <div className="admin-list-actions">
-                                        <span className="admin-updated">{formatLastUpdated(communityUpdatedAt)}</span>
-                                        <button className="admin-btn secondary" onClick={refreshCommunity} disabled={communityLoading}>
-                                            {communityLoading ? 'Refreshing...' : 'Refresh'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="admin-toggle">
-                                    <button
-                                        className={`admin-btn secondary ${communityTab === 'flags' ? 'active' : ''}`}
-                                        onClick={() => setCommunityTab('flags')}
-                                    >
-                                        Flags
-                                    </button>
-                                    <button
-                                        className={`admin-btn secondary ${communityTab === 'forums' ? 'active' : ''}`}
-                                        onClick={() => setCommunityTab('forums')}
-                                    >
-                                        Forums
-                                    </button>
-                                    <button
-                                        className={`admin-btn secondary ${communityTab === 'qa' ? 'active' : ''}`}
-                                        onClick={() => setCommunityTab('qa')}
-                                    >
-                                        Q&amp;A
-                                    </button>
-                                    <button
-                                        className={`admin-btn secondary ${communityTab === 'groups' ? 'active' : ''}`}
-                                        onClick={() => setCommunityTab('groups')}
-                                    >
-                                        Groups
-                                    </button>
-                                </div>
-
-                                {communityTab === 'flags' && (
-                                    <div className="admin-community-filter">
-                                        <label htmlFor="flagFilter" className="admin-inline-label">Status</label>
-                                        <select
-                                            id="flagFilter"
-                                            value={flagFilter}
-                                            onChange={(e) => setFlagFilter(e.target.value as 'all' | 'open' | 'reviewed' | 'resolved')}
-                                        >
-                                            <option value="open">Open</option>
-                                            <option value="reviewed">Reviewed</option>
-                                            <option value="resolved">Resolved</option>
-                                            <option value="all">All</option>
-                                        </select>
-                                    </div>
-                                )}
-
-                                {communityError && <div className="admin-error">{communityError}</div>}
-
-                                {communityLoading ? (
-                                    <div className="admin-loading">Loading community moderation data...</div>
-                                ) : communityTab === 'flags' ? (
-                                    <div className="admin-community-grid">
-                                        {communityFlags.length === 0 ? (
-                                            <div className="empty-state">No flags to review.</div>
-                                        ) : (
-                                            communityFlags.map((flag) => (
-                                                <div key={flag.id} className="admin-community-item">
-                                                    <div className="admin-community-header">
-                                                        <div>
-                                                            <h4>Flagged {flag.entityType.toUpperCase()}</h4>
-                                                            <p className="admin-subtitle">{flag.reason}</p>
-                                                        </div>
-                                                        <span className={`status-pill ${flag.status === 'open' ? 'danger' : 'info'}`}>{flag.status}</span>
-                                                    </div>
-                                                    <div className="admin-community-meta">
-                                                        <span>Item ID: {flag.entityId}</span>
-                                                        <span>Reporter: {flag.reporter || 'Anonymous'}</span>
-                                                        <span>{new Date(flag.createdAt).toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="admin-community-actions">
-                                                        {canWriteAdmin && (
-                                                            <button
-                                                                className="admin-btn warning small"
-                                                                onClick={() => handleCommunityDelete(flag.entityType, flag.entityId)}
-                                                                disabled={communityMutatingIds.has(flag.entityId)}
-                                                            >
-                                                                Delete item
-                                                            </button>
-                                                        )}
-                                                        {canWriteAdmin && (
-                                                            <button
-                                                                className="admin-btn secondary small"
-                                                                onClick={() => handleResolveFlag(flag.id)}
-                                                                disabled={communityMutatingIds.has(flag.id)}
-                                                            >
-                                                                Resolve flag
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                ) : communityTab === 'forums' ? (
-                                    <div className="admin-community-grid">
-                                        {communityForums.length === 0 ? (
-                                            <div className="empty-state">No forum posts yet.</div>
-                                        ) : (
-                                            communityForums.map((post) => (
-                                                <div key={post.id} className="admin-community-item">
-                                                    <div className="admin-community-header">
-                                                        <div>
-                                                            <h4>{post.title}</h4>
-                                                            <p className="admin-subtitle">{post.category}</p>
-                                                        </div>
-                                                    </div>
-                                                    <p className="admin-community-content">{post.content}</p>
-                                                    <div className="admin-community-meta">
-                                                        <span>By {post.author}</span>
-                                                        <span>{new Date(post.createdAt).toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="admin-community-actions">
-                                                        {canWriteAdmin && (
-                                                            <button
-                                                                className="admin-btn warning small"
-                                                                onClick={() => handleCommunityDelete('forum', post.id)}
-                                                                disabled={communityMutatingIds.has(post.id)}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                ) : communityTab === 'qa' ? (
-                                    <div className="admin-community-grid">
-                                        {communityQa.length === 0 ? (
-                                            <div className="empty-state">No Q&amp;A threads yet.</div>
-                                        ) : (
-                                            communityQa.map((thread) => (
-                                                <div key={thread.id} className="admin-community-item">
-                                                    <div className="admin-community-header">
-                                                        <div>
-                                                            <h4>{thread.question}</h4>
-                                                            <p className="admin-subtitle">Asked by {thread.author}</p>
-                                                        </div>
-                                                        <span className={`status-pill ${thread.answer ? 'success' : 'warning'}`}>
-                                                            {thread.answer ? 'Answered' : 'Pending'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="admin-community-meta">
-                                                        <span>{new Date(thread.createdAt).toLocaleString()}</span>
-                                                        {thread.answeredBy && <span>Answered by {thread.answeredBy}</span>}
-                                                    </div>
-                                                    <div className="admin-community-answer">
-                                                        {thread.answer ? thread.answer : 'No answer yet.'}
-                                                    </div>
-                                                    <textarea
-                                                        className="review-note-input compact"
-                                                        rows={3}
-                                                        placeholder="Write an official answer..."
-                                                        value={qaAnswerDrafts[thread.id] ?? ''}
-                                                        onChange={(e) => setQaAnswerDrafts((prev) => ({ ...prev, [thread.id]: e.target.value }))}
-                                                    />
-                                                    <div className="admin-community-actions">
-                                                        {canWriteAdmin && (
-                                                            <button
-                                                                className="admin-btn success small"
-                                                                onClick={() => handleAnswerQa(thread.id)}
-                                                                disabled={communityMutatingIds.has(thread.id)}
-                                                            >
-                                                                {communityMutatingIds.has(thread.id) ? 'Saving...' : 'Post answer'}
-                                                            </button>
-                                                        )}
-                                                        {canWriteAdmin && (
-                                                            <button
-                                                                className="admin-btn warning small"
-                                                                onClick={() => handleCommunityDelete('qa', thread.id)}
-                                                                disabled={communityMutatingIds.has(thread.id)}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="admin-community-grid">
-                                        {communityGroups.length === 0 ? (
-                                            <div className="empty-state">No study groups yet.</div>
-                                        ) : (
-                                            communityGroups.map((group) => (
-                                                <div key={group.id} className="admin-community-item">
-                                                    <div className="admin-community-header">
-                                                        <div>
-                                                            <h4>{group.name}</h4>
-                                                            <p className="admin-subtitle">{group.topic}</p>
-                                                        </div>
-                                                        <span className="status-pill info">{group.language}</span>
-                                                    </div>
-                                                    <div className="admin-community-meta">
-                                                        <span>{new Date(group.createdAt).toLocaleString()}</span>
-                                                        {group.link && <span>Invite: {group.link}</span>}
-                                                    </div>
-                                                    <div className="admin-community-actions">
-                                                        {canWriteAdmin && (
-                                                            <button
-                                                                className="admin-btn warning small"
-                                                                onClick={() => handleCommunityDelete('group', group.id)}
-                                                                disabled={communityMutatingIds.has(group.id)}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                            <CommunityTab
+                                communityFlags={communityFlags}
+                                communityForums={communityForums}
+                                communityQa={communityQa}
+                                communityGroups={communityGroups}
+                                communityLoading={communityLoading}
+                                communityError={communityError}
+                                communityUpdatedAt={communityUpdatedAt}
+                                communityMutatingIds={communityMutatingIds}
+                                flagFilter={flagFilter}
+                                setFlagFilter={setFlagFilter}
+                                qaAnswerDrafts={qaAnswerDrafts}
+                                setQaAnswerDrafts={setQaAnswerDrafts}
+                                refreshCommunity={refreshCommunity}
+                                handleCommunityDelete={handleCommunityDelete}
+                                handleResolveFlag={handleResolveFlag}
+                                handleAnswerQa={handleAnswerQa}
+                                canWriteAdmin={canWriteAdmin}
+                            />
                         ) : activeAdminTab === 'errors' ? (
-                            <div className="admin-list">
-                                <div className="admin-list-header">
-                                    <div>
-                                        <h3>Error reports</h3>
-                                        <p className="admin-subtitle">Review client error reports submitted from the UI.</p>
-                                    </div>
-                                    <div className="admin-list-actions">
-                                        <span className="admin-updated">{formatLastUpdated(errorReportsUpdatedAt)}</span>
-                                        <button className="admin-btn secondary" onClick={refreshErrorReports} disabled={errorReportsLoading}>
-                                            {errorReportsLoading ? 'Refreshing...' : 'Refresh'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="admin-community-filter">
-                                    <label htmlFor="errorStatusFilter" className="admin-inline-label">Status</label>
-                                    <select
-                                        id="errorStatusFilter"
-                                        value={errorReportStatusFilter}
-                                        onChange={(e) => setErrorReportStatusFilter(e.target.value as ErrorReportStatus | 'all')}
-                                    >
-                                        <option value="new">New</option>
-                                        <option value="triaged">Triaged</option>
-                                        <option value="resolved">Resolved</option>
-                                        <option value="all">All</option>
-                                    </select>
-                                    <label htmlFor="errorIdFilter" className="admin-inline-label">Error ID</label>
-                                    <input
-                                        id="errorIdFilter"
-                                        type="text"
-                                        placeholder="Search error ID"
-                                        value={errorReportQuery}
-                                        onChange={(e) => setErrorReportQuery(e.target.value)}
-                                    />
-                                </div>
-
-                                {errorReportsError && <div className="admin-error">{errorReportsError}</div>}
-
-                                {errorReportsLoading ? (
-                                    <div className="admin-loading">Loading error reports...</div>
-                                ) : errorReports.length === 0 ? (
-                                    <div className="empty-state">No error reports available.</div>
-                                ) : (
-                                    <div className="admin-community-grid">
-                                        {errorReports.map((report) => (
-                                            <div key={report.id} className="admin-community-item">
-                                                <div className="admin-community-header">
-                                                    <div>
-                                                        <h4>{report.message}</h4>
-                                                        <p className="admin-subtitle">Error ID: {report.errorId}</p>
-                                                    </div>
-                                                    <span className={`status-pill ${report.status === 'new' ? 'danger' : report.status === 'resolved' ? 'success' : 'warning'}`}>
-                                                        {report.status}
-                                                    </span>
-                                                </div>
-                                                <div className="admin-community-meta">
-                                                    <span>{new Date(report.createdAt).toLocaleString()}</span>
-                                                    {report.userEmail && <span>User: {report.userEmail}</span>}
-                                                    {report.pageUrl && (
-                                                        <a href={report.pageUrl} target="_blank" rel="noreferrer" className="community-link">
-                                                            Page link
-                                                        </a>
-                                                    )}
-                                                </div>
-                                                {report.note && (
-                                                    <div className="admin-community-answer">User note: {report.note}</div>
-                                                )}
-                                                {(report.stack || report.componentStack || report.userAgent) && (
-                                                    <details className="admin-trace">
-                                                        <summary>Debug details</summary>
-                                                        {report.userAgent && (
-                                                            <p className="admin-trace-meta"><strong>User agent:</strong> {report.userAgent}</p>
-                                                        )}
-                                                        {report.stack && (
-                                                            <pre className="admin-trace-block">{report.stack}</pre>
-                                                        )}
-                                                        {report.componentStack && (
-                                                            <>
-                                                                <p className="admin-trace-meta"><strong>Component stack:</strong></p>
-                                                                <pre className="admin-trace-block">{report.componentStack}</pre>
-                                                            </>
-                                                        )}
-                                                    </details>
-                                                )}
-                                                <textarea
-                                                    className="review-note-input compact"
-                                                    rows={3}
-                                                    placeholder="Add internal triage notes..."
-                                                    value={errorReportNotes[report.id] ?? report.adminNote ?? ''}
-                                                    onChange={(e) => setErrorReportNotes((prev) => ({ ...prev, [report.id]: e.target.value }))}
-                                                />
-                                                {canWriteAdmin && (
-                                                    <div className="admin-community-actions">
-                                                        <button
-                                                            className="admin-btn warning small"
-                                                            onClick={() => updateErrorReport(report.id, 'triaged')}
-                                                            disabled={communityMutatingIds.has(report.id)}
-                                                        >
-                                                            Mark triaged
-                                                        </button>
-                                                        <button
-                                                            className="admin-btn success small"
-                                                            onClick={() => updateErrorReport(report.id, 'resolved')}
-                                                            disabled={communityMutatingIds.has(report.id)}
-                                                        >
-                                                            Resolve
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <ErrorsTab
+                                errorReports={errorReports}
+                                errorReportsLoading={errorReportsLoading}
+                                errorReportsError={errorReportsError}
+                                errorReportsUpdatedAt={errorReportsUpdatedAt}
+                                errorReportStatusFilter={errorReportStatusFilter}
+                                setErrorReportStatusFilter={setErrorReportStatusFilter}
+                                errorReportQuery={errorReportQuery}
+                                setErrorReportQuery={setErrorReportQuery}
+                                errorReportNotes={errorReportNotes}
+                                setErrorReportNotes={setErrorReportNotes}
+                                refreshErrorReports={refreshErrorReports}
+                                updateErrorReport={updateErrorReport}
+                                communityMutatingIds={communityMutatingIds}
+                                canWriteAdmin={canWriteAdmin}
+                            />
                         ) : activeAdminTab === 'list' ? (
                             <Suspense fallback={<div className="admin-loading">Loading listings...</div>}>
                                 <AdminContentList
@@ -5433,329 +4116,48 @@ export function AdminPage() {
                                 </Suspense>
                             </div>
                         ) : activeAdminTab === 'bulk' ? (
-                            <div className="admin-form-container">
-                                <h3>Bulk Import Announcements</h3>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Paste JSON array of announcements below. Required fields: title, type, category, organization.</p>
-                                <textarea
-                                    value={bulkJson}
-                                    onChange={(e) => setBulkJson(e.target.value)}
-                                    placeholder={`{
-"announcements": [
-  {
-    "title": "SSC CGL 2025",
-    "type": "job",
-    "category": "Central Government",
-    "organization": "SSC",
-    "totalPosts": 5000
-  }
-]
-}`}
-                                    style={{
-                                        width: '100%',
-                                        height: '300px',
-                                        fontFamily: 'monospace',
-                                        fontSize: '0.9rem',
-                                        padding: '15px',
-                                        border: '1px solid var(--border-primary)',
-                                        borderRadius: '8px',
-                                        marginBottom: '15px'
-                                    }}
-                                />
-                                <button
-                                    className="admin-btn primary"
-                                    onClick={async () => {
-                                        if (!isLoggedIn) {
-                                            setMessage('Not authenticated');
-                                            return;
-                                        }
-                                        try {
-                                            const jsonData = JSON.parse(bulkJson);
-                                            const response = await adminFetch(`${apiBase}/api/bulk/import`, {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                },
-                                                body: JSON.stringify(jsonData),
-                                            });
-                                            const result = await response.json();
-                                            setMessage(result.message || 'Import complete');
-                                            if (response.ok) {
-
-                                                refreshData();
-
-                                                refreshDashboard();
-
-                                                setBulkJson('');
-
-                                            }
-
-                                        } catch (err: any) {
-                                            setMessage('Invalid JSON: ' + err.message);
-                                        }
-                                    }}
-                                >
-                                    Import Announcements
-                                </button>
-                            </div>
+                            <BulkTab
+                                bulkJson={bulkJson}
+                                setBulkJson={setBulkJson}
+                                isLoggedIn={isLoggedIn}
+                                setMessage={setMessage}
+                                adminFetch={adminFetch}
+                                refreshData={refreshData}
+                                refreshDashboard={refreshDashboard}
+                                apiBase={apiBase}
+                            />
                         ) : activeAdminTab === 'audit' ? (
-                            <div className="admin-list">
-                                <div className="admin-list-header">
-                                    <div>
-                                        <h3>Audit log</h3>
-                                        <p className="admin-subtitle">Recent admin actions across create, review, and bulk updates.</p>
-                                    </div>
-                                    <div className="admin-list-actions">
-                                        <span className="admin-updated">{formatLastUpdated(auditUpdatedAt)}</span>
-                                        <button className="admin-btn secondary" onClick={() => refreshAuditLogs()} disabled={auditLoading}>
-                                            {auditLoading ? 'Refreshing...' : 'Refresh'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="admin-filter-panel">
-                                    <div className="filter-group">
-                                        <label htmlFor="audit-admin-id">Admin ID</label>
-                                        <input
-                                            id="audit-admin-id"
-                                            type="text"
-                                            value={auditFilters.userId}
-                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, userId: e.target.value }))}
-                                            placeholder="User ID"
-                                        />
-                                    </div>
-                                    <div className="filter-group">
-                                        <label htmlFor="audit-action">Action</label>
-                                        <select
-                                            id="audit-action"
-                                            value={auditFilters.action}
-                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, action: e.target.value }))}
-                                        >
-                                            <option value="">All actions</option>
-                                            {AUDIT_ACTIONS.map((action) => (
-                                                <option key={action} value={action}>{action}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="filter-group">
-                                        <label htmlFor="audit-start-date">Start date</label>
-                                        <input
-                                            id="audit-start-date"
-                                            type="date"
-                                            value={auditFilters.start}
-                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, start: e.target.value }))}
-                                        />
-                                    </div>
-                                    <div className="filter-group">
-                                        <label htmlFor="audit-end-date">End date</label>
-                                        <input
-                                            id="audit-end-date"
-                                            type="date"
-                                            value={auditFilters.end}
-                                            onChange={(e) => setAuditFilters((prev) => ({ ...prev, end: e.target.value }))}
-                                        />
-                                    </div>
-                                    <div className="filter-group">
-                                        <label htmlFor="audit-limit">Limit</label>
-                                        <input
-                                            id="audit-limit"
-                                            type="number"
-                                            min={10}
-                                            max={200}
-                                            value={auditLimit}
-                                            onChange={(e) => {
-                                                setAuditLimit(Number(e.target.value) || 50);
-                                                setAuditPage(1);
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="filter-actions">
-                                        <button
-                                            className="admin-btn secondary"
-                                            onClick={() => refreshAuditLogs(1)}
-                                            disabled={auditLoading}
-                                        >
-                                            Apply
-                                        </button>
-                                        <button
-                                            className="admin-btn secondary"
-                                            onClick={() => {
-                                                setAuditFilters({ userId: '', action: '', start: '', end: '' });
-                                                setAuditLimit(50);
-                                                refreshAuditLogs(1);
-                                            }}
-                                            disabled={auditLoading}
-                                        >
-                                            Clear
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {auditLoading ? (
-                                    <div className="admin-loading">Loading audit log...</div>
-                                ) : auditError ? (
-                                    <div className="admin-error">{auditError}</div>
-                                ) : auditLogs.length === 0 ? (
-                                    <div className="empty-state">No audit entries yet. Approvals, rejects, deletes, and bulk edits will appear here.</div>
-                                ) : (
-                                    <>
-                                        <div className="admin-table-wrapper">
-                                            <table className="admin-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Time</th>
-                                                        <th>Action</th>
-                                                        <th>Title</th>
-                                                        <th>Note</th>
-                                                        <th>Admin</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {auditLogs.map((log) => (
-                                                        <tr key={log.id}>
-                                                            <td>{formatDateTime(log.createdAt)}</td>
-                                                            <td><span className="status-pill info">{log.action}</span></td>
-                                                            <td>{log.title || log.announcementId || '-'}</td>
-                                                            <td>{log.note || '-'}</td>
-                                                            <td>{log.userId || 'system'}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div className="admin-pagination">
-                                            <span className="pagination-info">
-                                                Showing {auditStartIndex}-{auditEndIndex} of {auditTotal}
-                                            </span>
-                                            <button
-                                                className="admin-btn secondary small"
-                                                onClick={() => refreshAuditLogs(Math.max(1, auditPage - 1))}
-                                                disabled={auditLoading || auditPage <= 1}
-                                            >
-                                                Prev
-                                            </button>
-                                            <span className="pagination-info">
-                                                Page {auditPage} of {auditTotalPages}
-                                            </span>
-                                            <button
-                                                className="admin-btn secondary small"
-                                                onClick={() => refreshAuditLogs(Math.min(auditTotalPages, auditPage + 1))}
-                                                disabled={auditLoading || auditPage >= auditTotalPages}
-                                            >
-                                                Next
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                            <AuditTab
+                                auditLogs={auditLogs}
+                                auditLoading={auditLoading}
+                                auditError={auditError}
+                                auditUpdatedAt={auditUpdatedAt}
+                                auditTotal={auditTotal}
+                                auditPage={auditPage}
+                                auditLimit={auditLimit}
+                                setAuditLimit={setAuditLimit}
+                                setAuditPage={setAuditPage}
+                                refreshAuditLogs={refreshAuditLogs}
+                                formatDateTime={formatDateTime}
+                            />
                         ) : activeAdminTab === 'security' ? (
-                            <div className="admin-security">
-                                <div className="admin-security-grid">
-                                    <div className="admin-security-card">
-                                        <div className="security-card-header">
-                                            <div>
-                                                <h4>Two-factor recovery</h4>
-                                                <p className="admin-subtitle">Generate backup codes for account recovery.</p>
-                                            </div>
-                                            <span className="security-card-pill">
-                                                {backupCodesStatus
-                                                    ? `${backupCodesStatus.remaining}/${backupCodesStatus.total} remaining`
-                                                    : 'Not generated'}
-                                            </span>
-                                        </div>
-                                        <div className="security-card-body">
-                                            <div className="security-stat">
-                                                <span className="stat-label">Backup codes remaining</span>
-                                                <span className="stat-value">{backupCodesStatus?.remaining ?? 0}</span>
-                                            </div>
-                                            <div className="security-stat">
-                                                <span className="stat-label">Last generated</span>
-                                                <span className="stat-value">
-                                                    {backupCodesStatus?.updatedAt ? formatDateTime(backupCodesStatus.updatedAt) : 'Not generated'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="security-card-actions">
-                                            {canWriteAdmin && (
-                                                <button
-                                                    className="admin-btn primary small"
-                                                    onClick={generateBackupCodes}
-                                                    disabled={backupCodesLoading}
-                                                >
-                                                    {backupCodesLoading ? 'Generating…' : 'Generate backup codes'}
-                                                </button>
-                                            )}
-                                            <button
-                                                className="admin-btn secondary small"
-                                                onClick={refreshBackupCodesStatus}
-                                                disabled={backupCodesLoading}
-                                            >
-                                                Refresh status
-                                            </button>
-                                        </div>
-                                        <p className="security-card-note">
-                                            Generate a new set to invalidate old codes and store them somewhere safe.
-                                        </p>
-                                    </div>
-
-                                    <div className="admin-security-card">
-                                        <div className="security-card-header">
-                                            <div>
-                                                <h4>Session health</h4>
-                                                <p className="admin-subtitle">Monitor active sessions and risk signals.</p>
-                                            </div>
-                                            <span className="security-card-pill">{sessions.length} total</span>
-                                        </div>
-                                        <div className="security-card-body">
-                                            <div className="security-stat">
-                                                <span className="stat-label">Active now</span>
-                                                <span className="stat-value">{activeSessionCount}</span>
-                                            </div>
-                                            <div className="security-stat">
-                                                <span className="stat-label">High risk</span>
-                                                <span className="stat-value">{highRiskSessionCount}</span>
-                                            </div>
-                                        </div>
-                                        <div className="security-card-actions">
-                                            <button
-                                                className="admin-btn secondary small"
-                                                onClick={refreshSessions}
-                                                disabled={sessionsLoading}
-                                            >
-                                                {sessionsLoading ? 'Refreshing…' : 'Refresh sessions'}
-                                            </button>
-                                            {sessions.length > 1 && (
-                                                <button
-                                                    className="admin-btn warning small"
-                                                    onClick={terminateOtherSessions}
-                                                    disabled={sessionsLoading || !canWriteAdmin}
-                                                >
-                                                    End other sessions
-                                                </button>
-                                            )}
-                                        </div>
-                                        <p className="security-card-note">
-                                            Terminate unknown sessions immediately if you see unfamiliar devices.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {sessionsError && <div className="admin-error">{sessionsError}</div>}
-
-                                <Suspense fallback={<div className="admin-loading">Loading sessions...</div>}>
-                                    <SessionManager
-                                        sessions={sessions}
-                                        onTerminateSession={terminateSession}
-                                        onTerminateAllOther={terminateOtherSessions}
-                                        onRefresh={refreshSessions}
-                                        loading={sessionsLoading}
-                                        canManage={canWriteAdmin}
-                                    />
-                                </Suspense>
-
-                                <Suspense fallback={<div className="admin-loading">Loading security logs...</div>}>
-                                    <SecurityLogsTable onUnauthorized={handleUnauthorized} />
-                                </Suspense>
-                            </div>
+                            <SecurityTab
+                                sessions={sessions}
+                                sessionsLoading={sessionsLoading}
+                                sessionsError={sessionsError}
+                                activeSessionCount={activeSessionCount}
+                                highRiskSessionCount={highRiskSessionCount}
+                                backupCodesStatus={backupCodesStatus}
+                                backupCodesLoading={backupCodesLoading}
+                                refreshSessions={refreshSessions}
+                                terminateSession={terminateSession}
+                                terminateOtherSessions={terminateOtherSessions}
+                                refreshBackupCodesStatus={refreshBackupCodesStatus}
+                                generateBackupCodes={generateBackupCodes}
+                                formatDateTime={formatDateTime}
+                                handleUnauthorized={handleUnauthorized}
+                                canWriteAdmin={canWriteAdmin}
+                            />
                         ) : (
                             <div className="admin-form-container">
                                 <form onSubmit={handleSubmit} className="admin-form">
@@ -6458,6 +4860,11 @@ export function AdminPage() {
                     </div>
                 </div>
             )}
+            <StepUpModal
+                open={stepUpModalOpen}
+                onSubmit={handleStepUpSubmit}
+                onCancel={handleStepUpCancel}
+            />
         </div>
     );
 }

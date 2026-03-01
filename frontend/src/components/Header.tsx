@@ -100,19 +100,24 @@ export function Header() {
         setMoreOpen(false);
     }, [location.pathname]);
 
-    // Close dropdowns on outside click
+    // Close dropdowns on outside click (stable listener via refs)
+    const userMenuOpenRef = useRef(userMenuOpen);
+    userMenuOpenRef.current = userMenuOpen;
+    const moreOpenRef = useRef(moreOpen);
+    moreOpenRef.current = moreOpen;
+
     useEffect(() => {
         const handleClickOutside = (e: globalThis.MouseEvent) => {
-            if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+            if (userMenuOpenRef.current && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
                 setUserMenuOpen(false);
             }
-            if (moreOpen && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+            if (moreOpenRef.current && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
                 setMoreOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [userMenuOpen, moreOpen]);
+    }, []);
 
     useEffect(() => {
         if (searchParams.get('login') === '1') {

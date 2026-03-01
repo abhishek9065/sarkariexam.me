@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { getAnnouncementCards, getBookmarks } from '../utils/api';
@@ -208,6 +208,12 @@ export function HomePage() {
     const [activeFilter, setActiveFilter] = useState<'all' | ContentType>('all');
     const [userPrefs, setUserPrefs] = useState<ContentType[]>(getSavedPrefs());
     const [showPicker, setShowPicker] = useState(!user && !hasDismissedPicker());
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     /* Track scroll depth */
     useEffect(() => {
@@ -216,7 +222,7 @@ export function HomePage() {
     }, []);
 
     /* Fetch latest items */
-    const fetchData = useCallback(async (mounted: { current: boolean }) => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError(false);
         try {
@@ -225,7 +231,7 @@ export function HomePage() {
                 contentTypes.map(t => getAnnouncementCards({ type: t, limit: 12, sort: 'newest' }))
             );
 
-            if (!mounted.current) return;
+            if (!mountedRef.current) return;
 
             const all = results
                 .filter((r): r is PromiseFulfilledResult<{ data: AnnouncementCard[] }> => r.status === 'fulfilled')
@@ -244,16 +250,14 @@ export function HomePage() {
             setUpdates(all.filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; }));
         } catch (err) {
             console.error('Homepage fetch error:', err);
-            if (mounted.current) setError(true);
+            if (mountedRef.current) setError(true);
         } finally {
-            if (mounted.current) setLoading(false);
+            if (mountedRef.current) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        const mounted = { current: true };
-        fetchData(mounted);
-        return () => { mounted.current = false; };
+        fetchData();
     }, [fetchData]);
 
     /* Fetch bookmarks for logged-in user */
@@ -416,7 +420,7 @@ export function HomePage() {
                     </nav>
 
                     {/* ═══ ERROR STATE ═══ */}
-                    {!loading && error && <ErrorState onRetry={() => fetchData({ current: true })} />}
+                    {!loading && error && <ErrorState onRetry={() => fetchData()} />}
 
                     <section className="home-v3-grid home-v3-top-grid" data-testid="home-v3-top-grid">
                         <article className="home-dense-box" data-testid="home-v3-dense-box-results">
@@ -767,7 +771,3 @@ export function HomePage() {
         </Layout>
     );
 }
-
-
-
-

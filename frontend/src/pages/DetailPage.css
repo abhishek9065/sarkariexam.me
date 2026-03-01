@@ -94,8 +94,7 @@
     align-items: center;
     gap: 8px;
     padding: 12px 28px;
-    background: linear-gradient(135deg, var(--accent), #0e7490, var(--accent));
-    background-size: 200% 100%;
+    background: var(--accent);
     color: #fff;
     border: none;
     border-radius: var(--radius-lg);
@@ -103,30 +102,14 @@
     font-weight: var(--weight-bold);
     text-decoration: none;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 20px rgba(8, 145, 178, 0.3),
-        0 0 32px rgba(8, 145, 178, 0.1);
-    animation: heroCtaShimmer 3s ease infinite;
-    position: relative;
-    overflow: hidden;
-}
-
-@keyframes heroCtaShimmer {
-
-    0%,
-    100% {
-        background-position: 0% 50%;
-    }
-
-    50% {
-        background-position: 100% 50%;
-    }
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    box-shadow: var(--shadow-sm);
 }
 
 .detail-hero-cta-primary:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 8px 32px rgba(8, 145, 178, 0.4),
-        0 0 48px rgba(8, 145, 178, 0.15);
+    background: var(--accent-hover, #0e7490);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .detail-hero-cta-secondary {

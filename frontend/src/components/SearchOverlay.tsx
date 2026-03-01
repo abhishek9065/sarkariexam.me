@@ -94,6 +94,12 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     }, [isOpen]);
 
     useEffect(() => {
+        if (!isOpen) return;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = ''; };
+    }, [isOpen]);
+
+    useEffect(() => {
         const handler = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onClose();
         };
@@ -172,7 +178,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     if (!isOpen) return null;
 
     return (
-        <div className="search-overlay" onClick={onClose}>
+        <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Search" onClick={onClose}>
             <div className="search-overlay-content animate-slide-up" onClick={(event) => event.stopPropagation()}>
                 <div className="search-input-wrapper">
                     <span className="search-input-icon">🔍</span>

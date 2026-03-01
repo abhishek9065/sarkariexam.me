@@ -55,19 +55,10 @@ body {
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.35s ease, color 0.35s ease;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    /* Premium subtle mesh gradient background */
-    background-image:
-        radial-gradient(ellipse at 15% 0%, rgba(8, 145, 178, 0.045) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 100%, rgba(124, 58, 237, 0.035) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.02) 0%, transparent 60%);
-    background-attachment: fixed;
 }
 
 [data-theme="dark"] body {
-    background-image:
-        radial-gradient(ellipse at 15% 0%, rgba(8, 145, 178, 0.07) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 100%, rgba(124, 58, 237, 0.05) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.03) 0%, transparent 60%);
+    background-image: none;
 }
 
 a {
@@ -133,16 +124,16 @@ select {
     --text-muted: #94a3b8;
     --text-inverse: #ffffff;
 
-    /* Backgrounds — warmer, layered */
-    --bg-primary: #f8fafc;
+    /* Backgrounds — warm, clean */
+    --bg-primary: #fafafa;
     --bg-secondary: #ffffff;
-    --bg-tertiary: #f1f5f9;
+    --bg-tertiary: #f5f5f5;
     --bg-elevated: #ffffff;
     --bg-overlay: rgba(15, 23, 42, 0.6);
 
-    /* Borders — softer */
-    --border-light: #e2e8f0;
-    --border-medium: #cbd5e1;
+    /* Borders — warmer grey */
+    --border-light: #e5e7eb;
+    --border-medium: #d1d5db;
     --border-focus: var(--accent);
 
     /* Premium Shadows — layered depth */
@@ -232,14 +223,14 @@ select {
     --text-muted: #64748b;
     --text-inverse: #0f172a;
 
-    --bg-primary: #0b1120;
-    --bg-secondary: #111827;
-    --bg-tertiary: #1a2332;
-    --bg-elevated: #1e293b;
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #1e293b;
+    --bg-elevated: #334155;
     --bg-overlay: rgba(0, 0, 0, 0.75);
 
-    --border-light: #1e293b;
-    --border-medium: #334155;
+    --border-light: #334155;
+    --border-medium: #475569;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.5);

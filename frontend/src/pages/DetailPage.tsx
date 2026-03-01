@@ -83,6 +83,7 @@ function getDeadlineStatus(deadline?: string | null): { label: string; className
     if (!deadline) return null;
     const diffDays = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
     if (diffDays < 0) return { label: 'Expired', className: 'detail-deadline-expired', icon: '⛔' };
+    if (diffDays === 0) return { label: 'Last day!', className: 'detail-deadline-urgent', icon: '🔥' };
     if (diffDays <= 3) return { label: `${diffDays} days left`, className: 'detail-deadline-urgent', icon: '🔥' };
     if (diffDays <= 7) return { label: `${diffDays} days left`, className: 'detail-deadline-soon', icon: '⏰' };
     return { label: formatDate(deadline), className: 'detail-deadline-normal', icon: '📅' };
@@ -121,33 +122,37 @@ export function DetailPage({ type }: { type: ContentType }) {
     useEffect(() => {
         window.scrollTo(0, 0);
         if (!slug) return;
+        let mounted = true;
         setLoading(true);
         setError(null);
 
         (async () => {
             try {
                 const res = await getAnnouncementBySlug(type, slug);
+                if (!mounted) return;
                 setAnnouncement(res.data);
                 trackEvent('detail_view', { type, slug });
 
                 try {
                     const rel = await getAnnouncementCards({ type, limit: 8, sort: 'newest' });
-                    setRelated(rel.data.filter((item) => item.slug !== slug).slice(0, 6));
-                } catch { setRelated([]); }
+                    if (mounted) setRelated(rel.data.filter((item) => item.slug !== slug).slice(0, 6));
+                } catch { if (mounted) setRelated([]); }
 
                 /* Check if bookmarked */
                 try {
                     const bm = await getBookmarks();
-                    if (Array.isArray(bm.data) && bm.data.some((b) => b.id === res.data.id)) {
+                    if (mounted && Array.isArray(bm.data) && bm.data.some((b) => b.id === res.data.id)) {
                         setBookmarked(true);
                     }
                 } catch { /* not logged in or error */ }
             } catch (err: unknown) {
-                setError(err instanceof Error ? err.message : 'Failed to load announcement');
+                if (mounted) setError(err instanceof Error ? err.message : 'Failed to load announcement');
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         })();
+
+        return () => { mounted = false; };
     }, [type, slug]);
 
     /* Intersection observer for jump-nav active state */
@@ -187,10 +192,12 @@ export function DetailPage({ type }: { type: ContentType }) {
         } catch { /* not logged in */ }
     }, [announcement, bookmarked]);
 
-    const handleCopyLink = useCallback(() => {
-        navigator.clipboard.writeText(window.location.href);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopyLink = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch { /* clipboard API not available */ }
     }, []);
 
     if (loading) {

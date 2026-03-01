@@ -177,9 +177,12 @@ function isCsrfInvalid(error: unknown): boolean {
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
         ...(options.headers as Record<string, string> || {}),
     };
+
+    if (options.body) {
+        headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    }
 
     if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
@@ -343,14 +346,14 @@ export function getBookmarks() {
 }
 
 export function addBookmark(announcementId: string) {
-    return apiFetch<{ message: string }>('/bookmarks', {
+    return apiFetchWithCsrf<{ message: string }>('/bookmarks', {
         method: 'POST',
         body: JSON.stringify({ announcementId }),
     });
 }
 
 export function removeBookmark(announcementId: string) {
-    return apiFetch<void>(`/bookmarks/${announcementId}`, { method: 'DELETE' });
+    return apiFetchWithCsrf<void>(`/bookmarks/${announcementId}`, { method: 'DELETE' });
 }
 
 /* ─── Profile utility ─── */

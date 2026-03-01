@@ -22,7 +22,7 @@ let flushTimer: ReturnType<typeof setInterval> | null = null;
 
 function getApiBase(): string {
     // Same base used by api.ts — avoid circular import
-    return import.meta.env.VITE_API_URL || '/api';
+    return import.meta.env.VITE_API_BASE || '/api';
 }
 
 async function flushEvents() {
@@ -76,8 +76,8 @@ export function trackEvent(name: string, props?: Record<string, string | number 
 /**
  * Track scroll depth — call once per page, will report 25/50/75/100% milestones.
  */
-export function trackScrollDepth(pageName: string) {
-    if (typeof window === 'undefined') return;
+export function trackScrollDepth(pageName: string): (() => void) | undefined {
+    if (typeof window === 'undefined') return undefined;
     const reported = new Set<number>();
     const milestones = [25, 50, 75, 100];
 

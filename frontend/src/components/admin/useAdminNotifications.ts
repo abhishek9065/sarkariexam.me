@@ -5,7 +5,7 @@ export function useAdminNotifications() {
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
 
     const addNotification = (notification: Omit<AdminNotification, 'id'>) => {
-        const id = Math.random().toString(36).substr(2, 9);
+        const id = crypto.randomUUID();
         const newNotification = {
             ...notification,
             id,
