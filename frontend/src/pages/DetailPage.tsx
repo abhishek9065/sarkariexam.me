@@ -26,15 +26,6 @@ const TYPE_ROUTES: Record<ContentType, string> = {
     syllabus: '/syllabus',
 };
 
-const TYPE_ICONS: Record<ContentType, string> = {
-    job: '💼',
-    result: '📊',
-    'admit-card': '🎫',
-    'answer-key': '🔑',
-    admission: '🎓',
-    syllabus: '📚',
-};
-
 const TYPE_COLORS: Record<ContentType, string> = {
     job: '#0069d9',
     result: '#0f9d58',
@@ -58,18 +49,6 @@ function formatDate(dateStr?: string | null): string {
     try {
         return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
     } catch { return '—'; }
-}
-
-function formatRelativeDate(dateStr?: string | null): string | null {
-    if (!dateStr) return null;
-    try {
-        const diffDays = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Yesterday';
-        if (diffDays < 7) return `${diffDays} days ago`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-        return null;
-    } catch { return null; }
 }
 
 function formatSalary(min?: number, max?: number): string | null {
@@ -253,7 +232,6 @@ export function DetailPage({ type }: { type: ContentType }) {
     const a = announcement;
     const salary = formatSalary(a.salaryMin, a.salaryMax);
     const deadlineStatus = getDeadlineStatus(a.deadline);
-    const relativeDate = formatRelativeDate(a.postedAt);
     const typeColor = TYPE_COLORS[a.type];
     const statusBadge = getStatusBadge(a.deadline);
     const jumpSections = buildJumpSections(a);
