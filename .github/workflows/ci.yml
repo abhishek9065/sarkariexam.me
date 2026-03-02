@@ -60,6 +60,9 @@ jobs:
       - name: Lint frontend
         run: npm run lint
 
+      - name: Verify frontend API types
+        run: npm run verify:api-types
+
       - name: Build frontend
         run: npm run build
 
@@ -89,11 +92,17 @@ jobs:
       - name: Lint admin frontend
         run: npm run lint
 
+      - name: Verify admin API types
+        run: npm run verify:api-types
+
       - name: Enforce admin UI guardrails
         run: npm run guard:ui
 
       - name: Build admin frontend
         run: npm run build
+
+      - name: Enforce admin bundle budget
+        run: npm run check:bundle-size
 
   playwright-smoke:
     name: Playwright Smoke
