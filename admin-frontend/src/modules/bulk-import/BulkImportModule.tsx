@@ -136,6 +136,9 @@ export function BulkImportModule() {
                         placeholder="Paste announcement IDs (comma, space, or newline separated)"
                         className="ops-textarea"
                     />
+                    <div className={`ops-char-counter${rawIds.length > 5000 ? ' danger' : rawIds.length > 3000 ? ' warning' : ''}`}>
+                        {rawIds.length} chars · {ids.length} IDs parsed
+                    </div>
 
                     <div className="ops-actions ops-sticky-actions">
                         <button

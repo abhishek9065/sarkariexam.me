@@ -358,12 +358,18 @@ export function CreatePostModule() {
                         onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))}
                         placeholder="Main post content / summary"
                     />
+                    <div className={`ops-char-counter ops-span-full${form.summary.length > 1000 ? ' danger' : form.summary.length > 800 ? ' warning' : ''}`}>
+                        {form.summary.length} / 1,000 chars
+                    </div>
                     <textarea
                         className="ops-span-full"
                         value={form.tags}
                         onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
                         placeholder="Tags (one per line or comma-separated)"
                     />
+                    <div className={`ops-char-counter ops-span-full${form.tags.length > 500 ? ' danger' : form.tags.length > 400 ? ' warning' : ''}`}>
+                        {form.tags.length} / 500 chars
+                    </div>
 
                     {form.type === 'job' ? (
                         <>

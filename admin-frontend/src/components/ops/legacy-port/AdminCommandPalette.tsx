@@ -48,6 +48,58 @@ function pushRecent(id: string) {
     } catch { /* ignore */ }
 }
 
+function clearRecent() {
+    try { localStorage.removeItem(RECENT_KEY); } catch { /* ignore */ }
+}
+
+const COMMAND_SHORTCUTS: Record<string, string> = {
+    'create-post': 'N',
+    'logout': '⇧L',
+    'toggle-density': '⇧D',
+};
+
+/** Highlight fuzzy-matched characters in a label */
+function fuzzyHighlight(label: string, needle: string): React.ReactNode {
+    if (!needle) return label;
+    const lower = label.toLowerCase();
+    const n = needle.toLowerCase();
+    const positions: number[] = [];
+
+    // Try exact substring first
+    const subIdx = lower.indexOf(n);
+    if (subIdx !== -1) {
+        for (let i = subIdx; i < subIdx + n.length; i++) positions.push(i);
+    } else {
+        // Fuzzy match positions
+        let hIdx = 0;
+        for (let nIdx = 0; nIdx < n.length; nIdx++) {
+            while (hIdx < lower.length) {
+                if (lower[hIdx] === n[nIdx]) {
+                    positions.push(hIdx);
+                    hIdx++;
+                    break;
+                }
+                hIdx++;
+            }
+        }
+    }
+    if (positions.length === 0) return label;
+
+    const posSet = new Set(positions);
+    const result: React.ReactNode[] = [];
+    let buf = '';
+    for (let i = 0; i < label.length; i++) {
+        if (posSet.has(i)) {
+            if (buf) { result.push(buf); buf = ''; }
+            result.push(<mark key={i} className="admin-palette-match">{label[i]}</mark>);
+        } else {
+            buf += label[i];
+        }
+    }
+    if (buf) result.push(buf);
+    return result;
+}
+
 /**
  * Simple fuzzy scorer — returns 0 (no match) or positive value (higher = better).
  * Rewards: consecutive matches, match at word-start, exact substring.
@@ -175,8 +227,8 @@ export function AdminCommandPalette({
             .slice(0, 12);
     }, [announcements, normalizedQuery, onOpenAnnouncement]);
 
-    const recentItems = useMemo<PaletteItem[]>(() => {
-        if (normalizedQuery) return [];
+    const recentItems = useMemo(() => {
+        if (normalizedQuery) return [] as PaletteItem[];
         return recentIds
             .map((recentId) => {
                 const cmd = commands.find((c) => c.id === recentId);
@@ -198,11 +250,11 @@ export function AdminCommandPalette({
     }, [recentIds, commands, normalizedQuery]);
 
     // Build grouped flat list
-    type SectionItem = { type: 'header'; label: string } | { type: 'item'; item: PaletteItem };
+    type SectionItem = { type: 'header'; label: string; clearable?: boolean } | { type: 'item'; item: PaletteItem };
     const sections = useMemo<SectionItem[]>(() => {
         const result: SectionItem[] = [];
         if (recentItems.length > 0) {
-            result.push({ type: 'header', label: 'Recent' });
+            result.push({ type: 'header', label: 'Recent', clearable: true });
             for (const item of recentItems) result.push({ type: 'item', item });
         }
         if (commandItems.length > 0) {
@@ -293,8 +345,13 @@ export function AdminCommandPalette({
                         sections.map((section, sIdx) => {
                             if (section.type === 'header') {
                                 return (
-                                    <div key={`hdr-${sIdx}`} className="admin-palette-section">
-                                        {section.label}
+                                    <div key={`hdr-${sIdx}`} className={section.clearable ? 'admin-palette-recent-header' : 'admin-palette-section'}>
+                                        {section.clearable ? (
+                                            <>
+                                                <span className="admin-palette-recent-label">{section.label}</span>
+                                                <button type="button" className="admin-palette-recent-clear" onClick={() => { clearRecent(); onQueryChange(query); }}>Clear</button>
+                                            </>
+                                        ) : section.label}
                                     </div>
                                 );
                             }
@@ -310,14 +367,18 @@ export function AdminCommandPalette({
                                 >
                                     <span className="admin-palette-item-icon">{section.item.icon}</span>
                                     <span className="admin-palette-item-body">
-                                        <span className="admin-palette-item-label">{section.item.label}</span>
+                                        <span className="admin-palette-item-label">{fuzzyHighlight(section.item.label, normalizedQuery)}</span>
                                         {section.item.description ? (
                                             <span className="admin-palette-item-desc">{section.item.description}</span>
                                         ) : null}
                                     </span>
-                                    <span className="admin-palette-item-badge">
-                                        {section.item.kind === 'recent' ? 'Recent' : section.item.kind === 'announcement' ? 'Content' : 'Cmd'}
-                                    </span>
+                                    {COMMAND_SHORTCUTS[section.item.key.replace('nav-', '')] ? (
+                                        <span className="admin-palette-item-shortcut">{COMMAND_SHORTCUTS[section.item.key.replace('nav-', '')]}</span>
+                                    ) : (
+                                        <span className="admin-palette-item-badge">
+                                            {section.item.kind === 'recent' ? 'Recent' : section.item.kind === 'announcement' ? 'Content' : 'Cmd'}
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })

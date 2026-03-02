@@ -982,6 +982,20 @@ button.ops-kpi-card:hover::before {
     font-size: 0.72rem;
     color: var(--danger);
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ops-form-field-error::before {
+    content: '\26A0';
+    font-size: 0.8rem;
+}
+
+.ops-form-field.has-success input,
+.ops-form-field.has-success select,
+.ops-form-field.has-success textarea {
+    border-color: var(--success);
 }
 
 .ops-form-field.has-error input,
@@ -994,6 +1008,70 @@ button.ops-kpi-card:hover::before {
 .ops-form-field.has-error select:focus,
 .ops-form-field.has-error textarea:focus {
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+/* ─── Floating Label ─── */
+
+.ops-float-field {
+    position: relative;
+}
+
+.ops-float-field input,
+.ops-float-field select,
+.ops-float-field textarea {
+    padding-top: 20px;
+    padding-bottom: 6px;
+}
+
+.ops-float-field label {
+    position: absolute;
+    left: var(--control-padding-inline);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--text-base);
+    color: var(--text-muted);
+    pointer-events: none;
+    transition:
+        top var(--duration-fast) var(--ease-spring),
+        font-size var(--duration-fast) var(--ease-spring),
+        color var(--duration-fast);
+    transform-origin: left;
+}
+
+.ops-float-field textarea~label {
+    top: 20px;
+}
+
+.ops-float-field input:focus~label,
+.ops-float-field input:not(:placeholder-shown)~label,
+.ops-float-field select:focus~label,
+.ops-float-field textarea:focus~label,
+.ops-float-field textarea:not(:placeholder-shown)~label {
+    top: 8px;
+    transform: translateY(0);
+    font-size: var(--text-xs);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ─── Character Counter ─── */
+
+.ops-char-counter {
+    display: flex;
+    justify-content: flex-end;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+
+.ops-char-counter.warning {
+    color: var(--warning);
+}
+
+.ops-char-counter.danger {
+    color: var(--danger);
+    font-weight: 600;
 }
 
 /* ─── Step-Up Auth ─── */
@@ -1799,4 +1877,115 @@ button.ops-kpi-card:hover::before {
 
 .dash-activity-time {
     opacity: 0.7;
+}
+
+/* ─── Activity dot with emoji icon ─── */
+
+.dash-activity-dot {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    margin-top: 2px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-elev-3);
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    line-height: 1;
+    box-shadow: none;
+}
+
+/* ─── Command Palette Enhancements ─── */
+
+.admin-palette-recent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 4px;
+}
+
+.admin-palette-recent-label {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.admin-palette-recent-clear {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    transition: color var(--duration-fast);
+}
+
+.admin-palette-recent-clear:hover {
+    color: var(--accent);
+}
+
+.admin-palette-item-shortcut {
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-3);
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.admin-palette-match {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* ─── Input Group (prefix/suffix) ─── */
+
+.ops-input-group {
+    display: flex;
+    align-items: stretch;
+}
+
+.ops-input-group input {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+}
+
+.ops-input-group input:first-child {
+    border-left: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.ops-input-group input:last-child {
+    border-right: 1px solid var(--border-soft);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.ops-input-prefix,
+.ops-input-suffix {
+    display: grid;
+    place-items: center;
+    padding: 0 12px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-soft);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ops-input-prefix {
+    border-right: none;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.ops-input-suffix {
+    border-left: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }

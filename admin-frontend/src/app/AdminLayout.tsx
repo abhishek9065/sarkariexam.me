@@ -80,6 +80,7 @@ export function AdminLayout() {
     );
     const [theme, setTheme] = useLocalStorageState<'dark' | 'light'>('admin-vnext-theme', 'dark');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
 
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [paletteQuery, setPaletteQuery] = useState('');
@@ -153,6 +154,9 @@ export function AdminLayout() {
             }
             if (!target.closest('.admin-topbar-alerts')) {
                 setAlertsOpen(false);
+            }
+            if (!target.closest('.admin-topbar-profile')) {
+                setProfileOpen(false);
             }
             if (mobileMenuOpen && !target.closest('.admin-sidebar') && !target.closest('.admin-mobile-menu-btn')) {
                 setMobileMenuOpen(false);
@@ -291,33 +295,33 @@ export function AdminLayout() {
                     </div>
                 </div>
 
-                <div className="admin-sidebar-controls">
+                <div className="admin-sidebar-controls" style={{ display: 'flex', gap: 4 }}>
                     <button
                         type="button"
-                        className="admin-btn subtle"
+                        className="admin-btn subtle icon-only small"
                         onClick={() => setSidebarCollapsed((current) => !current)}
                         aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                        data-tooltip={sidebarCollapsed ? 'Expand' : 'Collapse'}
                     >
-                        {sidebarCollapsed ? '\u25B8' : '\u25C2'}
+                        {sidebarCollapsed ? '▸' : '◂'}
                     </button>
                     <button
                         type="button"
-                        className="admin-btn subtle"
+                        className="admin-btn subtle icon-only small"
                         onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
                         aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                        data-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'}
                     >
-                        {theme === 'dark' ? '\u263C' : '\u263E'}
+                        {theme === 'dark' ? '☼' : '☾'}
                     </button>
                     <button
                         type="button"
-                        className="admin-btn subtle"
+                        className="admin-btn subtle icon-only small"
                         onClick={() => setPaletteOpen(true)}
                         aria-label="Command palette"
-                        title="Command palette (Ctrl+K)"
+                        data-tooltip="⌘K"
                     >
-                        {typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘' : 'Ctrl+'}K
+                        ⌘
                     </button>
                 </div>
 
@@ -377,6 +381,14 @@ export function AdminLayout() {
                 </nav>
 
                 <div className="admin-sidebar-footer">
+                    <div className="admin-sidebar-stats">
+                        <div className="admin-sidebar-stat">
+                            📦 <span className="admin-sidebar-stat-value">{enabledNavItems.length}</span> modules
+                        </div>
+                        <div className="admin-sidebar-stat">
+                            <span className="ops-live-dot" /> <span className="admin-sidebar-stat-value">Online</span>
+                        </div>
+                    </div>
                     <a className="admin-nav-link" href="/" target="_blank" rel="noreferrer">
                         <span className="admin-nav-icon">{'\u2197'}</span>
                         <span className="admin-nav-label">View Live Site</span>
@@ -487,7 +499,7 @@ export function AdminLayout() {
                             <option value="ist">🇮🇳 IST</option>
                             <option value="utc">🌐 UTC</option>
                         </select>
-                        <div className="admin-topbar-profile">
+                        <div className="admin-topbar-profile" onClick={() => setProfileOpen((c) => !c)}>
                             <div className="admin-topbar-avatar">
                                 {(user?.email ?? 'A').charAt(0).toUpperCase()}
                             </div>
@@ -502,21 +514,39 @@ export function AdminLayout() {
                                     )}
                                 </div>
                             </div>
+                            {profileOpen ? (
+                                <div className="admin-profile-dropdown" onClick={(e) => e.stopPropagation()}>
+                                    <div className="admin-profile-dropdown-header">
+                                        <div className="admin-profile-dropdown-name">{user?.email?.split('@')[0] ?? 'Admin'}</div>
+                                        <div className="admin-profile-dropdown-email">{user?.email ?? ''}</div>
+                                    </div>
+                                    <button type="button" className="admin-profile-dropdown-item" onClick={() => { setTheme((c) => c === 'dark' ? 'light' : 'dark'); setProfileOpen(false); }}>
+                                        {theme === 'dark' ? '☼' : '☾'} {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                                    </button>
+                                    <button type="button" className="admin-profile-dropdown-item" onClick={() => { setDensity((c) => c === 'comfortable' ? 'compact' : 'comfortable'); setProfileOpen(false); }}>
+                                        {density === 'comfortable' ? '▤' : '▥'} {density === 'comfortable' ? 'Compact Mode' : 'Comfortable Mode'}
+                                    </button>
+                                    <button type="button" className="admin-profile-dropdown-item" onClick={() => { navigate('/settings'); setProfileOpen(false); }}>
+                                        ⚙️ Settings
+                                    </button>
+                                    <div className="admin-profile-dropdown-divider" />
+                                    <button
+                                        type="button"
+                                        className="admin-profile-dropdown-item danger"
+                                        onClick={async () => {
+                                            try {
+                                                await logout();
+                                                navigate('/login', { replace: true });
+                                            } catch (error) {
+                                                notifyError('Logout failed', error instanceof Error ? error.message : 'Unable to sign out.');
+                                            }
+                                        }}
+                                    >
+                                        🚪 Sign Out
+                                    </button>
+                                </div>
+                            ) : null}
                         </div>
-                        <button
-                            type="button"
-                            className="admin-btn subtle"
-                            onClick={async () => {
-                                try {
-                                    await logout();
-                                    navigate('/login', { replace: true });
-                                } catch (error) {
-                                    notifyError('Logout failed', error instanceof Error ? error.message : 'Unable to sign out.');
-                                }
-                            }}
-                        >
-                            Sign Out
-                        </button>
                     </div>
                 </header>
 
