@@ -1,22 +1,40 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-const requireEnv = (key: 'ADMIN_E2E_EMAIL' | 'ADMIN_E2E_PASSWORD' | 'ADMIN_E2E_SETUP_KEY'): string => {
-    const value = process.env[key];
-    if (!value) {
-        throw new Error(`${key} is required for admin integration tests`);
-    }
-    return value;
-};
-
-const adminEmail = requireEnv('ADMIN_E2E_EMAIL');
-const adminPassword = requireEnv('ADMIN_E2E_PASSWORD');
-const adminSetupKey = requireEnv('ADMIN_E2E_SETUP_KEY');
-
 type JsonObject = Record<string, unknown>;
 const setupStatusMaxAttempts = 20;
 const setupStatusRetryDelayMs = 1500;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type IntegrationEnv = {
+    adminEmail: string;
+    adminPassword: string;
+    adminSetupKey: string;
+};
+
+const resolveIntegrationEnv = (): { values: IntegrationEnv | null; missing: string[] } => {
+    const adminEmail = process.env.ADMIN_E2E_EMAIL?.trim() || '';
+    const adminPassword = process.env.ADMIN_E2E_PASSWORD?.trim() || '';
+    const adminSetupKey = process.env.ADMIN_E2E_SETUP_KEY?.trim() || '';
+    const missing = [
+        !adminEmail ? 'ADMIN_E2E_EMAIL' : '',
+        !adminPassword ? 'ADMIN_E2E_PASSWORD' : '',
+        !adminSetupKey ? 'ADMIN_E2E_SETUP_KEY' : '',
+    ].filter(Boolean);
+
+    if (missing.length > 0) {
+        return { values: null, missing };
+    }
+
+    return {
+        values: {
+            adminEmail,
+            adminPassword,
+            adminSetupKey,
+        },
+        missing: [],
+    };
+};
 
 async function getCsrfToken(api: APIRequestContext): Promise<string> {
     const response = await api.get('/api/auth/csrf');
@@ -27,7 +45,7 @@ async function getCsrfToken(api: APIRequestContext): Promise<string> {
     return token as string;
 }
 
-async function ensureAdminAccount(api: APIRequestContext): Promise<void> {
+async function ensureAdminAccount(api: APIRequestContext, env: IntegrationEnv): Promise<void> {
     let needsSetup = false;
     let setupStatusResolved = false;
     let lastStatus = 0;
@@ -78,10 +96,10 @@ async function ensureAdminAccount(api: APIRequestContext): Promise<void> {
             'X-CSRF-Token': csrfToken,
         },
         data: {
-            email: adminEmail,
-            password: adminPassword,
+            email: env.adminEmail,
+            password: env.adminPassword,
             name: 'Admin Integration',
-            setupKey: adminSetupKey,
+            setupKey: env.adminSetupKey,
         },
     });
 
@@ -93,15 +111,15 @@ async function apiJson(response: Awaited<ReturnType<APIRequestContext['get']>>):
     return (await response.json()) as JsonObject;
 }
 
-async function loginAdmin(api: APIRequestContext): Promise<void> {
+async function loginAdmin(api: APIRequestContext, env: IntegrationEnv): Promise<void> {
     const csrfToken = await getCsrfToken(api);
     const loginResponse = await api.post('/api/admin-auth/login', {
         headers: {
             'X-CSRF-Token': csrfToken,
         },
         data: {
-            email: adminEmail,
-            password: adminPassword,
+            email: env.adminEmail,
+            password: env.adminPassword,
         },
     });
 
@@ -109,8 +127,20 @@ async function loginAdmin(api: APIRequestContext): Promise<void> {
 }
 
 test('admin real backend integration flow validates auth + privileged contracts', async ({ page }) => {
-    await ensureAdminAccount(page.request);
-    await loginAdmin(page.request);
+    const envResolution = resolveIntegrationEnv();
+    if (envResolution.missing.length > 0 && !process.env.CI) {
+        test.skip(true, `Skipping local admin integration test. Missing env vars: ${envResolution.missing.join(', ')}`);
+    }
+
+    expect(
+        envResolution.missing,
+        `Missing required integration env vars: ${envResolution.missing.join(', ')}`
+    ).toEqual([]);
+
+    const env = envResolution.values as IntegrationEnv;
+
+    await ensureAdminAccount(page.request, env);
+    await loginAdmin(page.request, env);
 
     const meResponse = await page.request.get('/api/admin-auth/me');
     expect(meResponse.ok(), await meResponse.text()).toBe(true);
@@ -129,8 +159,8 @@ test('admin real backend integration flow validates auth + privileged contracts'
             'X-CSRF-Token': csrfToken,
         },
         data: {
-            email: adminEmail,
-            password: adminPassword,
+            email: env.adminEmail,
+            password: env.adminPassword,
         },
     });
     expect(stepUpResponse.ok(), await stepUpResponse.text()).toBe(true);
