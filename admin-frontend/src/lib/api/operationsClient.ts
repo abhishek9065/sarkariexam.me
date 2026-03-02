@@ -9,14 +9,15 @@ import type {
     TemplateRecord,
 } from '../../types';
 import { mutationHeaders, request, toArray } from './core';
+import { ADMIN_API_PATHS } from './paths';
 
 export async function getHomepageSections(): Promise<HomepageSectionConfig[]> {
-    const body = await request('/api/admin/homepage/sections');
+    const body = await request(ADMIN_API_PATHS.homepageSections);
     return toArray<HomepageSectionConfig>(body?.data);
 }
 
 export async function updateHomepageSections(sections: HomepageSectionConfig[]): Promise<HomepageSectionConfig[]> {
-    const body = await request('/api/admin/homepage/sections', {
+    const body = await request(ADMIN_API_PATHS.homepageSections, {
         method: 'PUT',
         headers: mutationHeaders(),
         body: JSON.stringify({ sections }),
@@ -39,7 +40,7 @@ export async function getLinkRecords(input: {
     if (input.status && input.status !== 'all') params.set('status', input.status);
     if (input.announcementId) params.set('announcementId', input.announcementId);
     if (input.search?.trim()) params.set('search', input.search.trim());
-    const body = await request(`/api/admin/links?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminLinks}?${params.toString()}`);
     return {
         data: toArray<LinkRecord>(body?.data),
         meta: {
@@ -51,7 +52,7 @@ export async function getLinkRecords(input: {
 }
 
 export async function createLinkRecord(payload: Omit<LinkRecord, 'id'>): Promise<LinkRecord> {
-    const body = await request('/api/admin/links', {
+    const body = await request(ADMIN_API_PATHS.adminLinks, {
         method: 'POST',
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
@@ -73,7 +74,7 @@ export async function checkLinks(payload: {
     urls?: string[];
     timeoutMs?: number;
 }): Promise<{ data: LinkHealthReport[]; meta?: Record<string, unknown> }> {
-    const body = await request('/api/admin/links/check', {
+    const body = await request(ADMIN_API_PATHS.adminLinkCheck, {
         method: 'POST',
         headers: mutationHeaders(undefined, false),
         body: JSON.stringify(payload),
@@ -93,7 +94,7 @@ export async function getLinkHealthSummary(days = 7): Promise<{
     recentBroken: Array<{ id: string; label: string; url: string; announcementId?: string; updatedAt?: string }>;
 }> {
     const boundedDays = Math.max(1, Math.min(90, days));
-    const body = await request(`/api/admin/links/health/summary?days=${boundedDays}`);
+    const body = await request(`${ADMIN_API_PATHS.adminLinkHealthSummary}?days=${boundedDays}`);
     return body?.data ?? {
         windowDays: boundedDays,
         generatedAt: new Date().toISOString(),
@@ -108,7 +109,7 @@ export async function replaceLinks(
     payload: { fromUrl: string; toUrl: string; scope?: 'all' | 'announcements' | 'links' },
     stepUpToken: string
 ): Promise<Record<string, unknown>> {
-    const body = await request('/api/admin/links/replace', {
+    const body = await request(ADMIN_API_PATHS.adminLinkReplace, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
@@ -129,7 +130,7 @@ export async function getMediaAssets(input: {
     if (input.category && input.category !== 'all') params.set('category', input.category);
     if (input.status && input.status !== 'all') params.set('status', input.status);
     if (input.search?.trim()) params.set('search', input.search.trim());
-    const body = await request(`/api/admin/media?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminMedia}?${params.toString()}`);
     return {
         data: toArray<MediaAsset>(body?.data),
         meta: {
@@ -141,7 +142,7 @@ export async function getMediaAssets(input: {
 }
 
 export async function createMediaAsset(payload: Omit<MediaAsset, 'id' | 'status'>): Promise<MediaAsset> {
-    const body = await request('/api/admin/media', {
+    const body = await request(ADMIN_API_PATHS.adminMedia, {
         method: 'POST',
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
@@ -169,7 +170,7 @@ export async function getTemplateRecords(input: {
     params.set('shared', input.shared ?? 'all');
     params.set('limit', String(input.limit ?? 100));
     params.set('offset', String(input.offset ?? 0));
-    const body = await request(`/api/admin/templates?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminTemplates}?${params.toString()}`);
     return {
         data: toArray<TemplateRecord>(body?.data),
         meta: {
@@ -181,7 +182,7 @@ export async function getTemplateRecords(input: {
 }
 
 export async function createTemplateRecord(payload: Omit<TemplateRecord, 'id'>): Promise<TemplateRecord> {
-    const body = await request('/api/admin/templates', {
+    const body = await request(ADMIN_API_PATHS.adminTemplates, {
         method: 'POST',
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
@@ -211,7 +212,7 @@ export async function getAdminAlerts(input: {
     params.set('status', input.status ?? 'all');
     params.set('limit', String(input.limit ?? 60));
     params.set('offset', String(input.offset ?? 0));
-    const body = await request(`/api/admin/alerts?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminAlerts}?${params.toString()}`);
     return {
         data: toArray<AdminAlert>(body?.data),
         meta: {
@@ -223,7 +224,7 @@ export async function getAdminAlerts(input: {
 }
 
 export async function createAdminAlert(payload: Omit<AdminAlert, 'id'>): Promise<AdminAlert> {
-    const body = await request('/api/admin/alerts', {
+    const body = await request(ADMIN_API_PATHS.adminAlerts, {
         method: 'POST',
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
@@ -255,7 +256,7 @@ export async function updateAdminSetting(key: 'states' | 'boards' | 'tags', valu
 }
 
 export async function getAdminRoleUsers(): Promise<AdminRoleUser[]> {
-    const body = await request('/api/admin/users');
+    const body = await request(ADMIN_API_PATHS.adminUsers);
     return toArray<AdminRoleUser>(body?.data);
 }
 

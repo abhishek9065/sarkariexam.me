@@ -9,6 +9,7 @@ import type {
     Tag,
 } from '../types';
 import { reportClientError } from './reportClientError';
+import { API_PATHS } from './apiPaths';
 
 /* ─── Base URL ─── */
 const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
@@ -170,7 +171,7 @@ async function ensureCsrfToken(forceRefresh = false): Promise<string> {
         if (csrfTokenCache) return csrfTokenCache;
     }
 
-    const res = await fetchWithBaseFallback('/auth/csrf', {
+    const res = await fetchWithBaseFallback(API_PATHS.authCsrf, {
         method: 'GET',
         credentials: 'include',
     });
@@ -290,13 +291,13 @@ function toQueryString(params: Record<string, string | number | undefined>): str
 /** Fetch announcements — offset-based (v1) */
 export function getAnnouncements(filters: AnnouncementFilters = {}) {
     const qs = toQueryString(filters as Record<string, string | number | undefined>);
-    return apiFetch<{ data: Announcement[]; total: number }>(`/announcements${qs}`);
+    return apiFetch<{ data: Announcement[]; total: number }>(`${API_PATHS.announcements}${qs}`);
 }
 
 /** Fetch listing cards — cursor-based (v3, lightweight) */
 export function getAnnouncementCards(filters: AnnouncementFilters = {}) {
     const qs = toQueryString(filters as Record<string, string | number | undefined>);
-    return apiFetch<PaginatedResponse<AnnouncementCard>>(`/announcements/v3/cards${qs}`);
+    return apiFetch<PaginatedResponse<AnnouncementCard>>(`${API_PATHS.announcementCardsV3}${qs}`);
 }
 
 /** Fetch single announcement by slug */
@@ -306,17 +307,17 @@ export function getAnnouncementBySlug(_type: ContentType, slug: string) {
 
 /** Get categories */
 export function getCategories() {
-    return apiFetch<{ data: string[] }>('/announcements/meta/categories');
+    return apiFetch<{ data: string[] }>(API_PATHS.announcementMetaCategories);
 }
 
 /** Get organizations */
 export function getOrganizations() {
-    return apiFetch<{ data: string[] }>('/announcements/meta/organizations');
+    return apiFetch<{ data: string[] }>(API_PATHS.announcementMetaOrganizations);
 }
 
 /** Get tags */
 export function getTags() {
-    return apiFetch<{ data: Tag[] }>('/announcements/meta/tags');
+    return apiFetch<{ data: Tag[] }>(API_PATHS.announcementMetaTags);
 }
 
 /** Search suggestions */

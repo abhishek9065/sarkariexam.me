@@ -152,7 +152,7 @@ async function ensureCsrfToken(forceRefresh = false): Promise<string | null> {
         if (existing) return existing;
     }
 
-    const response = await fetchWithBaseFallback('/api/auth/csrf', {
+    const response = await fetchWithBaseFallback(ADMIN_API_PATHS.csrf, {
         credentials: 'include',
         headers: {
             'Cache-Control': 'no-store',
@@ -165,7 +165,7 @@ async function ensureCsrfToken(forceRefresh = false): Promise<string | null> {
     return body?.data?.csrfToken || readCookie(CSRF_COOKIE_NAME);
 }
 
-export async function request(path: string, init: RequestInit = {}, withCsrf = false): Promise<Record<string, any> | null> {
+export async function request(path: string, init: RequestInit = {}, withCsrf = false): Promise<Record<string, unknown> | null> {
     const method = (init.method ?? 'GET').toUpperCase();
     const isMutating = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
     const approvalFingerprint = isMutating ? buildApprovalFingerprint(method, path, init.body ?? null) : '';
@@ -278,6 +278,7 @@ export async function request(path: string, init: RequestInit = {}, withCsrf = f
         if (isMutating && approvalFingerprint) {
             approvalReplayCache.delete(approvalFingerprint);
         }
-        return body as Record<string, any> | null;
+        return body as Record<string, unknown> | null;
     }
 }
+import { ADMIN_API_PATHS } from './paths';

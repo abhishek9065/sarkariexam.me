@@ -1,8 +1,9 @@
 import type { AdminReportSnapshot } from '../../types';
 import { request } from './core';
+import { ADMIN_API_PATHS } from './paths';
 
 export async function getAdminDashboard() {
-    const body = await request('/api/admin/dashboard');
+    const body = await request(ADMIN_API_PATHS.adminDashboard);
     return body?.data ?? null;
 }
 
@@ -14,12 +15,12 @@ export async function getAnalyticsOverview(input: {
     if (input.days && Number.isFinite(input.days)) params.set('days', String(input.days));
     if (input.compareDays && Number.isFinite(input.compareDays)) params.set('compareDays', String(input.compareDays));
     const query = params.toString();
-    const body = await request(`/api/analytics/overview${query ? `?${query}` : ''}`);
+    const body = await request(`${ADMIN_API_PATHS.analyticsOverview}${query ? `?${query}` : ''}`);
     return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : null;
 }
 
 export async function getAdminReports(): Promise<AdminReportSnapshot> {
-    const body = await request('/api/admin/reports');
+    const body = await request(ADMIN_API_PATHS.adminReports);
     return body?.data ?? {
         summary: {
             totalPosts: 0,

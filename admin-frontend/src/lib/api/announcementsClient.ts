@@ -12,6 +12,7 @@ import type {
     AdminSavedView,
 } from '../../types';
 import { mutationHeaders, request, toArray } from './core';
+import { ADMIN_API_PATHS } from './paths';
 
 export async function getAdminAnnouncementsPaged(input: {
     limit?: number;
@@ -35,7 +36,7 @@ export async function getAdminAnnouncementsPaged(input: {
     if (input.dateEnd) params.set('dateEnd', input.dateEnd);
     if (input.author && input.author.trim()) params.set('author', input.author.trim());
 
-    const body = await request(`/api/admin/announcements?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminAnnouncements}?${params.toString()}`);
     return {
         data: toArray<AdminAnnouncementListItem>(body?.data),
         meta: {
@@ -189,7 +190,7 @@ export async function getReviewPreview(input: {
     scheduleAt?: string;
     note?: string;
 }): Promise<AdminReviewPreview> {
-    const body = await request('/api/admin/review/preview', {
+    const body = await request(ADMIN_API_PATHS.adminReviewPreview, {
         method: 'POST',
         headers: mutationHeaders(undefined, false),
         body: JSON.stringify(input),
@@ -202,7 +203,7 @@ export async function getBulkUpdatePreview(input: {
     ids: string[];
     data: Record<string, unknown>;
 }): Promise<AdminBulkPreview> {
-    const body = await request('/api/admin/announcements/bulk/preview', {
+    const body = await request(ADMIN_API_PATHS.adminAnnouncementBulkPreview, {
         method: 'POST',
         headers: mutationHeaders(undefined, false),
         body: JSON.stringify(input),
@@ -220,7 +221,7 @@ export async function createAdminAnnouncement(
     payload: Record<string, unknown>,
     stepUpToken?: string
 ): Promise<AdminAnnouncementListItem> {
-    const body = await request('/api/admin/announcements', {
+    const body = await request(ADMIN_API_PATHS.adminAnnouncements, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
@@ -271,7 +272,7 @@ export async function runBulkApprove(
     note: string | undefined,
     stepUpToken: string
 ): Promise<Record<string, unknown>> {
-    const body = await request('/api/admin/announcements/bulk-approve', {
+    const body = await request(ADMIN_API_PATHS.adminAnnouncementBulkApprove, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ ids, ...(note ? { note } : {}) }),
@@ -284,7 +285,7 @@ export async function runBulkReject(
     note: string | undefined,
     stepUpToken: string
 ): Promise<Record<string, unknown>> {
-    const body = await request('/api/admin/announcements/bulk-reject', {
+    const body = await request(ADMIN_API_PATHS.adminAnnouncementBulkReject, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ ids, ...(note ? { note } : {}) }),
@@ -297,7 +298,7 @@ export async function runBulkUpdate(
     data: Record<string, unknown>,
     stepUpToken: string
 ): Promise<Record<string, unknown>> {
-    const body = await request('/api/admin/announcements/bulk', {
+    const body = await request(ADMIN_API_PATHS.adminAnnouncementBulk, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ ids, data }),
@@ -306,7 +307,7 @@ export async function runBulkUpdate(
 }
 
 export async function createAdminContentRecord(payload: Record<string, unknown>): Promise<AdminContentRecord> {
-    const body = await request('/api/admin/announcements', {
+    const body = await request(ADMIN_API_PATHS.adminAnnouncements, {
         method: 'POST',
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
