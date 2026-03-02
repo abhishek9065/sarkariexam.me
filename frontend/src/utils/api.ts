@@ -46,13 +46,33 @@ const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
 /* ─── Token helpers ─── */
-let authToken: string | null = localStorage.getItem('token');
+const readLegacyStoredToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const legacyToken = window.localStorage.getItem('token');
+        if (legacyToken) {
+            // One-time migration: drop persisted token and keep only runtime memory.
+            window.localStorage.removeItem('token');
+        }
+        return legacyToken;
+    } catch {
+        return null;
+    }
+};
+
+let authToken: string | null = readLegacyStoredToken();
 let csrfTokenCache: string | null = null;
 
 export function setAuthToken(token: string | null) {
     authToken = token;
-    if (token) localStorage.setItem('token', token);
-    else localStorage.removeItem('token');
+    if (typeof window !== 'undefined') {
+        try {
+            // Auth token is runtime-only; enforce no persistent local storage token.
+            window.localStorage.removeItem('token');
+        } catch {
+            // ignore storage access errors
+        }
+    }
 }
 
 export function getAuthToken() {

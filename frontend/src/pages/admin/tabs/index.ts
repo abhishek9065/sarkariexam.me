@@ -4,6 +4,7 @@ export { ErrorsTab } from './ErrorsTab';
 export { AuditTab } from './AuditTab';
 export { SecurityTab } from './SecurityTab';
 export { BulkTab } from './BulkTab';
+export { ReviewQueueTab } from './ReviewQueueTab';
 
 export type { UsersTabProps } from './UsersTab';
 export type { CommunityTabProps } from './CommunityTab';

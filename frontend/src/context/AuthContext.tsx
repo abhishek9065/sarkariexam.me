@@ -3,7 +3,6 @@ import {
     getAdminPermissions,
     getMe,
     setAuthToken,
-    getAuthToken,
     login as apiLogin,
     register as apiRegister,
     logout as apiLogout,
@@ -45,16 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    /* Bootstrap — try to load user from saved token */
+    /* Bootstrap from cookie session (and optional runtime bearer token). */
     useEffect(() => {
         let canceled = false;
-
-        const token = getAuthToken();
-        if (!token) {
-            setState({ user: null, loading: false, error: null });
-            setAdminPermissions(null);
-            return;
-        }
 
         (async () => {
             try {
@@ -65,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await syncAdminPermissions(user);
             } catch {
                 setAuthToken(null);
+                if (canceled) return;
                 setAdminPermissions(null);
                 setState({ user: null, loading: false, error: null });
             }

@@ -1,11 +1,12 @@
+import { BlockList } from 'node:net';
+
 import { Request, Response, NextFunction } from 'express';
 
 /**
- * Cloudflare IP Ranges (IPv4)
- * These are the IP ranges that Cloudflare uses to proxy requests.
- * Updated: 2024 - Check https://www.cloudflare.com/ips/ for latest
+ * Cloudflare IP ranges.
+ * Source: https://www.cloudflare.com/ips/
  */
-const CLOUDFLARE_IP_RANGES = [
+const CLOUDFLARE_IPV4_RANGES = [
     '173.245.48.0/20',
     '103.21.244.0/22',
     '103.22.200.0/22',
@@ -23,6 +24,30 @@ const CLOUDFLARE_IP_RANGES = [
     '131.0.72.0/22',
 ];
 
+const CLOUDFLARE_IPV6_RANGES = [
+    '2400:cb00::/32',
+    '2606:4700::/32',
+    '2803:f800::/32',
+    '2405:b500::/32',
+    '2405:8100::/32',
+    '2a06:98c0::/29',
+    '2c0f:f248::/32',
+];
+
+const CLOUDFLARE_BLOCKLIST = (() => {
+    const list = new BlockList();
+    const addSubnet = (cidr: string) => {
+        const [network, prefixRaw] = cidr.split('/');
+        const prefix = Number(prefixRaw);
+        if (!network || !Number.isFinite(prefix)) return;
+        const type = network.includes(':') ? 'ipv6' : 'ipv4';
+        list.addSubnet(network, prefix, type);
+    };
+    for (const cidr of CLOUDFLARE_IPV4_RANGES) addSubnet(cidr);
+    for (const cidr of CLOUDFLARE_IPV6_RANGES) addSubnet(cidr);
+    return list;
+})();
+
 function normalizeIp(ip: string): string {
     if (!ip) return '';
     if (ip.startsWith('::ffff:')) return ip.slice(7);
@@ -31,60 +56,42 @@ function normalizeIp(ip: string): string {
     return zoneIndex > -1 ? ip.slice(0, zoneIndex) : ip;
 }
 
-/**
- * Check if an IP is within a CIDR range
- */
-function ipInRange(ip: string, cidr: string): boolean {
-    const [range, bits] = cidr.split('/');
-    const mask = ~(2 ** (32 - parseInt(bits)) - 1);
-
-    const ipParts = ip.split('.').map(Number);
-    const rangeParts = range.split('.').map(Number);
-
-    const ipNum = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3];
-    const rangeNum = (rangeParts[0] << 24) | (rangeParts[1] << 16) | (rangeParts[2] << 8) | rangeParts[3];
-
-    return (ipNum & mask) === (rangeNum & mask);
-}
+const normalizeHeaderIp = (value: string | string[] | undefined): string => {
+    if (!value) return '';
+    const first = Array.isArray(value) ? value[0] : value;
+    return normalizeIp(first.trim());
+};
 
 /**
- * Check if request comes from Cloudflare
+ * Check if request comes from Cloudflare edge.
  */
 export function isCloudflareRequest(ip: string): boolean {
-    // Skip IPv6 for now (simplified)
-    if (ip.includes(':')) return false;
-
-    return CLOUDFLARE_IP_RANGES.some(range => ipInRange(ip, range));
+    const normalized = normalizeIp(ip);
+    if (!normalized) return false;
+    const type = normalized.includes(':') ? 'ipv6' : 'ipv4';
+    try {
+        return CLOUDFLARE_BLOCKLIST.check(normalized, type);
+    } catch {
+        return false;
+    }
 }
 
 /**
- * Middleware to extract real client IP from Cloudflare headers
- * 
- * Cloudflare adds these headers:
- * - CF-Connecting-IP: The real client IP
- * - CF-IPCountry: Country code (e.g., "US", "IN")
- * - CF-RAY: Request ID for debugging
+ * Middleware to extract real client IP from Cloudflare headers.
  */
 export function cloudflareMiddleware() {
     return (req: Request, _res: Response, next: NextFunction) => {
-        // Get the connecting IP (immediate connection)
         const connectingIp = normalizeIp(req.socket.remoteAddress || '');
-
-        // Check if request comes from Cloudflare
-        const cfConnectingIp = req.headers['cf-connecting-ip'] as string;
+        const cfConnectingIp = normalizeHeaderIp(req.headers['cf-connecting-ip']);
         const cfCountry = req.headers['cf-ipcountry'] as string;
         const cfRay = req.headers['cf-ray'] as string;
 
         if (cfConnectingIp && isCloudflareRequest(connectingIp)) {
-            // Override req.ip with real client IP
-            // Note: Express uses req.ip which considers trust proxy
-            // We attach the real IP to a custom property for clarity
             (req as any).realIp = cfConnectingIp;
             (req as any).cfCountry = cfCountry;
             (req as any).cfRay = cfRay;
             (req as any).isCloudflare = true;
         } else {
-            // Not through Cloudflare (direct access or local dev)
             (req as any).realIp = req.ip || connectingIp;
             (req as any).isCloudflare = false;
             if (cfConnectingIp) {
@@ -97,15 +104,14 @@ export function cloudflareMiddleware() {
 }
 
 /**
- * Get the real client IP from request
- * Use this instead of req.ip when you need the actual client IP
+ * Get real client IP from request.
  */
 export function getRealIp(req: Request): string {
     return (req as any).realIp || req.ip || 'unknown';
 }
 
 /**
- * Get Cloudflare country code from request
+ * Get Cloudflare country code from request.
  */
 export function getCountry(req: Request): string | undefined {
     return (req as any).cfCountry;

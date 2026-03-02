@@ -1,6 +1,6 @@
 # Sarkari Result Monorepo: Architecture Map (High Depth, Backend-First)
 
-Generated on: 2026-02-24  
+Generated on: 2026-03-02  
 Repository root: `c:\Users\abhis\Downloads\sarkari-result-git-clean`
 
 ## 1) Scope and Outcome
@@ -118,13 +118,13 @@ Direct app routes:
 Inventory from route extraction (`router.<method>(...)`):
 
 1. 15 backend route files.
-2. 156 route method definitions.
+2. 158 route method definitions.
 
 Ownership matrix:
 
 | Mount prefix | Route count | Source file | Domain |
 | --- | ---: | --- | --- |
-| `/api/admin` | 67 | `backend/src/routes/admin.ts` | Admin control plane (content ops, approvals, security, settings, reports) |
+| `/api/admin` | 63 | `backend/src/routes/admin.ts` | Admin control plane (content ops, approvals, security, settings, reports) |
 | `/api/profile` | 18 | `backend/src/routes/profile.ts` | User profile, saved searches, tracker, notifications |
 | `/api/announcements` | 14 | `backend/src/routes/announcements.ts` | Public content listing/search/detail plus CRUD |
 | `/api/auth` | 13 | `backend/src/routes/auth.ts` | User/admin login, 2FA, step-up, sessions, password reset |
@@ -260,25 +260,19 @@ For endpoints wrapped with `idempotency()`:
 
 OpenAPI snapshot (`openapi.json`):
 
-1. `pathCount = 135`.
-2. `operationCount = 157`.
+1. `pathCount = 136`.
+2. `operationCount = 158`.
 3. Tag distribution includes `untagged = 32` operations.
 
 Parity command (`backend/npm run verify:openapi-parity`) result:
 
-1. Contract mismatch detected.
-2. Implemented but undocumented: `POST /api/admin/announcements/{id}/revert/{version}`.
+1. Implemented and documented endpoints are in sync (`158` method-path entries).
+2. `POST /api/admin/announcements/{id}/revert/{version}` is documented in `openapi.json`.
 
-Route hygiene finding:
+Route hygiene note:
 
-There are exact duplicate route definitions in `backend/src/routes/admin.ts`:
-
-1. `GET /api/admin/users`.
-2. `PATCH /api/admin/users/:id/role`.
-3. `GET /api/admin/settings/:key`.
-4. `PUT /api/admin/settings/:key`.
-
-These exist in two separate blocks in the same file. In Express, earlier handlers win unless they call `next()`, so downstream duplicates are operationally risky and confusing.
+1. No exact duplicate `users/settings` route definitions were found in current `backend/src/routes/admin.ts`.
+2. Keep regression tests around admin routing because `admin.ts` remains a large multi-domain file.
 
 ## 8) Async, Scheduled, and Realtime Flows
 
@@ -308,7 +302,7 @@ API client behavior (`utils/api.ts`):
 
 1. Base fallback: configured `VITE_API_BASE` then `/api`.
 2. CSRF bootstrap via `/auth/csrf` and automatic retry on `csrf_invalid`.
-3. Sends Bearer token from local storage when present.
+3. Cookie-auth first; optional Bearer token is runtime-memory only (not persisted in local storage).
 4. Reports repeated API failures via `reportClientError`.
 
 ### 9.2 Admin vNext (`admin-frontend/`)
@@ -327,15 +321,15 @@ API client behavior (`admin-frontend/src/lib/api/client.ts`):
 3. Mutation helpers auto-attach `Idempotency-Key`.
 4. CSRF token added for non-GET operations.
 
-### 9.3 Cross-frontend auth contract mismatch
+### 9.3 Cross-frontend auth contract status
 
-Role mismatch risk:
+Role alignment check:
 
 1. Backend treats `contributor` as admin-portal role.
-2. Legacy public frontend role union excludes `contributor`.
-3. Admin vNext `RequireAdminAuth` also excludes `contributor` in its explicit allow list.
+2. Legacy public frontend role union includes `contributor`.
+3. Admin vNext `RequireAdminAuth` allow list includes `contributor`.
 
-Operational result: backend can authenticate a contributor, but frontend gate can reject access.
+Operational result: backend and frontend role gates are aligned for `contributor`.
 
 ## 10) Deployment and Governance Guardrails
 
@@ -422,10 +416,11 @@ Validated against repository state:
 
 ## 13) Key Risks (Current State)
 
-1. Duplicate admin routes in `admin.ts` for users/settings endpoints increase maintenance and behavior ambiguity.
-2. OpenAPI parity has one concrete drift (`revert` endpoint undocumented).
-3. Role contract mismatch around `contributor` between backend and frontend gates can cause auth/access inconsistencies.
-4. `admin.ts` is a large multi-domain monolith (nearly 4k lines), increasing merge conflict and regression risk for admin changes.
+1. Backend/admin surface area is wide (`/api/admin` has the largest route concentration), so behavior coupling risk is high.
+2. `admin.ts` is a large multi-domain monolith (4k+ lines), increasing merge conflict and regression risk for admin changes.
+3. Legacy admin UI in `frontend/src/pages/AdminPage.tsx` remains a very large monolith (4k+ lines), slowing safe iteration.
+4. `admin-frontend/src/lib/api/client.ts` is large and cross-domain, coupling many workflows into one client module.
+5. Redis in-memory fallback mode can diverge across multi-instance deployments for idempotency/session/rate-limit behavior.
 
 ## 14) Assumptions and Defaults Applied
 

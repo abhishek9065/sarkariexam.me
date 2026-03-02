@@ -1,0 +1,273 @@
+import type {
+    AdminAlert,
+    AdminRoleUser,
+    AnnouncementTypeFilter,
+    HomepageSectionConfig,
+    LinkHealthReport,
+    LinkRecord,
+    MediaAsset,
+    TemplateRecord,
+} from '../../types';
+import { mutationHeaders, request, toArray } from './core';
+
+export async function getHomepageSections(): Promise<HomepageSectionConfig[]> {
+    const body = await request('/api/admin/homepage/sections');
+    return toArray<HomepageSectionConfig>(body?.data);
+}
+
+export async function updateHomepageSections(sections: HomepageSectionConfig[]): Promise<HomepageSectionConfig[]> {
+    const body = await request('/api/admin/homepage/sections', {
+        method: 'PUT',
+        headers: mutationHeaders(),
+        body: JSON.stringify({ sections }),
+    }, true);
+    return toArray<HomepageSectionConfig>(body?.data);
+}
+
+export async function getLinkRecords(input: {
+    limit?: number;
+    offset?: number;
+    type?: 'official' | 'pdf' | 'external' | 'all';
+    status?: 'active' | 'expired' | 'broken' | 'all';
+    announcementId?: string;
+    search?: string;
+} = {}): Promise<{ data: LinkRecord[]; meta: { total: number; limit: number; offset: number } }> {
+    const params = new URLSearchParams();
+    params.set('limit', String(input.limit ?? 50));
+    params.set('offset', String(input.offset ?? 0));
+    if (input.type && input.type !== 'all') params.set('type', input.type);
+    if (input.status && input.status !== 'all') params.set('status', input.status);
+    if (input.announcementId) params.set('announcementId', input.announcementId);
+    if (input.search?.trim()) params.set('search', input.search.trim());
+    const body = await request(`/api/admin/links?${params.toString()}`);
+    return {
+        data: toArray<LinkRecord>(body?.data),
+        meta: {
+            total: Number(body?.meta?.total ?? 0),
+            limit: Number(body?.meta?.limit ?? input.limit ?? 50),
+            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+        },
+    };
+}
+
+export async function createLinkRecord(payload: Omit<LinkRecord, 'id'>): Promise<LinkRecord> {
+    const body = await request('/api/admin/links', {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function updateLinkRecord(id: string, payload: Partial<Omit<LinkRecord, 'id'>>): Promise<LinkRecord> {
+    const body = await request(`/api/admin/links/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function checkLinks(payload: {
+    ids?: string[];
+    urls?: string[];
+    timeoutMs?: number;
+}): Promise<{ data: LinkHealthReport[]; meta?: Record<string, unknown> }> {
+    const body = await request('/api/admin/links/check', {
+        method: 'POST',
+        headers: mutationHeaders(undefined, false),
+        body: JSON.stringify(payload),
+    }, true);
+    return {
+        data: toArray<LinkHealthReport>(body?.data),
+        meta: body?.meta,
+    };
+}
+
+export async function getLinkHealthSummary(days = 7): Promise<{
+    windowDays: number;
+    generatedAt: string;
+    totalLinks: number;
+    byStatus: Record<string, number>;
+    eventSummary: Array<{ status: string; count: number; avgResponseTimeMs: number | null }>;
+    recentBroken: Array<{ id: string; label: string; url: string; announcementId?: string; updatedAt?: string }>;
+}> {
+    const boundedDays = Math.max(1, Math.min(90, days));
+    const body = await request(`/api/admin/links/health/summary?days=${boundedDays}`);
+    return body?.data ?? {
+        windowDays: boundedDays,
+        generatedAt: new Date().toISOString(),
+        totalLinks: 0,
+        byStatus: {},
+        eventSummary: [],
+        recentBroken: [],
+    };
+}
+
+export async function replaceLinks(
+    payload: { fromUrl: string; toUrl: string; scope?: 'all' | 'announcements' | 'links' },
+    stepUpToken: string
+): Promise<Record<string, unknown>> {
+    const body = await request('/api/admin/links/replace', {
+        method: 'POST',
+        headers: mutationHeaders(stepUpToken),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data ?? {};
+}
+
+export async function getMediaAssets(input: {
+    limit?: number;
+    offset?: number;
+    category?: 'notification' | 'result' | 'admit-card' | 'answer-key' | 'syllabus' | 'other' | 'all';
+    status?: 'active' | 'archived' | 'all';
+    search?: string;
+} = {}): Promise<{ data: MediaAsset[]; meta: { total: number; limit: number; offset: number } }> {
+    const params = new URLSearchParams();
+    params.set('limit', String(input.limit ?? 50));
+    params.set('offset', String(input.offset ?? 0));
+    if (input.category && input.category !== 'all') params.set('category', input.category);
+    if (input.status && input.status !== 'all') params.set('status', input.status);
+    if (input.search?.trim()) params.set('search', input.search.trim());
+    const body = await request(`/api/admin/media?${params.toString()}`);
+    return {
+        data: toArray<MediaAsset>(body?.data),
+        meta: {
+            total: Number(body?.meta?.total ?? 0),
+            limit: Number(body?.meta?.limit ?? input.limit ?? 50),
+            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+        },
+    };
+}
+
+export async function createMediaAsset(payload: Omit<MediaAsset, 'id' | 'status'>): Promise<MediaAsset> {
+    const body = await request('/api/admin/media', {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function updateMediaAsset(id: string, payload: Partial<Omit<MediaAsset, 'id'>>): Promise<MediaAsset> {
+    const body = await request(`/api/admin/media/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function getTemplateRecords(input: {
+    type?: AnnouncementTypeFilter | 'all';
+    shared?: 'true' | 'false' | 'all';
+    limit?: number;
+    offset?: number;
+} = {}): Promise<{ data: TemplateRecord[]; meta: { total: number; limit: number; offset: number } }> {
+    const params = new URLSearchParams();
+    params.set('type', input.type ?? 'all');
+    params.set('shared', input.shared ?? 'all');
+    params.set('limit', String(input.limit ?? 100));
+    params.set('offset', String(input.offset ?? 0));
+    const body = await request(`/api/admin/templates?${params.toString()}`);
+    return {
+        data: toArray<TemplateRecord>(body?.data),
+        meta: {
+            total: Number(body?.meta?.total ?? 0),
+            limit: Number(body?.meta?.limit ?? input.limit ?? 100),
+            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+        },
+    };
+}
+
+export async function createTemplateRecord(payload: Omit<TemplateRecord, 'id'>): Promise<TemplateRecord> {
+    const body = await request('/api/admin/templates', {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function updateTemplateRecord(id: string, payload: Partial<Omit<TemplateRecord, 'id'>>): Promise<TemplateRecord> {
+    const body = await request(`/api/admin/templates/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function getAdminAlerts(input: {
+    source?: 'deadline' | 'schedule' | 'link' | 'traffic' | 'manual' | 'all';
+    severity?: 'info' | 'warning' | 'critical' | 'all';
+    status?: 'open' | 'acknowledged' | 'resolved' | 'all';
+    limit?: number;
+    offset?: number;
+} = {}): Promise<{ data: AdminAlert[]; meta: { total: number; limit: number; offset: number } }> {
+    const params = new URLSearchParams();
+    params.set('source', input.source ?? 'all');
+    params.set('severity', input.severity ?? 'all');
+    params.set('status', input.status ?? 'all');
+    params.set('limit', String(input.limit ?? 60));
+    params.set('offset', String(input.offset ?? 0));
+    const body = await request(`/api/admin/alerts?${params.toString()}`);
+    return {
+        data: toArray<AdminAlert>(body?.data),
+        meta: {
+            total: Number(body?.meta?.total ?? 0),
+            limit: Number(body?.meta?.limit ?? input.limit ?? 60),
+            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+        },
+    };
+}
+
+export async function createAdminAlert(payload: Omit<AdminAlert, 'id'>): Promise<AdminAlert> {
+    const body = await request('/api/admin/alerts', {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function updateAdminAlert(id: string, payload: Partial<Omit<AdminAlert, 'id'>>): Promise<AdminAlert> {
+    const body = await request(`/api/admin/alerts/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
+
+export async function getAdminSetting(key: 'states' | 'boards' | 'tags'): Promise<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }> {
+    const body = await request(`/api/admin/settings/${encodeURIComponent(key)}`);
+    return body?.data ?? { key, values: [] };
+}
+
+export async function updateAdminSetting(key: 'states' | 'boards' | 'tags', values: string[]): Promise<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }> {
+    const body = await request(`/api/admin/settings/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: mutationHeaders(),
+        body: JSON.stringify({ values }),
+    }, true);
+    return body?.data ?? { key, values };
+}
+
+export async function getAdminRoleUsers(): Promise<AdminRoleUser[]> {
+    const body = await request('/api/admin/users');
+    return toArray<AdminRoleUser>(body?.data);
+}
+
+export async function updateAdminRoleUser(
+    id: string,
+    payload: { role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor'; isActive?: boolean },
+    stepUpToken: string
+): Promise<AdminRoleUser> {
+    const body = await request(`/api/admin/users/${encodeURIComponent(id)}/role`, {
+        method: 'PATCH',
+        headers: mutationHeaders(stepUpToken),
+        body: JSON.stringify(payload),
+    }, true);
+    return body?.data;
+}
