@@ -158,7 +158,7 @@ export function QueueModule() {
                                     </OpsBadge>
                                 </td>
                                 <td>{row.type || '-'}</td>
-                                <td>{row.updatedBy || '-'}</td>
+                                <td>{(row as Record<string, unknown>).createdBy as string || row.updatedBy || 'Unassigned'}</td>
                                 <td>{formatDateTime(row.updatedAt || row.publishedAt)}</td>
                                 <td>
                                     <ActionOverflowMenu

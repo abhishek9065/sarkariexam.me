@@ -31,6 +31,7 @@ export function ContentTypeListModule({ type, title, description }: Props) {
             search,
             sort,
             limit: 120,
+            includeInactive: true,
         }),
     });
 

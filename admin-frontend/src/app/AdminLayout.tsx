@@ -208,6 +208,7 @@ export function AdminLayout() {
 
             if (event.key === 'Escape') {
                 setPaletteOpen(false);
+                setPaletteQuery('');
                 setAlertsOpen(false);
                 setTopSearchFocused(false);
             }
@@ -296,6 +297,7 @@ export function AdminLayout() {
                         className="admin-btn subtle"
                         onClick={() => setSidebarCollapsed((current) => !current)}
                         aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                     >
                         {sidebarCollapsed ? '\u25B8' : '\u25C2'}
                     </button>
@@ -304,6 +306,7 @@ export function AdminLayout() {
                         className="admin-btn subtle"
                         onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
                         aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                     >
                         {theme === 'dark' ? '\u263C' : '\u263E'}
                     </button>
@@ -312,8 +315,9 @@ export function AdminLayout() {
                         className="admin-btn subtle"
                         onClick={() => setPaletteOpen(true)}
                         aria-label="Command palette"
+                        title="Command palette (Ctrl+K)"
                     >
-                        {'\u2318'}K
+                        {typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘' : 'Ctrl+'}K
                     </button>
                 </div>
 
@@ -353,7 +357,6 @@ export function AdminLayout() {
                                 >
                                     <span className="admin-nav-icon">{groupedModuleIcons[group.key]}</span>
                                     <span className="admin-nav-group-title">{group.label}</span>
-                                    <span className="admin-nav-group-count">{group.items.length}</span>
                                 </button>
                                 <div id={`admin-nav-group-${group.key}`} className="admin-nav-group-items">
                                     {group.items.map((item) => (
@@ -478,10 +481,11 @@ export function AdminLayout() {
                             value={timeZoneMode}
                             onChange={(event) => setTimeZoneMode(event.target.value as 'local' | 'ist' | 'utc')}
                             aria-label="Admin timezone"
+                            title="Change how dates and times are displayed"
                         >
-                            <option value="local">Local</option>
-                            <option value="ist">IST</option>
-                            <option value="utc">UTC</option>
+                            <option value="local">🕐 Local</option>
+                            <option value="ist">🇮🇳 IST</option>
+                            <option value="utc">🌐 UTC</option>
                         </select>
                         <div className="admin-topbar-profile">
                             <div className="admin-topbar-avatar">
@@ -553,7 +557,7 @@ export function AdminLayout() {
                 open={paletteOpen}
                 query={paletteQuery}
                 onQueryChange={setPaletteQuery}
-                onClose={() => setPaletteOpen(false)}
+                onClose={() => { setPaletteOpen(false); setPaletteQuery(''); }}
                 commands={commandPaletteCommands}
                 announcements={paletteAnnouncementsQuery.data ?? []}
                 onOpenAnnouncement={(id) => {

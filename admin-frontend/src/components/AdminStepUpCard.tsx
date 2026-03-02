@@ -72,6 +72,9 @@ export function AdminStepUpCard({
                         {loading ? 'Verifying...' : 'Verify'}
                     </button>
                     {error ? <div className="ops-error ops-span-full">{error}</div> : null}
+                    <div className="ops-inline-muted ops-span-full" style={{ fontSize: '0.78rem', lineHeight: 1.5 }}>
+                        Step-up tokens grant access to high-risk actions (publish, delete, bulk operations) and expire after 15 minutes. Re-verify when the token expires.
+                    </div>
                 </form>
             )}
         </OpsCard>

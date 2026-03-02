@@ -18,6 +18,9 @@ export function ReportsModule() {
 
             {report ? (
                 <>
+                    {report.summary.totalPosts === 0 && report.summary.pendingDrafts === 0 && report.summary.scheduled === 0 && report.summary.brokenLinks === 0 ? (
+                        <div className="admin-alert warning">Reports data appears empty. This usually means the analytics:read permission is missing or the reports API returned fallback values. Verify permission grants in the admin role configuration.</div>
+                    ) : null}
                     <div className="ops-kpi-grid">
                         <div className="ops-kpi-card">
                             <div className="ops-kpi-label">Total Posts</div>

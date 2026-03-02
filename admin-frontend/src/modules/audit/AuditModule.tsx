@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
-import { getAdminAuditIntegrity, getAdminAuditLogs } from '../../lib/api/client';
+import { getAdminAuditIntegrity, getAdminAuditLogs, rebuildAdminAuditLedger } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAuditLog } from '../../types';
 
@@ -17,10 +18,19 @@ const actionTone = (action?: string): 'neutral' | 'success' | 'warning' | 'dange
 
 export function AuditModule() {
     const { formatDateTime } = useAdminPreferences();
+    const { stepUpToken, hasValidStepUp } = useAdminAuth();
+    const queryClient = useQueryClient();
     const [action, setAction] = useState('');
     const [userId, setUserId] = useState('');
     const [start, setStart] = useState('');
     const [end, setEnd] = useState('');
+
+    const rebuildMutation = useMutation({
+        mutationFn: () => rebuildAdminAuditLedger(stepUpToken ?? ''),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-audit-integrity'] });
+        },
+    });
 
     const query = useQuery({
         queryKey: ['admin-audit-logs', action, userId, start, end],
@@ -90,6 +100,23 @@ export function AuditModule() {
                             <button type="button" className="admin-btn subtle small" onClick={() => void integrityQuery.refetch()}>
                                 Recheck Integrity
                             </button>
+                            {integrityStatus === 'invalid' ? (
+                                <button
+                                    type="button"
+                                    className="admin-btn small danger"
+                                    onClick={() => rebuildMutation.mutate()}
+                                    disabled={rebuildMutation.isPending || !hasValidStepUp}
+                                    title={!hasValidStepUp ? 'Step-up verification required' : 'Rebuild the audit ledger chain'}
+                                >
+                                    {rebuildMutation.isPending ? 'Rebuilding...' : 'Repair Ledger'}
+                                </button>
+                            ) : null}
+                            {rebuildMutation.isSuccess ? (
+                                <span className="ops-inline-muted">✅ Ledger rebuilt</span>
+                            ) : null}
+                            {rebuildMutation.isError ? (
+                                <span className="ops-text-danger">Rebuild failed</span>
+                            ) : null}
                             <button
                                 type="button"
                                 className="admin-btn small"

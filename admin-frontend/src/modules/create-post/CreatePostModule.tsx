@@ -213,8 +213,25 @@ export function CreatePostModule() {
                                 setForm((current) => ({
                                     ...current,
                                     type: nextType,
-                                    category: current.category || typeCategoryDefaults[nextType],
+                                    category: typeCategoryDefaults[nextType],
+                                    // Reset type-specific fields to prevent state carry-over
+                                    importantDates: '',
+                                    applicationFee: '',
+                                    ageLimit: '',
+                                    vacancyDetails: '',
+                                    eligibility: '',
+                                    selectionProcess: '',
+                                    salary: '',
+                                    resultType: '',
+                                    resultDate: '',
+                                    admitCardReleaseDate: '',
+                                    examDate: '',
+                                    objectionStart: '',
+                                    objectionEnd: '',
+                                    syllabusMarks: '',
+                                    counselingDates: '',
                                 }));
+                                setTemplateId('');
                             }}
                         >
                             <option value="job">Job</option>
@@ -307,18 +324,26 @@ export function CreatePostModule() {
                         />
                     </div>
                     <div className="ops-form-grid">
-                        <input
-                            type="date"
-                            value={form.deadline}
-                            onChange={(event) => setForm((current) => ({ ...current, deadline: event.target.value }))}
-                        />
-                        {form.status === 'scheduled' ? (
+                        <div>
+                            <label className="ops-label">Deadline</label>
                             <input
-                                type="datetime-local"
-                                value={form.publishAt}
-                                onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
-                                required
+                                type="date"
+                                value={form.deadline}
+                                onChange={(event) => setForm((current) => ({ ...current, deadline: event.target.value }))}
+                                aria-label="Application deadline"
                             />
+                        </div>
+                        {form.status === 'scheduled' ? (
+                            <div>
+                                <label className="ops-label">Scheduled Publish</label>
+                                <input
+                                    type="datetime-local"
+                                    value={form.publishAt}
+                                    onChange={(event) => setForm((current) => ({ ...current, publishAt: event.target.value }))}
+                                    aria-label="Scheduled publish date"
+                                    required
+                                />
+                            </div>
                         ) : null}
                     </div>
                     <input
@@ -388,26 +413,38 @@ export function CreatePostModule() {
                                 onChange={(event) => setForm((current) => ({ ...current, resultType: event.target.value }))}
                                 placeholder="Result type (Final / Tier-1 / Merit)"
                             />
-                            <input
-                                type="date"
-                                value={form.resultDate}
-                                onChange={(event) => setForm((current) => ({ ...current, resultDate: event.target.value }))}
-                            />
+                            <div>
+                                <label className="ops-label">Result Date</label>
+                                <input
+                                    type="date"
+                                    value={form.resultDate}
+                                    onChange={(event) => setForm((current) => ({ ...current, resultDate: event.target.value }))}
+                                    aria-label="Result date"
+                                />
+                            </div>
                         </>
                     ) : null}
 
                     {form.type === 'admit-card' ? (
                         <>
-                            <input
-                                type="date"
-                                value={form.examDate}
-                                onChange={(event) => setForm((current) => ({ ...current, examDate: event.target.value }))}
-                            />
-                            <input
-                                type="date"
-                                value={form.admitCardReleaseDate}
-                                onChange={(event) => setForm((current) => ({ ...current, admitCardReleaseDate: event.target.value }))}
-                            />
+                            <div>
+                                <label className="ops-label">Exam Date</label>
+                                <input
+                                    type="date"
+                                    value={form.examDate}
+                                    onChange={(event) => setForm((current) => ({ ...current, examDate: event.target.value }))}
+                                    aria-label="Exam date"
+                                />
+                            </div>
+                            <div>
+                                <label className="ops-label">Admit Card Release</label>
+                                <input
+                                    type="date"
+                                    value={form.admitCardReleaseDate}
+                                    onChange={(event) => setForm((current) => ({ ...current, admitCardReleaseDate: event.target.value }))}
+                                    aria-label="Admit card release date"
+                                />
+                            </div>
                         </>
                     ) : null}
 

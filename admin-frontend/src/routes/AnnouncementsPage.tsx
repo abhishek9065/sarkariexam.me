@@ -129,6 +129,21 @@ export function AnnouncementsPage() {
         return value?.trim() || '';
     }, [location.search]);
 
+    // Bug #6: Apply organization URL param as search filter
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const org = params.get('organization');
+        if (org && org.trim()) {
+            setSearch(org.trim());
+            // Clean the URL param after applying
+            const newParams = new URLSearchParams(location.search);
+            newParams.delete('organization');
+            const newSearch = newParams.toString();
+            navigate(location.pathname + (newSearch ? `?${newSearch}` : ''), { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const query = useQuery({
         queryKey: ['admin-announcements', status, type, search, limit, offset, sortOption, dateStart, dateEnd, author],
         queryFn: () => getAdminAnnouncementsPaged({
@@ -141,6 +156,7 @@ export function AnnouncementsPage() {
             dateStart,
             dateEnd,
             author,
+            includeInactive: true,
         }),
     });
 

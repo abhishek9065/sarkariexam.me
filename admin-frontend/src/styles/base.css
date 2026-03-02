@@ -177,6 +177,10 @@ code {
     font-size: 0.86rem;
 }
 
+.ops-text-danger {
+    color: var(--danger, #ef4444);
+}
+
 .ops-visually-hidden {
     position: absolute;
     width: 1px;

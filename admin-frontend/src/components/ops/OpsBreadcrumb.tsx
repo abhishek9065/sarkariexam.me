@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { getModuleByPath, groupedModuleLabels } from '../../config/adminModules';
+import { adminModuleNavItems, getModuleByPath, groupedModuleLabels } from '../../config/adminModules';
 
 export function OpsBreadcrumb() {
     const { pathname } = useLocation();
@@ -17,13 +17,22 @@ export function OpsBreadcrumb() {
 
     const groupLabel = groupedModuleLabels[mod.group];
 
+    /* Hide the group segment when it is redundant with the module label.
+       This covers single-item groups like Links/Link Manager and Media / PDFs. */
+    const groupItemCount = adminModuleNavItems.filter((item) => item.group === mod.group).length;
+    const isGroupRedundant =
+        mod.group === 'dashboard'
+        || groupItemCount === 1
+        || groupLabel === mod.label
+        || mod.label.toLowerCase().includes(groupLabel.toLowerCase());
+
     return (
         <nav className="ops-breadcrumb" aria-label="Breadcrumb">
             <ol>
                 <li>
                     <Link to="/dashboard">Home</Link>
                 </li>
-                {mod.group !== 'dashboard' && (
+                {!isGroupRedundant && (
                     <li>
                         <span>{groupLabel}</span>
                     </li>

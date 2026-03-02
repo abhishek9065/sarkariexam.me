@@ -202,7 +202,7 @@ export function ApprovalsModule() {
                     </OpsTable>
                 ) : null}
 
-                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No approvals found." /> : null}
+                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No approvals found. Approval requests are created when posts are submitted for review via the publish workflow. Use the Review module to submit posts that require dual-control approval." /> : null}
 
                 {activeMutationError ? <OpsErrorState message={activeMutationError} /> : null}
             </OpsCard>

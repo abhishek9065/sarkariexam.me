@@ -226,7 +226,7 @@ export function ReviewModule() {
                                     <td>{item.status || '-'}</td>
                                     <td>{item.type || '-'}</td>
                                     <td>
-                                        <a href={`/manage-posts?focus=${id}`} target="_blank" rel="noreferrer" className="admin-btn small subtle">Review Diffs</a>
+                                        <a href={`/detailed-post?focus=${id}`} className="admin-btn small subtle">Review Diffs</a>
                                     </td>
                                 </tr>
                             );
@@ -249,7 +249,7 @@ export function ReviewModule() {
                     </button>
                     <button
                         type="button"
-                        className="admin-btn primary"
+                        className="admin-btn danger"
                         disabled={selectedIds.length === 0 || executeMutation.isPending || !hasValidStepUp}
                         onClick={async () => {
                             const approved = await confirm({

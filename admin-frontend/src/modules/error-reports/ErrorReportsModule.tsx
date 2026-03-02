@@ -211,7 +211,7 @@ export function ErrorReportsModule() {
                     </OpsTable>
                 ) : null}
 
-                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No reports found." /> : null}
+                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No reports found. Client-side errors are automatically captured when users encounter issues on the public site. Use status filters to triage: New → Triaged → Resolved." /> : null}
             </div>
         </OpsCard>
     );

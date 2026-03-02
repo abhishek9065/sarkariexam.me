@@ -66,10 +66,10 @@ export function DashboardPage() {
         { label: 'Deadlines Soon', value: urgentDeadlines.length, tone: urgentDeadlines.length > 0 ? 'warning' : '', route: '/alerts', trend: { value: 0, label: 'steady' } },
         { label: 'Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts', trend: { value: -2, label: 'this month' } },
         { label: 'Today\u2019s Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts', trend: { value: 24, label: 'vs yesterday' } },
-        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts', trend: { value: 4, label: 'recent' } },
+        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts', trend: { value: 0, label: 'live count' } },
     ];
 
-    const mockVisits = [450, 620, 580, 810, 1024, 940, 1150];
+    const mockVisits = [450, 620, 580, 810, 1024, 940, 1150]; // TODO: replace with real analytics API
     const maxVisits = Math.max(...mockVisits);
     const totalVisits = mockVisits.reduce((a, b) => a + b, 0);
 
@@ -141,6 +141,7 @@ export function DashboardPage() {
                             const pct = `${Math.max(4, (val / maxVisits) * 100)}%`;
                             return (
                                 <div key={i} className="ops-chart-bar-wrap" title={`${val} visits`}>
+                                    <div className="ops-chart-bar-value">{val.toLocaleString()}</div>
                                     <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = pct; }}></div>
                                     <div className="ops-chart-label">{days[i]}</div>
                                 </div>
@@ -207,18 +208,43 @@ export function DashboardPage() {
                 ) : null}
                 {activityQuery.data && activityQuery.data.length > 0 ? (
                     <div className="dash-activity-list">
-                        {activityQuery.data.slice(0, 10).map((log, idx) => (
-                            <div key={log.id ?? idx} className="dash-activity-item">
-                                <span className="dash-activity-dot" />
-                                <div className="dash-activity-body">
-                                    <span className="dash-activity-action">{log.action ?? 'Unknown action'}</span>
-                                    <span className="dash-activity-meta">
-                                        {log.actorEmail ? <span className="dash-activity-actor">{log.actorEmail}</span> : null}
-                                        {log.createdAt ? <time className="dash-activity-time">{formatRelativeTime(log.createdAt)}</time> : null}
-                                    </span>
+                        {activityQuery.data.slice(0, 10).map((log, idx) => {
+                            const actionLabels: Record<string, string> = {
+                                create: 'Created post',
+                                update: 'Updated post',
+                                bulk_update: 'Bulk updated',
+                                bulk_approve: 'Bulk approved',
+                                bulk_reject: 'Bulk rejected',
+                                approve: 'Approved',
+                                reject: 'Rejected',
+                                publish: 'Published',
+                                unpublish: 'Unpublished',
+                                archive: 'Archived',
+                                delete: 'Deleted',
+                                announcement_draft_create: 'Created draft',
+                                rollback: 'Restored revision',
+                                role_update: 'Updated role',
+                                settings_update: 'Updated settings',
+                            };
+                            const actionLabel = actionLabels[log.action ?? ''] ?? log.action ?? 'Unknown action';
+                            const meta = (log as any).metadata as Record<string, unknown> | undefined;
+                            const targetTitle = typeof meta?.title === 'string' ? meta.title : null;
+                            return (
+                                <div key={log.id ?? idx} className="dash-activity-item">
+                                    <span className="dash-activity-dot" />
+                                    <div className="dash-activity-body">
+                                        <span className="dash-activity-action">
+                                            {actionLabel}
+                                            {targetTitle ? <> — <strong>{targetTitle}</strong></> : null}
+                                        </span>
+                                        <span className="dash-activity-meta">
+                                            {log.actorEmail ? <span className="dash-activity-actor">{log.actorEmail}</span> : null}
+                                            {log.createdAt ? <time className="dash-activity-time">{formatRelativeTime(log.createdAt)}</time> : null}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : null}
             </OpsCard>

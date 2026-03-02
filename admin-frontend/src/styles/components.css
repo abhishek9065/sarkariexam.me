@@ -391,6 +391,23 @@ button.ops-kpi-card:hover::before {
     font-weight: 500;
 }
 
+.ops-chart-bar-value {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.ops-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
 .ops-badge.neutral {
     color: var(--text-secondary);
 }
@@ -1213,12 +1230,10 @@ button.ops-kpi-card:hover::before {
 
 .ops-skeleton-shimmer {
     border-radius: var(--radius-xs);
-    background: linear-gradient(
-        90deg,
-        var(--bg-elev-2) 0%,
-        var(--bg-elev-3) 40%,
-        var(--bg-elev-2) 80%
-    );
+    background: linear-gradient(90deg,
+            var(--bg-elev-2) 0%,
+            var(--bg-elev-3) 40%,
+            var(--bg-elev-2) 80%);
     background-size: 300% 100%;
     animation: ops-skeleton-pulse 1.6s ease-in-out infinite;
 }
@@ -1226,31 +1241,71 @@ button.ops-kpi-card:hover::before {
 /* Keep the old class working too */
 .ops-skeleton {
     border-radius: var(--radius-xs);
-    background: linear-gradient(
-        90deg,
-        var(--bg-elev-2) 0%,
-        var(--bg-elev-3) 40%,
-        var(--bg-elev-2) 80%
-    );
+    background: linear-gradient(90deg,
+            var(--bg-elev-2) 0%,
+            var(--bg-elev-3) 40%,
+            var(--bg-elev-2) 80%);
     background-size: 300% 100%;
     animation: ops-skeleton-pulse 1.6s ease-in-out infinite;
 }
 
-.ops-skeleton-line { height: 14px; border-radius: var(--radius-full); }
-.ops-skeleton-line.full { width: 100%; }
-.ops-skeleton-line.large { height: 28px; width: 50%; }
-.ops-skeleton-line.header { height: 18px; width: 100%; margin-bottom: 8px; }
-.ops-skeleton-line.short { width: 40%; }
-.ops-skeleton-line.medium { width: 70%; }
-.ops-skeleton-line.tiny { width: 25%; height: 10px; }
+.ops-skeleton-line {
+    height: 14px;
+    border-radius: var(--radius-full);
+}
 
-.ops-skeleton.line { height: 14px; border-radius: var(--radius-full); }
-.ops-skeleton.line.short { width: 40%; }
-.ops-skeleton.line.medium { width: 70%; }
-.ops-skeleton.row { height: var(--control-height); }
-.ops-skeleton.card { height: 120px; }
+.ops-skeleton-line.full {
+    width: 100%;
+}
 
-.ops-skeleton-spacer { height: 12px; }
+.ops-skeleton-line.large {
+    height: 28px;
+    width: 50%;
+}
+
+.ops-skeleton-line.header {
+    height: 18px;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.ops-skeleton-line.short {
+    width: 40%;
+}
+
+.ops-skeleton-line.medium {
+    width: 70%;
+}
+
+.ops-skeleton-line.tiny {
+    width: 25%;
+    height: 10px;
+}
+
+.ops-skeleton.line {
+    height: 14px;
+    border-radius: var(--radius-full);
+}
+
+.ops-skeleton.line.short {
+    width: 40%;
+}
+
+.ops-skeleton.line.medium {
+    width: 70%;
+}
+
+.ops-skeleton.row {
+    height: var(--control-height);
+}
+
+.ops-skeleton.card {
+    height: 120px;
+}
+
+.ops-skeleton-spacer {
+    height: 12px;
+}
 
 .ops-skeleton-card {
     display: grid;
@@ -1413,7 +1468,7 @@ button.ops-kpi-card:hover::before {
     align-items: center;
 }
 
-.ops-breadcrumb li + li::before {
+.ops-breadcrumb li+li::before {
     content: '\203A';
     padding: 0 8px;
     color: var(--text-muted);

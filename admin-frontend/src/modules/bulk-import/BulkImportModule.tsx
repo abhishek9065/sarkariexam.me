@@ -207,7 +207,7 @@ export function BulkImportModule() {
                                 <button ref={closePreviewButtonRef} type="button" className="admin-btn" onClick={() => setPreviewOpen(false)}>Close</button>
                                 <button
                                     type="button"
-                                    className="admin-btn primary"
+                                    className="admin-btn danger"
                                     disabled={executeMutation.isPending || !hasValidStepUp}
                                     onClick={async () => {
                                         const approved = await confirm({

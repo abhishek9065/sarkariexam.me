@@ -40,13 +40,16 @@ export function AnalyticsModule() {
         return Array.isArray(raw) ? raw.slice(0, 4) : [];
     }, [data]);
 
+    const ctrValue = readNestedNumber(data ?? null, ['insights', 'clickThroughRate']);
+    const dropOffValue = readNestedNumber(data ?? null, ['insights', 'funnelDropRate']);
+
     const cards = [
-        { label: 'Listing Views', value: readNumber(data ?? null, 'totalListingViews') },
-        { label: 'Card Clicks', value: readNumber(data ?? null, 'totalCardClicksInApp') || readNumber(data ?? null, 'totalCardClicks') },
-        { label: 'Bookmarks', value: readNumber(data ?? null, 'totalBookmarks') },
-        { label: 'Searches', value: readNumber(data ?? null, 'totalSearches') },
-        { label: 'CTR %', value: readNestedNumber(data ?? null, ['insights', 'clickThroughRate']) },
-        { label: 'Drop-off %', value: readNestedNumber(data ?? null, ['insights', 'funnelDropRate']) },
+        { label: 'Listing Views', value: readNumber(data ?? null, 'totalListingViews'), isPercent: false },
+        { label: 'Card Clicks', value: readNumber(data ?? null, 'totalCardClicksInApp') || readNumber(data ?? null, 'totalCardClicks'), isPercent: false },
+        { label: 'Bookmarks', value: readNumber(data ?? null, 'totalBookmarks'), isPercent: false },
+        { label: 'Searches', value: readNumber(data ?? null, 'totalSearches'), isPercent: false },
+        { label: 'CTR', value: ctrValue, isPercent: true },
+        { label: 'Drop-off', value: dropOffValue, isPercent: true },
     ];
 
     return (
@@ -103,7 +106,11 @@ export function AnalyticsModule() {
                                     }}
                                 >
                                     <div className="ops-kpi-label">{card.label}</div>
-                                    <div className="ops-kpi-value">{Number(card.value).toLocaleString('en-IN')}</div>
+                                    <div className="ops-kpi-value">
+                                        {card.isPercent
+                                            ? (card.value === 0 ? 'N/A' : `${card.value.toFixed(1)}%`)
+                                            : card.value.toLocaleString('en-IN')}
+                                    </div>
                                 </button>
                             ))}
                         </div>

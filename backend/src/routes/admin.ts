@@ -19,7 +19,7 @@ import {
     validateApprovalForExecution,
     type AdminApprovalActionType,
 } from '../services/adminApprovals.js';
-import { getAdminAuditLogsPaged, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
+import { getAdminAuditLogsPaged, rebuildAdminAuditLedger, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import { getDailyRollups, recordAnalyticsEvent } from '../services/analytics.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
@@ -3435,6 +3435,27 @@ governanceRouter.get('/audit-log/integrity', requirePermission('audit:read'), as
     } catch (error) {
         console.error('Audit log integrity error:', error);
         return res.status(500).json({ error: 'Failed to verify audit log integrity' });
+    }
+});
+
+/**
+ * POST /api/admin/audit-log/rebuild
+ * Rebuild the immutable audit ledger chain from raw audit logs.
+ */
+governanceRouter.post('/audit-log/rebuild', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const result = await rebuildAdminAuditLedger();
+
+        await audit(req, {
+            action: 'audit_ledger_rebuild',
+            userId: req.user?.userId,
+            metadata: { rebuilt: result.rebuilt, valid: result.integrity.valid },
+        });
+
+        return res.json({ data: result });
+    } catch (error) {
+        console.error('Audit ledger rebuild error:', error);
+        return res.status(500).json({ error: 'Failed to rebuild audit ledger' });
     }
 });
 

@@ -46,7 +46,7 @@ export function UsersRolesModule() {
             <AdminStepUpCard />
             <OpsCard title="Users & Roles" description="Manage admin/editor/reviewer/viewer role assignments with audit-safe updates.">
                 {query.isPending ? <div className="admin-alert info">Loading admin users...</div> : null}
-                {query.error ? <OpsErrorState message="Failed to load admin users." /> : null}
+                {query.error ? <OpsErrorState message="Failed to load admin users. Ensure the users collection contains documents with admin portal roles (admin, editor, contributor, reviewer, viewer). Check that the API endpoint /api/admin/users is accessible and the current user has admin:read permission." /> : null}
                 {rows.length > 0 ? (
                     <OpsTable
                         columns={[
@@ -110,7 +110,7 @@ export function UsersRolesModule() {
                     </OpsTable>
                 ) : null}
                 {!query.isPending && !query.error && rows.length === 0 ? (
-                    <OpsEmptyState message="No admin users found." />
+                    <OpsEmptyState message="No admin users found. Users appear here when they have an admin portal role (admin, editor, contributor, reviewer, or viewer) assigned in the database." />
                 ) : null}
                 {updateMutation.isError ? (
                     <OpsErrorState message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update role.'} />

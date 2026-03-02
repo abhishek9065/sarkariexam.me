@@ -289,3 +289,63 @@ export async function verifyAdminAuditLedger(limit = 5000): Promise<AdminAuditIn
         };
     }
 }
+
+export async function rebuildAdminAuditLedger(): Promise<{
+    rebuilt: number;
+    integrity: AdminAuditIntegrityResult;
+}> {
+    const allLogs = await collection()
+        .find({})
+        .sort({ createdAt: 1 })
+        .toArray();
+
+    if (allLogs.length === 0) {
+        return {
+            rebuilt: 0,
+            integrity: { valid: true, checked: 0, headHash: null, tailHash: null },
+        };
+    }
+
+    // Drop existing ledger
+    await chainCollection().deleteMany({});
+
+    let prevHash = 'GENESIS';
+    const batchSize = 500;
+    const entries: AdminAuditChainDoc[] = [];
+
+    for (let i = 0; i < allLogs.length; i++) {
+        const doc = allLogs[i];
+        const sequence = i + 1;
+        const logId = (doc as any)._id;
+        const ledgerEntry = toLedgerEntry(doc, doc.createdAt);
+        const hash = computeHash({
+            sequence,
+            prevHash,
+            logId: logId?.toString() ?? '',
+            entry: ledgerEntry,
+        });
+
+        entries.push({
+            sequence,
+            prevHash,
+            hash,
+            logId,
+            entry: ledgerEntry,
+            createdAt: doc.createdAt,
+        } as AdminAuditChainDoc);
+
+        prevHash = hash;
+
+        if (entries.length >= batchSize) {
+            await chainCollection().insertMany(entries as any[]);
+            entries.length = 0;
+        }
+    }
+
+    if (entries.length > 0) {
+        await chainCollection().insertMany(entries as any[]);
+    }
+
+    const integrity = await verifyAdminAuditLedger(allLogs.length);
+    return { rebuilt: allLogs.length, integrity };
+}

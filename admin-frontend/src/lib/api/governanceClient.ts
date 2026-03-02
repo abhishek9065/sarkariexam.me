@@ -69,6 +69,14 @@ export async function getAdminAuditIntegrity(limit = 250): Promise<Record<string
     return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : null;
 }
 
+export async function rebuildAdminAuditLedger(stepUpToken: string): Promise<Record<string, unknown>> {
+    const body = await request(`${ADMIN_API_PATHS.adminAuditIntegrity.replace('/integrity', '/rebuild')}`, {
+        method: 'POST',
+        headers: mutationHeaders(stepUpToken, false),
+    }, true);
+    return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : {};
+}
+
 export async function getAdminSecurityLogs(input: {
     limit?: number;
     offset?: number;

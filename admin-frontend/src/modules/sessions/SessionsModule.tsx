@@ -194,7 +194,7 @@ export function SessionsModule() {
                                             {row.browser} | {row.os} {row.email ? `| ${row.email}` : ''}
                                         </div>
                                     </td>
-                                    <td><code>{row.ip}</code></td>
+                                    <td><code title={row.ip}>{row.ip ? row.ip.replace(/(\d+\.\d+)\.\d+\.\d+/, '$1.xxx.xxx') : '-'}</code></td>
                                     <td>{formatDateTime(row.lastActivity)}</td>
                                     <td><OpsBadge tone={riskTone(row.riskScore)}>{row.riskScore}</OpsBadge></td>
                                     <td>

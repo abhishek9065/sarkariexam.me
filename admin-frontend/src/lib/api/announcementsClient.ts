@@ -24,6 +24,7 @@ export async function getAdminAnnouncementsPaged(input: {
     dateStart?: string;
     dateEnd?: string;
     author?: string;
+    includeInactive?: boolean;
 } = {}): Promise<AdminAnnouncementListResponse> {
     const params = new URLSearchParams();
     params.set('limit', String(input.limit ?? 20));
@@ -35,6 +36,7 @@ export async function getAdminAnnouncementsPaged(input: {
     if (input.dateStart) params.set('dateStart', input.dateStart);
     if (input.dateEnd) params.set('dateEnd', input.dateEnd);
     if (input.author && input.author.trim()) params.set('author', input.author.trim());
+    if (input.includeInactive) params.set('includeInactive', 'true');
 
     const body = await request(`${ADMIN_API_PATHS.adminAnnouncements}?${params.toString()}`);
     return {
@@ -54,6 +56,7 @@ export async function getAdminAnnouncements(input: {
     search?: string;
     type?: string;
     sort?: 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+    includeInactive?: boolean;
 } = {}): Promise<AdminAnnouncementListItem[]> {
     const response = await getAdminAnnouncementsPaged(input);
     return response.data;
