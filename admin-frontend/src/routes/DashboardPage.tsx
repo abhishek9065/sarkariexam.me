@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { OpsCard, OpsErrorState } from '../components/ops';
 import { getAdminAlerts, getAdminAuditLogs, getAdminDashboard, getAdminReports } from '../lib/api/client';
+import { useAdminAuth } from '../app/useAdminAuth';
 
 function formatRelativeTime(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
@@ -16,8 +17,26 @@ function formatRelativeTime(iso: string): string {
     return `${days}d ago`;
 }
 
+function getGreeting(): { text: string; emoji: string } {
+    const h = new Date().getHours();
+    if (h < 6) return { text: 'Good night', emoji: '🌙' };
+    if (h < 12) return { text: 'Good morning', emoji: '☀️' };
+    if (h < 17) return { text: 'Good afternoon', emoji: '🌤️' };
+    if (h < 21) return { text: 'Good evening', emoji: '🌆' };
+    return { text: 'Good night', emoji: '🌙' };
+}
+
+const ACTION_ICONS: Record<string, string> = {
+    create: '✨', update: '✏️', bulk_update: '📦', bulk_approve: '✅',
+    bulk_reject: '❌', approve: '✅', reject: '❌', publish: '🚀',
+    unpublish: '📤', archive: '🗂️', delete: '🗑️', announcement_draft_create: '📝',
+    rollback: '⏪', role_update: '🔑', settings_update: '⚙️',
+};
+
 export function DashboardPage() {
     const navigate = useNavigate();
+    const { user } = useAdminAuth();
+    const greeting = getGreeting();
 
     const dashboardQuery = useQuery({
         queryKey: ['admin-dashboard'],
@@ -73,16 +92,46 @@ export function DashboardPage() {
     const maxVisits = Math.max(...mockVisits);
     const totalVisits = mockVisits.reduce((a, b) => a + b, 0);
 
+    // Donut chart data (CSS conic-gradient)
+    const trafficSources = [
+        { label: 'Organic', value: 58, color: 'var(--accent)' },
+        { label: 'Direct', value: 24, color: 'var(--info)' },
+        { label: 'Referral', value: 12, color: 'var(--success)' },
+        { label: 'Social', value: 6, color: 'var(--warning)' },
+    ];
+    const donutGradient = trafficSources.reduce((acc, src, i) => {
+        const start = trafficSources.slice(0, i).reduce((s, x) => s + x.value, 0);
+        const end = start + src.value;
+        return acc + `${src.color} ${start * 3.6}deg ${end * 3.6}deg, `;
+    }, '').slice(0, -2);
+
+    const displayName = user?.email?.split('@')[0] || 'Admin';
+
     return (
         <>
-            {/* ─── Quick Actions Bar ─── */}
-            <div className="dash-quick-actions">
-                <Link className="admin-btn primary" to="/create-post">
-                    <span className="dash-btn-icon">+</span> New Post
-                </Link>
-                <Link className="admin-btn subtle" to="/result">Result</Link>
-                <Link className="admin-btn subtle" to="/admit-card">Admit Card</Link>
-                <Link className="admin-btn ghost" to="/answer-key">Answer Key</Link>
+            {/* ─── Welcome Hero ─── */}
+            <div className="ops-card" style={{ backgroundImage: 'var(--accent-gradient-mesh)', marginBottom: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                    <div>
+                        <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, fontFamily: 'var(--font-heading)' }}>
+                            {greeting.emoji} {greeting.text}, {displayName}
+                        </div>
+                        <p style={{ color: 'var(--text-secondary)', marginTop: 4, fontSize: 'var(--text-base)' }}>
+                            {now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            {' · '}
+                            <span className="ops-live-dot" style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                            <span style={{ color: 'var(--success)', fontWeight: 600 }}>System online</span>
+                        </p>
+                    </div>
+                    <div className="dash-quick-actions">
+                        <Link className="admin-btn primary" to="/create-post">
+                            <span className="dash-btn-icon">+</span> New Post
+                        </Link>
+                        <Link className="admin-btn subtle" to="/result">Result</Link>
+                        <Link className="admin-btn subtle" to="/admit-card">Admit Card</Link>
+                        <Link className="admin-btn ghost" to="/answer-key">Answer Key</Link>
+                    </div>
+                </div>
             </div>
 
             {/* ─── KPI Metrics ─── */}
@@ -135,18 +184,46 @@ export function DashboardPage() {
                             <p className="ops-card-description">Last 7 days &middot; {totalVisits.toLocaleString()} total visits</p>
                         </div>
                     </div>
-                    <div className="ops-chart-container">
-                        {mockVisits.map((val, i) => {
-                            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                            const pct = `${Math.max(4, (val / maxVisits) * 100)}%`;
-                            return (
-                                <div key={i} className="ops-chart-bar-wrap" title={`${val} visits`}>
-                                    <div className="ops-chart-bar-value">{val.toLocaleString()}</div>
-                                    <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = pct; }}></div>
-                                    <div className="ops-chart-label">{days[i]}</div>
-                                </div>
-                            );
-                        })}
+                    {/* Donut + Bar combo */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 'var(--space-4)', alignItems: 'center' }}>
+                        {/* CSS Donut Chart */}
+                        <div style={{ position: 'relative', width: 120, height: 120, margin: '0 auto' }}>
+                            <div style={{
+                                width: '100%', height: '100%', borderRadius: '50%',
+                                background: `conic-gradient(${donutGradient})`,
+                                boxShadow: 'var(--shadow-glow-sm)',
+                            }} />
+                            <div style={{
+                                position: 'absolute', inset: '25%', borderRadius: '50%',
+                                background: 'var(--surface-card)',
+                                display: 'grid', placeItems: 'center',
+                            }}>
+                                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-muted)' }}>SOURCES</span>
+                            </div>
+                        </div>
+                        {/* Bar Chart */}
+                        <div className="ops-chart-container" style={{ height: 120 }}>
+                            {mockVisits.map((val, i) => {
+                                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                const pct = `${Math.max(4, (val / maxVisits) * 100)}%`;
+                                return (
+                                    <div key={i} className="ops-chart-bar-wrap" title={`${val} visits`}>
+                                        <div className="ops-chart-bar-value">{val.toLocaleString()}</div>
+                                        <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = pct; }}></div>
+                                        <div className="ops-chart-label">{days[i]}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    {/* Donut Legend */}
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        {trafficSources.map((src) => (
+                            <div key={src.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: src.color, flexShrink: 0 }} />
+                                {src.label} <strong style={{ color: 'var(--text-primary)' }}>{src.value}%</strong>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
@@ -234,14 +311,28 @@ export function DashboardPage() {
                             const targetTitle = typeof meta?.title === 'string' ? meta.title : null;
                             return (
                                 <div key={log.id ?? idx} className="dash-activity-item">
-                                    <span className="dash-activity-dot" />
+                                    <span className="dash-activity-dot" title={log.action ?? ''}>
+                                        {ACTION_ICONS[log.action ?? ''] ?? '📋'}
+                                    </span>
                                     <div className="dash-activity-body">
                                         <span className="dash-activity-action">
                                             {actionLabel}
                                             {targetTitle ? <> — <strong>{targetTitle}</strong></> : null}
                                         </span>
                                         <span className="dash-activity-meta">
-                                            {log.actorEmail ? <span className="dash-activity-actor">{log.actorEmail}</span> : null}
+                                            {log.actorEmail ? (
+                                                <span className="dash-activity-actor" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                    <span style={{
+                                                        width: 18, height: 18, borderRadius: '50%',
+                                                        background: 'var(--accent-gradient)', display: 'inline-grid',
+                                                        placeItems: 'center', fontSize: '0.55rem', fontWeight: 800,
+                                                        color: '#fff', flexShrink: 0,
+                                                    }}>
+                                                        {log.actorEmail.charAt(0).toUpperCase()}
+                                                    </span>
+                                                    {log.actorEmail}
+                                                </span>
+                                            ) : null}
                                             {log.createdAt ? <time className="dash-activity-time">{formatRelativeTime(log.createdAt)}</time> : null}
                                         </span>
                                     </div>

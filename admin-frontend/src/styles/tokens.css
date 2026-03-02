@@ -5,6 +5,16 @@
     --font-heading: 'Space Grotesk', 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
 
+    /* ─── Type Scale ─── */
+    --text-xs: 0.68rem;
+    --text-sm: 0.78rem;
+    --text-base: 0.88rem;
+    --text-md: 1rem;
+    --text-lg: 1.15rem;
+    --text-xl: 1.35rem;
+    --text-2xl: 1.65rem;
+    --text-3xl: 2.2rem;
+
     /* ─── Canvas & Elevation (dark) ─── */
     --bg-canvas: #06090f;
     --bg-canvas-alt: #0a1018;
@@ -16,10 +26,22 @@
     --bg-glass: rgba(14, 22, 38, 0.72);
     --bg-glass-strong: rgba(14, 22, 38, 0.88);
 
+    /* ─── Glass-morphism Tiers ─── */
+    --frosted-thin: blur(8px) saturate(1.2);
+    --frosted-medium: blur(20px) saturate(1.5);
+    --frosted-heavy: blur(40px) saturate(1.8);
+
+    /* ─── Semantic Surfaces ─── */
+    --surface-card: var(--bg-elev-1);
+    --surface-raised: var(--bg-elev-2);
+    --surface-overlay: var(--bg-glass-strong);
+    --surface-sunken: var(--bg-canvas);
+
     /* ─── Text ─── */
     --text-primary: #f0f6ff;
     --text-secondary: #94b0d4;
     --text-muted: #5f7d9f;
+    --text-on-accent: #0a0a0a;
 
     /* ─── Accent - Electric Cyan-Violet ─── */
     --accent: #22d3ee;
@@ -28,6 +50,9 @@
     --accent-glow: rgba(34, 211, 238, 0.25);
     --accent-gradient: linear-gradient(135deg, #22d3ee, #818cf8);
     --accent-gradient-vivid: linear-gradient(135deg, #06b6d4, #6366f1, #a855f7);
+    --accent-gradient-mesh: radial-gradient(ellipse at 20% 50%, rgba(34, 211, 238, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(129, 140, 248, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 60% 80%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
 
     /* ─── Semantic ─── */
     --success: #34d399;
@@ -52,6 +77,11 @@
     --shadow-glow-sm: 0 0 20px rgba(34, 211, 238, 0.08);
     --shadow-glow-md: 0 0 40px rgba(34, 211, 238, 0.12);
     --shadow-glow-lg: 0 4px 60px rgba(34, 211, 238, 0.18);
+
+    /* ─── Focus Ring ─── */
+    --ring-width: 3px;
+    --ring-color: var(--accent-glow);
+    --ring-gradient: 0 0 0 var(--ring-width) var(--accent-soft), var(--shadow-glow-sm);
 
     /* ─── Radius ─── */
     --radius-xs: 8px;
@@ -83,9 +113,21 @@
     --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-elastic: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    --duration-instant: 0.1s;
     --duration-fast: 0.15s;
     --duration-normal: 0.25s;
     --duration-slow: 0.4s;
+    --duration-dramatic: 0.6s;
+
+    /* ─── Z-Index Scale ─── */
+    --z-base: 0;
+    --z-dropdown: 40;
+    --z-sticky: 50;
+    --z-overlay: 60;
+    --z-modal: 70;
+    --z-toast: 80;
+    --z-loading: 90;
 }
 
 body[data-admin-density='compact'] {
@@ -109,9 +151,15 @@ body[data-admin-density='compact'] {
     --bg-glass: rgba(255, 255, 255, 0.78);
     --bg-glass-strong: rgba(255, 255, 255, 0.92);
 
+    --surface-card: #ffffff;
+    --surface-raised: #f1f5f9;
+    --surface-overlay: rgba(255, 255, 255, 0.95);
+    --surface-sunken: #f8fafc;
+
     --text-primary: #0f172a;
     --text-secondary: #475569;
     --text-muted: #94a3b8;
+    --text-on-accent: #ffffff;
 
     --accent: #0891b2;
     --accent-strong: #0e7490;
@@ -119,6 +167,9 @@ body[data-admin-density='compact'] {
     --accent-glow: rgba(8, 145, 178, 0.15);
     --accent-gradient: linear-gradient(135deg, #06b6d4, #6366f1);
     --accent-gradient-vivid: linear-gradient(135deg, #0891b2, #4f46e5, #9333ea);
+    --accent-gradient-mesh: radial-gradient(ellipse at 20% 50%, rgba(8, 145, 178, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 60% 80%, rgba(147, 51, 234, 0.04) 0%, transparent 50%);
 
     --success: #059669;
     --success-soft: rgba(5, 150, 105, 0.08);
@@ -140,4 +191,6 @@ body[data-admin-density='compact'] {
     --shadow-glow-sm: 0 0 16px rgba(8, 145, 178, 0.06);
     --shadow-glow-md: 0 0 32px rgba(8, 145, 178, 0.08);
     --shadow-glow-lg: 0 4px 48px rgba(8, 145, 178, 0.12);
+
+    --ring-gradient: 0 0 0 var(--ring-width) var(--accent-soft), var(--shadow-glow-sm);
 }

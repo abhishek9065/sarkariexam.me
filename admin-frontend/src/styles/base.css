@@ -32,10 +32,10 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-/* Premium scrollbar */
+/* ─── Premium scrollbar ─── */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
 }
 
 ::-webkit-scrollbar-track {
@@ -45,10 +45,11 @@ body {
 ::-webkit-scrollbar-thumb {
     background: var(--border-medium);
     border-radius: var(--radius-full);
+    transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-strong);
+    background: var(--accent-soft);
 }
 
 ::selection {
@@ -68,8 +69,33 @@ h4,
 h5 {
     margin: 0;
     font-family: var(--font-heading);
-    letter-spacing: -0.01em;
-    line-height: 1.25;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+h1 {
+    font-size: var(--text-3xl);
+    font-weight: 800;
+}
+
+h2 {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+}
+
+h3 {
+    font-size: var(--text-xl);
+    font-weight: 700;
+}
+
+h4 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+h5 {
+    font-size: var(--text-md);
+    font-weight: 600;
 }
 
 p {
@@ -110,7 +136,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-glow-sm);
+    box-shadow: var(--ring-gradient);
     outline: none;
 }
 
@@ -119,75 +145,136 @@ select {
     background-image:
         linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
         linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
-    background-position:
-        calc(100% - 18px) calc(50% - 2px),
-        calc(100% - 12px) calc(50% - 2px);
-    background-size: 6px 6px, 6px 6px;
+    background-size: 5px 5px, 5px 5px;
+    background-position: calc(100% - 16px) center, calc(100% - 11px) center;
     background-repeat: no-repeat;
-    padding-right: 34px;
+    padding-right: 36px;
     cursor: pointer;
 }
 
 textarea {
     resize: vertical;
-}
-
-input::placeholder,
-textarea::placeholder {
-    color: var(--text-muted);
-    opacity: 0.7;
-}
-
-button:focus-visible,
-a:focus-visible,
-summary:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-input[type='checkbox'] {
-    width: 18px;
-    min-height: 18px;
-    height: 18px;
-    padding: 0;
-    border-radius: 5px;
-    accent-color: var(--accent-strong);
-    cursor: pointer;
+    min-height: 80px;
 }
 
 code {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: var(--radius-xs);
-    border: 1px solid var(--border-soft);
-    background: var(--bg-elev-1);
-    color: var(--accent);
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    letter-spacing: -0.01em;
+    font-size: 0.82em;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: var(--bg-elev-3);
 }
 
-.admin-muted,
-.ops-muted {
-    color: var(--text-secondary);
+/* ─── Global Loading Bar (NProgress-style) ─── */
+.admin-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: var(--z-loading);
+    background: var(--accent-gradient);
+    background-size: 200% 100%;
+    animation: admin-loading-slide 1.5s ease-in-out infinite;
+    transform-origin: left;
+    opacity: 0;
+    transition: opacity var(--duration-fast);
+    pointer-events: none;
 }
 
-.ops-inline-muted {
-    color: var(--text-muted);
-    font-size: 0.86rem;
+.admin-loading-bar.active {
+    opacity: 1;
 }
 
-.ops-text-danger {
-    color: var(--danger, #ef4444);
+@keyframes admin-loading-slide {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
 }
 
+/* ─── Button Ripple Effect ─── */
+.admin-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-ripple {
+    position: absolute;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(0);
+    animation: admin-ripple-expand 0.5s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes admin-ripple-expand {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+/* ─── Focus-visible Gradient Ring ─── */
+button:focus-visible,
+a:focus-visible {
+    outline: none;
+    box-shadow: var(--ring-gradient);
+}
+
+/* ─── Tooltip Arrow ─── */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 6px 12px;
+    border-radius: var(--radius-xs);
+    background: var(--surface-overlay);
+    backdrop-filter: var(--frosted-medium);
+    color: var(--text-primary);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--duration-fast), transform var(--duration-fast);
+    z-index: var(--z-toast);
+    box-shadow: var(--shadow-1);
+}
+
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Utility ─── */
 .ops-visually-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
-    margin: -1px;
-    padding: 0;
     overflow: hidden;
-    border: 0;
-    clip: rect(0, 0, 0, 0);
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.ops-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ops-gradient-text {
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }

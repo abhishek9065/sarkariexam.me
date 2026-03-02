@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   Components — 2026 Premium Design System
+   Components — 2026 Premium Design System v2
    ═══════════════════════════════════════════════════ */
 
 /* ─── Buttons ─── */
@@ -110,7 +110,17 @@
 .admin-btn.small {
     min-height: var(--control-height-compact);
     padding-inline: 14px;
-    font-size: 0.82rem;
+    font-size: var(--text-sm);
+}
+
+.admin-btn.icon-only {
+    width: var(--control-height);
+    padding: 0;
+    justify-content: center;
+}
+
+.admin-btn.icon-only.small {
+    width: var(--control-height-compact);
 }
 
 /* ─── Cards ─── */
@@ -120,12 +130,13 @@
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
     padding: var(--space-4);
-    background: var(--bg-elev-1);
+    background: var(--surface-card);
     position: relative;
     overflow: hidden;
     transition:
         border-color var(--duration-normal) var(--ease-out),
-        box-shadow var(--duration-normal) var(--ease-out);
+        box-shadow var(--duration-normal) var(--ease-out),
+        transform var(--duration-normal) var(--ease-spring);
 }
 
 .ops-card:hover,
@@ -442,6 +453,7 @@ button.ops-kpi-card:hover::before {
     overflow: auto;
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
+    position: relative;
 }
 
 .ops-table {
@@ -461,21 +473,57 @@ button.ops-kpi-card:hover::before {
 .ops-table th {
     position: sticky;
     top: 0;
-    z-index: 1;
-    font-size: 0.7rem;
+    z-index: 2;
+    font-size: var(--text-xs);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-muted);
     font-weight: 700;
-    background: var(--bg-elev-2);
+    background: var(--surface-raised);
+    backdrop-filter: var(--frosted-thin);
+    -webkit-backdrop-filter: var(--frosted-thin);
+    user-select: none;
+    transition: color var(--duration-fast);
+}
+
+.ops-table th.sortable {
+    cursor: pointer;
+}
+
+.ops-table th.sortable:hover {
+    color: var(--accent);
+}
+
+.ops-table th .sort-indicator {
+    display: inline-block;
+    margin-left: 4px;
+    opacity: 0.4;
+    transition: opacity var(--duration-fast), transform var(--duration-fast);
+}
+
+.ops-table th.sorted .sort-indicator {
+    opacity: 1;
+    color: var(--accent);
+}
+
+.ops-table th.sorted.desc .sort-indicator {
+    transform: rotate(180deg);
 }
 
 .ops-table td {
-    font-size: 0.9rem;
+    font-size: var(--text-base);
+    transition: background var(--duration-fast) var(--ease-out);
 }
 
 .ops-table tbody tr {
-    transition: background var(--duration-fast) var(--ease-out);
+    transition:
+        background var(--duration-fast) var(--ease-out),
+        box-shadow var(--duration-fast);
+    position: relative;
+}
+
+.ops-table tbody tr:hover {
+    box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .ops-table tr:hover td {
@@ -484,7 +532,18 @@ button.ops-kpi-card:hover::before {
 
 .ops-table tr.ops-row-highlight td {
     background: var(--accent-soft);
-    border-left: 2px solid var(--accent);
+    border-left: 3px solid var(--accent);
+}
+
+.ops-table tr.ops-row-selected td {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.ops-table .ops-row-checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    cursor: pointer;
 }
 
 /* ─── Alerts ─── */
@@ -699,10 +758,10 @@ button.ops-kpi-card:hover::before {
 .admin-palette-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: var(--z-modal);
     background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: var(--frosted-thin);
+    -webkit-backdrop-filter: var(--frosted-thin);
     display: grid;
     place-items: start center;
     padding: 10vh 14px 14px;
@@ -959,7 +1018,7 @@ button.ops-kpi-card:hover::before {
     position: fixed;
     top: 18px;
     right: 18px;
-    z-index: 140;
+    z-index: var(--z-toast);
     display: grid;
     gap: 8px;
     width: min(380px, calc(100vw - 24px));
@@ -969,10 +1028,10 @@ button.ops-kpi-card:hover::before {
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-md);
     padding: 14px 16px;
-    background: var(--bg-glass-strong);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: var(--shadow-2);
+    background: var(--surface-overlay);
+    backdrop-filter: var(--frosted-medium);
+    -webkit-backdrop-filter: var(--frosted-medium);
+    box-shadow: var(--shadow-2), var(--shadow-glow-sm);
     transform: translateY(-12px);
     opacity: 0;
     transition:
@@ -1026,10 +1085,10 @@ button.ops-kpi-card:hover::before {
 .ops-confirm-overlay {
     position: fixed;
     inset: 0;
-    z-index: 120;
+    z-index: var(--z-modal);
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: var(--frosted-thin);
+    -webkit-backdrop-filter: var(--frosted-thin);
     display: grid;
     place-items: center;
     padding: 14px;
@@ -1092,10 +1151,10 @@ button.ops-kpi-card:hover::before {
 .ops-modal-overlay {
     position: fixed;
     inset: 0;
-    z-index: 110;
+    z-index: var(--z-overlay);
     background: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: var(--frosted-thin);
+    -webkit-backdrop-filter: var(--frosted-thin);
     display: grid;
     place-items: center;
     padding: 16px;
@@ -1105,11 +1164,13 @@ button.ops-kpi-card:hover::before {
     width: min(760px, 100%);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-medium);
-    background: var(--bg-glass-strong);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: var(--shadow-2), var(--shadow-glow-sm);
+    background: var(--surface-overlay);
+    backdrop-filter: var(--frosted-heavy);
+    -webkit-backdrop-filter: var(--frosted-heavy);
+    box-shadow: var(--shadow-2), var(--shadow-glow-md);
     padding: var(--space-4);
+    max-height: 85vh;
+    overflow-y: auto;
 }
 
 /* ─── Sticky Actions ─── */
@@ -1371,7 +1432,8 @@ button.ops-kpi-card:hover::before {
     padding: var(--space-6) var(--space-3);
     border: 1px dashed var(--border-medium);
     border-radius: var(--radius-lg);
-    background: var(--bg-elev-1);
+    background: var(--surface-card);
+    background-image: var(--accent-gradient-mesh);
     text-align: center;
 }
 
