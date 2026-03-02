@@ -729,6 +729,29 @@ const DEFAULT_HOME_SECTIONS: Omit<HomeSectionDoc, 'updatedAt' | 'updatedBy'>[] =
 ];
 
 const getEndpointPath = (url: string) => url.split('?')[0];
+const getRequestId = (req: any): string =>
+    typeof req?.requestId === 'string' && req.requestId
+        ? req.requestId
+        : (typeof req?.headers?.['x-request-id'] === 'string' ? req.headers['x-request-id'] : 'unknown');
+
+const withAuditContext = (req: any, metadata?: Record<string, unknown>): Record<string, unknown> => ({
+    requestId: getRequestId(req),
+    endpoint: getEndpointPath(req?.originalUrl || req?.url || ''),
+    method: req?.method || 'UNKNOWN',
+    ...(metadata ?? {}),
+});
+
+const audit = (req: any, entry: {
+    action: string;
+    announcementId?: string;
+    title?: string;
+    userId?: string;
+    note?: string;
+    metadata?: Record<string, unknown>;
+}) => recordAdminAudit({
+    ...entry,
+    metadata: withAuditContext(req, entry.metadata),
+});
 
 const toAnnouncementId = (doc: any): string =>
     doc?.id?.toString?.() || doc?._id?.toString?.() || '';
@@ -1444,7 +1467,7 @@ contentRouter.post('/views', requirePermission('announcements:write'), idempoten
             updatedBy: actorId,
         });
 
-        await recordAdminAudit({
+        await audit(req, {
             action: 'admin_view_create',
             userId: actorId,
             metadata: { module: parsed.data.module, scope: parsed.data.scope },
@@ -1536,7 +1559,7 @@ contentRouter.patch('/views/:id', requirePermission('announcements:write'), idem
             return res.status(404).json({ error: 'Saved view not found' });
         }
 
-        await recordAdminAudit({
+        await audit(req, {
             action: 'admin_view_update',
             userId: actorId,
             metadata: { viewId },
@@ -1575,7 +1598,7 @@ contentRouter.delete('/views/:id', requirePermission('announcements:write'), ide
 
         await viewsCollection.deleteOne({ _id: toMongoId(viewId) as any });
 
-        await recordAdminAudit({
+        await audit(req, {
             action: 'admin_view_delete',
             userId: actorId,
             metadata: { viewId },
@@ -1618,7 +1641,7 @@ contentRouter.post('/announcements/draft', requirePermission('announcements:writ
             req.user?.userId ?? 'system'
         );
 
-        await recordAdminAudit({
+        await audit(req, {
             action: 'announcement_draft_create',
             userId: req.user?.userId,
             announcementId: draft.id,
@@ -1949,7 +1972,7 @@ contentRouter.put('/homepage/sections', requirePermission('admin:write'), idempo
         }
 
         await sectionsCollection.deleteMany({ key: { $nin: sectionKeys } as any });
-        recordAdminAudit({
+        audit(req, {
             action: 'homepage_sections_update',
             userId: req.user?.userId,
             metadata: { count: sectionKeys.length },
@@ -2047,7 +2070,7 @@ contentRouter.post('/links', requirePermission('announcements:write'), idempoten
             updatedBy: req.user?.userId,
         });
 
-        recordAdminAudit({
+        audit(req, {
             action: 'link_create',
             userId: req.user?.userId,
             metadata: { label: payload.label, type: payload.type },
@@ -2102,7 +2125,7 @@ contentRouter.patch('/links/:id', requirePermission('announcements:write'), idem
             return res.status(404).json({ error: 'Link record not found' });
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'link_update',
             userId: req.user?.userId,
             metadata: { id: linkId },
@@ -2264,7 +2287,7 @@ contentRouter.post('/links/replace', requirePermission('announcements:write'), r
             }
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'link_replace',
             userId: req.user?.userId,
             metadata: { fromUrl, toUrl, scope, linksUpdated, announcementsUpdated },
@@ -2353,7 +2376,7 @@ contentRouter.post('/media', requirePermission('announcements:write'), idempoten
             updatedAt: now,
             updatedBy: req.user?.userId,
         });
-        recordAdminAudit({
+        audit(req, {
             action: 'media_create',
             userId: req.user?.userId,
             metadata: { fileName: cleanFileName, category: payload.category },
@@ -2414,7 +2437,7 @@ contentRouter.patch('/media/:id', requirePermission('announcements:write'), idem
             return res.status(404).json({ error: 'Media asset not found' });
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'media_update',
             userId: req.user?.userId,
             metadata: { id: mediaId },
@@ -2488,7 +2511,7 @@ contentRouter.post('/templates', requirePermission('announcements:write'), idemp
             updatedBy: req.user?.userId,
         });
 
-        recordAdminAudit({
+        audit(req, {
             action: 'template_create',
             userId: req.user?.userId,
             metadata: { type: payload.type, name: payload.name },
@@ -2545,7 +2568,7 @@ contentRouter.patch('/templates/:id', requirePermission('announcements:write'), 
             return res.status(404).json({ error: 'Template not found' });
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'template_update',
             userId: req.user?.userId,
             metadata: { id: templateId },
@@ -2621,7 +2644,7 @@ operationsRouter.post('/alerts', requirePermission('admin:write'), idempotency()
             updatedBy: req.user?.userId,
         });
 
-        recordAdminAudit({
+        audit(req, {
             action: 'alert_create',
             userId: req.user?.userId,
             metadata: { source: payload.source, severity: payload.severity },
@@ -2674,7 +2697,7 @@ operationsRouter.patch('/alerts/:id', requirePermission('admin:write'), idempote
         if (!updated) {
             return res.status(404).json({ error: 'Alert not found' });
         }
-        recordAdminAudit({
+        audit(req, {
             action: 'alert_update',
             userId: req.user?.userId,
             metadata: { id: alertId },
@@ -2743,7 +2766,7 @@ operationsRouter.put('/settings/:key', requirePermission('admin:write'), idempot
             },
             { upsert: true }
         );
-        recordAdminAudit({
+        audit(req, {
             action: `settings_${settingsKey}_update`,
             userId: req.user?.userId,
             metadata: { count: values.length },
@@ -2821,7 +2844,7 @@ operationsRouter.patch('/users/:id/role', requirePermission('admin:write'), requ
             return res.status(404).json({ error: 'User not found' });
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'admin_role_update',
             userId: req.user?.userId,
             metadata: { targetUserId: userId, role: parsed.data.role },
@@ -2870,7 +2893,7 @@ contentRouter.patch('/announcements/:id/seo', requirePermission('announcements:w
         if (!updated) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
-        recordAdminAudit({
+        audit(req, {
             action: 'announcement_seo_update',
             userId: req.user?.userId,
             announcementId,
@@ -3677,7 +3700,7 @@ announcementsRouter.post('/announcements', requirePermission('announcements:writ
 
         const userId = req.user?.userId ?? 'system';
         const announcement = await AnnouncementModelMongo.create(parseResult.data as unknown as CreateAnnouncementDto, userId);
-        recordAdminAudit({
+        audit(req, {
             action: 'create',
             announcementId: announcement.id,
             title: announcement.title,
@@ -3904,7 +3927,7 @@ announcementsRouter.post('/announcements/bulk', requirePermission('announcements
 
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
-        recordAdminAudit({
+        audit(req, {
             action: 'bulk_update',
             userId: req.user?.userId,
             metadata: {
@@ -3979,7 +4002,7 @@ announcementsRouter.post('/announcements/bulk-approve', requirePermission('annou
 
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
-        recordAdminAudit({
+        audit(req, {
             action: 'bulk_approve',
             userId: req.user?.userId,
             note: note?.trim() || undefined,
@@ -4031,7 +4054,7 @@ announcementsRouter.post('/announcements/bulk-reject', requirePermission('announ
 
         const updates = ids.map(id => ({ id, data }));
         const result = await AnnouncementModelMongo.batchUpdate(updates, req.user?.userId);
-        recordAdminAudit({
+        audit(req, {
             action: 'bulk_reject',
             userId: req.user?.userId,
             note: note?.trim() || undefined,
@@ -4144,7 +4167,7 @@ announcementsRouter.put('/announcements/:id', requirePermission('announcements:w
             auditAction = 'publish';
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: auditAction,
             announcementId: announcement.id,
             title: announcement.title,
@@ -4244,7 +4267,7 @@ announcementsRouter.post('/announcements/:id/revert/:version', requirePermission
             return res.status(404).json({ error: 'Announcement not found' });
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'revert' as any,
             announcementId: announcement.id,
             title: announcement.title,
@@ -4309,7 +4332,7 @@ announcementsRouter.post('/announcements/:id/approve', requirePermission('announ
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
-        recordAdminAudit({
+        audit(req, {
             action: 'approve',
             announcementId: announcement.id,
             title: announcement.title,
@@ -4356,7 +4379,7 @@ announcementsRouter.post('/announcements/:id/reject', requirePermission('announc
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
-        recordAdminAudit({
+        audit(req, {
             action: 'reject',
             announcementId: announcement.id,
             title: announcement.title,
@@ -4451,7 +4474,7 @@ announcementsRouter.post('/announcements/:id/rollback', requirePermission('annou
             return res.status(404).json({ error: 'Announcement not found' });
         }
 
-        recordAdminAudit({
+        audit(req, {
             action: 'rollback',
             announcementId: updated.id,
             title: updated.title,
@@ -4494,7 +4517,7 @@ announcementsRouter.delete('/announcements/:id', requirePermission('announcement
         if (!deleted) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
-        recordAdminAudit({
+        audit(req, {
             action: 'delete',
             announcementId,
             userId: req.user?.userId,
@@ -4521,4 +4544,5 @@ router.use(governanceRouter);
 router.use(announcementsRouter);
 
 export default router;
+
 

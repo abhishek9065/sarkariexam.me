@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "typecheck:strict": "tsc -p tsconfig.strict.json --noEmit",
     "start": "node dist/server.js",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
