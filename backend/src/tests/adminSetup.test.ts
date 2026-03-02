@@ -9,9 +9,13 @@ vi.mock('../models/users.mongo.js');
 vi.mock('../services/securityLogger.js', () => ({
   SecurityLogger: { log: vi.fn() },
 }));
+
+const TEST_ADMIN_SETUP_KEY = 'test-admin-setup-key';
+const TEST_ADMIN_PASSWORD = 'T3stAdmin#Pwd!';
+
 vi.mock('../config.js', () => ({
   config: {
-    adminSetupKey: 'setup-admin-123',
+    adminSetupKey: 'test-admin-setup-key',
     adminEmailAllowlist: [],
     adminDomainAllowlist: [],
   },
@@ -73,9 +77,9 @@ describe('Admin setup routes', () => {
       .post('/auth/admin/setup')
       .send({
         email: 'admin@example.com',
-        password: 'Password#12345',
+        password: TEST_ADMIN_PASSWORD,
         name: 'Admin',
-        setupKey: 'setup-admin-123',
+        setupKey: TEST_ADMIN_SETUP_KEY,
       });
 
     expect(response.status).toBe(201);
@@ -93,9 +97,9 @@ describe('Admin setup routes', () => {
       .post('/auth/admin/setup')
       .send({
         email: 'another-admin@example.com',
-        password: 'Password#12345',
+        password: TEST_ADMIN_PASSWORD,
         name: 'Another Admin',
-        setupKey: 'setup-admin-123',
+        setupKey: TEST_ADMIN_SETUP_KEY,
       });
 
     expect(response.status).toBe(409);

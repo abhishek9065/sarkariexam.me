@@ -309,6 +309,14 @@ jobs:
         run: npm run build
         working-directory: backend
 
+      - name: Prepare admin integration credentials
+        run: |
+          echo "ADMIN_INTEGRATION_EMAIL=admin.integration+${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}@example.test" >> "$GITHUB_ENV"
+          echo "ADMIN_INTEGRATION_PASSWORD=Admin#${GITHUB_RUN_ID}${GITHUB_RUN_ATTEMPT}Aa1" >> "$GITHUB_ENV"
+          echo "ADMIN_INTEGRATION_SETUP_KEY=setup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "ADMIN_INTEGRATION_TOTP_KEY=totp-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-key" >> "$GITHUB_ENV"
+          echo "ADMIN_INTEGRATION_BACKUP_SALT=backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-salt" >> "$GITHUB_ENV"
+
       - name: Start backend
         run: |
           NODE_ENV=integration \
@@ -316,10 +324,10 @@ jobs:
           MONGODB_URI=mongodb://127.0.0.1:27017/sarkari_db \
           COSMOS_DATABASE_NAME=sarkari_db \
           JWT_SECRET=test-secret \
-          ADMIN_SETUP_KEY=setup-admin-123 \
-          TOTP_ENCRYPTION_KEY=test-totp-key \
-          ADMIN_BACKUP_CODE_SALT=test-backup-salt \
-          ADMIN_EMAIL_ALLOWLIST=admin.integration@sarkariexams.me \
+          ADMIN_SETUP_KEY="${ADMIN_INTEGRATION_SETUP_KEY}" \
+          TOTP_ENCRYPTION_KEY="${ADMIN_INTEGRATION_TOTP_KEY}" \
+          ADMIN_BACKUP_CODE_SALT="${ADMIN_INTEGRATION_BACKUP_SALT}" \
+          ADMIN_EMAIL_ALLOWLIST="${ADMIN_INTEGRATION_EMAIL}" \
           ADMIN_ENFORCE_HTTPS=false \
           ADMIN_REQUIRE_2FA=false \
           ADMIN_DUAL_APPROVAL_REQUIRED=false \
@@ -355,9 +363,9 @@ jobs:
           VITE_PROXY_TARGET: http://127.0.0.1:5000
           VITE_ADMIN_BASENAME: /admin-vnext
           VITE_ADMIN_E2E_STEPUP_BYPASS: 'false'
-          ADMIN_E2E_EMAIL: admin.integration@sarkariexams.me
-          ADMIN_E2E_PASSWORD: Password#12345
-          ADMIN_E2E_SETUP_KEY: setup-admin-123
+          ADMIN_E2E_EMAIL: ${{ env.ADMIN_INTEGRATION_EMAIL }}
+          ADMIN_E2E_PASSWORD: ${{ env.ADMIN_INTEGRATION_PASSWORD }}
+          ADMIN_E2E_SETUP_KEY: ${{ env.ADMIN_INTEGRATION_SETUP_KEY }}
 
       - name: Upload admin API integration artifacts
         if: failure()

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const isTest = process.env.NODE_ENV === 'test';
 
 
 /**
@@ -99,7 +100,7 @@ const getDbConnectionString = (): string => {
 };
 
 const databaseUrl = getDbConnectionString();
-const jwtSecret = getRequiredEnv('JWT_SECRET', 'dev-secret');
+const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefined);
 const adminBackupCodeSalt = process.env.ADMIN_BACKUP_CODE_SALT ?? jwtSecret;
 
 const defaultCorsOrigins = [
@@ -118,12 +119,12 @@ const adminIpAllowlist = parseCsv(process.env.ADMIN_IP_ALLOWLIST);
 const adminEmailAllowlist = parseCsv(process.env.ADMIN_EMAIL_ALLOWLIST);
 const adminDomainAllowlist = parseCsv(process.env.ADMIN_DOMAIN_ALLOWLIST);
 const adminEnforceHttps = parseBoolean(process.env.ADMIN_ENFORCE_HTTPS, isProduction);
-const adminSetupKey = getRequiredEnv('ADMIN_SETUP_KEY', isProduction ? undefined : 'setup-admin-123');
+const adminSetupKey = getRequiredEnv('ADMIN_SETUP_KEY', isTest ? 'test-admin-setup-key' : undefined);
 const adminRequire2FA = parseBoolean(process.env.ADMIN_REQUIRE_2FA, isProduction);
 const adminAuthCookieName = process.env.ADMIN_AUTH_COOKIE_NAME ?? 'admin_auth_token';
 const adminSetupTokenExpiry = process.env.ADMIN_SETUP_TOKEN_EXPIRY ?? '15m';
 const totpIssuer = process.env.TOTP_ISSUER ?? 'SarkariExams Admin';
-const totpEncryptionKey = getRequiredEnv('TOTP_ENCRYPTION_KEY', isProduction ? undefined : 'dev-totp-key');
+const totpEncryptionKey = getRequiredEnv('TOTP_ENCRYPTION_KEY', isTest ? 'test-totp-encryption-key' : undefined);
 const jwtIssuer = process.env.JWT_ISSUER ?? '';
 const jwtAudience = process.env.JWT_AUDIENCE ?? '';
 const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
@@ -161,9 +162,9 @@ const featureFlags = {
 };
 
 // Validate secrets aren't using known insecure defaults in production
-validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'change-me', 'secret', 'jwt-secret']);
-validateSecret('ADMIN_SETUP_KEY', adminSetupKey, ['setup-admin-123', 'change-me', 'admin-setup']);
-validateSecret('TOTP_ENCRYPTION_KEY', totpEncryptionKey, ['dev-totp-key', 'change-me', 'secret']);
+validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'test-secret', 'change-me', 'secret', 'jwt-secret']);
+validateSecret('ADMIN_SETUP_KEY', adminSetupKey, ['setup-admin-123', 'test-admin-setup-key', 'change-me', 'admin-setup']);
+validateSecret('TOTP_ENCRYPTION_KEY', totpEncryptionKey, ['dev-totp-key', 'change-me', 'secret', 'test-totp-encryption-key']);
 if (process.env.ADMIN_BACKUP_CODE_SALT) {
   validateSecret('ADMIN_BACKUP_CODE_SALT', adminBackupCodeSalt, ['change-me', 'admin-backup-salt', 'backup-salt']);
 }

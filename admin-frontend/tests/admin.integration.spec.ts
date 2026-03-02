@@ -1,8 +1,16 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-const adminEmail = process.env.ADMIN_E2E_EMAIL ?? 'admin.integration@sarkariexams.me';
-const adminPassword = process.env.ADMIN_E2E_PASSWORD ?? 'Password#12345';
-const adminSetupKey = process.env.ADMIN_E2E_SETUP_KEY ?? 'setup-admin-123';
+const requireEnv = (key: 'ADMIN_E2E_EMAIL' | 'ADMIN_E2E_PASSWORD' | 'ADMIN_E2E_SETUP_KEY'): string => {
+    const value = process.env[key];
+    if (!value) {
+        throw new Error(`${key} is required for admin integration tests`);
+    }
+    return value;
+};
+
+const adminEmail = requireEnv('ADMIN_E2E_EMAIL');
+const adminPassword = requireEnv('ADMIN_E2E_PASSWORD');
+const adminSetupKey = requireEnv('ADMIN_E2E_SETUP_KEY');
 
 type JsonObject = Record<string, unknown>;
 const setupStatusMaxAttempts = 20;

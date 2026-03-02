@@ -17,6 +17,7 @@ dist/
 # Logs
 *.log
 npm-debug.log*
+backend/test-output*.txt
 
 # OS
 .DS_Store

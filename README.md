@@ -16,6 +16,12 @@ Government jobs and exam updates platform built with:
 - E2E and backend contract test coverage
 - Security workflows: `npm audit` + CodeQL
 
+## Security Doc Guardrails
+- This public README uses placeholder values and avoids publishing secrets.
+- Keep full privileged API inventories and sensitive operational details in internal runbooks.
+- Rotate all production secrets if they were ever pasted into docs, issues, or terminal history.
+- Keep production secrets in a secret manager; do not store plaintext secrets in tickets/chat logs.
+
 ## Requirements
 - Node.js 22+
 - npm 10+
@@ -58,12 +64,14 @@ COSMOS_CONNECTION_STRING=...
 JWT_SECRET=...
 ADMIN_SETUP_KEY=...
 TOTP_ENCRYPTION_KEY=...
-ADMIN_EMAIL_ALLOWLIST=admin@example.com
+ADMIN_EMAIL_ALLOWLIST=ops-team@example.com
 # or
 ADMIN_DOMAIN_ALLOWLIST=example.com
+ADMIN_BACKUP_CODE_SALT=...
 ```
 `ADMIN_SETUP_KEY`, `TOTP_ENCRYPTION_KEY`, and one of `ADMIN_EMAIL_ALLOWLIST`/`ADMIN_DOMAIN_ALLOWLIST` are required in production.
-`ADMIN_BACKUP_CODE_SALT` is optional (if omitted, backend safely falls back to `JWT_SECRET`).
+`ADMIN_BACKUP_CODE_SALT` is strongly recommended in production and should be unique (do not reuse any other secret).
+Restrict `.env` permissions on servers (for example: `chmod 600 .env`).
 
 ### Backend (`backend/.env`)
 ```env
@@ -79,7 +87,7 @@ VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 
 # CORS
-CORS_ORIGINS=http://localhost:4173,http://localhost:3000,https://sarkariexams.me,https://www.sarkariexams.me
+CORS_ORIGINS=http://localhost:4173,http://localhost:3000,https://your-domain.example,https://www.your-domain.example
 
 # Rate limits
 RATE_LIMIT_WINDOW_MS=60000
@@ -89,7 +97,7 @@ AUTH_RATE_LIMIT_MAX=20
 # Admin hardening
 ADMIN_SETUP_KEY=change-this-strong-key
 ADMIN_REQUIRE_2FA=true
-ADMIN_EMAIL_ALLOWLIST=admin@example.com
+ADMIN_EMAIL_ALLOWLIST=ops-team@example.com
 ADMIN_DOMAIN_ALLOWLIST=example.com
 ADMIN_ENFORCE_HTTPS=true
 TOTP_ENCRYPTION_KEY=change-this-strong-encryption-key
@@ -167,8 +175,7 @@ VITE_PROXY_TARGET=http://127.0.0.1:5000 npm run test:e2e:integration
 - `/admin-legacy` and `/admin-legacy/*`: explicit legacy rollback alias
 - Legacy admin routes (`/admin`, `/admin-legacy`) are desktop-only (minimum viewport width: `1120px`)
 - Admin vNext (`/admin-vnext`) is responsive
-- `/api/admin-auth/*`: additive admin-auth namespace backed by shared auth logic
-- Existing `/api/admin/*` and `/api/auth/admin/*` remain backward-compatible
+- Admin auth namespace and compatibility aliases are maintained (details in internal runbook).
 - Cutover back to vNext on `/admin` is deferred until full parity is proven.
 
 ## Admin vNext Operational Modules (`/admin-vnext`)
@@ -196,33 +203,18 @@ Premium operator features shipped in vNext:
 - Global admin search (`/` hotkey)
 - Detailed editor autosave (~10s cadence) + revision timeline
 
-## New Additive Admin APIs
-- `GET /api/admin/search`
-- `GET/POST /api/admin/views`
-- `PATCH/DELETE /api/admin/views/{id}`
-- `POST /api/admin/announcements/draft`
-- `PATCH /api/admin/announcements/{id}/autosave`
-- `GET /api/admin/announcements/{id}/revisions`
-- `GET /api/admin/links/health/summary`
-- `GET/PUT /api/admin/homepage/sections`
-- `GET/POST/PATCH /api/admin/links`
-- `POST /api/admin/links/check`
-- `POST /api/admin/links/replace`
-- `GET/POST/PATCH /api/admin/media`
-- `GET/POST/PATCH /api/admin/templates`
-- `GET/POST/PATCH /api/admin/alerts`
-- `GET/PUT /api/admin/settings/{key}` where `{key}` in `states|boards|tags`
-- `GET /api/admin/users`
-- `PATCH /api/admin/users/{id}/role`
-- `GET /api/admin/reports`
-- `PATCH /api/admin/announcements/{id}/seo`
+## Admin API Surface
+- Full admin endpoint inventory is intentionally omitted from this public README.
+- Contract source of truth: `openapi.json` and authorized environment docs.
+- Operational references: `docs/ADMIN_CUTOVER_RUNBOOK.md` and `docs/GITHUB_GOVERNANCE_CHECKLIST.md`.
 
 ### Route Verification
 After deploy, verify edge routing headers:
 ```bash
-curl -I https://sarkariexams.me/admin/ | grep -i x-sarkari-app
-curl -I https://sarkariexams.me/admin-vnext/ | grep -i x-sarkari-app
-curl -I https://sarkariexams.me/admin-legacy/ | grep -i x-sarkari-app
+PUBLIC_BASE_URL="https://your-domain.example"
+curl -I "$PUBLIC_BASE_URL/admin/" | grep -i x-sarkari-app
+curl -I "$PUBLIC_BASE_URL/admin-vnext/" | grep -i x-sarkari-app
+curl -I "$PUBLIC_BASE_URL/admin-legacy/" | grep -i x-sarkari-app
 ```
 
 ## Admin Stabilization Policy
@@ -233,26 +225,8 @@ curl -I https://sarkariexams.me/admin-legacy/ | grep -i x-sarkari-app
 - vNext (`/admin-vnext`) remains responsive.
 
 ## Admin Rollback Procedure
-If vNext preview routing needs emergency fallback, map `/admin-vnext` to legacy frontend and redeploy:
-
-```bash
-# 1) Edit nginx mapping:
-#    in nginx/default.conf change /admin-vnext and /admin-vnext/* proxy target from:
-#    proxy_pass http://admin_frontend/;
-#    to:
-#    proxy_pass http://frontend/;
-
-# 2) Deploy updated routing and services
-cd ~/sarkari-result
-git pull --ff-only origin main
-docker compose up -d --build nginx backend frontend admin-frontend
-```
-
-Then verify:
-- `/admin` serves legacy admin.
-- `/admin-vnext` falls back to legacy admin.
-- `/admin-legacy` serves legacy admin.
-- `/api/health` is healthy.
+For emergency rollback procedures, follow `docs/ADMIN_CUTOVER_RUNBOOK.md`.
+Keep edge proxy mapping details and rollback internals in controlled operational docs only.
 
 ## Migration
 - Backfill admin identity records:
@@ -283,7 +257,7 @@ admin-frontend/tests/      Admin Playwright smoke suite
 ## Production Deploy (Recommended)
 Use the guarded deploy script on server:
 ```bash
-cd ~/sarkari-result
+cd ~/your-repo
 bash scripts/deploy-prod.sh
 ```
 It validates required production env vars before deploy and checks API health after startup.
