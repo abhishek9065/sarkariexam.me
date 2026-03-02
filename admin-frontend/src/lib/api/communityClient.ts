@@ -1,5 +1,6 @@
 import type { AdminErrorReport, CommunityFlag, CommunityForum, CommunityGroup, CommunityQa } from '../../types';
 import { mutationHeaders, request, toArray } from './core';
+import { ADMIN_API_PATHS } from './paths';
 
 export async function getErrorReports(input: {
     status?: 'new' | 'triaged' | 'resolved' | 'all';
@@ -13,7 +14,7 @@ export async function getErrorReports(input: {
     if (input.status && input.status !== 'all') params.set('status', input.status);
     if (input.errorId && input.errorId.trim()) params.set('errorId', input.errorId.trim());
 
-    const body = await request(`/api/support/error-reports?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.supportErrorReports}?${params.toString()}`);
     return toArray<AdminErrorReport>(body?.data);
 }
 
@@ -21,7 +22,7 @@ export async function updateErrorReport(
     id: string,
     payload: { status: 'new' | 'triaged' | 'resolved'; adminNote?: string }
 ): Promise<AdminErrorReport> {
-    const body = await request(`/api/support/error-reports/${encodeURIComponent(id)}`, {
+    const body = await request(`${ADMIN_API_PATHS.supportErrorReports}/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
@@ -41,28 +42,28 @@ export async function getCommunityFlags(input: {
     if (input.status && input.status !== 'all') params.set('status', input.status);
     if (input.entityType && input.entityType !== 'all') params.set('entityType', input.entityType);
 
-    const body = await request(`/api/community/flags?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.communityFlags}?${params.toString()}`);
     return toArray<CommunityFlag>(body?.data);
 }
 
 export async function resolveCommunityFlag(id: string): Promise<void> {
-    await request(`/api/community/flags/${encodeURIComponent(id)}`, {
+    await request(`${ADMIN_API_PATHS.communityFlags}/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: mutationHeaders(),
     }, true);
 }
 
 export async function getCommunityForums(limit = 20): Promise<CommunityForum[]> {
-    const body = await request(`/api/community/forums?limit=${limit}&offset=0`);
+    const body = await request(`${ADMIN_API_PATHS.communityForums}?limit=${limit}&offset=0`);
     return toArray<CommunityForum>(body?.data);
 }
 
 export async function getCommunityQa(limit = 20): Promise<CommunityQa[]> {
-    const body = await request(`/api/community/qa?limit=${limit}&offset=0`);
+    const body = await request(`${ADMIN_API_PATHS.communityQa}?limit=${limit}&offset=0`);
     return toArray<CommunityQa>(body?.data);
 }
 
 export async function getCommunityGroups(limit = 20): Promise<CommunityGroup[]> {
-    const body = await request(`/api/community/groups?limit=${limit}&offset=0`);
+    const body = await request(`${ADMIN_API_PATHS.communityGroups}?limit=${limit}&offset=0`);
     return toArray<CommunityGroup>(body?.data);
 }

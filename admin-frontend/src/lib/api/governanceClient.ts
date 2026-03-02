@@ -6,14 +6,15 @@ import type {
     AdminSessionTerminateOthersResult,
 } from '../../types';
 import { mutationHeaders, request, toArray } from './core';
+import { ADMIN_API_PATHS } from './paths';
 
 export async function getAdminSessions(): Promise<AdminSession[]> {
-    const body = await request('/api/admin/sessions');
+    const body = await request(ADMIN_API_PATHS.adminSessions);
     return toArray<AdminSession>(body?.data);
 }
 
 export async function terminateAdminSessionById(sessionId: string, stepUpToken: string): Promise<{ success: boolean }> {
-    const body = await request('/api/admin-auth/sessions/terminate', {
+    const body = await request(ADMIN_API_PATHS.adminTerminateSession, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken, false),
         body: JSON.stringify({ sessionId }),
@@ -23,7 +24,7 @@ export async function terminateAdminSessionById(sessionId: string, stepUpToken: 
 }
 
 export async function terminateOtherAdminSessions(stepUpToken: string): Promise<AdminSessionTerminateOthersResult> {
-    const body = await request('/api/admin-auth/sessions/terminate-others', {
+    const body = await request(ADMIN_API_PATHS.adminTerminateOtherSessions, {
         method: 'POST',
         headers: mutationHeaders(stepUpToken, false),
     }, true);
@@ -59,12 +60,12 @@ export async function getAdminAuditLogs(input: {
     if (input.start) params.set('start', input.start);
     if (input.end) params.set('end', input.end);
 
-    const body = await request(`/api/admin/audit-log?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminAuditLog}?${params.toString()}`);
     return toArray<AdminAuditLog>(body?.data);
 }
 
 export async function getAdminAuditIntegrity(limit = 250): Promise<Record<string, unknown> | null> {
-    const body = await request(`/api/admin/audit-log/integrity?limit=${Math.max(10, Math.min(1000, limit))}`);
+    const body = await request(`${ADMIN_API_PATHS.adminAuditIntegrity}?limit=${Math.max(10, Math.min(1000, limit))}`);
     return (body?.data && typeof body.data === 'object') ? (body.data as Record<string, unknown>) : null;
 }
 
@@ -86,12 +87,12 @@ export async function getAdminSecurityLogs(input: {
     if (input.start) params.set('start', input.start);
     if (input.end) params.set('end', input.end);
 
-    const body = await request(`/api/admin/security?${params.toString()}`);
+    const body = await request(`${ADMIN_API_PATHS.adminSecurityLog}?${params.toString()}`);
     return toArray<AdminSecurityLog>(body?.data);
 }
 
 export async function getAdminApprovals(status = 'pending'): Promise<AdminApprovalItem[]> {
-    const body = await request(`/api/admin/approvals?status=${encodeURIComponent(status)}`);
+    const body = await request(`${ADMIN_API_PATHS.adminApprovals}?status=${encodeURIComponent(status)}`);
     return toArray<AdminApprovalItem>(body?.data);
 }
 

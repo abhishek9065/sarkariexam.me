@@ -1,8 +1,9 @@
 import type { AdminPermissionSnapshot, AdminStepUpGrant, AdminUser } from '../../types';
 import { mutationHeaders, request } from './core';
+import { ADMIN_API_PATHS } from './paths';
 
 export async function adminAuthLogin(email: string, password: string, twoFactorCode?: string): Promise<void> {
-    await request('/api/admin-auth/login', {
+    await request(ADMIN_API_PATHS.adminAuthLogin, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, ...(twoFactorCode ? { twoFactorCode } : {}) }),
@@ -10,11 +11,11 @@ export async function adminAuthLogin(email: string, password: string, twoFactorC
 }
 
 export async function adminAuthLogout(): Promise<void> {
-    await request('/api/admin-auth/logout', { method: 'POST' }, true);
+    await request(ADMIN_API_PATHS.adminAuthLogout, { method: 'POST' }, true);
 }
 
 export async function adminAuthStepUp(email: string, password: string, twoFactorCode?: string): Promise<AdminStepUpGrant> {
-    const body = await request('/api/admin-auth/step-up', {
+    const body = await request(ADMIN_API_PATHS.adminAuthStepUp, {
         method: 'POST',
         headers: mutationHeaders(undefined, false),
         body: JSON.stringify({
@@ -34,11 +35,11 @@ export async function adminAuthStepUp(email: string, password: string, twoFactor
 }
 
 export async function getAdminMe(): Promise<AdminUser | null> {
-    const body = await request('/api/admin-auth/me');
+    const body = await request(ADMIN_API_PATHS.adminAuthMe);
     return body?.data?.user ?? null;
 }
 
 export async function getAdminPermissions(): Promise<AdminPermissionSnapshot | null> {
-    const body = await request('/api/admin-auth/permissions');
+    const body = await request(ADMIN_API_PATHS.adminAuthPermissions);
     return body?.data ?? null;
 }
