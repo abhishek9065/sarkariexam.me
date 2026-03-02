@@ -36,7 +36,7 @@ async function generateSitemap() {
       announcements = data.data || [];
       console.log(`✅ Fetched ${announcements.length} announcements from API`);
     }
-  } catch (err) {
+  } catch (_err) {
     console.log('⚠️  Could not fetch announcements, generating static sitemap only');
   }
 
