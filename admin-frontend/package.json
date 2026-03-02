@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check:bundle-size": "node ./scripts/check-bundle-size.mjs",
+    "verify:api-types": "npm run generate:api && git diff --exit-code -- src/types/api.generated.ts",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --max-warnings=0",
     "guard:ui": "node ../scripts/admin-ui-guard.mjs",

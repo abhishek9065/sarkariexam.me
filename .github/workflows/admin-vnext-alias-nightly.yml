@@ -50,6 +50,9 @@ jobs:
           VITE_ADMIN_BASENAME: /admin-vnext
           VITE_ADMIN_E2E_STEPUP_BYPASS: 'true'
 
+      - name: Enforce admin bundle budget
+        run: npm run check:bundle-size
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
