@@ -31,6 +31,11 @@ import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
+const telemetryRouter = Router();
+const contentRouter = Router();
+const operationsRouter = Router();
+const governanceRouter = Router();
+const announcementsRouter = Router();
 const ADMIN_APPROVAL_ID_HEADER = 'x-admin-approval-id';
 const ADMIN_BREAK_GLASS_REASON_HEADER = 'x-admin-break-glass-reason';
 
@@ -1052,7 +1057,7 @@ router.use(authenticateToken, requirePermission('admin:read'));
  * POST /api/admin/telemetry/events
  * Lightweight admin-side instrumentation sink.
  */
-router.post('/telemetry/events', requirePermission('admin:read'), async (req, res) => {
+telemetryRouter.post('/telemetry/events', requirePermission('admin:read'), async (req, res) => {
     try {
         const parsed = adminTelemetrySchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -1080,7 +1085,7 @@ router.post('/telemetry/events', requirePermission('admin:read'), async (req, re
  * GET /api/admin/dashboard
  * Get complete dashboard overview - returns all data that AdminDashboard.tsx expects
  */
-router.get('/dashboard', async (_req, res) => {
+telemetryRouter.get('/dashboard', async (_req, res) => {
     try {
         // Get all announcements for stats
         const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 1000, includeInactive: true });
@@ -1188,7 +1193,7 @@ router.get('/dashboard', async (_req, res) => {
  * GET /api/admin/search
  * Global search across posts, links, media, organizations and tags.
  */
-router.get('/search', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/search', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = adminSearchQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -1347,7 +1352,7 @@ router.get('/search', requirePermission('announcements:read'), async (req, res) 
  * GET /api/admin/views
  * List saved filter views for the current admin.
  */
-router.get('/views', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/views', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = adminViewsListQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -1396,7 +1401,7 @@ router.get('/views', requirePermission('announcements:read'), async (req, res) =
  * POST /api/admin/views
  * Create saved view.
  */
-router.post('/views', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.post('/views', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = adminViewCreateSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -1466,7 +1471,7 @@ router.post('/views', requirePermission('announcements:write'), idempotency(), a
  * PATCH /api/admin/views/:id
  * Update saved view.
  */
-router.patch('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = adminViewPatchSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -1548,7 +1553,7 @@ router.patch('/views/:id', requirePermission('announcements:write'), idempotency
  * DELETE /api/admin/views/:id
  * Delete saved view.
  */
-router.delete('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.delete('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const viewId = getPathParam(req.params.id);
         const actorId = req.user?.userId ?? 'unknown';
@@ -1587,7 +1592,7 @@ router.delete('/views/:id', requirePermission('announcements:write'), idempotenc
  * POST /api/admin/announcements/draft
  * Create a draft-first announcement shell.
  */
-router.post('/announcements/draft', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.post('/announcements/draft', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = announcementDraftSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -1632,7 +1637,7 @@ router.post('/announcements/draft', requirePermission('announcements:write'), id
  * PATCH /api/admin/announcements/:id/autosave
  * Autosave draft edits.
  */
-router.patch('/announcements/:id/autosave', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/announcements/:id/autosave', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = announcementAutosaveSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -1728,7 +1733,7 @@ router.patch('/announcements/:id/autosave', requirePermission('announcements:wri
  * GET /api/admin/announcements/:id/revisions
  * Fetch revision timeline metadata.
  */
-router.get('/announcements/:id/revisions', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/announcements/:id/revisions', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = announcementRevisionsQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -1797,7 +1802,7 @@ router.get('/announcements/:id/revisions', requirePermission('announcements:read
  * GET /api/admin/links/health/summary
  * Link health summary for dashboard/reporting widgets.
  */
-router.get('/links/health/summary', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/links/health/summary', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = linkHealthSummaryQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -1870,7 +1875,7 @@ router.get('/links/health/summary', requirePermission('announcements:read'), asy
  * GET /api/admin/homepage/sections
  * Homepage section ordering and ranking configuration.
 */
-router.get('/homepage/sections', requirePermission('announcements:read'), async (_req, res) => {
+contentRouter.get('/homepage/sections', requirePermission('announcements:read'), async (_req, res) => {
     try {
         const sectionsCollection = getCollection<HomeSectionDoc>('homepage_sections');
         const docs = await sectionsCollection
@@ -1910,7 +1915,7 @@ router.get('/homepage/sections', requirePermission('announcements:read'), async 
  * PUT /api/admin/homepage/sections
  * Upsert homepage section configs.
  */
-router.put('/homepage/sections', requirePermission('admin:write'), idempotency(), async (req, res) => {
+contentRouter.put('/homepage/sections', requirePermission('admin:write'), idempotency(), async (req, res) => {
     try {
         const parsed = sectionUpsertSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -1974,7 +1979,7 @@ router.put('/homepage/sections', requirePermission('admin:write'), idempotency()
  * GET /api/admin/links
  * Link manager listing.
  */
-router.get('/links', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/links', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = linkListQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -2021,7 +2026,7 @@ router.get('/links', requirePermission('announcements:read'), async (req, res) =
  * POST /api/admin/links
  * Create link record.
  */
-router.post('/links', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.post('/links', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = linkRecordCreateSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2069,7 +2074,7 @@ router.post('/links', requirePermission('announcements:write'), idempotency(), a
  * PATCH /api/admin/links/:id
  * Update link record.
  */
-router.patch('/links/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/links/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = linkRecordPatchSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2119,7 +2124,7 @@ router.patch('/links/:id', requirePermission('announcements:write'), idempotency
  * POST /api/admin/links/check
  * Run link health checks.
  */
-router.post('/links/check', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.post('/links/check', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = linkCheckSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2223,7 +2228,7 @@ router.post('/links/check', requirePermission('announcements:read'), async (req,
  * POST /api/admin/links/replace
  * Replace a URL across link records and content.
  */
-router.post('/links/replace', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+contentRouter.post('/links/replace', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parsed = linkReplaceSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2285,7 +2290,7 @@ router.post('/links/replace', requirePermission('announcements:write'), requireA
  * GET /api/admin/media
  * Media/PDF listing.
  */
-router.get('/media', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/media', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = mediaListQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -2321,7 +2326,7 @@ router.get('/media', requirePermission('announcements:read'), async (req, res) =
  * POST /api/admin/media
  * Add media/PDF metadata entry.
  */
-router.post('/media', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.post('/media', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = mediaAssetCreateSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2379,7 +2384,7 @@ router.post('/media', requirePermission('announcements:write'), idempotency(), a
  * PATCH /api/admin/media/:id
  * Update media metadata.
  */
-router.patch('/media/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/media/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = mediaAssetPatchSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2426,7 +2431,7 @@ router.patch('/media/:id', requirePermission('announcements:write'), idempotency
  * GET /api/admin/templates
  * Fetch posting templates.
  */
-router.get('/templates', requirePermission('announcements:read'), async (req, res) => {
+contentRouter.get('/templates', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = templateListQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -2461,7 +2466,7 @@ router.get('/templates', requirePermission('announcements:read'), async (req, re
  * POST /api/admin/templates
  * Create posting template.
  */
-router.post('/templates', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.post('/templates', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = templateCreateSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2512,7 +2517,7 @@ router.post('/templates', requirePermission('announcements:write'), idempotency(
  * PATCH /api/admin/templates/:id
  * Update posting template.
  */
-router.patch('/templates/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/templates/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parsed = templatePatchSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2557,7 +2562,7 @@ router.patch('/templates/:id', requirePermission('announcements:write'), idempot
  * GET /api/admin/alerts
  * Notifications and alerts feed.
  */
-router.get('/alerts', requirePermission('admin:read'), async (req, res) => {
+operationsRouter.get('/alerts', requirePermission('admin:read'), async (req, res) => {
     try {
         const parsed = alertListQuerySchema.safeParse(req.query ?? {});
         if (!parsed.success) {
@@ -2594,7 +2599,7 @@ router.get('/alerts', requirePermission('admin:read'), async (req, res) => {
  * POST /api/admin/alerts
  * Create manual/admin alert.
  */
-router.post('/alerts', requirePermission('admin:write'), idempotency(), async (req, res) => {
+operationsRouter.post('/alerts', requirePermission('admin:write'), idempotency(), async (req, res) => {
     try {
         const parsed = alertCreateSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2644,7 +2649,7 @@ router.post('/alerts', requirePermission('admin:write'), idempotency(), async (r
  * PATCH /api/admin/alerts/:id
  * Update alert state.
  */
-router.patch('/alerts/:id', requirePermission('admin:write'), idempotency(), async (req, res) => {
+operationsRouter.patch('/alerts/:id', requirePermission('admin:write'), idempotency(), async (req, res) => {
     try {
         const parsed = alertPatchSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2685,7 +2690,7 @@ router.patch('/alerts/:id', requirePermission('admin:write'), idempotency(), asy
  * GET /api/admin/settings/:key
  * Read configurable taxonomy arrays.
  */
-router.get('/settings/:key', requirePermission('admin:read'), async (req, res) => {
+operationsRouter.get('/settings/:key', requirePermission('admin:read'), async (req, res) => {
     try {
         const settingsKey = getPathParam(req.params.key);
         if (settingsKey !== 'states' && settingsKey !== 'boards' && settingsKey !== 'tags') {
@@ -2712,7 +2717,7 @@ router.get('/settings/:key', requirePermission('admin:read'), async (req, res) =
  * PUT /api/admin/settings/:key
  * Update taxonomy arrays.
  */
-router.put('/settings/:key', requirePermission('admin:write'), idempotency(), async (req, res) => {
+operationsRouter.put('/settings/:key', requirePermission('admin:write'), idempotency(), async (req, res) => {
     try {
         const settingsKey = getPathParam(req.params.key);
         if (settingsKey !== 'states' && settingsKey !== 'boards' && settingsKey !== 'tags') {
@@ -2761,7 +2766,7 @@ router.put('/settings/:key', requirePermission('admin:write'), idempotency(), as
  * GET /api/admin/users
  * Admin user roster with roles.
  */
-router.get('/users', requirePermission('admin:read'), async (_req, res) => {
+operationsRouter.get('/users', requirePermission('admin:read'), async (_req, res) => {
     try {
         const usersCollection = getCollection<AdminUserListDoc>('users');
         const docs = await usersCollection
@@ -2792,7 +2797,7 @@ router.get('/users', requirePermission('admin:read'), async (_req, res) => {
  * PATCH /api/admin/users/:id/role
  * Update admin user role / status.
  */
-router.patch('/users/:id/role', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+operationsRouter.patch('/users/:id/role', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const userId = getPathParam(req.params.id);
         const parsed = adminRoleUpdateSchema.safeParse(req.body ?? {});
@@ -2842,7 +2847,7 @@ router.patch('/users/:id/role', requirePermission('admin:write'), requireAdminSt
  * PATCH /api/admin/announcements/:id/seo
  * Update SEO/schema fields for a content record.
  */
-router.patch('/announcements/:id/seo', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/announcements/:id/seo', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const parsed = seoPatchSchema.safeParse(req.body ?? {});
@@ -2882,7 +2887,7 @@ router.patch('/announcements/:id/seo', requirePermission('announcements:write'),
  * GET /api/admin/reports
  * Operational report snapshot for links, deadlines, traffic, and queue.
  */
-router.get('/reports', requirePermission('analytics:read'), async (_req, res) => {
+operationsRouter.get('/reports', requirePermission('analytics:read'), async (_req, res) => {
     try {
         const announcements = await AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 });
         const now = Date.now();
@@ -2951,7 +2956,7 @@ router.get('/reports', requirePermission('analytics:read'), async (_req, res) =>
  * GET /api/admin/active-users
  * Get active user counts in the last N minutes
  */
-router.get('/active-users', async (req, res) => {
+operationsRouter.get('/active-users', async (req, res) => {
     try {
         const windowMinutes = Math.min(120, parseInt(req.query.windowMinutes as string) || 15);
         const stats = await getActiveUsersStats(windowMinutes);
@@ -2966,7 +2971,7 @@ router.get('/active-users', async (req, res) => {
  * GET /api/admin/stats
  * Get quick stats overview
  */
-router.get('/stats', async (_req, res) => {
+operationsRouter.get('/stats', async (_req, res) => {
     try {
         const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 1000, includeInactive: true });
         return res.json({
@@ -2985,7 +2990,7 @@ router.get('/stats', async (_req, res) => {
  * GET /api/admin/slo
  * Get admin SLO snapshot with synthetic dependency status.
  */
-router.get('/slo', async (_req, res) => {
+operationsRouter.get('/slo', async (_req, res) => {
     try {
         const snapshot = getAdminSloSnapshot();
         const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
@@ -3015,7 +3020,7 @@ router.get('/slo', async (_req, res) => {
  * GET /api/admin/security
  * Get security logs
  */
-router.get('/security', requirePermission('security:read'), async (req, res) => {
+operationsRouter.get('/security', requirePermission('security:read'), async (req, res) => {
     try {
         const parsed = securityLogsQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -3065,7 +3070,7 @@ router.get('/security', requirePermission('security:read'), async (req, res) => 
  * GET /api/admin/security/logs
  * Get security logs (alias)
  */
-router.get('/security/logs', requirePermission('security:read'), async (req, res) => {
+operationsRouter.get('/security/logs', requirePermission('security:read'), async (req, res) => {
     try {
         const parsed = securityLogsQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -3115,7 +3120,7 @@ router.get('/security/logs', requirePermission('security:read'), async (req, res
  * GET /api/admin/sessions
  * List active admin sessions.
  */
-router.get('/sessions', requirePermission('security:read'), async (req, res) => {
+operationsRouter.get('/sessions', requirePermission('security:read'), async (req, res) => {
     try {
         const currentSessionId = req.user?.sessionId;
         const sessions = (await listAdminSessions()).map((record) => mapSessionForClient(record, currentSessionId));
@@ -3133,7 +3138,7 @@ router.get('/sessions', requirePermission('security:read'), async (req, res) => 
  * GET /api/admin/session
  * Get current admin session details.
  */
-router.get('/session', requirePermission('security:read'), async (req, res) => {
+operationsRouter.get('/session', requirePermission('security:read'), async (req, res) => {
     try {
         const session = await getAdminSession(req.user?.sessionId);
         if (!session) {
@@ -3150,7 +3155,7 @@ router.get('/session', requirePermission('security:read'), async (req, res) => {
  * POST /api/admin/sessions/terminate
  * Terminate a specific session.
  */
-router.post('/sessions/terminate', requirePermission('security:read'), requireAdminStepUp, async (req, res) => {
+operationsRouter.post('/sessions/terminate', requirePermission('security:read'), requireAdminStepUp, async (req, res) => {
     try {
         const parsed = sessionIdSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -3184,7 +3189,7 @@ router.post('/sessions/terminate', requirePermission('security:read'), requireAd
  * POST /api/admin/sessions/terminate-others
  * Terminate all other sessions for the current admin.
  */
-router.post('/sessions/terminate-others', requirePermission('security:read'), requireAdminStepUp, async (req, res) => {
+operationsRouter.post('/sessions/terminate-others', requirePermission('security:read'), requireAdminStepUp, async (req, res) => {
     try {
         if (!req.user?.userId) {
             return res.status(400).json({ error: 'Missing user context' });
@@ -3209,7 +3214,7 @@ router.post('/sessions/terminate-others', requirePermission('security:read'), re
  * GET /api/admin/approvals
  * List approval workflow items.
  */
-router.get('/approvals', requirePermission('announcements:approve'), async (req, res) => {
+governanceRouter.get('/approvals', requirePermission('announcements:approve'), async (req, res) => {
     try {
         const parsed = adminApprovalsQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -3231,7 +3236,7 @@ router.get('/approvals', requirePermission('announcements:approve'), async (req,
  * GET /api/admin/workflow/overview
  * Combined review queue, approval, and session workflow summary.
  */
-router.get('/workflow/overview', requirePermission('announcements:read'), async (req, res) => {
+governanceRouter.get('/workflow/overview', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parsed = workflowOverviewQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -3267,7 +3272,7 @@ router.get('/workflow/overview', requirePermission('announcements:read'), async 
  * POST /api/admin/approvals/:id/approve
  * Approve a pending high-risk action.
  */
-router.post('/approvals/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
+governanceRouter.post('/approvals/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
     try {
         const approvalId = getPathParam(req.params.id);
         const parsed = adminApprovalResolveSchema.safeParse(req.body ?? {});
@@ -3309,7 +3314,7 @@ router.post('/approvals/:id/approve', requirePermission('announcements:approve')
  * POST /api/admin/approvals/:id/reject
  * Reject a pending high-risk action.
  */
-router.post('/approvals/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
+governanceRouter.post('/approvals/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, async (req, res) => {
     try {
         const approvalId = getPathParam(req.params.id);
         const parsed = adminApprovalResolveSchema.safeParse(req.body ?? {});
@@ -3350,7 +3355,7 @@ router.post('/approvals/:id/reject', requirePermission('announcements:approve'),
  * GET /api/admin/audit-log
  * Get admin audit log
  */
-router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
+governanceRouter.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
     try {
         const parseResult = auditQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -3395,7 +3400,7 @@ router.get('/audit-log', requirePermission('audit:read'), async (req, res) => {
  * GET /api/admin/audit-log/integrity
  * Verify immutable admin audit ledger integrity.
  */
-router.get('/audit-log/integrity', requirePermission('audit:read'), async (req, res) => {
+governanceRouter.get('/audit-log/integrity', requirePermission('audit:read'), async (req, res) => {
     try {
         const parsed = auditIntegrityQuerySchema.safeParse(req.query);
         if (!parsed.success) {
@@ -3414,7 +3419,7 @@ router.get('/audit-log/integrity', requirePermission('audit:read'), async (req, 
  * GET /api/admin/announcements
  * Get all announcements for admin management
  */
-router.get('/announcements', requirePermission('announcements:read'), async (req, res) => {
+announcementsRouter.get('/announcements', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parseResult = adminListQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -3458,7 +3463,7 @@ router.get('/announcements', requirePermission('announcements:read'), async (req
  * GET /api/admin/announcements/summary
  * Get counts by status/type and pending SLA summary
  */
-router.get('/announcements/summary', requirePermission('announcements:read'), async (req, res) => {
+announcementsRouter.get('/announcements/summary', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parseResult = adminSummaryQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -3491,7 +3496,7 @@ router.get('/announcements/summary', requirePermission('announcements:read'), as
  * GET /api/admin/announcements/export/csv
  * Export announcements (admin view) as CSV
  */
-router.get('/announcements/export/csv', requirePermission('announcements:read'), async (req, res) => {
+announcementsRouter.get('/announcements/export/csv', requirePermission('announcements:read'), async (req, res) => {
     try {
         const parseResult = adminExportQuerySchema.safeParse(req.query);
         if (!parseResult.success) {
@@ -3625,7 +3630,7 @@ async function validateForPublish(data: any, announcementId?: string, isApproveG
  * POST /api/admin/announcements
  * Create new announcement
  */
-router.post('/announcements', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const parseResult = adminAnnouncementSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -3701,7 +3706,7 @@ router.post('/announcements', requirePermission('announcements:write'), idempote
  * POST /api/admin/announcements/bulk/preview
  * Preview impact for bulk updates without mutating records.
  */
-router.post('/announcements/bulk/preview', requirePermission('announcements:write'), async (req, res) => {
+announcementsRouter.post('/announcements/bulk/preview', requirePermission('announcements:write'), async (req, res) => {
     try {
         const parseResult = bulkPreviewSchema.safeParse(req.body ?? {});
         if (!parseResult.success) {
@@ -3764,7 +3769,7 @@ router.post('/announcements/bulk/preview', requirePermission('announcements:writ
  * POST /api/admin/review/preview
  * Preview review queue bulk decisions before submission.
  */
-router.post('/review/preview', requirePermission('announcements:approve'), async (req, res) => {
+announcementsRouter.post('/review/preview', requirePermission('announcements:approve'), async (req, res) => {
     try {
         const parseResult = reviewPreviewSchema.safeParse(req.body ?? {});
         if (!parseResult.success) {
@@ -3844,7 +3849,7 @@ router.post('/review/preview', requirePermission('announcements:approve'), async
  * POST /api/admin/announcements/bulk
  * Bulk update announcements
  */
-router.post('/announcements/bulk', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/bulk', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parseResult = bulkUpdateSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -3927,7 +3932,7 @@ router.post('/announcements/bulk', requirePermission('announcements:write'), req
  * POST /api/admin/announcements/bulk-approve
  * Bulk approve announcements
  */
-router.post('/announcements/bulk-approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/bulk-approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -4002,7 +4007,7 @@ router.post('/announcements/bulk-approve', requirePermission('announcements:appr
  * POST /api/admin/announcements/bulk-reject
  * Bulk reject announcements
  */
-router.post('/announcements/bulk-reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/bulk-reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const parseResult = bulkReviewSchema.safeParse(req.body);
         if (!parseResult.success) {
@@ -4047,7 +4052,7 @@ router.post('/announcements/bulk-reject', requirePermission('announcements:appro
  * PUT /api/admin/announcements/:id
  * Update announcement
  */
-router.put('/announcements/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+announcementsRouter.put('/announcements/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const updateSchema = adminAnnouncementPartialSchema;
@@ -4172,7 +4177,7 @@ router.put('/announcements/:id', requirePermission('announcements:write'), idemp
  * POST /api/admin/announcements/:id/revert/:version
  * Revert announcement to a previous version
  */
-router.post('/announcements/:id/revert/:version', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/:id/revert/:version', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const version = parseInt(getPathParam(req.params.version), 10);
@@ -4267,7 +4272,7 @@ router.post('/announcements/:id/revert/:version', requirePermission('announcemen
  * POST /api/admin/announcements/:id/approve
  * Approve and publish an announcement
  */
-router.post('/announcements/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/:id/approve', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
@@ -4334,7 +4339,7 @@ router.post('/announcements/:id/approve', requirePermission('announcements:appro
  * POST /api/admin/announcements/:id/reject
  * Reject an announcement back to draft
  */
-router.post('/announcements/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/:id/reject', requirePermission('announcements:approve'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const note = typeof req.body?.note === 'string' ? req.body.note.trim() || undefined : undefined;
@@ -4372,7 +4377,7 @@ router.post('/announcements/:id/reject', requirePermission('announcements:approv
  * POST /api/admin/announcements/:id/rollback
  * Rollback to a specific historical version snapshot.
  */
-router.post('/announcements/:id/rollback', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.post('/announcements/:id/rollback', requirePermission('announcements:write'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const parsed = rollbackSchema.safeParse(req.body ?? {});
@@ -4475,7 +4480,7 @@ router.post('/announcements/:id/rollback', requirePermission('announcements:writ
  * DELETE /api/admin/announcements/:id
  * Delete announcement
  */
-router.delete('/announcements/:id', requirePermission('announcements:delete'), requireAdminStepUp, idempotency(), async (req, res) => {
+announcementsRouter.delete('/announcements/:id', requirePermission('announcements:delete'), requireAdminStepUp, idempotency(), async (req, res) => {
     try {
         const announcementId = getPathParam(req.params.id);
         const approvalGate = await requireDualApproval(req, res, {
@@ -4508,4 +4513,12 @@ router.delete('/announcements/:id', requirePermission('announcements:delete'), r
     }
 });
 
+
+router.use(telemetryRouter);
+router.use(contentRouter);
+router.use(operationsRouter);
+router.use(governanceRouter);
+router.use(announcementsRouter);
+
 export default router;
+

@@ -14,12 +14,7 @@ type TelemetryPayload = {
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
 const getAuthToken = (providedToken?: string | null) => {
-    if (providedToken) return providedToken;
-    try {
-        return localStorage.getItem('token') || localStorage.getItem('adminToken');
-    } catch {
-        return null;
-    }
+    return providedToken ?? null;
 };
 
 export async function trackAdminTelemetry(
