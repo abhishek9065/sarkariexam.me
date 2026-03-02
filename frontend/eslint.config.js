@@ -34,4 +34,12 @@ export default [
     {
         ignores: ['dist/**', 'node_modules/**'],
     },
+    {
+        files: ['scripts/**/*.{js,mjs}'],
+        languageOptions: {
+            globals: {
+                ...globals.node,
+            },
+        },
+    },
 ];
