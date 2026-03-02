@@ -227,7 +227,10 @@ export function DashboardPage() {
                                 settings_update: 'Updated settings',
                             };
                             const actionLabel = actionLabels[log.action ?? ''] ?? log.action ?? 'Unknown action';
-                            const meta = (log as any).metadata as Record<string, unknown> | undefined;
+                            const metadataValue = (log as { metadata?: unknown }).metadata;
+                            const meta = metadataValue && typeof metadataValue === 'object'
+                                ? metadataValue as Record<string, unknown>
+                                : undefined;
                             const targetTitle = typeof meta?.title === 'string' ? meta.title : null;
                             return (
                                 <div key={log.id ?? idx} className="dash-activity-item">

@@ -3754,6 +3754,59 @@
         }
       }
     },
+    "/api/admin/audit-log/rebuild": {
+      "post": {
+        "summary": "POST /api/admin/audit-log/rebuild",
+        "description": "Rebuilds the immutable audit ledger chain from raw admin audit logs.",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "postApiAdminAuditLogRebuild",
+        "parameters": [
+          {
+            "name": "X-Admin-Step-Up-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fresh admin step-up token."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional idempotency key to safely retry rebuild requests."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/admin/announcements/{id}/rollback": {
       "post": {
         "summary": "POST /api/admin/announcements/{id}/rollback",
