@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
+import { MongoClient, Db, Collection, ObjectId, Document } from 'mongodb';
 
 /**
  * Azure Cosmos DB Service (MongoDB API)
@@ -200,7 +200,7 @@ export async function getDatabase(): Promise<Db> {
 /**
  * Get a collection by name with connection validation
  */
-export function getCollection<T>(name: string): Collection<T> {
+export function getCollection<T extends Document>(name: string): Collection<T> {
     if (!db) {
         throw new Error('Database not connected. Call connectToDatabase() first.');
     }
@@ -210,7 +210,7 @@ export function getCollection<T>(name: string): Collection<T> {
 /**
  * Async collection getter with auto-reconnection
  */
-export async function getCollectionAsync<T>(name: string): Promise<Collection<T>> {
+export async function getCollectionAsync<T extends Document>(name: string): Promise<Collection<T>> {
     const database = await getDatabase();
     return database.collection<T>(name);
 }
@@ -233,6 +233,7 @@ async function createIndexes(): Promise<void> {
         const analyticsRollups = database.collection('analytics_rollups');
         const adminAuditLogs = database.collection('admin_audit_logs');
         const adminAccounts = database.collection('admin_accounts');
+        const adminSavedViews = database.collection('admin_saved_views');
         const userNotifications = database.collection('user_notifications');
         const trackedApplications = database.collection('tracked_applications');
         const reminderDispatchLogs = database.collection('reminder_dispatch_logs');
@@ -255,6 +256,13 @@ async function createIndexes(): Promise<void> {
         await announcements.createIndex({ updatedAt: -1 });
         await announcements.createIndex({ viewCount: -1 });
         await announcements.createIndex({ deadline: 1 });
+        // Admin listing/query acceleration indexes
+        await announcements.createIndex({ isActive: 1, status: 1, type: 1, updatedAt: -1, _id: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, type: 1, publishAt: -1, _id: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, deadline: 1, _id: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, viewCount: -1, _id: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, organization: 1, updatedAt: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, category: 1, updatedAt: -1 });
         // Note: Text indexes are not supported in Cosmos DB MongoDB API
         // Use regex search instead (already implemented in model)
 
@@ -305,6 +313,9 @@ async function createIndexes(): Promise<void> {
         await adminAccounts.createIndex({ email: 1 }, { unique: true });
         await adminAccounts.createIndex({ role: 1, status: 1 });
         await adminAccounts.createIndex({ status: 1, updatedAt: -1 });
+        await adminSavedViews.createIndex({ module: 1, scope: 1, updatedAt: -1 });
+        await adminSavedViews.createIndex({ createdBy: 1, module: 1, updatedAt: -1 });
+        await adminSavedViews.createIndex({ scope: 1, updatedAt: -1 });
 
         // User notifications
         await userNotifications.createIndex({ userId: 1, createdAt: -1 });

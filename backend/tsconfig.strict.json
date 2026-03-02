@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "src/middleware/cloudflare.ts",
+    "src/middleware/requestId.ts",
+    "src/services/adminStepUp.ts",
+    "src/services/adminApprovals.ts"
+  ]
+}

@@ -47,7 +47,7 @@ const joinMountAndRoute = (mountPath: string, routePath: string): string => {
 
 const parseRouteMethods = (source: string): Array<{ method: HttpMethod; routePath: string }> => {
     const results: Array<{ method: HttpMethod; routePath: string }> = [];
-    const regex = /router\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/g;
+    const regex = /\b(?:router|[A-Za-z0-9_]*Router)\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/g;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(source)) !== null) {
         const method = match[1] as HttpMethod;

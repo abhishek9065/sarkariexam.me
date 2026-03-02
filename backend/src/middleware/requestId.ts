@@ -4,6 +4,15 @@ import { NextFunction, Request, Response } from 'express';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      requestId?: string;
+    }
+  }
+}
+
 const normalizeHeaderValue = (value: string | string[] | undefined): string | null => {
   if (!value) return null;
   const selected = Array.isArray(value) ? value[0] : value;

@@ -59,6 +59,7 @@ function normalizeIp(ip: string): string {
 const normalizeHeaderIp = (value: string | string[] | undefined): string => {
     if (!value) return '';
     const first = Array.isArray(value) ? value[0] : value;
+    if (!first) return '';
     return normalizeIp(first.trim());
 };
 
