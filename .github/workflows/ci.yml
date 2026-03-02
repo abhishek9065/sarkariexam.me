@@ -184,6 +184,11 @@ jobs:
         run: npm run build
         working-directory: backend
 
+      - name: Prepare frontend integration security env
+        run: |
+          echo "FRONTEND_INTEGRATION_SETUP_KEY=setup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "FRONTEND_INTEGRATION_TOTP_KEY=totp-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-key" >> "$GITHUB_ENV"
+
       - name: Start backend
         run: |
           NODE_ENV=integration \
@@ -191,6 +196,11 @@ jobs:
           MONGODB_URI=mongodb://127.0.0.1:27017/sarkari_db \
           COSMOS_DATABASE_NAME=sarkari_db \
           JWT_SECRET=test-secret \
+          ADMIN_SETUP_KEY="${FRONTEND_INTEGRATION_SETUP_KEY}" \
+          TOTP_ENCRYPTION_KEY="${FRONTEND_INTEGRATION_TOTP_KEY}" \
+          ADMIN_ENFORCE_HTTPS=false \
+          ADMIN_REQUIRE_2FA=false \
+          ADMIN_DUAL_APPROVAL_REQUIRED=false \
           node backend/dist/server.js > backend-integration.log 2>&1 &
 
       - name: Wait for backend deep health (DB ready)
