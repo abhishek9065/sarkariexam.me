@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-smoke-artifacts
           path: |
@@ -224,7 +224,7 @@ jobs:
 
       - name: Upload frontend API integration artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-api-integration-artifacts
           path: |
@@ -264,7 +264,7 @@ jobs:
 
       - name: Upload admin Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: admin-playwright-smoke-artifacts
           path: |
@@ -361,7 +361,7 @@ jobs:
 
       - name: Upload admin API integration artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: admin-api-integration-artifacts
           path: |
