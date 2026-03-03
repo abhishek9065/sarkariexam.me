@@ -1,5 +1,5 @@
 import type { AdminReportSnapshot } from '../../types';
-import { request } from './core';
+import { request, typedData } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
 export async function getAdminDashboard() {
@@ -21,7 +21,7 @@ export async function getAnalyticsOverview(input: {
 
 export async function getAdminReports(): Promise<AdminReportSnapshot> {
     const body = await request(ADMIN_API_PATHS.adminReports);
-    return body?.data ?? {
+    return typedData<AdminReportSnapshot>(body) ?? {
         summary: {
             totalPosts: 0,
             pendingDrafts: 0,

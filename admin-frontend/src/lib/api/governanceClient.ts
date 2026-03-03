@@ -5,7 +5,7 @@ import type {
     AdminSession,
     AdminSessionTerminateOthersResult,
 } from '../../types';
-import { mutationHeaders, request, toArray } from './core';
+import { mutationHeaders, request, toArray, typedData } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
 export async function getAdminSessions(): Promise<AdminSession[]> {
@@ -20,7 +20,7 @@ export async function terminateAdminSessionById(sessionId: string, stepUpToken: 
         body: JSON.stringify({ sessionId }),
     }, true);
 
-    return body?.data ?? { success: false };
+    return typedData<{ success: boolean }>(body) ?? { success: false };
 }
 
 export async function terminateOtherAdminSessions(stepUpToken: string): Promise<AdminSessionTerminateOthersResult> {
@@ -114,7 +114,7 @@ export async function approveAdminApproval(
         headers: mutationHeaders(stepUpToken, false),
         body: JSON.stringify(note ? { note } : {}),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminApprovalItem>(body) ?? {} as AdminApprovalItem;
 }
 
 export async function rejectAdminApproval(
@@ -127,5 +127,5 @@ export async function rejectAdminApproval(
         headers: mutationHeaders(stepUpToken, false),
         body: JSON.stringify(reason ? { reason } : {}),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminApprovalItem>(body) ?? {} as AdminApprovalItem;
 }

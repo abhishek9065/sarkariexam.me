@@ -37,10 +37,10 @@ const matchesPermission = (permission: string, allowed: string): boolean => {
 
 export function hasAdminPermission(
     snapshot: AdminPermissionSnapshot | null,
-    role: AdminPortalRole | undefined,
+    role: 'user' | AdminPortalRole | undefined,
     permission: AdminPermission
 ): boolean {
-    if (!role) return false;
+    if (!role || role === 'user') return false;
     const allowed = snapshot?.roles?.[role] ?? FALLBACK_ADMIN_ROLE_PERMISSIONS[role] ?? [];
     return allowed.some((entry) => matchesPermission(permission, entry));
 }

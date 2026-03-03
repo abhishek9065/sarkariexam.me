@@ -230,7 +230,7 @@ export function AdminCommandPalette({
     const recentItems = useMemo(() => {
         if (normalizedQuery) return [] as PaletteItem[];
         return recentIds
-            .map((recentId) => {
+            .map((recentId): PaletteItem | null => {
                 const cmd = commands.find((c) => c.id === recentId);
                 if (!cmd) return null;
                 return {

@@ -1,3 +1,5 @@
+import { ADMIN_API_PATHS } from './paths';
+
 const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
 const configuredApiBase = import.meta.env.VITE_API_BASE
     ? normalizeBase(String(import.meta.env.VITE_API_BASE))
@@ -28,6 +30,22 @@ const parseBody = async (res: Response) => {
 };
 
 export const toArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+
+/** Safely extract `body.data` with a type assertion. */
+export function typedData<T>(body: Record<string, unknown> | null): T | undefined {
+    return body?.data as T | undefined;
+}
+
+/** Safely extract pagination meta from `body.data.meta` or `body.meta`. */
+export function typedMeta(body: Record<string, unknown> | null): { total: number; limit: number; offset: number } {
+    const meta = (body?.data as Record<string, unknown> | undefined)?.meta ?? body?.meta;
+    const m = (meta && typeof meta === 'object') ? (meta as Record<string, unknown>) : {};
+    return {
+        total: typeof m.total === 'number' ? m.total : 0,
+        limit: typeof m.limit === 'number' ? m.limit : 20,
+        offset: typeof m.offset === 'number' ? m.offset : 0,
+    };
+}
 
 const cleanText = (value: string): string => value.trim();
 
@@ -281,4 +299,3 @@ export async function request(path: string, init: RequestInit = {}, withCsrf = f
         return body as Record<string, unknown> | null;
     }
 }
-import { ADMIN_API_PATHS } from './paths';

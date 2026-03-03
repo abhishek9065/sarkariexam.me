@@ -25,8 +25,9 @@ export async function adminAuthStepUp(email: string, password: string, twoFactor
         }),
     }, true);
 
-    const token = body?.data?.token;
-    const expiresAt = body?.data?.expiresAt;
+    const data = body?.data as Record<string, unknown> | undefined;
+    const token = data?.token;
+    const expiresAt = data?.expiresAt;
     if (typeof token !== 'string' || typeof expiresAt !== 'string') {
         throw new Error('Invalid step-up response');
     }
@@ -36,10 +37,10 @@ export async function adminAuthStepUp(email: string, password: string, twoFactor
 
 export async function getAdminMe(): Promise<AdminUser | null> {
     const body = await request(ADMIN_API_PATHS.adminAuthMe);
-    return body?.data?.user ?? null;
+    return (body?.data as Record<string, unknown> | undefined)?.user as AdminUser | null ?? null;
 }
 
 export async function getAdminPermissions(): Promise<AdminPermissionSnapshot | null> {
     const body = await request(ADMIN_API_PATHS.adminAuthPermissions);
-    return body?.data ?? null;
+    return (body?.data as AdminPermissionSnapshot | undefined) ?? null;
 }

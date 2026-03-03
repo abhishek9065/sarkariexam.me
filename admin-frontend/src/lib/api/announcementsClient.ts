@@ -11,7 +11,7 @@ import type {
     AdminReviewPreview,
     AdminSavedView,
 } from '../../types';
-import { mutationHeaders, request, toArray } from './core';
+import { mutationHeaders, request, toArray, typedData, typedMeta } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
 export async function getAdminAnnouncementsPaged(input: {
@@ -39,12 +39,13 @@ export async function getAdminAnnouncementsPaged(input: {
     if (input.includeInactive) params.set('includeInactive', 'true');
 
     const body = await request(`${ADMIN_API_PATHS.adminAnnouncements}?${params.toString()}`);
+    const meta = typedMeta(body);
     return {
         data: toArray<AdminAnnouncementListItem>(body?.data),
         meta: {
-            total: Number(body?.meta?.total ?? 0),
-            limit: Number(body?.meta?.limit ?? input.limit ?? 20),
-            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+            total: meta.total,
+            limit: meta.limit || (input.limit ?? 20),
+            offset: meta.offset || (input.offset ?? 0),
         },
     };
 }
@@ -93,12 +94,13 @@ export async function getAdminSavedViews(input: {
     params.set('offset', String(input.offset ?? 0));
 
     const body = await request(`/api/admin/views?${params.toString()}`);
+    const meta = typedMeta(body);
     return {
         data: toArray<AdminSavedView>(body?.data),
         meta: {
-            total: Number(body?.meta?.total ?? 0),
-            limit: Number(body?.meta?.limit ?? input.limit ?? 100),
-            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+            total: meta.total,
+            limit: meta.limit || (input.limit ?? 100),
+            offset: meta.offset || (input.offset ?? 0),
         },
     };
 }
@@ -109,7 +111,7 @@ export async function createAdminSavedView(payload: Omit<AdminSavedView, 'id' | 
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminSavedView>(body)!;
 }
 
 export async function updateAdminSavedView(
@@ -121,7 +123,7 @@ export async function updateAdminSavedView(
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminSavedView>(body)!;
 }
 
 export async function deleteAdminSavedView(id: string): Promise<{ success: boolean; id: string }> {
@@ -129,7 +131,7 @@ export async function deleteAdminSavedView(id: string): Promise<{ success: boole
         method: 'DELETE',
         headers: mutationHeaders(),
     }, true);
-    return body?.data ?? { success: false, id };
+    return (typedData<{ success: boolean; id: string }>(body)) ?? { success: false, id };
 }
 
 export async function createAnnouncementDraft(input: {
@@ -144,7 +146,7 @@ export async function createAnnouncementDraft(input: {
         headers: mutationHeaders(),
         body: JSON.stringify(input),
     }, true);
-    return body?.data;
+    return typedData<AdminDraftRecord>(body)!;
 }
 
 export async function autosaveAnnouncementDraft(id: string, payload: AdminAutosavePayload): Promise<{
@@ -160,7 +162,7 @@ export async function autosaveAnnouncementDraft(id: string, payload: AdminAutosa
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<{ id: string; title: string; status: string; version: number; updatedAt?: string; autosaved: boolean }>(body)!;
 }
 
 export async function getAnnouncementRevisions(id: string, limit = 20): Promise<{
@@ -170,7 +172,7 @@ export async function getAnnouncementRevisions(id: string, limit = 20): Promise<
     revisions: AdminRevisionEntry[];
 }> {
     const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/revisions?limit=${Math.max(1, Math.min(100, limit))}`);
-    return body?.data ?? { announcementId: id, currentVersion: 0, revisions: [] };
+    return typedData<{ announcementId: string; currentVersion: number; currentUpdatedAt?: string; revisions: AdminRevisionEntry[] }>(body) ?? { announcementId: id, currentVersion: 0, revisions: [] };
 }
 
 export async function restoreRevision(
@@ -184,7 +186,7 @@ export async function restoreRevision(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ version, note: note || `Restored to v${version}` }),
     }, true);
-    return body?.data;
+    return typedData<Record<string, unknown>>(body) ?? {};
 }
 
 export async function getReviewPreview(input: {
@@ -199,7 +201,7 @@ export async function getReviewPreview(input: {
         body: JSON.stringify(input),
     }, true);
 
-    return body?.data ?? { eligibleIds: [], blockedIds: [], warnings: [] };
+    return typedData<AdminReviewPreview>(body) ?? { eligibleIds: [], blockedIds: [], warnings: [] };
 }
 
 export async function getBulkUpdatePreview(input: {
@@ -212,7 +214,7 @@ export async function getBulkUpdatePreview(input: {
         body: JSON.stringify(input),
     }, true);
 
-    return body?.data ?? {
+    return typedData<AdminBulkPreview>(body) ?? {
         totalTargets: 0,
         affectedByStatus: {},
         warnings: [],
@@ -229,7 +231,7 @@ export async function createAdminAnnouncement(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
 }
 
 export async function updateAdminAnnouncement(
@@ -241,7 +243,7 @@ export async function updateAdminAnnouncement(
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
 }
 
 export async function approveAdminAnnouncement(
@@ -254,7 +256,7 @@ export async function approveAdminAnnouncement(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(note ? { note } : {}),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
 }
 
 export async function rejectAdminAnnouncement(
@@ -267,7 +269,7 @@ export async function rejectAdminAnnouncement(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(note ? { note } : {}),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
 }
 
 export async function runBulkApprove(
@@ -280,7 +282,7 @@ export async function runBulkApprove(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ ids, ...(note ? { note } : {}) }),
     }, true);
-    return body?.data ?? {};
+    return typedData<Record<string, unknown>>(body) ?? {};
 }
 
 export async function runBulkReject(
@@ -293,7 +295,7 @@ export async function runBulkReject(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ ids, ...(note ? { note } : {}) }),
     }, true);
-    return body?.data ?? {};
+    return typedData<Record<string, unknown>>(body) ?? {};
 }
 
 export async function runBulkUpdate(
@@ -306,7 +308,7 @@ export async function runBulkUpdate(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify({ ids, data }),
     }, true);
-    return body?.data ?? {};
+    return typedData<Record<string, unknown>>(body) ?? {};
 }
 
 export async function createAdminContentRecord(payload: Record<string, unknown>): Promise<AdminContentRecord> {
@@ -315,7 +317,7 @@ export async function createAdminContentRecord(payload: Record<string, unknown>)
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminContentRecord>(body) ?? {} as AdminContentRecord;
 }
 
 export async function updateAdminContentRecord(id: string, payload: Record<string, unknown>): Promise<AdminContentRecord> {
@@ -324,7 +326,7 @@ export async function updateAdminContentRecord(id: string, payload: Record<strin
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data ?? {};
+    return typedData<AdminContentRecord>(body) ?? {} as AdminContentRecord;
 }
 
 export async function updateAnnouncementSeo(
@@ -345,5 +347,5 @@ export async function updateAnnouncementSeo(
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminContentRecord>(body)!;
 }

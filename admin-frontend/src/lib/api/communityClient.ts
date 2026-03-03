@@ -1,5 +1,5 @@
 import type { AdminErrorReport, CommunityFlag, CommunityForum, CommunityGroup, CommunityQa } from '../../types';
-import { mutationHeaders, request, toArray } from './core';
+import { mutationHeaders, request, toArray, typedData } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
 export async function getErrorReports(input: {
@@ -27,7 +27,7 @@ export async function updateErrorReport(
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminErrorReport>(body)!;
 }
 
 export async function getCommunityFlags(input: {

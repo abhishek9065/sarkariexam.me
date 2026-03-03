@@ -8,7 +8,7 @@ import type {
     MediaAsset,
     TemplateRecord,
 } from '../../types';
-import { mutationHeaders, request, toArray } from './core';
+import { mutationHeaders, request, toArray, typedData, typedMeta } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
 export async function getHomepageSections(): Promise<HomepageSectionConfig[]> {
@@ -41,12 +41,13 @@ export async function getLinkRecords(input: {
     if (input.announcementId) params.set('announcementId', input.announcementId);
     if (input.search?.trim()) params.set('search', input.search.trim());
     const body = await request(`${ADMIN_API_PATHS.adminLinks}?${params.toString()}`);
+    const meta = typedMeta(body);
     return {
         data: toArray<LinkRecord>(body?.data),
         meta: {
-            total: Number(body?.meta?.total ?? 0),
-            limit: Number(body?.meta?.limit ?? input.limit ?? 50),
-            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+            total: meta.total,
+            limit: meta.limit || (input.limit ?? 50),
+            offset: meta.offset || (input.offset ?? 0),
         },
     };
 }
@@ -57,7 +58,7 @@ export async function createLinkRecord(payload: Omit<LinkRecord, 'id'>): Promise
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<LinkRecord>(body)!;
 }
 
 export async function updateLinkRecord(id: string, payload: Partial<Omit<LinkRecord, 'id'>>): Promise<LinkRecord> {
@@ -66,7 +67,7 @@ export async function updateLinkRecord(id: string, payload: Partial<Omit<LinkRec
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<LinkRecord>(body)!;
 }
 
 export async function checkLinks(payload: {
@@ -81,7 +82,7 @@ export async function checkLinks(payload: {
     }, true);
     return {
         data: toArray<LinkHealthReport>(body?.data),
-        meta: body?.meta,
+        meta: (body?.meta as Record<string, unknown> | undefined),
     };
 }
 
@@ -95,7 +96,8 @@ export async function getLinkHealthSummary(days = 7): Promise<{
 }> {
     const boundedDays = Math.max(1, Math.min(90, days));
     const body = await request(`${ADMIN_API_PATHS.adminLinkHealthSummary}?days=${boundedDays}`);
-    return body?.data ?? {
+    type HealthSummary = { windowDays: number; generatedAt: string; totalLinks: number; byStatus: Record<string, number>; eventSummary: Array<{ status: string; count: number; avgResponseTimeMs: number | null }>; recentBroken: Array<{ id: string; label: string; url: string; announcementId?: string; updatedAt?: string }> };
+    return typedData<HealthSummary>(body) ?? {
         windowDays: boundedDays,
         generatedAt: new Date().toISOString(),
         totalLinks: 0,
@@ -114,7 +116,7 @@ export async function replaceLinks(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data ?? {};
+    return typedData<Record<string, unknown>>(body) ?? {};
 }
 
 export async function getMediaAssets(input: {
@@ -131,12 +133,13 @@ export async function getMediaAssets(input: {
     if (input.status && input.status !== 'all') params.set('status', input.status);
     if (input.search?.trim()) params.set('search', input.search.trim());
     const body = await request(`${ADMIN_API_PATHS.adminMedia}?${params.toString()}`);
+    const meta = typedMeta(body);
     return {
         data: toArray<MediaAsset>(body?.data),
         meta: {
-            total: Number(body?.meta?.total ?? 0),
-            limit: Number(body?.meta?.limit ?? input.limit ?? 50),
-            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+            total: meta.total,
+            limit: meta.limit || (input.limit ?? 50),
+            offset: meta.offset || (input.offset ?? 0),
         },
     };
 }
@@ -147,7 +150,7 @@ export async function createMediaAsset(payload: Omit<MediaAsset, 'id' | 'status'
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<MediaAsset>(body)!;
 }
 
 export async function updateMediaAsset(id: string, payload: Partial<Omit<MediaAsset, 'id'>>): Promise<MediaAsset> {
@@ -156,7 +159,7 @@ export async function updateMediaAsset(id: string, payload: Partial<Omit<MediaAs
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<MediaAsset>(body)!;
 }
 
 export async function getTemplateRecords(input: {
@@ -171,12 +174,13 @@ export async function getTemplateRecords(input: {
     params.set('limit', String(input.limit ?? 100));
     params.set('offset', String(input.offset ?? 0));
     const body = await request(`${ADMIN_API_PATHS.adminTemplates}?${params.toString()}`);
+    const meta = typedMeta(body);
     return {
         data: toArray<TemplateRecord>(body?.data),
         meta: {
-            total: Number(body?.meta?.total ?? 0),
-            limit: Number(body?.meta?.limit ?? input.limit ?? 100),
-            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+            total: meta.total,
+            limit: meta.limit || (input.limit ?? 100),
+            offset: meta.offset || (input.offset ?? 0),
         },
     };
 }
@@ -187,7 +191,7 @@ export async function createTemplateRecord(payload: Omit<TemplateRecord, 'id'>):
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<TemplateRecord>(body)!;
 }
 
 export async function updateTemplateRecord(id: string, payload: Partial<Omit<TemplateRecord, 'id'>>): Promise<TemplateRecord> {
@@ -196,7 +200,7 @@ export async function updateTemplateRecord(id: string, payload: Partial<Omit<Tem
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<TemplateRecord>(body)!;
 }
 
 export async function getAdminAlerts(input: {
@@ -213,12 +217,13 @@ export async function getAdminAlerts(input: {
     params.set('limit', String(input.limit ?? 60));
     params.set('offset', String(input.offset ?? 0));
     const body = await request(`${ADMIN_API_PATHS.adminAlerts}?${params.toString()}`);
+    const meta = typedMeta(body);
     return {
         data: toArray<AdminAlert>(body?.data),
         meta: {
-            total: Number(body?.meta?.total ?? 0),
-            limit: Number(body?.meta?.limit ?? input.limit ?? 60),
-            offset: Number(body?.meta?.offset ?? input.offset ?? 0),
+            total: meta.total,
+            limit: meta.limit || (input.limit ?? 60),
+            offset: meta.offset || (input.offset ?? 0),
         },
     };
 }
@@ -229,7 +234,7 @@ export async function createAdminAlert(payload: Omit<AdminAlert, 'id'>): Promise
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminAlert>(body)!;
 }
 
 export async function updateAdminAlert(id: string, payload: Partial<Omit<AdminAlert, 'id'>>): Promise<AdminAlert> {
@@ -238,12 +243,12 @@ export async function updateAdminAlert(id: string, payload: Partial<Omit<AdminAl
         headers: mutationHeaders(),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminAlert>(body)!;
 }
 
 export async function getAdminSetting(key: 'states' | 'boards' | 'tags'): Promise<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }> {
     const body = await request(`/api/admin/settings/${encodeURIComponent(key)}`);
-    return body?.data ?? { key, values: [] };
+    return typedData<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }>(body) ?? { key, values: [] };
 }
 
 export async function updateAdminSetting(key: 'states' | 'boards' | 'tags', values: string[]): Promise<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }> {
@@ -252,7 +257,7 @@ export async function updateAdminSetting(key: 'states' | 'boards' | 'tags', valu
         headers: mutationHeaders(),
         body: JSON.stringify({ values }),
     }, true);
-    return body?.data ?? { key, values };
+    return typedData<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }>(body) ?? { key, values };
 }
 
 export async function getAdminRoleUsers(): Promise<AdminRoleUser[]> {
@@ -270,5 +275,5 @@ export async function updateAdminRoleUser(
         headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
     }, true);
-    return body?.data;
+    return typedData<AdminRoleUser>(body)!;
 }
