@@ -1,0 +1,9 @@
+remote: error: GH006: Protected branch update failed for refs/heads/main.        
+remote: 
+remote: - This branch must not contain merge commits.        
+remote:   Found 1 violation:        
+remote: 
+remote:   d3ba78dbf029cc8e0fe0bce2983c5c4ed649a001        
+To https://github.com/abhishek9065/sarkariexam.me.git
+ ! [remote rejected] main -> main (protected branch hook declined)
+error: failed to push some refs to 'https://github.com/abhishek9065/sarkariexam.me.git'
