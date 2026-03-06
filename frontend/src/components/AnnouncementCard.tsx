@@ -4,58 +4,47 @@ import { buildAnnouncementDetailPath, type SourceTag } from '../utils/trackingLi
 import { trackEvent } from '../utils/analytics';
 
 const TYPE_LABELS: Record<ContentType, string> = {
-    job: 'Job',
-    result: 'Result',
-    'admit-card': 'Admit Card',
-    'answer-key': 'Answer Key',
-    admission: 'Admission',
-    syllabus: 'Syllabus',
+    job: 'Job', result: 'Result', 'admit-card': 'Admit Card',
+    'answer-key': 'Answer Key', admission: 'Admission', syllabus: 'Syllabus',
 };
 
 const TYPE_ICONS: Record<ContentType, string> = {
-    job: '💼',
-    result: '📊',
-    'admit-card': '🎫',
-    'answer-key': '🔑',
-    admission: '🎓',
-    syllabus: '📚',
+    job: '💼', result: '📊', 'admit-card': '🎫',
+    'answer-key': '🔑', admission: '🎓', syllabus: '📚',
 };
 
 function formatDate(dateStr?: string | null): string {
     if (!dateStr) return '';
     try {
         return new Date(dateStr).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
+            day: 'numeric', month: 'short', year: 'numeric',
         });
-    } catch {
-        return '';
-    }
+    } catch { return ''; }
 }
 
-function getDeadlineStatus(deadline?: string | null): { label: string; className: string } | null {
+function getDeadlineInfo(deadline?: string | null): {
+    label: string; className: string; isExpired: boolean; daysLeft: number | null;
+} | null {
     if (!deadline) return null;
     const now = new Date();
     const dl = new Date(deadline);
     const diffDays = Math.ceil((dl.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { label: 'Expired', className: 'deadline-expired' };
-    if (diffDays <= 3) return { label: `${diffDays}d left`, className: 'deadline-urgent' };
-    if (diffDays <= 7) return { label: `${diffDays}d left`, className: 'deadline-soon' };
-    return { label: formatDate(deadline), className: 'deadline-normal' };
+    if (diffDays < 0) return { label: 'Expired', className: 'deadline-expired', isExpired: true, daysLeft: diffDays };
+    if (diffDays === 0) return { label: '🔥 Last Day!', className: 'deadline-urgent', isExpired: false, daysLeft: 0 };
+    if (diffDays <= 3) return { label: `🔥 ${diffDays}d left`, className: 'deadline-urgent', isExpired: false, daysLeft: diffDays };
+    if (diffDays <= 7) return { label: `⏰ ${diffDays}d left`, className: 'deadline-soon', isExpired: false, daysLeft: diffDays };
+    return { label: `${diffDays}d left`, className: 'deadline-normal', isExpired: false, daysLeft: diffDays };
 }
 
 interface Props {
     card: CardType;
-    /** Show type badge. Defaults to true */
     showType?: boolean;
-    /** Optional source tagging for analytics attribution */
     sourceTag?: SourceTag;
 }
 
 export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
-    const deadlineInfo = getDeadlineStatus(card.deadline);
+    const deadlineInfo = getDeadlineInfo(card.deadline);
     const detailPath = buildAnnouncementDetailPath(card.type, card.slug, sourceTag);
 
     const handleClick = () => {
@@ -63,7 +52,7 @@ export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
     };
 
     return (
-        <Link to={detailPath} className="announcement-card card card-clickable" data-source={sourceTag} onClick={handleClick}>
+        <Link to={detailPath} className={`announcement-card card card-clickable${deadlineInfo?.isExpired ? ' card-expired' : ''}`} data-source={sourceTag} onClick={handleClick}>
             <div className="announcement-card-header">
                 {showType && (
                     <span className={`badge badge-${card.type}`}>
@@ -84,24 +73,34 @@ export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
 
             <div className="announcement-card-meta">
                 {card.organization && (
-                    <span className="announcement-card-org">
-                        🏛️ {card.organization}
-                    </span>
+                    <span className="announcement-card-org">🏛️ {card.organization}</span>
                 )}
                 {card.location && (
-                    <span className="announcement-card-location">
-                        📍 {card.location}
+                    <span className="announcement-card-location">📍 {card.location}</span>
+                )}
+            </div>
+
+            {/* ── Rich Info Row (Posts + Deadline countdown) ── */}
+            <div className="announcement-card-info">
+                {card.totalPosts != null && card.totalPosts > 0 && (
+                    <span className="card-info-chip card-info-posts">
+                        👥 {card.totalPosts.toLocaleString()} Posts
+                    </span>
+                )}
+                {card.deadline && !deadlineInfo?.isExpired && (
+                    <span className="card-info-chip card-info-deadline">
+                        📅 {formatDate(card.deadline)}
+                    </span>
+                )}
+                {deadlineInfo?.isExpired && (
+                    <span className="card-info-chip card-info-expired">
+                        ❌ Closed
                     </span>
                 )}
             </div>
 
             <div className="announcement-card-footer">
                 <div className="announcement-card-stats">
-                    {card.totalPosts != null && card.totalPosts > 0 && (
-                        <span className="announcement-card-posts">
-                            👥 {card.totalPosts.toLocaleString()} posts
-                        </span>
-                    )}
                     {card.viewCount != null && card.viewCount > 0 && (
                         <span className="announcement-card-views">
                             👁 {card.viewCount.toLocaleString()}

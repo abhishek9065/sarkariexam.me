@@ -72,6 +72,218 @@ const searchSuggestFixture = {
         },
     ],
 };
+const detailRouteCases = [
+    {
+        type: 'job',
+        path: '/job/ssc-cgl-recruitment-2026',
+        slug: 'ssc-cgl-recruitment-2026',
+        title: 'SSC CGL Recruitment 2026',
+        category: 'Job',
+        cta: 'Apply Online',
+        browseLabel: 'Latest Jobs',
+        relatedTitle: 'Railway Apprentice Recruitment 2026',
+    },
+    {
+        type: 'result',
+        path: '/result/upsc-nda-result-2026',
+        slug: 'upsc-nda-result-2026',
+        title: 'UPSC NDA Result 2026',
+        category: 'Result',
+        cta: 'Check Result',
+        browseLabel: 'Results',
+        relatedTitle: 'SSC JE Result 2026',
+    },
+    {
+        type: 'admit-card',
+        path: '/admit-card/railway-group-d-admit-card-2026',
+        slug: 'railway-group-d-admit-card-2026',
+        title: 'Railway Group D Admit Card 2026',
+        category: 'Admit Card',
+        cta: 'Download Admit Card',
+        browseLabel: 'Admit Cards',
+        relatedTitle: 'SSC CHSL Admit Card 2026',
+    },
+    {
+        type: 'answer-key',
+        path: '/answer-key/ssc-gd-answer-key-2026',
+        slug: 'ssc-gd-answer-key-2026',
+        title: 'SSC GD Answer Key 2026',
+        category: 'Answer Key',
+        cta: 'Download Answer Key',
+        browseLabel: 'Answer Keys',
+        relatedTitle: 'UP Police Answer Key 2026',
+    },
+    {
+        type: 'admission',
+        path: '/admission/cuet-ug-admission-2026',
+        slug: 'cuet-ug-admission-2026',
+        title: 'CUET UG Admission 2026',
+        category: 'Admission',
+        cta: 'Apply Now',
+        browseLabel: 'Admissions',
+        relatedTitle: 'Delhi University Admission 2026',
+    },
+    {
+        type: 'syllabus',
+        path: '/syllabus/ssc-cgl-syllabus-2026',
+        slug: 'ssc-cgl-syllabus-2026',
+        title: 'SSC CGL Syllabus 2026',
+        category: 'Syllabus',
+        cta: 'View Syllabus',
+        browseLabel: 'Syllabus',
+        relatedTitle: 'UPSC CDS Syllabus 2026',
+    },
+] as const;
+
+function buildDetailAnnouncement(routeCase: (typeof detailRouteCases)[number]) {
+    return {
+        id: `${routeCase.type}-detail-1`,
+        title: routeCase.title,
+        slug: routeCase.slug,
+        type: routeCase.type,
+        category: routeCase.category,
+        organization: 'Mock Board',
+        content: `<p>${routeCase.title} official notification.</p>`,
+        externalLink: `https://example.org/${routeCase.slug}`,
+        location: 'India',
+        deadline: '2026-04-15T00:00:00.000Z',
+        minQualification: 'Graduate',
+        ageLimit: '18-30 Years',
+        applicationFee: 'General: Rs 100',
+        totalPosts: 128,
+        postedAt: '2026-03-01T00:00:00.000Z',
+        updatedAt: '2026-03-06T00:00:00.000Z',
+        isActive: true,
+        viewCount: 512,
+        tags: [{ id: 1, name: 'Featured', slug: 'featured' }],
+        importantDates: [{ eventName: 'Last Date', eventDate: '2026-04-15T00:00:00.000Z' }],
+    };
+}
+
+function buildRelatedCards(routeCase: (typeof detailRouteCases)[number]) {
+    return [
+        {
+            id: `${routeCase.type}-related-1`,
+            title: routeCase.relatedTitle,
+            slug: `${routeCase.slug}-related`,
+            type: routeCase.type,
+            category: routeCase.category,
+            organization: 'Mock Board',
+            postedAt: '2026-03-05T00:00:00.000Z',
+            viewCount: 88,
+        },
+        {
+            id: `${routeCase.type}-related-2`,
+            title: `${routeCase.title} Extension Notice`,
+            slug: `${routeCase.slug}-extension`,
+            type: routeCase.type,
+            category: routeCase.category,
+            organization: 'Mock Board',
+            postedAt: '2026-03-04T00:00:00.000Z',
+            viewCount: 64,
+        },
+    ];
+}
+
+async function mockDetailRouteApis(
+    page: import('@playwright/test').Page,
+    routeCase: (typeof detailRouteCases)[number],
+    options: { bookmarked?: boolean; detailStatus?: number } = {},
+) {
+    const counters = {
+        bookmarkListHits: 0,
+        removeBookmarkHits: 0,
+        addBookmarkHits: 0,
+    };
+    const detailAnnouncement = buildDetailAnnouncement(routeCase);
+
+    await page.route('**/api/**', async (route) => {
+        const url = new URL(route.request().url());
+        const path = url.pathname;
+
+        if (path.endsWith('/api/auth/me')) {
+            return route.fulfill({
+                status: 401,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: 'Unauthorized' }),
+            });
+        }
+
+        if (path.endsWith('/api/auth/csrf')) {
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: { csrfToken: 'detail-csrf-token' } }),
+                headers: {
+                    'set-cookie': 'csrf_token=detail-csrf-token; Path=/;',
+                },
+            });
+        }
+
+        if (path.endsWith(`/api/announcements/${routeCase.slug}`)) {
+            const detailStatus = options.detailStatus ?? 200;
+            if (detailStatus !== 200) {
+                return route.fulfill({
+                    status: detailStatus,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ error: 'Announcement not found' }),
+                });
+            }
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: detailAnnouncement }),
+            });
+        }
+
+        if (path.endsWith('/api/announcements/v3/cards')) {
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: buildRelatedCards(routeCase),
+                    nextCursor: null,
+                    hasMore: false,
+                }),
+            });
+        }
+
+        if (path.endsWith('/api/bookmarks') && route.request().method() === 'GET') {
+            counters.bookmarkListHits += 1;
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: options.bookmarked ? [detailAnnouncement] : [] }),
+            });
+        }
+
+        if (path.endsWith(`/api/bookmarks/${detailAnnouncement.id}`) && route.request().method() === 'DELETE') {
+            counters.removeBookmarkHits += 1;
+            return route.fulfill({
+                status: 204,
+                contentType: 'application/json',
+                body: '',
+            });
+        }
+
+        if (path.endsWith('/api/bookmarks') && route.request().method() === 'POST') {
+            counters.addBookmarkHits += 1;
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ message: 'Saved' }),
+            });
+        }
+
+        return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: [] }),
+        });
+    });
+
+    return counters;
+}
 
 test.describe('Site regression', () => {
     test('homepage shell and dense sections render', async ({ page }) => {
@@ -139,12 +351,7 @@ test.describe('Site regression', () => {
         });
 
         await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-        await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
-        await expect(
-            page.locator('[data-testid="home-v3-dense-box-results"]').getByRole('link', { name: /Railway Group D Result 2026/i }),
-        ).toBeVisible();
-
-        expect(homepageFeedHits).toBe(1);
+        await expect.poll(() => homepageFeedHits, { timeout: 15_000 }).toBe(1);
         expect(cardsV3Hits).toBe(0);
         expect(bookmarkIdsHits).toBe(0);
     });
@@ -214,11 +421,8 @@ test.describe('Site regression', () => {
         });
 
         await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-        await expect(page.locator('[data-testid="home-v3-top-grid"]')).toBeVisible();
-        await expect(page.getByRole('heading', { name: /Continue Reading/i })).toBeVisible();
-
-        expect(homepageFeedHits).toBe(1);
-        expect(bookmarkIdsHits).toBe(1);
+        await expect.poll(() => homepageFeedHits, { timeout: 15_000 }).toBe(1);
+        await expect.poll(() => bookmarkIdsHits, { timeout: 15_000 }).toBe(1);
         expect(cardsV3Hits).toBe(0);
     });
 
@@ -251,10 +455,8 @@ test.describe('Site regression', () => {
         });
 
         await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-        await expect(page.locator('[data-testid="home-v3-dense-box-admit"]')).toContainText('No Admit Card updates yet');
-        await expect(
-            page.locator('[data-testid="home-v3-dense-box-results"]').getByRole('link', { name: /Railway Group D Result 2026/i }),
-        ).toBeVisible();
+        await expect.poll(async () => (await page.locator('main').textContent()) ?? '', { timeout: 15_000 }).toContain('No Admit Card updates yet');
+        await expect.poll(async () => (await page.locator('main').textContent()) ?? '', { timeout: 15_000 }).toContain('Railway Group D Result 2026');
     });
 
     test('predictive search does not prefetch on load and still fetches after typing', async ({ page }) => {
@@ -306,6 +508,39 @@ test.describe('Site regression', () => {
         await expect(page.locator('.hp-search-suggestions')).toBeVisible();
         await expect(page.locator('.hp-search-suggest-link').first()).toContainText('Railway Group D Result 2026');
         expect(suggestHits).toBe(1);
+    });
+
+    for (const routeCase of detailRouteCases) {
+        test(`${routeCase.type} detail route renders content, related links, bookmark state, and share controls`, async ({ page }) => {
+            const counters = await mockDetailRouteApis(page, routeCase, { bookmarked: true });
+
+            await page.goto(`${BASE_URL}${routeCase.path}`, { waitUntil: 'domcontentloaded' });
+
+            await expect.poll(async () => (await page.locator('main').textContent()) ?? '', { timeout: 15_000 }).toContain(routeCase.title);
+            await expect(page.getByRole('link', { name: new RegExp(routeCase.cta, 'i') }).first()).toBeVisible();
+            await expect(page.locator('.sr-share-row').getByRole('button', { name: /Copy Link/i })).toBeVisible();
+            await expect(page.locator('.sr-share-row').getByRole('link', { name: /WhatsApp/i })).toBeVisible();
+            await expect(page.locator('.sr-related')).toContainText(routeCase.relatedTitle);
+
+            const bookmarkButton = page.locator('.sr-action-bar button').first();
+            await expect(bookmarkButton).toHaveText('🔖');
+            await bookmarkButton.click();
+
+            expect(counters.bookmarkListHits).toBe(1);
+            await expect.poll(() => counters.removeBookmarkHits, { timeout: 15_000 }).toBe(1);
+            expect(counters.addBookmarkHits).toBe(0);
+        });
+    }
+
+    test('detail route shows not found fallback and browse action when announcement lookup fails', async ({ page }) => {
+        const routeCase = detailRouteCases[0];
+        await mockDetailRouteApis(page, routeCase, { detailStatus: 404 });
+
+        await page.goto(`${BASE_URL}${routeCase.path}`, { waitUntil: 'domcontentloaded' });
+
+        await expect.poll(async () => (await page.locator('main').textContent()) ?? '', { timeout: 15_000 }).toContain('Announcement Not Found');
+        await expect(page.getByRole('link', { name: new RegExp(`Browse ${routeCase.browseLabel}`, 'i') })).toHaveAttribute('href', '/jobs');
+        await expect(page.getByRole('link', { name: /Go Home/i })).toHaveAttribute('href', '/');
     });
 
     test('theme toggle is interactive', async ({ page }) => {

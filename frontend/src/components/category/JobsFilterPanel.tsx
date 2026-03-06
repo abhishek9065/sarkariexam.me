@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { type ChangeEvent, useEffect, useRef } from 'react';
 
 export interface JobsFilterState {
     search: string;
@@ -43,27 +43,51 @@ export function JobsFilterPanel({
     onApply,
     onReset,
 }: Props) {
+    /* Auto-apply: debounce search input, instant for dropdowns */
+    const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+    const isFirstMount = useRef(true);
+
+    /* Auto-apply on dropdown changes (state, qualification, organization) */
+    useEffect(() => {
+        if (isFirstMount.current) { isFirstMount.current = false; return; }
+        /* Skip debounce for dropdown changes — apply immediately */
+        onApply();
+    }, [onApply, value.state, value.qualification, value.organization]);
+
     const handleInput = (key: keyof JobsFilterState) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        onChange({ ...value, [key]: event.target.value });
+        const next = { ...value, [key]: event.target.value };
+        onChange(next);
+
+        /* For search: debounce 400ms then auto-apply */
+        if (key === 'search') {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(() => onApply(), 400);
+        }
+    };
+
+    const handleSortChange = (event: ChangeEvent<HTMLSelectElement>) => {
+        onSortChange(event.target.value as 'newest' | 'oldest' | 'deadline' | 'views');
+        /* Sort changes apply immediately */
+        setTimeout(() => onApply(), 0);
     };
 
     return (
         <section className="jobs-filter-panel card" data-testid="jobs-filter-panel">
             <div className="jobs-filter-grid">
                 <label className="jobs-filter-field">
-                    <span>Search</span>
+                    <span>🔍 Search</span>
                     <input
                         className="input"
                         type="text"
                         aria-label="Search"
                         value={value.search}
                         onChange={handleInput('search')}
-                        placeholder="Search jobs..."
+                        placeholder="Search jobs, exams..."
                     />
                 </label>
 
                 <label className="jobs-filter-field">
-                    <span>State</span>
+                    <span>📍 State</span>
                     <select className="input" aria-label="State" value={value.state} onChange={handleInput('state')}>
                         <option value="">All States</option>
                         {options.states.map((item) => (
@@ -73,7 +97,7 @@ export function JobsFilterPanel({
                 </label>
 
                 <label className="jobs-filter-field">
-                    <span>Qualification</span>
+                    <span>📚 Qualification</span>
                     <select className="input" aria-label="Qualification" value={value.qualification} onChange={handleInput('qualification')}>
                         <option value="">All Qualifications</option>
                         {options.qualifications.map((item) => (
@@ -83,7 +107,7 @@ export function JobsFilterPanel({
                 </label>
 
                 <label className="jobs-filter-field">
-                    <span>Organization</span>
+                    <span>🏛️ Organization</span>
                     <select className="input" aria-label="Organization" value={value.organization} onChange={handleInput('organization')}>
                         <option value="">All Organizations</option>
                         {options.organizations.map((item) => (
@@ -93,12 +117,12 @@ export function JobsFilterPanel({
                 </label>
 
                 <label className="jobs-filter-field">
-                    <span>Sort</span>
+                    <span>⬇️ Sort</span>
                     <select
                         className="input"
                         aria-label="Sort"
                         value={sort}
-                        onChange={(event) => onSortChange(event.target.value as 'newest' | 'oldest' | 'deadline' | 'views')}
+                        onChange={handleSortChange}
                     >
                         {SORT_OPTIONS.map((item) => (
                             <option key={item.value} value={item.value}>{item.label}</option>
@@ -125,8 +149,7 @@ export function JobsFilterPanel({
             </div>
 
             <div className="jobs-filter-actions">
-                <button type="button" className="btn btn-accent" onClick={onApply}>Apply Filters</button>
-                <button type="button" className="btn btn-outline" onClick={onReset}>Reset</button>
+                <button type="button" className="btn btn-outline" onClick={onReset}>🔄 Reset Filters</button>
             </div>
         </section>
     );

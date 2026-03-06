@@ -233,9 +233,132 @@
     background: var(--bg-primary);
     border: 1px solid var(--border-light);
     border-radius: 16px;
-    padding: var(--space-5);
+    padding: 0;
     margin-bottom: var(--space-4);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+/* ── Prominent Status Banner ── */
+.sr-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    flex-wrap: wrap;
+}
+
+.sr-status-banner.sr-badge-open {
+    background: linear-gradient(90deg, #dcfce7, #f0fdf4);
+    color: #15803d;
+    border-bottom: 2px solid #22c55e;
+}
+
+.sr-status-banner.sr-badge-soon {
+    background: linear-gradient(90deg, #fef3c7, #fffbeb);
+    color: #b45309;
+    border-bottom: 2px solid #f59e0b;
+}
+
+.sr-status-banner.sr-badge-urgent {
+    background: linear-gradient(90deg, #fee2e2, #fef2f2);
+    color: #b91c1c;
+    border-bottom: 2px solid #ef4444;
+    animation: urgentPulse 2s ease-in-out infinite;
+}
+
+.sr-status-banner.sr-badge-closed {
+    background: linear-gradient(90deg, #f1f5f9, #f8fafc);
+    color: #64748b;
+    border-bottom: 2px solid #94a3b8;
+}
+
+@keyframes urgentPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.85;
+    }
+}
+
+.sr-status-icon {
+    font-size: 1rem;
+}
+
+.sr-status-text {
+    font-size: 0.9rem;
+}
+
+.sr-status-countdown {
+    font-weight: 500;
+    opacity: 0.85;
+}
+
+.sr-status-date {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 500;
+    opacity: 0.7;
+}
+
+/* Hero content padding (since overflow hidden on parent) */
+.sr-title,
+.sr-org,
+.sr-stats-grid,
+.sr-action-bar {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+}
+
+.sr-title {
+    padding-top: var(--space-4);
+}
+
+.sr-action-bar {
+    padding-bottom: var(--space-5);
+}
+
+/* ── Countdown in stat card ── */
+.sr-stat-countdown {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 2px;
+}
+
+.sr-stat-deadline .sr-stat-countdown {
+    color: #b45309;
+}
+
+.sr-stat-deadline-urgent .sr-stat-countdown {
+    color: #b91c1c;
+    animation: urgentPulse 2s ease-in-out infinite;
+}
+
+.sr-stat-expired {
+    color: #64748b !important;
+}
+
+/* Dynamic deadline stat — urgent red instead of default */
+.sr-stat-deadline-urgent {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.sr-stat-deadline-urgent .sr-stat-label {
+    color: #b91c1c;
+}
+
+.sr-stat-deadline-urgent .sr-stat-value {
+    color: #991b1b;
 }
 
 .sr-hero-top {
@@ -1341,6 +1464,47 @@
     background: var(--bg-secondary);
     border-color: rgba(30, 41, 59, 0.6);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .sr-status-banner.sr-badge-open {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05));
+    color: #4ade80;
+    border-bottom-color: rgba(34, 197, 94, 0.4);
+}
+
+[data-theme="dark"] .sr-status-banner.sr-badge-soon {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+    color: #fbbf24;
+    border-bottom-color: rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="dark"] .sr-status-banner.sr-badge-urgent {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+    color: #f87171;
+    border-bottom-color: rgba(239, 68, 68, 0.4);
+}
+
+[data-theme="dark"] .sr-status-banner.sr-badge-closed {
+    background: linear-gradient(90deg, rgba(100, 116, 139, 0.15), rgba(100, 116, 139, 0.05));
+    color: #94a3b8;
+    border-bottom-color: rgba(100, 116, 139, 0.4);
+}
+
+[data-theme="dark"] .sr-stat-deadline-urgent {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .sr-stat-deadline-urgent .sr-stat-label {
+    color: #f87171;
+}
+
+[data-theme="dark"] .sr-stat-deadline-urgent .sr-stat-value {
+    color: #fca5a5;
+}
+
+[data-theme="dark"] .sr-stat-countdown {
+    color: #fbbf24;
 }
 
 [data-theme="dark"] .sr-section {

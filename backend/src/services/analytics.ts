@@ -1,6 +1,6 @@
 import type { Collection } from 'mongodb';
 
-import { classifySource } from './attribution.js';
+import { classifySource, normalizeAttribution } from './attribution.js';
 import { getCollection } from './cosmosdb.js';
 
 export type AnalyticsEventType =
@@ -77,6 +77,31 @@ const getCollectionSafe = <T>(name: string): Collection<T> | null => {
         return null;
     }
 };
+
+const TRAFFIC_SOURCE_LABELS = {
+    seo: 'Organic',
+    direct: 'Direct',
+    social: 'Social',
+    email: 'Email',
+    push: 'Push',
+    referral: 'Referral',
+    in_app: 'In-App',
+    unknown: 'Unknown',
+} as const;
+
+type TrafficSourceBucket = keyof typeof TRAFFIC_SOURCE_LABELS;
+
+function toTrafficSourceBucket(source: string | null): TrafficSourceBucket {
+    const normalizedSource = normalizeAttribution({ source }).source;
+    if (normalizedSource === 'seo') return 'seo';
+    if (normalizedSource === 'direct') return 'direct';
+    if (normalizedSource === 'social') return 'social';
+    if (normalizedSource === 'email' || normalizedSource === 'digest') return 'email';
+    if (normalizedSource === 'push') return 'push';
+    if (normalizedSource === 'referral') return 'referral';
+    if (classifySource(normalizedSource) === 'in_app') return 'in_app';
+    return 'unknown';
+}
 
 export async function recordAnnouncementView(
     announcementId: string,
@@ -399,6 +424,102 @@ export async function getDailyRollups(days: number = 14): Promise<Array<{
     }
 
     return results;
+}
+
+export async function getTopAnnouncementViews(hours: number = 24, limit: number = 10): Promise<Array<{
+    announcementId: string;
+    views: number;
+}>> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) return [];
+
+    const start = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+    try {
+        const rows = await events.aggregate([
+            {
+                $match: {
+                    type: 'announcement_view',
+                    createdAt: { $gte: start },
+                    announcementId: { $exists: true, $ne: null },
+                },
+            },
+            {
+                $group: {
+                    _id: '$announcementId',
+                    views: { $sum: 1 },
+                },
+            },
+            { $sort: { views: -1 } },
+            { $limit: limit },
+        ]).toArray();
+
+        return rows
+            .map((row) => ({
+                announcementId: String((row as { _id?: unknown })._id ?? ''),
+                views: Number((row as { views?: unknown }).views ?? 0),
+            }))
+            .filter((row) => row.announcementId && Number.isFinite(row.views) && row.views > 0);
+    } catch (error) {
+        console.error('[Analytics] Failed to load top announcement views:', error);
+        return [];
+    }
+}
+
+export async function getAnnouncementViewTrafficSources(days: number = 7, limit: number = 6): Promise<Array<{
+    source: string;
+    label: string;
+    views: number;
+}>> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) return [];
+
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
+
+    try {
+        const rows = await events.aggregate([
+            {
+                $match: {
+                    type: 'announcement_view',
+                    createdAt: { $gte: start },
+                },
+            },
+            {
+                $group: {
+                    _id: { $ifNull: ['$metadata.source', '__none__'] },
+                    views: { $sum: 1 },
+                },
+            },
+        ]).toArray();
+
+        const buckets = new Map<TrafficSourceBucket, { source: string; label: string; views: number }>();
+
+        for (const row of rows) {
+            const views = Number((row as { views?: unknown }).views ?? 0);
+            if (!Number.isFinite(views) || views <= 0) continue;
+
+            const rawSource = (row as { _id?: unknown })._id === '__none__'
+                ? null
+                : String((row as { _id?: unknown })._id ?? '');
+            const bucket = toTrafficSourceBucket(rawSource);
+            const existing = buckets.get(bucket) ?? {
+                source: bucket,
+                label: TRAFFIC_SOURCE_LABELS[bucket],
+                views: 0,
+            };
+            existing.views += views;
+            buckets.set(bucket, existing);
+        }
+
+        return Array.from(buckets.values())
+            .sort((a, b) => b.views - a.views)
+            .slice(0, limit);
+    } catch (error) {
+        console.error('[Analytics] Failed to load announcement traffic sources:', error);
+        return [];
+    }
 }
 
 export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Promise<{

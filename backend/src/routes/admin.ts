@@ -21,7 +21,12 @@ import {
 } from '../services/adminApprovals.js';
 import { getAdminAuditLogsPaged, rebuildAdminAuditLedger, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
-import { getDailyRollups, recordAnalyticsEvent } from '../services/analytics.js';
+import {
+    getAnnouncementViewTrafficSources,
+    getDailyRollups,
+    getTopAnnouncementViews,
+    recordAnalyticsEvent,
+} from '../services/analytics.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { getCollection, healthCheck } from '../services/cosmosdb.js';
 import { hasPermission } from '../services/rbac.js';
@@ -2912,7 +2917,13 @@ contentRouter.patch('/announcements/:id/seo', requirePermission('announcements:w
  */
 operationsRouter.get('/reports', requirePermission('analytics:read'), async (_req, res) => {
     try {
-        const announcements = await AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 });
+        const [announcements, linkRecords, trafficRollups, trafficSourcesRaw, topAnnouncementViews] = await Promise.all([
+            AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 }),
+            getCollection<LinkRecordDoc>('link_records').find({}).toArray(),
+            getDailyRollups(7),
+            getAnnouncementViewTrafficSources(7),
+            getTopAnnouncementViews(24, 10),
+        ]);
         const now = Date.now();
         const inSevenDays = now + 7 * 24 * 60 * 60 * 1000;
         const expired = announcements.filter((item: any) => item.deadline && new Date(item.deadline).getTime() < now);
@@ -2925,12 +2936,37 @@ operationsRouter.get('/reports', requirePermission('analytics:read'), async (_re
             .sort((a: any, b: any) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
             .slice(0, 25);
 
-        const topViewed24h = announcements
-            .slice()
-            .sort((a: any, b: any) => (b.viewCount || 0) - (a.viewCount || 0))
-            .slice(0, 10);
+        const announcementsById = new Map(
+            announcements.map((item: any) => [
+                serializeId(item?.id ?? item?._id),
+                item,
+            ]),
+        );
+        const topViewed24h = topAnnouncementViews
+            .map(({ announcementId, views }) => {
+                const item = announcementsById.get(announcementId);
+                if (!item) return null;
+                return {
+                    id: serializeId(item.id ?? item._id),
+                    title: item.title,
+                    type: item.type,
+                    views,
+                    organization: item.organization,
+                };
+            })
+            .filter((item) => item !== null);
 
-        const linkRecords = await getCollection<LinkRecordDoc>('link_records').find({}).toArray();
+        const trafficSeries = trafficRollups.map((entry) => ({
+            date: entry.date,
+            views: entry.views,
+        }));
+        const trafficSourceTotal = trafficSourcesRaw.reduce((sum, item) => sum + item.views, 0);
+        const trafficSources = trafficSourcesRaw.map((item) => ({
+            ...item,
+            percentage: trafficSourceTotal > 0
+                ? Number(((item.views / trafficSourceTotal) * 100).toFixed(1))
+                : 0,
+        }));
         const brokenLinks = linkRecords.filter((item) => item.status === 'broken');
         const pendingDrafts = announcements.filter((item: any) => (item.status || 'published') === 'draft');
         const scheduled = announcements.filter((item: any) => item.status === 'scheduled');
@@ -2946,13 +2982,7 @@ operationsRouter.get('/reports', requirePermission('analytics:read'), async (_re
                     brokenLinks: brokenLinks.length,
                     expired: expired.length,
                 },
-                mostViewed24h: topViewed24h.map((item: any) => ({
-                    id: item.id,
-                    title: item.title,
-                    type: item.type,
-                    views: item.viewCount || 0,
-                    organization: item.organization,
-                })),
+                mostViewed24h: topViewed24h,
                 upcomingDeadlines: upcoming.map((item: any) => ({
                     id: item.id,
                     title: item.title,
@@ -2960,6 +2990,8 @@ operationsRouter.get('/reports', requirePermission('analytics:read'), async (_re
                     deadline: item.deadline,
                     organization: item.organization,
                 })),
+                trafficSeries,
+                trafficSources,
                 brokenLinkItems: brokenLinks.slice(0, 50).map((item: any) => ({
                     id: serializeId((item as any)._id),
                     label: item.label,

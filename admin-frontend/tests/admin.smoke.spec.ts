@@ -9,7 +9,12 @@ const jsonResponse = (data: unknown) => ({
     body: JSON.stringify({ success: true, data }),
 });
 
-async function mockAuthenticatedAdmin(page: import('@playwright/test').Page) {
+async function mockAuthenticatedAdmin(
+    page: import('@playwright/test').Page,
+    overrides: {
+        reports?: Record<string, unknown>;
+    } = {},
+) {
     await page.route('**/api/admin-auth/me', async (route) => {
         await route.fulfill(jsonResponse({
             user: {
@@ -48,7 +53,23 @@ async function mockAuthenticatedAdmin(page: import('@playwright/test').Page) {
             },
             mostViewed24h: [],
             upcomingDeadlines: [],
+            trafficSeries: [
+                { date: '2026-03-01', views: 30 },
+                { date: '2026-03-02', views: 45 },
+                { date: '2026-03-03', views: 60 },
+                { date: '2026-03-04', views: 75 },
+                { date: '2026-03-05', views: 90 },
+                { date: '2026-03-06', views: 105 },
+                { date: '2026-03-07', views: 120 },
+            ],
+            trafficSources: [
+                { source: 'seo', label: 'Organic', views: 60, percentage: 60 },
+                { source: 'direct', label: 'Direct', views: 25, percentage: 25 },
+                { source: 'referral', label: 'Referral', views: 10, percentage: 10 },
+                { source: 'social', label: 'Social', views: 5, percentage: 5 },
+            ],
             brokenLinkItems: [],
+            ...overrides.reports,
         }));
     });
 
@@ -116,6 +137,61 @@ test('authenticated dashboard renders premium desktop shell', async ({ page }) =
     const logoutButton = page.getByRole('button', { name: /^Logout$/i });
     const height = await logoutButton.evaluate((node) => node.getBoundingClientRect().height);
     expect(height).toBeGreaterThanOrEqual(44);
+});
+
+test('dashboard traffic widgets render reports API traffic data instead of fallback constants', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page, {
+        reports: {
+            trafficSeries: [
+                { date: '2026-03-01', views: 15 },
+                { date: '2026-03-02', views: 30 },
+                { date: '2026-03-03', views: 45 },
+                { date: '2026-03-04', views: 60 },
+                { date: '2026-03-05', views: 75 },
+                { date: '2026-03-06', views: 90 },
+                { date: '2026-03-07', views: 105 },
+            ],
+            trafficSources: [
+                { source: 'seo', label: 'Organic', views: 60, percentage: 60 },
+                { source: 'direct', label: 'Direct', views: 25, percentage: 25 },
+                { source: 'referral', label: 'Referral', views: 10, percentage: 10 },
+                { source: 'social', label: 'Social', views: 5, percentage: 5 },
+            ],
+            mostViewed24h: [
+                { id: 'a-1', title: 'SSC CGL Recruitment 2026', type: 'job', views: 42, organization: 'SSC' },
+            ],
+        },
+    });
+    await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByText(/Last 7 days .*420 total visits/i)).toBeVisible();
+    await expect(page.locator('.dash-traffic-legend')).toContainText('Organic');
+    await expect(page.locator('.dash-traffic-legend')).toContainText('60%');
+    await expect(page.locator('.dash-traffic-chart')).toContainText('105');
+    await expect(page.locator('.dash-viewed-list')).toContainText('42 views');
+});
+
+test('dashboard traffic widgets show an explicit empty state when reports API has no traffic data', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page, {
+        reports: {
+            trafficSeries: [
+                { date: '2026-03-01', views: 0 },
+                { date: '2026-03-02', views: 0 },
+                { date: '2026-03-03', views: 0 },
+                { date: '2026-03-04', views: 0 },
+                { date: '2026-03-05', views: 0 },
+                { date: '2026-03-06', views: 0 },
+                { date: '2026-03-07', views: 0 },
+            ],
+            trafficSources: [],
+            mostViewed24h: [],
+        },
+    });
+    await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByText('Traffic charts will populate after announcement views are recorded.')).toBeVisible();
 });
 
 test('command palette opens from shell action in authenticated session', async ({ page }) => {

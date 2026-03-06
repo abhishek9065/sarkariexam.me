@@ -265,6 +265,8 @@ export interface AdminReportSnapshot {
     };
     mostViewed24h: Array<{ id: string; title: string; type: string; views: number; organization?: string }>;
     upcomingDeadlines: Array<{ id: string; title: string; type: string; deadline?: string; organization?: string }>;
+    trafficSeries: Array<{ date: string; views: number }>;
+    trafficSources: Array<{ source: string; label: string; views: number; percentage: number }>;
     brokenLinkItems: Array<{ id: string; label: string; url: string; updatedAt?: string; announcementId?: string }>;
 }
 

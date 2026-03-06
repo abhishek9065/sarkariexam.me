@@ -4703,7 +4703,107 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "totalPosts": { "type": "integer" },
+                            "pendingDrafts": { "type": "integer" },
+                            "scheduled": { "type": "integer" },
+                            "pendingReview": { "type": "integer" },
+                            "brokenLinks": { "type": "integer" },
+                            "expired": { "type": "integer" }
+                          },
+                          "required": [
+                            "totalPosts",
+                            "pendingDrafts",
+                            "scheduled",
+                            "pendingReview",
+                            "brokenLinks",
+                            "expired"
+                          ]
+                        },
+                        "mostViewed24h": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "title": { "type": "string" },
+                              "type": { "type": "string" },
+                              "views": { "type": "integer" },
+                              "organization": { "type": "string" }
+                            },
+                            "required": ["id", "title", "type", "views"]
+                          }
+                        },
+                        "upcomingDeadlines": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "title": { "type": "string" },
+                              "type": { "type": "string" },
+                              "deadline": { "type": "string", "format": "date-time" },
+                              "organization": { "type": "string" }
+                            },
+                            "required": ["id", "title", "type"]
+                          }
+                        },
+                        "trafficSeries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "date": { "type": "string" },
+                              "views": { "type": "integer" }
+                            },
+                            "required": ["date", "views"]
+                          }
+                        },
+                        "trafficSources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "source": { "type": "string" },
+                              "label": { "type": "string" },
+                              "views": { "type": "integer" },
+                              "percentage": { "type": "number" }
+                            },
+                            "required": ["source", "label", "views", "percentage"]
+                          }
+                        },
+                        "brokenLinkItems": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "label": { "type": "string" },
+                              "url": { "type": "string" },
+                              "updatedAt": { "type": "string", "format": "date-time" },
+                              "announcementId": { "type": "string" }
+                            },
+                            "required": ["id", "label", "url"]
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "mostViewed24h",
+                        "upcomingDeadlines",
+                        "trafficSeries",
+                        "trafficSources",
+                        "brokenLinkItems"
+                      ]
+                    }
+                  },
+                  "required": ["data"]
                 }
               }
             }

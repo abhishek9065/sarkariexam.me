@@ -11,12 +11,40 @@ const SOCIAL_LINKS = [
     { label: 'Threads', href: 'https://threads.net/@sarkariexamsme', icon: '@' },
 ];
 
-const FOOTER_LINKS = [
-    { label: 'About', to: '/about' },
-    { label: 'Contact', to: '/contact' },
-    { label: 'Advertise With Us', to: '/advertise' },
-    { label: 'Privacy Policy', to: '/privacy' },
-    { label: 'Disclaimer', to: '/disclaimer' },
+const FOOTER_SECTIONS = [
+    {
+        title: '📂 Browse',
+        links: [
+            { label: 'Latest Jobs', to: '/jobs' },
+            { label: 'Results', to: '/results' },
+            { label: 'Admit Cards', to: '/admit-card' },
+            { label: 'Answer Keys', to: '/answer-key' },
+            { label: 'Syllabus', to: '/syllabus' },
+            { label: 'Admissions', to: '/admission' },
+        ],
+    },
+    {
+        title: '🏛️ Popular Exams',
+        links: [
+            { label: 'SSC', to: '/jobs?q=SSC' },
+            { label: 'UPSC', to: '/jobs?q=UPSC' },
+            { label: 'Railway (RRB)', to: '/jobs?q=Railway' },
+            { label: 'Banking (IBPS)', to: '/jobs?q=IBPS' },
+            { label: 'Defence', to: '/jobs?q=Defence' },
+            { label: 'State PSC', to: '/jobs?q=PSC' },
+        ],
+    },
+    {
+        title: '🔗 Quick Links',
+        links: [
+            { label: 'About', to: '/about' },
+            { label: 'Contact', to: '/contact' },
+            { label: 'Explore Organizations', to: '/explore' },
+            { label: 'Advertise With Us', to: '/advertise' },
+            { label: 'Privacy Policy', to: '/privacy' },
+            { label: 'Disclaimer', to: '/disclaimer' },
+        ],
+    },
 ];
 
 export function Footer() {
@@ -50,17 +78,26 @@ export function Footer() {
                     </div>
                 </div>
 
-                <nav className="footer-nav" aria-label="Footer navigation">
-                    {FOOTER_LINKS.map((item) => (
-                        <Link key={item.label} to={item.to}>{item.label}</Link>
+                {/* ── Categorized Link Sections ── */}
+                <div className="footer-sections">
+                    {FOOTER_SECTIONS.map((section) => (
+                        <div key={section.title} className="footer-section">
+                            <h3 className="footer-section-title">{section.title}</h3>
+                            <ul className="footer-section-list">
+                                {section.links.map((link) => (
+                                    <li key={link.label}>
+                                        <Link to={link.to}>{link.label}</Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     ))}
-                    <Link to="/explore">Explore Organizations</Link>
-                </nav>
+                </div>
 
                 <div className="footer-bottom">
                     <p>© 2026 SarkariExams.me — All Rights Reserved</p>
                     <p className="footer-disclaimer">
-                        <strong>Disclaimer:</strong> Content is for informational use only. Verify all details from official sources before acting.
+                        <strong>Disclaimer:</strong> Content is for informational use only. Verify all details from official sources before acting. We do not collect any fees.
                     </p>
                 </div>
             </div>

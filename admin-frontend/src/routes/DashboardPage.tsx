@@ -33,6 +33,23 @@ const ACTION_ICONS: Record<string, string> = {
     rollback: '⏪', role_update: '🔑', settings_update: '⚙️',
 };
 
+const TRAFFIC_SOURCE_COLORS: Record<string, string> = {
+    seo: 'var(--accent)',
+    direct: 'var(--info)',
+    social: 'var(--warning)',
+    referral: 'var(--success)',
+    email: 'var(--accent-strong)',
+    push: 'var(--danger)',
+    in_app: 'var(--success)',
+    unknown: 'var(--text-muted)',
+};
+
+function formatTrafficDayLabel(date: string): string {
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime())) return date;
+    return parsed.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+}
+
 export function DashboardPage() {
     const navigate = useNavigate();
     const { user } = useAdminAuth();
@@ -62,6 +79,7 @@ export function DashboardPage() {
     const summary = reportsQuery.data?.summary;
     const topViewed = reportsQuery.data?.mostViewed24h ?? [];
     const deadlines = reportsQuery.data?.upcomingDeadlines ?? [];
+    const trafficSeries = reportsQuery.data?.trafficSeries ?? [];
     const openAlertsCount = alertsQuery.data?.meta?.total ?? alertsQuery.data?.data?.length ?? 0;
 
     const dashboardData = dashboardQuery.data && typeof dashboardQuery.data === 'object'
@@ -72,36 +90,32 @@ export function DashboardPage() {
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
     const urgentDeadlines = deadlines.filter((d) => d.deadline && new Date(d.deadline) <= threeDaysFromNow);
 
-    const staleDrafts = summary?.pendingDrafts ?? dashboardData.pendingReview ?? 0;
+    const staleDrafts = summary?.pendingDrafts ?? 0;
     const brokenLinksCount = summary?.brokenLinks ?? 0;
     const needsReviewCount = summary?.pendingReview ?? dashboardData.pendingReview ?? 0;
 
     const isPending = dashboardQuery.isPending || reportsQuery.isPending || alertsQuery.isPending;
     const hasError = dashboardQuery.error || reportsQuery.error || alertsQuery.error;
 
-    const quickStats: Array<{ label: string; value: number | string; tone?: string; route: string; trend?: { value: number, label: string } }> = [
-        { label: 'Needs Review', value: Number(needsReviewCount), tone: Number(needsReviewCount) > 0 ? 'warning' : '', route: '/review', trend: { value: 12, label: 'this week' } },
-        { label: 'Broken Links', value: Number(brokenLinksCount), tone: Number(brokenLinksCount) > 0 ? 'danger' : '', route: '/link-manager', trend: { value: -5, label: 'vs last week' } },
-        { label: 'Deadlines Soon', value: urgentDeadlines.length, tone: urgentDeadlines.length > 0 ? 'warning' : '', route: '/alerts', trend: { value: 0, label: 'steady' } },
-        { label: 'Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts', trend: { value: -2, label: 'this month' } },
-        { label: 'Today\u2019s Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts', trend: { value: 24, label: 'vs yesterday' } },
-        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts', trend: { value: 0, label: 'live count' } },
+    const quickStats: Array<{ label: string; value: number | string; tone?: string; route: string }> = [
+        { label: 'Needs Review', value: Number(needsReviewCount), tone: Number(needsReviewCount) > 0 ? 'warning' : '', route: '/review' },
+        { label: 'Broken Links', value: Number(brokenLinksCount), tone: Number(brokenLinksCount) > 0 ? 'danger' : '', route: '/link-manager' },
+        { label: 'Deadlines Soon', value: urgentDeadlines.length, tone: urgentDeadlines.length > 0 ? 'warning' : '', route: '/alerts' },
+        { label: 'Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts' },
+        { label: 'Total Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts' },
+        { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts' },
     ];
 
-    const mockVisits = [450, 620, 580, 810, 1024, 940, 1150]; // TODO: replace with real analytics API
-    const maxVisits = Math.max(...mockVisits);
-    const totalVisits = mockVisits.reduce((a, b) => a + b, 0);
-
-    // Donut chart data (CSS conic-gradient)
-    const trafficSources = [
-        { label: 'Organic', value: 58, color: 'var(--accent)' },
-        { label: 'Direct', value: 24, color: 'var(--info)' },
-        { label: 'Referral', value: 12, color: 'var(--success)' },
-        { label: 'Social', value: 6, color: 'var(--warning)' },
-    ];
+    const totalVisits = trafficSeries.reduce((sum, item) => sum + item.views, 0);
+    const maxVisits = trafficSeries.reduce((max, item) => Math.max(max, item.views), 0);
+    const trafficSources = (reportsQuery.data?.trafficSources ?? []).map((src) => ({
+        ...src,
+        color: TRAFFIC_SOURCE_COLORS[src.source] ?? TRAFFIC_SOURCE_COLORS.unknown,
+    }));
+    const hasTrafficData = totalVisits > 0 && (trafficSeries.some((item) => item.views > 0) || trafficSources.some((item) => item.views > 0));
     const donutGradient = trafficSources.reduce((acc, src, i) => {
-        const start = trafficSources.slice(0, i).reduce((s, x) => s + x.value, 0);
-        const end = start + src.value;
+        const start = trafficSources.slice(0, i).reduce((sum, item) => sum + item.percentage, 0);
+        const end = start + src.percentage;
         return acc + `${src.color} ${start * 3.6}deg ${end * 3.6}deg, `;
     }, '').slice(0, -2);
 
@@ -161,15 +175,10 @@ export function DashboardPage() {
                                 {metric.tone === 'danger' && Number(metric.value) > 0 ? (
                                     <span className="ops-status-chip expired">Fix</span>
                                 ) : null}
-                                {metric.tone === 'warning' && Number(metric.value) > 0 ? (
-                                    <span className="ops-status-chip review">!</span>
-                                ) : null}
-                            </div>
-                            {metric.trend && (
-                                <div className={`ops-kpi-trend ${metric.trend.value > 0 ? 'positive' : metric.trend.value < 0 ? 'negative' : 'neutral'}`}>
-                                    {metric.trend.value > 0 ? '\u2191' : metric.trend.value < 0 ? '\u2193' : '\u2014'} {Math.abs(metric.trend.value)}% {metric.trend.label}
-                                </div>
-                            )}
+                            {metric.tone === 'warning' && Number(metric.value) > 0 ? (
+                                <span className="ops-status-chip review">!</span>
+                            ) : null}
+                        </div>
                         </button>
                     ))}
                 </div>
@@ -181,51 +190,78 @@ export function DashboardPage() {
                     <div className="ops-card-header">
                         <div>
                             <h2 className="ops-card-title">Traffic Overview</h2>
-                            <p className="ops-card-description">Last 7 days &middot; {totalVisits.toLocaleString()} total visits</p>
+                            <p className="ops-card-description">
+                                Last 7 days &middot; {hasTrafficData ? `${totalVisits.toLocaleString()} total visits` : 'Waiting for traffic events'}
+                            </p>
                         </div>
                     </div>
-                    {/* Donut + Bar combo */}
-                    <div className="dash-traffic-layout">
-                        {/* CSS Donut Chart */}
-                        <div className="dash-donut-wrap">
-                            <div
-                                className="dash-donut-chart"
-                                ref={(el) => {
-                                    if (el) {
-                                        el.style.background = `conic-gradient(${donutGradient})`;
-                                    }
-                                }}
-                            />
-                            <div className="dash-donut-center">
-                                <span className="dash-donut-label">SOURCES</span>
+                    {reportsQuery.isPending ? (
+                        <div className="dash-traffic-layout">
+                            <div className="dash-donut-wrap">
+                                <div className="dash-donut-chart ops-skeleton" />
                             </div>
-                        </div>
-                        {/* Bar Chart */}
-                        <div className="ops-chart-container dash-traffic-chart">
-                            {mockVisits.map((val, i) => {
-                                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                                const pct = `${Math.max(4, (val / maxVisits) * 100)}%`;
-                                return (
-                                    <div key={i} className="ops-chart-bar-wrap" title={`${val} visits`}>
-                                        <div className="ops-chart-bar-value">{val.toLocaleString()}</div>
-                                        <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = pct; }}></div>
-                                        <div className="ops-chart-label">{days[i]}</div>
+                            <div className="ops-chart-container dash-traffic-chart">
+                                {Array.from({ length: 7 }).map((_, index) => (
+                                    <div key={index} className="ops-chart-bar-wrap">
+                                        <div className="ops-skeleton line short" />
+                                        <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = `${25 + index * 8}%`; }} />
+                                        <div className="ops-skeleton line short" />
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    {/* Donut Legend */}
-                    <div className="dash-traffic-legend">
-                        {trafficSources.map((src) => (
-                            <div key={src.label} className="dash-traffic-legend-item">
-                                <span
-                                    className={`dash-traffic-legend-dot dash-traffic-legend-dot-${src.label.toLowerCase()}`}
-                                />
-                                {src.label} <strong className="dash-traffic-legend-value">{src.value}%</strong>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ) : null}
+                    {!reportsQuery.isPending && !hasTrafficData ? (
+                        <div className="ops-empty-state">
+                            <div className="ops-empty-state-icon">📈</div>
+                            <div className="ops-empty-state-title">No traffic data yet</div>
+                            <div className="ops-empty-state-description">Traffic charts will populate after announcement views are recorded.</div>
+                        </div>
+                    ) : null}
+                    {!reportsQuery.isPending && hasTrafficData ? (
+                        <>
+                            <div className="dash-traffic-layout">
+                                <div className="dash-donut-wrap">
+                                    <div
+                                        className="dash-donut-chart"
+                                        ref={(el) => {
+                                            if (el) {
+                                                el.style.background = donutGradient
+                                                    ? `conic-gradient(${donutGradient})`
+                                                    : 'conic-gradient(var(--text-muted) 0deg 360deg)';
+                                            }
+                                        }}
+                                    />
+                                    <div className="dash-donut-center">
+                                        <span className="dash-donut-label">SOURCES</span>
+                                    </div>
+                                </div>
+                                <div className="ops-chart-container dash-traffic-chart">
+                                    {trafficSeries.map((item) => {
+                                        const pct = maxVisits > 0 ? `${Math.max(4, (item.views / maxVisits) * 100)}%` : '4%';
+                                        return (
+                                            <div key={item.date} className="ops-chart-bar-wrap" title={`${item.views} visits`}>
+                                                <div className="ops-chart-bar-value">{item.views.toLocaleString()}</div>
+                                                <div className="ops-chart-bar" ref={(el) => { if (el) el.style.height = pct; }}></div>
+                                                <div className="ops-chart-label">{formatTrafficDayLabel(item.date)}</div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="dash-traffic-legend">
+                                {trafficSources.map((src) => (
+                                    <div key={src.source} className="dash-traffic-legend-item">
+                                        <span
+                                            className="dash-traffic-legend-dot"
+                                            ref={(el) => { if (el) el.style.background = src.color; }}
+                                        />
+                                        {src.label} <strong className="dash-traffic-legend-value">{src.percentage}%</strong>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
                 </div>
 
                 <OpsCard title="Most Viewed" description="Top content by 24h window.">

@@ -2717,7 +2717,49 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            [key: string]: unknown;
+                            data: {
+                                summary: {
+                                    totalPosts: number;
+                                    pendingDrafts: number;
+                                    scheduled: number;
+                                    pendingReview: number;
+                                    brokenLinks: number;
+                                    expired: number;
+                                };
+                                mostViewed24h: {
+                                    id: string;
+                                    title: string;
+                                    type: string;
+                                    views: number;
+                                    organization?: string;
+                                }[];
+                                upcomingDeadlines: {
+                                    id: string;
+                                    title: string;
+                                    type: string;
+                                    /** Format: date-time */
+                                    deadline?: string;
+                                    organization?: string;
+                                }[];
+                                trafficSeries: {
+                                    date: string;
+                                    views: number;
+                                }[];
+                                trafficSources: {
+                                    source: string;
+                                    label: string;
+                                    views: number;
+                                    percentage: number;
+                                }[];
+                                brokenLinkItems: {
+                                    id: string;
+                                    label: string;
+                                    url: string;
+                                    /** Format: date-time */
+                                    updatedAt?: string;
+                                    announcementId?: string;
+                                }[];
+                            };
                         };
                     };
                 };

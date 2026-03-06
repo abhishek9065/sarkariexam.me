@@ -35,9 +35,9 @@ test.describe('Homepage v3/v4 premium layout', () => {
         const allHeaders = page.locator('.home-dense-box-header h2');
         await expect(allHeaders).toHaveCount(8);
 
-        await expect(allHeaders.filter({ hasText: 'Latest Jobs' })).toBeVisible();
-        await expect(allHeaders.filter({ hasText: 'Result' })).toBeVisible();
-        await expect(allHeaders.filter({ hasText: 'Admit Card' })).toBeVisible();
+        await expect(page.getByTestId('home-v3-dense-box-jobs').getByRole('heading', { name: 'Latest Jobs' })).toBeVisible();
+        await expect(page.getByTestId('home-v3-dense-box-results').getByRole('heading', { name: 'Result' })).toBeVisible();
+        await expect(page.getByTestId('home-v3-dense-box-admit').getByRole('heading', { name: 'Admit Card' })).toBeVisible();
 
         // Verify data loads OR empty state shows for Jobs
         const jobsBox = page.locator('[data-testid="home-v3-dense-box-jobs"]');

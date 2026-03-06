@@ -205,9 +205,18 @@ export function DetailPage({ type }: { type: ContentType }) {
     const isClosed = deadline?.cls === 'sr-badge-closed';
     const sections = buildSections(a, jd);
 
+    /* Countdown days for deadline stat */
+    const daysLeft = a.deadline ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / 86_400_000) : null;
+    const deadlineStatCls = daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 ? 'sr-stat-deadline-urgent' : 'sr-stat-deadline';
+
     /* Stale data warning: > 30 days since last update */
     const daysSinceUpdate = Math.floor((Date.now() - new Date(a.updatedAt).getTime()) / 86_400_000);
     const isStale = daysSinceUpdate > 30;
+
+    /* Filter related: hide expired, prioritize open listings */
+    const openRelated = related.filter((card) => !card.deadline || new Date(card.deadline).getTime() > Date.now());
+    const expiredRelated = related.filter((card) => card.deadline && new Date(card.deadline).getTime() <= Date.now());
+    const filteredRelated = [...openRelated, ...expiredRelated].slice(0, 6);
 
     const toNum = (v: unknown) => { const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? n : 0; };
     const fmtCount = (v?: number | null) => toNum(v).toLocaleString('en-IN');
@@ -238,10 +247,15 @@ export function DetailPage({ type }: { type: ContentType }) {
 
                 {/* ─── Hero Header ─── */}
                 <header className="sr-hero">
-                    <div className="sr-hero-top">
-                        {deadline && <span className={`sr-badge ${deadline.cls}`}>{deadline.label}</span>}
-                        <span className="sr-meta">Updated: {formatDate(a.updatedAt)}</span>
-                    </div>
+                    {/* Status Banner — prominent, full width */}
+                    {deadline && (
+                        <div className={`sr-status-banner ${deadline.cls}`}>
+                            <span className="sr-status-icon">{isClosed ? '🔴' : daysLeft !== null && daysLeft <= 3 ? '🔥' : '🟢'}</span>
+                            <span className="sr-status-text">{deadline.label}</span>
+                            {daysLeft !== null && daysLeft > 0 && !isClosed && <span className="sr-status-countdown">({daysLeft} days to apply)</span>}
+                            <span className="sr-status-date">Updated: {formatDate(a.updatedAt)}</span>
+                        </div>
+                    )}
                     <h1 className="sr-title">{a.title}</h1>
                     {a.organization && <p className="sr-org">{a.organization}</p>}
 
@@ -254,9 +268,13 @@ export function DetailPage({ type }: { type: ContentType }) {
                             </div>
                         )}
                         {a.deadline && (
-                            <div className="sr-stat-card sr-stat-deadline">
+                            <div className={`sr-stat-card ${deadlineStatCls}`}>
                                 <span className="sr-stat-label">Last Date</span>
                                 <strong className="sr-stat-value">{formatDate(a.deadline)}</strong>
+                                {daysLeft !== null && daysLeft >= 0 && !isClosed && (
+                                    <span className="sr-stat-countdown">{daysLeft === 0 ? 'Today!' : `${daysLeft} days left`}</span>
+                                )}
+                                {isClosed && <span className="sr-stat-countdown sr-stat-expired">Expired</span>}
                             </div>
                         )}
                         {a.minQualification && (
@@ -656,11 +674,11 @@ export function DetailPage({ type }: { type: ContentType }) {
                 </div>
 
                 {/* ─── Related ─── */}
-                {related.length > 0 && (
+                {filteredRelated.length > 0 && (
                     <section className="sr-related">
                         <h2 className="sr-section-title">🔗 Related {TYPE_LABELS[type]}</h2>
                         <div className="sr-related-grid">
-                            {related.map((card) => <AnnouncementCard key={card.id} card={card} sourceTag="detail_related" />)}
+                            {filteredRelated.map((card) => <AnnouncementCard key={card.id} card={card} sourceTag="detail_related" />)}
                         </div>
                     </section>
                 )}

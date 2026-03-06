@@ -10,7 +10,11 @@ const {
     findByIdMock,
     findByIdsAdminMock,
     findByIdsMock,
+    findAllAdminMock,
     invalidateAnnouncementCachesMock,
+    getDailyRollupsMock,
+    getAnnouncementViewTrafficSourcesMock,
+    getTopAnnouncementViewsMock,
 } = vi.hoisted(() => ({
     createMock: vi.fn(),
     updateMock: vi.fn(),
@@ -19,7 +23,11 @@ const {
     findByIdMock: vi.fn(),
     findByIdsAdminMock: vi.fn(),
     findByIdsMock: vi.fn(),
+    findAllAdminMock: vi.fn(),
     invalidateAnnouncementCachesMock: vi.fn().mockResolvedValue(undefined),
+    getDailyRollupsMock: vi.fn(),
+    getAnnouncementViewTrafficSourcesMock: vi.fn(),
+    getTopAnnouncementViewsMock: vi.fn(),
 }));
 
 vi.mock('../middleware/auth.js', () => ({
@@ -49,6 +57,7 @@ vi.mock('../models/announcements.mongo.js', () => ({
         findById: findByIdMock,
         findByIdsAdmin: findByIdsAdminMock,
         findByIds: findByIdsMock,
+        findAllAdmin: findAllAdminMock,
     },
 }));
 
@@ -106,7 +115,9 @@ vi.mock('../services/activeUsers.js', () => ({
 }));
 
 vi.mock('../services/analytics.js', () => ({
-    getDailyRollups: vi.fn(),
+    getAnnouncementViewTrafficSources: getAnnouncementViewTrafficSourcesMock,
+    getDailyRollups: getDailyRollupsMock,
+    getTopAnnouncementViews: getTopAnnouncementViewsMock,
     recordAnalyticsEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -175,10 +186,47 @@ describe('admin mutation cache invalidation', () => {
             status: 'draft',
             versions: [],
         });
+        findAllAdminMock.mockResolvedValue([
+            {
+                id: 'a1',
+                title: 'UPSC Recruitment 2026',
+                type: 'job',
+                organization: 'UPSC',
+                status: 'draft',
+                deadline: '2026-04-01T00:00:00.000Z',
+                viewCount: 9999,
+            },
+            {
+                id: 'a2',
+                title: 'SSC Result 2026',
+                type: 'result',
+                organization: 'SSC',
+                status: 'published',
+                deadline: '2026-04-02T00:00:00.000Z',
+                viewCount: 8888,
+            },
+        ]);
         findByIdsAdminMock.mockResolvedValue([
             { _id: { toString: () => 'a1' }, status: 'draft' },
         ]);
         findByIdsMock.mockResolvedValue([]);
+        getDailyRollupsMock.mockResolvedValue([
+            { date: '2026-03-01', count: 0, views: 10, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+            { date: '2026-03-02', count: 0, views: 20, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+            { date: '2026-03-03', count: 0, views: 30, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+            { date: '2026-03-04', count: 0, views: 40, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+            { date: '2026-03-05', count: 0, views: 50, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+            { date: '2026-03-06', count: 0, views: 60, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+            { date: '2026-03-07', count: 0, views: 70, listingViews: 0, cardClicks: 0, categoryClicks: 0, filterApplies: 0, searches: 0, bookmarkAdds: 0, registrations: 0 },
+        ]);
+        getAnnouncementViewTrafficSourcesMock.mockResolvedValue([
+            { source: 'seo', label: 'Organic', views: 60 },
+            { source: 'direct', label: 'Direct', views: 40 },
+        ]);
+        getTopAnnouncementViewsMock.mockResolvedValue([
+            { announcementId: 'a2', views: 7 },
+            { announcementId: 'a1', views: 3 },
+        ]);
     });
 
     it('invalidates caches on create', async () => {
@@ -260,5 +308,43 @@ describe('admin mutation cache invalidation', () => {
 
         expect(response.status).toBe(200);
         expect(invalidateAnnouncementCachesMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns reports with truthful traffic series, source split, and 24h top-view counts', async () => {
+        const response = await request(app).get('/api/admin/reports');
+
+        expect(response.status).toBe(200);
+        expect(getDailyRollupsMock).toHaveBeenCalledWith(7);
+        expect(getAnnouncementViewTrafficSourcesMock).toHaveBeenCalledWith(7);
+        expect(getTopAnnouncementViewsMock).toHaveBeenCalledWith(24, 10);
+        expect(response.body.data.trafficSeries).toEqual([
+            { date: '2026-03-01', views: 10 },
+            { date: '2026-03-02', views: 20 },
+            { date: '2026-03-03', views: 30 },
+            { date: '2026-03-04', views: 40 },
+            { date: '2026-03-05', views: 50 },
+            { date: '2026-03-06', views: 60 },
+            { date: '2026-03-07', views: 70 },
+        ]);
+        expect(response.body.data.trafficSources).toEqual([
+            { source: 'seo', label: 'Organic', views: 60, percentage: 60 },
+            { source: 'direct', label: 'Direct', views: 40, percentage: 40 },
+        ]);
+        expect(response.body.data.mostViewed24h).toEqual([
+            {
+                id: 'a2',
+                title: 'SSC Result 2026',
+                type: 'result',
+                views: 7,
+                organization: 'SSC',
+            },
+            {
+                id: 'a1',
+                title: 'UPSC Recruitment 2026',
+                type: 'job',
+                views: 3,
+                organization: 'UPSC',
+            },
+        ]);
     });
 });

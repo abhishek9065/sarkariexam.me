@@ -32,6 +32,8 @@ export async function getAdminReports(): Promise<AdminReportSnapshot> {
         },
         mostViewed24h: [],
         upcomingDeadlines: [],
+        trafficSeries: [],
+        trafficSources: [],
         brokenLinkItems: [],
     };
 }
