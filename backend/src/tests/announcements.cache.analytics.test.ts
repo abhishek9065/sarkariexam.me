@@ -188,7 +188,7 @@ describe('homepage announcement feed', () => {
             .filter((entry: any) => entry?.type === 'listing_view');
 
         expect(listingViewCalls.length).toBeGreaterThanOrEqual(2);
-        expect(listingViewCalls[0]?.metadata?.source).toBe('home');
+        expect(listingViewCalls[0]?.metadata?.source).toBe('home_feed');
         expect(listingViewCalls[0]?.metadata?.count).toBe(2);
     });
 
@@ -213,5 +213,52 @@ describe('homepage announcement feed', () => {
             syllabus: [],
             admission: [],
         });
+    });
+
+    it('returns partial homepage data when one section lookup fails', async () => {
+        findListingCardsMock
+            .mockResolvedValueOnce({
+                data: [
+                    {
+                        id: 'job-1',
+                        title: 'Job Item',
+                        slug: 'job-item',
+                        type: 'job',
+                        category: 'Jobs',
+                        organization: 'UPSC',
+                        postedAt: '2026-03-03T00:00:00.000Z',
+                    },
+                ],
+                nextCursor: null,
+                hasMore: false,
+            })
+            .mockRejectedValueOnce(new Error('result lookup failed'))
+            .mockResolvedValueOnce({
+                data: [
+                    {
+                        id: 'admit-1',
+                        title: 'Admit Item',
+                        slug: 'admit-item',
+                        type: 'admit-card',
+                        category: 'Admit',
+                        organization: 'SSC',
+                        postedAt: '2026-03-02T00:00:00.000Z',
+                    },
+                ],
+                nextCursor: null,
+                hasMore: false,
+            })
+            .mockResolvedValueOnce({ data: [], nextCursor: null, hasMore: false })
+            .mockResolvedValueOnce({ data: [], nextCursor: null, hasMore: false })
+            .mockResolvedValueOnce({ data: [], nextCursor: null, hasMore: false });
+
+        const response = await request(app).get('/api/announcements/homepage');
+
+        expect(response.status).toBe(200);
+        expect(findListingCardsMock).toHaveBeenCalledTimes(6);
+        expect(response.body.data.sections.job).toHaveLength(1);
+        expect(response.body.data.sections.result).toEqual([]);
+        expect(response.body.data.sections['admit-card']).toHaveLength(1);
+        expect(response.body.data.latest.map((entry: { id: string }) => entry.id)).toEqual(['job-1', 'admit-1']);
     });
 });

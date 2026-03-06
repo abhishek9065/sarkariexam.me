@@ -354,7 +354,7 @@ router.get(
   cacheControl(120),
   async (req, res) => {
     try {
-      const results = await Promise.all(
+      const settledResults = await Promise.allSettled(
         HOMEPAGE_SECTION_TYPES.map((type) =>
           AnnouncementModel.findListingCards({
             type,
@@ -366,8 +366,22 @@ router.get(
       );
 
       const sections = createEmptyHomepageSections();
+      let failedSections = 0;
+
       for (const [index, type] of HOMEPAGE_SECTION_TYPES.entries()) {
-        sections[type] = results[index]?.data ?? [];
+        const result = settledResults[index];
+        if (result?.status === 'fulfilled') {
+          sections[type] = result.value?.data ?? [];
+          continue;
+        }
+
+        failedSections += 1;
+        sections[type] = [];
+        console.error(`Error fetching homepage section "${type}":`, result?.reason);
+      }
+
+      if (failedSections === HOMEPAGE_SECTION_TYPES.length) {
+        return res.status(500).json({ error: 'Failed to fetch homepage announcement feed' });
       }
 
       const latest = buildHomepageLatest(sections);

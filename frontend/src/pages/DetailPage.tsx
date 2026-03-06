@@ -8,86 +8,95 @@ import { trackEvent } from '../utils/analytics';
 import type { Announcement, AnnouncementCard as CardType, ContentType } from '../types';
 import './DetailPage.css';
 
+/* ── JobDetails sub-types (mirrors admin JobPostingForm) ── */
+interface JDImportantDate { name: string; date: string }
+interface JDApplicationFee { category: string; amount: number }
+interface JDAgeRelaxation { category: string; years: number; maxAge: number }
+interface JDVacancyDetail { category: string; male: number; female: number; total: number }
+interface JDExamSubject { name: string; questions: number; marks: number }
+interface JDSelectionStep { step: number; name: string; description: string }
+interface JDImportantLink { label: string; url: string; type: 'primary' | 'secondary' }
+interface JDFAQ { question: string; answer: string }
+
+interface JobDetailsData {
+    importantDates?: JDImportantDate[];
+    applicationFees?: JDApplicationFee[];
+    ageLimits?: { minAge: number; maxAge: number; asOnDate: string; relaxations: JDAgeRelaxation[] };
+    vacancies?: { total: number; details: JDVacancyDetail[] };
+    eligibility?: { nationality: string; domicile: string; education: string; additional: string[] };
+    salary?: { payLevel: string; payScale: string; inHandSalary: string };
+    physicalRequirements?: {
+        male: { heightGeneral: string; heightSCST: string; chestNormal: string; chestExpanded: string; running: string };
+        female: { heightGeneral: string; heightSCST: string; running: string };
+    };
+    examPattern?: { totalQuestions: number; totalMarks: number; duration: string; negativeMarking: string; subjects: JDExamSubject[] };
+    selectionProcess?: JDSelectionStep[];
+    howToApply?: string[];
+    importantLinks?: JDImportantLink[];
+    faqs?: JDFAQ[];
+}
+
 const TYPE_LABELS: Record<ContentType, string> = {
-    job: 'Latest Jobs',
-    result: 'Results',
-    'admit-card': 'Admit Cards',
-    'answer-key': 'Answer Keys',
-    admission: 'Admissions',
-    syllabus: 'Syllabus',
+    job: 'Latest Jobs', result: 'Results', 'admit-card': 'Admit Cards',
+    'answer-key': 'Answer Keys', admission: 'Admissions', syllabus: 'Syllabus',
 };
-
 const TYPE_ROUTES: Record<ContentType, string> = {
-    job: '/jobs',
-    result: '/results',
-    'admit-card': '/admit-card',
-    'answer-key': '/answer-key',
-    admission: '/admission',
-    syllabus: '/syllabus',
+    job: '/jobs', result: '/results', 'admit-card': '/admit-card',
+    'answer-key': '/answer-key', admission: '/admission', syllabus: '/syllabus',
 };
-
-const TYPE_COLORS: Record<ContentType, string> = {
-    job: '#0069d9',
-    result: '#0f9d58',
-    'admit-card': '#f97316',
-    'answer-key': '#7c3aed',
-    admission: '#be185d',
-    syllabus: '#0284c7',
-};
-
 const TYPE_CTA: Record<ContentType, string> = {
-    job: 'Apply Online',
-    result: 'Check Result',
-    'admit-card': 'Download Admit Card',
-    'answer-key': 'Download Answer Key',
-    admission: 'Apply Now',
-    syllabus: 'View Syllabus',
+    job: 'Apply Online', result: 'Check Result', 'admit-card': 'Download Admit Card',
+    'answer-key': 'Download Answer Key', admission: 'Apply Now', syllabus: 'View Syllabus',
 };
 
+/* ── Helpers ── */
 function formatDate(dateStr?: string | null): string {
     if (!dateStr) return '—';
-    try {
-        return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return '—'; }
+    try { return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+    catch { return '—'; }
 }
 
 function formatSalary(min?: number, max?: number): string | null {
     if (!min && !max) return null;
-    if (min && max) return `₹${min.toLocaleString()} – ₹${max.toLocaleString()}`;
-    if (min) return `₹${min.toLocaleString()}+`;
-    return `Up to ₹${max!.toLocaleString()}`;
+    if (min && max) return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')}`;
+    if (min) return `₹${min.toLocaleString('en-IN')}+`;
+    return `Up to ₹${max!.toLocaleString('en-IN')}`;
 }
 
-function getDeadlineStatus(deadline?: string | null): { label: string; className: string; icon: string } | null {
+function getDeadlineStatus(deadline?: string | null): { label: string; cls: string } | null {
     if (!deadline) return null;
-    const diffDays = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
-    if (diffDays < 0) return { label: 'Expired', className: 'detail-deadline-expired', icon: '⛔' };
-    if (diffDays === 0) return { label: 'Last day!', className: 'detail-deadline-urgent', icon: '🔥' };
-    if (diffDays <= 3) return { label: `${diffDays} days left`, className: 'detail-deadline-urgent', icon: '🔥' };
-    if (diffDays <= 7) return { label: `${diffDays} days left`, className: 'detail-deadline-soon', icon: '⏰' };
-    return { label: formatDate(deadline), className: 'detail-deadline-normal', icon: '📅' };
-}
-
-function getStatusBadge(deadline?: string | null): { label: string; cls: string } {
-    if (!deadline) return { label: 'Open', cls: 'detail-facts-open' };
     const d = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
-    if (d < 0) return { label: 'Closed', cls: 'detail-facts-closed' };
-    return { label: 'Open', cls: 'detail-facts-open' };
+    if (d < 0) return { label: 'Closed', cls: 'sr-badge-closed' };
+    if (d === 0) return { label: '🔥 Last Day!', cls: 'sr-badge-urgent' };
+    if (d <= 3) return { label: `🔥 ${d} Days Left`, cls: 'sr-badge-urgent' };
+    if (d <= 7) return { label: `⏰ ${d} Days Left`, cls: 'sr-badge-soon' };
+    return { label: '🟢 Open', cls: 'sr-badge-open' };
 }
 
-/* Extractable sections from rich HTML content for jump-nav */
-interface JumpSection { id: string; label: string; icon: string }
-function buildJumpSections(a: Announcement): JumpSection[] {
-    const sections: JumpSection[] = [];
-    sections.push({ id: 'overview', label: 'Overview', icon: '📋' });
-    if (a.importantDates && a.importantDates.length > 0) sections.push({ id: 'dates', label: 'Important Dates', icon: '📅' });
-    if (a.minQualification || a.ageLimit) sections.push({ id: 'eligibility', label: 'Eligibility', icon: '🎓' });
-    if (a.applicationFee) sections.push({ id: 'fees', label: 'Fees', icon: '💳' });
-    if (a.content) sections.push({ id: 'details', label: 'Full Details', icon: '📝' });
-    if (a.externalLink) sections.push({ id: 'links', label: 'Important Links', icon: '🔗' });
-    return sections;
+/* ── Jump-linked sections for scroll-nav ── */
+interface SectionDef { id: string; label: string }
+function buildSections(a: Announcement, jd?: JobDetailsData): SectionDef[] {
+    const s: SectionDef[] = [];
+    s.push({ id: 'overview', label: 'Overview' });
+    if (jd?.importantDates?.length || (a.importantDates && a.importantDates.length > 0)) s.push({ id: 'dates', label: 'Important Dates' });
+    if (jd?.applicationFees?.length || a.applicationFee) s.push({ id: 'fees', label: 'Application Fee' });
+    if (jd?.ageLimits || a.ageLimit) s.push({ id: 'age', label: 'Age Limit' });
+    if (jd?.eligibility || a.minQualification) s.push({ id: 'eligibility', label: 'Eligibility' });
+    if (jd?.vacancies?.details?.length) s.push({ id: 'vacancy', label: 'Vacancy Details' });
+    if (jd?.salary?.payLevel || jd?.salary?.payScale) s.push({ id: 'salary', label: 'Salary' });
+    if (jd?.physicalRequirements) s.push({ id: 'physical', label: 'Physical Eligibility' });
+    if (jd?.examPattern?.subjects?.length) s.push({ id: 'exam', label: 'Exam Pattern' });
+    if (jd?.selectionProcess?.length) s.push({ id: 'selection', label: 'Selection Process' });
+    if (jd?.howToApply?.length) s.push({ id: 'howtoapply', label: 'How to Apply' });
+    if (a.content) s.push({ id: 'content', label: 'Full Details' });
+    if (jd?.faqs?.length) s.push({ id: 'faq', label: 'FAQs' });
+    s.push({ id: 'links', label: 'Important Links' });
+    return s;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   DetailPage Component — SarkariResult-style single-column
+   ═══════════════════════════════════════════════════════════ */
 export function DetailPage({ type }: { type: ContentType }) {
     const { slug } = useParams<{ slug: string }>();
     const [announcement, setAnnouncement] = useState<Announcement | null>(null);
@@ -95,152 +104,92 @@ export function DetailPage({ type }: { type: ContentType }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [bookmarked, setBookmarked] = useState(false);
-    const [subscribed, setSubscribed] = useState(false);
     const [activeSection, setActiveSection] = useState('overview');
     const [copied, setCopied] = useState(false);
-
-    // Eligibility Checker States
-    const [dob, setDob] = useState('');
-    const [hasQualification, setHasQualification] = useState(false);
-    const [eligibilityStatus, setEligibilityStatus] = useState<'unknown' | 'eligible' | 'not-eligible'>('unknown');
 
     useEffect(() => {
         window.scrollTo(0, 0);
         if (!slug) return;
         let mounted = true;
-        setLoading(true);
-        setError(null);
-
+        setLoading(true); setError(null);
         (async () => {
             try {
                 const res = await getAnnouncementBySlug(type, slug);
                 if (!mounted) return;
                 setAnnouncement(res.data);
                 trackEvent('detail_view', { type, slug });
-
                 try {
                     const rel = await getAnnouncementCards({ type, limit: 8, sort: 'newest' });
                     if (mounted) setRelated(rel.data.filter((item) => item.slug !== slug).slice(0, 6));
                 } catch { if (mounted) setRelated([]); }
-
-                /* Check if bookmarked */
                 try {
                     const bm = await getBookmarks();
-                    if (mounted && Array.isArray(bm.data) && bm.data.some((b) => b.id === res.data.id)) {
-                        setBookmarked(true);
-                    }
-                } catch { /* not logged in or error */ }
+                    if (mounted && Array.isArray(bm.data) && bm.data.some((b) => b.id === res.data.id)) setBookmarked(true);
+                } catch { /* not logged in */ }
             } catch (err: unknown) {
                 if (mounted) setError(err instanceof Error ? err.message : 'Failed to load announcement');
             } finally {
                 if (mounted) setLoading(false);
             }
         })();
-
         return () => { mounted = false; };
     }, [type, slug]);
 
-    /* Intersection observer for jump-nav active state */
+    /* Intersection observer for scroll-spy */
     useEffect(() => {
         if (!announcement) return;
-        const sectionIds = buildJumpSections(announcement).map((s) => s.id);
+        const jd = announcement.jobDetails as JobDetailsData | undefined;
+        const ids = buildSections(announcement, jd).map((s) => s.id);
         const observer = new IntersectionObserver(
-            (entries) => {
-                for (const entry of entries) {
-                    if (entry.isIntersecting) {
-                        setActiveSection(entry.target.id);
-                        break;
-                    }
-                }
-            },
-            { rootMargin: '-100px 0px -60% 0px', threshold: 0.1 },
+            (entries) => { for (const e of entries) { if (e.isIntersecting) { setActiveSection(e.target.id); break; } } },
+            { rootMargin: '-80px 0px -60% 0px', threshold: 0.1 },
         );
-        for (const id of sectionIds) {
-            const el = document.getElementById(id);
-            if (el) observer.observe(el);
-        }
+        for (const id of ids) { const el = document.getElementById(id); if (el) observer.observe(el); }
         return () => observer.disconnect();
     }, [announcement]);
 
     const toggleBookmark = useCallback(async () => {
         if (!announcement) return;
         try {
-            if (bookmarked) {
-                await removeBookmark(announcement.id);
-                setBookmarked(false);
-                trackEvent('bookmark_remove', { slug: announcement.slug });
-            } else {
-                await addBookmark(announcement.id);
-                setBookmarked(true);
-                trackEvent('bookmark_add', { slug: announcement.slug });
-            }
+            if (bookmarked) { await removeBookmark(announcement.id); setBookmarked(false); trackEvent('bookmark_remove', { slug: announcement.slug }); }
+            else { await addBookmark(announcement.id); setBookmarked(true); trackEvent('bookmark_add', { slug: announcement.slug }); }
         } catch { /* not logged in */ }
     }, [announcement, bookmarked]);
 
     const handleCopyLink = useCallback(async () => {
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch { /* clipboard API not available */ }
+        try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /**/ }
     }, []);
 
-    const toggleSubscribe = useCallback(() => {
-        setSubscribed(prev => !prev);
-        if (!subscribed) {
-            trackEvent('subscribe_alerts', { slug: announcement?.slug });
-        } else {
-            trackEvent('unsubscribe_alerts', { slug: announcement?.slug });
-        }
-    }, [announcement, subscribed]);
-
     const handlePrint = useCallback(() => {
-        window.print();
-        trackEvent('print_page', { slug: announcement?.slug });
+        window.print(); trackEvent('print_page', { slug: announcement?.slug ?? '' });
     }, [announcement]);
 
+    /* ── Loading skeleton ── */
     if (loading) {
         return (
             <Layout>
-                <div className="detail-premium-skeleton animate-fade-in">
-                    <div className="detail-skeleton-breadcrumb">
-                        <div className="skeleton" style={{ height: 14, width: 200 }} />
+                <div className="sr-detail-skeleton animate-fade-in">
+                    <div className="skeleton" style={{ height: 14, width: 200, marginBottom: 16 }} />
+                    <div className="skeleton" style={{ height: 28, width: '80%', marginBottom: 12 }} />
+                    <div className="skeleton" style={{ height: 16, width: '50%', marginBottom: 24 }} />
+                    <div className="sr-skeleton-grid">
+                        {[1, 2, 3, 4].map(i => (<div key={i} className="skeleton" style={{ height: 72, borderRadius: 12 }} />))}
                     </div>
-                    <div className="detail-skeleton-hero">
-                        <div className="skeleton" style={{ height: 20, width: 100, marginBottom: 16 }} />
-                        <div className="skeleton" style={{ height: 32, width: '80%', marginBottom: 12 }} />
-                        <div className="skeleton" style={{ height: 16, width: '50%', marginBottom: 24 }} />
-                        <div className="detail-skeleton-stats">
-                            {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="skeleton" style={{ height: 72, borderRadius: 12 }} />
-                            ))}
-                        </div>
-                    </div>
-                    <div className="detail-skeleton-body">
-                        <div className="detail-skeleton-main">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                                <div key={i} className="skeleton" style={{ height: 16, width: `${90 - i * 8}%`, marginBottom: 10 }} />
-                            ))}
-                        </div>
-                        <div className="detail-skeleton-side">
-                            <div className="skeleton" style={{ height: 48, borderRadius: 12, marginBottom: 12 }} />
-                            <div className="skeleton" style={{ height: 48, borderRadius: 12, marginBottom: 12 }} />
-                            <div className="skeleton" style={{ height: 160, borderRadius: 12 }} />
-                        </div>
-                    </div>
+                    {[1, 2, 3].map(i => (<div key={i} className="skeleton" style={{ height: 120, borderRadius: 12, marginTop: 16 }} />))}
                 </div>
             </Layout>
         );
     }
 
+    /* ── Error ── */
     if (error || !announcement) {
         return (
             <Layout>
-                <div className="detail-error-premium animate-fade-in">
-                    <div className="detail-error-icon">😕</div>
+                <div className="sr-detail-error animate-fade-in">
+                    <div className="sr-error-icon">😕</div>
                     <h2>Announcement Not Found</h2>
-                    <p className="text-muted">{error || 'This announcement may have been removed or is no longer available.'}</p>
-                    <div className="detail-error-actions">
+                    <p>{error || 'This announcement may have been removed or is no longer available.'}</p>
+                    <div className="sr-error-actions">
                         <Link to={TYPE_ROUTES[type]} className="btn btn-accent">← Browse {TYPE_LABELS[type]}</Link>
                         <Link to="/" className="btn btn-outline">Go Home</Link>
                     </div>
@@ -250,458 +199,468 @@ export function DetailPage({ type }: { type: ContentType }) {
     }
 
     const a = announcement;
+    const jd = a.jobDetails as JobDetailsData | undefined;
     const salary = formatSalary(a.salaryMin, a.salaryMax);
-    const deadlineStatus = getDeadlineStatus(a.deadline);
-    const typeColor = TYPE_COLORS[a.type];
-    const statusBadge = getStatusBadge(a.deadline);
-    const jumpSections = buildJumpSections(a);
+    const deadline = getDeadlineStatus(a.deadline);
+    const sections = buildSections(a, jd);
 
-    /* Key facts for sidebar */
-    const keyFacts: Array<{ label: string; value: string; isLink?: boolean; href?: string }> = [];
-    if (a.organization) keyFacts.push({ label: 'Organization', value: a.organization });
-    if (a.totalPosts) keyFacts.push({ label: 'Total Vacancies', value: a.totalPosts.toLocaleString() });
-    if (a.deadline) keyFacts.push({ label: 'Last Date', value: formatDate(a.deadline) });
-    if (a.minQualification) keyFacts.push({ label: 'Qualification', value: a.minQualification });
-    if (a.applicationFee) keyFacts.push({ label: 'Application Fee', value: a.applicationFee });
-    if (salary) keyFacts.push({ label: 'Salary', value: salary });
-    if (a.ageLimit) keyFacts.push({ label: 'Age Limit', value: a.ageLimit });
-    if (a.externalLink) keyFacts.push({ label: 'Official Website', value: 'Visit →', isLink: true, href: a.externalLink });
-
-    /* Key Facts Box (Scanning Friendly TL;DR) */
-    const quickInfoItems: Array<{ label: string; value: string; highlight?: boolean }> = [];
-    if (a.organization) quickInfoItems.push({ label: 'Organization', value: a.organization });
-    quickInfoItems.push({ label: 'Post Name', value: a.title });
-    if (a.totalPosts) quickInfoItems.push({ label: 'Total Vacancies', value: a.totalPosts.toLocaleString() });
-    if (a.deadline) quickInfoItems.push({ label: 'Last Date', value: formatDate(a.deadline), highlight: !!deadlineStatus && deadlineStatus.className !== 'detail-deadline-normal' });
+    const toNum = (v: unknown) => { const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? n : 0; };
+    const fmtCount = (v?: number | null) => toNum(v).toLocaleString('en-IN');
 
     return (
         <Layout>
-            <article className="detail-premium animate-fade-in">
-                {/* 1) Top Header & Key Facts */}
-                <header className="detail-hero" style={{ '--detail-accent': typeColor } as React.CSSProperties}>
-                    {/* A. Breadcrumb */}
-                    <nav className="detail-breadcrumb-premium" style={{ marginBottom: '16px' }}>
-                        <Link to="/">Home</Link>
-                        <span className="breadcrumb-chevron">›</span>
-                        <Link to={TYPE_ROUTES[type]}>{TYPE_LABELS[type]}</Link>
-                        <span className="breadcrumb-chevron">›</span>
-                        <span className="breadcrumb-current">{a.title}</span>
-                    </nav>
+            <article className="sr-detail animate-fade-in">
+                {/* ─── Breadcrumb ─── */}
+                <nav className="sr-breadcrumb">
+                    <Link to="/">Home</Link>
+                    <span className="sr-bc-sep">›</span>
+                    <Link to={TYPE_ROUTES[type]}>{TYPE_LABELS[type]}</Link>
+                    <span className="sr-bc-sep">›</span>
+                    <span className="sr-bc-current">{a.title}</span>
+                </nav>
 
-                    {/* B. Title + Trust Line */}
-                    <h1 className="detail-hero-title">{a.title}</h1>
-                    <div className="detail-trust-line" style={{ marginBottom: '24px' }}>
-                        <span>Updated: {formatDate(a.updatedAt)}</span>
-                        {a.externalLink && (
-                            <>
-                                <span className="detail-trust-dot" />
-                                <span>Source: <a href={a.externalLink} target="_blank" rel="noopener noreferrer">{(() => { try { return new URL(a.externalLink!).hostname; } catch { return 'Official Site'; } })()}</a> (Official)</span>
-                            </>
+                {/* ─── Hero Header ─── */}
+                <header className="sr-hero">
+                    <div className="sr-hero-top">
+                        {deadline && <span className={`sr-badge ${deadline.cls}`}>{deadline.label}</span>}
+                        <span className="sr-meta">Updated: {formatDate(a.updatedAt)}</span>
+                    </div>
+                    <h1 className="sr-title">{a.title}</h1>
+                    {a.organization && <p className="sr-org">{a.organization}</p>}
+
+                    {/* Quick Stats */}
+                    <div className="sr-stats-grid">
+                        {a.totalPosts != null && a.totalPosts > 0 && (
+                            <div className="sr-stat-card sr-stat-vacancy">
+                                <span className="sr-stat-label">Total Posts</span>
+                                <strong className="sr-stat-value">{a.totalPosts.toLocaleString('en-IN')}</strong>
+                            </div>
+                        )}
+                        {a.deadline && (
+                            <div className="sr-stat-card sr-stat-deadline">
+                                <span className="sr-stat-label">Last Date</span>
+                                <strong className="sr-stat-value">{formatDate(a.deadline)}</strong>
+                            </div>
+                        )}
+                        {a.minQualification && (
+                            <div className="sr-stat-card sr-stat-qual">
+                                <span className="sr-stat-label">Qualification</span>
+                                <strong className="sr-stat-value">{a.minQualification}</strong>
+                            </div>
+                        )}
+                        {salary && (
+                            <div className="sr-stat-card sr-stat-salary">
+                                <span className="sr-stat-label">Salary</span>
+                                <strong className="sr-stat-value">{salary}</strong>
+                            </div>
                         )}
                     </div>
 
-                    {/* 2) Key Facts Box */}
-                    {quickInfoItems.length > 0 && (
-                        <div className="detail-key-facts-grid">
-                            {quickInfoItems.map((item, i) => (
-                                <div key={i} className={`detail-key-fact${item.highlight ? ' highlight' : ''}`}>
-                                    <span className="detail-key-fact-label">{item.label}</span>
-                                    <strong className="detail-key-fact-value">{item.value}</strong>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* C. Primary CTA (Desktop & Mobile Sticky) */}
-                    <div className="detail-hero-cta-wrapper">
-                        <div className="detail-hero-cta-row">
-                            {a.externalLink ? (
-                                <>
-                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-hero-cta-primary"
-                                        onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
-                                        ✅ {TYPE_CTA[a.type]}
-                                    </a>
-                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-hero-cta-secondary"
-                                        onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'download_pdf' })}>
-                                        📄 Download PDF
-                                    </a>
-                                </>
-                            ) : (
-                                <span className="detail-hero-cta-disabled">Link Not Available Yet</span>
-                            )}
-                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={toggleBookmark} title={bookmarked ? "Saved" : "Save"}>
-                                {bookmarked ? <>🔖 <span className="hide-mobile">Saved</span></> : <>🔖 <span className="hide-mobile">Save</span></>}
-                            </button>
-                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={toggleSubscribe} title={subscribed ? "Alerts On" : "Get Alerts"}>
-                                {subscribed ? <>🔕 <span className="hide-mobile">Stop Alerts</span></> : <>🔔 <span className="hide-mobile">Get Alerts</span></>}
-                            </button>
-                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon hide-mobile" onClick={handlePrint} title="Print Details">
-                                🖨️ <span className="hide-mobile">Print</span>
-                            </button>
-                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={handleCopyLink} title="Share">
-                                {copied ? <>✅ <span className="hide-mobile">Copied!</span></> : <>🔗 <span className="hide-mobile">Share</span></>}
-                            </button>
-                        </div>
+                    {/* Action Bar */}
+                    <div className="sr-action-bar hide-on-print">
+                        {a.externalLink ? (
+                            <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-btn-primary"
+                                onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
+                                ✅ {TYPE_CTA[a.type]}
+                            </a>
+                        ) : (
+                            <span className="sr-btn-disabled">Link Not Available Yet</span>
+                        )}
+                        <button type="button" className={`sr-btn-icon${bookmarked ? ' active' : ''}`} onClick={toggleBookmark} title={bookmarked ? "Saved" : "Save"}>
+                            {bookmarked ? '🔖' : '📑'}
+                        </button>
+                        <button type="button" className="sr-btn-icon hide-mobile" onClick={handlePrint} title="Print">🖨️</button>
+                        <button type="button" className="sr-btn-icon" onClick={handleCopyLink} title="Share">
+                            {copied ? '✅' : '🔗'}
+                        </button>
                     </div>
                 </header>
 
-                {/* Jump Navigation */}
-                {jumpSections.length > 1 && (
-                    <nav className="detail-jump-nav">
-                        {jumpSections.map((s) => (
-                            <a
-                                key={s.id}
-                                href={`#${s.id}`}
-                                className={`detail-jump-link${activeSection === s.id ? ' active' : ''}`}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                    setActiveSection(s.id);
-                                }}
-                            >
-                                {s.icon} {s.label}
+                {/* ─── Sticky Section Nav ─── */}
+                {sections.length > 1 && (
+                    <nav className="sr-section-nav">
+                        {sections.map((s) => (
+                            <a key={s.id} href={`#${s.id}`}
+                                className={`sr-nav-link${activeSection === s.id ? ' active' : ''}`}
+                                onClick={(e) => { e.preventDefault(); document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActiveSection(s.id); }}>
+                                {s.label}
                             </a>
                         ))}
                     </nav>
                 )}
 
-                {/* Main Body */}
-                <div className="detail-body-premium">
-                    {/* Content Column */}
-                    <div className="detail-main-col">
-                        {/* Overview / Info Table */}
-                        <section id="overview" className="detail-info-table-section">
-                            <h2 className="detail-section-title"><span className="detail-section-icon">📋</span> Quick Overview</h2>
-                            <div className="detail-info-table">
-                                {a.organization && (
-                                    <div className="detail-info-row">
-                                        <span className="detail-info-key">Organization</span>
-                                        <span className="detail-info-val">{a.organization}</span>
+                {/* ═══ CONTENT SECTIONS ═══ */}
+                <div className="sr-sections">
+
+                    {/* ─── 1. Overview ─── */}
+                    <section id="overview" className="sr-section sr-section-blue">
+                        <h2 className="sr-section-title">📋 Quick Overview</h2>
+                        <div className="sr-info-table">
+                            {a.organization && <div className="sr-info-row"><span className="sr-info-key">Organization</span><span className="sr-info-val">{a.organization}</span></div>}
+                            <div className="sr-info-row"><span className="sr-info-key">Post Name</span><span className="sr-info-val">{a.title}</span></div>
+                            {a.totalPosts != null && a.totalPosts > 0 && <div className="sr-info-row"><span className="sr-info-key">Total Posts</span><span className="sr-info-val sr-highlight">{a.totalPosts.toLocaleString('en-IN')}</span></div>}
+                            {a.deadline && <div className="sr-info-row"><span className="sr-info-key">Last Date</span><span className="sr-info-val sr-highlight-red">{formatDate(a.deadline)}</span></div>}
+                            {salary && <div className="sr-info-row"><span className="sr-info-key">Salary</span><span className="sr-info-val sr-highlight-green">{salary}</span></div>}
+                            {a.minQualification && <div className="sr-info-row"><span className="sr-info-key">Qualification</span><span className="sr-info-val">{a.minQualification}</span></div>}
+                            {a.ageLimit && <div className="sr-info-row"><span className="sr-info-key">Age Limit</span><span className="sr-info-val">{a.ageLimit}</span></div>}
+                            {a.applicationFee && <div className="sr-info-row"><span className="sr-info-key">Application Fee</span><span className="sr-info-val">{a.applicationFee}</span></div>}
+                            {a.location && <div className="sr-info-row"><span className="sr-info-key">Location</span><span className="sr-info-val">{a.location}</span></div>}
+                            {a.externalLink && (
+                                <div className="sr-info-row">
+                                    <span className="sr-info-key">Official Website</span>
+                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-info-val sr-info-link">
+                                        {(() => { try { return new URL(a.externalLink!).hostname; } catch { return 'Visit →'; } })()}
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    {/* ─── 2. Important Dates ─── */}
+                    {((jd?.importantDates && jd.importantDates.length > 0) || (a.importantDates && a.importantDates.length > 0)) && (
+                        <section id="dates" className="sr-section sr-section-purple">
+                            <h2 className="sr-section-title">📅 Important Dates</h2>
+                            <div className="sr-info-table">
+                                {jd?.importantDates && jd.importantDates.length > 0
+                                    ? jd.importantDates.map((d, i) => (
+                                        <div key={i} className="sr-info-row">
+                                            <span className="sr-info-key">{d.name}</span>
+                                            <span className="sr-info-val sr-date-val">{formatDate(d.date)}</span>
+                                        </div>
+                                    ))
+                                    : a.importantDates!.map((d, i) => (
+                                        <div key={d.id ?? i} className="sr-info-row">
+                                            <span className="sr-info-key">{d.eventName}</span>
+                                            <span className="sr-info-val sr-date-val">{formatDate(d.eventDate)}</span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ─── 3. Application Fee ─── */}
+                    {((jd?.applicationFees && jd.applicationFees.length > 0) || a.applicationFee) && (
+                        <section id="fees" className="sr-section sr-section-green">
+                            <h2 className="sr-section-title">💰 Application Fee</h2>
+                            {jd?.applicationFees && jd.applicationFees.length > 0 ? (
+                                <div className="sr-info-table">
+                                    {jd.applicationFees.map((f, i) => (
+                                        <div key={i} className="sr-info-row">
+                                            <span className="sr-info-key">{f.category}</span>
+                                            <span className="sr-info-val sr-fee-val">₹{f.amount.toLocaleString('en-IN')}/-</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="sr-info-table">
+                                    <div className="sr-info-row">
+                                        <span className="sr-info-key">Fee</span>
+                                        <span className="sr-info-val">{a.applicationFee}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
+
+                    {/* ─── 4. Age Limit ─── */}
+                    {(jd?.ageLimits || a.ageLimit) && (
+                        <section id="age" className="sr-section sr-section-cyan">
+                            <h2 className="sr-section-title">👤 Age Limit</h2>
+                            {jd?.ageLimits ? (
+                                <>
+                                    <div className="sr-age-boxes">
+                                        <div className="sr-age-box">
+                                            <span className="sr-age-label">Minimum Age</span>
+                                            <strong className="sr-age-value">{jd.ageLimits.minAge || 18} Years</strong>
+                                        </div>
+                                        <div className="sr-age-box">
+                                            <span className="sr-age-label">Maximum Age</span>
+                                            <strong className="sr-age-value">{jd.ageLimits.maxAge || 30} Years</strong>
+                                        </div>
+                                    </div>
+                                    {jd.ageLimits.asOnDate && <p className="sr-age-ason">As on {formatDate(jd.ageLimits.asOnDate)}</p>}
+                                    <p className="sr-age-note">Age Relaxation Extra as per Rules</p>
+                                    {jd.ageLimits.relaxations && jd.ageLimits.relaxations.length > 0 && (
+                                        <div className="sr-table-wrap">
+                                            <table className="sr-data-table">
+                                                <thead><tr><th>Category</th><th>Relaxation</th><th>Max Age</th></tr></thead>
+                                                <tbody>
+                                                    {jd.ageLimits.relaxations.map((r, i) => (
+                                                        <tr key={i}><td>{r.category}</td><td>{r.years} Years</td><td>{r.maxAge} Years</td></tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="sr-info-table">
+                                    <div className="sr-info-row">
+                                        <span className="sr-info-key">Age Limit</span>
+                                        <span className="sr-info-val">{a.ageLimit}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
+
+                    {/* ─── 5. Eligibility ─── */}
+                    {(jd?.eligibility || a.minQualification) && (
+                        <section id="eligibility" className="sr-section sr-section-indigo">
+                            <h2 className="sr-section-title">📚 Eligibility Criteria</h2>
+                            {jd?.eligibility ? (
+                                <ul className="sr-eligibility-list">
+                                    {jd.eligibility.nationality && <li><strong>Nationality:</strong> {jd.eligibility.nationality}</li>}
+                                    {jd.eligibility.domicile && <li><strong>Domicile:</strong> {jd.eligibility.domicile}</li>}
+                                    {jd.eligibility.education && <li><strong>Education:</strong> {jd.eligibility.education}</li>}
+                                    {jd.eligibility.additional?.map((item, i) => <li key={i}>{item}</li>)}
+                                </ul>
+                            ) : (
+                                <div className="sr-info-table">
+                                    <div className="sr-info-row">
+                                        <span className="sr-info-key">Qualification</span>
+                                        <span className="sr-info-val">{a.minQualification}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
+
+                    {/* ─── 6. Vacancy Details ─── */}
+                    {jd?.vacancies?.details && jd.vacancies.details.length > 0 && (
+                        <section id="vacancy" className="sr-section sr-section-amber">
+                            <h2 className="sr-section-title">📊 Vacancy Details — Total: {fmtCount(jd.vacancies.total)} Posts</h2>
+                            <div className="sr-table-wrap">
+                                <table className="sr-data-table sr-vacancy-table">
+                                    <thead><tr><th>Category</th><th>Male</th><th>Female</th><th>Total</th></tr></thead>
+                                    <tbody>
+                                        {jd.vacancies.details.map((v, i) => (
+                                            <tr key={i}><td>{v.category}</td><td>{fmtCount(v.male)}</td><td>{fmtCount(v.female)}</td><td className="sr-total-cell">{fmtCount(v.total)}</td></tr>
+                                        ))}
+                                        <tr className="sr-total-row">
+                                            <td><strong>Total</strong></td>
+                                            <td><strong>{fmtCount(jd.vacancies.details.reduce((s, v) => s + toNum(v.male), 0))}</strong></td>
+                                            <td><strong>{fmtCount(jd.vacancies.details.reduce((s, v) => s + toNum(v.female), 0))}</strong></td>
+                                            <td className="sr-total-cell"><strong>{fmtCount(jd.vacancies.total)}</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ─── 7. Salary Details ─── */}
+                    {jd?.salary && (jd.salary.payLevel || jd.salary.payScale) && (
+                        <section id="salary" className="sr-section sr-section-emerald">
+                            <h2 className="sr-section-title">💵 Salary Details</h2>
+                            <div className="sr-salary-cards">
+                                {jd.salary.payLevel && <div className="sr-salary-card"><span className="sr-salary-label">Pay Level</span><strong>{jd.salary.payLevel}</strong></div>}
+                                {jd.salary.payScale && <div className="sr-salary-card"><span className="sr-salary-label">Pay Scale</span><strong>{jd.salary.payScale}</strong></div>}
+                                {jd.salary.inHandSalary && <div className="sr-salary-card sr-salary-highlight"><span className="sr-salary-label">In-Hand Salary</span><strong>{jd.salary.inHandSalary}</strong></div>}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ─── 8. Physical Requirements ─── */}
+                    {jd?.physicalRequirements && (
+                        <section id="physical" className="sr-section sr-section-red">
+                            <h2 className="sr-section-title">🏃 Physical Eligibility</h2>
+                            <div className="sr-physical-grid">
+                                {jd.physicalRequirements.male && (
+                                    <div className="sr-physical-card sr-physical-male">
+                                        <h3>👨 Male Candidates</h3>
+                                        <ul>
+                                            {jd.physicalRequirements.male.heightGeneral && <li>Height (General): {jd.physicalRequirements.male.heightGeneral}</li>}
+                                            {jd.physicalRequirements.male.heightSCST && <li>Height (SC/ST): {jd.physicalRequirements.male.heightSCST}</li>}
+                                            {jd.physicalRequirements.male.chestNormal && <li>Chest (Normal): {jd.physicalRequirements.male.chestNormal}</li>}
+                                            {jd.physicalRequirements.male.chestExpanded && <li>Chest (Expanded): {jd.physicalRequirements.male.chestExpanded}</li>}
+                                            {jd.physicalRequirements.male.running && <li>Running: {jd.physicalRequirements.male.running}</li>}
+                                        </ul>
                                     </div>
                                 )}
-                                {a.totalPosts != null && a.totalPosts > 0 && (
-                                    <div className="detail-info-row">
-                                        <span className="detail-info-key">Total Posts</span>
-                                        <span className="detail-info-val">{a.totalPosts.toLocaleString()}</span>
-                                    </div>
-                                )}
-                                {a.deadline && (
-                                    <div className="detail-info-row">
-                                        <span className="detail-info-key">Last Date</span>
-                                        <span className={`detail-info-val ${deadlineStatus?.className || ''}`}>{formatDate(a.deadline)}</span>
-                                    </div>
-                                )}
-                                {salary && (
-                                    <div className="detail-info-row">
-                                        <span className="detail-info-key">Salary</span>
-                                        <span className="detail-info-val detail-info-salary">{salary}</span>
+                                {jd.physicalRequirements.female && (
+                                    <div className="sr-physical-card sr-physical-female">
+                                        <h3>👩 Female Candidates</h3>
+                                        <ul>
+                                            {jd.physicalRequirements.female.heightGeneral && <li>Height (General): {jd.physicalRequirements.female.heightGeneral}</li>}
+                                            {jd.physicalRequirements.female.heightSCST && <li>Height (SC/ST): {jd.physicalRequirements.female.heightSCST}</li>}
+                                            {jd.physicalRequirements.female.running && <li>Running: {jd.physicalRequirements.female.running}</li>}
+                                        </ul>
                                     </div>
                                 )}
                             </div>
                         </section>
+                    )}
 
-                        {/* Eligibility */}
-                        {(a.minQualification || a.ageLimit) && (
-                            <section id="eligibility" className="detail-info-table-section">
-                                <h2 className="detail-section-title"><span className="detail-section-icon">🎓</span> Eligibility</h2>
-                                <div className="detail-info-table">
-                                    {a.minQualification && (
-                                        <div className="detail-info-row">
-                                            <span className="detail-info-key">Qualification</span>
-                                            <span className="detail-info-val">{a.minQualification}</span>
-                                        </div>
-                                    )}
-                                    {a.ageLimit && (
-                                        <div className="detail-info-row">
-                                            <span className="detail-info-key">Age Limit</span>
-                                            <span className="detail-info-val">{a.ageLimit}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Eligibility Checker Widget */}
-                                <div className="detail-eligibility-checker hide-on-print">
-                                    <div className="detail-checker-title">🔍 Quick Eligibility Check</div>
-                                    <div className="detail-checker-form">
-                                        <div className="detail-checker-input-group">
-                                            <label className="detail-checker-label">Date of Birth</label>
-                                            <input
-                                                type="date"
-                                                className="detail-checker-input"
-                                                value={dob}
-                                                onChange={(e) => {
-                                                    setDob(e.target.value);
-                                                    if (e.target.value) {
-                                                        const userAge = new Date().getFullYear() - new Date(e.target.value).getFullYear();
-                                                        const match = a.ageLimit ? a.ageLimit.match(/(\d+)/g) : null;
-                                                        if (match && match.length > 0) {
-                                                            const maxAge = parseInt(match[match.length - 1], 10);
-                                                            const minAge = match.length > 1 ? parseInt(match[0], 10) : 18;
-                                                            if (userAge >= minAge && userAge <= maxAge) {
-                                                                setEligibilityStatus('eligible');
-                                                            } else {
-                                                                setEligibilityStatus('not-eligible');
-                                                            }
-                                                        } else {
-                                                            setEligibilityStatus('eligible');
-                                                        }
-                                                    } else {
-                                                        setEligibilityStatus('unknown');
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="detail-checker-input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
-                                            <input
-                                                type="checkbox"
-                                                id="req-qual"
-                                                checked={hasQualification}
-                                                onChange={(e) => setHasQualification(e.target.checked)}
-                                                style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
-                                            />
-                                            <label htmlFor="req-qual" className="detail-checker-label" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>
-                                                I have the required qualification
-                                            </label>
-                                        </div>
-
-                                        {dob && (
-                                            <div className={`detail-checker-result detail-checker-${eligibilityStatus}`}>
-                                                {eligibilityStatus === 'eligible' && hasQualification && "✅ You appear to be eligible!"}
-                                                {eligibilityStatus === 'eligible' && !hasQualification && "⚠️ Age is within limits, confirm qualification."}
-                                                {eligibilityStatus === 'not-eligible' && "❌ You do not meet the age requirements."}
-                                                {eligibilityStatus === 'unknown' && "Please enter valid details."}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* Fees */}
-                        {a.applicationFee && (
-                            <section id="fees" className="detail-info-table-section">
-                                <h2 className="detail-section-title"><span className="detail-section-icon">💳</span> Application Fee</h2>
-                                <div className="detail-info-table">
-                                    <div className="detail-info-row">
-                                        <span className="detail-info-key">Fee</span>
-                                        <span className="detail-info-val">{a.applicationFee}</span>
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* Important Dates */}
-                        {a.importantDates && a.importantDates.length > 0 && (
-                            <section id="dates" className="detail-dates-inline">
-                                <h2 className="detail-section-title"><span className="detail-section-icon">📅</span> Important Dates</h2>
-                                <div className="detail-visual-timeline">
-                                    {a.importantDates.map((date, i) => {
-                                        const eventTime = new Date(date.eventDate).getTime();
-                                        const now = Date.now();
-                                        const isPast = eventTime < now - 86400000;
-                                        const isSoon = eventTime >= now - 86400000 && eventTime <= now + (5 * 86400000);
-                                        const isLatestFuture = !isPast && (i === 0 || new Date(a.importantDates![i - 1].eventDate).getTime() < now - 86400000);
-
-                                        return (
-                                            <div key={date.id ?? i} className={`detail-timeline-step ${isPast ? 'past' : ''} ${isLatestFuture ? 'active' : ''}`}>
-                                                <div className="detail-timeline-dot" />
-                                                <div className="detail-timeline-content">
-                                                    <span className="detail-timeline-event">
-                                                        {date.eventName}
-                                                        {isSoon && !isPast && <span className="detail-urgent-badge">Action Required Soon</span>}
-                                                    </span>
-                                                    <span className="detail-timeline-date">{formatDate(date.eventDate)}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </section>
-                        )}
-
-                        {/* Rich Content */}
-                        {a.content && (
-                            <section id="details" className="detail-content-section">
-                                <h2 className="detail-section-title"><span className="detail-section-icon">📝</span> Full Details</h2>
-                                <div className="detail-content-body" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(a.content) }} />
-                            </section>
-                        )}
-
-                        {/* Important Links */}
-                        {a.externalLink && (
-                            <section id="links" className="detail-info-table-section">
-                                <h2 className="detail-section-title"><span className="detail-section-icon">🔗</span> Important Links</h2>
-                                <div className="detail-links-grid">
-                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-link-btn detail-link-btn-primary"
-                                        onClick={() => trackEvent('link_click', { type, slug: a.slug, action: 'apply' })}>
-                                        <span className="detail-link-btn-icon">✅</span> {TYPE_CTA[a.type]}
-                                    </a>
-                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-link-btn">
-                                        <span className="detail-link-btn-icon">📄</span> Download Notification
-                                    </a>
-                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-link-btn">
-                                        <span className="detail-link-btn-icon">🌐</span> Official Website
-                                    </a>
-                                    <Link to={TYPE_ROUTES[type]} className="detail-link-btn">
-                                        <span className="detail-link-btn-icon">📂</span> More {TYPE_LABELS[type]}
-                                    </Link>
-                                </div>
-                            </section>
-                        )}
-
-                        {/* Tags */}
-                        {a.tags && a.tags.length > 0 && (
-                            <div className="detail-tags-premium">
-                                {a.tags.map((tag) => (
-                                    <span key={tag.id} className="detail-tag">{tag.name}</span>
-                                ))}
+                    {/* ─── 9. Exam Pattern ─── */}
+                    {jd?.examPattern?.subjects && jd.examPattern.subjects.length > 0 && (
+                        <section id="exam" className="sr-section sr-section-pink">
+                            <h2 className="sr-section-title">📝 Exam Pattern</h2>
+                            <div className="sr-exam-meta">
+                                {jd.examPattern.duration && <span>⏱️ Duration: {jd.examPattern.duration}</span>}
+                                {jd.examPattern.totalQuestions > 0 && <span>📋 Questions: {jd.examPattern.totalQuestions}</span>}
+                                {jd.examPattern.totalMarks > 0 && <span>📊 Total Marks: {jd.examPattern.totalMarks}</span>}
+                                {jd.examPattern.negativeMarking && <span>⚠️ Negative Marking: {jd.examPattern.negativeMarking}</span>}
                             </div>
-                        )}
+                            <div className="sr-table-wrap">
+                                <table className="sr-data-table">
+                                    <thead><tr><th>Subject</th><th>Questions</th><th>Marks</th></tr></thead>
+                                    <tbody>
+                                        {jd.examPattern.subjects.map((s, i) => (
+                                            <tr key={i}><td>{s.name}</td><td>{s.questions}</td><td>{s.marks}</td></tr>
+                                        ))}
+                                        <tr className="sr-total-row">
+                                            <td><strong>Total</strong></td>
+                                            <td><strong>{jd.examPattern.totalQuestions}</strong></td>
+                                            <td><strong>{jd.examPattern.totalMarks}</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    )}
 
-                        {/* Trust + Transparency */}
-                        <div className="detail-trust-section">
-                            <div className="detail-trust-disclaimer">
-                                <span className="detail-trust-disclaimer-icon">🛡️</span>
-                                <span>We do not collect application fees. Always apply on the official website. Information is sourced from official notifications and may change — verify on the official site before applying.</span>
-                            </div>
-                            <div className="detail-trust-actions">
-                                <button type="button" className="detail-report-btn" onClick={() => trackEvent('report_issue', { slug: a.slug })}>
-                                    🚩 Report Wrong Info
-                                </button>
-                                <button type="button" className="detail-report-btn" onClick={handleCopyLink}>
-                                    🔗 {copied ? 'Copied!' : 'Share This Page'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sidebar */}
-                    <aside className="detail-sidebar-premium">
-                        {/* Key Facts Box */}
-                        <div className="detail-facts-card">
-                            <div className="detail-facts-header">
-                                <h3>📋 Key Facts</h3>
-                            </div>
-                            <div className="detail-facts-body">
-                                {/* Status badge */}
-                                <div className="detail-facts-row">
-                                    <span className="detail-facts-key">Status</span>
-                                    <span className={`detail-facts-status ${statusBadge.cls}`}>
-                                        {statusBadge.label === 'Open' ? '🟢' : '🔴'} {statusBadge.label}
-                                    </span>
-                                </div>
-                                {keyFacts.map((fact, i) => (
-                                    <div key={i} className="detail-facts-row">
-                                        <span className="detail-facts-key">{fact.label}</span>
-                                        {fact.isLink && fact.href ? (
-                                            <a href={fact.href} target="_blank" rel="noopener noreferrer" className="detail-facts-link">{fact.value}</a>
-                                        ) : (
-                                            <span className="detail-facts-val">{fact.value}</span>
-                                        )}
+                    {/* ─── 10. Selection Process ─── */}
+                    {jd?.selectionProcess && jd.selectionProcess.length > 0 && (
+                        <section id="selection" className="sr-section sr-section-teal">
+                            <h2 className="sr-section-title">🎯 Selection Process</h2>
+                            <div className="sr-selection-steps">
+                                {jd.selectionProcess.map((step, i) => (
+                                    <div key={i} className="sr-step">
+                                        <div className="sr-step-num">{step.step}</div>
+                                        <div className="sr-step-body">
+                                            <h4>{step.name}</h4>
+                                            {step.description && <p>{step.description}</p>}
+                                        </div>
                                     </div>
                                 ))}
-                                {a.updatedAt && (
-                                    <div className="detail-facts-row">
-                                        <span className="detail-facts-key">Updated</span>
-                                        <span className="detail-facts-val">{formatDate(a.updatedAt)}</span>
-                                    </div>
-                                )}
                             </div>
-                        </div>
+                        </section>
+                    )}
 
-                        {/* CTA Card */}
-                        <div className="detail-cta-card" style={{ '--detail-accent': typeColor } as React.CSSProperties}>
-                            {a.externalLink ? (
-                                <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-cta-btn detail-cta-primary"
-                                    onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
-                                    <span>{TYPE_CTA[a.type]}</span>
-                                    <span className="detail-cta-arrow">↗</span>
+                    {/* ─── 11. How to Apply ─── */}
+                    {jd?.howToApply && jd.howToApply.length > 0 && (
+                        <section id="howtoapply" className="sr-section sr-section-violet">
+                            <h2 className="sr-section-title">📝 How to Apply Online?</h2>
+                            <ol className="sr-apply-steps">
+                                {jd.howToApply.map((step, i) => <li key={i}>{step}</li>)}
+                            </ol>
+                        </section>
+                    )}
+
+                    {/* ─── 12. Full Content (Rich HTML) ─── */}
+                    {a.content && (
+                        <section id="content" className="sr-section sr-section-blue">
+                            <h2 className="sr-section-title">📝 Full Details</h2>
+                            <div className="sr-rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(a.content) }} />
+                        </section>
+                    )}
+
+                    {/* ─── 13. FAQs ─── */}
+                    {jd?.faqs && jd.faqs.length > 0 && (
+                        <section id="faq" className="sr-section sr-section-orange">
+                            <h2 className="sr-section-title">❓ Frequently Asked Questions</h2>
+                            <div className="sr-faq-list">
+                                {jd.faqs.map((faq, i) => (
+                                    <details key={i} className="sr-faq-item">
+                                        <summary>{faq.question}</summary>
+                                        <p>{faq.answer}</p>
+                                    </details>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {/* ─── 14. Important Links ─── */}
+                    <section id="links" className="sr-section sr-section-blue">
+                        <h2 className="sr-section-title">🔗 Important Links</h2>
+                        <div className="sr-links-grid">
+                            {/* JobDetails links */}
+                            {jd?.importantLinks && jd.importantLinks.length > 0 && jd.importantLinks.map((link, i) => (
+                                <a key={`jd-${i}`} href={link.url} target="_blank" rel="noopener noreferrer"
+                                    className={`sr-link-btn ${link.type === 'primary' ? 'sr-link-primary' : 'sr-link-secondary'}`}
+                                    onClick={() => trackEvent('link_click', { type, slug: a.slug, label: link.label })}>
+                                    {link.label}
                                 </a>
-                            ) : (
-                                <button type="button" className="detail-cta-btn detail-cta-disabled" disabled>Link Not Available Yet</button>
+                            ))}
+                            {/* Fallback links from announcement fields */}
+                            {(!jd?.importantLinks || jd.importantLinks.length === 0) && a.externalLink && (
+                                <>
+                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-link-btn sr-link-primary"
+                                        onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
+                                        ✅ {TYPE_CTA[a.type]}
+                                    </a>
+                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-link-btn sr-link-secondary">
+                                        📄 Download Notification
+                                    </a>
+                                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-link-btn sr-link-secondary">
+                                        🌐 Official Website
+                                    </a>
+                                </>
                             )}
-                            <Link to={TYPE_ROUTES[type]} className="detail-cta-btn detail-cta-secondary">
-                                More {TYPE_LABELS[type]} →
+                            <Link to={TYPE_ROUTES[type]} className="sr-link-btn sr-link-secondary">
+                                📂 More {TYPE_LABELS[type]}
                             </Link>
                         </div>
+                    </section>
 
-                        {/* Important Dates (sidebar desktop) */}
-                        {a.importantDates && a.importantDates.length > 0 && (
-                            <div className="detail-sidebar-card detail-sidebar-dates">
-                                <h3>📅 Important Dates</h3>
-                                <ul className="detail-sidebar-dates-list">
-                                    {a.importantDates.map((date, i) => (
-                                        <li key={date.id ?? i}>
-                                            <span className="detail-sidebar-date-event">{date.eventName}</span>
-                                            <span className="detail-sidebar-date-val">{formatDate(date.eventDate)}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Share Card */}
-                        <div className="detail-sidebar-card detail-share-card">
-                            <h3>📤 Share This</h3>
-                            <div className="detail-share-buttons">
-                                <a href={`https://wa.me/?text=${encodeURIComponent(a.title + ' - ' + window.location.href)}`}
-                                    target="_blank" rel="noreferrer" className="detail-share-btn detail-share-whatsapp">
-                                    💬 WhatsApp
-                                </a>
-                                <a href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(a.title)}`}
-                                    target="_blank" rel="noreferrer" className="detail-share-btn detail-share-telegram">
-                                    ✈️ Telegram
-                                </a>
-                                <button type="button" className="detail-share-btn detail-share-copy" onClick={handleCopyLink}>
-                                    🔗 {copied ? 'Copied!' : 'Copy Link'}
-                                </button>
-                            </div>
+                    {/* ─── Tags ─── */}
+                    {a.tags && a.tags.length > 0 && (
+                        <div className="sr-tags">
+                            {a.tags.map((tag) => <span key={tag.id} className="sr-tag">{tag.name}</span>)}
                         </div>
+                    )}
 
-                        {/* Tags sidebar */}
-                        {a.tags && a.tags.length > 0 && (
-                            <div className="detail-sidebar-card">
-                                <h3>🏷️ Tags</h3>
-                                <div className="detail-sidebar-tags">
-                                    {a.tags.map((tag) => (<span key={tag.id} className="detail-tag">{tag.name}</span>))}
-                                </div>
-                            </div>
-                        )}
-                    </aside>
+                    {/* ─── Share & Trust ─── */}
+                    <div className="sr-share-trust">
+                        <div className="sr-share-row">
+                            <span className="sr-share-label">📤 Share:</span>
+                            <a href={`https://wa.me/?text=${encodeURIComponent(a.title + ' - ' + window.location.href)}`}
+                                target="_blank" rel="noreferrer" className="sr-share-btn sr-share-wa">💬 WhatsApp</a>
+                            <a href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(a.title)}`}
+                                target="_blank" rel="noreferrer" className="sr-share-btn sr-share-tg">✈️ Telegram</a>
+                            <button type="button" className="sr-share-btn sr-share-copy" onClick={handleCopyLink}>
+                                🔗 {copied ? 'Copied!' : 'Copy Link'}
+                            </button>
+                        </div>
+                        <div className="sr-disclaimer">
+                            <span className="sr-disclaimer-icon">🛡️</span>
+                            <span>We do not collect application fees. Always apply on the official website. Information is sourced from official notifications and may change — verify on the official site before applying.</span>
+                        </div>
+                        <div className="sr-trust-actions hide-on-print">
+                            <button type="button" className="sr-report-btn" onClick={() => trackEvent('report_issue', { slug: a.slug })}>
+                                🚩 Report Wrong Info
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Related (up to 6) */}
+                {/* ─── Related ─── */}
                 {related.length > 0 && (
-                    <section className="detail-related-premium">
-                        <h2 className="detail-section-title">
-                            <span className="detail-section-icon">🔗</span>
-                            Related {TYPE_LABELS[type]}
-                        </h2>
-                        <div className="detail-related-grid">
-                            {related.map((card) => (
-                                <AnnouncementCard key={card.id} card={card} sourceTag="detail_related" />
-                            ))}
+                    <section className="sr-related">
+                        <h2 className="sr-section-title">🔗 Related {TYPE_LABELS[type]}</h2>
+                        <div className="sr-related-grid">
+                            {related.map((card) => <AnnouncementCard key={card.id} card={card} sourceTag="detail_related" />)}
                         </div>
                     </section>
                 )}
             </article>
 
-            {/* Sticky mobile CTA bar */}
-            <div className="detail-sticky-cta">
+            {/* ─── Sticky Mobile CTA ─── */}
+            <div className="sr-mobile-cta">
                 {a.externalLink ? (
-                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="detail-sticky-primary"
+                    <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-mobile-primary"
                         onClick={() => trackEvent('sticky_cta_click', { type, slug: a.slug })}>
                         ✅ {TYPE_CTA[a.type]}
                     </a>
                 ) : (
-                    <span className="detail-sticky-primary" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-                        Link Not Available
-                    </span>
+                    <span className="sr-mobile-primary" style={{ opacity: 0.5, pointerEvents: 'none' }}>Link Not Available</span>
                 )}
-                <button type="button" className={`detail-sticky-secondary${bookmarked ? ' bookmarked' : ''}`} onClick={toggleBookmark} title="Save">
+                <button type="button" className={`sr-mobile-icon${bookmarked ? ' active' : ''}`} onClick={toggleBookmark}>
                     {bookmarked ? '🔖' : '📑'}
                 </button>
-                <button type="button" className="detail-sticky-secondary" onClick={handleCopyLink} title="Share">
+                <button type="button" className="sr-mobile-icon" onClick={handleCopyLink}>
                     {copied ? '✅' : '🔗'}
                 </button>
             </div>

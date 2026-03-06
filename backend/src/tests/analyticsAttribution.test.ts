@@ -95,5 +95,12 @@ describe('analytics attribution normalization', () => {
             expect(attribution.source).not.toBe('unknown');
         }
     });
+
+    it('preserves the dedicated homepage feed source marker', () => {
+        const attribution = normalizeAttribution({ source: 'home_feed' });
+
+        expect(attribution.source).toBe('home_feed');
+        expect(attribution.sourceClass).toBe('in_app');
+    });
 });
 

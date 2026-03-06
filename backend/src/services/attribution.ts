@@ -31,6 +31,7 @@ export interface NormalizedAttribution {
 
 const IN_APP_SOURCES = new Set([
   'home',
+  'home_feed',
   'category',
   'search_overlay',
   'bookmarks',
@@ -84,6 +85,7 @@ const SOURCE_ALIASES: Record<string, string> = {
   notification_prompt: 'push',
   push_prompt: 'push',
   app: 'push',
+  home_feed: 'home_feed',
   header_trending: 'home',
   '(direct)': 'direct',
   none: 'direct',
