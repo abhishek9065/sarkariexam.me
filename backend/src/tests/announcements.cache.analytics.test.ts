@@ -95,3 +95,123 @@ describe('announcements v3 cards cache analytics', () => {
         expect(listingViewCalls[1]?.metadata?.count).toBe(1);
     });
 });
+
+describe('homepage announcement feed', () => {
+    const app = express();
+    app.use(express.json());
+    app.use('/api/announcements', announcementsRouter);
+
+    beforeEach(() => {
+        invalidateCache();
+        vi.clearAllMocks();
+        recordAnalyticsEventMock.mockResolvedValue(undefined);
+    });
+
+    it('returns deduped latest items and cached section payloads for /homepage', async () => {
+        const sectionResults = [
+            {
+                data: [
+                    {
+                        id: 'shared-1',
+                        title: 'Shared Item',
+                        slug: 'shared-item',
+                        type: 'job',
+                        category: 'Jobs',
+                        organization: 'UPSC',
+                        postedAt: '2026-03-01T00:00:00.000Z',
+                    },
+                ],
+                nextCursor: null,
+                hasMore: false,
+            },
+            {
+                data: [
+                    {
+                        id: 'result-1',
+                        title: 'Result Item',
+                        slug: 'result-item',
+                        type: 'result',
+                        category: 'Results',
+                        organization: 'SSC',
+                        postedAt: '2026-03-03T00:00:00.000Z',
+                    },
+                ],
+                nextCursor: null,
+                hasMore: false,
+            },
+            {
+                data: [
+                    {
+                        id: 'shared-1',
+                        title: 'Shared Item',
+                        slug: 'shared-item',
+                        type: 'admit-card',
+                        category: 'Admit',
+                        organization: 'UPSC',
+                        postedAt: '2026-03-02T00:00:00.000Z',
+                    },
+                ],
+                nextCursor: null,
+                hasMore: false,
+            },
+            { data: [], nextCursor: null, hasMore: false },
+            { data: [], nextCursor: null, hasMore: false },
+            { data: [], nextCursor: null, hasMore: false },
+        ];
+
+        for (const result of sectionResults) {
+            findListingCardsMock.mockResolvedValueOnce(result);
+        }
+
+        const first = await request(app).get('/api/announcements/homepage');
+        const second = await request(app).get('/api/announcements/homepage');
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(first.headers['x-cache']).toBe('MISS');
+        expect(String(second.headers['x-cache'] || '')).toContain('HIT');
+        expect(findListingCardsMock).toHaveBeenCalledTimes(6);
+
+        expect(first.body.data.sections.job).toHaveLength(1);
+        expect(first.body.data.sections.result).toHaveLength(1);
+        expect(first.body.data.sections['admit-card']).toHaveLength(1);
+        expect(first.body.data.sections['answer-key']).toEqual([]);
+        expect(first.body.data.sections.syllabus).toEqual([]);
+        expect(first.body.data.sections.admission).toEqual([]);
+        expect(first.body.data.latest.map((entry: { id: string }) => entry.id)).toEqual(['result-1', 'shared-1']);
+        expect(typeof first.body.data.generatedAt).toBe('string');
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const listingViewCalls = recordAnalyticsEventMock.mock.calls
+            .map(([arg]) => arg)
+            .filter((entry: any) => entry?.type === 'listing_view');
+
+        expect(listingViewCalls.length).toBeGreaterThanOrEqual(2);
+        expect(listingViewCalls[0]?.metadata?.source).toBe('home');
+        expect(listingViewCalls[0]?.metadata?.count).toBe(2);
+    });
+
+    it('returns stable empty arrays for every homepage section when no content exists', async () => {
+        for (let index = 0; index < 6; index += 1) {
+            findListingCardsMock.mockResolvedValueOnce({
+                data: [],
+                nextCursor: null,
+                hasMore: false,
+            });
+        }
+
+        const response = await request(app).get('/api/announcements/homepage');
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.latest).toEqual([]);
+        expect(response.body.data.sections).toEqual({
+            job: [],
+            result: [],
+            'admit-card': [],
+            'answer-key': [],
+            syllabus: [],
+            admission: [],
+        });
+    });
+});

@@ -77,6 +77,7 @@ describe('analytics attribution normalization', () => {
             'home_box_admission',
             'home_box_important',
             'home_box_certificate',
+            'home_feed',
             'category_list',
             'category_compact',
             'search_overlay',

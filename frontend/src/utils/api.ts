@@ -4,6 +4,7 @@ import type {
     AnnouncementCard,
     AuthResponse,
     ContentType,
+    HomepageFeedData,
     PaginatedResponse,
     SearchSuggestion,
     Tag,
@@ -294,6 +295,11 @@ export function getAnnouncements(filters: AnnouncementFilters = {}) {
     return apiFetch<{ data: Announcement[]; total: number }>(`${API_PATHS.announcements}${qs}`);
 }
 
+/** Fetch homepage feed — merged listing cards for homepage sections */
+export function getHomepageFeed() {
+    return apiFetch<{ data: HomepageFeedData }>(API_PATHS.announcementsHomepage);
+}
+
 /** Fetch listing cards — cursor-based (v3, lightweight) */
 export function getAnnouncementCards(filters: AnnouncementFilters = {}) {
     const qs = toQueryString(filters as Record<string, string | number | undefined>);
@@ -364,6 +370,10 @@ export function logout() {
 /* ─── Bookmarks ─── */
 export function getBookmarks() {
     return apiFetch<{ data: Announcement[] }>('/bookmarks');
+}
+
+export function getBookmarkIds() {
+    return apiFetch<{ data: string[] }>('/bookmarks/ids');
 }
 
 export function addBookmark(announcementId: string) {

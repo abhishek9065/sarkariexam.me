@@ -624,6 +624,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/announcements/homepage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Homepage announcement feed */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Homepage feed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HomepageFeedResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/announcements/v3/cards": {
         parameters: {
             query?: never;
@@ -3706,6 +3742,23 @@ export interface components {
             count?: number;
             nextCursor: string | null;
             hasMore: boolean;
+        };
+        HomepageFeedSections: {
+            job: components["schemas"]["AnnouncementCard"][];
+            result: components["schemas"]["AnnouncementCard"][];
+            "admit-card": components["schemas"]["AnnouncementCard"][];
+            "answer-key": components["schemas"]["AnnouncementCard"][];
+            syllabus: components["schemas"]["AnnouncementCard"][];
+            admission: components["schemas"]["AnnouncementCard"][];
+        };
+        HomepageFeedData: {
+            latest: components["schemas"]["AnnouncementCard"][];
+            sections: components["schemas"]["HomepageFeedSections"];
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        HomepageFeedResponse: {
+            data: components["schemas"]["HomepageFeedData"];
         };
         User: {
             id: string;

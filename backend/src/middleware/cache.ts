@@ -142,6 +142,8 @@ export const cacheKeys = {
         return `announcements:${params.join(':')}`;
     },
 
+    announcementsHomepage: () => 'announcements:homepage',
+
     announcementBySlug: (req: Request) => `announcement:${req.params.slug}`,
 
     categories: () => 'categories',

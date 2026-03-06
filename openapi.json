@@ -1492,6 +1492,23 @@
         }
       }
     },
+    "/api/announcements/homepage": {
+      "get": {
+        "summary": "Homepage announcement feed",
+        "responses": {
+          "200": {
+            "description": "Homepage feed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomepageFeedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/announcements/v3/cards": {
       "get": {
         "summary": "List announcement cards",
@@ -6030,6 +6047,90 @@
           "data",
           "nextCursor",
           "hasMore"
+        ]
+      },
+      "HomepageFeedSections": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          },
+          "result": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          },
+          "admit-card": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          },
+          "answer-key": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          },
+          "syllabus": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          },
+          "admission": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          }
+        },
+        "required": [
+          "job",
+          "result",
+          "admit-card",
+          "answer-key",
+          "syllabus",
+          "admission"
+        ],
+        "additionalProperties": false
+      },
+      "HomepageFeedData": {
+        "type": "object",
+        "properties": {
+          "latest": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementCard"
+            }
+          },
+          "sections": {
+            "$ref": "#/components/schemas/HomepageFeedSections"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "latest",
+          "sections",
+          "generatedAt"
+        ]
+      },
+      "HomepageFeedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HomepageFeedData"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "User": {

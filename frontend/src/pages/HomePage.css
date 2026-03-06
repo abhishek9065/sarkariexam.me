@@ -467,6 +467,31 @@
     font-size: var(--font-xs);
 }
 
+.hp-dense-skeleton {
+    gap: var(--space-2);
+}
+
+.hp-dense-skeleton-item {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-2) var(--space-3);
+}
+
+.hp-dense-skeleton-bar {
+    display: block;
+    border-radius: var(--radius-sm);
+}
+
+.hp-dense-skeleton-title {
+    width: 88%;
+    height: 14px;
+}
+
+.hp-dense-skeleton-meta {
+    width: 42%;
+    height: 10px;
+}
+
 /* ─── Mobile Tabs ─── */
 .home-mobile-tabs {
     display: none;

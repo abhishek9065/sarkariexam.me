@@ -31,6 +31,13 @@ const allFiles = walkFiles(distDir);
 const jsFiles = allFiles.filter((file) => file.endsWith('.js'));
 const cssFiles = allFiles.filter((file) => file.endsWith('.css'));
 
+function isServiceWorkerArtifact(relativeName) {
+    const normalized = relativeName.replace(/\\/g, '/');
+    return normalized === 'sw.js'
+        || /^workbox-.*\.js$/i.test(normalized)
+        || /^assets\/workbox-.*\.js$/i.test(normalized);
+}
+
 const jsStats = jsFiles.map((file) => ({
     file,
     bytes: fs.statSync(file).size,
@@ -42,10 +49,13 @@ const cssStats = cssFiles.map((file) => ({
     name: path.relative(distDir, file),
 }));
 
-const totalJsBytes = jsStats.reduce((sum, item) => sum + item.bytes, 0);
+const appJsStats = jsStats.filter((item) => !isServiceWorkerArtifact(item.name));
+const serviceWorkerJsStats = jsStats.filter((item) => isServiceWorkerArtifact(item.name));
+
+const totalJsBytes = appJsStats.reduce((sum, item) => sum + item.bytes, 0);
 const totalCssBytes = cssStats.reduce((sum, item) => sum + item.bytes, 0);
 
-const sortedJs = [...jsStats].sort((a, b) => b.bytes - a.bytes);
+const sortedJs = [...appJsStats].sort((a, b) => b.bytes - a.bytes);
 const largestJs = sortedJs[0] || null;
 const adminChunk = sortedJs.find((item) => /admin/i.test(path.basename(item.name)));
 
@@ -93,11 +103,12 @@ const report = {
     totals: {
         jsBytes: totalJsBytes,
         cssBytes: totalCssBytes,
-        jsFiles: jsStats.length,
+        jsFiles: appJsStats.length,
         cssFiles: cssStats.length,
     },
     largestJs: largestJs ? { name: largestJs.name, bytes: largestJs.bytes } : null,
     adminChunk: adminChunk ? { name: adminChunk.name, bytes: adminChunk.bytes } : null,
+    excludedServiceWorkerJs: serviceWorkerJsStats.map((item) => ({ name: item.name, bytes: item.bytes })),
     budgets: evaluations,
     topJsChunks: sortedJs.slice(0, 8).map((item) => ({ name: item.name, bytes: item.bytes })),
 };

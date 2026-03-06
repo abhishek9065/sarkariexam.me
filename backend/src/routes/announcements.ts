@@ -14,6 +14,10 @@ import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
 import { getPathParam } from '../utils/routeParams.js';
 
 const router = express.Router();
+const HOMEPAGE_SECTION_TYPES: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
+
+type ListingCard = Awaited<ReturnType<typeof AnnouncementModel.findListingCards>>['data'][number];
+type HomepageSections = Record<ContentType, ListingCard[]>;
 
 // Add rate limiting info to responses
 router.use((req, res, next) => {
@@ -260,6 +264,32 @@ const recordAnnouncementAnalytics = (req: express.Request, announcement: Announc
   }
 };
 
+const createEmptyHomepageSections = (): HomepageSections => ({
+  job: [],
+  result: [],
+  'admit-card': [],
+  'answer-key': [],
+  syllabus: [],
+  admission: [],
+});
+
+const buildHomepageLatest = (sections: HomepageSections): ListingCard[] => {
+  const seen = new Set<string>();
+
+  return HOMEPAGE_SECTION_TYPES
+    .flatMap((type) => sections[type])
+    .sort((a, b) => {
+      const left = a.postedAt ? new Date(a.postedAt).getTime() : 0;
+      const right = b.postedAt ? new Date(b.postedAt).getTime() : 0;
+      return right - left;
+    })
+    .filter((card) => {
+      if (!card.id || seen.has(card.id)) return false;
+      seen.add(card.id);
+      return true;
+    });
+};
+
 // Get all announcements - with caching (5 min server, 2 min browser)
 router.get('/', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcements }), cacheControl(120), async (req, res) => {
   try {
@@ -307,6 +337,59 @@ router.get(
       return res.status(500).json({ error: 'Failed to fetch announcements' });
     }
   });
+
+router.get(
+  '/homepage',
+  cacheMiddleware({
+    ttl: 300,
+    keyGenerator: cacheKeys.announcementsHomepage,
+    onHit: (req, cachedData) => {
+      const count = Array.isArray(cachedData?.data?.latest) ? cachedData.data.latest.length : 0;
+      recordListingAnalytics(req, {
+        count,
+        source: 'home_feed',
+      });
+    },
+  }),
+  cacheControl(120),
+  async (req, res) => {
+    try {
+      const results = await Promise.all(
+        HOMEPAGE_SECTION_TYPES.map((type) =>
+          AnnouncementModel.findListingCards({
+            type,
+            sort: 'newest',
+            limit: 12,
+            includeTotal: false,
+          })
+        )
+      );
+
+      const sections = createEmptyHomepageSections();
+      for (const [index, type] of HOMEPAGE_SECTION_TYPES.entries()) {
+        sections[type] = results[index]?.data ?? [];
+      }
+
+      const latest = buildHomepageLatest(sections);
+
+      recordListingAnalytics(req, {
+        count: latest.length,
+        source: 'home_feed',
+      });
+
+      return res.json({
+        data: {
+          latest,
+          sections,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching homepage announcement feed:', error);
+      return res.status(500).json({ error: 'Failed to fetch homepage announcement feed' });
+    }
+  }
+);
 
 // V3: OPTIMIZED listing cards (minimal fields, 60% less RU consumption)
 router.get(

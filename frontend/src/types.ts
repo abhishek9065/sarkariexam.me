@@ -123,6 +123,14 @@ export interface AnnouncementCard {
     viewCount?: number;
 }
 
+export type HomepageFeedSections = Record<ContentType, AnnouncementCard[]>;
+
+export interface HomepageFeedData {
+    latest: AnnouncementCard[];
+    sections: HomepageFeedSections;
+    generatedAt: string;
+}
+
 /* ─── User ─── */
 export interface User {
     id: string;
