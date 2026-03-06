@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { Layout } from '../components/Layout';
@@ -202,7 +202,12 @@ export function DetailPage({ type }: { type: ContentType }) {
     const jd = a.jobDetails as JobDetailsData | undefined;
     const salary = formatSalary(a.salaryMin, a.salaryMax);
     const deadline = getDeadlineStatus(a.deadline);
+    const isClosed = deadline?.cls === 'sr-badge-closed';
     const sections = buildSections(a, jd);
+
+    /* Stale data warning: > 30 days since last update */
+    const daysSinceUpdate = Math.floor((Date.now() - new Date(a.updatedAt).getTime()) / 86_400_000);
+    const isStale = daysSinceUpdate > 30;
 
     const toNum = (v: unknown) => { const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? n : 0; };
     const fmtCount = (v?: number | null) => toNum(v).toLocaleString('en-IN');
@@ -218,6 +223,18 @@ export function DetailPage({ type }: { type: ContentType }) {
                     <span className="sr-bc-sep">›</span>
                     <span className="sr-bc-current">{a.title}</span>
                 </nav>
+
+                {/* ─── Stale/Expired Warnings ─── */}
+                {isClosed && (
+                    <div className="sr-expired-banner">
+                        ⚠️ This listing has <strong>expired</strong>. The deadline has passed and applications are no longer being accepted.
+                    </div>
+                )}
+                {isStale && !isClosed && (
+                    <div className="sr-stale-banner">
+                        ℹ️ This page was last updated {daysSinceUpdate} days ago. Some information may have changed — please verify on the official website.
+                    </div>
+                )}
 
                 {/* ─── Hero Header ─── */}
                 <header className="sr-hero">
@@ -258,7 +275,9 @@ export function DetailPage({ type }: { type: ContentType }) {
 
                     {/* Action Bar */}
                     <div className="sr-action-bar hide-on-print">
-                        {a.externalLink ? (
+                        {isClosed ? (
+                            <span className="sr-btn-closed">❌ Application Closed</span>
+                        ) : a.externalLink ? (
                             <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-btn-primary"
                                 onClick={() => trackEvent('cta_click', { type, slug: a.slug, action: 'apply' })}>
                                 ✅ {TYPE_CTA[a.type]}
@@ -649,7 +668,9 @@ export function DetailPage({ type }: { type: ContentType }) {
 
             {/* ─── Sticky Mobile CTA ─── */}
             <div className="sr-mobile-cta">
-                {a.externalLink ? (
+                {isClosed ? (
+                    <span className="sr-mobile-closed">❌ Application Closed</span>
+                ) : a.externalLink ? (
                     <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-mobile-primary"
                         onClick={() => trackEvent('sticky_cta_click', { type, slug: a.slug })}>
                         ✅ {TYPE_CTA[a.type]}
