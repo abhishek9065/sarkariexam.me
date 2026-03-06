@@ -82,6 +82,7 @@ jobs:
         if: steps.deploy-config.outputs.enabled == 'true' && success()
         run: |
           echo "Checking production endpoints..."
+          failures=0
           for url in \
             "https://sarkariexams.me/api/health" \
             "https://sarkariexams.me/" \
@@ -91,5 +92,11 @@ jobs:
               echo "OK $url (status=$status)"
             else
               echo "FAIL $url (status=$status)"
+              failures=1
             fi
           done
+
+          if [ "$failures" -ne 0 ]; then
+            echo "Production health verification failed."
+            exit 1
+          fi

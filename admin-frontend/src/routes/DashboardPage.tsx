@@ -110,17 +110,17 @@ export function DashboardPage() {
     return (
         <>
             {/* ─── Welcome Hero ─── */}
-            <div className="ops-card" style={{ backgroundImage: 'var(--accent-gradient-mesh)', marginBottom: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            <div className="ops-card dash-hero-card">
+                <div className="dash-hero-header">
                     <div>
-                        <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, fontFamily: 'var(--font-heading)' }}>
+                        <div className="dash-hero-title">
                             {greeting.emoji} {greeting.text}, {displayName}
                         </div>
-                        <p style={{ color: 'var(--text-secondary)', marginTop: 4, fontSize: 'var(--text-base)' }}>
+                        <p className="dash-hero-subtitle">
                             {now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             {' · '}
-                            <span className="ops-live-dot" style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                            <span style={{ color: 'var(--success)', fontWeight: 600 }}>System online</span>
+                            <span className="ops-live-dot dash-live-dot" />
+                            <span className="dash-system-online">System online</span>
                         </p>
                     </div>
                     <div className="dash-quick-actions">
@@ -185,24 +185,23 @@ export function DashboardPage() {
                         </div>
                     </div>
                     {/* Donut + Bar combo */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 'var(--space-4)', alignItems: 'center' }}>
+                    <div className="dash-traffic-layout">
                         {/* CSS Donut Chart */}
-                        <div style={{ position: 'relative', width: 120, height: 120, margin: '0 auto' }}>
-                            <div style={{
-                                width: '100%', height: '100%', borderRadius: '50%',
-                                background: `conic-gradient(${donutGradient})`,
-                                boxShadow: 'var(--shadow-glow-sm)',
-                            }} />
-                            <div style={{
-                                position: 'absolute', inset: '25%', borderRadius: '50%',
-                                background: 'var(--surface-card)',
-                                display: 'grid', placeItems: 'center',
-                            }}>
-                                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--text-muted)' }}>SOURCES</span>
+                        <div className="dash-donut-wrap">
+                            <div
+                                className="dash-donut-chart"
+                                ref={(el) => {
+                                    if (el) {
+                                        el.style.background = `conic-gradient(${donutGradient})`;
+                                    }
+                                }}
+                            />
+                            <div className="dash-donut-center">
+                                <span className="dash-donut-label">SOURCES</span>
                             </div>
                         </div>
                         {/* Bar Chart */}
-                        <div className="ops-chart-container" style={{ height: 120 }}>
+                        <div className="ops-chart-container dash-traffic-chart">
                             {mockVisits.map((val, i) => {
                                 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                                 const pct = `${Math.max(4, (val / maxVisits) * 100)}%`;
@@ -217,11 +216,13 @@ export function DashboardPage() {
                         </div>
                     </div>
                     {/* Donut Legend */}
-                    <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    <div className="dash-traffic-legend">
                         {trafficSources.map((src) => (
-                            <div key={src.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: src.color, flexShrink: 0 }} />
-                                {src.label} <strong style={{ color: 'var(--text-primary)' }}>{src.value}%</strong>
+                            <div key={src.label} className="dash-traffic-legend-item">
+                                <span
+                                    className={`dash-traffic-legend-dot dash-traffic-legend-dot-${src.label.toLowerCase()}`}
+                                />
+                                {src.label} <strong className="dash-traffic-legend-value">{src.value}%</strong>
                             </div>
                         ))}
                     </div>
@@ -321,13 +322,8 @@ export function DashboardPage() {
                                         </span>
                                         <span className="dash-activity-meta">
                                             {log.actorEmail ? (
-                                                <span className="dash-activity-actor" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                                    <span style={{
-                                                        width: 18, height: 18, borderRadius: '50%',
-                                                        background: 'var(--accent-gradient)', display: 'inline-grid',
-                                                        placeItems: 'center', fontSize: '0.55rem', fontWeight: 800,
-                                                        color: '#fff', flexShrink: 0,
-                                                    }}>
+                                                <span className="dash-activity-actor">
+                                                    <span className="dash-activity-avatar">
                                                         {log.actorEmail.charAt(0).toUpperCase()}
                                                     </span>
                                                     {log.actorEmail}
