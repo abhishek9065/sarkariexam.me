@@ -36,7 +36,7 @@ const ORG_GROUPS: Array<{ heading: string; items: Array<{ label: string; to: str
             { label: 'Banking Jobs', to: '/jobs?q=Banking' },
             { label: 'TET', to: '/jobs?q=TET' },
             { label: 'Scholarships', to: '/jobs?q=Scholarship' },
-            { label: 'Certificate Verification', to: '/results?q=certificate' },
+            { label: 'Admit Card Download', to: '/admit-card?q=download' },
         ],
     },
 ];

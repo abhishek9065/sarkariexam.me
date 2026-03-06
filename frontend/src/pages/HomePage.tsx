@@ -577,10 +577,10 @@ export function HomePage() {
 
                     <section className="home-v3-grid home-v3-bottom-grid" data-testid="home-v3-bottom-grid">
                         <DenseBoxSection
-                            title="Certificate Verification"
+                            title="Admit Card Download"
                             viewAllTo="/admit-card?source=home_box_certificate"
                             items={denseCertificate}
-                            emptyLabel="Certificate"
+                            emptyLabel="Admit Card"
                             emptyHref="/admit-card"
                             testId="home-v3-dense-box-certificate"
                             loading={loading}
