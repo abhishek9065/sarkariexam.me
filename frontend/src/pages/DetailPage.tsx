@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { Layout } from '../components/Layout';
@@ -95,8 +95,14 @@ export function DetailPage({ type }: { type: ContentType }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [bookmarked, setBookmarked] = useState(false);
+    const [subscribed, setSubscribed] = useState(false);
     const [activeSection, setActiveSection] = useState('overview');
     const [copied, setCopied] = useState(false);
+
+    // Eligibility Checker States
+    const [dob, setDob] = useState('');
+    const [hasQualification, setHasQualification] = useState(false);
+    const [eligibilityStatus, setEligibilityStatus] = useState<'unknown' | 'eligible' | 'not-eligible'>('unknown');
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -178,6 +184,20 @@ export function DetailPage({ type }: { type: ContentType }) {
             setTimeout(() => setCopied(false), 2000);
         } catch { /* clipboard API not available */ }
     }, []);
+
+    const toggleSubscribe = useCallback(() => {
+        setSubscribed(prev => !prev);
+        if (!subscribed) {
+            trackEvent('subscribe_alerts', { slug: announcement?.slug });
+        } else {
+            trackEvent('unsubscribe_alerts', { slug: announcement?.slug });
+        }
+    }, [announcement, subscribed]);
+
+    const handlePrint = useCallback(() => {
+        window.print();
+        trackEvent('print_page', { slug: announcement?.slug });
+    }, [announcement]);
 
     if (loading) {
         return (
@@ -312,6 +332,12 @@ export function DetailPage({ type }: { type: ContentType }) {
                             <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={toggleBookmark} title={bookmarked ? "Saved" : "Save"}>
                                 {bookmarked ? <>🔖 <span className="hide-mobile">Saved</span></> : <>🔖 <span className="hide-mobile">Save</span></>}
                             </button>
+                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={toggleSubscribe} title={subscribed ? "Alerts On" : "Get Alerts"}>
+                                {subscribed ? <>🔕 <span className="hide-mobile">Stop Alerts</span></> : <>🔔 <span className="hide-mobile">Get Alerts</span></>}
+                            </button>
+                            <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon hide-mobile" onClick={handlePrint} title="Print Details">
+                                🖨️ <span className="hide-mobile">Print</span>
+                            </button>
                             <button type="button" className="detail-hero-cta-secondary detail-hero-cta-icon" onClick={handleCopyLink} title="Share">
                                 {copied ? <>✅ <span className="hide-mobile">Copied!</span></> : <>🔗 <span className="hide-mobile">Share</span></>}
                             </button>
@@ -392,6 +418,62 @@ export function DetailPage({ type }: { type: ContentType }) {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Eligibility Checker Widget */}
+                                <div className="detail-eligibility-checker hide-on-print">
+                                    <div className="detail-checker-title">🔍 Quick Eligibility Check</div>
+                                    <div className="detail-checker-form">
+                                        <div className="detail-checker-input-group">
+                                            <label className="detail-checker-label">Date of Birth</label>
+                                            <input
+                                                type="date"
+                                                className="detail-checker-input"
+                                                value={dob}
+                                                onChange={(e) => {
+                                                    setDob(e.target.value);
+                                                    if (e.target.value) {
+                                                        const userAge = new Date().getFullYear() - new Date(e.target.value).getFullYear();
+                                                        const match = a.ageLimit ? a.ageLimit.match(/(\d+)/g) : null;
+                                                        if (match && match.length > 0) {
+                                                            const maxAge = parseInt(match[match.length - 1], 10);
+                                                            const minAge = match.length > 1 ? parseInt(match[0], 10) : 18;
+                                                            if (userAge >= minAge && userAge <= maxAge) {
+                                                                setEligibilityStatus('eligible');
+                                                            } else {
+                                                                setEligibilityStatus('not-eligible');
+                                                            }
+                                                        } else {
+                                                            setEligibilityStatus('eligible');
+                                                        }
+                                                    } else {
+                                                        setEligibilityStatus('unknown');
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="detail-checker-input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
+                                            <input
+                                                type="checkbox"
+                                                id="req-qual"
+                                                checked={hasQualification}
+                                                onChange={(e) => setHasQualification(e.target.checked)}
+                                                style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                                            />
+                                            <label htmlFor="req-qual" className="detail-checker-label" style={{ cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+                                                I have the required qualification
+                                            </label>
+                                        </div>
+
+                                        {dob && (
+                                            <div className={`detail-checker-result detail-checker-${eligibilityStatus}`}>
+                                                {eligibilityStatus === 'eligible' && hasQualification && "✅ You appear to be eligible!"}
+                                                {eligibilityStatus === 'eligible' && !hasQualification && "⚠️ Age is within limits, confirm qualification."}
+                                                {eligibilityStatus === 'not-eligible' && "❌ You do not meet the age requirements."}
+                                                {eligibilityStatus === 'unknown' && "Please enter valid details."}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </section>
                         )}
 
@@ -412,16 +494,27 @@ export function DetailPage({ type }: { type: ContentType }) {
                         {a.importantDates && a.importantDates.length > 0 && (
                             <section id="dates" className="detail-dates-inline">
                                 <h2 className="detail-section-title"><span className="detail-section-icon">📅</span> Important Dates</h2>
-                                <div className="detail-dates-timeline">
-                                    {a.importantDates.map((date, i) => (
-                                        <div key={date.id ?? i} className="detail-date-row">
-                                            <span className="detail-date-dot" />
-                                            <div className="detail-date-content">
-                                                <span className="detail-date-event">{date.eventName}</span>
-                                                <span className="detail-date-value">{formatDate(date.eventDate)}</span>
+                                <div className="detail-visual-timeline">
+                                    {a.importantDates.map((date, i) => {
+                                        const eventTime = new Date(date.eventDate).getTime();
+                                        const now = Date.now();
+                                        const isPast = eventTime < now - 86400000;
+                                        const isSoon = eventTime >= now - 86400000 && eventTime <= now + (5 * 86400000);
+                                        const isLatestFuture = !isPast && (i === 0 || new Date(a.importantDates![i - 1].eventDate).getTime() < now - 86400000);
+
+                                        return (
+                                            <div key={date.id ?? i} className={`detail-timeline-step ${isPast ? 'past' : ''} ${isLatestFuture ? 'active' : ''}`}>
+                                                <div className="detail-timeline-dot" />
+                                                <div className="detail-timeline-content">
+                                                    <span className="detail-timeline-event">
+                                                        {date.eventName}
+                                                        {isSoon && !isPast && <span className="detail-urgent-badge">Action Required Soon</span>}
+                                                    </span>
+                                                    <span className="detail-timeline-date">{formatDate(date.eventDate)}</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </section>
                         )}
