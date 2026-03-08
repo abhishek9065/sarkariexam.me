@@ -5,6 +5,7 @@ import { reportClientError } from '../utils/reportClientError';
 interface Props {
     children: ReactNode;
     fallback?: ReactNode;
+    resetKey?: string;
 }
 
 interface State {
@@ -34,6 +35,16 @@ export class ErrorBoundary extends Component<Props, State> {
         });
     }
 
+    componentDidUpdate(prevProps: Props) {
+        if (this.state.hasError && this.props.resetKey !== prevProps.resetKey) {
+            this.setState({ hasError: false, error: null });
+        }
+    }
+
+    private readonly handleRetry = () => {
+        this.setState({ hasError: false, error: null });
+    };
+
     render() {
         if (this.state.hasError) {
             if (this.props.fallback) return this.props.fallback;
@@ -47,9 +58,9 @@ export class ErrorBoundary extends Component<Props, State> {
                         </p>
                         <button
                             className="btn btn-primary"
-                            onClick={() => window.location.reload()}
+                            onClick={this.handleRetry}
                         >
-                            Reload Page
+                            Try Again
                         </button>
                     </div>
                 </div>

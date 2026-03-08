@@ -11,39 +11,10 @@ import type {
 } from '../types';
 import { reportClientError } from './reportClientError';
 import { API_PATHS } from './apiPaths';
+import { getApiBaseCandidates } from './apiBase';
 
 /* ─── Base URL ─── */
-const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
-const configuredApiBase = import.meta.env.VITE_API_BASE
-    ? `${normalizeBase(String(import.meta.env.VITE_API_BASE))}/api`
-    : null;
-
-const resolveSiblingApiBase = (): string | null => {
-    if (typeof window === 'undefined') return null;
-    const host = window.location.hostname.toLowerCase();
-    if (host === 'www.sarkariexams.me') return 'https://sarkariexams.me/api';
-    if (host === 'sarkariexams.me') return 'https://www.sarkariexams.me/api';
-    return null;
-};
-
-const API_BASE_CANDIDATES = (() => {
-    const siblingApiBase = resolveSiblingApiBase();
-    const candidates = [
-        ...(configuredApiBase ? [configuredApiBase] : []),
-        '/api',
-        ...(siblingApiBase ? [siblingApiBase] : []),
-    ];
-
-    const seen = new Set<string>();
-    const unique: string[] = [];
-    for (const candidate of candidates) {
-        const normalized = normalizeBase(candidate);
-        if (seen.has(normalized)) continue;
-        seen.add(normalized);
-        unique.push(normalized);
-    }
-    return unique;
-})();
+const API_BASE_CANDIDATES = getApiBaseCandidates(import.meta.env.VITE_API_BASE ? String(import.meta.env.VITE_API_BASE) : null);
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 

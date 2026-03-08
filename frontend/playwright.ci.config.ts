@@ -20,6 +20,7 @@ export default defineConfig({
         env: {
             ...process.env,
             VITE_DISABLE_PROXY: '1',
+            VITE_E2E_ERROR_BOUNDARY_ROUTES: '1',
         },
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: false,

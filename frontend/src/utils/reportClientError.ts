@@ -1,10 +1,6 @@
-const normalizeBase = (value: string) => value.trim().replace(/\/+$/, '');
+import { getApiBaseCandidates } from './apiBase';
 
-const configuredApiBase = import.meta.env.VITE_API_BASE
-    ? `${normalizeBase(String(import.meta.env.VITE_API_BASE))}/api`
-    : null;
-
-const API_BASE_CANDIDATES = configuredApiBase ? [configuredApiBase, '/api'] : ['/api'];
+const API_BASE_CANDIDATES = getApiBaseCandidates(import.meta.env.VITE_API_BASE ? String(import.meta.env.VITE_API_BASE) : null);
 const DEDUPE_MAP = new Map<string, number>();
 const DEFAULT_DEDUPE_WINDOW_MS = 60_000;
 

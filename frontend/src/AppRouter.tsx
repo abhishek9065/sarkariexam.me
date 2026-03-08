@@ -1,5 +1,5 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Suspense, lazy, type ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -21,6 +21,8 @@ const ExplorePage = lazy(() => import('./pages/ExplorePage').then((m) => ({ defa
 const TrendingPage = lazy(() => import('./pages/TrendingPage').then((m) => ({ default: m.TrendingPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
+const ENABLE_E2E_ERROR_BOUNDARY_ROUTES = import.meta.env.VITE_E2E_ERROR_BOUNDARY_ROUTES === '1';
+
 function SuspenseFallback() {
     return (
         <Layout>
@@ -29,13 +31,33 @@ function SuspenseFallback() {
     );
 }
 
+function RouteAwareErrorBoundary({ children }: { children: ReactNode }) {
+    const location = useLocation();
+    return <ErrorBoundary resetKey={`${location.pathname}${location.search}`}>{children}</ErrorBoundary>;
+}
+
+function E2EErrorBoundaryOkPage() {
+    return (
+        <Layout>
+            <section data-testid="e2e-error-boundary-ok">
+                <h1>Error boundary recovered</h1>
+                <p>The app rendered normally after leaving the crashing route.</p>
+            </section>
+        </Layout>
+    );
+}
+
+function E2EErrorBoundaryCrashPage() {
+    throw new Error('Intentional e2e route crash');
+}
+
 export default function App() {
     return (
         <ThemeProvider>
             <LanguageProvider>
                 <BrowserRouter>
                     <AuthProvider>
-                        <ErrorBoundary>
+                        <RouteAwareErrorBoundary>
                             <Suspense fallback={<SuspenseFallback />}>
                                 <Routes>
                                     {/* Home */}
@@ -78,11 +100,18 @@ export default function App() {
                                     <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
                                     <Route path="/advertise" element={<StaticPage type="advertise" />} />
 
+                                    {ENABLE_E2E_ERROR_BOUNDARY_ROUTES ? (
+                                        <>
+                                            <Route path="/__e2e/error-boundary/ok" element={<E2EErrorBoundaryOkPage />} />
+                                            <Route path="/__e2e/error-boundary/crash" element={<E2EErrorBoundaryCrashPage />} />
+                                        </>
+                                    ) : null}
+
                                     {/* 404 */}
                                     <Route path="*" element={<NotFoundPage />} />
                                 </Routes>
                             </Suspense>
-                        </ErrorBoundary>
+                        </RouteAwareErrorBoundary>
                     </AuthProvider>
                 </BrowserRouter>
             </LanguageProvider>
