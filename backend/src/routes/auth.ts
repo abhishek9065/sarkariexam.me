@@ -1255,6 +1255,13 @@ router.get('/admin/permissions', async (req, res) => {
     if (!user || !user.isActive || !isAdminPortalRole(user.role)) {
       return res.status(403).json({ error: 'Admin portal access required' });
     }
+    if (isAdminPortalRole(user.role) && config.adminRequire2FA && !decoded.twoFactorVerified) {
+      return res.status(403).json({
+        error: 'two_factor_required',
+        code: 'TWO_FACTOR_REQUIRED',
+        message: 'Two-factor authentication required',
+      });
+    }
 
     return res.json({
       data: {

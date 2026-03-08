@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { config } from '../config.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import authRouter from '../routes/auth.js';
 import RedisCache from '../services/redis.js';
@@ -80,6 +81,7 @@ app.use('/auth', authRouter);
 describe('Auth Routes', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    config.adminRequire2FA = false;
     await RedisCache.invalidatePattern('auth:');
   });
 
@@ -438,6 +440,71 @@ describe('Auth Routes', () => {
       expect(throttled.body.code).toBe('AUTH_THROTTLED');
       expect(throttled.body.retryAfter).toBeGreaterThan(0);
       expect(Number(throttled.headers['retry-after'])).toBe(throttled.body.retryAfter);
+    });
+  });
+
+  describe('GET /auth/admin/permissions', () => {
+    it('requires 2FA verification when admin 2FA enforcement is enabled', async () => {
+      config.adminRequire2FA = true;
+      const adminUser = {
+        id: 'admin-perm-1',
+        email: 'admin-perm@example.com',
+        username: 'Admin',
+        role: 'admin',
+        isActive: true,
+      };
+      const authToken = jwt.sign(
+        {
+          userId: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role,
+          twoFactorVerified: false,
+        },
+        'test-secret',
+        { expiresIn: '1h' }
+      );
+      vi.mocked(UserModelMongo.findById).mockResolvedValue(adminUser as any);
+
+      const res = await request(app)
+        .get('/auth/admin/permissions')
+        .set('Cookie', [`admin_auth_token=${authToken}`]);
+
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({
+        error: 'two_factor_required',
+        code: 'TWO_FACTOR_REQUIRED',
+        message: 'Two-factor authentication required',
+      });
+    });
+
+    it('returns permissions for 2FA-verified admin sessions', async () => {
+      config.adminRequire2FA = true;
+      const adminUser = {
+        id: 'admin-perm-2',
+        email: 'admin-perm2@example.com',
+        username: 'Admin',
+        role: 'admin',
+        isActive: true,
+      };
+      const authToken = jwt.sign(
+        {
+          userId: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role,
+          twoFactorVerified: true,
+        },
+        'test-secret',
+        { expiresIn: '1h' }
+      );
+      vi.mocked(UserModelMongo.findById).mockResolvedValue(adminUser as any);
+
+      const res = await request(app)
+        .get('/auth/admin/permissions')
+        .set('Cookie', [`admin_auth_token=${authToken}`]);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data?.role).toBe('admin');
+      expect(res.body.data?.roles).toBeDefined();
     });
   });
 });
