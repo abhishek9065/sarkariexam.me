@@ -19,6 +19,8 @@ type FormState = {
     deadline: string;
     publishAt: string;
     externalLink: string;
+    applyOnlineLink: string;
+    notificationPdfLink: string;
     tags: string;
     importantDates: string;
     applicationFee: string;
@@ -47,6 +49,8 @@ const defaultForm: FormState = {
     deadline: '',
     publishAt: '',
     externalLink: '',
+    applyOnlineLink: '',
+    notificationPdfLink: '',
     tags: '',
     importantDates: '',
     applicationFee: '',
@@ -70,10 +74,58 @@ const parseLines = (input: string) => input
     .map((item) => item.trim())
     .filter(Boolean);
 
+const toImportantLinkRecords = (form: FormState) => {
+    if (form.type !== 'job') return [];
+    return [
+        form.applyOnlineLink.trim()
+            ? { label: 'Apply Online', url: form.applyOnlineLink.trim(), type: 'apply' }
+            : null,
+        form.notificationPdfLink.trim()
+            ? { label: 'Notification PDF', url: form.notificationPdfLink.trim(), type: 'notification' }
+            : null,
+    ].filter(Boolean);
+};
+
+const getPublishValidationMessage = (form: FormState): string | null => {
+    if (!['published', 'scheduled'].includes(form.status)) return null;
+    if (form.type === 'job') {
+        if (!form.applyOnlineLink.trim() && !form.externalLink.trim()) {
+            return 'Add an Apply Online link before publishing or scheduling a Job post.';
+        }
+        if (!form.notificationPdfLink.trim()) {
+            return 'Add a Notification PDF link before publishing or scheduling a Job post.';
+        }
+        if (!parseLines(form.importantDates).length) {
+            return 'Add Important Dates before publishing or scheduling a Job post.';
+        }
+        if (!form.deadline) {
+            return 'Add the application deadline before publishing or scheduling a Job post.';
+        }
+        if (!form.eligibility.trim()) {
+            return 'Add Eligibility / Qualification details before publishing or scheduling a Job post.';
+        }
+    }
+    return null;
+};
+
+const mapCreateErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) {
+        const raw = error.message.trim();
+        if (!raw) return 'Failed to create post.';
+        if (raw.startsWith('Validation failed for')) {
+            const detail = raw.split(': ').slice(1).join(': ').replace(/^[A-Z_]+:\s*/, '').trim();
+            return detail || raw;
+        }
+        return raw.replace(/^[A-Z_]+:\s*/, '');
+    }
+    return 'Failed to create post.';
+};
+
 const buildTypeDetails = (form: FormState): Record<string, unknown> => {
     if (form.type === 'job') {
         return {
             importantDates: parseLines(form.importantDates),
+            importantLinks: toImportantLinkRecords(form),
             applicationFee: form.applicationFee.trim() || undefined,
             ageLimit: form.ageLimit.trim() || undefined,
             vacancyDetails: form.vacancyDetails.trim() || undefined,
@@ -146,6 +198,10 @@ export function CreatePostModule() {
     const createMutation = useMutation({
         mutationFn: async () => {
             const requiresPublishStepUp = form.status === 'published';
+            const publishValidationMessage = getPublishValidationMessage(form);
+            if (publishValidationMessage) {
+                throw new Error(publishValidationMessage);
+            }
             const payload: Record<string, unknown> = {
                 title: form.title.trim(),
                 type: form.type,
@@ -176,6 +232,10 @@ export function CreatePostModule() {
             ]);
             notifySuccess('Post created', 'Content is now in workflow queue.');
         },
+        onError: (error) => {
+            const message = mapCreateErrorMessage(error);
+            notifyInfo('Create post blocked', message);
+        },
     });
 
     useEffect(() => {
@@ -205,9 +265,17 @@ export function CreatePostModule() {
             eligibility: String(payload.eligibility ?? current.eligibility),
             selectionProcess: String(payload.selectionProcess ?? current.selectionProcess),
             salary: String(payload.salary ?? current.salary),
+            applyOnlineLink: Array.isArray(payload.importantLinks)
+                ? String((payload.importantLinks as Array<Record<string, unknown>>).find((item) => String(item.type ?? '').includes('apply'))?.url ?? current.applyOnlineLink)
+                : current.applyOnlineLink,
+            notificationPdfLink: Array.isArray(payload.importantLinks)
+                ? String((payload.importantLinks as Array<Record<string, unknown>>).find((item) => String(item.type ?? '').includes('notification'))?.url ?? current.notificationPdfLink)
+                : current.notificationPdfLink,
         }));
         notifyInfo('Template applied', `Applied template: ${template.name}`);
     };
+
+    const publishValidationMessage = getPublishValidationMessage(form);
 
     return (
         <>
@@ -229,6 +297,8 @@ export function CreatePostModule() {
                                     category: typeCategoryDefaults[nextType],
                                     // Reset type-specific fields to prevent state carry-over
                                     importantDates: '',
+                                    applyOnlineLink: '',
+                                    notificationPdfLink: '',
                                     applicationFee: '',
                                     ageLimit: '',
                                     vacancyDetails: '',
@@ -388,6 +458,16 @@ export function CreatePostModule() {
 
                     {form.type === 'job' ? (
                         <>
+                            <input
+                                value={form.applyOnlineLink}
+                                onChange={(event) => setForm((current) => ({ ...current, applyOnlineLink: event.target.value }))}
+                                placeholder="Apply Online link"
+                            />
+                            <input
+                                value={form.notificationPdfLink}
+                                onChange={(event) => setForm((current) => ({ ...current, notificationPdfLink: event.target.value }))}
+                                placeholder="Notification PDF link"
+                            />
                             <textarea
                                 value={form.importantDates}
                                 onChange={(event) => setForm((current) => ({ ...current, importantDates: event.target.value }))}
@@ -526,6 +606,29 @@ export function CreatePostModule() {
                                 <input type="checkbox" checked={Boolean(form.summary)} readOnly />
                                 <span className="ops-inline-muted">Summary provided</span>
                             </div>
+                            {form.type === 'job' ? (
+                                <>
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={Boolean(form.applyOnlineLink.trim() || form.externalLink.trim())} readOnly />
+                                        <span className="ops-inline-muted">Apply Online link added</span>
+                                    </div>
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={Boolean(form.notificationPdfLink.trim())} readOnly />
+                                        <span className="ops-inline-muted">Notification PDF link added</span>
+                                    </div>
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={Boolean(parseLines(form.importantDates).length)} readOnly />
+                                        <span className="ops-inline-muted">Important Dates added</span>
+                                    </div>
+                                    <div className="ops-row">
+                                        <input type="checkbox" checked={Boolean(form.eligibility.trim())} readOnly />
+                                        <span className="ops-inline-muted">Eligibility added</span>
+                                    </div>
+                                </>
+                            ) : null}
+                            {publishValidationMessage ? (
+                                <div className="admin-alert warning">{publishValidationMessage}</div>
+                            ) : null}
 
                             <div className="ops-actions">
                                 <button type="submit" className="admin-btn primary">
@@ -545,7 +648,7 @@ export function CreatePostModule() {
             </form>
 
             {createMutation.isError ? (
-                <OpsErrorState message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create post.'} />
+                <OpsErrorState message={mapCreateErrorMessage(createMutation.error)} />
             ) : null}
             {success ? <div className="ops-success">{success}</div> : null}
             {selectedTemplate ? (

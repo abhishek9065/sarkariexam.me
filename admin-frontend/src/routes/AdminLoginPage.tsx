@@ -71,8 +71,6 @@ export function AdminLoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    if (user) return <Navigate to="/dashboard" replace />;
-
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
         const queryToken = queryParams.get('token')?.trim() ?? '';
@@ -158,6 +156,8 @@ export function AdminLoginPage() {
             setSetupBusy(false);
         }
     };
+
+    if (user) return <Navigate to="/dashboard" replace />;
 
     const completeTwoFactorSetup = async () => {
         if (!setupToken) {

@@ -676,6 +676,23 @@ test('create post includes step-up controls for direct publish actions', async (
     await expect(page.getByText(/Required before creating published posts from Create Post/i)).toBeVisible();
 });
 
+test('create post shows job-specific publish requirements before submit', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.goto('create-post', { waitUntil: 'domcontentloaded' });
+
+    await page.getByPlaceholder('Post title').fill('SSC CGL Recruitment 2026');
+    await page.getByPlaceholder('Category').fill('Latest Jobs');
+    await page.getByPlaceholder('Organization').fill('SSC');
+    await page.locator('.ops-editor-rail select').first().selectOption('published');
+    await page.getByRole('button', { name: /Create Post/i }).click();
+
+    await expect(page.locator('.ops-editor-rail .admin-alert.warning')).toContainText(/Add an Apply Online link before publishing or scheduling a Job post\./i);
+    await expect(page.getByRole('alert')).toContainText(/Add an Apply Online link before publishing or scheduling a Job post\./i);
+    await expect(page.getByText(/Apply Online link added/i)).toBeVisible();
+    await expect(page.getByText(/Notification PDF link added/i)).toBeVisible();
+});
+
 test('review diff links stay inside the admin router basename', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockAuthenticatedAdmin(page, {

@@ -4040,6 +4040,8 @@ announcementsRouter.get('/announcements/export/csv', requirePermission('announce
 
 async function validateForPublish(data: any, announcementId?: string, isApproveGate: boolean = false): Promise<string | null> {
     const isStrictType = ['job', 'result', 'admit-card'].includes(data.type);
+    const normalizedTypeDetails = data.typeDetails && typeof data.typeDetails === 'object' ? data.typeDetails : {};
+    const normalizedJobDetails = data.jobDetails && typeof data.jobDetails === 'object' ? data.jobDetails : normalizedTypeDetails;
 
     // Ticket 1: Enforce review gates. Jobs, Results, and Admit Cards must require approval.
     if (isStrictType && !isApproveGate && (!data.approvedBy || !data.approvedAt)) {
@@ -4056,7 +4058,7 @@ async function validateForPublish(data: any, announcementId?: string, isApproveG
         const contentStr = (data.content || '').toLowerCase();
         if (contentStr.includes(keyword)) return true;
 
-        const links = data.jobDetails?.importantLinks || [];
+        const links = normalizedJobDetails?.importantLinks || [];
         if (links.some((l: any) => (l.label || '').toLowerCase().includes(keyword) || l.type === keyword)) return true;
 
         return false;
@@ -4073,12 +4075,12 @@ async function validateForPublish(data: any, announcementId?: string, isApproveG
         const hasNotif = hasInPayload('notification') || hasInAttached('notification') || hasInAttached('pdf');
         if (!hasNotif) return 'MISSING_REQUIRED_LINK: Notification PDF link is required for Job posts.';
 
-        const hasDates = (data.jobDetails?.importantDates?.length > 0) || (data.importantDates?.length > 0) || (data.content || '').toLowerCase().includes('important dates');
+        const hasDates = (normalizedJobDetails?.importantDates?.length > 0) || (data.importantDates?.length > 0) || (data.content || '').toLowerCase().includes('important dates');
         if (!hasDates) return 'MISSING_REQUIRED_FIELD: Important Dates are required for Job posts.';
 
         if (!data.deadline) return 'MISSING_REQUIRED_FIELD: Deadline is required for Job posts.';
 
-        const hasEligibility = data.minQualification || data.jobDetails?.eligibility?.education || hasInPayload('eligibility') || hasInPayload('qualification');
+        const hasEligibility = data.minQualification || normalizedJobDetails?.eligibility?.education || normalizedJobDetails?.eligibility || hasInPayload('eligibility') || hasInPayload('qualification');
         if (!hasEligibility) return 'MISSING_REQUIRED_FIELD: Eligibility / Qualification details are required for Job posts.';
     } else if (data.type === 'result') {
         const hasResultLink = !!data.externalLink || hasInPayload('result') || hasInAttached('result') || hasInAttached('pdf');
