@@ -356,7 +356,7 @@ export function SecurityModule() {
                                         disabled={updateMutation.isPending}
                                         onClick={() => updateMutation.mutate({
                                             id: String(activeIncident.id ?? ''),
-                                            incidentStatus: activeIncident.incidentStatus === 'resolved' ? 'resolved' : 'investigating',
+                                            incidentStatus: activeIncident.incidentStatus ?? 'new',
                                             assigneeEmail: activeIncident.assigneeEmail || user?.email,
                                             note: incidentNoteDraft.trim(),
                                         })}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
@@ -326,7 +326,7 @@ export function ReviewModule() {
                                     <td>{renderRisk(item)}</td>
                                     <td>{item.type || '-'}</td>
                                     <td>
-                                        <a href={`/detailed-post?focus=${id}`} className="admin-btn small subtle">Review Diffs</a>
+                                        <Link to={`/detailed-post?focus=${id}`} className="admin-btn small subtle">Review Diffs</Link>
                                     </td>
                                 </tr>
                             );

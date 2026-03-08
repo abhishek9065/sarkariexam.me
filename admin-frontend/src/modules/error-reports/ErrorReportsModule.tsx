@@ -96,15 +96,22 @@ export function ErrorReportsModule() {
         void trackAdminTelemetry('admin_module_viewed', { module: 'error_reports', count: rows.length });
     }, [rows.length]);
 
-    const updateStatus = (row: AdminErrorReport, nextStatus: 'new' | 'triaged' | 'resolved', assigneeEmail?: string, adminNote?: string) => {
+    const updateStatus = (
+        row: AdminErrorReport,
+        nextStatus: 'new' | 'triaged' | 'resolved',
+        assigneeEmail?: string,
+        adminNote?: string,
+        successMessage?: string,
+        telemetryAction: 'status_update' | 'note_update' = 'status_update',
+    ) => {
         updateMutation.mutate(
             { id: row.id, nextStatus, assigneeEmail, adminNote },
             {
                 onSuccess: () => {
-                    notifySuccess('Report updated', `Status set to ${nextStatus}.`);
+                    notifySuccess('Report updated', successMessage ?? `Status set to ${nextStatus}.`);
                     void trackAdminTelemetry('admin_triage_action', {
                         module: 'error_reports',
-                        action: 'status_update',
+                        action: telemetryAction,
                         current: row.status,
                         next: nextStatus,
                     });
@@ -319,9 +326,11 @@ export function ErrorReportsModule() {
                                     disabled={updateMutation.isPending}
                                     onClick={() => updateStatus(
                                         activeReport,
-                                        activeReport.status === 'resolved' ? 'resolved' : 'triaged',
+                                        activeReport.status,
                                         activeReport.assigneeEmail || user?.email,
-                                        adminNoteDraft.trim()
+                                        adminNoteDraft.trim(),
+                                        'Admin note saved.',
+                                        'note_update',
                                     )}
                                 >
                                     Save Admin Note

@@ -676,6 +676,29 @@ test('create post includes step-up controls for direct publish actions', async (
     await expect(page.getByText(/Required before creating published posts from Create Post/i)).toBeVisible();
 });
 
+test('review diff links stay inside the admin router basename', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page, {
+        announcements: [
+            {
+                id: 'ann-1',
+                title: 'SSC CGL Recruitment 2026',
+                type: 'job',
+                status: 'pending',
+                organization: 'SSC',
+                category: 'Latest Jobs',
+                updatedAt: '2026-03-08T08:00:00.000Z',
+                assigneeEmail: 'admin@sarkariexams.me',
+            },
+        ],
+    });
+    await page.goto('review', { waitUntil: 'domcontentloaded' });
+
+    await page.getByRole('link', { name: /Review Diffs/i }).click();
+    await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/detailed-post\\?focus=ann-1$`));
+    await expect(page.getByRole('heading', { name: /Detailed Post/i })).toBeVisible();
+});
+
 test('detailed post shows revision comparison and duplicate draft controls', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockAuthenticatedAdmin(page, {
@@ -791,7 +814,10 @@ test('security incident detail panel supports investigation notes and audit dril
 
     await expect(page.getByText(/Incident Detail: admin_security_alert/i)).toBeVisible();
     await page.getByPlaceholder(/Capture investigation notes/i).fill('Investigating suspicious device fingerprint');
+    const incidentUpdateRequest = page.waitForRequest((request) => request.method() === 'PATCH' && request.url().includes('/api/admin/security'));
     await page.getByRole('button', { name: /Save Incident Note/i }).click();
+    const incidentUpdatePayload = incidentUpdateRequest.then((request) => request.postDataJSON() as Record<string, unknown>);
+    await expect.poll(async () => (await incidentUpdatePayload).incidentStatus).toBe('new');
     await expect(page.getByText(/Incident updated/i)).toBeVisible();
     await expect(page.getByText(/Note: Investigating suspicious device fingerprint/i)).toBeVisible();
 
@@ -847,9 +873,12 @@ test('error report detail panel exposes stack traces and saves admin notes', asy
     await expect(page.locator('.ops-code-block').first()).toContainText('DetailPage.tsx:41:13');
     await expect(page.locator('.ops-code-block').nth(1)).toContainText('at DetailPage');
     await page.getByPlaceholder(/Capture reproduction steps/i).fill('Reproduced on result detail route after share click');
+    const reportUpdateRequest = page.waitForRequest((request) => request.method() === 'PATCH' && request.url().includes('/api/support/error-reports/'));
     await page.getByRole('button', { name: /Save Admin Note/i }).click();
 
-    await expect(page.getByText(/Status set to triaged\./i)).toBeVisible();
+    const reportUpdatePayload = reportUpdateRequest.then((request) => request.postDataJSON() as Record<string, unknown>);
+    await expect.poll(async () => (await reportUpdatePayload).status).toBe('new');
+    await expect(page.getByText(/Admin note saved\./i)).toBeVisible();
     await expect(page.getByText(/Admin note: Reproduced on result detail route after share click/i)).toBeVisible();
 });
 
