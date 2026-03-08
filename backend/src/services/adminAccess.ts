@@ -5,7 +5,7 @@ import { AdminAccountsModelMongo, type AdminAccountMetadata } from '../models/ad
 import { UserModelMongo } from '../models/users.mongo.js';
 
 import { listAdminSessions } from './adminSessions.js';
-import { getCollection } from './cosmosdb.js';
+import { getCollectionAsync } from './cosmosdb.js';
 import { sendAdminPasswordResetEmail } from './email.js';
 import RedisCache from './redis.js';
 
@@ -23,8 +23,6 @@ interface AdminUserDoc {
     twoFactorEnabled?: boolean;
     twoFactorBackupCodes?: Array<{ codeHash: string; usedAt?: Date | null }>;
 }
-
-const adminUsersCollection = () => getCollection<AdminUserDoc>('users');
 const ADMIN_RESET_TOKEN_TTL_SECONDS = 15 * 60;
 const ADMIN_RESET_TOKEN_BYTES = 32;
 
@@ -35,9 +33,13 @@ const hashAdminResetToken = (token: string) => crypto
     .digest('hex');
 const getAdminPasswordResetKey = (userId: string) => `auth:admin_password_reset:${userId}`;
 
-const buildResetUrl = (email: string, token: string) => {
+export const buildAdminResetUrl = (email: string, token: string) => {
     const frontendBase = config.frontendUrl.replace(/\/$/, '');
-    return `${frontendBase}/admin-vnext/login?mode=reset-password&token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+    const url = new URL(`${frontendBase}/admin-vnext/login`);
+    url.searchParams.set('mode', 'reset-password');
+    url.searchParams.set('email', email);
+    url.hash = new URLSearchParams({ token }).toString();
+    return url.toString();
 };
 
 const deriveInvitationState = (
@@ -81,7 +83,7 @@ export async function issueAdminPasswordReset(userId: string, email: string, act
 
     await sendAdminPasswordResetEmail(
         email,
-        buildResetUrl(email, token),
+        buildAdminResetUrl(email, token),
         Math.floor(ADMIN_RESET_TOKEN_TTL_SECONDS / 60),
     );
 }
@@ -138,17 +140,27 @@ export async function inviteAdminUser(input: {
 }
 
 export async function listAdminAccessUsers(): Promise<Array<Record<string, unknown>>> {
-    const docs = await adminUsersCollection()
+    const docs = await (await getCollectionAsync<AdminUserDoc>('users'))
         .find({ role: { $in: ['admin', 'editor', 'reviewer', 'viewer', 'contributor'] } as any })
         .sort({ updatedAt: -1 })
         .limit(500)
         .toArray() as AdminUserDoc[];
 
     const userIds = docs.map((doc) => doc._id.toString());
-    const [accounts, sessions] = await Promise.all([
+    const [accountsResult, sessionsResult] = await Promise.allSettled([
         AdminAccountsModelMongo.findByUserIds(userIds),
         listAdminSessions(),
     ]);
+
+    if (accountsResult.status === 'rejected') {
+        console.warn('[AdminAccess] Failed to load admin account metadata for roster:', accountsResult.reason);
+    }
+    if (sessionsResult.status === 'rejected') {
+        console.warn('[AdminAccess] Failed to load admin sessions for roster:', sessionsResult.reason);
+    }
+
+    const accounts = accountsResult.status === 'fulfilled' ? accountsResult.value : {};
+    const sessions = sessionsResult.status === 'fulfilled' ? sessionsResult.value : [];
 
     const activeSessionCountByUser = sessions.reduce<Record<string, number>>((acc, session) => {
         acc[session.userId] = (acc[session.userId] || 0) + 1;
