@@ -6,7 +6,7 @@ export interface AdminAuthContextValue {
     user: AdminUser | null;
     permissions: AdminPermissionSnapshot | null;
     loading: boolean;
-    login: (email: string, password: string, twoFactorCode?: string) => Promise<AdminAuthLoginResult>;
+    login: (email: string, password?: string, twoFactorCode?: string, challengeToken?: string) => Promise<AdminAuthLoginResult>;
     logout: () => Promise<void>;
     refresh: () => Promise<void>;
     stepUpToken: string | null;

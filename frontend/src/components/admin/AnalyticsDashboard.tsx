@@ -368,7 +368,6 @@ function TrendChart({
 }
 
 export function AnalyticsDashboard({
-    adminToken,
     onEditById,
     onOpenList,
     onDrilldown,
@@ -378,7 +377,6 @@ export function AnalyticsDashboard({
     enableUxV2 = true,
     enableV3 = false,
 }: {
-    adminToken?: string | null;
     onEditById?: (id: string) => void;
     onOpenList?: () => void;
     onDrilldown?: (query: Record<string, string>) => void;
@@ -494,7 +492,6 @@ export function AnalyticsDashboard({
         try {
             const nocache = options?.forceFresh ? '&nocache=1' : '';
             const compareParam = enableV3 ? `&compareDays=${compareDays}` : '';
-            const headers = adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined;
             const onRateLimit = (response: Response) => {
                 const retryAfter = response.headers.get('Retry-After');
                 setError(retryAfter
@@ -503,11 +500,9 @@ export function AnalyticsDashboard({
             };
             const [overviewRes, popularRes] = await Promise.all([
                 adminRequest(`${apiBase}/api/analytics/overview?days=${rangeDays}${compareParam}${nocache}`, {
-                    headers,
                     onRateLimit,
                 }),
                 adminRequest(`${apiBase}/api/analytics/popular?limit=10${nocache}`, {
-                    headers,
                     onRateLimit,
                 })
             ]);
@@ -538,7 +533,7 @@ export function AnalyticsDashboard({
             setLoading(false);
             setRefreshing(false);
         }
-    }, [adminToken, compareDays, enableV3, rangeDays, onUnauthorized]);
+    }, [compareDays, enableV3, rangeDays, onUnauthorized]);
 
     useEffect(() => {
         loadAnalytics();
@@ -556,8 +551,7 @@ export function AnalyticsDashboard({
         let ws: WebSocket | null = null;
         const baseUrl = apiBase ? new URL(apiBase, window.location.origin) : new URL(window.location.origin);
         const wsProtocol = baseUrl.protocol === 'https:' ? 'wss' : 'ws';
-        const tokenParam = adminToken ? `token=${encodeURIComponent(adminToken)}&` : '';
-        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?${tokenParam}days=${rangeDays}`;
+        const wsUrl = `${wsProtocol}://${baseUrl.host}/ws/analytics?days=${rangeDays}`;
 
         try {
             ws = new WebSocket(wsUrl);
@@ -585,14 +579,12 @@ export function AnalyticsDashboard({
                 ws.close();
             }
         };
-    }, [adminToken, liveEnabled, rangeDays]);
+    }, [liveEnabled, rangeDays]);
 
     const handleExport = async () => {
         setExporting(true);
         try {
-            const response = await adminRequest(`${apiBase}/api/analytics/export/csv`, {
-                headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined,
-            });
+            const response = await adminRequest(`${apiBase}/api/analytics/export/csv`);
             if (response.status === 401 || response.status === 403) {
                 onUnauthorized?.();
                 return;
@@ -640,7 +632,6 @@ export function AnalyticsDashboard({
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
                     'Idempotency-Key': crypto.randomUUID(),
                 },
                 maxRetries: 0,

@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 
+import { getClientIP } from '../middleware/security.js';
 import type { UserRole } from '../types.js';
 
 import RedisCache from './redis.js';
@@ -24,15 +25,7 @@ function getClientKey(req: Request): string | null {
         return `user:${req.user.userId}`;
     }
 
-    const forwarded = req.headers['x-forwarded-for'];
-    let ip = req.ip;
-
-    if (typeof forwarded === 'string' && forwarded.trim()) {
-        ip = forwarded.split(',')[0].trim();
-    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
-        ip = forwarded[0];
-    }
-
+    const ip = getClientIP(req);
     if (!ip) {
         return null;
     }

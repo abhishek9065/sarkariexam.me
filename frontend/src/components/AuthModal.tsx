@@ -52,6 +52,9 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
             const result = await login(email, password);
             if (result === 'success') {
                 onClose();
+            } else {
+                setPassword('');
+                setTwoFactorCode('');
             }
             /* If 'two_factor_required', component will re-render to show 2FA step */
         } catch {
@@ -72,7 +75,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
 
         setSubmitting(true);
         try {
-            await login(twoFactorChallenge!.email, twoFactorChallenge!.password, twoFactorCode.trim());
+            await login(twoFactorChallenge!.email, undefined, twoFactorCode.trim(), twoFactorChallenge!.challengeToken);
             onClose();
         } catch {
             /* error is stored in context */
@@ -158,7 +161,12 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
                                 type="button"
                                 className="btn btn-ghost btn-sm"
                                 style={{ alignSelf: 'center' }}
-                                onClick={() => { clearTwoFactorChallenge(); clearError(); }}
+                                onClick={() => {
+                                    clearTwoFactorChallenge();
+                                    clearError();
+                                    setPassword('');
+                                    setTwoFactorCode('');
+                                }}
                             >
                                 ← Back to Sign In
                             </button>

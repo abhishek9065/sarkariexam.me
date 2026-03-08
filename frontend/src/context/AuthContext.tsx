@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    /* Bootstrap from cookie session (and optional runtime bearer token). */
+    /* Bootstrap from the cookie-backed session. */
     useEffect(() => {
         let canceled = false;
 
@@ -68,14 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
     }, [syncAdminPermissions]);
 
-    const login = useCallback(async (email: string, password: string, twoFactorCode?: string): Promise<LoginResult> => {
+    const login = useCallback(async (email: string, password?: string, twoFactorCode?: string, challengeToken?: string): Promise<LoginResult> => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
-            const res = await apiLogin(email, password, twoFactorCode);
-            /* Admin login uses httpOnly cookies — token may not be in body */
-            if (res.data.token) {
-                setAuthToken(res.data.token);
-            }
+            const res = await apiLogin(email, password, twoFactorCode, challengeToken);
             setTwoFactorChallenge(null);
             const user = normalizeUser(res.data.user);
             setState({ user, loading: false, error: null });
@@ -88,7 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const errorCode = body?.error;
 
                 if (errorCode === 'two_factor_required') {
-                    setTwoFactorChallenge({ email, password });
+                    const nextChallengeToken = typeof body?.challengeToken === 'string' ? body.challengeToken : null;
+                    if (!nextChallengeToken) {
+                        setState((s) => ({
+                            ...s,
+                            loading: false,
+                            error: 'Sign-in challenge expired. Please try again.',
+                        }));
+                        throw new Error('Missing login challenge token');
+                    }
+                    setTwoFactorChallenge({ email, challengeToken: nextChallengeToken });
                     setState((s) => ({ ...s, loading: false, error: null }));
                     return 'two_factor_required';
                 }
@@ -120,9 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const res = await apiRegister(email, name, password);
-            if (res.data.token) {
-                setAuthToken(res.data.token);
-            }
             const user = normalizeUser(res.data.user);
             setState({ user, loading: false, error: null });
             await syncAdminPermissions(user);

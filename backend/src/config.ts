@@ -104,6 +104,8 @@ const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefine
 const adminBackupCodeSalt = process.env.ADMIN_BACKUP_CODE_SALT ?? jwtSecret;
 
 const defaultCorsOrigins = [
+  'http://localhost:4173',
+  'http://localhost:4174',
   'http://localhost:5173',
   'http://localhost:3000',
   'https://sarkariexams.me',

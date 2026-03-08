@@ -56,8 +56,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         setStepUpExpiresAt(E2E_STEP_UP_EXPIRY);
     }, []);
 
-    const login = useCallback(async (email: string, password: string, twoFactorCode?: string) => {
-        const result = await adminAuthLogin(email, password, twoFactorCode);
+    const login = useCallback(async (email: string, password?: string, twoFactorCode?: string, challengeToken?: string) => {
+        const result = await adminAuthLogin(email, password, twoFactorCode, challengeToken);
         if (result.status === 'authenticated') {
             await refresh();
         }

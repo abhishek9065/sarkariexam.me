@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 
 import { recordActiveUser } from '../services/activeUsers.js';
 
+import { getClientIP } from './security.js';
+
 interface RequestLog {
     method: string;
     path: string;
@@ -36,7 +38,7 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
             duration: durationMs,
             status: res.statusCode,
             timestamp: new Date().toISOString(),
-            ip: req.ip || 'unknown',
+            ip: getClientIP(req),
         };
 
         // Store for analytics

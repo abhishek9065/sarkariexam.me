@@ -19,15 +19,17 @@ describeOrSkip('auth/register', () => {
             })
             .expect(201);
 
-        expect(registerRes.body?.data?.token).toBeTypeOf('string');
+        expect(registerRes.body?.data?.token).toBeUndefined();
         expect(registerRes.body?.data?.user?.email).toBe(email);
+        expect(registerRes.headers['set-cookie']).toBeDefined();
 
         const loginRes = await request(app)
             .post('/api/auth/login')
             .send({ email, password })
             .expect(200);
 
-        expect(loginRes.body?.data?.token).toBeTypeOf('string');
+        expect(loginRes.body?.data?.token).toBeUndefined();
         expect(loginRes.body?.data?.user?.email).toBe(email);
+        expect(loginRes.headers['set-cookie']).toBeDefined();
     });
 });

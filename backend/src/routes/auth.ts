@@ -54,6 +54,8 @@ const passwordSchema = z.string()
 const ADMIN_RESET_TOKEN_TTL_SECONDS = 15 * 60;
 const ADMIN_RESET_TOKEN_BYTES = 32;
 const ADMIN_RESET_REPLAY_TTL_SECONDS = 24 * 60 * 60;
+const ADMIN_LOGIN_CHALLENGE_TTL_SECONDS = 5 * 60;
+const ADMIN_LOGIN_CHALLENGE_BYTES = 32;
 
 const registerSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
@@ -179,6 +181,51 @@ const hashAdminResetToken = (token: string) => crypto
   .createHmac('sha256', config.adminBackupCodeSalt)
   .update(token)
   .digest('hex');
+const getAdminLoginChallengeKey = (tokenHash: string) => `auth:admin_login_challenge:${tokenHash}`;
+const createAdminLoginChallengeToken = () => crypto.randomBytes(ADMIN_LOGIN_CHALLENGE_BYTES).toString('base64url');
+const hashAdminLoginChallengeToken = (token: string) => crypto
+  .createHmac('sha256', config.adminBackupCodeSalt)
+  .update(token)
+  .digest('hex');
+
+const issueAdminLoginChallenge = async (input: {
+  userId: string;
+  email: string;
+  ip: string;
+}) => {
+  const token = createAdminLoginChallengeToken();
+  await RedisCache.set(getAdminLoginChallengeKey(hashAdminLoginChallengeToken(token)), {
+    userId: input.userId,
+    email: input.email.toLowerCase(),
+    ip: input.ip,
+    issuedAt: Date.now(),
+  }, ADMIN_LOGIN_CHALLENGE_TTL_SECONDS);
+  return token;
+};
+
+const readAdminLoginChallenge = async (input: {
+  token: string;
+  email: string;
+  ip: string;
+}): Promise<{ userId: string; email: string; ip: string } | null> => {
+  const record = await RedisCache.get(getAdminLoginChallengeKey(hashAdminLoginChallengeToken(input.token)));
+  if (!record || typeof record !== 'object') return null;
+
+  const userId = typeof (record as any).userId === 'string' ? (record as any).userId : '';
+  const email = typeof (record as any).email === 'string' ? (record as any).email : '';
+  const ip = typeof (record as any).ip === 'string' ? (record as any).ip : '';
+
+  if (!userId || !email || !ip) return null;
+  if (email !== input.email.toLowerCase()) return null;
+  if (ip !== input.ip) return null;
+
+  return { userId, email, ip };
+};
+
+const clearAdminLoginChallenge = async (token?: string | null) => {
+  if (!token) return;
+  await RedisCache.del(getAdminLoginChallengeKey(hashAdminLoginChallengeToken(token)));
+};
 
 router.post('/register', async (req, res) => {
   try {
@@ -218,7 +265,6 @@ router.post('/register', async (req, res) => {
     return res.status(201).json({
       data: {
         user: { id: user.id, email: user.email, name: user.username, role: user.role },
-        token
       }
     });
   } catch (error) {
@@ -232,8 +278,20 @@ router.post('/register', async (req, res) => {
 
 const loginSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
-  password: z.string(),
+  password: z.string().min(1).optional(),
+  challengeToken: z.string().trim().min(20).max(512).optional(),
   twoFactorCode: z.string().trim().min(6).max(20).optional(),
+}).superRefine((value, ctx) => {
+  const hasPassword = Boolean(value.password);
+  const hasChallengeToken = Boolean(value.challengeToken);
+
+  if (hasPassword === hasChallengeToken) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Provide exactly one of password or challengeToken.',
+      path: ['password'],
+    });
+  }
 });
 
 const twoFactorSetupSchema = z.object({
@@ -349,7 +407,35 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       return sendAuthThrottleResponse(res, abuseStatus.retryAfterSeconds);
     }
 
-    const user = await UserModelMongo.verifyPassword(validated.email, validated.password);
+    let user = null as Awaited<ReturnType<typeof UserModelMongo.verifyPassword>>;
+    let loginChallengeTokenToClear: string | null = null;
+
+    if (validated.challengeToken) {
+      const loginChallenge = await readAdminLoginChallenge({
+        token: validated.challengeToken,
+        email: validated.email,
+        ip: clientIP,
+      });
+      if (!loginChallenge) {
+        return res.status(401).json({
+          error: 'invalid_login_challenge',
+          message: 'Login challenge expired. Please sign in again.',
+        });
+      }
+
+      user = await UserModelMongo.findById(loginChallenge.userId) as Awaited<ReturnType<typeof UserModelMongo.verifyPassword>>;
+      if (!user || (user as any).isActive === false || user.email.toLowerCase() !== validated.email.toLowerCase()) {
+        await clearAdminLoginChallenge(validated.challengeToken);
+        return res.status(401).json({
+          error: 'invalid_login_challenge',
+          message: 'Login challenge expired. Please sign in again.',
+        });
+      }
+
+      loginChallengeTokenToClear = validated.challengeToken;
+    } else {
+      user = await UserModelMongo.verifyPassword(validated.email, validated.password!);
+    }
 
     if (!user) {
       const failure = await recordAuthAbuseFailure({
@@ -384,6 +470,13 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     }
 
     const isAdminPortalUser = isAdminPortalRole(user.role);
+    if (validated.challengeToken && !isAdminPortalUser) {
+      await clearAdminLoginChallenge(loginChallengeTokenToClear);
+      return res.status(401).json({
+        error: 'invalid_login_challenge',
+        message: 'Login challenge expired. Please sign in again.',
+      });
+    }
 
     if (isAdminPortalUser) {
       if (config.adminEnforceHttps) {
@@ -427,6 +520,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       const twoFactorEnabled = authUser?.twoFactorEnabled ?? false;
 
       if (!twoFactorEnabled) {
+        await clearAdminLoginChallenge(loginChallengeTokenToClear);
         const setupToken = createAdminSetupToken(user);
         return res.status(403).json({
           error: 'two_factor_setup_required',
@@ -436,9 +530,15 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       }
 
       if (!validated.twoFactorCode) {
+        const challengeToken = loginChallengeTokenToClear ?? await issueAdminLoginChallenge({
+          userId: user.id,
+          email: user.email,
+          ip: clientIP,
+        });
         return res.status(403).json({
           error: 'two_factor_required',
           message: 'Two-factor authentication required',
+          challengeToken,
         });
       }
 
@@ -447,6 +547,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         const encryptedSecret = authUser?.twoFactorSecret;
         const secret = encryptedSecret ? decryptSecret(encryptedSecret) : null;
         if (!secret) {
+          await clearAdminLoginChallenge(loginChallengeTokenToClear);
           const setupToken = createAdminSetupToken(user);
           return res.status(403).json({
             error: 'two_factor_setup_required',
@@ -501,6 +602,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       email: validated.email,
     });
     await clearFailedLoginsWithEmail(clientIP, validated.email);
+    await clearAdminLoginChallenge(loginChallengeTokenToClear);
 
     const expiresIn = (isAdminPortalUser
       ? config.adminJwtExpiry
@@ -575,12 +677,9 @@ router.post('/login', bruteForceProtection, async (req, res) => {
 
     console.log(`[Auth] Login success: ${user.email} from ${clientIP}`);
 
-    const responseData: { user: { id: string; email: string; name: string; role: string }; token?: string } = {
+    const responseData: { user: { id: string; email: string; name: string; role: string } } = {
       user: { id: user.id, email: user.email, name: user.username, role: user.role },
     };
-    if (!isAdminPortalUser) {
-      responseData.token = token;
-    }
     return res.json({ data: responseData });
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -23,6 +23,34 @@ const normalizeEmail = (email?: string): string | null => {
 const buildIpKey = (ip: string) => `bf:ip:${ip}`;
 const buildEmailKey = (email: string) => `bf:email:${email}`;
 
+const normalizeIp = (value?: string | null): string => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('::ffff:')) return trimmed.slice(7);
+    if (trimmed === '::1') return '127.0.0.1';
+    const zoneIndex = trimmed.indexOf('%');
+    return zoneIndex >= 0 ? trimmed.slice(0, zoneIndex) : trimmed;
+};
+
+const readSingleIpHeader = (value: string | string[] | undefined): string => {
+    if (!value) return '';
+    const raw = Array.isArray(value) ? value[0] : value;
+    if (!raw) return '';
+    return normalizeIp(raw.split(',')[0] ?? '');
+};
+
+const isTrustedProxyIp = (value: string): boolean => {
+    const ip = normalizeIp(value);
+    if (!ip) return false;
+    if (ip === '127.0.0.1') return true;
+    if (ip.startsWith('10.')) return true;
+    if (/^192\.168\./.test(ip)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) return true;
+    if (ip === '::1' || ip.startsWith('fc') || ip.startsWith('fd')) return true;
+    return false;
+};
+
 /**
  * Helmet security headers configuration
  */
@@ -132,12 +160,29 @@ export async function clearFailedLoginsWithEmail(ip: string, email?: string): Pr
  * Get real client IP (handles proxies)
  */
 export function getClientIP(req: Request): string {
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-        const ips = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',');
-        return ips[0].trim();
+    const realIp = normalizeIp((req as any).realIp);
+    if (realIp) {
+        return realIp;
     }
-    return req.ip || req.socket.remoteAddress || 'unknown';
+
+    const expressIp = normalizeIp(req.ip);
+    if (expressIp) {
+        return expressIp;
+    }
+
+    const socketIp = normalizeIp(req.socket?.remoteAddress ?? '');
+    if (isTrustedProxyIp(socketIp)) {
+        const realHeaderIp = readSingleIpHeader(req.headers['x-real-ip']);
+        if (realHeaderIp) return realHeaderIp;
+
+        const forwardedHeaderIp = readSingleIpHeader(req.headers['x-forwarded-for']);
+        if (forwardedHeaderIp) return forwardedHeaderIp;
+
+        const cloudflareHeaderIp = readSingleIpHeader(req.headers['cf-connecting-ip']);
+        if (cloudflareHeaderIp) return cloudflareHeaderIp;
+    }
+
+    return socketIp || 'unknown';
 }
 
 /**

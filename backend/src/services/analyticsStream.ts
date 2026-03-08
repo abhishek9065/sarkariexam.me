@@ -31,10 +31,9 @@ export function startAnalyticsWebSocket(server: Server) {
     wss.on('connection', async (socket, req) => {
         try {
             const url = new URL(req.url || '', 'http://localhost');
-            const tokenParam = url.searchParams.get('token');
             const adminCookie = getCookieValue(req.headers.cookie, ADMIN_AUTH_COOKIE_NAME);
             const userCookie = getCookieValue(req.headers.cookie, AUTH_COOKIE_NAME);
-            const token = tokenParam || adminCookie || userCookie;
+            const token = adminCookie || userCookie;
             const daysParam = parseInt(url.searchParams.get('days') || '', 10);
             const days = Number.isFinite(daysParam) ? Math.min(90, Math.max(1, daysParam)) : 30;
             if (!token) {

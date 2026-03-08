@@ -19,37 +19,25 @@ const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
 /* ─── Token helpers ─── */
-const readLegacyStoredToken = (): string | null => {
-    if (typeof window === 'undefined') return null;
+const clearLegacyStoredToken = () => {
+    if (typeof window === 'undefined') return;
     try {
-        const legacyToken = window.localStorage.getItem('token');
-        if (legacyToken) {
-            // One-time migration: drop persisted token and keep only runtime memory.
-            window.localStorage.removeItem('token');
-        }
-        return legacyToken;
+        window.localStorage.removeItem('token');
     } catch {
-        return null;
+        // ignore storage access errors
     }
 };
 
-let authToken: string | null = readLegacyStoredToken();
+const readLegacyStoredToken = (): string | null => {
+    clearLegacyStoredToken();
+    return null;
+};
+
+readLegacyStoredToken();
 let csrfTokenCache: string | null = null;
 
-export function setAuthToken(token: string | null) {
-    authToken = token;
-    if (typeof window !== 'undefined') {
-        try {
-            // Auth token is runtime-only; enforce no persistent local storage token.
-            window.localStorage.removeItem('token');
-        } catch {
-            // ignore storage access errors
-        }
-    }
-}
-
-export function getAuthToken() {
-    return authToken;
+export function setAuthToken(_token: string | null) {
+    clearLegacyStoredToken();
 }
 
 function readCookie(name: string): string | null {
@@ -177,10 +165,6 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
         headers['Content-Type'] = headers['Content-Type'] || 'application/json';
     }
 
-    if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-    }
-
     const res = await fetchWithBaseFallback(path, { ...options, headers, credentials: 'include' });
 
     if (!res.ok) {
@@ -208,10 +192,6 @@ async function apiFetchWithCsrf<T>(path: string, options: RequestInit = {}): Pro
             ...(options.headers as Record<string, string> || {}),
             [CSRF_HEADER_NAME]: csrfToken,
         };
-
-        if (authToken) {
-            headers['Authorization'] = `Bearer ${authToken}`;
-        }
 
         const res = await fetchWithBaseFallback(path, { ...options, headers, credentials: 'include' });
         if (!res.ok) {
@@ -310,10 +290,15 @@ export function getTrendingSearches(days = 30, limit = 8) {
 }
 
 /* ─── Auth ─── */
-export function login(email: string, password: string, twoFactorCode?: string) {
+export function login(email: string, password?: string, twoFactorCode?: string, challengeToken?: string) {
     return apiFetchWithCsrf<{ data: AuthResponse }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password, ...(twoFactorCode ? { twoFactorCode } : {}) }),
+        body: JSON.stringify({
+            email,
+            ...(password ? { password } : {}),
+            ...(challengeToken ? { challengeToken } : {}),
+            ...(twoFactorCode ? { twoFactorCode } : {}),
+        }),
     });
 }
 

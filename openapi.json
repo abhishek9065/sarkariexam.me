@@ -6392,14 +6392,10 @@
             "properties": {
               "user": {
                 "$ref": "#/components/schemas/User"
-              },
-              "token": {
-                "type": "string"
               }
             },
             "required": [
-              "user",
-              "token"
+              "user"
             ]
           }
         },
@@ -6436,11 +6432,16 @@
           },
           "password": {
             "type": "string"
+          },
+          "challengeToken": {
+            "type": "string"
+          },
+          "twoFactorCode": {
+            "type": "string"
           }
         },
         "required": [
-          "email",
-          "password"
+          "email"
         ]
       },
       "BookmarkCreateRequest": {

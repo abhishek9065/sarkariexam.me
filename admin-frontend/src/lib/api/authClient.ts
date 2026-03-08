@@ -2,18 +2,29 @@ import type { AdminAuthLoginResult, AdminPermissionSnapshot, AdminStepUpGrant, A
 import { AdminApiWorkflowError, mutationHeaders, request } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
-export async function adminAuthLogin(email: string, password: string, twoFactorCode?: string): Promise<AdminAuthLoginResult> {
+export async function adminAuthLogin(
+    email: string,
+    password?: string,
+    twoFactorCode?: string,
+    challengeToken?: string
+): Promise<AdminAuthLoginResult> {
     try {
         await request(ADMIN_API_PATHS.adminAuthLogin, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, ...(twoFactorCode ? { twoFactorCode } : {}) }),
+            body: JSON.stringify({
+                email,
+                ...(password ? { password } : {}),
+                ...(challengeToken ? { challengeToken } : {}),
+                ...(twoFactorCode ? { twoFactorCode } : {}),
+            }),
         }, true);
         return { status: 'authenticated' };
     } catch (error) {
         if (error instanceof AdminApiWorkflowError) {
             if (error.code === 'two_factor_required') {
-                return { status: 'two-factor-required', message: error.message };
+                const nextChallengeToken = typeof error.body?.challengeToken === 'string' ? error.body.challengeToken : undefined;
+                return { status: 'two-factor-required', challengeToken: nextChallengeToken, message: error.message };
             }
             if (error.code === 'two_factor_setup_required') {
                 const setupToken = typeof error.body?.setupToken === 'string' ? error.body.setupToken : undefined;

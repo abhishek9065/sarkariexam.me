@@ -333,7 +333,6 @@ export function AdminPage() {
         setBackupCodesStatus(null);
         setBackupCodesModal(null);
         clearFetchRefsRef.current?.();
-        localStorage.removeItem('adminToken');
         localStorage.removeItem(ADMIN_USER_STORAGE_KEY);
         setActiveAdminTab('analytics');
     }, []);

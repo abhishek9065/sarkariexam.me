@@ -21,6 +21,7 @@ export function AdminLoginPage() {
     const [email, setEmail] = useState(searchParams.get('email') || '');
     const [password, setPassword] = useState('');
     const [twoFactorCode, setTwoFactorCode] = useState('');
+    const [loginChallengeToken, setLoginChallengeToken] = useState<string | null>(null);
     const [setupToken, setSetupToken] = useState<string | null>(null);
     const [setupQrCode, setSetupQrCode] = useState<string | null>(null);
     const [setupSecret, setSetupSecret] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function AdminLoginPage() {
     if (user) return <Navigate to="/dashboard" replace />;
 
     const resetTwoFactorSetup = () => {
+        setLoginChallengeToken(null);
         setSetupToken(null);
         setSetupQrCode(null);
         setSetupSecret(null);
@@ -131,6 +133,7 @@ export function AdminLoginPage() {
                                 setNotice('If an admin account exists for this email, reset instructions have been sent.');
                                 setPassword('');
                                 setTwoFactorCode('');
+                                setLoginChallengeToken(null);
                                 return;
                             }
                             if (mode === 'reset-password') {
@@ -142,15 +145,30 @@ export function AdminLoginPage() {
                                 setNotice('Password reset successful. Sign in with your new password.');
                                 setPassword('');
                                 setTwoFactorCode('');
+                                setLoginChallengeToken(null);
                                 return;
                             }
 
-                            const result = await login(email, password, twoFactorCode || undefined);
+                            const result = await login(
+                                email,
+                                loginChallengeToken ? undefined : password,
+                                twoFactorCode || undefined,
+                                loginChallengeToken || undefined
+                            );
                             if (result.status === 'authenticated') {
+                                setLoginChallengeToken(null);
                                 navigate('/dashboard', { replace: true });
                                 return;
                             }
                             if (result.status === 'two-factor-required') {
+                                const nextChallengeToken = result.challengeToken ?? loginChallengeToken;
+                                if (!nextChallengeToken) {
+                                    setError('Sign-in challenge expired. Please enter your password again.');
+                                    setPassword('');
+                                    return;
+                                }
+                                setLoginChallengeToken(nextChallengeToken);
+                                setPassword('');
                                 setError(result.message ?? 'Two-factor authentication required. Enter your authenticator code or backup code.');
                                 return;
                             }
@@ -185,11 +203,12 @@ export function AdminLoginPage() {
                             <input
                                 id="admin-password"
                                 type="password"
-                                placeholder={mode === 'reset-password' ? 'Set a strong new password' : 'Enter your password'}
+                                placeholder={mode === 'reset-password' ? 'Set a strong new password' : loginChallengeToken ? 'First factor complete' : 'Enter your password'}
                                 value={password}
                                 onChange={(event) => setPassword(event.target.value)}
                                 autoComplete={mode === 'reset-password' ? 'new-password' : 'current-password'}
-                                required
+                                required={!loginChallengeToken}
+                                disabled={mode === 'login' && Boolean(loginChallengeToken)}
                             />
                         </div>
                     ) : null}
@@ -265,7 +284,15 @@ export function AdminLoginPage() {
                             >
                                 {setupBusy ? 'Verifying...' : 'Verify 2FA Setup'}
                             </button>
-                            <button type="button" className="admin-btn subtle" onClick={resetTwoFactorSetup}>
+                            <button
+                                type="button"
+                                className="admin-btn subtle"
+                                onClick={() => {
+                                    resetTwoFactorSetup();
+                                    setPassword('');
+                                    setTwoFactorCode('');
+                                }}
+                            >
                                 Dismiss
                             </button>
                         </div>

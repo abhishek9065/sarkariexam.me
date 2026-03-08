@@ -10,13 +10,13 @@ interface AuthState {
 
 export interface TwoFactorChallenge {
     email: string;
-    password: string;
+    challengeToken: string;
 }
 
 export type LoginResult = 'success' | 'two_factor_required';
 
 export interface AuthContextValue extends AuthState {
-    login: (email: string, password: string, twoFactorCode?: string) => Promise<LoginResult>;
+    login: (email: string, password?: string, twoFactorCode?: string, challengeToken?: string) => Promise<LoginResult>;
     register: (email: string, name: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     clearError: () => void;

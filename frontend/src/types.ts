@@ -145,7 +145,6 @@ export interface User {
 
 /* ─── Auth ─── */
 export interface AuthResponse {
-    token?: string;
     user: User;
 }
 

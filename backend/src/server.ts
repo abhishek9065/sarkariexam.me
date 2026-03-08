@@ -19,7 +19,6 @@ import { responseTimeLogger, getPerformanceStats } from './middleware/responseTi
 import {
   securityHeaders,
   blockSuspiciousAgents,
-  sanitizeRequestBody,
   validateContentType,
   enforceAdminHttps,
   enforceAdminIpAllowlist
@@ -76,28 +75,9 @@ const allowedOrigins = [
   .filter(Boolean)
   .map((origin) => normalizeOrigin(origin as string));
 const allowedOriginSet = new Set(allowedOrigins);
-const allowedOriginHosts = new Set(
-  allowedOrigins
-    .map((origin) => {
-      try {
-        return new URL(origin).hostname;
-      } catch {
-        return null;
-      }
-    })
-    .filter((host): host is string => Boolean(host))
-);
 const isAllowedOrigin = (origin: string) => {
   const normalized = normalizeOrigin(origin);
-  if (allowedOriginSet.has(normalized)) return true;
-  try {
-    const hostname = new URL(normalized).hostname;
-    if (allowedOriginHosts.has(hostname)) return true;
-    if (hostname.endsWith('.sarkariexams.me')) return true;
-  } catch {
-    // ignore invalid origin
-  }
-  return false;
+  return allowedOriginSet.has(normalized);
 };
 
 app.use(cors({
@@ -131,7 +111,6 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
-app.use(sanitizeRequestBody);
 
 // Swagger UI
 try {

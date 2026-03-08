@@ -10,6 +10,7 @@ import { config } from '../config.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import authRouter from '../routes/auth.js';
 import RedisCache from '../services/redis.js';
+import { hashBackupCode } from '../utils/backupCodes.js';
 
 // Mock dependencies
 vi.mock('../models/users.mongo.js');
@@ -178,7 +179,39 @@ describe('Auth Routes', () => {
         name: 'Test User',
         role: 'user',
       });
-      expect(res.body.data.token).toBeDefined();
+      expect(res.body.data.token).toBeUndefined();
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('returns a short-lived challenge token instead of replaying the password for admin 2FA', async () => {
+      config.adminRequire2FA = true;
+      const mockUser = {
+        id: '507f1f77bcf86cd799439011',
+        email: 'admin@example.com',
+        username: 'Admin User',
+        role: 'admin',
+        isActive: true,
+      };
+      vi.mocked(UserModelMongo.verifyPassword).mockResolvedValue(mockUser as any);
+      vi.mocked(UserModelMongo.findByIdWithSecrets).mockResolvedValue({
+        ...mockUser,
+        twoFactorEnabled: true,
+        twoFactorBackupCodes: [{ codeHash: hashBackupCode('ABCD-EFGH') }],
+      } as any);
+
+      const res = await request(app)
+        .post('/auth/login')
+        .send({
+          email: 'admin@example.com',
+          password: 'Password123!',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({
+        error: 'two_factor_required',
+        message: 'Two-factor authentication required',
+      });
+      expect(typeof res.body.challengeToken).toBe('string');
     });
 
     it('should fail with invalid credentials', async () => {

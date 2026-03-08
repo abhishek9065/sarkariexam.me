@@ -13,22 +13,13 @@ type TelemetryPayload = {
 
 const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
-const getAuthToken = (providedToken?: string | null) => {
-    return providedToken ?? null;
-};
-
-export async function trackAdminTelemetry(
-    payload: TelemetryPayload,
-    token?: string | null
-): Promise<void> {
+export async function trackAdminTelemetry(payload: TelemetryPayload): Promise<void> {
     try {
-        const authToken = getAuthToken(token);
         await fetch(`${apiBase}/api/admin/telemetry/events`, {
             method: 'POST',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
             },
             body: JSON.stringify(payload),
         });

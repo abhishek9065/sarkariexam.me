@@ -329,6 +329,7 @@ export interface AdminSettingRecord {
 
 export interface AdminAuthLoginResult {
     status: 'authenticated' | 'two-factor-required' | 'two-factor-setup-required';
+    challengeToken?: string;
     setupToken?: string;
     message?: string;
 }
