@@ -6,6 +6,7 @@ import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import {
+    AdminApiWorkflowError,
     getAdminRoleUsers,
     getAdminRoles,
     inviteAdminRoleUser,
@@ -31,6 +32,35 @@ const invitationTone = (state?: AdminRoleUser['invitationState']) => {
 };
 
 const formatMaybeDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '-');
+
+const describeAccessControlError = (
+    error: unknown,
+    fallbackMessage: string,
+): { title?: string; message: string } => {
+    if (error instanceof AdminApiWorkflowError) {
+        if (error.code === 'two_factor_required') {
+            return {
+                title: 'Two-factor required',
+                message: 'Sign in again with your authenticator code to access admin access controls.',
+            };
+        }
+        if (error.status === 403) {
+            return {
+                title: 'Access restricted',
+                message: error.message || 'You do not have permission to access this admin control.',
+            };
+        }
+        return {
+            message: error.message || fallbackMessage,
+        };
+    }
+
+    if (error instanceof Error) {
+        return { message: error.message || fallbackMessage };
+    }
+
+    return { message: fallbackMessage };
+};
 
 export function UsersRolesModule() {
     const queryClient = useQueryClient();
@@ -69,6 +99,12 @@ export function UsersRolesModule() {
 
     const rows = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
     const permissionList = rolesQuery.data?.permissions ?? [];
+    const usersErrorState = usersQuery.error
+        ? describeAccessControlError(usersQuery.error, 'Failed to load admin roster.')
+        : null;
+    const rolesErrorState = rolesQuery.error
+        ? describeAccessControlError(rolesQuery.error, 'Failed to load role permissions.')
+        : null;
 
     const refreshAll = async () => {
         await Promise.all([
@@ -190,7 +226,14 @@ export function UsersRolesModule() {
                     />
 
                     {usersQuery.isPending ? <div className="admin-alert info">Loading admin roster...</div> : null}
-                    {usersQuery.error ? <OpsErrorState message="Failed to load admin access roster." /> : null}
+                    {usersErrorState ? (
+                        <OpsErrorState
+                            title={usersErrorState.title}
+                            message={usersErrorState.message}
+                            onRetry={() => void usersQuery.refetch()}
+                            retryLabel="Retry roster load"
+                        />
+                    ) : null}
 
                     {rows.length > 0 ? (
                         <OpsTable
@@ -290,7 +333,14 @@ export function UsersRolesModule() {
 
             <OpsCard title="Role Permission Matrix" description="Default roles stay intact, but permission overrides can now be edited directly for the admin console.">
                 {rolesQuery.isPending ? <div className="admin-alert info">Loading role permissions...</div> : null}
-                {rolesQuery.error ? <OpsErrorState message="Failed to load role permissions." /> : null}
+                {rolesErrorState ? (
+                    <OpsErrorState
+                        title={rolesErrorState.title}
+                        message={rolesErrorState.message}
+                        onRetry={() => void rolesQuery.refetch()}
+                        retryLabel="Retry permission load"
+                    />
+                ) : null}
                 {!rolesQuery.isPending && !rolesQuery.error ? (
                     <div className="ops-table-wrap">
                         <table className="ops-table">

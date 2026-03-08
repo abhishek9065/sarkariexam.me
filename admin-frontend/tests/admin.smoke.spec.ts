@@ -746,6 +746,24 @@ test('access control workspace renders roster and role matrix', async ({ page })
     await expect(page.getByRole('heading', { name: /Role Permission Matrix/i })).toBeVisible();
 });
 
+test('access control roster failures do not mislabel the error as access denied', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.route('**/api/admin/users', async (route) => {
+        await route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Failed to load users' }),
+        });
+    });
+    await page.goto('users-roles', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByText('Failed to load users')).toBeVisible();
+    await expect(page.locator('.ops-error-state-title')).toContainText(/Unable to load data|Request failed/i);
+    await expect(page.locator('.ops-error-state-title')).not.toHaveText(/Access denied/i);
+    await expect(page.getByRole('button', { name: /Retry roster load/i })).toBeVisible();
+});
+
 test('configuration workspace exposes structured policy controls and backup-code controls', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockAuthenticatedAdmin(page);

@@ -10,7 +10,16 @@ const deriveErrorTitle = (message: string): string => {
     const normalized = message.trim().toLowerCase();
     if (!normalized) return 'Request failed';
     if (normalized.includes('not found')) return 'Resource not found';
-    if (normalized.includes('permission') || normalized.includes('forbidden') || normalized.includes('access')) return 'Access denied';
+    if (
+        normalized.includes('access denied')
+        || normalized.includes('insufficient permissions')
+        || normalized.includes('not authorized')
+        || normalized.includes('unauthorized')
+        || normalized.includes('forbidden')
+        || normalized.includes('admin access required')
+    ) {
+        return 'Access denied';
+    }
     if (normalized.includes('step-up')) return 'Step-up required';
     if (normalized.includes('failed to load') || normalized.includes('unable to load')) return 'Unable to load data';
     if (normalized.includes('network') || normalized.includes('fetch')) return 'Connection issue';
