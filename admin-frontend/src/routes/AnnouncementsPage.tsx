@@ -129,15 +129,18 @@ export function AnnouncementsPage() {
         return value?.trim() || '';
     }, [location.search]);
 
-    // Bug #6: Apply organization URL param as search filter
+    // Apply search deep-link params emitted by admin global search routes.
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const org = params.get('organization');
-        if (org && org.trim()) {
-            setSearch(org.trim());
-            // Clean the URL param after applying
+        const tag = params.get('tag');
+        const nextSearch = (org && org.trim()) || (tag && tag.trim()) || '';
+        if (nextSearch) {
+            setSearch(nextSearch);
+            // Clean the one-shot URL params after applying.
             const newParams = new URLSearchParams(location.search);
             newParams.delete('organization');
+            newParams.delete('tag');
             const newSearch = newParams.toString();
             navigate(location.pathname + (newSearch ? `?${newSearch}` : ''), { replace: true });
         }

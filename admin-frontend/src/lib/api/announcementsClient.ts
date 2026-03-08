@@ -311,10 +311,10 @@ export async function runBulkUpdate(
     return typedData<Record<string, unknown>>(body) ?? {};
 }
 
-export async function createAdminContentRecord(payload: Record<string, unknown>): Promise<AdminContentRecord> {
+export async function createAdminContentRecord(payload: Record<string, unknown>, stepUpToken?: string): Promise<AdminContentRecord> {
     const body = await request(ADMIN_API_PATHS.adminAnnouncements, {
         method: 'POST',
-        headers: mutationHeaders(),
+        headers: mutationHeaders(stepUpToken),
         body: JSON.stringify(payload),
     }, true);
     return typedData<AdminContentRecord>(body) ?? {} as AdminContentRecord;

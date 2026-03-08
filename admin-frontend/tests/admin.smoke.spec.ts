@@ -24,6 +24,7 @@ async function mockAuthenticatedAdmin(
     overrides: {
         reports?: Record<string, unknown>;
         auditLogs?: Array<Record<string, unknown>>;
+        announcements?: Array<Record<string, unknown>>;
     } = {},
 ) {
     await page.route('**/api/admin-auth/me', async (route) => {
@@ -89,7 +90,47 @@ async function mockAuthenticatedAdmin(
     });
 
     await page.route('**/api/admin/announcements**', async (route) => {
-        await route.fulfill(jsonResponse([]));
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                data: overrides.announcements ?? [],
+                meta: {
+                    total: (overrides.announcements ?? []).length,
+                    limit: 40,
+                    offset: 0,
+                },
+            }),
+        });
+    });
+
+    await page.route('**/api/admin/templates**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                data: [],
+                meta: { total: 0, limit: 50, offset: 0 },
+            }),
+        });
+    });
+
+    await page.route('**/api/admin/views**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                data: [],
+                meta: { total: 0, limit: 100, offset: 0 },
+            }),
+        });
+    });
+
+    await page.route('**/api/admin/telemetry/events', async (route) => {
+        await route.fulfill(jsonResponse({ ok: true }));
     });
 
     await page.route('**/api/admin/audit-log**', async (route) => {
@@ -222,6 +263,36 @@ test('dashboard traffic widgets show an explicit empty state when reports API ha
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText('Traffic charts will populate after announcement views are recorded.')).toBeVisible();
+});
+
+test('manage posts applies tag deep links from admin search routes', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page, {
+        announcements: [
+            {
+                id: 'ann-1',
+                title: 'Railway Group D Recruitment 2026',
+                type: 'job',
+                status: 'draft',
+                organization: 'Railway Recruitment Board',
+                category: 'Latest Jobs',
+                updatedAt: '2026-03-07T08:00:00.000Z',
+            },
+        ],
+    });
+    await page.goto('manage-posts?tag=Railway', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByLabel('Search announcements')).toHaveValue('Railway');
+    await expect(page).not.toHaveURL(/tag=/i);
+});
+
+test('create post includes step-up controls for direct publish actions', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.goto('create-post', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByRole('heading', { name: /Step-up Verification/i })).toBeVisible();
+    await expect(page.getByText(/Required before creating published posts from Create Post/i)).toBeVisible();
 });
 
 test('command palette opens from shell action in authenticated session', async ({ page }) => {

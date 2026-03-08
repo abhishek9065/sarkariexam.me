@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   admin-alias-playwright:
-    name: Admin Playwright Alias Validation
+    name: Admin Playwright Smoke Validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -56,7 +56,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run admin Playwright alias suite
+      - name: Run admin Playwright smoke suite
         run: npm run test:e2e:nightly:smoke
         env:
           VITE_ADMIN_BASENAME: /admin-vnext
@@ -72,11 +72,11 @@ jobs:
             echo "results.json not found"
           fi
 
-      - name: Upload admin alias artifacts
+      - name: Upload admin smoke artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: admin-vnext-alias-playwright-artifacts
+          name: admin-vnext-smoke-playwright-artifacts
           path: |
             admin-frontend/playwright-report
             admin-frontend/test-results

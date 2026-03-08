@@ -115,6 +115,8 @@ export const mutationHeaders = (stepUpToken?: string, includeIdempotency = true)
 };
 
 const isRetryableNetworkError = (error: unknown): boolean => error instanceof TypeError;
+const isCsrfInvalid = (status: number, body: Record<string, unknown> | null): boolean =>
+    status === 403 && body?.error === 'csrf_invalid';
 
 export class AdminApiWorkflowError extends Error {
     status: number;
@@ -189,6 +191,7 @@ export async function request(path: string, init: RequestInit = {}, withCsrf = f
     const approvalFingerprint = isMutating ? buildApprovalFingerprint(method, path, init.body ?? null) : '';
     let breakGlassReason: string | null = null;
     let breakGlassAttempted = false;
+    let csrfRefreshAttempted = false;
 
     while (true) {
         const headers = new Headers(init.headers || {});
@@ -219,6 +222,12 @@ export async function request(path: string, init: RequestInit = {}, withCsrf = f
         const parsed = await parseBody(response);
         const body = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
         const errorCode = typeof body?.error === 'string' ? body.error : '';
+
+        if (withCsrf && isMutating && isCsrfInvalid(response.status, body) && !csrfRefreshAttempted) {
+            csrfRefreshAttempted = true;
+            await ensureCsrfToken(true);
+            continue;
+        }
 
         if (isMutating && response.status === 202 && errorCode === 'approval_required') {
             const approvalId = typeof body?.approvalId === 'string' ? body.approvalId.trim() : '';

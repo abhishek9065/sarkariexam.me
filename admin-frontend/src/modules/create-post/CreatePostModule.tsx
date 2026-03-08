@@ -2,6 +2,8 @@ import { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
+import { useAdminAuth } from '../../app/useAdminAuth';
+import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { createAdminContentRecord, getTemplateRecords } from '../../lib/api/client';
@@ -120,6 +122,7 @@ const typeCategoryDefaults: Record<AnnouncementTypeFilter, string> = {
 export function CreatePostModule() {
     const queryClient = useQueryClient();
     const { notifyInfo, notifySuccess } = useAdminNotifications();
+    const { hasValidStepUp, stepUpToken } = useAdminAuth();
 
     const [form, setForm] = useState<FormState>(defaultForm);
     const [templateId, setTemplateId] = useState<string>('');
@@ -142,6 +145,7 @@ export function CreatePostModule() {
 
     const createMutation = useMutation({
         mutationFn: async () => {
+            const requiresPublishStepUp = form.status === 'published';
             const payload: Record<string, unknown> = {
                 title: form.title.trim(),
                 type: form.type,
@@ -156,7 +160,11 @@ export function CreatePostModule() {
                 typeDetails: buildTypeDetails(form),
             };
 
-            return createAdminContentRecord(payload);
+            if (requiresPublishStepUp && (!hasValidStepUp || !stepUpToken)) {
+                throw new Error('Step-up verification is required before creating a published post.');
+            }
+
+            return createAdminContentRecord(payload, requiresPublishStepUp ? stepUpToken ?? undefined : undefined);
         },
         onSuccess: async (data) => {
             setSuccess(`Created ${data.type} post: ${data.title}`);
@@ -202,7 +210,12 @@ export function CreatePostModule() {
     };
 
     return (
-        <OpsCard title="Create Post" description="Unified create flow for Job, Result, Admit Card, Answer Key, Syllabus, and Admission.">
+        <>
+            <AdminStepUpCard
+                title="Step-up Verification"
+                description="Required before creating published posts from Create Post."
+            />
+            <OpsCard title="Create Post" description="Unified create flow for Job, Result, Admit Card, Answer Key, Syllabus, and Admission.">
             <OpsToolbar
                 controls={(
                     <>
@@ -262,7 +275,9 @@ export function CreatePostModule() {
                 actions={(
                     <>
                         <span className="ops-inline-muted">
-                            Review gate is active for high-risk publishing actions.
+                            {form.status === 'published' && !hasValidStepUp
+                                ? 'Verify step-up first, then create published post.'
+                                : 'Review gate is active for high-risk publishing actions.'}
                         </span>
                         <button
                             type="button"
@@ -536,6 +551,7 @@ export function CreatePostModule() {
             {selectedTemplate ? (
                 <div className="admin-alert info">Using template: {selectedTemplate.name}</div>
             ) : null}
-        </OpsCard>
+            </OpsCard>
+        </>
     );
 }
