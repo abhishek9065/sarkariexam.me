@@ -10,6 +10,8 @@ export const API_PATHS = {
     announcementMetaCategories: '/announcements/meta/categories',
     announcementMetaOrganizations: '/announcements/meta/organizations',
     announcementMetaTags: '/announcements/meta/tags',
+    subscriptionsVerify: '/subscriptions/verify',
+    subscriptionsUnsubscribe: '/subscriptions/unsubscribe',
 } as const;
 
 // Static OpenAPI contract assertions for stable endpoints.
@@ -20,6 +22,8 @@ const OPENAPI_STATIC_PATH_ASSERTIONS = {
     categoriesApi: '/api/announcements/meta/categories',
     organizationsApi: '/api/announcements/meta/organizations',
     tagsApi: '/api/announcements/meta/tags',
+    subscriptionsVerifyApi: '/api/subscriptions/verify',
+    subscriptionsUnsubscribeApi: '/api/subscriptions/unsubscribe',
 } as const satisfies Record<string, OpenApiPath>;
 
 void OPENAPI_STATIC_PATH_ASSERTIONS;

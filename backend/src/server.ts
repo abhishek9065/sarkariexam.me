@@ -184,7 +184,11 @@ app.get('/api/health/deep', async (_req, res) => {
 });
 
 app.get('/metrics', (req, res) => {
-  const token = process.env.METRICS_TOKEN;
+  const token = config.metricsToken;
+  if (config.isProduction && !token) {
+    res.status(404).type('text/plain').send('not found');
+    return;
+  }
   const providedToken = req.get('Authorization')?.replace(/^Bearer\s+/i, '') || req.get('X-Metrics-Token');
   if (token && token !== providedToken) {
     res.status(401).type('text/plain').send('unauthorized');

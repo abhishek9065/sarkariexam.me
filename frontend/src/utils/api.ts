@@ -323,6 +323,16 @@ export function logout() {
     });
 }
 
+export function verifySubscriptionToken(token: string) {
+    const qs = toQueryString({ token });
+    return apiFetch<{ message: string }>(`${API_PATHS.subscriptionsVerify}${qs}`);
+}
+
+export function unsubscribeSubscriptionToken(token: string) {
+    const qs = toQueryString({ token });
+    return apiFetch<{ message: string }>(`${API_PATHS.subscriptionsUnsubscribe}${qs}`);
+}
+
 /* ─── Bookmarks ─── */
 export function getBookmarks() {
     return apiFetch<{ data: Announcement[] }>('/bookmarks');

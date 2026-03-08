@@ -19,6 +19,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ defa
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })));
 const ExplorePage = lazy(() => import('./pages/ExplorePage').then((m) => ({ default: m.ExplorePage })));
 const TrendingPage = lazy(() => import('./pages/TrendingPage').then((m) => ({ default: m.TrendingPage })));
+const SubscriptionActionPage = lazy(() => import('./pages/SubscriptionActionPage').then((m) => ({ default: m.SubscriptionActionPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 const ENABLE_E2E_ERROR_BOUNDARY_ROUTES = import.meta.env.VITE_E2E_ERROR_BOUNDARY_ROUTES === '1';
@@ -99,6 +100,8 @@ export default function App() {
                                     <Route path="/privacy" element={<StaticPage type="privacy" />} />
                                     <Route path="/disclaimer" element={<StaticPage type="disclaimer" />} />
                                     <Route path="/advertise" element={<StaticPage type="advertise" />} />
+                                    <Route path="/verify" element={<SubscriptionActionPage mode="verify" />} />
+                                    <Route path="/unsubscribe" element={<SubscriptionActionPage mode="unsubscribe" />} />
 
                                     {ENABLE_E2E_ERROR_BOUNDARY_ROUTES ? (
                                         <>

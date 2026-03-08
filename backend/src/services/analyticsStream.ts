@@ -1,17 +1,91 @@
-import type { Server } from 'http';
+import type { IncomingMessage, Server } from 'http';
 
 import jwt, { VerifyOptions } from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
 
 import { config } from '../config.js';
-import { ADMIN_AUTH_COOKIE_NAME, AUTH_COOKIE_NAME } from '../middleware/auth.js';
+import { ADMIN_AUTH_COOKIE_NAME, AUTH_COOKIE_NAME, isTokenBlacklisted } from '../middleware/auth.js';
 import { getClientIP } from '../middleware/security.js';
+import { UserModelMongo } from '../models/users.mongo.js';
+import type { JwtPayload } from '../types.js';
 
+import { isAdminPortalRole } from './adminPermissions.js';
+import { touchAdminSession, validateAdminSession } from './adminSessions.js';
 import { getAnalyticsOverview } from './analyticsOverview.js';
 import { hasEffectivePermission } from './rbac.js';
 import { SecurityLogger } from './securityLogger.js';
 
 const UPDATE_INTERVAL_MS = 30 * 1000;
+
+type AnalyticsSocketAuthResult =
+    | { ok: true; user: JwtPayload }
+    | { ok: false; reason: string };
+
+export async function authorizeAnalyticsSocket(
+    token: string,
+    req: IncomingMessage,
+    clientIp: string
+): Promise<AnalyticsSocketAuthResult> {
+    if (await isTokenBlacklisted(token)) {
+        return { ok: false, reason: 'Token has been revoked' };
+    }
+
+    let decoded: JwtPayload & { exp?: number };
+    try {
+        const verifyOptions: VerifyOptions = {};
+        if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
+        if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
+        decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload & { exp?: number };
+    } catch {
+        return { ok: false, reason: 'Invalid token' };
+    }
+
+    if (decoded.twoFactorSetup) {
+        return { ok: false, reason: 'Invalid token' };
+    }
+
+    if (decoded.userId) {
+        const user = await UserModelMongo.findById(decoded.userId);
+        if (!user || !user.isActive) {
+            return { ok: false, reason: 'User account deactivated' };
+        }
+        decoded.role = user.role;
+    }
+
+    if (isAdminPortalRole(decoded.role) && decoded.sessionId) {
+        const sessionValidation = await validateAdminSession(decoded.sessionId);
+        if (!sessionValidation.valid) {
+            return { ok: false, reason: 'Admin session expired' };
+        }
+
+        const expiresAt = decoded.exp ? new Date(decoded.exp * 1000) : null;
+        const session = await touchAdminSession(
+            decoded.sessionId,
+            {
+                userId: decoded.userId,
+                email: decoded.email,
+                ip: clientIp,
+                userAgent: req.headers['user-agent']?.toString() || 'Unknown',
+                expiresAt,
+            },
+            '/ws/analytics'
+        );
+
+        if (!session) {
+            return { ok: false, reason: 'Admin session expired' };
+        }
+    }
+
+    if (isAdminPortalRole(decoded.role) && config.adminRequire2FA && !decoded.twoFactorVerified) {
+        return { ok: false, reason: 'Two-factor authentication required' };
+    }
+
+    if (!await hasEffectivePermission(decoded.role, 'analytics:read')) {
+        return { ok: false, reason: 'Forbidden' };
+    }
+
+    return { ok: true, user: decoded };
+}
 
 export function startAnalyticsWebSocket(server: Server) {
     const wss = new WebSocketServer({ server, path: '/ws/analytics' });
@@ -68,48 +142,51 @@ export function startAnalyticsWebSocket(server: Server) {
                 return;
             }
 
-            let decoded: any;
-            try {
-                const verifyOptions: VerifyOptions = {};
-                if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
-                if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
-                decoded = jwt.verify(token, config.jwtSecret, verifyOptions) as any;
-            } catch {
-                socket.close(1008, 'Invalid token');
+            const authResult = await authorizeAnalyticsSocket(token, req, clientIp);
+            if ('reason' in authResult) {
+                socket.close(1008, authResult.reason);
                 return;
             }
 
-            if (decoded?.twoFactorSetup) {
-                socket.close(1008, 'Invalid token');
-                return;
-            }
+            let interval: ReturnType<typeof setInterval> | null = null;
 
-            if (decoded?.role === 'admin' && config.adminRequire2FA && !decoded?.twoFactorVerified) {
-                socket.close(1008, 'Two-factor authentication required');
-                return;
-            }
-
-            if (!await hasEffectivePermission(decoded?.role, 'analytics:read')) {
-                socket.close(1008, 'Forbidden');
-                return;
-            }
-
-            const sendUpdate = async () => {
+            const sendUpdate = async (): Promise<boolean> => {
                 try {
+                    const refreshAuth = await authorizeAnalyticsSocket(token, req, clientIp);
+                    if ('reason' in refreshAuth) {
+                        if (interval) clearInterval(interval);
+                        if (socket.readyState === socket.OPEN) {
+                            socket.close(1008, refreshAuth.reason);
+                        }
+                        return false;
+                    }
+
                     const { data, cached } = await getAnalyticsOverview(days);
                     if (socket.readyState === socket.OPEN) {
                         socket.send(JSON.stringify({ type: 'analytics:update', data, cached }));
                     }
+                    return true;
                 } catch (error) {
                     console.error('[Analytics WS] Update failed:', error);
+                    return false;
                 }
             };
 
-            await sendUpdate();
-            const interval = setInterval(sendUpdate, UPDATE_INTERVAL_MS);
+            const keepOpen = await sendUpdate();
+            if (!keepOpen) {
+                return;
+            }
 
-            socket.on('close', () => clearInterval(interval));
-            socket.on('error', () => clearInterval(interval));
+            interval = setInterval(() => {
+                void sendUpdate();
+            }, UPDATE_INTERVAL_MS);
+
+            socket.on('close', () => {
+                if (interval) clearInterval(interval);
+            });
+            socket.on('error', () => {
+                if (interval) clearInterval(interval);
+            });
         } catch (error) {
             console.error('[Analytics WS] Connection error:', error);
             socket.close(1011, 'Internal error');

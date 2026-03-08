@@ -148,6 +148,7 @@ const adminApprovalPolicyMatrix = parseJsonObject(process.env.ADMIN_APPROVAL_POL
 const adminBreakGlassEnabled = parseBoolean(process.env.ADMIN_BREAK_GLASS_ENABLED, false);
 const adminBreakGlassMinReasonLength = Math.max(8, parseNumber(process.env.ADMIN_BREAK_GLASS_MIN_REASON_LENGTH, 12));
 const adminSecurityAlertEmail = process.env.ADMIN_SECURITY_ALERT_EMAIL ?? '';
+const metricsToken = process.env.METRICS_TOKEN ?? '';
 const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24));
 const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
 const securityLogDbRetentionDays = Math.max(1, parseNumber(process.env.SECURITY_LOG_DB_RETENTION_DAYS, 30));
@@ -222,6 +223,7 @@ export const config = {
   adminBreakGlassEnabled,
   adminBreakGlassMinReasonLength,
   adminSecurityAlertEmail,
+  metricsToken,
   securityLogRetentionHours,
   securityLogPersistenceEnabled,
   securityLogDbRetentionDays,
