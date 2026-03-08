@@ -36,7 +36,6 @@ vi.mock('../services/redis.js', () => ({
 }));
 
 import { listAdminAccessUsers } from '../services/adminAccess.js';
-import { sendAdminPasswordResetEmail } from '../services/email.js';
 import { buildAdminResetUrl } from '../services/adminAccess.js';
 
 describe('admin access roster', () => {

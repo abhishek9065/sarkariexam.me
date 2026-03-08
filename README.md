@@ -70,7 +70,7 @@ ADMIN_DOMAIN_ALLOWLIST=example.com
 ADMIN_BACKUP_CODE_SALT=...
 ```
 `ADMIN_SETUP_KEY`, `TOTP_ENCRYPTION_KEY`, and one of `ADMIN_EMAIL_ALLOWLIST`/`ADMIN_DOMAIN_ALLOWLIST` are required in production.
-`ADMIN_BACKUP_CODE_SALT` is strongly recommended in production and should be unique (do not reuse any other secret).
+`ADMIN_BACKUP_CODE_SALT` is also required in production and must be unique (do not reuse `JWT_SECRET` or any other secret).
 Restrict `.env` permissions on servers (for example: `chmod 600 .env`).
 
 ### Backend (`backend/.env`)

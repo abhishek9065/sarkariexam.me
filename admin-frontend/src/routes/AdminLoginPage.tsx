@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../app/useAdminAuth';
 import { OpsBadge } from '../components/ops';
@@ -11,16 +11,55 @@ import {
 } from '../lib/api/client';
 
 type AuthMode = 'login' | 'forgot-password' | 'reset-password';
+const RESET_TOKEN_STORAGE_KEY = 'admin_reset_token';
+
+const readResetTokenFromHash = (hash: string): string => {
+    const normalizedHash = hash.startsWith('#') ? hash.slice(1) : hash;
+    if (!normalizedHash) return '';
+    return new URLSearchParams(normalizedHash).get('token')?.trim() ?? '';
+};
+
+const readStoredResetToken = (): string => {
+    if (typeof window === 'undefined') return '';
+    try {
+        return window.sessionStorage.getItem(RESET_TOKEN_STORAGE_KEY)?.trim() ?? '';
+    } catch {
+        return '';
+    }
+};
+
+const persistResetToken = (token: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+        window.sessionStorage.setItem(RESET_TOKEN_STORAGE_KEY, token);
+    } catch {
+        // Ignore storage errors and keep the token in component state only.
+    }
+};
+
+const clearStoredResetToken = () => {
+    if (typeof window === 'undefined') return;
+    try {
+        window.sessionStorage.removeItem(RESET_TOKEN_STORAGE_KEY);
+    } catch {
+        // Ignore storage errors.
+    }
+};
 
 export function AdminLoginPage() {
     const { user, login } = useAdminAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const mode = (searchParams.get('mode') as AuthMode) || 'login';
-    const token = searchParams.get('token') || '';
     const [email, setEmail] = useState(searchParams.get('email') || '');
     const [password, setPassword] = useState('');
     const [twoFactorCode, setTwoFactorCode] = useState('');
+    const [resetToken, setResetToken] = useState(() => {
+        const initialHashToken = typeof window === 'undefined' ? '' : readResetTokenFromHash(window.location.hash);
+        const initialQueryToken = searchParams.get('token')?.trim() ?? '';
+        return initialHashToken || initialQueryToken || readStoredResetToken();
+    });
     const [loginChallengeToken, setLoginChallengeToken] = useState<string | null>(null);
     const [setupToken, setSetupToken] = useState<string | null>(null);
     const [setupQrCode, setSetupQrCode] = useState<string | null>(null);
@@ -33,6 +72,42 @@ export function AdminLoginPage() {
     const [submitting, setSubmitting] = useState(false);
 
     if (user) return <Navigate to="/dashboard" replace />;
+
+    useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        const queryToken = queryParams.get('token')?.trim() ?? '';
+        const hashToken = readResetTokenFromHash(location.hash);
+        const urlToken = hashToken || queryToken;
+
+        if (urlToken) {
+            persistResetToken(urlToken);
+            if (urlToken !== resetToken) {
+                setResetToken(urlToken);
+            }
+
+            queryParams.delete('token');
+            const nextSearch = queryParams.toString();
+            navigate({
+                pathname: location.pathname,
+                search: nextSearch ? `?${nextSearch}` : '',
+                hash: '',
+            }, { replace: true });
+            return;
+        }
+
+        if (mode === 'reset-password') {
+            const storedToken = readStoredResetToken();
+            if (storedToken && storedToken !== resetToken) {
+                setResetToken(storedToken);
+            }
+            return;
+        }
+
+        if (resetToken) {
+            setResetToken('');
+            clearStoredResetToken();
+        }
+    }, [location.hash, location.pathname, location.search, mode, navigate, resetToken]);
 
     const resetTwoFactorSetup = () => {
         setLoginChallengeToken(null);
@@ -57,6 +132,8 @@ export function AdminLoginPage() {
         setNotice(null);
         setPassword('');
         setTwoFactorCode('');
+        setResetToken('');
+        clearStoredResetToken();
         resetTwoFactorSetup();
     };
 
@@ -137,7 +214,11 @@ export function AdminLoginPage() {
                                 return;
                             }
                             if (mode === 'reset-password') {
-                                await adminResetPassword(email, token, password);
+                                if (!resetToken) {
+                                    setError('Password reset link is missing or expired. Request a new reset email.');
+                                    return;
+                                }
+                                await adminResetPassword(email, resetToken, password);
                                 const next = new URLSearchParams(searchParams);
                                 next.delete('mode');
                                 next.delete('token');
@@ -145,6 +226,8 @@ export function AdminLoginPage() {
                                 setNotice('Password reset successful. Sign in with your new password.');
                                 setPassword('');
                                 setTwoFactorCode('');
+                                setResetToken('');
+                                clearStoredResetToken();
                                 setLoginChallengeToken(null);
                                 return;
                             }

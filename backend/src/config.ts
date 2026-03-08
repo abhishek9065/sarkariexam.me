@@ -101,7 +101,10 @@ const getDbConnectionString = (): string => {
 
 const databaseUrl = getDbConnectionString();
 const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefined);
-const adminBackupCodeSalt = process.env.ADMIN_BACKUP_CODE_SALT ?? jwtSecret;
+const adminBackupCodeSalt = getRequiredEnv(
+  'ADMIN_BACKUP_CODE_SALT',
+  isTest ? 'test-admin-backup-code-salt' : 'dev-admin-backup-code-salt'
+);
 
 const defaultCorsOrigins = [
   'http://localhost:4173',
@@ -167,9 +170,13 @@ const featureFlags = {
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'test-secret', 'change-me', 'secret', 'jwt-secret']);
 validateSecret('ADMIN_SETUP_KEY', adminSetupKey, ['setup-admin-123', 'test-admin-setup-key', 'change-me', 'admin-setup']);
 validateSecret('TOTP_ENCRYPTION_KEY', totpEncryptionKey, ['dev-totp-key', 'change-me', 'secret', 'test-totp-encryption-key']);
-if (process.env.ADMIN_BACKUP_CODE_SALT) {
-  validateSecret('ADMIN_BACKUP_CODE_SALT', adminBackupCodeSalt, ['change-me', 'admin-backup-salt', 'backup-salt']);
-}
+validateSecret('ADMIN_BACKUP_CODE_SALT', adminBackupCodeSalt, [
+  'change-me',
+  'admin-backup-salt',
+  'backup-salt',
+  'dev-admin-backup-code-salt',
+  'test-admin-backup-code-salt',
+]);
 
 if (isProduction && adminEmailAllowlist.length === 0 && adminDomainAllowlist.length === 0) {
   throw new Error('SECURITY ERROR: ADMIN_EMAIL_ALLOWLIST or ADMIN_DOMAIN_ALLOWLIST is required in production.');

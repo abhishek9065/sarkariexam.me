@@ -13,7 +13,7 @@ import {
   getClientIP
 } from '../middleware/security.js';
 import { UserModelMongo } from '../models/users.mongo.js';
-import { syncAdminAccessMetadata } from '../services/adminAccess.js';
+import { buildAdminResetUrl, syncAdminAccessMetadata } from '../services/adminAccess.js';
 import {
   getAdminPermissionsSnapshot,
   isAdminPortalRole,
@@ -736,8 +736,7 @@ router.post('/admin/forgot-password', async (req, res) => {
       email: user.email,
     }, ADMIN_RESET_TOKEN_TTL_SECONDS);
 
-    const frontendBase = config.frontendUrl.replace(/\/$/, '');
-    const resetUrl = `${frontendBase}/admin-vnext/login?mode=reset-password&token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}`;
+    const resetUrl = buildAdminResetUrl(user.email, token);
     await sendAdminPasswordResetEmail(user.email, resetUrl, Math.ceil(ADMIN_RESET_TOKEN_TTL_SECONDS / 60));
     await clearAuthAbuseFailures({
       scope: 'admin_forgot_password',
