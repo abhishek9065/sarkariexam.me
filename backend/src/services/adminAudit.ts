@@ -53,6 +53,7 @@ export interface AdminAuditIntegrityResult {
 
 const collection = () => getCollection<AdminAuditDoc>('admin_audit_logs');
 const chainCollection = () => getCollection<AdminAuditChainDoc>('admin_audit_ledger');
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const stableStringify = (value: any): string => {
     if (Array.isArray(value)) {
@@ -149,7 +150,17 @@ const buildAuditQuery = (options: AuditQueryOptions) => {
     const query: Record<string, any> = {};
 
     if (options.userId) {
-        query.userId = options.userId;
+        const actorPattern = { $regex: escapeRegex(options.userId), $options: 'i' };
+        query.$or = [
+            { userId: actorPattern },
+            { 'metadata.actor': actorPattern },
+            { 'metadata.actorEmail': actorPattern },
+            { 'metadata.requestedBy': actorPattern },
+            { 'metadata.approvedBy': actorPattern },
+            { 'metadata.rejectedBy': actorPattern },
+            { 'metadata.assigneeEmail': actorPattern },
+            { 'metadata.targetUserId': actorPattern },
+        ];
     }
 
     if (options.action) {

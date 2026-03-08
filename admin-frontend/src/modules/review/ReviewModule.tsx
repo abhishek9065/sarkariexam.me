@@ -1,25 +1,30 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import {
     getAdminAnnouncements,
+    getAdminRoleUsers,
     getReviewPreview,
     runBulkApprove,
     runBulkReject,
     runBulkUpdate,
+    updateAnnouncementAssignment,
+    updateAnnouncementReviewSla,
 } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAnnouncementListItem, AdminReviewPreview } from '../../types';
 
 export function ReviewModule() {
     const queryClient = useQueryClient();
-    const { hasValidStepUp, stepUpToken } = useAdminAuth();
+    const { user, hasValidStepUp, stepUpToken } = useAdminAuth();
     const { notifyError, notifyInfo, notifySuccess } = useAdminNotifications();
     const { confirm } = useConfirmDialog();
+    const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
     const [action, setAction] = useState<'approve' | 'reject' | 'schedule'>('approve');
     const [scheduleAt, setScheduleAt] = useState('');
@@ -27,19 +32,43 @@ export function ReviewModule() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [preview, setPreview] = useState<AdminReviewPreview | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'job' | 'result' | 'admit-card' | 'other'>('all');
+    const [assignmentTarget, setAssignmentTarget] = useState('me');
+    const [bulkDueAt, setBulkDueAt] = useState('');
+
+    const assigneeFilter = searchParams.get('assignee');
+    const slaFilter = searchParams.get('sla');
 
     const query = useQuery({
         queryKey: ['review-announcements', search],
         queryFn: () => getAdminAnnouncements({ limit: 120, status: 'pending', search }),
     });
 
+    const rosterQuery = useQuery({
+        queryKey: ['review-admin-roster'],
+        queryFn: () => getAdminRoleUsers(),
+    });
+
     const rows = useMemo(() => query.data ?? [], [query.data]);
 
     const filteredRows = useMemo(() => {
-        if (activeTab === 'all') return rows;
-        if (activeTab === 'other') return rows.filter((r) => !['job', 'result', 'admit-card'].includes(r.type || ''));
-        return rows.filter((r) => r.type === activeTab);
-    }, [rows, activeTab]);
+        let baseRows = rows;
+        if (activeTab !== 'all') {
+            if (activeTab === 'other') {
+                baseRows = baseRows.filter((r) => !['job', 'result', 'admit-card'].includes(r.type || ''));
+            } else {
+                baseRows = baseRows.filter((r) => r.type === activeTab);
+            }
+        }
+        if (assigneeFilter === 'me') {
+            baseRows = baseRows.filter((row) => Boolean((user?.id && row.assigneeUserId === user.id) || (user?.email && row.assigneeEmail === user.email)));
+        } else if (assigneeFilter === 'unassigned') {
+            baseRows = baseRows.filter((row) => !row.assigneeUserId && !row.assigneeEmail);
+        }
+        if (slaFilter === 'overdue') {
+            baseRows = baseRows.filter((row) => row.reviewDueAt && new Date(row.reviewDueAt).getTime() < Date.now());
+        }
+        return baseRows;
+    }, [activeTab, assigneeFilter, rows, slaFilter, user?.email, user?.id]);
 
     const allSelected = useMemo(() => filteredRows.length > 0 && filteredRows.every((item) => selectedIds.includes(item.id || item._id || '')), [filteredRows, selectedIds]);
 
@@ -48,11 +77,10 @@ export function ReviewModule() {
         if (!item.externalLink) risks.push('Missing Link');
         const deadline = (item as { deadline?: string }).deadline;
         if (deadline && new Date(deadline) < new Date()) risks.push('Expired deadline');
+        if (item.reviewDueAt && new Date(item.reviewDueAt).getTime() < Date.now()) risks.push('Overdue');
         if (risks.length === 0) return <span className="ops-badge success">Low</span>;
         return <span className="ops-badge danger">{risks.join(', ')}</span>;
     };
-
-
 
     const previewMutation = useMutation({
         mutationFn: () => getReviewPreview({
@@ -106,10 +134,41 @@ export function ReviewModule() {
         },
     });
 
+    const assignmentMutation = useMutation({
+        mutationFn: async () => {
+            const target = rosterQuery.data?.find((entry) => entry.id === assignmentTarget);
+            await Promise.all(selectedIds.map((id) => updateAnnouncementAssignment(id, assignmentTarget === 'me'
+                ? { assigneeUserId: user?.id, assigneeEmail: user?.email }
+                : assignmentTarget === 'unassigned'
+                    ? { assigneeUserId: '', assigneeEmail: '' }
+                    : { assigneeUserId: target?.id, assigneeEmail: target?.email })));
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['review-announcements'] });
+            notifySuccess('Assignments updated', 'Selected review items were reassigned.');
+        },
+        onError: (error) => {
+            notifyError('Assignment failed', error instanceof Error ? error.message : 'Failed to assign review items.');
+        },
+    });
+
+    const slaMutation = useMutation({
+        mutationFn: async () => {
+            await Promise.all(selectedIds.map((id) => updateAnnouncementReviewSla(id, bulkDueAt || undefined)));
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['review-announcements'] });
+            notifySuccess('Review SLA updated', 'Selected review items now have a new due date.');
+        },
+        onError: (error) => {
+            notifyError('SLA update failed', error instanceof Error ? error.message : 'Failed to update review SLA.');
+        },
+    });
+
     return (
         <>
             <AdminStepUpCard />
-            <OpsCard title="Review" description="Review queue with preview-first decisions and controlled execution.">
+            <OpsCard title="Review" description="Review queue with ownership, SLA control, and preview-first approval decisions.">
                 <OpsToolbar
                     controls={
                         <>
@@ -170,6 +229,33 @@ export function ReviewModule() {
                     <button className={`admin-btn small ${activeTab === 'other' ? 'primary' : 'subtle'}`} onClick={() => setActiveTab('other')}>Other</button>
                 </div>
 
+                <div className="ops-actions">
+                    <select value={assignmentTarget} onChange={(event) => setAssignmentTarget(event.target.value)}>
+                        <option value="me">Assign to me</option>
+                        <option value="unassigned">Unassign</option>
+                        {(rosterQuery.data ?? []).map((entry) => (
+                            <option key={entry.id} value={entry.id}>{entry.email}</option>
+                        ))}
+                    </select>
+                    <button
+                        type="button"
+                        className="admin-btn small subtle"
+                        disabled={selectedIds.length === 0 || assignmentMutation.isPending}
+                        onClick={() => assignmentMutation.mutate()}
+                    >
+                        {assignmentMutation.isPending ? 'Assigning...' : 'Apply Assignment'}
+                    </button>
+                    <input type="datetime-local" value={bulkDueAt} onChange={(event) => setBulkDueAt(event.target.value)} />
+                    <button
+                        type="button"
+                        className="admin-btn small subtle"
+                        disabled={selectedIds.length === 0 || slaMutation.isPending}
+                        onClick={() => slaMutation.mutate()}
+                    >
+                        {slaMutation.isPending ? 'Updating...' : 'Set Review SLA'}
+                    </button>
+                </div>
+
                 {action === 'schedule' ? (
                     <input
                         type="text"
@@ -187,8 +273,9 @@ export function ReviewModule() {
                         columns={[
                             { key: 'select', label: 'Select' },
                             { key: 'title', label: 'Title' },
+                            { key: 'owner', label: 'Owner' },
+                            { key: 'sla', label: 'Review SLA' },
                             { key: 'risk', label: 'Risk Flags' },
-                            { key: 'status', label: 'Status' },
                             { key: 'type', label: 'Type' },
                             { key: 'actions', label: 'Diff' }
                         ]}
@@ -207,11 +294,12 @@ export function ReviewModule() {
                                     }}
                                 />
                             </td>
-                            <td colSpan={5} className="ops-inline-muted">Select all {activeTab} rows</td>
+                            <td colSpan={6} className="ops-inline-muted">Select all {activeTab} rows</td>
                         </tr>
                         {filteredRows.map((item: AdminAnnouncementListItem) => {
                             const id = item.id || item._id || '';
-                            const toggleSelect = () => setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+                            const toggleSelect = () => setSelectedIds((current) => (current.includes(id) ? current.filter((rowId) => rowId !== id) : [...current, id]));
+                            const overdue = item.reviewDueAt && new Date(item.reviewDueAt).getTime() < Date.now();
                             return (
                                 <tr key={id}>
                                     <td>
@@ -222,8 +310,20 @@ export function ReviewModule() {
                                         />
                                     </td>
                                     <td>{item.title || 'Untitled'}</td>
+                                    <td>
+                                        <div>{item.assigneeEmail || 'Unassigned'}</div>
+                                        {item.claimedByCurrentUser ? <div className="ops-inline-muted">Assigned to you</div> : null}
+                                    </td>
+                                    <td>
+                                        {item.reviewDueAt ? (
+                                            <OpsBadge tone={overdue ? 'danger' : 'warning'}>
+                                                {overdue ? 'Overdue' : new Date(item.reviewDueAt).toLocaleString()}
+                                            </OpsBadge>
+                                        ) : (
+                                            <span className="ops-inline-muted">No SLA</span>
+                                        )}
+                                    </td>
                                     <td>{renderRisk(item)}</td>
-                                    <td>{item.status || '-'}</td>
                                     <td>{item.type || '-'}</td>
                                     <td>
                                         <a href={`/detailed-post?focus=${id}`} className="admin-btn small subtle">Review Diffs</a>
@@ -285,6 +385,12 @@ export function ReviewModule() {
                     </div>
                 ) : null}
 
+                {assignmentMutation.isError ? (
+                    <OpsErrorState message={assignmentMutation.error instanceof Error ? assignmentMutation.error.message : 'Failed to assign review items.'} />
+                ) : null}
+                {slaMutation.isError ? (
+                    <OpsErrorState message={slaMutation.error instanceof Error ? slaMutation.error.message : 'Failed to update review SLA.'} />
+                ) : null}
                 {executeMutation.isError ? (
                     <OpsErrorState message={executeMutation.error instanceof Error ? executeMutation.error.message : 'Failed to execute action.'} />
                 ) : null}

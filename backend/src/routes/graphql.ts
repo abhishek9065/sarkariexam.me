@@ -5,7 +5,7 @@ import { authenticateToken, requirePermission } from '../middleware/auth.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';
-import { hasPermission } from '../services/rbac.js';
+import { hasEffectivePermission } from '../services/rbac.js';
 
 const router = Router();
 
@@ -191,15 +191,15 @@ const schema = buildSchema(`
   }
 `);
 
-const ensurePermission = (role: string | undefined, permission: Parameters<typeof hasPermission>[1]) => {
-    if (!hasPermission(role as any, permission as any)) {
+const ensurePermission = async (role: string | undefined, permission: Parameters<typeof hasEffectivePermission>[1]) => {
+    if (!await hasEffectivePermission(role as any, permission as any)) {
         throw new Error('Forbidden');
     }
 };
 
 const root = {
     analyticsOverview: async (_args: unknown, context: { user?: { role?: string } }) => {
-        ensurePermission(context.user?.role, 'analytics:read');
+        await ensurePermission(context.user?.role, 'analytics:read');
         const { data } = await getAnalyticsOverview();
         return data;
     },
@@ -207,7 +207,7 @@ const root = {
         { limit = 10 }: { limit?: number },
         context: { user?: { role?: string } }
     ) => {
-        ensurePermission(context.user?.role, 'analytics:read');
+        await ensurePermission(context.user?.role, 'analytics:read');
         const announcements = await AnnouncementModelMongo.getTrending({ limit: Math.min(50, limit ?? 10) });
         return announcements.map((announcement) => ({
             id: announcement.id,
@@ -235,7 +235,7 @@ const root = {
         },
         context: { user?: { role?: string } }
     ) => {
-        ensurePermission(context.user?.role, 'announcements:read');
+        await ensurePermission(context.user?.role, 'announcements:read');
         const announcements = await AnnouncementModelMongo.findAllAdmin({
             limit: Math.min(500, Math.max(1, limit)),
             offset: Math.max(0, offset),
@@ -260,7 +260,7 @@ const root = {
         { windowMinutes = 15 }: { windowMinutes?: number },
         context: { user?: { role?: string } }
     ) => {
-        ensurePermission(context.user?.role, 'admin:read');
+        await ensurePermission(context.user?.role, 'admin:read');
         return await getActiveUsersStats(windowMinutes);
     },
 };

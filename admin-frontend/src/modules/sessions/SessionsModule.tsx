@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
@@ -22,6 +23,7 @@ export function SessionsModule() {
     const { notifyError, notifySuccess } = useAdminNotifications();
     const { confirm } = useConfirmDialog();
     const queryClient = useQueryClient();
+    const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
     const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
 
@@ -55,11 +57,27 @@ export function SessionsModule() {
     });
 
     const rows = useMemo(() => query.data ?? [], [query.data]);
+    const focusSessionId = searchParams.get('sessionId') || searchParams.get('focus');
+
+    useEffect(() => {
+        const nextSearch = searchParams.get('search')
+            || searchParams.get('ip')
+            || searchParams.get('email')
+            || '';
+        const nextRisk = searchParams.get('risk');
+        setSearch(nextSearch);
+        if (nextRisk === 'low' || nextRisk === 'medium' || nextRisk === 'high' || nextRisk === 'all') {
+            setRiskFilter(nextRisk);
+        } else {
+            setRiskFilter('all');
+        }
+    }, [searchParams]);
+
     const filteredRows = useMemo(() => {
         return rows.filter((row: AdminSession) => {
             if (riskFilter !== 'all' && row.riskScore !== riskFilter) return false;
             if (!search.trim()) return true;
-            const target = `${row.email || ''} ${row.device || ''} ${row.browser || ''} ${row.ip || ''}`.toLowerCase();
+            const target = `${row.id || ''} ${row.email || ''} ${row.device || ''} ${row.browser || ''} ${row.os || ''} ${row.ip || ''} ${(row.actions || []).join(' ')}`.toLowerCase();
             return target.includes(search.trim().toLowerCase());
         });
     }, [riskFilter, rows, search]);
@@ -187,15 +205,22 @@ export function SessionsModule() {
                             ]}
                         >
                             {filteredRows.map((row: AdminSession) => (
-                                <tr key={row.id}>
+                                <tr key={row.id} className={focusSessionId && row.id === focusSessionId ? 'ops-row-highlight' : undefined}>
                                     <td>
                                         <strong>{row.device}</strong>
                                         <div className="ops-inline-muted">
                                             {row.browser} | {row.os} {row.email ? `| ${row.email}` : ''}
                                         </div>
+                                        <div className="ops-inline-muted">Session: <code>{row.id}</code></div>
+                                        {row.actions?.length ? (
+                                            <div className="ops-inline-muted">Recent actions: {row.actions.join(', ')}</div>
+                                        ) : null}
                                     </td>
                                     <td><code title={row.ip}>{row.ip ? row.ip.replace(/(\d+\.\d+)\.\d+\.\d+/, '$1.xxx.xxx') : '-'}</code></td>
-                                    <td>{formatDateTime(row.lastActivity)}</td>
+                                    <td>
+                                        <div>{formatDateTime(row.lastActivity)}</div>
+                                        <div className="ops-inline-muted">Login: {formatDateTime(row.loginTime)}</div>
+                                    </td>
                                     <td><OpsBadge tone={riskTone(row.riskScore)}>{row.riskScore}</OpsBadge></td>
                                     <td>
                                         {row.isCurrentSession ? (

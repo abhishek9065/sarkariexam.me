@@ -6,7 +6,7 @@ import { UserModelMongo } from '../models/users.mongo.js';
 import { isAdminPortalRole } from '../services/adminPermissions.js';
 import { touchAdminSession, validateAdminSession } from '../services/adminSessions.js';
 import { validateAdminStepUpToken, ADMIN_STEP_UP_HEADER } from '../services/adminStepUp.js';
-import { hasPermission, type Permission } from '../services/rbac.js';
+import { hasEffectivePermission, type Permission } from '../services/rbac.js';
 import RedisCache from '../services/redis.js';
 import { JwtPayload } from '../types.js';
 
@@ -147,12 +147,12 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 }
 
 export function requirePermission(permission: Permission) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (isAdminPortalRole(req.user?.role) && config.adminRequire2FA && !req.user?.twoFactorVerified) {
       res.status(403).json({ error: 'two_factor_required', message: 'Two-factor authentication required' });
       return;
     }
-    if (!hasPermission(req.user?.role, permission)) {
+    if (!await hasEffectivePermission(req.user?.role, permission)) {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }

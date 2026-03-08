@@ -37,6 +37,12 @@ const defaultEditable: EditableAnnouncement = {
 };
 
 const createSnapshot = (value: EditableAnnouncement) => JSON.stringify(value);
+const REVISION_COMPARE_FIELDS: Array<keyof EditableAnnouncement> = ['title', 'category', 'organization', 'status', 'externalLink', 'location', 'content'];
+const normalizeCompareValue = (value: unknown) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    return JSON.stringify(value);
+};
 
 export function DetailedPostModule() {
     const location = useLocation();
@@ -47,6 +53,7 @@ export function DetailedPostModule() {
     const [lastSyncedSnapshot, setLastSyncedSnapshot] = useState<string>(createSnapshot(defaultEditable));
     const [lastAutosaveAt, setLastAutosaveAt] = useState<string>('');
     const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+    const [selectedRevisionVersion, setSelectedRevisionVersion] = useState<number | null>(null);
     const { notifyInfo, notifySuccess, notifyError } = useAdminNotifications();
 
     const query = useQuery({
@@ -98,6 +105,7 @@ export function DetailedPostModule() {
         setEditable(nextEditable);
         setLastSyncedSnapshot(createSnapshot(nextEditable));
         setLastAutosaveAt('');
+        setSelectedRevisionVersion(null);
     }, [selected]);
 
     const mutation = useMutation({
@@ -165,6 +173,26 @@ export function DetailedPostModule() {
         },
     });
 
+    const duplicateMutation = useMutation({
+        mutationFn: async () => {
+            if (!selected) throw new Error('Select an announcement first.');
+            return createAnnouncementDraft({
+                type: (selected.type as 'job' | 'result' | 'admit-card' | 'answer-key' | 'syllabus' | 'admission' | undefined) ?? 'job',
+                title: `${editable.title.trim() || selected.title || 'Untitled'} Copy`,
+                category: editable.category.trim() || String(selected.category ?? ''),
+                organization: editable.organization.trim() || String(selected.organization ?? ''),
+            });
+        },
+        onSuccess: async (draft) => {
+            await query.refetch();
+            setSelectedId(draft.id);
+            notifySuccess('Draft duplicated', `Created ${draft.id} from the current record.`);
+        },
+        onError: (error) => {
+            notifyError('Duplicate failed', error instanceof Error ? error.message : 'Unable to duplicate draft.');
+        },
+    });
+
     const restoreMutation = useMutation({
         mutationFn: async ({ id, version }: { id: string; version: number }) => {
             if (!hasValidStepUp || !stepUpToken) {
@@ -184,6 +212,37 @@ export function DetailedPostModule() {
 
     const currentSnapshot = createSnapshot(editable);
     const isDirty = Boolean(selectedId) && currentSnapshot !== lastSyncedSnapshot;
+    const revisionEntries = useMemo(() => revisionsQuery.data?.revisions ?? [], [revisionsQuery.data?.revisions]);
+    const selectedRevision = useMemo(() => {
+        if (revisionEntries.length === 0) return null;
+        if (selectedRevisionVersion == null) return revisionEntries[0];
+        return revisionEntries.find((revision) => revision.version === selectedRevisionVersion) ?? revisionEntries[0];
+    }, [revisionEntries, selectedRevisionVersion]);
+
+    useEffect(() => {
+        if (revisionEntries.length === 0) {
+            setSelectedRevisionVersion(null);
+            return;
+        }
+        setSelectedRevisionVersion((current) => {
+            if (current != null && revisionEntries.some((revision) => revision.version === current)) return current;
+            return revisionEntries[0]?.version ?? null;
+        });
+    }, [revisionEntries]);
+
+    const revisionDiffRows = useMemo(() => {
+        if (!selectedRevision) return [];
+        return REVISION_COMPARE_FIELDS.map((field) => {
+            const currentValue = normalizeCompareValue(editable[field]);
+            const revisionValue = normalizeCompareValue(selectedRevision.snapshot?.[field]);
+            return {
+                field,
+                currentValue: currentValue || '-',
+                revisionValue: revisionValue || '-',
+                changed: currentValue !== revisionValue,
+            };
+        });
+    }, [editable, selectedRevision]);
 
     useEffect(() => {
         if (!autosaveEnabled) return;
@@ -298,6 +357,14 @@ export function DetailedPostModule() {
                                 >
                                     Restore values
                                 </button>
+                                <button
+                                    type="button"
+                                    className="admin-btn small subtle"
+                                    onClick={() => duplicateMutation.mutate()}
+                                    disabled={!selected || duplicateMutation.isPending}
+                                >
+                                    {duplicateMutation.isPending ? 'Duplicating...' : 'Duplicate as draft'}
+                                </button>
                             </>
                         }
                     />
@@ -404,6 +471,41 @@ export function DetailedPostModule() {
                                         </div>
                                     </div>
                                 </OpsCard>
+
+                                {selectedRevision ? (
+                                    <OpsCard title={`Compare with v${selectedRevision.version}`} tone="muted">
+                                        <div className="ops-stack">
+                                            <div className="ops-inline-muted">
+                                                {selectedRevision.updatedAt ? new Date(selectedRevision.updatedAt).toLocaleString() : 'Unknown revision time'}
+                                                {selectedRevision.updatedBy ? ` | ${selectedRevision.updatedBy}` : ''}
+                                            </div>
+                                            {selectedRevision.note ? <div className="ops-inline-muted">{selectedRevision.note}</div> : null}
+                                            <div className="revision-compare-list">
+                                                {revisionDiffRows.map((entry) => (
+                                                    <div key={entry.field} className={`revision-compare-row${entry.changed ? ' changed' : ''}`}>
+                                                        <strong>{entry.field}</strong>
+                                                        <div className="ops-inline-muted">Current: {entry.currentValue}</div>
+                                                        <div className="ops-inline-muted">Revision: {entry.revisionValue}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="ops-actions">
+                                                <button
+                                                    type="button"
+                                                    className="admin-btn subtle"
+                                                    disabled={restoreMutation.isPending || !hasValidStepUp}
+                                                    onClick={() => {
+                                                        if (window.confirm(`Restore this announcement to version ${selectedRevision.version}? The current state will be saved as a new revision.`)) {
+                                                            restoreMutation.mutate({ id: selectedId, version: selectedRevision.version });
+                                                        }
+                                                    }}
+                                                >
+                                                    {restoreMutation.isPending ? 'Restoring...' : `Restore v${selectedRevision.version}`}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </OpsCard>
+                                ) : null}
                             </div>
                         </form>
                     ) : null}
@@ -416,12 +518,23 @@ export function DetailedPostModule() {
                             {!revisionsQuery.isPending && !revisionsQuery.error ? (
                                 <div className="ops-stack">
                                     {(revisionsQuery.data?.revisions ?? []).map((revision) => (
-                                        <div key={revision.version} className="ops-row wrap" ref={(el) => { if (el) { el.style.gap = '0.5rem'; el.style.alignItems = 'center'; } }}>
+                                        <div
+                                            key={revision.version}
+                                            className={`ops-row wrap${selectedRevision?.version === revision.version ? ' ops-row-highlight' : ''}`}
+                                            ref={(el) => { if (el) { el.style.gap = '0.5rem'; el.style.alignItems = 'center'; } }}
+                                        >
                                             <strong>v{revision.version}</strong>
                                             <span className="ops-inline-muted">
                                                 {revision.updatedAt ? new Date(revision.updatedAt).toLocaleString() : 'Unknown time'}
                                             </span>
                                             <code>{(revision.changedKeys || []).slice(0, 6).join(', ') || 'no-key-diff'}</code>
+                                            <button
+                                                type="button"
+                                                className="admin-btn subtle small"
+                                                onClick={() => setSelectedRevisionVersion(revision.version)}
+                                            >
+                                                Compare
+                                            </button>
                                             <button
                                                 type="button"
                                                 className="admin-btn subtle"
@@ -454,6 +567,9 @@ export function DetailedPostModule() {
                         <OpsErrorState message={mutation.error instanceof Error ? mutation.error.message : 'Failed to update announcement.'} />
                     ) : null}
                     {mutation.isSuccess ? <div className="ops-success">Changes saved.</div> : null}
+                    {duplicateMutation.isError ? (
+                        <OpsErrorState message={duplicateMutation.error instanceof Error ? duplicateMutation.error.message : 'Failed to duplicate draft.'} />
+                    ) : null}
                 </div>
             </OpsCard>
         </>

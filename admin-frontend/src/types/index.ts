@@ -2,6 +2,15 @@ export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 
 export type AnnouncementTypeFilter = 'job' | 'admit-card' | 'result' | 'answer-key' | 'syllabus' | 'admission';
 export type AnnouncementStatusFilter = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type AnnouncementSortOption = 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+export type AdminSettingKey =
+    | 'states'
+    | 'boards'
+    | 'tags'
+    | 'workflow-defaults'
+    | 'homepage-defaults'
+    | 'alert-thresholds'
+    | 'security-policy'
+    | 'notification-routing';
 
 export type AdminPermission =
     | 'admin:read'
@@ -51,10 +60,12 @@ export interface AdminSessionTerminateOthersResult {
 }
 
 export interface AdminPermissionSnapshot {
-    role: AdminPortalRole;
     roles: Record<AdminPortalRole, string[]>;
-    tabs: Record<string, AdminPermission>;
-    highRiskActions: string[];
+    permissions?: AdminPermission[];
+    defaults?: AdminPortalRole[];
+    role?: AdminPortalRole;
+    tabs?: Record<string, AdminPermission>;
+    highRiskActions?: string[];
 }
 
 export interface AdminReviewPreview {
@@ -103,6 +114,11 @@ export interface AdminAnnouncementListItem {
         trendingScore?: number;
     };
     schema?: Record<string, unknown>;
+    assigneeUserId?: string;
+    assigneeEmail?: string;
+    assignedAt?: string;
+    reviewDueAt?: string;
+    claimedByCurrentUser?: boolean;
 }
 
 export interface AdminAnnouncementListResponse {
@@ -249,9 +265,17 @@ export interface AdminRoleUser {
     username?: string;
     role: AdminPortalRole;
     isActive: boolean;
+    twoFactorEnabled?: boolean;
     createdAt?: string;
     updatedAt?: string;
     lastLoginAt?: string | null;
+    activeSessionCount?: number;
+    invitationState?: 'pending' | 'accepted' | 'reset-required';
+    invitedAt?: string | null;
+    invitedBy?: string | null;
+    passwordResetRequired?: boolean;
+    backupCodesAvailable?: number;
+    backupCodesTotal?: number;
 }
 
 export interface AdminReportSnapshot {
@@ -268,6 +292,23 @@ export interface AdminReportSnapshot {
     trafficSeries: Array<{ date: string; views: number }>;
     trafficSources: Array<{ source: string; label: string; views: number; percentage: number }>;
     brokenLinkItems: Array<{ id: string; label: string; url: string; updatedAt?: string; announcementId?: string }>;
+    workflowSummary?: {
+        unassignedPendingReview: number;
+        overdueReviewItems: number;
+        currentUserAssignedQueue: number;
+    };
+    incidentSummary?: {
+        unresolvedErrorReports: number;
+        highRiskSessions: number;
+        openCriticalAlerts: number;
+    };
+    drilldowns?: Array<{
+        key: string;
+        label: string;
+        count: number;
+        route: string;
+        tone?: 'neutral' | 'info' | 'warning' | 'danger';
+    }>;
 }
 
 export interface AdminUser {
@@ -278,12 +319,31 @@ export interface AdminUser {
     twoFactorEnabled?: boolean;
 }
 
+export interface AdminSettingRecord {
+    key: AdminSettingKey;
+    values?: string[];
+    payload?: Record<string, unknown>;
+    updatedAt?: string | null;
+    updatedBy?: string | null;
+}
+
+export interface AdminAuthLoginResult {
+    status: 'authenticated' | 'two-factor-required' | 'two-factor-setup-required';
+    setupToken?: string;
+    message?: string;
+}
+
 export interface AdminAuditLog {
     id?: string;
     action?: string;
     createdAt?: string;
+    announcementId?: string;
+    title?: string;
+    userId?: string;
+    note?: string;
     actorId?: string;
     actorEmail?: string;
+    metadata?: Record<string, unknown>;
     [key: string]: unknown;
 }
 
@@ -293,6 +353,9 @@ export interface AdminSecurityLog {
     endpoint?: string;
     ipAddress?: string;
     createdAt?: string;
+    incidentStatus?: 'new' | 'investigating' | 'resolved';
+    assigneeEmail?: string | null;
+    note?: string | null;
     [key: string]: unknown;
 }
 
@@ -317,11 +380,17 @@ export interface AdminErrorReport {
     pageUrl?: string | null;
     userAgent?: string | null;
     note?: string | null;
+    stack?: string | null;
+    componentStack?: string | null;
     status: 'new' | 'triaged' | 'resolved';
     adminNote?: string | null;
+    assigneeEmail?: string | null;
     createdAt: string;
     updatedAt?: string;
     userEmail?: string | null;
+    release?: string | null;
+    requestId?: string | null;
+    sentryEventUrl?: string | null;
     resolvedAt?: string | null;
     resolvedBy?: string | null;
 }

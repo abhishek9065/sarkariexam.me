@@ -1,6 +1,6 @@
 import type { UserRole } from '../types.js';
 
-import { ADMIN_ROLE_PERMISSIONS } from './adminPermissions.js';
+import { ADMIN_ROLE_PERMISSIONS, hasEffectiveAdminPermission, isAdminPortalRole } from './adminPermissions.js';
 
 export type Permission =
     | 'admin:read'
@@ -30,6 +30,15 @@ export function hasPermission(role: UserRole | undefined, permission: Permission
     if (!role) return false;
     const allowed = ROLE_PERMISSIONS[role] ?? [];
     return allowed.some((entry) => matchesPermission(permission, entry));
+}
+
+export async function hasEffectivePermission(role: UserRole | undefined, permission: Permission): Promise<boolean> {
+    if (!role) return false;
+    if (role === 'admin') return true;
+    if (isAdminPortalRole(role)) {
+        return hasEffectiveAdminPermission(role, permission);
+    }
+    return hasPermission(role, permission);
 }
 
 export function listPermissions(role: UserRole | undefined): string[] {

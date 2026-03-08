@@ -20,7 +20,7 @@ export async function getErrorReports(input: {
 
 export async function updateErrorReport(
     id: string,
-    payload: { status: 'new' | 'triaged' | 'resolved'; adminNote?: string }
+    payload: { status: 'new' | 'triaged' | 'resolved'; adminNote?: string; assigneeEmail?: string }
 ): Promise<AdminErrorReport> {
     const body = await request(`${ADMIN_API_PATHS.supportErrorReports}/${encodeURIComponent(id)}`, {
         method: 'PATCH',

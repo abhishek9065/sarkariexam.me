@@ -22,6 +22,10 @@ interface ErrorReportDoc {
     userEmail?: string | null;
     status: 'new' | 'triaged' | 'resolved';
     adminNote?: string | null;
+    assigneeEmail?: string | null;
+    release?: string | null;
+    requestId?: string | null;
+    sentryEventUrl?: string | null;
     resolvedAt?: Date | null;
     resolvedBy?: string | null;
 }
@@ -34,6 +38,9 @@ const reportSchema = z.object({
     note: z.string().trim().max(1000).optional(),
     stack: z.string().trim().max(5000).optional(),
     componentStack: z.string().trim().max(5000).optional(),
+    release: z.string().trim().max(200).optional(),
+    requestId: z.string().trim().max(120).optional(),
+    sentryEventUrl: z.string().trim().max(1000).optional(),
     timestamp: z.string().trim().optional(),
 });
 
@@ -47,6 +54,7 @@ const listQuerySchema = z.object({
 const updateSchema = z.object({
     status: z.enum(['new', 'triaged', 'resolved']),
     adminNote: z.string().trim().max(1000).optional(),
+    assigneeEmail: z.string().email().trim().optional().or(z.literal('')),
 });
 
 const reportsCollection = () => getCollection<ErrorReportDoc>('error_reports');
@@ -68,6 +76,9 @@ router.post('/error-report', optionalAuth, async (req, res) => {
             note: input.note ?? null,
             stack: input.stack ?? null,
             componentStack: input.componentStack ?? null,
+            release: input.release ?? null,
+            requestId: input.requestId ?? req.requestId ?? null,
+            sentryEventUrl: input.sentryEventUrl ?? null,
             createdAt: now,
             userId: req.user?.userId ?? null,
             userEmail: req.user?.email ?? null,
@@ -145,6 +156,7 @@ router.patch('/error-reports/:id', authenticateToken, requirePermission('admin:w
         const update: Partial<ErrorReportDoc> = {
             status,
             adminNote: parseResult.data.adminNote ?? null,
+            assigneeEmail: parseResult.data.assigneeEmail || null,
             updatedAt: now,
             resolvedAt: status === 'resolved' ? now : null,
             resolvedBy: status === 'resolved' ? (req.user?.email ?? req.user?.userId ?? 'admin') : null,

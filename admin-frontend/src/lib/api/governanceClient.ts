@@ -99,6 +99,19 @@ export async function getAdminSecurityLogs(input: {
     return toArray<AdminSecurityLog>(body?.data);
 }
 
+export async function updateAdminSecurityIncident(
+    id: string,
+    payload: { incidentStatus?: 'new' | 'investigating' | 'resolved'; assigneeEmail?: string; note?: string },
+    stepUpToken: string
+): Promise<AdminSecurityLog> {
+    const body = await request(`${ADMIN_API_PATHS.adminSecurityLog}/logs/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers: mutationHeaders(stepUpToken),
+        body: JSON.stringify(payload),
+    }, true);
+    return typedData<AdminSecurityLog>(body) ?? {} as AdminSecurityLog;
+}
+
 export async function getAdminApprovals(status = 'pending'): Promise<AdminApprovalItem[]> {
     const body = await request(`${ADMIN_API_PATHS.adminApprovals}?status=${encodeURIComponent(status)}`);
     return toArray<AdminApprovalItem>(body?.data);

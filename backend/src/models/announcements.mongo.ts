@@ -97,6 +97,10 @@ interface AnnouncementVersionDoc {
         postedAt?: Date;
         updatedAt?: Date;
         viewCount?: number;
+        assigneeUserId?: string;
+        assigneeEmail?: string;
+        assignedAt?: Date;
+        reviewDueAt?: Date;
     };
 }
 
@@ -151,6 +155,10 @@ interface AnnouncementDoc extends Document {
     };
     schema?: Record<string, unknown>;
     importantDates?: Array<{ eventName: string; eventDate: Date; description?: string }>;
+    assigneeUserId?: string;
+    assigneeEmail?: string;
+    assignedAt?: Date | null;
+    reviewDueAt?: Date | null;
 }
 
 const DEFAULT_STATUS: AnnouncementStatus = 'published';
@@ -326,6 +334,10 @@ function buildVersionSnapshot(doc: AnnouncementDoc): AnnouncementVersionDoc['sna
         postedAt: doc.postedAt,
         updatedAt: doc.updatedAt,
         viewCount: doc.viewCount,
+        assigneeUserId: doc.assigneeUserId,
+        assigneeEmail: doc.assigneeEmail,
+        assignedAt: doc.assignedAt,
+        reviewDueAt: doc.reviewDueAt,
     };
 }
 
@@ -1065,6 +1077,10 @@ export class AnnouncementModelMongo {
             seo: (data as any).seo || undefined,
             home: (data as any).home || undefined,
             schema: (data as any).schema || undefined,
+            assigneeUserId: (data as any).assigneeUserId || undefined,
+            assigneeEmail: (data as any).assigneeEmail || undefined,
+            assignedAt: (data as any).assignedAt ? new Date((data as any).assignedAt) : undefined,
+            reviewDueAt: (data as any).reviewDueAt ? new Date((data as any).reviewDueAt) : undefined,
             importantDates: data.importantDates?.map(date => ({
                 eventName: date.eventName,
                 eventDate: new Date(date.eventDate),
@@ -1111,6 +1127,14 @@ export class AnnouncementModelMongo {
         if ((data as any).seo !== undefined) updateData.seo = (data as any).seo;
         if ((data as any).home !== undefined) updateData.home = (data as any).home;
         if ((data as any).schema !== undefined) updateData.schema = (data as any).schema;
+        if ((data as any).assigneeUserId !== undefined) updateData.assigneeUserId = (data as any).assigneeUserId || null;
+        if ((data as any).assigneeEmail !== undefined) updateData.assigneeEmail = (data as any).assigneeEmail || null;
+        if ((data as any).assignedAt !== undefined) {
+            updateData.assignedAt = (data as any).assignedAt ? new Date((data as any).assignedAt) : null;
+        }
+        if ((data as any).reviewDueAt !== undefined) {
+            updateData.reviewDueAt = (data as any).reviewDueAt ? new Date((data as any).reviewDueAt) : null;
+        }
         if (data.importantDates !== undefined) {
             updateData.importantDates = data.importantDates?.map(date => ({
                 eventName: date.eventName,
@@ -1518,6 +1542,10 @@ export class AnnouncementModelMongo {
                 seo: version.snapshot.seo as Announcement['seo'] | undefined,
                 home: version.snapshot.home as Announcement['home'] | undefined,
                 schema: version.snapshot.schema as Record<string, unknown> | undefined,
+                assigneeUserId: version.snapshot.assigneeUserId,
+                assigneeEmail: version.snapshot.assigneeEmail,
+                assignedAt: version.snapshot.assignedAt?.toISOString() as any,
+                reviewDueAt: version.snapshot.reviewDueAt?.toISOString() as any,
                 status: normalizeStatus(version.snapshot.status),
                 publishAt: version.snapshot.publishAt?.toISOString() as any,
                 approvedAt: version.snapshot.approvedAt?.toISOString() as any,
@@ -1569,6 +1597,10 @@ export class AnnouncementModelMongo {
             seo: doc.seo,
             home: doc.home,
             schema: doc.schema,
+            assigneeUserId: doc.assigneeUserId,
+            assigneeEmail: doc.assigneeEmail,
+            assignedAt: doc.assignedAt?.toISOString() as any,
+            reviewDueAt: doc.reviewDueAt?.toISOString() as any,
         };
     }
 }

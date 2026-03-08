@@ -35,5 +35,16 @@ export async function getAdminReports(): Promise<AdminReportSnapshot> {
         trafficSeries: [],
         trafficSources: [],
         brokenLinkItems: [],
+        workflowSummary: {
+            unassignedPendingReview: 0,
+            overdueReviewItems: 0,
+            currentUserAssignedQueue: 0,
+        },
+        incidentSummary: {
+            unresolvedErrorReports: 0,
+            highRiskSessions: 0,
+            openCriticalAlerts: 0,
+        },
+        drilldowns: [],
     };
 }

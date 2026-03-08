@@ -36,6 +36,9 @@ export interface SecurityEvent {
       | 'admin_password_reset_completed';
     endpoint: string;
     metadata?: any;
+    incidentStatus?: 'new' | 'investigating' | 'resolved';
+    assigneeEmail?: string | null;
+    note?: string | null;
 }
 
 interface StoredEvent extends SecurityEvent {
@@ -114,6 +117,9 @@ const mapDocToStoredEvent = (doc: SecurityLogDoc & { _id?: ObjectId }): StoredEv
     event_type: doc.event_type,
     endpoint: doc.endpoint,
     metadata: doc.metadata,
+    incidentStatus: doc.incidentStatus,
+    assigneeEmail: doc.assigneeEmail ?? null,
+    note: doc.note ?? null,
     created_at: new Date(doc.created_at),
 });
 
@@ -127,6 +133,9 @@ const persistSecurityEvent = async (event: StoredEvent): Promise<void> => {
             event_type: event.event_type,
             endpoint: event.endpoint,
             metadata: event.metadata,
+            incidentStatus: event.incidentStatus ?? 'new',
+            assigneeEmail: event.assigneeEmail ?? null,
+            note: event.note ?? null,
             created_at: event.created_at,
         } as SecurityLogDoc);
     } catch (error) {
@@ -140,6 +149,9 @@ export class SecurityLogger {
             const storedEvent: StoredEvent = {
                 ...event,
                 id: ++eventCounter,
+                incidentStatus: event.incidentStatus ?? 'new',
+                assigneeEmail: event.assigneeEmail ?? null,
+                note: event.note ?? null,
                 created_at: new Date()
             };
 
@@ -204,6 +216,46 @@ export class SecurityLogger {
             total: filtered.length,
             source: 'memory',
         };
+    }
+
+    static async updateIncident(
+        id: number,
+        patch: {
+            incidentStatus?: 'new' | 'investigating' | 'resolved';
+            assigneeEmail?: string | null;
+            note?: string | null;
+        }
+    ): Promise<StoredEvent | null> {
+        const memoryEvent = securityLogs.find((item) => item.id === id);
+        if (memoryEvent) {
+            if (patch.incidentStatus !== undefined) memoryEvent.incidentStatus = patch.incidentStatus;
+            if (patch.assigneeEmail !== undefined) memoryEvent.assigneeEmail = patch.assigneeEmail;
+            if (patch.note !== undefined) memoryEvent.note = patch.note;
+        }
+
+        if (config.securityLogPersistenceEnabled) {
+            try {
+                const collection = await getCollectionAsync<SecurityLogDoc>('security_logs');
+                await collection.updateOne(
+                    { id },
+                    {
+                        $set: {
+                            ...(patch.incidentStatus !== undefined ? { incidentStatus: patch.incidentStatus } : {}),
+                            ...(patch.assigneeEmail !== undefined ? { assigneeEmail: patch.assigneeEmail } : {}),
+                            ...(patch.note !== undefined ? { note: patch.note } : {}),
+                        },
+                    }
+                );
+                const updated = await collection.findOne({ id });
+                if (updated) {
+                    return mapDocToStoredEvent(updated as SecurityLogDoc);
+                }
+            } catch (error) {
+                console.warn('[SecurityLogger] Failed to update persisted incident state:', error);
+            }
+        }
+
+        return memoryEvent ?? null;
     }
 
     static clearOldLogs(olderThanMs: number = securityLogRetentionMs): void {

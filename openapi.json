@@ -926,6 +926,35 @@
         }
       }
     },
+    "/api/admin/security/logs/{id}/status": {
+      "patch": {
+        "summary": "PATCH /api/admin/security/logs/{id}/status",
+        "tags": [
+          "admin"
+        ],
+        "operationId": "patchApiAdminSecurityLogsIdStatus",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/admin/session": {
       "get": {
         "summary": "GET /api/admin/session",
@@ -5309,6 +5338,19 @@
         }
       }
     },
+    "/api/admin/users/invite": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Invite an admin user",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
     "/api/admin/users/{id}/role": {
       "patch": {
         "tags": [
@@ -5337,6 +5379,58 @@
                 "additionalProperties": true
               }
             }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/status": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update admin user status",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/reset-password": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Issue an admin password reset",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/admin/roles": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List admin roles and permission overrides",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/admin/roles/{role}/permissions": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update role permission overrides",
+        "responses": {
+          "200": {
+            "description": "Success"
           }
         }
       }
@@ -5390,6 +5484,32 @@
                 "additionalProperties": true
               }
             }
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/{id}/assignment": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update announcement assignment",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/admin/announcements/{id}/review-sla": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update announcement review SLA",
+        "responses": {
+          "200": {
+            "description": "Success"
           }
         }
       }

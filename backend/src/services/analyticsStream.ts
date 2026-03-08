@@ -8,7 +8,7 @@ import { ADMIN_AUTH_COOKIE_NAME, AUTH_COOKIE_NAME } from '../middleware/auth.js'
 import { getClientIP } from '../middleware/security.js';
 
 import { getAnalyticsOverview } from './analyticsOverview.js';
-import { hasPermission } from './rbac.js';
+import { hasEffectivePermission } from './rbac.js';
 import { SecurityLogger } from './securityLogger.js';
 
 const UPDATE_INTERVAL_MS = 30 * 1000;
@@ -90,7 +90,7 @@ export function startAnalyticsWebSocket(server: Server) {
                 return;
             }
 
-            if (!hasPermission(decoded?.role, 'analytics:read')) {
+            if (!await hasEffectivePermission(decoded?.role, 'analytics:read')) {
                 socket.close(1008, 'Forbidden');
                 return;
             }

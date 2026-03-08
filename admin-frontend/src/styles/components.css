@@ -616,6 +616,16 @@ button.ops-kpi-card:hover::before {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.ops-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: var(--space-2);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
 .ops-span-full {
     grid-column: 1 / -1;
 }
@@ -649,6 +659,22 @@ button.ops-kpi-card:hover::before {
 
 .ops-textarea {
     min-height: 160px;
+}
+
+.ops-code-block {
+    margin: 0;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 240px;
+    overflow: auto;
 }
 
 .ops-count-grid {
@@ -751,6 +777,168 @@ button.ops-kpi-card:hover::before {
     margin-top: var(--space-1);
     min-height: 48px;
     font-size: 0.95rem;
+}
+
+.admin-login-setup-panel {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-soft);
+    display: grid;
+    gap: var(--space-2);
+}
+
+.admin-login-setup-copy {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.admin-login-setup-qr {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: min(220px, 100%);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+}
+
+.admin-login-setup-image {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+    display: block;
+}
+
+.admin-login-setup-secret {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+}
+
+.admin-login-setup-secret span {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.admin-login-setup-secret code,
+.settings-backup-code {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.settings-json-editor {
+    min-height: 240px;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+}
+
+.settings-text-list {
+    min-height: 140px;
+}
+
+.settings-policy-grid {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.settings-policy-card {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+}
+
+.settings-policy-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+}
+
+.settings-policy-toggle input {
+    flex-shrink: 0;
+}
+
+.settings-policy-toggle-inline {
+    align-self: end;
+}
+
+.settings-backup-codes {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.settings-two-factor-panel {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.settings-two-factor-qr {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: min(220px, 100%);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+}
+
+.settings-two-factor-image {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+    display: block;
+}
+
+.settings-backup-code-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+}
+
+.settings-backup-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+}
+
+.revision-compare-list {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.revision-compare-row {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-soft);
+    background: var(--bg-elev-1);
+}
+
+.revision-compare-row.changed {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+    background: color-mix(in srgb, var(--accent-soft) 50%, var(--bg-elev-1));
 }
 
 /* ─── Command Palette ─── */

@@ -31,6 +31,14 @@ export interface AdminAccount {
     metadata?: Record<string, unknown>;
 }
 
+export interface AdminAccountMetadata {
+    invitationState?: 'pending' | 'accepted' | 'reset-required';
+    invitedAt?: string;
+    invitedBy?: string;
+    passwordResetRequired?: boolean;
+    lastResetIssuedAt?: string;
+}
+
 const ADMIN_ROLES: AdminAccountRole[] = ['admin', 'editor', 'reviewer', 'viewer', 'contributor'];
 
 export class AdminAccountsModelMongo {
@@ -83,6 +91,48 @@ export class AdminAccountsModelMongo {
         await this.collection.createIndex({ email: 1 }, { unique: true });
         await this.collection.createIndex({ role: 1, status: 1 });
         await this.collection.createIndex({ status: 1, updatedAt: -1 });
+    }
+
+    static async findByUserIds(userIds: string[]): Promise<Record<string, AdminAccount>> {
+        if (userIds.length === 0) return {};
+        const docs = await this.collection.find({ userId: { $in: userIds } }).toArray();
+        return docs.reduce<Record<string, AdminAccount>>((acc, doc) => {
+            acc[doc.userId] = this.docToAdminAccount(doc);
+            return acc;
+        }, {});
+    }
+
+    static async updateMetadata(
+        userId: string,
+        input: {
+            email: string;
+            role: AdminAccountRole;
+            status: AdminAccountStatus;
+            twoFactorEnabled?: boolean;
+            metadata: Record<string, unknown>;
+            lastLoginAt?: Date | null;
+        }
+    ): Promise<void> {
+        const now = new Date();
+        await this.collection.updateOne(
+            { userId },
+            {
+                $set: {
+                    email: input.email.toLowerCase(),
+                    role: input.role,
+                    status: input.status,
+                    twoFactorEnabled: Boolean(input.twoFactorEnabled),
+                    updatedAt: now,
+                    lastLoginAt: input.lastLoginAt ?? null,
+                    metadata: input.metadata,
+                },
+                $setOnInsert: {
+                    userId,
+                    createdAt: now,
+                },
+            },
+            { upsert: true }
+        );
     }
 
     private static docToAdminAccount(doc: WithId<AdminAccountDoc>): AdminAccount {

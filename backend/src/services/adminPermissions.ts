@@ -1,5 +1,7 @@
 import type { UserRole } from '../types.js';
 
+import { listAdminRoleOverrides } from './adminRoleOverrides.js';
+
 export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer';
 export type AdminPermission =
   | 'admin:read'
@@ -11,6 +13,18 @@ export type AdminPermission =
   | 'announcements:delete'
   | 'audit:read'
   | 'security:read';
+
+export const ADMIN_PERMISSION_LIST: AdminPermission[] = [
+  'admin:read',
+  'admin:write',
+  'analytics:read',
+  'announcements:read',
+  'announcements:write',
+  'announcements:approve',
+  'announcements:delete',
+  'audit:read',
+  'security:read',
+];
 
 export type AdminTab =
   | 'analytics'
@@ -91,6 +105,15 @@ const matchesPermission = (permission: string, allowed: string): boolean => {
   return permission === allowed;
 };
 
+const normalizePermissions = (permissions: string[]): string[] => {
+  const allowed = new Set<string>(['*', ...ADMIN_PERMISSION_LIST]);
+  const normalized = permissions
+    .map((permission) => permission.trim())
+    .filter((permission) => allowed.has(permission));
+
+  return Array.from(new Set(normalized));
+};
+
 export const isAdminPortalRole = (role?: string): role is AdminPortalRole => {
   if (!role) return false;
   return ADMIN_PORTAL_ROLE_SET.has(role as AdminPortalRole);
@@ -104,8 +127,32 @@ export const hasAdminPermission = (role: UserRole | undefined, permission: Admin
   return allowed.some((entry) => matchesPermission(permission, entry));
 };
 
-export const getAdminPermissionsSnapshot = () => ({
-  roles: ADMIN_ROLE_PERMISSIONS,
+export const getEffectiveAdminRolePermissions = async (): Promise<Record<AdminPortalRole, string[]>> => {
+  const overrides = await listAdminRoleOverrides();
+  return ADMIN_PORTAL_ROLES.reduce<Record<AdminPortalRole, string[]>>((acc, role) => {
+    const override = overrides[role];
+    acc[role] = override ? normalizePermissions(override) : [...ADMIN_ROLE_PERMISSIONS[role]];
+    if (acc[role].length === 0) {
+      acc[role] = [...ADMIN_ROLE_PERMISSIONS[role]];
+    }
+    return acc;
+  }, {} as Record<AdminPortalRole, string[]>);
+};
+
+export const hasEffectiveAdminPermission = async (
+  role: UserRole | undefined,
+  permission: AdminPermission
+): Promise<boolean> => {
+  if (!role) return false;
+  if (role === 'admin') return true;
+  if (!isAdminPortalRole(role)) return false;
+  const permissions = await getEffectiveAdminRolePermissions();
+  const allowed = permissions[role] ?? [];
+  return allowed.some((entry) => matchesPermission(permission, entry));
+};
+
+export const getAdminPermissionsSnapshot = async () => ({
+  roles: await getEffectiveAdminRolePermissions(),
   tabs: ADMIN_TAB_PERMISSIONS,
   highRiskActions: ADMIN_HIGH_RISK_ACTIONS,
 });

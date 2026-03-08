@@ -1,5 +1,7 @@
 import type {
     AdminAlert,
+    AdminSettingKey,
+    AdminSettingRecord,
     AdminRoleUser,
     AnnouncementTypeFilter,
     HomepageSectionConfig,
@@ -246,23 +248,38 @@ export async function updateAdminAlert(id: string, payload: Partial<Omit<AdminAl
     return typedData<AdminAlert>(body)!;
 }
 
-export async function getAdminSetting(key: 'states' | 'boards' | 'tags'): Promise<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }> {
+export async function getAdminSetting(key: AdminSettingKey): Promise<AdminSettingRecord> {
     const body = await request(`/api/admin/settings/${encodeURIComponent(key)}`);
-    return typedData<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }>(body) ?? { key, values: [] };
+    return typedData<AdminSettingRecord>(body) ?? { key, values: [] };
 }
 
-export async function updateAdminSetting(key: 'states' | 'boards' | 'tags', values: string[]): Promise<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }> {
+export async function updateAdminSetting(
+    key: AdminSettingKey,
+    input: { values?: string[]; payload?: Record<string, unknown> }
+): Promise<AdminSettingRecord> {
     const body = await request(`/api/admin/settings/${encodeURIComponent(key)}`, {
         method: 'PUT',
         headers: mutationHeaders(),
-        body: JSON.stringify({ values }),
+        body: JSON.stringify(input),
     }, true);
-    return typedData<{ key: string; values: string[]; updatedAt?: string; updatedBy?: string }>(body) ?? { key, values };
+    return typedData<AdminSettingRecord>(body) ?? { key, ...input };
 }
 
 export async function getAdminRoleUsers(): Promise<AdminRoleUser[]> {
     const body = await request(ADMIN_API_PATHS.adminUsers);
     return toArray<AdminRoleUser>(body?.data);
+}
+
+export async function inviteAdminRoleUser(
+    payload: { email: string; role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor' },
+    stepUpToken: string
+): Promise<AdminRoleUser> {
+    const body = await request(`${ADMIN_API_PATHS.adminUsers}/invite`, {
+        method: 'POST',
+        headers: mutationHeaders(stepUpToken),
+        body: JSON.stringify(payload),
+    }, true);
+    return typedData<AdminRoleUser>(body)!;
 }
 
 export async function updateAdminRoleUser(
@@ -276,4 +293,69 @@ export async function updateAdminRoleUser(
         body: JSON.stringify(payload),
     }, true);
     return typedData<AdminRoleUser>(body)!;
+}
+
+export async function updateAdminUserStatus(
+    id: string,
+    isActive: boolean,
+    stepUpToken: string
+): Promise<AdminRoleUser> {
+    const body = await request(`${ADMIN_API_PATHS.adminUsers}/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers: mutationHeaders(stepUpToken),
+        body: JSON.stringify({ isActive }),
+    }, true);
+    return typedData<AdminRoleUser>(body)!;
+}
+
+export async function issueAdminUserPasswordReset(id: string, stepUpToken: string): Promise<AdminRoleUser> {
+    const body = await request(`${ADMIN_API_PATHS.adminUsers}/${encodeURIComponent(id)}/reset-password`, {
+        method: 'POST',
+        headers: mutationHeaders(stepUpToken),
+    }, true);
+    return typedData<AdminRoleUser>(body)!;
+}
+
+export async function getAdminRoles(): Promise<{
+    roles: Record<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer', string[]>;
+    permissions: string[];
+    defaults: Array<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer'>;
+}> {
+    const body = await request(ADMIN_API_PATHS.adminRoles);
+    const data = typedData<{
+        roles: Record<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer', string[]>;
+        permissions: string[];
+        defaults: Array<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer'>;
+    }>(body);
+    return data ?? {
+        roles: { admin: [], editor: [], contributor: [], reviewer: [], viewer: [] },
+        permissions: [],
+        defaults: ['admin', 'editor', 'contributor', 'reviewer', 'viewer'],
+    };
+}
+
+export async function updateAdminRolePermissions(
+    role: 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer',
+    permissions: string[],
+    stepUpToken: string
+): Promise<{
+    roles: Record<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer', string[]>;
+    permissions: string[];
+    defaults: Array<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer'>;
+}> {
+    const body = await request(`${ADMIN_API_PATHS.adminRoles}/${encodeURIComponent(role)}/permissions`, {
+        method: 'PATCH',
+        headers: mutationHeaders(stepUpToken),
+        body: JSON.stringify({ permissions }),
+    }, true);
+    const data = typedData<{
+        roles: Record<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer', string[]>;
+        permissions: string[];
+        defaults: Array<'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer'>;
+    }>(body);
+    return data ?? {
+        roles: { admin: [], editor: [], contributor: [], reviewer: [], viewer: [] },
+        permissions: [],
+        defaults: ['admin', 'editor', 'contributor', 'reviewer', 'viewer'],
+    };
 }

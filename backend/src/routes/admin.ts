@@ -8,6 +8,7 @@ import { idempotency } from '../middleware/idempotency.js';
 import { getAdminSloSnapshot } from '../middleware/responseTime.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 import { getActiveUsersStats } from '../services/activeUsers.js';
+import { inviteAdminUser, issueAdminPasswordReset, listAdminAccessUsers, syncAdminAccessMetadata } from '../services/adminAccess.js';
 import { evaluateAdminApprovalRequirement } from '../services/adminApprovalPolicy.js';
 import {
     approveAdminApprovalRequest,
@@ -20,6 +21,8 @@ import {
     type AdminApprovalActionType,
 } from '../services/adminApprovals.js';
 import { getAdminAuditLogsPaged, rebuildAdminAuditLedger, recordAdminAudit, verifyAdminAuditLedger } from '../services/adminAudit.js';
+import { ADMIN_PERMISSION_LIST, ADMIN_PORTAL_ROLES, getAdminPermissionsSnapshot } from '../services/adminPermissions.js';
+import { upsertAdminRoleOverride } from '../services/adminRoleOverrides.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
 import {
     getAnnouncementViewTrafficSources,
@@ -29,7 +32,7 @@ import {
 } from '../services/analytics.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { getCollection, healthCheck } from '../services/cosmosdb.js';
-import { hasPermission } from '../services/rbac.js';
+import { hasEffectivePermission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
@@ -138,11 +141,28 @@ interface AdminAlertDoc {
 }
 
 interface AdminSettingsDoc {
-    key: 'states' | 'boards' | 'tags';
-    values: string[];
+    key: 'states' | 'boards' | 'tags' | 'workflow-defaults' | 'homepage-defaults' | 'alert-thresholds' | 'security-policy' | 'notification-routing';
+    values?: string[];
+    payload?: Record<string, unknown>;
     updatedAt: Date;
     updatedBy?: string;
 }
+
+const ADMIN_SETTINGS_KEYS = [
+    'states',
+    'boards',
+    'tags',
+    'workflow-defaults',
+    'homepage-defaults',
+    'alert-thresholds',
+    'security-policy',
+    'notification-routing',
+] as const satisfies ReadonlyArray<AdminSettingsDoc['key']>;
+
+const ARRAY_SETTINGS_KEYS = new Set<AdminSettingsDoc['key']>(['states', 'boards', 'tags']);
+
+const isAdminSettingKey = (value: string): value is AdminSettingsDoc['key'] =>
+    (ADMIN_SETTINGS_KEYS as readonly string[]).includes(value);
 
 interface AdminUserListDoc {
     email: string;
@@ -459,12 +479,41 @@ const alertListQuerySchema = z.object({
 });
 
 const settingValuesSchema = z.object({
-    values: z.array(z.string().trim().min(1).max(120)).max(500),
+    values: z.array(z.string().trim().min(1).max(120)).max(500).optional(),
+    payload: z.record(z.unknown()).optional(),
 });
 
 const adminRoleUpdateSchema = z.object({
     role: z.enum(['admin', 'editor', 'reviewer', 'viewer', 'contributor']),
     isActive: z.boolean().optional(),
+});
+
+const adminInviteSchema = z.object({
+    email: z.string().email().trim().toLowerCase(),
+    role: z.enum(['admin', 'editor', 'reviewer', 'viewer', 'contributor']),
+});
+
+const adminStatusPatchSchema = z.object({
+    isActive: z.boolean(),
+});
+
+const adminRoleOverrideSchema = z.object({
+    permissions: z.array(z.enum(ADMIN_PERMISSION_LIST as [string, ...string[]]).or(z.literal('*'))).min(1),
+});
+
+const assignmentPatchSchema = z.object({
+    assigneeUserId: z.string().trim().optional().or(z.literal('')),
+    assigneeEmail: z.string().email().trim().optional().or(z.literal('')),
+});
+
+const reviewSlaPatchSchema = z.object({
+    reviewDueAt: dateField,
+});
+
+const securityIncidentPatchSchema = z.object({
+    incidentStatus: z.enum(['new', 'investigating', 'resolved']).optional(),
+    assigneeEmail: z.string().email().trim().optional().or(z.literal('')),
+    note: z.string().trim().max(1000).optional().or(z.literal('')),
 });
 
 const seoPatchSchema = z.object({
@@ -544,6 +593,14 @@ const mapApprovalResolveFailure = (reason?: string) => {
 const normalizeAnnouncementStatus = (status?: string | null) => status ?? 'published';
 
 const isPublishedStatus = (status?: string | null) => normalizeAnnouncementStatus(status) === 'published';
+
+const getRecentSecurityLogsSafe = async (limit = 250) => {
+    const getRecentLogsPaged = (SecurityLogger as any)?.getRecentLogsPaged;
+    if (typeof getRecentLogsPaged !== 'function') {
+        return { data: [], total: 0, source: 'memory' as const };
+    }
+    return getRecentLogsPaged.call(SecurityLogger, limit, 0);
+};
 
 const dispatchPublishNotifications = async (announcements: Announcement[]) => {
     if (!announcements.length) return;
@@ -1113,7 +1170,7 @@ telemetryRouter.post('/telemetry/events', requirePermission('admin:read'), async
  * GET /api/admin/dashboard
  * Get complete dashboard overview - returns all data that AdminDashboard.tsx expects
  */
-telemetryRouter.get('/dashboard', async (_req, res) => {
+telemetryRouter.get('/dashboard', async (req, res) => {
     try {
         // Get all announcements for stats
         const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 1000, includeInactive: true });
@@ -1130,11 +1187,22 @@ telemetryRouter.get('/dashboard', async (_req, res) => {
         const usersCollection = getCollection<UserDoc>('users');
         const subscriptionsCollection = getCollection<SubscriptionDoc>('subscriptions');
 
-        const [totalUsers, newToday, newThisWeek, activeSubscribers] = await Promise.all([
+        const [
+            totalUsers,
+            newToday,
+            newThisWeek,
+            activeSubscribers,
+            openCriticalAlerts,
+            unresolvedErrorReports,
+            securityLogs,
+        ] = await Promise.all([
             usersCollection.countDocuments({ isActive: true }),
             usersCollection.countDocuments({ isActive: true, createdAt: { $gte: startOfDay } }),
             usersCollection.countDocuments({ isActive: true, createdAt: { $gte: startOfWeek } }),
             subscriptionsCollection.countDocuments({ isActive: true, verified: true }),
+            getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'open', severity: 'critical' } as any),
+            getCollection<any>('error_reports').countDocuments({ status: { $ne: 'resolved' } } as any),
+            getRecentSecurityLogsSafe(250),
         ]);
 
         // Calculate category stats
@@ -1156,6 +1224,18 @@ telemetryRouter.get('/dashboard', async (_req, res) => {
             acc[key] = (acc[key] || 0) + 1;
             return acc;
         }, {});
+        const pendingReviewItems = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'pending');
+        const unassignedPendingReview = pendingReviewItems.filter((item: any) => !item.assigneeUserId).length;
+        const overdueReviewItems = pendingReviewItems.filter((item: any) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < Date.now()).length;
+        const assignedToCurrentUser = announcements.filter((item: any) => {
+            const status = normalizeAnnouncementStatus(item.status);
+            if (!['pending', 'scheduled', 'draft'].includes(status)) return false;
+            return item.assigneeUserId === req.user?.userId || item.assigneeEmail === req.user?.email;
+        }).length;
+        const highRiskSessions = securityLogs.data.filter((log: any) => {
+            const eventType = String(log.eventType ?? log.event_type ?? '').toLowerCase();
+            return eventType.includes('alert') || eventType.includes('fail') || eventType.includes('forbidden') || eventType.includes('blocked');
+        }).length;
         const stats = {
             total,
             published: statusMap.published || 0,
@@ -1203,6 +1283,22 @@ telemetryRouter.get('/dashboard', async (_req, res) => {
                 categories,
                 trends,
                 topContent,
+                workflowSummary: {
+                    unassignedPendingReview,
+                    overdueReviewItems,
+                    assignedToCurrentUser,
+                    unresolvedErrorReports,
+                    highRiskSessions,
+                    openCriticalAlerts,
+                },
+                operatorCards: [
+                    { key: 'unassigned-pending', label: 'Unassigned Pending', count: unassignedPendingReview, route: '/review?status=pending&assignee=unassigned', tone: unassignedPendingReview > 0 ? 'warning' : 'neutral' },
+                    { key: 'overdue-review', label: 'Overdue Review', count: overdueReviewItems, route: '/review?status=pending&sla=overdue', tone: overdueReviewItems > 0 ? 'danger' : 'neutral' },
+                    { key: 'my-queue', label: 'My Queue', count: assignedToCurrentUser, route: '/queue?assignee=me', tone: assignedToCurrentUser > 0 ? 'info' : 'neutral' },
+                    { key: 'errors', label: 'Unresolved Errors', count: unresolvedErrorReports, route: '/errors?status=new', tone: unresolvedErrorReports > 0 ? 'warning' : 'neutral' },
+                    { key: 'sessions', label: 'High-risk Sessions', count: highRiskSessions, route: '/security?risk=high', tone: highRiskSessions > 0 ? 'danger' : 'neutral' },
+                    { key: 'critical-alerts', label: 'Critical Alerts', count: openCriticalAlerts, route: '/alerts?status=open&severity=critical', tone: openCriticalAlerts > 0 ? 'danger' : 'neutral' },
+                ],
                 users: {
                     totalUsers,
                     newToday,
@@ -2721,7 +2817,7 @@ operationsRouter.patch('/alerts/:id', requirePermission('admin:write'), idempote
 operationsRouter.get('/settings/:key', requirePermission('admin:read'), async (req, res) => {
     try {
         const settingsKey = getPathParam(req.params.key);
-        if (settingsKey !== 'states' && settingsKey !== 'boards' && settingsKey !== 'tags') {
+        if (!isAdminSettingKey(settingsKey)) {
             return res.status(400).json({ error: 'Invalid settings key' });
         }
         const typedKey = settingsKey as AdminSettingsDoc['key'];
@@ -2730,7 +2826,8 @@ operationsRouter.get('/settings/:key', requirePermission('admin:read'), async (r
         return res.json({
             data: {
                 key: typedKey,
-                values: existing?.values ?? [],
+                values: ARRAY_SETTINGS_KEYS.has(typedKey) ? (existing?.values ?? []) : undefined,
+                payload: ARRAY_SETTINGS_KEYS.has(typedKey) ? undefined : (existing?.payload ?? {}),
                 updatedAt: existing?.updatedAt ?? null,
                 updatedBy: existing?.updatedBy ?? null,
             },
@@ -2748,7 +2845,7 @@ operationsRouter.get('/settings/:key', requirePermission('admin:read'), async (r
 operationsRouter.put('/settings/:key', requirePermission('admin:write'), idempotency(), async (req, res) => {
     try {
         const settingsKey = getPathParam(req.params.key);
-        if (settingsKey !== 'states' && settingsKey !== 'boards' && settingsKey !== 'tags') {
+        if (!isAdminSettingKey(settingsKey)) {
             return res.status(400).json({ error: 'Invalid settings key' });
         }
         const typedKey = settingsKey as AdminSettingsDoc['key'];
@@ -2757,29 +2854,40 @@ operationsRouter.put('/settings/:key', requirePermission('admin:write'), idempot
             return res.status(400).json({ error: parsed.error.flatten() });
         }
         const settingsCollection = getCollection<AdminSettingsDoc>('admin_settings');
-        const values = normalizeStringList(parsed.data.values);
+        const isArraySetting = ARRAY_SETTINGS_KEYS.has(typedKey);
+        if (isArraySetting && !parsed.data.values) {
+            return res.status(400).json({ error: 'values are required for this settings key' });
+        }
+        if (!isArraySetting && !parsed.data.payload) {
+            return res.status(400).json({ error: 'payload is required for this settings key' });
+        }
+        const values = isArraySetting ? normalizeStringList(parsed.data.values) : undefined;
+        const payload = isArraySetting ? undefined : parsed.data.payload ?? {};
         const now = new Date();
         await settingsCollection.updateOne(
             { key: typedKey },
             {
                 $set: {
                     key: typedKey,
-                    values,
+                    ...(values !== undefined ? { values } : {}),
+                    ...(payload !== undefined ? { payload } : {}),
                     updatedAt: now,
                     updatedBy: req.user?.userId,
                 },
+                $unset: isArraySetting ? { payload: '' } : { values: '' },
             },
             { upsert: true }
         );
         audit(req, {
             action: `settings_${settingsKey}_update`,
             userId: req.user?.userId,
-            metadata: { count: values.length },
+            metadata: isArraySetting ? { count: values?.length ?? 0 } : { keys: Object.keys(payload ?? {}).length },
         }).catch(console.error);
         return res.json({
             data: {
                 key: typedKey,
                 values,
+                payload,
                 updatedAt: now,
                 updatedBy: req.user?.userId,
             },
@@ -2796,24 +2904,8 @@ operationsRouter.put('/settings/:key', requirePermission('admin:write'), idempot
  */
 operationsRouter.get('/users', requirePermission('admin:read'), async (_req, res) => {
     try {
-        const usersCollection = getCollection<AdminUserListDoc>('users');
-        const docs = await usersCollection
-            .find({ role: { $in: ['admin', 'editor', 'reviewer', 'viewer', 'contributor'] } as any })
-            .sort({ updatedAt: -1 })
-            .limit(500)
-            .toArray();
-
         return res.json({
-            data: docs.map((doc: any) => ({
-                id: serializeId(doc._id),
-                email: doc.email,
-                username: doc.username,
-                role: doc.role,
-                isActive: Boolean(doc.isActive),
-                createdAt: doc.createdAt,
-                updatedAt: doc.updatedAt,
-                lastLoginAt: doc.lastLoginAt ?? null,
-            })),
+            data: await listAdminAccessUsers(),
         });
     } catch (error) {
         console.error('Admin users list error:', error);
@@ -2849,6 +2941,15 @@ operationsRouter.patch('/users/:id/role', requirePermission('admin:write'), requ
             return res.status(404).json({ error: 'User not found' });
         }
 
+        await syncAdminAccessMetadata({
+            userId,
+            email: (updated as any).email,
+            role: (updated as any).role,
+            isActive: Boolean((updated as any).isActive),
+            twoFactorEnabled: Boolean((updated as any).twoFactorEnabled),
+            lastLoginAt: (updated as any).lastLogin ? new Date((updated as any).lastLogin) : null,
+        });
+
         audit(req, {
             action: 'admin_role_update',
             userId: req.user?.userId,
@@ -2856,7 +2957,7 @@ operationsRouter.patch('/users/:id/role', requirePermission('admin:write'), requ
         }).catch(console.error);
 
         return res.json({
-            data: {
+            data: (await listAdminAccessUsers()).find((item) => item.id === userId) ?? {
                 id: serializeId((updated as any)._id),
                 email: (updated as any).email,
                 username: (updated as any).username,
@@ -2868,6 +2969,143 @@ operationsRouter.patch('/users/:id/role', requirePermission('admin:write'), requ
     } catch (error) {
         console.error('Admin role update error:', error);
         return res.status(500).json({ error: 'Failed to update admin role' });
+    }
+});
+
+operationsRouter.post('/users/invite', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const parsed = adminInviteSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const invited = await inviteAdminUser({
+            email: parsed.data.email,
+            role: parsed.data.role,
+            actorEmail: req.user?.email,
+        });
+
+        await audit(req, {
+            action: 'admin_user_invite',
+            userId: req.user?.userId,
+            metadata: {
+                targetUserId: invited.id,
+                email: invited.email,
+                role: invited.role,
+            },
+        });
+
+        return res.status(201).json({
+            data: (await listAdminAccessUsers()).find((item) => item.id === invited.id) ?? invited,
+        });
+    } catch (error) {
+        console.error('Admin invite error:', error);
+        return res.status(500).json({ error: 'Failed to invite admin user' });
+    }
+});
+
+operationsRouter.patch('/users/:id/status', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const userId = getPathParam(req.params.id);
+        const parsed = adminStatusPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const updated = await getCollection<AdminUserListDoc>('users').findOneAndUpdate(
+            { _id: toMongoId(userId) as any },
+            { $set: { isActive: parsed.data.isActive, updatedAt: new Date() } },
+            { returnDocument: 'after' }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        await syncAdminAccessMetadata({
+            userId,
+            email: (updated as any).email,
+            role: (updated as any).role,
+            isActive: Boolean((updated as any).isActive),
+            twoFactorEnabled: Boolean((updated as any).twoFactorEnabled),
+            lastLoginAt: (updated as any).lastLogin ? new Date((updated as any).lastLogin) : null,
+        });
+
+        await audit(req, {
+            action: parsed.data.isActive ? 'admin_user_reactivated' : 'admin_user_suspended',
+            userId: req.user?.userId,
+            metadata: { targetUserId: userId, isActive: parsed.data.isActive },
+        });
+
+        return res.json({
+            data: (await listAdminAccessUsers()).find((item) => item.id === userId),
+        });
+    } catch (error) {
+        console.error('Admin status update error:', error);
+        return res.status(500).json({ error: 'Failed to update admin status' });
+    }
+});
+
+operationsRouter.post('/users/:id/reset-password', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const userId = getPathParam(req.params.id);
+        const user = await getCollection<AdminUserListDoc>('users').findOne({ _id: toMongoId(userId) as any });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        await issueAdminPasswordReset(userId, user.email, req.user?.email);
+        await audit(req, {
+            action: 'admin_password_reset_issued',
+            userId: req.user?.userId,
+            metadata: { targetUserId: userId, email: user.email },
+        });
+
+        return res.json({
+            data: (await listAdminAccessUsers()).find((item) => item.id === userId) ?? { id: userId, email: user.email },
+        });
+    } catch (error) {
+        console.error('Admin reset issue error:', error);
+        return res.status(500).json({ error: 'Failed to issue password reset' });
+    }
+});
+
+operationsRouter.get('/roles', requirePermission('admin:read'), async (_req, res) => {
+    try {
+        const snapshot = await getAdminPermissionsSnapshot();
+        return res.json({
+            data: {
+                roles: snapshot.roles,
+                permissions: ADMIN_PERMISSION_LIST,
+                defaults: ADMIN_PORTAL_ROLES,
+            },
+        });
+    } catch (error) {
+        console.error('Admin roles error:', error);
+        return res.status(500).json({ error: 'Failed to load roles' });
+    }
+});
+
+operationsRouter.patch('/roles/:role/permissions', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const role = getPathParam(req.params.role) as typeof ADMIN_PORTAL_ROLES[number];
+        if (!ADMIN_PORTAL_ROLES.includes(role)) {
+            return res.status(400).json({ error: 'Invalid role' });
+        }
+        const parsed = adminRoleOverrideSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+        await upsertAdminRoleOverride(role, parsed.data.permissions, req.user?.email);
+        await audit(req, {
+            action: 'admin_role_permissions_update',
+            userId: req.user?.userId,
+            metadata: { role, permissions: parsed.data.permissions },
+        });
+        return res.json({ data: await getAdminPermissionsSnapshot() });
+    } catch (error) {
+        console.error('Admin role override error:', error);
+        return res.status(500).json({ error: 'Failed to update role permissions' });
     }
 });
 
@@ -2915,14 +3153,17 @@ contentRouter.patch('/announcements/:id/seo', requirePermission('announcements:w
  * GET /api/admin/reports
  * Operational report snapshot for links, deadlines, traffic, and queue.
  */
-operationsRouter.get('/reports', requirePermission('analytics:read'), async (_req, res) => {
+operationsRouter.get('/reports', requirePermission('analytics:read'), async (req, res) => {
     try {
-        const [announcements, linkRecords, trafficRollups, trafficSourcesRaw, topAnnouncementViews] = await Promise.all([
+        const [announcements, linkRecords, trafficRollups, trafficSourcesRaw, topAnnouncementViews, errorReports, securityLogs, criticalAlerts] = await Promise.all([
             AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 }),
             getCollection<LinkRecordDoc>('link_records').find({}).toArray(),
             getDailyRollups(7),
             getAnnouncementViewTrafficSources(7),
             getTopAnnouncementViews(24, 10),
+            getCollection<any>('error_reports').find({}).sort({ createdAt: -1 }).limit(250).toArray(),
+            getRecentSecurityLogsSafe(250),
+            getCollection<AdminAlertDoc>('admin_alerts').find({ status: 'open', severity: 'critical' } as any).sort({ updatedAt: -1 }).limit(20).toArray(),
         ]);
         const now = Date.now();
         const inSevenDays = now + 7 * 24 * 60 * 60 * 1000;
@@ -2971,6 +3212,18 @@ operationsRouter.get('/reports', requirePermission('analytics:read'), async (_re
         const pendingDrafts = announcements.filter((item: any) => (item.status || 'published') === 'draft');
         const scheduled = announcements.filter((item: any) => item.status === 'scheduled');
         const pendingReview = announcements.filter((item: any) => item.status === 'pending');
+        const unassignedPendingReview = pendingReview.filter((item: any) => !item.assigneeUserId && !item.assigneeEmail);
+        const overdueReview = pendingReview.filter((item: any) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < now);
+        const assignedQueue = announcements.filter((item: any) => {
+            const status = normalizeAnnouncementStatus(item.status);
+            if (!['pending', 'scheduled', 'draft'].includes(status)) return false;
+            return item.assigneeUserId === req.user?.userId || item.assigneeEmail === req.user?.email;
+        });
+        const unresolvedErrorReports = errorReports.filter((item: any) => item.status !== 'resolved');
+        const highRiskSessions = securityLogs.data.filter((log: any) => {
+            const eventType = String(log.eventType ?? log.event_type ?? '').toLowerCase();
+            return eventType.includes('alert') || eventType.includes('fail') || eventType.includes('forbidden') || eventType.includes('blocked');
+        });
 
         return res.json({
             data: {
@@ -2999,6 +3252,24 @@ operationsRouter.get('/reports', requirePermission('analytics:read'), async (_re
                     updatedAt: item.updatedAt,
                     announcementId: item.announcementId,
                 })),
+                workflowSummary: {
+                    unassignedPendingReview: unassignedPendingReview.length,
+                    overdueReviewItems: overdueReview.length,
+                    currentUserAssignedQueue: assignedQueue.length,
+                },
+                incidentSummary: {
+                    unresolvedErrorReports: unresolvedErrorReports.length,
+                    highRiskSessions: highRiskSessions.length,
+                    openCriticalAlerts: criticalAlerts.length,
+                },
+                drilldowns: [
+                    { key: 'unassigned-pending', label: 'Unassigned pending reviews', count: unassignedPendingReview.length, route: '/review?status=pending&assignee=unassigned', tone: unassignedPendingReview.length > 0 ? 'warning' : 'neutral' },
+                    { key: 'overdue-review', label: 'Overdue review items', count: overdueReview.length, route: '/review?status=pending&sla=overdue', tone: overdueReview.length > 0 ? 'danger' : 'neutral' },
+                    { key: 'my-queue', label: 'Assigned to me', count: assignedQueue.length, route: '/queue?assignee=me', tone: assignedQueue.length > 0 ? 'info' : 'neutral' },
+                    { key: 'errors', label: 'Unresolved error reports', count: unresolvedErrorReports.length, route: '/errors?status=new', tone: unresolvedErrorReports.length > 0 ? 'warning' : 'neutral' },
+                    { key: 'sessions', label: 'High-risk sessions', count: highRiskSessions.length, route: '/security?risk=high', tone: highRiskSessions.length > 0 ? 'danger' : 'neutral' },
+                    { key: 'critical-alerts', label: 'Open critical alerts', count: criticalAlerts.length, route: '/alerts?status=open&severity=critical', tone: criticalAlerts.length > 0 ? 'danger' : 'neutral' },
+                ],
             },
         });
     } catch (error) {
@@ -3168,6 +3439,43 @@ operationsRouter.get('/security/logs', requirePermission('security:read'), async
     } catch (error) {
         console.error('Security logs error:', error);
         return res.status(500).json({ error: 'Failed to load security logs' });
+    }
+});
+
+operationsRouter.patch('/security/logs/:id/status', requirePermission('admin:write'), requireAdminStepUp, idempotency(), async (req, res) => {
+    try {
+        const id = Number.parseInt(getPathParam(req.params.id), 10);
+        if (!Number.isFinite(id)) {
+            return res.status(400).json({ error: 'Invalid security log id' });
+        }
+        const parsed = securityIncidentPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const updated = await SecurityLogger.updateIncident(id, {
+            incidentStatus: parsed.data.incidentStatus,
+            assigneeEmail: parsed.data.assigneeEmail || null,
+            note: parsed.data.note || null,
+        });
+        if (!updated) {
+            return res.status(404).json({ error: 'Security log not found' });
+        }
+
+        await audit(req, {
+            action: 'security_incident_update',
+            userId: req.user?.userId,
+            metadata: {
+                logId: id,
+                incidentStatus: parsed.data.incidentStatus,
+                assigneeEmail: parsed.data.assigneeEmail || null,
+            },
+        });
+
+        return res.json({ data: updated });
+    } catch (error) {
+        console.error('Security incident update error:', error);
+        return res.status(500).json({ error: 'Failed to update security incident' });
     }
 });
 
@@ -3522,7 +3830,13 @@ announcementsRouter.get('/announcements', requirePermission('announcements:read'
         ]);
 
         return res.json({
-            data: announcements,
+            data: announcements.map((item: any) => ({
+                ...item,
+                claimedByCurrentUser: Boolean(
+                    (req.user?.userId && item.assigneeUserId === req.user.userId)
+                    || (req.user?.email && item.assigneeEmail === req.user.email)
+                ),
+            })),
             meta: {
                 total,
                 limit: filters.limit,
@@ -3565,6 +3879,91 @@ announcementsRouter.get('/announcements/summary', requirePermission('announcemen
     } catch (error) {
         console.error('Admin summary error:', error);
         return res.status(500).json({ error: 'Failed to load admin summary' });
+    }
+});
+
+announcementsRouter.patch('/announcements/:id/assignment', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const announcementId = getPathParam(req.params.id);
+        const parsed = assignmentPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const updated = await AnnouncementModelMongo.update(announcementId, {
+            assigneeUserId: parsed.data.assigneeUserId || undefined,
+            assigneeEmail: parsed.data.assigneeEmail || undefined,
+            assignedAt: parsed.data.assigneeUserId || parsed.data.assigneeEmail ? new Date().toISOString() : '',
+        } as Partial<CreateAnnouncementDto>, req.user?.userId);
+
+        if (!updated) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        await audit(req, {
+            action: 'announcement_assignment_update',
+            announcementId,
+            title: updated.title,
+            userId: req.user?.userId,
+            metadata: {
+                assigneeUserId: parsed.data.assigneeUserId || null,
+                assigneeEmail: parsed.data.assigneeEmail || null,
+            },
+        });
+
+        await invalidateAnnouncementCaches().catch((err) => {
+            console.error('Failed to invalidate caches after assignment update:', err);
+        });
+
+        return res.json({
+            data: {
+                ...updated,
+                claimedByCurrentUser: Boolean(
+                    (req.user?.userId && updated.assigneeUserId === req.user.userId)
+                    || (req.user?.email && updated.assigneeEmail === req.user.email)
+                ),
+            },
+        });
+    } catch (error) {
+        console.error('Announcement assignment update error:', error);
+        return res.status(500).json({ error: 'Failed to update announcement assignment' });
+    }
+});
+
+announcementsRouter.patch('/announcements/:id/review-sla', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const announcementId = getPathParam(req.params.id);
+        const parsed = reviewSlaPatchSchema.safeParse(req.body ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const updated = await AnnouncementModelMongo.update(announcementId, {
+            reviewDueAt: parsed.data.reviewDueAt || '',
+        } as Partial<CreateAnnouncementDto>, req.user?.userId);
+
+        if (!updated) {
+            return res.status(404).json({ error: 'Announcement not found' });
+        }
+
+        await audit(req, {
+            action: 'announcement_review_sla_update',
+            announcementId,
+            title: updated.title,
+            userId: req.user?.userId,
+            metadata: {
+                reviewDueAt: parsed.data.reviewDueAt || null,
+            },
+        });
+
+        await invalidateAnnouncementCaches().catch((err) => {
+            console.error('Failed to invalidate caches after review SLA update:', err);
+        });
+
+        return res.json({ data: updated });
+    } catch (error) {
+        console.error('Announcement review SLA update error:', error);
+        return res.status(500).json({ error: 'Failed to update review SLA' });
     }
 });
 
@@ -3724,7 +4123,7 @@ announcementsRouter.post('/announcements', requirePermission('announcements:writ
         if (role === 'editor' && !['draft', 'pending'].includes(status)) {
             return res.status(403).json({ error: 'Editors cannot publish or schedule announcements.' });
         }
-        if (['published', 'scheduled'].includes(status) && !hasPermission(role as any, 'announcements:approve')) {
+        if (['published', 'scheduled'].includes(status) && !(await hasEffectivePermission(role as any, 'announcements:approve'))) {
             return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
         }
 
@@ -3951,7 +4350,7 @@ announcementsRouter.post('/announcements/bulk', requirePermission('announcements
         }
 
         let publishTransitionIds: string[] = [];
-        if (data.status === 'published' && !hasPermission(req.user?.role as any, 'announcements:approve')) {
+        if (data.status === 'published' && !(await hasEffectivePermission(req.user?.role as any, 'announcements:approve'))) {
             return res.status(403).json({ error: 'Insufficient permissions to publish announcements.' });
         }
         let approvalId: string | undefined;
@@ -4158,7 +4557,7 @@ announcementsRouter.put('/announcements/:id', requirePermission('announcements:w
         if (role === 'editor' && !['draft', 'pending'].includes(targetStatus)) {
             return res.status(403).json({ error: 'Editors cannot save or edit published announcements. Must be draft or pending.' });
         }
-        if (newStatus && ['published', 'scheduled'].includes(newStatus) && !hasPermission(role as any, 'announcements:approve')) {
+        if (newStatus && ['published', 'scheduled'].includes(newStatus) && !(await hasEffectivePermission(role as any, 'announcements:approve'))) {
             return res.status(403).json({
                 error: 'insufficient_permissions',
                 code: 'INSUFFICIENT_PERMISSIONS',
@@ -4261,7 +4660,7 @@ announcementsRouter.post('/announcements/:id/revert/:version', requirePermission
             ? req.body.note.trim() || `Reverted to version ${version}`
             : `Reverted to version ${version}`;
 
-        if (!hasPermission(req.user?.role as any, 'announcements:approve')) {
+        if (!(await hasEffectivePermission(req.user?.role as any, 'announcements:approve'))) {
             return res.status(403).json({
                 error: 'insufficient_permissions',
                 code: 'INSUFFICIENT_PERMISSIONS',
@@ -4487,7 +4886,7 @@ announcementsRouter.post('/announcements/:id/rollback', requirePermission('annou
         let approvalGate: ApprovalGateResult | undefined;
 
         if (rollbackStatus === 'published') {
-            if (!hasPermission(req.user?.role as any, 'announcements:approve')) {
+            if (!(await hasEffectivePermission(req.user?.role as any, 'announcements:approve'))) {
                 return res.status(403).json({
                     error: 'insufficient_permissions',
                     code: 'INSUFFICIENT_PERMISSIONS',

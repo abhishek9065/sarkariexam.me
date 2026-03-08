@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 
+import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
-import { getAdminAnnouncements } from '../../lib/api/client';
+import { getAdminAnnouncements, updateAnnouncementAssignment, updateAnnouncementReviewSla } from '../../lib/api/client';
 import type { AdminAnnouncementListItem } from '../../types';
 
 const queueStatusTone = (status?: string) => {
@@ -14,21 +16,54 @@ const queueStatusTone = (status?: string) => {
     return 'neutral';
 };
 
+const dueTone = (reviewDueAt?: string) => {
+    if (!reviewDueAt) return 'neutral';
+    return new Date(reviewDueAt).getTime() < Date.now() ? 'danger' : 'warning';
+};
+
 export function QueueModule() {
+    const queryClient = useQueryClient();
     const { formatDateTime } = useAdminPreferences();
+    const { user } = useAdminAuth();
     const { notifyError, notifyInfo, notifySuccess } = useAdminNotifications();
-    const [view, setView] = useState<'pending' | 'scheduled' | 'combined'>('combined');
+    const [searchParams] = useSearchParams();
+    const [view, setView] = useState<'pending' | 'scheduled' | 'combined'>((searchParams.get('status') as 'pending' | 'scheduled') || 'combined');
     const [search, setSearch] = useState('');
     const [sort, setSort] = useState<'updated' | 'title'>('updated');
+    const assigneeFilter = searchParams.get('assignee');
 
     const pendingQuery = useQuery({
         queryKey: ['admin-queue', 'pending'],
-        queryFn: () => getAdminAnnouncements({ status: 'pending', limit: 40, sort: 'newest' }),
+        queryFn: () => getAdminAnnouncements({ status: 'pending', limit: 60, sort: 'newest' }),
     });
 
     const scheduledQuery = useQuery({
         queryKey: ['admin-queue', 'scheduled'],
-        queryFn: () => getAdminAnnouncements({ status: 'scheduled', limit: 40, sort: 'newest' }),
+        queryFn: () => getAdminAnnouncements({ status: 'scheduled', limit: 60, sort: 'newest' }),
+    });
+
+    const assignmentMutation = useMutation({
+        mutationFn: ({ id, assigneeUserId, assigneeEmail }: { id: string; assigneeUserId?: string; assigneeEmail?: string }) => (
+            updateAnnouncementAssignment(id, { assigneeUserId, assigneeEmail })
+        ),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-queue'] });
+            notifySuccess('Assignment updated', 'Queue ownership was updated.');
+        },
+        onError: (error) => {
+            notifyError('Assignment failed', error instanceof Error ? error.message : 'Failed to update queue assignment.');
+        },
+    });
+
+    const slaMutation = useMutation({
+        mutationFn: ({ id, reviewDueAt }: { id: string; reviewDueAt?: string }) => updateAnnouncementReviewSla(id, reviewDueAt),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-queue'] });
+            notifySuccess('SLA updated', 'Review due date was updated.');
+        },
+        onError: (error) => {
+            notifyError('SLA update failed', error instanceof Error ? error.message : 'Failed to update review SLA.');
+        },
     });
 
     const rows = useMemo(() => {
@@ -41,12 +76,17 @@ export function QueueModule() {
                 : [...pendingRows, ...scheduledRows];
 
         const normalizedSearch = search.trim().toLowerCase();
-        const filtered = normalizedSearch
-            ? merged.filter((row) => {
-                const haystack = `${row.title ?? ''} ${row.type ?? ''} ${row.updatedBy ?? ''} ${row.id ?? row._id ?? ''}`.toLowerCase();
-                return haystack.includes(normalizedSearch);
-            })
-            : merged;
+        const filtered = merged.filter((row) => {
+            const haystack = `${row.title ?? ''} ${row.type ?? ''} ${row.updatedBy ?? ''} ${row.assigneeEmail ?? ''} ${row.id ?? row._id ?? ''}`.toLowerCase();
+            if (normalizedSearch && !haystack.includes(normalizedSearch)) return false;
+            if (assigneeFilter === 'me') {
+                return Boolean((user?.id && row.assigneeUserId === user.id) || (user?.email && row.assigneeEmail === user.email));
+            }
+            if (assigneeFilter === 'unassigned') {
+                return !row.assigneeUserId && !row.assigneeEmail;
+            }
+            return true;
+        });
 
         const sorted = [...filtered];
         if (sort === 'title') {
@@ -60,14 +100,14 @@ export function QueueModule() {
         }
 
         return sorted;
-    }, [pendingQuery.data, scheduledQuery.data, search, sort, view]);
+    }, [assigneeFilter, pendingQuery.data, scheduledQuery.data, search, sort, user?.email, user?.id, view]);
 
     const loading = pendingQuery.isPending || scheduledQuery.isPending;
     const hasError = pendingQuery.error || scheduledQuery.error;
-    const filterSummary = `${rows.length} rows | view=${view} | sort=${sort}`;
+    const filterSummary = `${rows.length} rows | view=${view} | sort=${sort}${assigneeFilter ? ` | assignee=${assigneeFilter}` : ''}`;
 
     return (
-        <OpsCard title="Queue" description="Pending and scheduled content queue with ownership/state visibility.">
+        <OpsCard title="Queue" description="Pending and scheduled content queue with ownership controls and review SLA visibility.">
             <div className="ops-stack">
                 <OpsToolbar
                     controls={
@@ -131,8 +171,8 @@ export function QueueModule() {
                         <div className="ops-kpi-value">{scheduledQuery.data?.length ?? 0}</div>
                     </div>
                     <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Combined view</div>
-                        <div className="ops-kpi-value">{rows.length}</div>
+                        <div className="ops-kpi-label">Assigned to me</div>
+                        <div className="ops-kpi-value">{rows.filter((row) => row.claimedByCurrentUser).length}</div>
                     </div>
                 </div>
 
@@ -145,60 +185,87 @@ export function QueueModule() {
                             { key: 'status', label: 'Status' },
                             { key: 'type', label: 'Type' },
                             { key: 'owner', label: 'Owner' },
+                            { key: 'sla', label: 'Review SLA' },
                             { key: 'updated', label: 'Updated' },
                             { key: 'actions', label: 'Actions' },
                         ]}
                     >
-                        {rows.map((row: AdminAnnouncementListItem) => (
-                            <tr key={row.id || row._id || row.slug || row.title || `${row.updatedAt}-${row.type}`}>
-                                <td>{row.title || 'Untitled'}</td>
-                                <td>
-                                    <OpsBadge tone={queueStatusTone(row.status) as 'neutral' | 'info' | 'warning' | 'success'}>
-                                        {row.status || '-'}
-                                    </OpsBadge>
-                                </td>
-                                <td>{row.type || '-'}</td>
-                                <td>{(row as Record<string, unknown>).createdBy as string || row.updatedBy || 'Unassigned'}</td>
-                                <td>{formatDateTime(row.updatedAt || row.publishedAt)}</td>
-                                <td>
-                                    <ActionOverflowMenu
-                                        itemLabel={row.title || row.id || row._id || 'queue item'}
-                                        actions={[
-                                            {
-                                                id: 'copy-id',
-                                                label: 'Copy ID',
-                                                disabled: !row.id && !row._id,
-                                                onClick: async () => {
-                                                    const id = row.id || row._id || '';
-                                                    if (!id) return;
-                                                    try {
-                                                        await navigator.clipboard.writeText(id);
-                                                        notifySuccess('ID copied', `Copied ${id}`);
-                                                    } catch {
-                                                        notifyError('Copy failed', 'Could not copy queue item ID.');
-                                                    }
+                        {rows.map((row: AdminAnnouncementListItem) => {
+                            const id = row.id || row._id || '';
+                            const isMine = Boolean((user?.id && row.assigneeUserId === user.id) || (user?.email && row.assigneeEmail === user.email));
+                            return (
+                                <tr key={row.id || row._id || row.slug || row.title || `${row.updatedAt}-${row.type}`}>
+                                    <td>{row.title || 'Untitled'}</td>
+                                    <td>
+                                        <OpsBadge tone={queueStatusTone(row.status) as 'neutral' | 'info' | 'warning' | 'success'}>
+                                            {row.status || '-'}
+                                        </OpsBadge>
+                                    </td>
+                                    <td>{row.type || '-'}</td>
+                                    <td>
+                                        <div>{row.assigneeEmail || 'Unassigned'}</div>
+                                        {row.assignedAt ? <div className="ops-inline-muted">Assigned {formatDateTime(row.assignedAt)}</div> : null}
+                                    </td>
+                                    <td>
+                                        {row.reviewDueAt ? (
+                                            <>
+                                                <OpsBadge tone={dueTone(row.reviewDueAt) as 'neutral' | 'warning' | 'danger'}>
+                                                    {new Date(row.reviewDueAt).getTime() < Date.now() ? 'Overdue' : 'Due'}
+                                                </OpsBadge>
+                                                <div className="ops-inline-muted">{formatDateTime(row.reviewDueAt)}</div>
+                                            </>
+                                        ) : (
+                                            <span className="ops-inline-muted">No SLA</span>
+                                        )}
+                                    </td>
+                                    <td>{formatDateTime(row.updatedAt || row.publishedAt)}</td>
+                                    <td>
+                                        <ActionOverflowMenu
+                                            itemLabel={row.title || row.id || row._id || 'queue item'}
+                                            actions={[
+                                                {
+                                                    id: 'claim',
+                                                    label: isMine ? 'Refresh My Claim' : 'Claim',
+                                                    disabled: !id || assignmentMutation.isPending,
+                                                    onClick: () => {
+                                                        if (!id) return;
+                                                        assignmentMutation.mutate({ id, assigneeUserId: user?.id, assigneeEmail: user?.email });
+                                                    },
                                                 },
-                                            },
-                                            {
-                                                id: 'copy-title',
-                                                label: 'Copy Title',
-                                                disabled: !row.title,
-                                                onClick: async () => {
-                                                    const title = row.title || '';
-                                                    if (!title) return;
-                                                    try {
-                                                        await navigator.clipboard.writeText(title);
-                                                        notifySuccess('Title copied', 'Queue title copied to clipboard.');
-                                                    } catch {
-                                                        notifyError('Copy failed', 'Could not copy queue title.');
-                                                    }
+                                                {
+                                                    id: 'unclaim',
+                                                    label: 'Unassign',
+                                                    disabled: !id || assignmentMutation.isPending || (!row.assigneeUserId && !row.assigneeEmail),
+                                                    onClick: () => {
+                                                        if (!id) return;
+                                                        assignmentMutation.mutate({ id, assigneeUserId: '', assigneeEmail: '' });
+                                                    },
                                                 },
-                                            },
-                                        ]}
-                                    />
-                                </td>
-                            </tr>
-                        ))}
+                                                {
+                                                    id: 'due-tomorrow',
+                                                    label: 'Set Due +24h',
+                                                    disabled: !id || slaMutation.isPending,
+                                                    onClick: () => {
+                                                        if (!id) return;
+                                                        const dueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+                                                        slaMutation.mutate({ id, reviewDueAt: dueAt });
+                                                    },
+                                                },
+                                                {
+                                                    id: 'clear-due',
+                                                    label: 'Clear SLA',
+                                                    disabled: !id || slaMutation.isPending || !row.reviewDueAt,
+                                                    onClick: () => {
+                                                        if (!id) return;
+                                                        slaMutation.mutate({ id, reviewDueAt: '' });
+                                                    },
+                                                },
+                                            ]}
+                                        />
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </OpsTable>
                 ) : null}
                 {!loading && !hasError && rows.length === 0 ? <OpsEmptyState message="Queue is empty for selected view." /> : null}

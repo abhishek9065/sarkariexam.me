@@ -13,6 +13,7 @@ import {
   getClientIP
 } from '../middleware/security.js';
 import { UserModelMongo } from '../models/users.mongo.js';
+import { syncAdminAccessMetadata } from '../services/adminAccess.js';
 import {
   getAdminPermissionsSnapshot,
   isAdminPortalRole,
@@ -556,6 +557,18 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         endpoint: '/api/auth/login',
         metadata: { email: user.email, method: twoFactorMethod ?? 'password' }
       });
+      await syncAdminAccessMetadata({
+        userId: user.id,
+        email: user.email,
+        role: user.role as 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor',
+        isActive: user.isActive,
+        twoFactorEnabled: user.twoFactorEnabled,
+        lastLoginAt: new Date(),
+        patch: {
+          invitationState: 'accepted',
+          passwordResetRequired: false,
+        },
+      });
     } else {
       setAuthCookie(res, token, expiresIn);
     }
@@ -625,7 +638,7 @@ router.post('/admin/forgot-password', async (req, res) => {
     }, ADMIN_RESET_TOKEN_TTL_SECONDS);
 
     const frontendBase = config.frontendUrl.replace(/\/$/, '');
-    const resetUrl = `${frontendBase}/admin?mode=reset-password&token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}`;
+    const resetUrl = `${frontendBase}/admin-vnext/login?mode=reset-password&token=${encodeURIComponent(token)}&email=${encodeURIComponent(user.email)}`;
     await sendAdminPasswordResetEmail(user.email, resetUrl, Math.ceil(ADMIN_RESET_TOKEN_TTL_SECONDS / 60));
     await clearAuthAbuseFailures({
       scope: 'admin_forgot_password',
@@ -755,6 +768,21 @@ router.post('/admin/reset-password', async (req, res) => {
       endpoint: '/api/auth/admin/reset-password',
       metadata: { email: validated.email },
     });
+
+    if (isAdminPortalRole(updated.role)) {
+      await syncAdminAccessMetadata({
+        userId: updated.id,
+        email: updated.email,
+        role: updated.role,
+        isActive: updated.isActive,
+        twoFactorEnabled: updated.twoFactorEnabled,
+        lastLoginAt: updated.lastLogin ? new Date(updated.lastLogin) : null,
+        patch: {
+          invitationState: 'accepted',
+          passwordResetRequired: false,
+        },
+      });
+    }
 
     return res.json({ message: 'Password reset successful' });
   } catch (error) {
@@ -1231,7 +1259,7 @@ router.get('/admin/permissions', async (req, res) => {
     return res.json({
       data: {
         role: user.role,
-        ...getAdminPermissionsSnapshot(),
+        ...(await getAdminPermissionsSnapshot()),
       },
     });
   } catch (error) {

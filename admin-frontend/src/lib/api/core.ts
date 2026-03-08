@@ -74,8 +74,8 @@ const deriveApiErrorMessage = (body: Record<string, unknown> | null, fallback: s
     if (!body) return fallback;
     const errorText = typeof body.error === 'string' ? body.error : '';
     const messageText = typeof body.message === 'string' ? body.message : '';
-    const direct = joinParts([errorText, messageText].filter(Boolean));
-    if (direct) return direct;
+    if (messageText) return messageText;
+    if (errorText) return errorText;
     const flattenError = extractFlattenMessages(body.error);
     if (flattenError) return flattenError;
     const flattenMessage = extractFlattenMessages(body.message);
@@ -299,7 +299,14 @@ export async function request(path: string, init: RequestInit = {}, withCsrf = f
 
         if (!response.ok) {
             const message = deriveApiErrorMessage(body, `Request failed: ${response.status}`);
-            throw new Error(message);
+            throw new AdminApiWorkflowError({
+                message,
+                status: response.status,
+                code: typeof body?.error === 'string' ? body.error : 'REQUEST_FAILED',
+                body,
+                path,
+                method,
+            });
         }
 
         if (isMutating && approvalFingerprint) {

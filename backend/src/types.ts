@@ -60,6 +60,11 @@ export interface Announcement {
     trendingScore?: number;
   };
   schema?: Record<string, unknown>;
+  assigneeUserId?: string;
+  assigneeEmail?: string;
+  assignedAt?: Date;
+  reviewDueAt?: Date;
+  claimedByCurrentUser?: boolean;
 }
 
 export interface Tag {
@@ -167,6 +172,10 @@ export interface CreateAnnouncementDto {
     trendingScore?: number;
   };
   schema?: Record<string, unknown>;
+  assigneeUserId?: string;
+  assigneeEmail?: string;
+  assignedAt?: string;
+  reviewDueAt?: string;
 }
 
 export interface JwtPayload {

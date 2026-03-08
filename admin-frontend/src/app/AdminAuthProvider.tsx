@@ -57,8 +57,11 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const login = useCallback(async (email: string, password: string, twoFactorCode?: string) => {
-        await adminAuthLogin(email, password, twoFactorCode);
-        await refresh();
+        const result = await adminAuthLogin(email, password, twoFactorCode);
+        if (result.status === 'authenticated') {
+            await refresh();
+        }
+        return result;
     }, [refresh]);
 
     const logout = useCallback(async () => {

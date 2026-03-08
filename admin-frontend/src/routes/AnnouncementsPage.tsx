@@ -531,6 +531,8 @@ export function AnnouncementsPage() {
                         { key: 'title', label: 'Title' },
                         { key: 'status', label: 'Status' },
                         { key: 'type', label: 'Type' },
+                        { key: 'owner', label: 'Owner' },
+                        { key: 'sla', label: 'Review SLA' },
                         { key: 'updated', label: 'Updated' },
                         { key: 'actions', label: 'Actions' },
                     ]}
@@ -552,7 +554,7 @@ export function AnnouncementsPage() {
                                 aria-label="Select all visible announcements"
                             />
                         </td>
-                        <td colSpan={5} className="ops-inline-muted">
+                        <td colSpan={7} className="ops-inline-muted">
                             Select all rows on this page
                         </td>
                     </tr>
@@ -588,6 +590,19 @@ export function AnnouncementsPage() {
                                     </span>
                                 </td>
                                 <td><span className="ops-status-chip scheduled">{item.type || '-'}</span></td>
+                                <td>
+                                    <div>{item.assigneeEmail || 'Unassigned'}</div>
+                                    {item.claimedByCurrentUser ? <div className="ops-inline-muted">Assigned to you</div> : null}
+                                </td>
+                                <td>
+                                    {item.reviewDueAt ? (
+                                        <span className={`ops-status-chip ${new Date(item.reviewDueAt).getTime() < Date.now() ? 'expired' : 'review'}`}>
+                                            {formatDateTime(item.reviewDueAt)}
+                                        </span>
+                                    ) : (
+                                        <span className="ops-inline-muted">No SLA</span>
+                                    )}
+                                </td>
                                 <td>{formatDateTime(item.updatedAt || item.publishedAt)}</td>
                                 <td>
                                     <ActionOverflowMenu

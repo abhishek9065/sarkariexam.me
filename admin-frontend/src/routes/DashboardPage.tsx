@@ -80,6 +80,9 @@ export function DashboardPage() {
     const topViewed = reportsQuery.data?.mostViewed24h ?? [];
     const deadlines = reportsQuery.data?.upcomingDeadlines ?? [];
     const trafficSeries = reportsQuery.data?.trafficSeries ?? [];
+    const drilldowns = reportsQuery.data?.drilldowns ?? [];
+    const workflowSummary = reportsQuery.data?.workflowSummary;
+    const incidentSummary = reportsQuery.data?.incidentSummary;
     const openAlertsCount = alertsQuery.data?.meta?.total ?? alertsQuery.data?.data?.length ?? 0;
 
     const dashboardData = dashboardQuery.data && typeof dashboardQuery.data === 'object'
@@ -104,6 +107,14 @@ export function DashboardPage() {
         { label: 'Pending Drafts', value: Number(staleDrafts), tone: '', route: '/manage-posts' },
         { label: 'Total Posts', value: Number(summary?.totalPosts ?? dashboardData.totalAnnouncements ?? 0), tone: '', route: '/manage-posts' },
         { label: 'Open Alerts', value: Number(openAlertsCount), tone: Number(openAlertsCount) > 0 ? 'info' : '', route: '/alerts' },
+    ];
+    const cockpitCards = [
+        { label: 'Unassigned Pending', value: workflowSummary?.unassignedPendingReview ?? dashboardData.workflowSummary?.unassignedPendingReview ?? 0, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
+        { label: 'Overdue Review', value: workflowSummary?.overdueReviewItems ?? dashboardData.workflowSummary?.overdueReviewItems ?? 0, route: '/review?status=pending&sla=overdue', tone: 'danger' },
+        { label: 'My Queue', value: workflowSummary?.currentUserAssignedQueue ?? dashboardData.workflowSummary?.assignedToCurrentUser ?? 0, route: '/queue?assignee=me', tone: 'info' },
+        { label: 'Unresolved Errors', value: incidentSummary?.unresolvedErrorReports ?? dashboardData.workflowSummary?.unresolvedErrorReports ?? 0, route: '/errors?status=new', tone: 'warning' },
+        { label: 'High-risk Sessions', value: incidentSummary?.highRiskSessions ?? dashboardData.workflowSummary?.highRiskSessions ?? 0, route: '/security?risk=high', tone: 'danger' },
+        { label: 'Critical Alerts', value: incidentSummary?.openCriticalAlerts ?? dashboardData.workflowSummary?.openCriticalAlerts ?? 0, route: '/alerts?status=open&severity=critical', tone: 'danger' },
     ];
 
     const totalVisits = trafficSeries.reduce((sum, item) => sum + item.views, 0);
@@ -182,6 +193,24 @@ export function DashboardPage() {
                         </button>
                     ))}
                 </div>
+            ) : null}
+
+            {!isPending && !hasError ? (
+                <OpsCard title="Operator Cockpit" description="Drill directly into queue ownership, incidents, and active worklists.">
+                    <div className="ops-kpi-grid">
+                        {(drilldowns.length > 0 ? drilldowns : cockpitCards).map((card) => (
+                            <button
+                                key={card.label}
+                                type="button"
+                                className="ops-kpi-card"
+                                onClick={() => navigate(card.route)}
+                            >
+                                <div className="ops-kpi-label">{card.label}</div>
+                                <div className={`ops-kpi-value${card.tone ? ` ops-kpi-${card.tone}` : ''}`}>{card.count ?? card.value ?? 0}</div>
+                            </button>
+                        ))}
+                    </div>
+                </OpsCard>
             ) : null}
 
             {/* ─── Two-Column: Traffic + Most Viewed ─── */}

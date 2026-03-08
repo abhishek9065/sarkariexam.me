@@ -246,6 +246,30 @@ export async function updateAdminAnnouncement(
     return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
 }
 
+export async function updateAnnouncementAssignment(
+    id: string,
+    payload: { assigneeUserId?: string; assigneeEmail?: string }
+): Promise<AdminAnnouncementListItem> {
+    const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/assignment`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify(payload),
+    }, true);
+    return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
+}
+
+export async function updateAnnouncementReviewSla(
+    id: string,
+    reviewDueAt?: string
+): Promise<AdminAnnouncementListItem> {
+    const body = await request(`/api/admin/announcements/${encodeURIComponent(id)}/review-sla`, {
+        method: 'PATCH',
+        headers: mutationHeaders(),
+        body: JSON.stringify({ reviewDueAt }),
+    }, true);
+    return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
+}
+
 export async function approveAdminAnnouncement(
     id: string,
     note: string | undefined,

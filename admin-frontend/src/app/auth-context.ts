@@ -1,12 +1,12 @@
 import { createContext } from 'react';
 
-import type { AdminPermissionSnapshot, AdminUser } from '../types';
+import type { AdminAuthLoginResult, AdminPermissionSnapshot, AdminUser } from '../types';
 
 export interface AdminAuthContextValue {
     user: AdminUser | null;
     permissions: AdminPermissionSnapshot | null;
     loading: boolean;
-    login: (email: string, password: string, twoFactorCode?: string) => Promise<void>;
+    login: (email: string, password: string, twoFactorCode?: string) => Promise<AdminAuthLoginResult>;
     logout: () => Promise<void>;
     refresh: () => Promise<void>;
     stepUpToken: string | null;
