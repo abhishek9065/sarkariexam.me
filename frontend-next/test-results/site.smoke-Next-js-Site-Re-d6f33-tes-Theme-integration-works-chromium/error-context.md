@@ -1,0 +1,113 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "SarkariExams.me" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e6]:
+          - link "Home" [ref=e7] [cursor=pointer]:
+            - /url: /
+          - link "Latest Jobs" [ref=e8] [cursor=pointer]:
+            - /url: /jobs
+          - link "Results" [ref=e9] [cursor=pointer]:
+            - /url: /results
+          - link "Admit Card" [ref=e10] [cursor=pointer]:
+            - /url: /admit-card
+          - link "Answer Key" [ref=e11] [cursor=pointer]:
+            - /url: /answer-key
+          - link "Syllabus" [ref=e12] [cursor=pointer]:
+            - /url: /syllabus
+          - link "Admission" [ref=e13] [cursor=pointer]:
+            - /url: /admission
+        - generic [ref=e14]:
+          - link "Search" [ref=e15] [cursor=pointer]:
+            - /url: /explore
+            - img [ref=e16]
+            - text: Search
+          - button "Log In" [ref=e19] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e25]:
+          - heading "Your Dream Government Job Starts Here" [level=1] [ref=e26]
+          - paragraph [ref=e27]: The fastest, most reliable source for Sarkari Results, Admit Cards, and Latest Jobs across India.
+          - generic [ref=e28]:
+            - link "Browse Latest Jobs" [ref=e29] [cursor=pointer]:
+              - /url: /jobs
+            - link "Check Results" [ref=e30] [cursor=pointer]:
+              - /url: /results
+        - generic [ref=e32]:
+          - heading "Temporary Error" [level=2] [ref=e33]
+          - paragraph [ref=e34]: We couldn't load the latest updates. The backend might be starting up from sleep. Please refresh in a moment.
+    - contentinfo [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - heading "SarkariExams.me" [level=3] [ref=e38]
+          - paragraph [ref=e39]: Your trusted source for the latest government jobs, results, admit cards, and educational updates across India.
+        - generic [ref=e40]:
+          - heading "Quick Links" [level=4] [ref=e41]
+          - list [ref=e42]:
+            - listitem [ref=e43]:
+              - link "Latest Jobs" [ref=e44] [cursor=pointer]:
+                - /url: /jobs
+            - listitem [ref=e45]:
+              - link "Results" [ref=e46] [cursor=pointer]:
+                - /url: /results
+            - listitem [ref=e47]:
+              - link "Admit Cards" [ref=e48] [cursor=pointer]:
+                - /url: /admit-card
+            - listitem [ref=e49]:
+              - link "Syllabus" [ref=e50] [cursor=pointer]:
+                - /url: /syllabus
+        - generic [ref=e51]:
+          - heading "Information" [level=4] [ref=e52]
+          - list [ref=e53]:
+            - listitem [ref=e54]:
+              - link "About Us" [ref=e55] [cursor=pointer]:
+                - /url: /about
+            - listitem [ref=e56]:
+              - link "Contact Us" [ref=e57] [cursor=pointer]:
+                - /url: /contact
+            - listitem [ref=e58]:
+              - link "Privacy Policy" [ref=e59] [cursor=pointer]:
+                - /url: /privacy
+            - listitem [ref=e60]:
+              - link "Disclaimer" [ref=e61] [cursor=pointer]:
+                - /url: /disclaimer
+      - generic [ref=e62]:
+        - paragraph [ref=e63]: © 2026 SarkariExams.me. All rights reserved.
+        - paragraph [ref=e64]: "Disclaimer: We are an informational portal and not affiliated with any government organization. All information is gathered from official sources but should be verified independently."
+    - navigation [ref=e65]:
+      - link "Home" [ref=e66] [cursor=pointer]:
+        - /url: /
+        - img [ref=e67]
+        - generic [ref=e69]: Home
+      - link "Jobs" [ref=e70] [cursor=pointer]:
+        - /url: /jobs
+        - img [ref=e71]
+        - generic [ref=e73]: Jobs
+      - link "Results" [ref=e74] [cursor=pointer]:
+        - /url: /results
+        - img [ref=e75]
+        - generic [ref=e77]: Results
+      - link "Profile" [ref=e78] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e79]
+        - generic [ref=e81]: Profile
+  - generic [ref=e86] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e87]:
+      - img [ref=e88]
+    - generic [ref=e91]:
+      - button "Open issues overlay" [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: "1"
+          - generic [ref=e95]: "2"
+        - generic [ref=e96]:
+          - text: Issue
+          - generic [ref=e97]: s
+      - button "Collapse issues badge" [ref=e98]:
+        - img [ref=e99]
+  - alert [ref=e101]
+```
