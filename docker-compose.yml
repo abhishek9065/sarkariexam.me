@@ -58,23 +58,19 @@ services:
       timeout: 10s
       retries: 3
 
-  # Frontend (Next.js SSR)
+  # Frontend
   frontend:
     build:
-      context: ./frontend-next
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: sarkari-frontend
-    environment:
-      - INTERNAL_API_BASE=http://backend:4000/api
     expose:
-      - "3000"
-    depends_on:
-      - backend
+      - "80"
     restart: unless-stopped
     networks:
       - sarkari-network
     healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000" ]
+      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:80" ]
       interval: 30s
       timeout: 10s
       retries: 3
