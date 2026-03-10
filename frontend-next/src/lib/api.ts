@@ -11,7 +11,13 @@ import type {
 } from './types';
 
 /* ─── Base URL ─── */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:3000/api';
+// In Docker, the backend service is at http://backend:4000/api
+// NEXT_PUBLIC_API_BASE can override for local dev or other environments
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || (
+    typeof window === 'undefined'
+        ? (process.env.INTERNAL_API_BASE || 'http://backend:4000/api')
+        : '/api'
+);
 
 /* ─── Query string helper ─── */
 function toQueryString(params: Record<string, string | number | undefined>): string {
@@ -98,11 +104,11 @@ async function ensureCsrfToken(forceRefresh = false): Promise<string> {
 
     const res = await fetch(`${API_BASE}/auth/csrf`, { method: 'GET', credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch CSRF token');
-    
+
     const body = await res.json();
     const csrfToken = body?.data?.csrfToken;
     if (!csrfToken) throw new Error('Unable to initialize CSRF token');
-    
+
     csrfTokenCache = csrfToken;
     return csrfToken;
 }
@@ -117,7 +123,7 @@ async function clientFetchAuth<T>(path: string, options: RequestInit = {}): Prom
         };
 
         const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
-        
+
         if (!res.ok) {
             const body = await res.json().catch(() => null);
             if (res.status === 403 && body?.error === 'csrf_invalid') {
