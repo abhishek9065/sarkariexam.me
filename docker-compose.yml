@@ -58,10 +58,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # Frontend
+  # Frontend (Next.js static export)
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend-next
       dockerfile: Dockerfile
     container_name: sarkari-frontend
     expose:
