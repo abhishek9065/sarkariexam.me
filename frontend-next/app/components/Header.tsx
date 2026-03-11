@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useTheme } from '@/app/lib/useTheme';
 import { useAuth } from '@/app/lib/useAuth';
@@ -127,10 +127,11 @@ export function Header() {
         if (searchParams.get('login') === '1') {
             setAuthTab('login');
             setAuthOpen(true);
-            
-            router.replace(`?${searchParams.toString()}`);
+            const cleaned = new URLSearchParams(searchParams.toString());
+            cleaned.delete('login');
+            router.replace(`?${cleaned.toString()}`);
         }
-    }, [searchParams, setSearchParams]);
+    }, [searchParams, router]);
 
 
 
