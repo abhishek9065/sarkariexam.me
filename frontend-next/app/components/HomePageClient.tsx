@@ -426,7 +426,7 @@ export function HomePage() {
         const q = searchQuery.trim();
         if (!q) return;
         trackEvent('home_search', { query: q });
-        router.push(`/jobs?q=${encodeURIComponent(q)}&source=home`);
+        navigate.push(`/jobs?q=${encodeURIComponent(q)}&source=home`);
     }, [searchQuery, navigate]);
 
     const handleCardClick = useCallback((card: AnnouncementCard) => {
