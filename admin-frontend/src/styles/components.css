@@ -1875,6 +1875,42 @@ button.ops-kpi-card:hover::before {
     line-height: 1;
 }
 
+.dash-focus-eyebrow {
+    margin: 0 0 6px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+}
+
+.dash-page-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+}
+
+.dash-focus-title {
+    margin: 10px 0 0;
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dash-focus-copy {
+    margin: 6px 0 0;
+    max-width: 70ch;
+    color: var(--text-secondary);
+}
+
+.dash-widget-meta {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
 .dash-grid-2col {
     display: grid;
     gap: var(--space-4);
@@ -1934,6 +1970,9 @@ button.ops-kpi-card:hover::before {
     gap: 6px;
     font-size: var(--text-xs);
     color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 .dash-traffic-legend-dot {
@@ -1985,6 +2024,10 @@ button.ops-kpi-card:hover::before {
     padding: 10px 12px;
     border-radius: var(--radius-xs);
     transition: background var(--duration-fast) var(--ease-out);
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: left;
 }
 
 .dash-viewed-item:hover {
@@ -2143,6 +2186,12 @@ button.ops-kpi-card:hover::before {
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--border-soft);
     position: relative;
+    width: 100%;
+    background: transparent;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    text-align: left;
 }
 
 .dash-activity-item:last-child {
@@ -2218,6 +2267,99 @@ button.ops-kpi-card:hover::before {
     font-size: 0.85rem;
     line-height: 1;
     box-shadow: none;
+}
+
+.dash-lock-note {
+    margin: var(--space-3) 0 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.dash-list {
+    display: grid;
+    gap: 8px;
+}
+
+.dash-list-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elev-2);
+    text-align: left;
+    transition:
+        border-color var(--duration-fast) ease,
+        transform var(--duration-fast) ease,
+        background var(--duration-fast) ease;
+}
+
+.dash-list-item:hover {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border-medium));
+    background: var(--accent-soft);
+    transform: translateY(-1px);
+}
+
+.dash-list-item-main {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.dash-list-item-title {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dash-list-item-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.dash-list-item-side {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.dash-quick-action-grid {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.dash-quick-action {
+    width: 100%;
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-elev-2) 90%, transparent), var(--bg-elev-2));
+    text-align: left;
+    transition:
+        transform var(--duration-fast) ease,
+        border-color var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
+}
+
+.dash-quick-action:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border-medium));
+    box-shadow: var(--shadow-glow-sm);
+}
+
+.dash-quick-action-title {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dash-quick-action-copy {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
 }
 
 /* ─── Command Palette Enhancements ─── */

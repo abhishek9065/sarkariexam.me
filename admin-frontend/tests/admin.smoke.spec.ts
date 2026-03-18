@@ -9,6 +9,208 @@ const jsonResponse = (data: unknown) => ({
     body: JSON.stringify({ success: true, data }),
 });
 
+function buildDashboardSnapshot(input: {
+    me?: Record<string, unknown>;
+    reports?: Record<string, unknown>;
+    auditLogs?: Array<Record<string, unknown>>;
+    securityLogs?: Array<Record<string, unknown>>;
+    errorReports?: Array<Record<string, unknown>>;
+} = {}) {
+    const role = typeof input.me?.role === 'string' ? input.me.role : 'admin';
+    const reports = {
+        summary: {
+            totalPosts: 128,
+            pendingDrafts: 12,
+            scheduled: 5,
+            pendingReview: 17,
+            brokenLinks: 3,
+            expired: 9,
+        },
+        mostViewed24h: [],
+        upcomingDeadlines: [],
+        trafficSeries: [
+            { date: '2026-03-01', views: 30 },
+            { date: '2026-03-02', views: 45 },
+            { date: '2026-03-03', views: 60 },
+            { date: '2026-03-04', views: 75 },
+            { date: '2026-03-05', views: 90 },
+            { date: '2026-03-06', views: 105 },
+            { date: '2026-03-07', views: 120 },
+        ],
+        trafficSources: [
+            { source: 'seo', label: 'Organic', views: 60, percentage: 60 },
+            { source: 'direct', label: 'Direct', views: 25, percentage: 25 },
+            { source: 'referral', label: 'Referral', views: 10, percentage: 10 },
+            { source: 'social', label: 'Social', views: 5, percentage: 5 },
+        ],
+        workflowSummary: {
+            unassignedPendingReview: 6,
+            overdueReviewItems: 3,
+            currentUserAssignedQueue: 4,
+        },
+        incidentSummary: {
+            unresolvedErrorReports: 5,
+            highRiskSessions: 2,
+            openCriticalAlerts: 1,
+        },
+        ...input.reports,
+    };
+    const auditLogs = input.auditLogs ?? [
+        {
+            id: 'audit-1',
+            action: 'update',
+            announcementId: 'ann-42',
+            title: 'SSC CGL Recruitment 2026',
+            actorEmail: 'admin@sarkariexams.me',
+            createdAt: '2026-03-07T08:00:00.000Z',
+        },
+    ];
+    const securityLogs = input.securityLogs ?? [
+        {
+            id: '101',
+            eventType: 'admin_security_alert',
+            createdAt: '2026-03-07T08:00:00.000Z',
+        },
+    ];
+    const errorReports = input.errorReports ?? [
+        {
+            id: 'err-1',
+            status: 'new',
+            createdAt: '2026-03-07T08:00:00.000Z',
+        },
+    ];
+
+    const totalVisits = Array.isArray(reports.trafficSeries)
+        ? reports.trafficSeries.reduce((sum, item) => sum + Number((item as { views?: number }).views ?? 0), 0)
+        : 0;
+    const trafficEmpty = totalVisits === 0
+        && Array.isArray(reports.trafficSources)
+        && reports.trafficSources.length === 0
+        && Array.isArray(reports.mostViewed24h)
+        && reports.mostViewed24h.length === 0;
+
+    return {
+        generatedAt: '2026-03-07T08:30:00.000Z',
+        displayName: 'admin',
+        role,
+        permissions: {
+            adminRead: true,
+            adminWrite: true,
+            analyticsRead: true,
+            announcementsRead: true,
+            announcementsWrite: true,
+            announcementsApprove: true,
+            auditRead: true,
+            securityRead: true,
+        },
+        focus: {
+            eyebrow: role === 'admin' ? 'Admin Control' : 'Dashboard',
+            title: 'Own incidents, routing, and access drift first.',
+            description: 'Start with critical alerts, risky sessions, and role-impacting changes before moving into content operations.',
+            primaryAction: { id: 'focus-security', label: 'Open Security', route: '/security', tone: 'danger' },
+            secondaryAction: { id: 'focus-access', label: 'Users & Roles', route: '/users-roles', tone: 'subtle' },
+        },
+        summary: {
+            status: 'ready',
+            updatedAt: '2026-03-07T08:30:00.000Z',
+            data: {
+                metrics: [
+                    { key: 'total-posts', label: 'Total Posts', value: reports.summary.totalPosts, route: '/manage-posts' },
+                    { key: 'published', label: 'Published', value: 92, route: '/manage-posts?status=published', tone: 'success' },
+                    { key: 'pending-review', label: 'Pending Review', value: reports.summary.pendingReview, route: '/review', tone: 'warning' },
+                    { key: 'views', label: 'Total Views', value: 6400, route: '/reports' },
+                    { key: 'active-users', label: 'Active Users', value: 24, route: '/users-roles' },
+                    { key: 'subscribers', label: 'Subscribers', value: 512, route: '/reports' },
+                ],
+            },
+        },
+        workload: {
+            status: 'ready',
+            updatedAt: '2026-03-07T08:30:00.000Z',
+            data: {
+                metrics: [
+                    { key: 'pending-review', label: 'Pending Reviews', value: reports.summary.pendingReview, route: '/review', tone: 'warning' },
+                    { key: 'unassigned', label: 'Unassigned Pending Reviews', value: reports.workflowSummary.unassignedPendingReview, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
+                    { key: 'overdue', label: 'Overdue Review Items', value: reports.workflowSummary.overdueReviewItems, route: '/review?status=pending&sla=overdue', tone: 'danger' },
+                    { key: 'assigned', label: 'My Queue', value: reports.workflowSummary.currentUserAssignedQueue, route: '/queue?assignee=me', tone: 'info' },
+                    { key: 'broken-links', label: 'Broken Links', value: reports.summary.brokenLinks, route: '/link-manager', tone: 'danger' },
+                ],
+            },
+        },
+        incidents: {
+            status: 'ready',
+            updatedAt: '2026-03-07T08:30:00.000Z',
+            data: {
+                metrics: [
+                    { key: 'open-alerts', label: 'Open Alerts', value: reports.incidentSummary.openCriticalAlerts, route: '/alerts', tone: 'warning' },
+                    { key: 'critical-alerts', label: 'Critical Alerts', value: reports.incidentSummary.openCriticalAlerts, route: '/alerts?status=open&severity=critical', tone: 'danger' },
+                    { key: 'unresolved-errors', label: 'Unresolved Errors', value: errorReports.length, route: '/errors?status=new', tone: 'warning' },
+                    { key: 'high-risk-sessions', label: 'High-risk Sessions', value: securityLogs.length, route: '/security?risk=high', tone: 'danger' },
+                ],
+                securityLocked: false,
+            },
+        },
+        traffic: trafficEmpty
+            ? {
+                status: 'empty',
+                updatedAt: '2026-03-07T08:30:00.000Z',
+                message: 'Traffic charts will populate after announcement views are recorded.',
+                data: {
+                    totalVisits: 0,
+                    series: [],
+                    sources: [],
+                    topContent: [],
+                },
+            }
+            : {
+                status: 'ready',
+                updatedAt: '2026-03-07T08:30:00.000Z',
+                data: {
+                    totalVisits,
+                    series: reports.trafficSeries,
+                    sources: reports.trafficSources,
+                    topContent: reports.mostViewed24h,
+                },
+            },
+        deadlines: {
+            status: Array.isArray(reports.upcomingDeadlines) && reports.upcomingDeadlines.length > 0 ? 'ready' : 'empty',
+            updatedAt: '2026-03-07T08:30:00.000Z',
+            message: Array.isArray(reports.upcomingDeadlines) && reports.upcomingDeadlines.length > 0 ? undefined : 'No deadlines in the next 7 days.',
+            data: {
+                items: (reports.upcomingDeadlines ?? []).map((item: any) => ({
+                    ...item,
+                    route: `/detailed-post?focus=${encodeURIComponent(String(item.id ?? 'ann-1'))}`,
+                })),
+            },
+        },
+        activity: {
+            status: 'ready',
+            updatedAt: '2026-03-07T08:30:00.000Z',
+            data: {
+                items: auditLogs.map((item) => ({
+                    id: String(item.id ?? 'audit-1'),
+                    title: 'Announcement Update',
+                    subtitle: String(item.actorEmail ?? 'admin@sarkariexams.me'),
+                    createdAt: String(item.createdAt ?? '2026-03-07T08:00:00.000Z'),
+                    route: '/audit',
+                })),
+            },
+        },
+        quickActions: {
+            status: 'ready',
+            updatedAt: '2026-03-07T08:30:00.000Z',
+            data: {
+                items: [
+                    { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.' },
+                    { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.' },
+                    { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.' },
+                    { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.' },
+                ],
+            },
+        },
+    };
+}
+
 async function mockUnauthenticatedAdmin(page: import('@playwright/test').Page) {
     await page.route('**/api/auth/csrf', async (route) => {
         await route.fulfill(jsonResponse({ csrfToken: 'test-csrf-token' }));
@@ -102,12 +304,13 @@ async function mockAuthenticatedAdmin(
     });
 
     await page.route('**/api/admin/dashboard', async (route) => {
-        await route.fulfill(jsonResponse({
-            totalAnnouncements: 128,
-            pendingReview: 17,
-            activeSessions: 5,
-            highRiskEvents: 2,
-        }));
+        await route.fulfill(jsonResponse(buildDashboardSnapshot({
+            me: adminMe,
+            reports: overrides.reports,
+            auditLogs: overrides.auditLogs,
+            securityLogs: overrides.securityLogs,
+            errorReports: overrides.errorReports,
+        })));
     });
 
     await page.route('**/api/admin/reports', async (route) => {

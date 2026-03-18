@@ -1,10 +1,38 @@
-import type { AdminReportSnapshot } from '../../types';
+import type { AdminDashboardSnapshot, AdminReportSnapshot } from '../../types';
 import { request, typedData } from './core';
 import { ADMIN_API_PATHS } from './paths';
 
-export async function getAdminDashboard() {
+const emptyDashboardSnapshot: AdminDashboardSnapshot = {
+    generatedAt: new Date(0).toISOString(),
+    displayName: 'Admin',
+    role: 'viewer',
+    permissions: {
+        adminRead: true,
+        adminWrite: false,
+        analyticsRead: false,
+        announcementsRead: false,
+        announcementsWrite: false,
+        announcementsApprove: false,
+        auditRead: false,
+        securityRead: false,
+    },
+    focus: {
+        eyebrow: 'Dashboard',
+        title: 'Dashboard data unavailable.',
+        description: 'Refresh the page to load the current admin snapshot.',
+    },
+    summary: { status: 'empty', updatedAt: new Date(0).toISOString(), message: 'Dashboard data unavailable.', data: { metrics: [] } },
+    workload: { status: 'empty', updatedAt: new Date(0).toISOString(), message: 'Dashboard data unavailable.', data: { metrics: [] } },
+    incidents: { status: 'empty', updatedAt: new Date(0).toISOString(), message: 'Dashboard data unavailable.', data: { metrics: [], securityLocked: true } },
+    traffic: { status: 'forbidden', updatedAt: new Date(0).toISOString(), permission: 'analytics:read', message: 'Analytics access is required to view traffic trends.', data: null },
+    deadlines: { status: 'forbidden', updatedAt: new Date(0).toISOString(), permission: 'announcements:read', message: 'Announcement access is required to view upcoming deadlines.', data: null },
+    activity: { status: 'forbidden', updatedAt: new Date(0).toISOString(), permission: 'audit:read', message: 'Audit access is required to view recent activity.', data: null },
+    quickActions: { status: 'empty', updatedAt: new Date(0).toISOString(), message: 'Dashboard data unavailable.', data: { items: [] } },
+};
+
+export async function getAdminDashboard(): Promise<AdminDashboardSnapshot> {
     const body = await request(ADMIN_API_PATHS.adminDashboard);
-    return body?.data ?? null;
+    return typedData<AdminDashboardSnapshot>(body) ?? emptyDashboardSnapshot;
 }
 
 export async function getAnalyticsOverview(input: {

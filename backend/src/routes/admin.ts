@@ -33,7 +33,7 @@ import {
 } from '../services/analytics.js';
 import { invalidateAnnouncementCaches } from '../services/cacheInvalidation.js';
 import { getCollection, healthCheck } from '../services/cosmosdb.js';
-import { hasEffectivePermission } from '../services/rbac.js';
+import { hasEffectivePermission, type Permission } from '../services/rbac.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import { Announcement, ContentType, CreateAnnouncementDto } from '../types.js';
@@ -603,6 +603,554 @@ const getRecentSecurityLogsSafe = async (limit = 250) => {
     return getRecentLogsPaged.call(SecurityLogger, limit, 0);
 };
 
+type DashboardWidgetStatus = 'ready' | 'empty' | 'forbidden' | 'error';
+type DashboardMetricTone = 'neutral' | 'info' | 'warning' | 'danger' | 'success';
+type DashboardActionTone = 'primary' | 'subtle' | 'warning' | 'danger' | 'success';
+
+type DashboardWidget<T> = {
+    status: DashboardWidgetStatus;
+    updatedAt: string;
+    permission?: Permission;
+    message?: string;
+    data: T | null;
+};
+
+type DashboardMetric = {
+    key: string;
+    label: string;
+    value: number | string;
+    route?: string;
+    tone?: DashboardMetricTone;
+    hint?: string;
+};
+
+type DashboardAction = {
+    id: string;
+    label: string;
+    route: string;
+    description?: string;
+    tone?: DashboardActionTone;
+};
+
+type DashboardPermissionFlags = {
+    adminRead: boolean;
+    adminWrite: boolean;
+    analyticsRead: boolean;
+    announcementsRead: boolean;
+    announcementsWrite: boolean;
+    announcementsApprove: boolean;
+    auditRead: boolean;
+    securityRead: boolean;
+};
+
+const dashboardReady = <T>(data: T, options?: { empty?: boolean; message?: string; permission?: Permission }): DashboardWidget<T> => ({
+    status: options?.empty ? 'empty' : 'ready',
+    updatedAt: new Date().toISOString(),
+    ...(options?.permission ? { permission: options.permission } : {}),
+    ...(options?.message ? { message: options.message } : {}),
+    data,
+});
+
+const dashboardForbidden = <T>(permission: Permission, message: string): DashboardWidget<T> => ({
+    status: 'forbidden',
+    updatedAt: new Date().toISOString(),
+    permission,
+    message,
+    data: null,
+});
+
+const dashboardError = <T>(message: string, permission?: Permission): DashboardWidget<T> => ({
+    status: 'error',
+    updatedAt: new Date().toISOString(),
+    ...(permission ? { permission } : {}),
+    message,
+    data: null,
+});
+
+const dashboardFocusByRole = (
+    role: string | undefined,
+    permissions: DashboardPermissionFlags
+): {
+    eyebrow: string;
+    title: string;
+    description: string;
+    primaryAction?: DashboardAction;
+    secondaryAction?: DashboardAction;
+} => {
+    switch (role) {
+        case 'admin':
+            return {
+                eyebrow: 'Admin Control',
+                title: 'Own incidents, routing, and access drift first.',
+                description: 'Start with critical alerts, risky sessions, and role-impacting changes before moving into content operations.',
+                primaryAction: { id: 'focus-security', label: 'Open Security', route: '/security', description: 'Investigate active alerts and session anomalies.', tone: 'danger' },
+                secondaryAction: { id: 'focus-access', label: 'Users & Roles', route: '/users-roles', description: 'Review access changes and account health.', tone: 'subtle' },
+            };
+        case 'reviewer':
+            return {
+                eyebrow: 'Reviewer Lane',
+                title: 'Clear overdue review work before new approvals pile up.',
+                description: 'Prioritize pending decisions, overdue queues, and anything waiting on secondary approval.',
+                primaryAction: { id: 'focus-review', label: 'Review Queue', route: '/review', description: 'Work pending review items.', tone: 'primary' },
+                secondaryAction: permissions.announcementsApprove
+                    ? { id: 'focus-approvals', label: 'Approvals', route: '/approvals', description: 'Resolve approval-gated actions.', tone: 'warning' }
+                    : undefined,
+            };
+        case 'editor':
+        case 'contributor':
+            return {
+                eyebrow: 'Publishing Lane',
+                title: 'Move assigned content forward and clear blockers early.',
+                description: 'Watch queue ownership, deadline pressure, and publish blockers before opening new drafts.',
+                primaryAction: { id: 'focus-manage', label: 'Manage Posts', route: '/manage-posts', description: 'Work assigned and pending items.', tone: 'primary' },
+                secondaryAction: permissions.announcementsWrite
+                    ? { id: 'focus-create', label: 'New Post', route: '/create-post', description: 'Create or duplicate urgent content.', tone: 'success' }
+                    : undefined,
+            };
+        default:
+            return {
+                eyebrow: 'Monitoring Lane',
+                title: 'Track trends, deadlines, and alert movement without mutation paths.',
+                description: 'Use the dashboard as a read-only control room for traffic, deadlines, and operational signals.',
+                primaryAction: { id: 'focus-reports', label: 'Reports', route: '/reports', description: 'Inspect traffic and broken-link reports.', tone: 'primary' },
+                secondaryAction: { id: 'focus-alerts', label: 'Alerts', route: '/alerts', description: 'Review current operational alerts.', tone: 'subtle' },
+            };
+    }
+};
+
+const dashboardQuickActions = (
+    role: string | undefined,
+    permissions: DashboardPermissionFlags
+): DashboardAction[] => {
+    const actions: DashboardAction[] = [];
+
+    if (permissions.announcementsWrite) {
+        actions.push(
+            { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.', tone: 'primary' },
+            { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.', tone: 'subtle' },
+        );
+    } else if (permissions.announcementsRead) {
+        actions.push(
+            { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Review current content inventory.', tone: 'primary' },
+        );
+    }
+
+    if (permissions.announcementsApprove) {
+        actions.push(
+            { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.', tone: 'warning' },
+            { id: 'approvals', label: 'Approvals', route: '/approvals', description: 'Resolve approval-gated actions.', tone: 'warning' },
+        );
+    }
+
+    if (permissions.securityRead) {
+        actions.push(
+            { id: 'sessions', label: 'Sessions', route: '/sessions', description: 'Inspect active admin sessions.', tone: 'danger' },
+            { id: 'security', label: 'Security', route: '/security', description: 'Investigate incidents and risky activity.', tone: 'danger' },
+        );
+    }
+
+    if (permissions.auditRead) {
+        actions.push(
+            { id: 'audit', label: 'Audit Log', route: '/audit', description: 'Review the latest administrative actions.', tone: 'subtle' },
+        );
+    }
+
+    if (permissions.adminWrite || role === 'admin') {
+        actions.push(
+            { id: 'users-roles', label: 'Users & Roles', route: '/users-roles', description: 'Review access, roles, and account posture.', tone: 'subtle' },
+        );
+    }
+
+    actions.push(
+        { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.', tone: 'subtle' },
+        { id: 'reports', label: 'Reports', route: '/reports', description: 'Open the reporting workspace.', tone: 'subtle' },
+    );
+
+    return actions;
+};
+
+const humanizeDashboardAuditAction = (action?: string | null) => {
+    const normalized = String(action ?? '')
+        .replace(/^admin_/, '')
+        .replace(/_/g, ' ')
+        .trim();
+    if (!normalized) return 'Admin activity';
+    return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const isHighRiskSecurityLog = (entry: any) => {
+    const eventType = String(entry?.eventType ?? entry?.event_type ?? '').toLowerCase();
+    return eventType.includes('alert')
+        || eventType.includes('fail')
+        || eventType.includes('forbidden')
+        || eventType.includes('blocked');
+};
+
+const buildDashboardPermissionFlags = async (role: string | undefined): Promise<DashboardPermissionFlags> => {
+    const [
+        adminRead,
+        adminWrite,
+        analyticsRead,
+        announcementsRead,
+        announcementsWrite,
+        announcementsApprove,
+        auditRead,
+        securityRead,
+    ] = await Promise.all([
+        hasEffectivePermission(role as any, 'admin:read'),
+        hasEffectivePermission(role as any, 'admin:write'),
+        hasEffectivePermission(role as any, 'analytics:read'),
+        hasEffectivePermission(role as any, 'announcements:read'),
+        hasEffectivePermission(role as any, 'announcements:write'),
+        hasEffectivePermission(role as any, 'announcements:approve'),
+        hasEffectivePermission(role as any, 'audit:read'),
+        hasEffectivePermission(role as any, 'security:read'),
+    ]);
+
+    return {
+        adminRead,
+        adminWrite,
+        analyticsRead,
+        announcementsRead,
+        announcementsWrite,
+        announcementsApprove,
+        auditRead,
+        securityRead,
+    };
+};
+
+const buildAdminDashboardSnapshot = async (req: any) => {
+    const generatedAt = new Date().toISOString();
+    const role = typeof req.user?.role === 'string' ? req.user.role : undefined;
+    const displayName = typeof req.user?.email === 'string'
+        ? req.user.email.split('@')[0]
+        : 'Admin';
+    const permissions = await buildDashboardPermissionFlags(role);
+    const focus = dashboardFocusByRole(role, permissions);
+
+    const announcementsPromise = permissions.announcementsRead
+        ? AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 })
+        : Promise.resolve([]);
+    const activeUsersPromise = getCollection<UserDoc>('users').countDocuments({ isActive: true });
+    const subscribersPromise = getCollection<SubscriptionDoc>('subscriptions').countDocuments({ isActive: true, verified: true });
+    const brokenLinksPromise = getCollection<LinkRecordDoc>('link_records').countDocuments({ status: 'broken' } as any);
+    const openAlertsPromise = getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'open' } as any);
+    const criticalAlertsPromise = getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'open', severity: 'critical' } as any);
+    const errorReportsPromise = getCollection<any>('error_reports').countDocuments({ status: { $ne: 'resolved' } } as any);
+    const trafficSeriesPromise = permissions.analyticsRead ? getDailyRollups(7) : Promise.resolve([]);
+    const trafficSourcesPromise = permissions.analyticsRead ? getAnnouncementViewTrafficSources(7) : Promise.resolve([]);
+    const topViewsPromise = permissions.analyticsRead ? getTopAnnouncementViews(24, 10) : Promise.resolve([]);
+    const auditPromise = permissions.auditRead
+        ? getAdminAuditLogsPaged({ limit: 10, offset: 0 })
+        : Promise.resolve({ data: [], total: 0 });
+    const securityPromise = permissions.securityRead
+        ? getRecentSecurityLogsSafe(250)
+        : Promise.resolve({ data: [], total: 0, source: 'memory' as const });
+    const approvalsPromise = getAdminApprovalWorkflowSummary({ dueSoonMinutes: 60 });
+
+    const [
+        announcementsResult,
+        activeUsersResult,
+        subscribersResult,
+        brokenLinksResult,
+        openAlertsResult,
+        criticalAlertsResult,
+        errorReportsResult,
+        trafficSeriesResult,
+        trafficSourcesResult,
+        topViewsResult,
+        auditResult,
+        securityResult,
+        approvalsResult,
+    ] = await Promise.allSettled([
+        announcementsPromise,
+        activeUsersPromise,
+        subscribersPromise,
+        brokenLinksPromise,
+        openAlertsPromise,
+        criticalAlertsPromise,
+        errorReportsPromise,
+        trafficSeriesPromise,
+        trafficSourcesPromise,
+        topViewsPromise,
+        auditPromise,
+        securityPromise,
+        approvalsPromise,
+    ]);
+
+    const announcements = announcementsResult.status === 'fulfilled' ? announcementsResult.value : null;
+    const totalUsers = activeUsersResult.status === 'fulfilled' ? activeUsersResult.value : null;
+    const activeSubscribers = subscribersResult.status === 'fulfilled' ? subscribersResult.value : null;
+    const brokenLinks = brokenLinksResult.status === 'fulfilled' ? brokenLinksResult.value : null;
+    const openAlerts = openAlertsResult.status === 'fulfilled' ? openAlertsResult.value : null;
+    const criticalAlerts = criticalAlertsResult.status === 'fulfilled' ? criticalAlertsResult.value : null;
+    const unresolvedErrors = errorReportsResult.status === 'fulfilled' ? errorReportsResult.value : null;
+    const trafficSeries = trafficSeriesResult.status === 'fulfilled' ? trafficSeriesResult.value : null;
+    const trafficSources = trafficSourcesResult.status === 'fulfilled' ? trafficSourcesResult.value : null;
+    const topViews = topViewsResult.status === 'fulfilled' ? topViewsResult.value : null;
+    const auditFeed = auditResult.status === 'fulfilled' ? auditResult.value : null;
+    const securityFeed = securityResult.status === 'fulfilled' ? securityResult.value : null;
+    const approvalSummary = approvalsResult.status === 'fulfilled' ? approvalsResult.value : null;
+
+    const nowMs = Date.now();
+    const sevenDaysMs = nowMs + (7 * 24 * 60 * 60 * 1000);
+    const currentUserId = req.user?.userId;
+    const currentEmail = req.user?.email;
+
+    const summary = (() => {
+        if (!announcements) {
+            return dashboardError<{ metrics: DashboardMetric[] }>('Failed to load dashboard summary.', 'announcements:read');
+        }
+
+        const statusMap = announcements.reduce<Record<string, number>>((acc, item: any) => {
+            const key = normalizeAnnouncementStatus(item.status);
+            acc[key] = (acc[key] ?? 0) + 1;
+            return acc;
+        }, {});
+        const totalViews = announcements.reduce((sum: number, item: any) => sum + Number(item.viewCount ?? 0), 0);
+
+        return dashboardReady({
+            metrics: [
+                { key: 'total-posts', label: 'Total Posts', value: announcements.length, route: '/manage-posts' },
+                { key: 'published', label: 'Published', value: statusMap.published ?? 0, route: '/manage-posts?status=published', tone: 'success' },
+                { key: 'pending-review', label: 'Pending Review', value: statusMap.pending ?? 0, route: '/review', tone: (statusMap.pending ?? 0) > 0 ? 'warning' : 'neutral' },
+                { key: 'views', label: 'Total Views', value: totalViews, route: '/reports' },
+                { key: 'active-users', label: 'Active Users', value: totalUsers ?? '--', route: '/users-roles', hint: totalUsers === null ? 'Unavailable' : undefined },
+                { key: 'subscribers', label: 'Subscribers', value: activeSubscribers ?? '--', route: '/reports', hint: activeSubscribers === null ? 'Unavailable' : undefined },
+            ],
+        });
+    })();
+
+    const workload = (() => {
+        if (!permissions.announcementsRead) {
+            return dashboardForbidden<{ metrics: DashboardMetric[] }>('announcements:read', 'Announcement access is required to view queue workload.');
+        }
+        if (!announcements) {
+            return dashboardError<{ metrics: DashboardMetric[] }>('Failed to load workload queues.', 'announcements:read');
+        }
+
+        const pendingReviewItems = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'pending');
+        const overdueReviewItems = pendingReviewItems.filter((item: any) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < nowMs);
+        const unassignedPendingReview = pendingReviewItems.filter((item: any) => !item.assigneeUserId && !item.assigneeEmail);
+        const assignedToCurrentUser = announcements.filter((item: any) => {
+            const status = normalizeAnnouncementStatus(item.status);
+            if (!['pending', 'scheduled', 'draft'].includes(status)) return false;
+            return item.assigneeUserId === currentUserId || item.assigneeEmail === currentEmail;
+        });
+        const pendingDrafts = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'draft');
+        const scheduled = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'scheduled');
+        const dueSoon = announcements.filter((item: any) => {
+            if (!item.deadline) return false;
+            const deadlineTs = new Date(item.deadline).getTime();
+            return !Number.isNaN(deadlineTs) && deadlineTs >= nowMs && deadlineTs <= sevenDaysMs;
+        });
+        const metricsByRole: DashboardMetric[] = role === 'reviewer'
+            ? [
+                { key: 'pending-review', label: 'Pending Reviews', value: pendingReviewItems.length, route: '/review', tone: pendingReviewItems.length > 0 ? 'warning' : 'neutral' },
+                { key: 'overdue-review', label: 'Overdue Review Items', value: overdueReviewItems.length, route: '/review?status=pending&sla=overdue', tone: overdueReviewItems.length > 0 ? 'danger' : 'neutral' },
+                { key: 'unassigned', label: 'Unassigned Pending Reviews', value: unassignedPendingReview.length, route: '/review?status=pending&assignee=unassigned', tone: unassignedPendingReview.length > 0 ? 'warning' : 'neutral' },
+                { key: 'assigned', label: 'Assigned To Me', value: assignedToCurrentUser.length, route: '/queue?assignee=me', tone: assignedToCurrentUser.length > 0 ? 'info' : 'neutral' },
+                { key: 'approvals-due', label: 'Approvals Due Soon', value: approvalSummary?.dueSoon ?? '--', route: '/approvals', tone: (approvalSummary?.dueSoon ?? 0) > 0 ? 'warning' : 'neutral', hint: approvalSummary ? undefined : 'Unavailable' },
+            ]
+            : role === 'editor' || role === 'contributor'
+                ? [
+                    { key: 'assigned', label: 'Assigned To Me', value: assignedToCurrentUser.length, route: '/queue?assignee=me', tone: assignedToCurrentUser.length > 0 ? 'info' : 'neutral' },
+                    { key: 'drafts', label: 'Pending Drafts', value: pendingDrafts.length, route: '/manage-posts?status=draft', tone: pendingDrafts.length > 0 ? 'warning' : 'neutral' },
+                    { key: 'scheduled', label: 'Scheduled', value: scheduled.length, route: '/queue?status=scheduled' },
+                    { key: 'deadlines', label: 'Deadlines This Week', value: dueSoon.length, route: '/alerts', tone: dueSoon.length > 0 ? 'warning' : 'neutral' },
+                    { key: 'broken-links', label: 'Broken Links', value: brokenLinks ?? '--', route: '/link-manager', tone: (brokenLinks ?? 0) > 0 ? 'danger' : 'neutral', hint: brokenLinks === null ? 'Unavailable' : undefined },
+                ]
+                : [
+                    { key: 'pending-review', label: 'Pending Reviews', value: pendingReviewItems.length, route: '/review', tone: pendingReviewItems.length > 0 ? 'warning' : 'neutral' },
+                    { key: 'unassigned', label: 'Unassigned Pending Reviews', value: unassignedPendingReview.length, route: '/review?status=pending&assignee=unassigned', tone: unassignedPendingReview.length > 0 ? 'warning' : 'neutral' },
+                    { key: 'overdue', label: 'Overdue Review Items', value: overdueReviewItems.length, route: '/review?status=pending&sla=overdue', tone: overdueReviewItems.length > 0 ? 'danger' : 'neutral' },
+                    { key: 'assigned', label: 'My Queue', value: assignedToCurrentUser.length, route: '/queue?assignee=me', tone: assignedToCurrentUser.length > 0 ? 'info' : 'neutral' },
+                    { key: 'broken-links', label: 'Broken Links', value: brokenLinks ?? '--', route: '/link-manager', tone: (brokenLinks ?? 0) > 0 ? 'danger' : 'neutral', hint: brokenLinks === null ? 'Unavailable' : undefined },
+                ];
+
+        return dashboardReady({
+            metrics: metricsByRole,
+        }, {
+            empty: metricsByRole.every((item) => Number(item.value || 0) === 0),
+            permission: 'announcements:read',
+            message: 'No active queue pressure right now.',
+        });
+    })();
+
+    const incidents = (() => {
+        const highRiskSessions = permissions.securityRead && securityFeed
+            ? securityFeed.data.filter((entry: any) => isHighRiskSecurityLog(entry)).length
+            : null;
+
+        return dashboardReady({
+            metrics: [
+                { key: 'open-alerts', label: 'Open Alerts', value: openAlerts ?? '--', route: '/alerts', tone: (openAlerts ?? 0) > 0 ? 'warning' : 'neutral', hint: openAlerts === null ? 'Unavailable' : undefined },
+                { key: 'critical-alerts', label: 'Critical Alerts', value: criticalAlerts ?? '--', route: '/alerts?status=open&severity=critical', tone: (criticalAlerts ?? 0) > 0 ? 'danger' : 'neutral', hint: criticalAlerts === null ? 'Unavailable' : undefined },
+                { key: 'unresolved-errors', label: 'Unresolved Errors', value: unresolvedErrors ?? '--', route: '/errors?status=new', tone: (unresolvedErrors ?? 0) > 0 ? 'warning' : 'neutral', hint: unresolvedErrors === null ? 'Unavailable' : undefined },
+                { key: 'high-risk-sessions', label: 'High-risk Sessions', value: permissions.securityRead ? (highRiskSessions ?? '--') : 'Locked', route: '/security?risk=high', tone: permissions.securityRead && (highRiskSessions ?? 0) > 0 ? 'danger' : 'neutral', hint: permissions.securityRead ? (highRiskSessions === null ? 'Unavailable' : undefined) : 'Requires security access' },
+            ],
+            securityLocked: !permissions.securityRead,
+        }, {
+            empty: (openAlerts ?? 0) === 0 && (criticalAlerts ?? 0) === 0 && (unresolvedErrors ?? 0) === 0 && (highRiskSessions ?? 0) === 0,
+            message: 'No active incidents or alert pressure right now.',
+        });
+    })();
+
+    const traffic = (() => {
+        if (!permissions.analyticsRead) {
+            return dashboardForbidden<{
+                totalVisits: number;
+                series: Array<{ date: string; views: number }>;
+                sources: Array<{ source: string; label: string; views: number; percentage: number }>;
+                topContent: Array<{ id: string; title: string; type: string; views: number; organization?: string }>;
+            }>('analytics:read', 'Analytics access is required to view traffic trends.');
+        }
+        if (!trafficSeries || !trafficSources || !topViews) {
+            return dashboardError<{
+                totalVisits: number;
+                series: Array<{ date: string; views: number }>;
+                sources: Array<{ source: string; label: string; views: number; percentage: number }>;
+                topContent: Array<{ id: string; title: string; type: string; views: number; organization?: string }>;
+            }>('Failed to load analytics traffic.', 'analytics:read');
+        }
+
+        const totalVisits = trafficSeries.reduce((sum: number, item: any) => sum + Number(item.views ?? 0), 0);
+        const sourceTotal = trafficSources.reduce((sum: number, item: any) => sum + Number(item.views ?? 0), 0);
+        const announcementsById = new Map(
+            (announcements ?? []).map((item: any) => [
+                serializeId(item?.id ?? item?._id),
+                item,
+            ])
+        );
+        const topContent = topViews
+            .map((entry: any) => {
+                const match = announcementsById.get(entry.announcementId);
+                if (!match) return null;
+                return {
+                    id: serializeId(match.id ?? match._id),
+                    title: match.title,
+                    type: match.type,
+                    views: Number(entry.views ?? 0),
+                    organization: match.organization,
+                };
+            })
+            .filter((item: any) => item !== null);
+
+        return dashboardReady({
+            totalVisits,
+            series: trafficSeries.map((entry: any) => ({
+                date: entry.date,
+                views: Number(entry.views ?? 0),
+            })),
+            sources: trafficSources.map((entry: any) => ({
+                source: String(entry.source ?? 'unknown'),
+                label: String(entry.label ?? entry.source ?? 'Unknown'),
+                views: Number(entry.views ?? 0),
+                percentage: sourceTotal > 0
+                    ? Number(((Number(entry.views ?? 0) / sourceTotal) * 100).toFixed(1))
+                    : 0,
+            })),
+            topContent,
+        }, {
+            empty: totalVisits === 0 && topContent.length === 0,
+            permission: 'analytics:read',
+            message: 'Traffic charts will populate after announcement views are recorded.',
+        });
+    })();
+
+    const deadlines = (() => {
+        if (!permissions.announcementsRead) {
+            return dashboardForbidden<{ items: Array<{ id: string; title: string; type: string; deadline?: string; organization?: string; route: string }> }>(
+                'announcements:read',
+                'Announcement access is required to view upcoming deadlines.'
+            );
+        }
+        if (!announcements) {
+            return dashboardError<{ items: Array<{ id: string; title: string; type: string; deadline?: string; organization?: string; route: string }> }>(
+                'Failed to load deadline queue.',
+                'announcements:read'
+            );
+        }
+
+        const items = announcements
+            .filter((item: any) => {
+                if (!item.deadline) return false;
+                const deadlineTs = new Date(item.deadline).getTime();
+                return !Number.isNaN(deadlineTs) && deadlineTs >= nowMs && deadlineTs <= sevenDaysMs;
+            })
+            .sort((a: any, b: any) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+            .slice(0, 6)
+            .map((item: any) => ({
+                id: serializeId(item.id ?? item._id),
+                title: item.title,
+                type: item.type,
+                deadline: item.deadline,
+                organization: item.organization,
+                route: `/detailed-post?focus=${encodeURIComponent(serializeId(item.id ?? item._id))}`,
+            }));
+
+        return dashboardReady({
+            items,
+        }, {
+            empty: items.length === 0,
+            permission: 'announcements:read',
+            message: 'No deadlines in the next 7 days.',
+        });
+    })();
+
+    const activity = (() => {
+        if (!permissions.auditRead) {
+            return dashboardForbidden<{ items: Array<{ id: string; title: string; subtitle?: string; createdAt: string; route?: string }> }>(
+                'audit:read',
+                'Audit access is required to view recent activity.'
+            );
+        }
+        if (!auditFeed) {
+            return dashboardError<{ items: Array<{ id: string; title: string; subtitle?: string; createdAt: string; route?: string }> }>(
+                'Failed to load recent activity.',
+                'audit:read'
+            );
+        }
+
+        const items = auditFeed.data.map((entry: any, index: number) => ({
+            id: String(entry.id ?? index),
+            title: humanizeDashboardAuditAction(entry.action),
+            subtitle: String(entry.actorEmail ?? entry.userId ?? 'System'),
+            createdAt: String(entry.createdAt ?? generatedAt),
+            route: entry.announcementId
+                ? `/detailed-post?focus=${encodeURIComponent(String(entry.announcementId))}`
+                : '/audit',
+        }));
+
+        return dashboardReady({
+            items,
+        }, {
+            empty: items.length === 0,
+            permission: 'audit:read',
+            message: 'No recent audit activity yet.',
+        });
+    })();
+
+    const quickActions = dashboardReady({
+        items: dashboardQuickActions(role, permissions),
+    });
+
+    return {
+        generatedAt,
+        displayName,
+        role,
+        permissions,
+        focus,
+        summary,
+        workload,
+        incidents,
+        traffic,
+        deadlines,
+        activity,
+        quickActions,
+    };
+};
+
 const dispatchPublishNotifications = async (announcements: Announcement[]) => {
     if (!announcements.length) return;
 
@@ -1169,145 +1717,11 @@ telemetryRouter.post('/telemetry/events', requirePermission('admin:read'), async
 
 /**
  * GET /api/admin/dashboard
- * Get complete dashboard overview - returns all data that AdminDashboard.tsx expects
+ * Permission-aware dashboard snapshot for the vNext admin console.
  */
 telemetryRouter.get('/dashboard', async (req, res) => {
     try {
-        // Get all announcements for stats
-        const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 1000, includeInactive: true });
-        const total = announcements.length;
-        const totalViews = announcements.reduce((sum, a) => sum + (a.viewCount || 0), 0);
-
-        const now = new Date();
-        const startOfDay = new Date(now);
-        startOfDay.setHours(0, 0, 0, 0);
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(startOfWeek.getDate() - 7);
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        const usersCollection = getCollection<UserDoc>('users');
-        const subscriptionsCollection = getCollection<SubscriptionDoc>('subscriptions');
-
-        const [
-            totalUsers,
-            newToday,
-            newThisWeek,
-            activeSubscribers,
-            openCriticalAlerts,
-            unresolvedErrorReports,
-            securityLogs,
-        ] = await Promise.all([
-            usersCollection.countDocuments({ isActive: true }),
-            usersCollection.countDocuments({ isActive: true, createdAt: { $gte: startOfDay } }),
-            usersCollection.countDocuments({ isActive: true, createdAt: { $gte: startOfWeek } }),
-            subscriptionsCollection.countDocuments({ isActive: true, verified: true }),
-            getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'open', severity: 'critical' } as any),
-            getCollection<any>('error_reports').countDocuments({ status: { $ne: 'resolved' } } as any),
-            getRecentSecurityLogsSafe(250),
-        ]);
-
-        // Calculate category stats
-        const categoryMap: Record<string, { count: number; views: number }> = {};
-        for (const a of announcements) {
-            if (!categoryMap[a.type]) {
-                categoryMap[a.type] = { count: 0, views: 0 };
-            }
-            categoryMap[a.type].count++;
-            categoryMap[a.type].views += a.viewCount || 0;
-        }
-        const categories = Object.entries(categoryMap).map(([type, stats]) => ({
-            type,
-            count: stats.count,
-            views: stats.views
-        }));
-        const statusMap = announcements.reduce<Record<string, number>>((acc, item) => {
-            const key = item.status || 'published';
-            acc[key] = (acc[key] || 0) + 1;
-            return acc;
-        }, {});
-        const pendingReviewItems = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'pending');
-        const unassignedPendingReview = pendingReviewItems.filter((item: any) => !item.assigneeUserId).length;
-        const overdueReviewItems = pendingReviewItems.filter((item: any) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < Date.now()).length;
-        const assignedToCurrentUser = announcements.filter((item: any) => {
-            const status = normalizeAnnouncementStatus(item.status);
-            if (!['pending', 'scheduled', 'draft'].includes(status)) return false;
-            return item.assigneeUserId === req.user?.userId || item.assigneeEmail === req.user?.email;
-        }).length;
-        const highRiskSessions = securityLogs.data.filter((log: any) => {
-            const eventType = String(log.eventType ?? log.event_type ?? '').toLowerCase();
-            return eventType.includes('alert') || eventType.includes('fail') || eventType.includes('forbidden') || eventType.includes('blocked');
-        }).length;
-        const stats = {
-            total,
-            published: statusMap.published || 0,
-            draft: statusMap.draft || 0,
-            archived: statusMap.archived || 0,
-            users: totalUsers,
-            views: totalViews,
-        };
-        const recent = announcements
-            .slice()
-            .sort((a, b) => {
-                const aTime = new Date(a.updatedAt || a.postedAt).getTime();
-                const bTime = new Date(b.updatedAt || b.postedAt).getTime();
-                return bTime - aTime;
-            })
-            .slice(0, 8);
-        const trends = await getDailyRollups(14);
-
-        const topContent = announcements
-            .slice()
-            .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-            .slice(0, 10)
-            .map(a => ({
-                id: a.id,
-                title: a.title,
-                type: a.type,
-                views: a.viewCount || 0,
-                organization: a.organization || 'Unknown'
-            }));
-
-        return res.json({
-            data: {
-                stats,
-                recent,
-                overview: {
-                    totalAnnouncements: total,
-                    totalUsers,
-                    totalViews,
-                    totalBookmarks: 0,
-                    activeJobs: categoryMap['job']?.count || 0,
-                    expiringSoon: 0,
-                    newToday: 0,
-                    newThisWeek: Math.min(total, 10)
-                },
-                categories,
-                trends,
-                topContent,
-                workflowSummary: {
-                    unassignedPendingReview,
-                    overdueReviewItems,
-                    assignedToCurrentUser,
-                    unresolvedErrorReports,
-                    highRiskSessions,
-                    openCriticalAlerts,
-                },
-                operatorCards: [
-                    { key: 'unassigned-pending', label: 'Unassigned Pending', count: unassignedPendingReview, route: '/review?status=pending&assignee=unassigned', tone: unassignedPendingReview > 0 ? 'warning' : 'neutral' },
-                    { key: 'overdue-review', label: 'Overdue Review', count: overdueReviewItems, route: '/review?status=pending&sla=overdue', tone: overdueReviewItems > 0 ? 'danger' : 'neutral' },
-                    { key: 'my-queue', label: 'My Queue', count: assignedToCurrentUser, route: '/queue?assignee=me', tone: assignedToCurrentUser > 0 ? 'info' : 'neutral' },
-                    { key: 'errors', label: 'Unresolved Errors', count: unresolvedErrorReports, route: '/errors?status=new', tone: unresolvedErrorReports > 0 ? 'warning' : 'neutral' },
-                    { key: 'sessions', label: 'High-risk Sessions', count: highRiskSessions, route: '/security?risk=high', tone: highRiskSessions > 0 ? 'danger' : 'neutral' },
-                    { key: 'critical-alerts', label: 'Critical Alerts', count: openCriticalAlerts, route: '/alerts?status=open&severity=critical', tone: openCriticalAlerts > 0 ? 'danger' : 'neutral' },
-                ],
-                users: {
-                    totalUsers,
-                    newToday,
-                    newThisWeek,
-                    activeSubscribers
-                }
-            }
-        });
+        return res.json({ data: await buildAdminDashboardSnapshot(req) });
     } catch (error) {
         console.error('Dashboard error:', error);
         return res.status(500).json({ error: 'Failed to load dashboard' });

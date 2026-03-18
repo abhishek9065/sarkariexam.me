@@ -163,6 +163,137 @@ function announcementsForStatus(status: string | null) {
     return defaultAnnouncements;
 }
 
+function buildDashboardSnapshot() {
+    return {
+        generatedAt: '2026-02-12T11:30:00.000Z',
+        displayName: 'admin',
+        role: 'admin',
+        permissions: {
+            adminRead: true,
+            adminWrite: true,
+            analyticsRead: true,
+            announcementsRead: true,
+            announcementsWrite: true,
+            announcementsApprove: true,
+            auditRead: true,
+            securityRead: true,
+        },
+        focus: {
+            eyebrow: 'Admin Control',
+            title: 'Own incidents, routing, and access drift first.',
+            description: 'Start with critical alerts, risky sessions, and role-impacting changes before moving into content operations.',
+            primaryAction: { id: 'focus-security', label: 'Open Security', route: '/security', tone: 'danger' },
+            secondaryAction: { id: 'focus-access', label: 'Users & Roles', route: '/users-roles', tone: 'subtle' },
+        },
+        summary: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                metrics: [
+                    { key: 'total-posts', label: 'Total Posts', value: 128, route: '/manage-posts' },
+                    { key: 'published', label: 'Published', value: 92, route: '/manage-posts?status=published', tone: 'success' },
+                    { key: 'pending-review', label: 'Pending Review', value: 17, route: '/review', tone: 'warning' },
+                    { key: 'views', label: 'Total Views', value: 6400, route: '/reports' },
+                    { key: 'active-users', label: 'Active Users', value: 24, route: '/users-roles' },
+                    { key: 'subscribers', label: 'Subscribers', value: 512, route: '/reports' },
+                ],
+            },
+        },
+        workload: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                metrics: [
+                    { key: 'pending-review', label: 'Pending Reviews', value: 17, route: '/review', tone: 'warning' },
+                    { key: 'unassigned', label: 'Unassigned Pending Reviews', value: 6, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
+                    { key: 'overdue', label: 'Overdue Review Items', value: 3, route: '/review?status=pending&sla=overdue', tone: 'danger' },
+                    { key: 'assigned', label: 'My Queue', value: 4, route: '/queue?assignee=me', tone: 'info' },
+                    { key: 'broken-links', label: 'Broken Links', value: 3, route: '/link-manager', tone: 'danger' },
+                ],
+            },
+        },
+        incidents: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                metrics: [
+                    { key: 'open-alerts', label: 'Open Alerts', value: 2, route: '/alerts', tone: 'warning' },
+                    { key: 'critical-alerts', label: 'Critical Alerts', value: 1, route: '/alerts?status=open&severity=critical', tone: 'danger' },
+                    { key: 'unresolved-errors', label: 'Unresolved Errors', value: 1, route: '/errors?status=new', tone: 'warning' },
+                    { key: 'high-risk-sessions', label: 'High-risk Sessions', value: 1, route: '/security?risk=high', tone: 'danger' },
+                ],
+                securityLocked: false,
+            },
+        },
+        traffic: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                totalVisits: 420,
+                series: [
+                    { date: '2026-02-06', views: 30 },
+                    { date: '2026-02-07', views: 45 },
+                    { date: '2026-02-08', views: 60 },
+                    { date: '2026-02-09', views: 75 },
+                    { date: '2026-02-10', views: 90 },
+                    { date: '2026-02-11', views: 45 },
+                    { date: '2026-02-12', views: 75 },
+                ],
+                sources: [
+                    { source: 'seo', label: 'Organic', views: 252, percentage: 60 },
+                    { source: 'direct', label: 'Direct', views: 105, percentage: 25 },
+                    { source: 'referral', label: 'Referral', views: 42, percentage: 10 },
+                    { source: 'social', label: 'Social', views: 21, percentage: 5 },
+                ],
+                topContent: [
+                    { id: 'ann-100', title: 'Assistant Clerk Recruitment 2026', type: 'job', views: 42, organization: 'SSC' },
+                ],
+            },
+        },
+        deadlines: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                items: [
+                    {
+                        id: 'ann-100',
+                        title: 'Assistant Clerk Recruitment 2026',
+                        type: 'job',
+                        deadline: '2026-02-14T00:00:00.000Z',
+                        organization: 'SSC',
+                        route: '/detailed-post?focus=ann-100',
+                    },
+                ],
+            },
+        },
+        activity: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                items: defaultAuditLogs.map((item) => ({
+                    id: item.id,
+                    title: 'Announcement Update',
+                    subtitle: item.actorEmail,
+                    createdAt: item.createdAt,
+                    route: '/audit',
+                })),
+            },
+        },
+        quickActions: {
+            status: 'ready',
+            updatedAt: '2026-02-12T11:30:00.000Z',
+            data: {
+                items: [
+                    { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.' },
+                    { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.' },
+                    { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.' },
+                    { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.' },
+                ],
+            },
+        },
+    };
+}
+
 export async function seedCsrfCookie(page: Page) {
     await page.context().addCookies([
         {
@@ -241,12 +372,7 @@ export async function mockAdminApi(page: Page, options: AdminMockOptions = {}) {
         }
 
         if (pathname === '/api/admin/dashboard' && method === 'GET') {
-            await route.fulfill(okJson({
-                totalAnnouncements: 128,
-                pendingReview: 17,
-                activeSessions: 5,
-                highRiskEvents: 2,
-            }));
+            await route.fulfill(okJson(buildDashboardSnapshot()));
             return;
         }
 

@@ -311,6 +311,101 @@ export interface AdminReportSnapshot {
     }>;
 }
 
+export type AdminDashboardWidgetStatus = 'ready' | 'empty' | 'forbidden' | 'error';
+export type AdminDashboardMetricTone = 'neutral' | 'info' | 'warning' | 'danger' | 'success';
+export type AdminDashboardActionTone = 'primary' | 'subtle' | 'warning' | 'danger' | 'success';
+
+export interface AdminDashboardMetric {
+    key: string;
+    label: string;
+    value: number | string;
+    route?: string;
+    tone?: AdminDashboardMetricTone;
+    hint?: string;
+}
+
+export interface AdminDashboardAction {
+    id: string;
+    label: string;
+    route: string;
+    description?: string;
+    tone?: AdminDashboardActionTone;
+}
+
+export interface AdminDashboardWidget<T> {
+    status: AdminDashboardWidgetStatus;
+    updatedAt: string;
+    permission?: AdminPermission;
+    message?: string;
+    data: T | null;
+}
+
+export interface AdminDashboardPermissions {
+    adminRead: boolean;
+    adminWrite: boolean;
+    analyticsRead: boolean;
+    announcementsRead: boolean;
+    announcementsWrite: boolean;
+    announcementsApprove: boolean;
+    auditRead: boolean;
+    securityRead: boolean;
+}
+
+export interface AdminDashboardFocus {
+    eyebrow: string;
+    title: string;
+    description: string;
+    primaryAction?: AdminDashboardAction;
+    secondaryAction?: AdminDashboardAction;
+}
+
+export interface AdminDashboardSummaryData {
+    metrics: AdminDashboardMetric[];
+}
+
+export interface AdminDashboardWorkloadData {
+    metrics: AdminDashboardMetric[];
+}
+
+export interface AdminDashboardIncidentsData {
+    metrics: AdminDashboardMetric[];
+    securityLocked?: boolean;
+}
+
+export interface AdminDashboardTrafficData {
+    totalVisits: number;
+    series: Array<{ date: string; views: number }>;
+    sources: Array<{ source: string; label: string; views: number; percentage: number }>;
+    topContent: Array<{ id: string; title: string; type: string; views: number; organization?: string }>;
+}
+
+export interface AdminDashboardDeadlinesData {
+    items: Array<{ id: string; title: string; type: string; deadline?: string; organization?: string; route: string }>;
+}
+
+export interface AdminDashboardActivityData {
+    items: Array<{ id: string; title: string; subtitle?: string; createdAt: string; route?: string }>;
+}
+
+export interface AdminDashboardQuickActionsData {
+    items: AdminDashboardAction[];
+}
+
+export interface AdminDashboardSnapshot {
+    generatedAt: string;
+    displayName: string;
+    role?: AdminPortalRole;
+    permissions: AdminDashboardPermissions;
+    focus: AdminDashboardFocus;
+    summary: AdminDashboardWidget<AdminDashboardSummaryData>;
+    workload: AdminDashboardWidget<AdminDashboardWorkloadData>;
+    incidents: AdminDashboardWidget<AdminDashboardIncidentsData>;
+    traffic: AdminDashboardWidget<AdminDashboardTrafficData>;
+    deadlines: AdminDashboardWidget<AdminDashboardDeadlinesData>;
+    activity: AdminDashboardWidget<AdminDashboardActivityData>;
+    quickActions: AdminDashboardWidget<AdminDashboardQuickActionsData>;
+}
+
 export interface AdminUser {
     id: string;
     email: string;
