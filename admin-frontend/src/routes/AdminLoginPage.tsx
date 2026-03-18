@@ -11,6 +11,7 @@ import {
 } from '../lib/api/client';
 
 type AuthMode = 'login' | 'forgot-password' | 'reset-password';
+type SessionAuthStage = 'password' | '2fa_required' | '2fa_setup_required' | 'authenticated' | 'session_expired' | 'locked_out';
 const RESET_TOKEN_STORAGE_KEY = 'admin_reset_token';
 
 const readResetTokenFromHash = (hash: string): string => {
@@ -47,7 +48,7 @@ const clearStoredResetToken = () => {
 };
 
 export function AdminLoginPage() {
-    const { user, login } = useAdminAuth();
+    const { user, login, sessionStatus } = useAdminAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -70,6 +71,12 @@ export function AdminLoginPage() {
     const [notice, setNotice] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const [sessionStage, setSessionStage] = useState<SessionAuthStage>(() => (
+        searchParams.get('reason') === 'session-expired' ? 'session_expired' : 'password'
+    ));
+    const [lockoutUntilMs, setLockoutUntilMs] = useState<number | null>(null);
+
+    const sessionExpiredReason = searchParams.get('reason') === 'session-expired';
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
@@ -107,6 +114,30 @@ export function AdminLoginPage() {
         }
     }, [location.hash, location.pathname, location.search, mode, navigate, resetToken]);
 
+    useEffect(() => {
+        if (mode !== 'login') return;
+        if ((sessionExpiredReason || sessionStatus === 'session_expired') && !loginChallengeToken && !setupToken) {
+            setSessionStage('session_expired');
+            setNotice((current) => current ?? 'Your admin session expired. Sign in again to continue.');
+        }
+    }, [loginChallengeToken, mode, sessionExpiredReason, sessionStatus, setupToken]);
+
+    useEffect(() => {
+        if (sessionStage !== 'locked_out' || !lockoutUntilMs) return undefined;
+        const remaining = lockoutUntilMs - Date.now();
+        if (remaining <= 0) {
+            setLockoutUntilMs(null);
+            setSessionStage('password');
+            return undefined;
+        }
+
+        const timeout = window.setTimeout(() => {
+            setLockoutUntilMs(null);
+            setSessionStage('password');
+        }, remaining);
+        return () => window.clearTimeout(timeout);
+    }, [lockoutUntilMs, sessionStage]);
+
     const resetTwoFactorSetup = () => {
         setLoginChallengeToken(null);
         setSetupToken(null);
@@ -119,6 +150,7 @@ export function AdminLoginPage() {
 
     const switchMode = (nextMode: AuthMode) => {
         const next = new URLSearchParams(searchParams);
+        next.delete('reason');
         if (nextMode === 'login') {
             next.delete('mode');
             next.delete('token');
@@ -131,6 +163,8 @@ export function AdminLoginPage() {
         setPassword('');
         setTwoFactorCode('');
         setResetToken('');
+        setLockoutUntilMs(null);
+        setSessionStage(nextMode === 'login' && sessionStatus === 'session_expired' ? 'session_expired' : 'password');
         clearStoredResetToken();
         resetTwoFactorSetup();
     };
@@ -145,6 +179,7 @@ export function AdminLoginPage() {
         setError(null);
         try {
             const setup = await setupAdminTwoFactor(challengeToken);
+            setSessionStage('2fa_setup_required');
             setSetupToken(challengeToken);
             setSetupQrCode(setup.qrCode);
             setSetupSecret(setup.secret);
@@ -172,6 +207,7 @@ export function AdminLoginPage() {
             setSetupVerified(true);
             setPassword('');
             setTwoFactorCode('');
+            setSessionStage('password');
             setNotice('Two-factor enabled. Sign in again with your authenticator code, then generate backup codes from Configuration.');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Two-factor verification failed');
@@ -180,17 +216,40 @@ export function AdminLoginPage() {
         }
     };
 
+    const loginSubtitle = sessionStage === '2fa_required'
+        ? 'Password accepted. Finish session activation with your authenticator code or a backup code.'
+        : sessionStage === '2fa_setup_required'
+            ? 'This admin account must complete two-factor enrollment before the console session can be activated.'
+            : sessionStage === 'session_expired'
+                ? 'Your previous admin session expired. Sign in again to continue.'
+                : sessionStage === 'locked_out'
+                    ? 'Too many attempts were detected. Wait for the lockout window to clear, then retry sign-in.'
+                    : 'Session sign-in activates the admin console. Sensitive actions use a separate step-up check later.';
+
+    const stageBadge = sessionStage === '2fa_required'
+        ? { tone: 'warning' as const, label: '2FA Challenge' }
+        : sessionStage === '2fa_setup_required'
+            ? { tone: 'warning' as const, label: '2FA Setup Required' }
+            : sessionStage === 'session_expired'
+                ? { tone: 'warning' as const, label: 'Session Expired' }
+                : sessionStage === 'locked_out'
+                    ? { tone: 'danger' as const, label: 'Rate Limited' }
+                    : { tone: 'success' as const, label: 'Session Ready' };
+
     return (
         <div className="admin-login-wrap">
             <div className="admin-login-card">
                 <div className="admin-login-logo">SE</div>
                 <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
-                <p className="admin-login-subtitle">Secure operations console with dedicated auth boundaries.</p>
+                <p className="admin-login-subtitle">{loginSubtitle}</p>
                 <div className="ops-row wrap admin-login-badges">
-                    <OpsBadge tone="info">Admin Auth Boundary</OpsBadge>
-                    <OpsBadge tone={setupToken ? 'warning' : 'success'}>
-                        {setupToken ? '2FA Setup In Progress' : '2FA Ready'}
+                    <OpsBadge tone="info">Session Sign-In</OpsBadge>
+                    <OpsBadge tone={stageBadge.tone}>
+                        {stageBadge.label}
                     </OpsBadge>
+                </div>
+                <div className="admin-alert info">
+                    Session sign-in gets you into the console. Step-up verification is requested later for publish, delete, approvals, and other sensitive actions.
                 </div>
 
                 <form
@@ -206,6 +265,7 @@ export function AdminLoginPage() {
                                 const next = new URLSearchParams(searchParams);
                                 next.delete('mode');
                                 next.delete('token');
+                                next.delete('reason');
                                 setSearchParams(next);
                                 setNotice('If an admin account exists for this email, reset instructions have been sent.');
                                 setPassword('');
@@ -222,6 +282,7 @@ export function AdminLoginPage() {
                                 const next = new URLSearchParams(searchParams);
                                 next.delete('mode');
                                 next.delete('token');
+                                next.delete('reason');
                                 setSearchParams(next);
                                 setNotice('Password reset successful. Sign in with your new password.');
                                 setPassword('');
@@ -229,6 +290,7 @@ export function AdminLoginPage() {
                                 setResetToken('');
                                 clearStoredResetToken();
                                 setLoginChallengeToken(null);
+                                setSessionStage('password');
                                 return;
                             }
 
@@ -239,6 +301,8 @@ export function AdminLoginPage() {
                                 loginChallengeToken || undefined
                             );
                             if (result.status === 'authenticated') {
+                                setSessionStage('authenticated');
+                                setLockoutUntilMs(null);
                                 setLoginChallengeToken(null);
                                 navigate('/dashboard', { replace: true });
                                 return;
@@ -250,9 +314,24 @@ export function AdminLoginPage() {
                                     setPassword('');
                                     return;
                                 }
+                                setSessionStage('2fa_required');
                                 setLoginChallengeToken(nextChallengeToken);
                                 setPassword('');
-                                setError(result.message ?? 'Two-factor authentication required. Enter your authenticator code or backup code.');
+                                setError(null);
+                                setNotice(result.message ?? 'Password verified. Enter your authenticator code or a backup code to finish session sign-in.');
+                                return;
+                            }
+                            if (result.status === 'locked-out') {
+                                const nextLockoutUntilMs = typeof result.retryAfter === 'number' && Number.isFinite(result.retryAfter)
+                                    ? Date.now() + result.retryAfter * 1000
+                                    : null;
+                                setSessionStage(nextLockoutUntilMs ? 'locked_out' : 'password');
+                                setLoginChallengeToken(null);
+                                setPassword('');
+                                setTwoFactorCode('');
+                                setError(null);
+                                setLockoutUntilMs(nextLockoutUntilMs);
+                                setNotice(result.message ?? 'Too many sign-in attempts. Retry after the lockout window ends.');
                                 return;
                             }
 
@@ -265,11 +344,11 @@ export function AdminLoginPage() {
                         }
                     }}
                 >
-                    <div className="admin-login-field">
-                        <label className="admin-login-label" htmlFor="admin-email">Email address</label>
-                        <input
-                            id="admin-email"
-                            type="email"
+                        <div className="admin-login-field">
+                            <label className="admin-login-label" htmlFor="admin-email">Email address</label>
+                            <input
+                                id="admin-email"
+                                type="email"
                             placeholder="admin@sarkariexams.me"
                             value={email}
                             onChange={(event) => setEmail(event.target.value)}
@@ -298,14 +377,18 @@ export function AdminLoginPage() {
 
                     {mode === 'login' ? (
                         <div className="admin-login-field">
-                            <label className="admin-login-label" htmlFor="admin-2fa">Two-factor code <span className="admin-login-optional">(optional)</span></label>
+                            <label className="admin-login-label" htmlFor="admin-2fa">
+                                Two-factor code
+                                {sessionStage !== '2fa_required' ? <span className="admin-login-optional">(optional)</span> : null}
+                            </label>
                             <input
                                 id="admin-2fa"
                                 type="text"
-                                placeholder="6-digit code or backup key"
+                                placeholder={sessionStage === '2fa_required' ? 'Authenticator or backup code required' : '6-digit code or backup key'}
                                 value={twoFactorCode}
                                 onChange={(event) => setTwoFactorCode(event.target.value)}
                                 autoComplete="one-time-code"
+                                required={sessionStage === '2fa_required'}
                             />
                         </div>
                     ) : null}
@@ -313,14 +396,18 @@ export function AdminLoginPage() {
                     {notice ? <div className="admin-alert success">{notice}</div> : null}
                     {error ? <div className="admin-alert error">{error}</div> : null}
 
-                    <button className="admin-btn primary admin-login-submit" type="submit" disabled={submitting}>
+                    <button className="admin-btn primary admin-login-submit" type="submit" disabled={submitting || sessionStage === 'locked_out'}>
                         {submitting
                             ? 'Submitting...'
                             : mode === 'forgot-password'
                                 ? 'Send Reset Link'
                                 : mode === 'reset-password'
                                     ? 'Reset Password'
-                                    : 'Sign in'}
+                                    : sessionStage === '2fa_required'
+                                        ? 'Verify Session'
+                                        : sessionStage === 'locked_out'
+                                            ? 'Retry Later'
+                                            : 'Sign in'}
                     </button>
                 </form>
 

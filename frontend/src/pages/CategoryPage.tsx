@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '../components/AnnouncementCard';
@@ -159,10 +159,15 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
     /* Mobile bottom-sheet */
     const [sheetOpen, setSheetOpen] = useState(false);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
 
+    /* ─── UX: A11y Bottom Sheet Lock & Escape Key ─── */
     useEffect(() => {
-        if (sheetOpen) document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
+        if (!sheetOpen) return;
+        document.body.style.overflow = 'hidden';
+        const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheetOpen(false); };
+        window.addEventListener('keydown', handleEsc);
+        return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', handleEsc); };
     }, [sheetOpen]);
 
     const filterAriaLabelByKey: Record<'organization' | 'location' | 'qualification', string> = {
@@ -225,6 +230,20 @@ export function CategoryPage({ type }: { type: ContentType }) {
         setNextCursor(undefined);
         fetchCards();
     }, [fetchCards]);
+
+    /* ─── UX: Zero-Click Infinite Scroll ─── */
+    useEffect(() => {
+        if (!hasMore || loading || loadingMore) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) fetchCards(nextCursor);
+            },
+            { rootMargin: '400px' } // Fetch 400px *before* they hit the bottom
+        );
+        const currentRef = loadMoreRef.current;
+        if (currentRef) observer.observe(currentRef);
+        return () => { if (currentRef) observer.unobserve(currentRef); };
+    }, [hasMore, loading, loadingMore, nextCursor, fetchCards]);
 
     /* ─── URL param helpers ─── */
     const updateParam = useCallback(
@@ -486,11 +505,13 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
                     {/* Load more */}
                     {hasMore && !loading && (
-                        <div className="cat-load-more">
+                        <div className="cat-load-more" ref={loadMoreRef}>
                             <button type="button" className="cat-load-more-btn" onClick={() => fetchCards(nextCursor)} disabled={loadingMore}>
                                 {loadingMore ? (
                                     <><span className="spinner" style={{ width: 16, height: 16 }} /> Loading…</>
-                                ) : 'Load More →'}
+                                ) : (
+                                    'Scroll to load more ↓'
+                                )}
                             </button>
                         </div>
                     )}

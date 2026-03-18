@@ -6,6 +6,7 @@ export interface AdminAuthContextValue {
     user: AdminUser | null;
     permissions: AdminPermissionSnapshot | null;
     loading: boolean;
+    sessionStatus: 'signed_out' | 'active' | 'session_expired';
     login: (email: string, password?: string, twoFactorCode?: string, challengeToken?: string) => Promise<AdminAuthLoginResult>;
     logout: () => Promise<void>;
     refresh: () => Promise<void>;

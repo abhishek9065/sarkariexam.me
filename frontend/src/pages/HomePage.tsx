@@ -273,6 +273,7 @@ export function HomePage() {
     // Predictive Search State
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedSuggestIdx, setSelectedSuggestIdx] = useState(-1);
     const searchRef = useRef<HTMLFormElement>(null);
     const mountedRef = useRef(true);
 
@@ -286,6 +287,7 @@ export function HomePage() {
         const q = searchQuery.trim();
         if (!q || q.length < 2) {
             setSuggestions([]);
+            setSelectedSuggestIdx(-1);
             return;
         }
         let active = true;
@@ -293,6 +295,7 @@ export function HomePage() {
             try {
                 const res = await getSearchSuggestions(q);
                 if (active && mountedRef.current) setSuggestions(res.data || []);
+                setSelectedSuggestIdx(-1); // Reset highlight on new results
             } catch {
                 if (active && mountedRef.current) setSuggestions([]);
             }
@@ -429,6 +432,24 @@ export function HomePage() {
         trackEvent('card_click', { type: card.type, slug: card.slug, source: 'home_latest' });
     }, []);
 
+    /* ─── UX: Keyboard Navigation for Search ─── */
+    const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!showSuggestions || suggestions.length === 0) return;
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedSuggestIdx((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedSuggestIdx((prev) => (prev > 0 ? prev - 1 : -1));
+        } else if (e.key === 'Enter' && selectedSuggestIdx >= 0) {
+            e.preventDefault();
+            const s = suggestions[selectedSuggestIdx];
+            trackEvent('search_suggest_click', { slug: s.slug });
+            navigate(buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay' as SourceTag));
+        }
+    }, [showSuggestions, suggestions, selectedSuggestIdx, navigate]);
+
     const handleFilterChange = useCallback((key: 'all' | ContentType) => {
         setActiveFilter(key);
         trackEvent('filter_change', { tab: key });
@@ -469,6 +490,7 @@ export function HomePage() {
                                     setShowSuggestions(true);
                                 }}
                                 onFocus={() => setShowSuggestions(true)}
+                                onKeyDown={handleSearchKeyDown}
                                 aria-label="Search government exams and jobs"
                             />
                             <button className="hp-search-btn" type="submit">Search</button>
@@ -482,7 +504,8 @@ export function HomePage() {
                                                 <li key={idx}>
                                                     <Link
                                                         to={buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay' as SourceTag)}
-                                                        className="hp-search-suggest-link"
+                                                        className={`hp-search-suggest-link ${selectedSuggestIdx === idx ? 'focused-suggestion' : ''}`}
+                                                        style={selectedSuggestIdx === idx ? { backgroundColor: 'var(--color-gray-100)' } : {}}
                                                         onClick={() => trackEvent('search_suggest_click', { slug: s.slug })}
                                                     >
                                                         <span className="hp-suggest-icon">{CATEGORIES.find(c => c.key === s.type || c.to.includes(s.type))?.icon || '📄'}</span>

@@ -508,9 +508,9 @@ export function AdminLayout() {
                                 <div className="admin-topbar-meta">
                                     <span className="admin-topbar-role">{user?.role ?? 'none'}</span>
                                     {hasValidStepUp ? (
-                                        <span className="admin-chiplet success">{'\u2713'} Step-up</span>
+                                        <span className="admin-chiplet success">{'\u2713'} Sensitive Actions Unlocked</span>
                                     ) : (
-                                        <span className="admin-chiplet warning">{'\u26A0'} No step-up</span>
+                                        <span className="admin-chiplet warning">{'\u26A0'} Sensitive Actions Locked</span>
                                     )}
                                 </div>
                             </div>

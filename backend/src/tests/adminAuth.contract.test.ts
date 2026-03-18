@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   authState,
+  adminAuthLoginHandlerMock,
   terminateAdminSessionMock,
   terminateOtherSessionsMock,
   delegatePayloadForPath,
@@ -12,6 +13,25 @@ const {
     includeUserContext: true,
   };
 
+  const adminAuthLoginHandlerMock = vi.fn((req: any, res: any) => {
+    if (req.body?.email === 'forbidden@sarkariexams.me') {
+      return res.status(403).json({
+        error: 'admin_account_required',
+        code: 'ADMIN_ACCOUNT_REQUIRED',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        user: {
+          id: 'admin-user-1',
+          email: 'admin@sarkariexams.me',
+          role: 'admin',
+        },
+      },
+    });
+  });
   const terminateAdminSessionMock = vi.fn(async () => true);
   const terminateOtherSessionsMock = vi.fn(async () => 2);
 
@@ -55,6 +75,7 @@ const {
 
   return {
     authState,
+    adminAuthLoginHandlerMock,
     terminateAdminSessionMock,
     terminateOtherSessionsMock,
     delegatePayloadForPath,
@@ -91,18 +112,15 @@ vi.mock('../middleware/auth.js', () => ({
 
 vi.mock('../services/adminAuth/delegate.js', () => ({
   delegateToAuthRouter: (targetPath: string) => (req: any, res: any) => {
-    if (targetPath === '/login' && req.body?.email === 'forbidden@sarkariexams.me') {
-      return res.status(401).json({
-        error: 'invalid_credentials',
-        code: 'AUTH_INVALID_CREDENTIALS',
-      });
-    }
-
     return res.json({
       success: true,
       data: delegatePayloadForPath(targetPath),
     });
   },
+}));
+
+vi.mock('../routes/auth.js', () => ({
+  adminAuthLoginHandler: adminAuthLoginHandlerMock,
 }));
 
 vi.mock('../services/adminSessions.js', () => ({
@@ -126,11 +144,12 @@ describe('admin-auth contract', () => {
   beforeEach(() => {
     authState.includeUserContext = true;
     vi.clearAllMocks();
+    adminAuthLoginHandlerMock.mockClear();
     terminateAdminSessionMock.mockResolvedValue(true);
     terminateOtherSessionsMock.mockResolvedValue(2);
   });
 
-  it('delegates login under /api/admin-auth/login', async () => {
+  it('uses the dedicated admin login handler under /api/admin-auth/login', async () => {
     const response = await request(app).post('/api/admin-auth/login').send({
       email: 'admin@sarkariexams.me',
       password: 'Password#123',
@@ -139,6 +158,20 @@ describe('admin-auth contract', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.data?.user?.email).toBe('admin@sarkariexams.me');
+    expect(adminAuthLoginHandlerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects non-admin accounts at the admin login boundary', async () => {
+    const response = await request(app).post('/api/admin-auth/login').send({
+      email: 'forbidden@sarkariexams.me',
+      password: 'Password#123',
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toMatchObject({
+      error: 'admin_account_required',
+      code: 'ADMIN_ACCOUNT_REQUIRED',
+    });
   });
 
   it('delegates me and permissions under /api/admin-auth namespace', async () => {

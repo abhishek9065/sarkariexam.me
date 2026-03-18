@@ -18,8 +18,19 @@ import {
   getAdminPermissionsSnapshot,
   isAdminPortalRole,
 } from '../services/adminPermissions.js';
-import { createAdminSession, isNewDeviceForUser, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
-import { issueAdminStepUpToken } from '../services/adminStepUp.js';
+import {
+  createAdminSession,
+  isNewDeviceForUser,
+  terminateAdminSession,
+  terminateOtherSessions,
+  touchAdminSession,
+  validateAdminSession,
+} from '../services/adminSessions.js';
+import {
+  issueAdminStepUpToken,
+  revokeAdminStepUpGrantsForSession,
+  revokeAdminStepUpGrantsForUser,
+} from '../services/adminStepUp.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { clearAuthAbuseFailures, getAuthAbuseStatus, recordAuthAbuseFailure } from '../services/authAbuse.js';
 import { sendAdminNewDeviceLoginEmail, sendAdminPasswordResetEmail, sendAdminSecurityAlertEmail } from '../services/email.js';
@@ -153,11 +164,46 @@ const getAdminAuthContext = async (req: express.Request, setupToken?: string) =>
     return null;
   }
   if (!isAdminPortalRole(decoded.role)) return null;
+  if (!decoded.twoFactorSetup && decoded.sessionId) {
+    const sessionValidation = await validateAdminSession(decoded.sessionId);
+    if (!sessionValidation.valid) return null;
+  }
 
   const user = await UserModelMongo.findByIdWithSecrets(decoded.userId);
   if (!user || !user.isActive || !isAdminPortalRole(user.role)) return null;
 
   return { user, decoded };
+};
+
+const ensureActiveAdminSession = async (req: express.Request, decoded: JwtPayload) => {
+  if (!isAdminPortalRole(decoded.role) || !decoded.sessionId) {
+    return { valid: true as const };
+  }
+
+  const sessionValidation = await validateAdminSession(decoded.sessionId);
+  if (!sessionValidation.valid) {
+    return {
+      valid: false as const,
+      status: 401,
+      body: {
+        error: 'session_invalid',
+        code: sessionValidation.reason,
+        message: 'Admin session expired. Please sign in again.',
+      },
+    };
+  }
+
+  const exp = (decoded as any).exp;
+  const expiresAt = exp ? new Date(exp * 1000) : null;
+  await touchAdminSession(decoded.sessionId, {
+    userId: decoded.userId,
+    email: decoded.email,
+    ip: getClientIP(req),
+    userAgent: req.headers['user-agent']?.toString() || 'Unknown',
+    expiresAt,
+  }, req.originalUrl);
+
+  return { valid: true as const };
 };
 
 const isAdminEmailAllowed = (email: string): boolean => {
@@ -393,8 +439,10 @@ const consumeBackupCode = async (user: any, rawCode: string): Promise<boolean> =
   return true;
 };
 
-router.post('/login', bruteForceProtection, async (req, res) => {
+const createLoginHandler = (options?: { adminOnly?: boolean }) => async (req: express.Request, res: express.Response) => {
   const clientIP = getClientIP(req);
+  const adminOnly = options?.adminOnly === true;
+  const loginEndpoint = adminOnly ? '/api/admin-auth/login' : '/api/auth/login';
 
   try {
     const validated = loginSchema.parse(req.body);
@@ -446,14 +494,14 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       SecurityLogger.log({
         ip_address: clientIP,
         event_type: 'admin_login_failure',
-        endpoint: '/api/auth/login',
+        endpoint: loginEndpoint,
         metadata: { email: validated.email, reason: 'invalid_credentials', count: failure.count },
       });
       if (shouldAlertForAbuse('admin_login', failure.count)) {
         SecurityLogger.log({
           ip_address: clientIP,
           event_type: 'admin_security_alert',
-          endpoint: '/api/auth/login',
+          endpoint: loginEndpoint,
           metadata: { email: validated.email, reason: 'excessive_login_failures', count: failure.count },
         });
         await maybeSendSecurityAlertEmail({
@@ -478,6 +526,21 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       });
     }
 
+    if (adminOnly && !isAdminPortalUser) {
+      await clearAdminLoginChallenge(loginChallengeTokenToClear);
+      SecurityLogger.log({
+        ip_address: clientIP,
+        event_type: 'admin_login_failure',
+        endpoint: loginEndpoint,
+        metadata: { email: user.email, reason: 'admin_account_required' },
+      });
+      return res.status(403).json({
+        error: 'admin_account_required',
+        code: 'ADMIN_ACCOUNT_REQUIRED',
+        message: 'Admin account required.',
+      });
+    }
+
     if (isAdminPortalUser) {
       if (config.adminEnforceHttps) {
         const forwardedProto = req.headers['x-forwarded-proto'];
@@ -486,7 +549,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
           SecurityLogger.log({
             ip_address: clientIP,
             event_type: 'admin_login_failure',
-            endpoint: '/api/auth/login',
+            endpoint: loginEndpoint,
             metadata: { reason: 'admin_https_required', email: user.email }
           });
           return res.status(403).json({ error: 'HTTPS required for admin access' });
@@ -497,7 +560,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         SecurityLogger.log({
           ip_address: clientIP,
           event_type: 'admin_login_failure',
-          endpoint: '/api/auth/login',
+          endpoint: loginEndpoint,
           metadata: { reason: 'admin_ip_block', email: user.email }
         });
         return res.status(403).json({ error: 'Admin access restricted' });
@@ -506,7 +569,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         SecurityLogger.log({
           ip_address: clientIP,
           event_type: 'admin_login_failure',
-          endpoint: '/api/auth/login',
+          endpoint: loginEndpoint,
           metadata: { reason: 'admin_email_block', email: user.email }
         });
         return res.status(403).json({ error: 'Admin access restricted' });
@@ -590,7 +653,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         SecurityLogger.log({
           ip_address: clientIP,
           event_type: 'admin_backup_code_used',
-          endpoint: '/api/auth/login',
+          endpoint: loginEndpoint,
           metadata: { email: user.email }
         });
       }
@@ -641,7 +704,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
         SecurityLogger.log({
           ip_address: clientIP,
           event_type: 'admin_login_new_device',
-          endpoint: '/api/auth/login',
+          endpoint: loginEndpoint,
           metadata: { email: user.email, device: session.device, browser: session.browser, os: session.os },
         });
         await sendAdminNewDeviceLoginEmail({
@@ -656,7 +719,7 @@ router.post('/login', bruteForceProtection, async (req, res) => {
       SecurityLogger.log({
         ip_address: clientIP,
         event_type: 'admin_login_success',
-        endpoint: '/api/auth/login',
+        endpoint: loginEndpoint,
         metadata: { email: user.email, method: twoFactorMethod ?? 'password' }
       });
       await syncAdminAccessMetadata({
@@ -688,7 +751,11 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Login failed' });
   }
-});
+};
+
+export const adminAuthLoginHandler = createLoginHandler({ adminOnly: true });
+
+router.post('/login', bruteForceProtection, createLoginHandler());
 
 router.post('/admin/forgot-password', async (req, res) => {
   const genericResponse = {
@@ -858,6 +925,7 @@ router.post('/admin/reset-password', async (req, res) => {
       email: validated.email,
     });
     await clearFailedLoginsWithEmail(clientIP, validated.email);
+    await revokeAdminStepUpGrantsForUser(user.id);
     await terminateOtherSessions(user.id);
 
     SecurityLogger.log({
@@ -910,7 +978,14 @@ router.post('/admin/step-up', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { user } = context;
+    const { user, decoded } = context;
+    if (!decoded.sessionId) {
+      return res.status(401).json({
+        error: 'session_invalid',
+        code: 'SESSION_ID_MISSING',
+        message: 'Admin session expired. Please sign in again.',
+      });
+    }
     if (validated.email !== user.email) {
       return res.status(403).json({ error: 'step_up_user_mismatch', message: 'Step-up must match the active account.' });
     }
@@ -992,6 +1067,7 @@ router.post('/admin/step-up', async (req, res) => {
       userId: user.id,
       email: user.email,
       role: user.role,
+      sessionId: decoded.sessionId,
     });
     SecurityLogger.log({
       ip_address: clientIP,
@@ -1246,6 +1322,7 @@ router.post('/logout', async (req, res) => {
       const decoded = jwt.decode(token) as { sessionId?: string } | null;
       if (decoded?.sessionId) {
         await terminateAdminSession(decoded.sessionId);
+        await revokeAdminStepUpGrantsForSession(decoded.sessionId);
       }
     }));
     console.log(`[Auth] Logout from ${getClientIP(req)}`);
@@ -1284,6 +1361,10 @@ router.get('/me', async (req, res) => {
     const decoded = verifyJwtToken(token);
     if (decoded.twoFactorSetup) {
       return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const sessionStatus = await ensureActiveAdminSession(req, decoded);
+    if (!sessionStatus.valid) {
+      return res.status(sessionStatus.status).json(sessionStatus.body);
     }
     const user = await UserModelMongo.findById(decoded.userId);
     
@@ -1349,6 +1430,10 @@ router.get('/admin/permissions', async (req, res) => {
     }
 
     const decoded = verifyJwtToken(token);
+    const sessionStatus = await ensureActiveAdminSession(req, decoded);
+    if (!sessionStatus.valid) {
+      return res.status(sessionStatus.status).json(sessionStatus.body);
+    }
     const user = await UserModelMongo.findById(decoded.userId);
     if (!user || !user.isActive || !isAdminPortalRole(user.role)) {
       return res.status(403).json({ error: 'Admin portal access required' });

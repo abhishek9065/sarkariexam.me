@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
+    AdminApiWorkflowError,
     adminAuthLogin,
     adminAuthLogout,
     adminAuthStepUp,
@@ -18,6 +19,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<AdminUser | null>(null);
     const [permissions, setPermissions] = useState<AdminPermissionSnapshot | null>(null);
     const [loading, setLoading] = useState(true);
+    const [sessionStatus, setSessionStatus] = useState<'signed_out' | 'active' | 'session_expired'>('signed_out');
     const [stepUpToken, setStepUpToken] = useState<string | null>(E2E_STEP_UP_BYPASS ? E2E_STEP_UP_TOKEN : null);
     const [stepUpExpiresAt, setStepUpExpiresAt] = useState<string | null>(E2E_STEP_UP_BYPASS ? E2E_STEP_UP_EXPIRY : null);
 
@@ -36,11 +38,20 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
             ]);
             setUser(nextUser);
             setPermissions(nextPermissions);
+            setSessionStatus(nextUser ? 'active' : 'signed_out');
             if (!nextUser) clearStepUp();
-        } catch {
+        } catch (error) {
             setUser(null);
             setPermissions(null);
             clearStepUp();
+            if (
+                error instanceof AdminApiWorkflowError
+                && (error.code === 'session_invalid' || error.code === 'TOKEN_EXPIRED' || error.code === 'TOKEN_INVALID')
+            ) {
+                setSessionStatus('session_expired');
+            } else {
+                setSessionStatus('signed_out');
+            }
         } finally {
             setLoading(false);
         }
@@ -60,6 +71,8 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         const result = await adminAuthLogin(email, password, twoFactorCode, challengeToken);
         if (result.status === 'authenticated') {
             await refresh();
+        } else {
+            setSessionStatus('signed_out');
         }
         return result;
     }, [refresh]);
@@ -68,6 +81,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         await adminAuthLogout();
         setUser(null);
         setPermissions(null);
+        setSessionStatus('signed_out');
         clearStepUp();
     }, [clearStepUp]);
 
@@ -113,6 +127,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         user,
         permissions,
         loading,
+        sessionStatus,
         login,
         logout,
         refresh,
@@ -125,6 +140,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         user,
         permissions,
         loading,
+        sessionStatus,
         login,
         logout,
         refresh,

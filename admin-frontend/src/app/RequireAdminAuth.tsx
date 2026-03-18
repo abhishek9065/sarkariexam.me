@@ -3,7 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAdminAuth } from './useAdminAuth';
 
 export function RequireAdminAuth() {
-    const { user, loading } = useAdminAuth();
+    const { user, loading, sessionStatus } = useAdminAuth();
 
     if (loading) {
         return (
@@ -15,7 +15,8 @@ export function RequireAdminAuth() {
         );
     }
     if (!user || !['admin', 'editor', 'contributor', 'reviewer', 'viewer'].includes(user.role)) {
-        return <Navigate to="/login" replace />;
+        const reason = sessionStatus === 'session_expired' ? '?reason=session-expired' : '';
+        return <Navigate to={`/login${reason}`} replace />;
     }
 
     return <Outlet />;

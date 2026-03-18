@@ -2,6 +2,7 @@ import crypto from 'crypto';
 
 import { config } from '../config.js';
 
+import { revokeAdminStepUpGrantsForSession } from './adminStepUp.js';
 import RedisCache from './redis.js';
 
 const SESSION_INACTIVE_WINDOW_MS = 30 * 60 * 1000;
@@ -211,6 +212,7 @@ const removeSessionRecord = async (sessionId: string, userIdHint?: string): Prom
   }
 
   await RedisCache.del(getSessionKey(sessionId));
+  await revokeAdminStepUpGrantsForSession(sessionId);
   await removeFromIndex(SESSION_INDEX_KEY, sessionId);
   if (userId) {
     await removeFromIndex(getUserIndexKey(userId), sessionId);

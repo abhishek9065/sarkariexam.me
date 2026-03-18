@@ -25,6 +25,25 @@ vi.mock('../middleware/security.js', () => ({
 vi.mock('../services/analytics.js', () => ({
   recordAnalyticsEvent: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../services/adminSessions.js', () => ({
+  createAdminSession: vi.fn(async ({ userId, email }: any) => ({
+    id: `session-${userId}`,
+    userId,
+    email,
+    device: 'Test Device',
+    browser: 'Test Browser',
+    os: 'Test OS',
+    ip: '127.0.0.1',
+    createdAt: new Date().toISOString(),
+    lastActivityAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  })),
+  isNewDeviceForUser: vi.fn(async () => false),
+  terminateAdminSession: vi.fn(async () => true),
+  terminateOtherSessions: vi.fn(async () => 0),
+  touchAdminSession: vi.fn(async () => undefined),
+  validateAdminSession: vi.fn(async () => ({ valid: true })),
+}));
 vi.mock('../middleware/auth.js', async () => {
   const actual = await vi.importActual('../middleware/auth.js');
   return {
@@ -405,6 +424,7 @@ describe('Auth Routes', () => {
           userId: adminUser.id,
           email: adminUser.email,
           role: adminUser.role,
+          sessionId: 'session-admin-stepup-1',
         },
         'test-secret',
         { expiresIn: '1h' }
@@ -439,6 +459,7 @@ describe('Auth Routes', () => {
           userId: adminUser.id,
           email: adminUser.email,
           role: adminUser.role,
+          sessionId: 'session-admin-stepup-2',
         },
         'test-secret',
         { expiresIn: '1h' }

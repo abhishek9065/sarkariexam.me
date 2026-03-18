@@ -195,7 +195,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
 }
 
 export function requireAdminStepUp(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user?.userId || !isAdminPortalRole(req.user.role)) {
+  if (!req.user?.userId || !req.user?.sessionId || !isAdminPortalRole(req.user.role)) {
     res.status(403).json({ error: 'admin_access_required' });
     return;
   }
@@ -214,7 +214,7 @@ export function requireAdminStepUp(req: Request, res: Response, next: NextFuncti
     return;
   }
 
-  validateAdminStepUpToken(stepUpToken, req.user.userId)
+  validateAdminStepUpToken(stepUpToken, req.user.userId, req.user.sessionId)
     .then((result) => {
       if (!result.valid) {
         res.status(403).json({

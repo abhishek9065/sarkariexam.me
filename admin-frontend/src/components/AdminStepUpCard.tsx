@@ -9,8 +9,8 @@ type AdminStepUpCardProps = {
 };
 
 export function AdminStepUpCard({
-    title = 'Step-up Verification',
-    description = 'Required for high-risk actions like publish, delete, and bulk execution.',
+    title = 'Sensitive Action Verification',
+    description = 'Re-verify the active admin session before high-risk actions like publish, delete, and bulk execution.',
 }: AdminStepUpCardProps) {
     const { hasValidStepUp, stepUpExpiresAt, issueStepUp, clearStepUp } = useAdminAuth();
     const [password, setPassword] = useState('');
@@ -34,7 +34,7 @@ export function AdminStepUpCard({
         >
             {hasValidStepUp ? (
                 <div className="admin-stepup-state">
-                    <span className="ops-inline-muted">Verified until {expiryLabel ?? 'active window'}.</span>
+                    <span className="ops-inline-muted">Sensitive actions unlocked until {expiryLabel ?? 'active window'}.</span>
                     <button type="button" className="admin-btn" onClick={clearStepUp}>Clear Token</button>
                 </div>
             ) : (
@@ -69,11 +69,11 @@ export function AdminStepUpCard({
                         placeholder="2FA or backup code"
                     />
                     <button type="submit" className="admin-btn primary" disabled={loading}>
-                        {loading ? 'Verifying...' : 'Verify'}
+                        {loading ? 'Verifying...' : 'Unlock Sensitive Actions'}
                     </button>
                     {error ? <div className="ops-error ops-span-full">{error}</div> : null}
                     <div className="ops-inline-muted ops-span-full" style={{ fontSize: '0.78rem', lineHeight: 1.5 }}>
-                        Step-up tokens grant access to high-risk actions (publish, delete, bulk operations) and expire after 15 minutes. Re-verify when the token expires.
+                        This does not sign you into the console. It re-verifies the current admin session for high-risk actions and expires after 15 minutes.
                     </div>
                 </form>
             )}

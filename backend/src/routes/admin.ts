@@ -24,6 +24,7 @@ import { getAdminAuditLogsPaged, rebuildAdminAuditLedger, recordAdminAudit, veri
 import { ADMIN_PERMISSION_LIST, ADMIN_PORTAL_ROLES, getAdminPermissionsSnapshot } from '../services/adminPermissions.js';
 import { upsertAdminRoleOverride } from '../services/adminRoleOverrides.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
+import { revokeAdminStepUpGrantsForUser } from '../services/adminStepUp.js';
 import {
     getAnnouncementViewTrafficSources,
     getDailyRollups,
@@ -2949,6 +2950,7 @@ operationsRouter.patch('/users/:id/role', requirePermission('admin:write'), requ
             twoFactorEnabled: Boolean((updated as any).twoFactorEnabled),
             lastLoginAt: (updated as any).lastLogin ? new Date((updated as any).lastLogin) : null,
         });
+        await revokeAdminStepUpGrantsForUser(userId);
 
         audit(req, {
             action: 'admin_role_update',
@@ -3030,6 +3032,7 @@ operationsRouter.patch('/users/:id/status', requirePermission('admin:write'), re
             twoFactorEnabled: Boolean((updated as any).twoFactorEnabled),
             lastLoginAt: (updated as any).lastLogin ? new Date((updated as any).lastLogin) : null,
         });
+        await revokeAdminStepUpGrantsForUser(userId);
 
         await audit(req, {
             action: parsed.data.isActive ? 'admin_user_reactivated' : 'admin_user_suspended',
@@ -3055,6 +3058,7 @@ operationsRouter.post('/users/:id/reset-password', requirePermission('admin:writ
         }
 
         await issueAdminPasswordReset(userId, user.email, req.user?.email);
+        await revokeAdminStepUpGrantsForUser(userId);
         await audit(req, {
             action: 'admin_password_reset_issued',
             userId: req.user?.userId,
@@ -3097,6 +3101,16 @@ operationsRouter.patch('/roles/:role/permissions', requirePermission('admin:writ
             return res.status(400).json({ error: parsed.error.flatten() });
         }
         await upsertAdminRoleOverride(role, parsed.data.permissions, req.user?.email);
+        const impactedUsers = await getCollection<AdminUserListDoc>('users')
+            .find({ role } as Partial<AdminUserListDoc>)
+            .project({ _id: 1 })
+            .toArray();
+        await Promise.all(
+            impactedUsers
+                .map((user) => serializeId((user as any)._id))
+                .filter(Boolean)
+                .map((userId) => revokeAdminStepUpGrantsForUser(userId))
+        );
         await audit(req, {
             action: 'admin_role_permissions_update',
             userId: req.user?.userId,

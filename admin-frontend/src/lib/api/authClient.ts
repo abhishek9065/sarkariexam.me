@@ -34,6 +34,13 @@ export async function adminAuthLogin(
                     message: error.message,
                 };
             }
+            if (error.status === 429 || error.code === 'too_many_attempts' || error.body?.code === 'AUTH_THROTTLED') {
+                return {
+                    status: 'locked-out',
+                    message: error.message,
+                    retryAfter: typeof error.body?.retryAfter === 'number' ? error.body.retryAfter : undefined,
+                };
+            }
         }
         throw error;
     }

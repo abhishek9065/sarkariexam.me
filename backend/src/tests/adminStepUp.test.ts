@@ -2,7 +2,11 @@ import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { config } from '../config.js';
-import { issueAdminStepUpToken, validateAdminStepUpToken } from '../services/adminStepUp.js';
+import {
+  issueAdminStepUpToken,
+  revokeAdminStepUpGrantsForSession,
+  validateAdminStepUpToken,
+} from '../services/adminStepUp.js';
 import RedisCache from '../services/redis.js';
 
 const buildSignOptions = (expiresIn: jwt.SignOptions['expiresIn']): jwt.SignOptions => {
@@ -22,12 +26,14 @@ describe('Admin step-up tokens', () => {
       userId: 'admin-1',
       email: 'admin@example.com',
       role: 'admin',
+      sessionId: 'session-1',
     });
 
-    const result = await validateAdminStepUpToken(issued.token, 'admin-1');
+    const result = await validateAdminStepUpToken(issued.token, 'admin-1', 'session-1');
 
     expect(result.valid).toBe(true);
     expect(result.payload?.userId).toBe('admin-1');
+    expect(result.payload?.sessionId).toBe('session-1');
     expect(result.payload?.purpose).toBe('admin_sensitive_action');
   });
 
@@ -37,6 +43,7 @@ describe('Admin step-up tokens', () => {
         userId: 'admin-1',
         email: 'admin@example.com',
         role: 'admin',
+        sessionId: 'session-1',
         stepUp: false,
         purpose: 'admin_sensitive_action',
         jti: 'invalid-jti',
@@ -45,7 +52,7 @@ describe('Admin step-up tokens', () => {
       buildSignOptions('5m')
     );
 
-    const result = await validateAdminStepUpToken(token, 'admin-1');
+    const result = await validateAdminStepUpToken(token, 'admin-1', 'session-1');
 
     expect(result.valid).toBe(false);
     expect(result.reason).toBe('invalid_step_up_token');
@@ -57,6 +64,7 @@ describe('Admin step-up tokens', () => {
         userId: 'admin-1',
         email: 'admin@example.com',
         role: 'admin',
+        sessionId: 'session-1',
         stepUp: true,
         purpose: 'admin_sensitive_action',
         jti: 'expired-jti',
@@ -65,7 +73,7 @@ describe('Admin step-up tokens', () => {
       buildSignOptions(-1)
     );
 
-    const result = await validateAdminStepUpToken(token, 'admin-1');
+    const result = await validateAdminStepUpToken(token, 'admin-1', 'session-1');
 
     expect(result.valid).toBe(false);
     expect(result.reason).toBe('step_up_expired');
@@ -76,11 +84,42 @@ describe('Admin step-up tokens', () => {
       userId: 'admin-1',
       email: 'admin@example.com',
       role: 'admin',
+      sessionId: 'session-1',
     });
 
-    const result = await validateAdminStepUpToken(issued.token, 'admin-2');
+    const result = await validateAdminStepUpToken(issued.token, 'admin-2', 'session-1');
 
     expect(result.valid).toBe(false);
     expect(result.reason).toBe('step_up_user_mismatch');
+  });
+
+  it('rejects tokens issued for another session', async () => {
+    const issued = await issueAdminStepUpToken({
+      userId: 'admin-1',
+      email: 'admin@example.com',
+      role: 'admin',
+      sessionId: 'session-1',
+    });
+
+    const result = await validateAdminStepUpToken(issued.token, 'admin-1', 'session-2');
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('step_up_session_mismatch');
+  });
+
+  it('revokes all grants for a session', async () => {
+    const issued = await issueAdminStepUpToken({
+      userId: 'admin-1',
+      email: 'admin@example.com',
+      role: 'admin',
+      sessionId: 'session-1',
+    });
+
+    await revokeAdminStepUpGrantsForSession('session-1');
+
+    const result = await validateAdminStepUpToken(issued.token, 'admin-1', 'session-1');
+
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe('step_up_expired');
   });
 });

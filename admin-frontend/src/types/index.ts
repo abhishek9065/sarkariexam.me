@@ -328,10 +328,11 @@ export interface AdminSettingRecord {
 }
 
 export interface AdminAuthLoginResult {
-    status: 'authenticated' | 'two-factor-required' | 'two-factor-setup-required';
+    status: 'authenticated' | 'two-factor-required' | 'two-factor-setup-required' | 'locked-out';
     challengeToken?: string;
     setupToken?: string;
     message?: string;
+    retryAfter?: number;
 }
 
 export interface AdminAuditLog {

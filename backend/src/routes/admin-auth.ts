@@ -2,8 +2,11 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 
 import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
+import { bruteForceProtection } from '../middleware/security.js';
 import { delegateToAuthRouter } from '../services/adminAuth/delegate.js';
 import { terminateAllOtherSessions, terminateSessionById } from '../services/adminAuth/sessions.js';
+
+import { adminAuthLoginHandler } from './auth.js';
 
 const router = Router();
 
@@ -34,7 +37,7 @@ const sendAdminAuthError = (
 };
 
 // Additive admin-auth namespace that reuses hardened auth flows.
-router.post('/login', delegateToAuthRouter('/login'));
+router.post('/login', bruteForceProtection, adminAuthLoginHandler);
 router.post('/logout', delegateToAuthRouter('/logout'));
 router.get('/me', delegateToAuthRouter('/me'));
 router.get('/permissions', delegateToAuthRouter('/admin/permissions'));

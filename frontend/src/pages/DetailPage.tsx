@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
 import { Layout } from '../components/Layout';
 import { AnnouncementCard } from '../components/AnnouncementCard';
@@ -94,67 +95,157 @@ function buildSections(a: Announcement, jd?: JobDetailsData): SectionDef[] {
     return s;
 }
 
+/* ── 2026 Custom Hooks ── */
+function useScrollSpy(sectionIds: string[], offset = 80) {
+    const [activeId, setActiveId] = useState(sectionIds[0] || 'overview');
+    useEffect(() => {
+        if (!sectionIds.length) return;
+        const observer = new IntersectionObserver(
+            (entries) => { for (const e of entries) { if (e.isIntersecting) { setActiveId(e.target.id); break; } } },
+            { rootMargin: `-${offset}px 0px -60% 0px`, threshold: 0.1 }
+        );
+        for (const id of sectionIds) { const el = document.getElementById(id); if (el) observer.observe(el); }
+        return () => observer.disconnect();
+    }, [sectionIds, offset]);
+    return activeId;
+}
+
+function useReadingProgress() {
+    const [progress, setProgress] = useState(0);
+    useEffect(() => {
+        let frame: number;
+        const updateProgress = () => {
+            frame = requestAnimationFrame(() => {
+                const currentScroll = window.scrollY;
+                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+                if (scrollHeight) setProgress(Number((currentScroll / scrollHeight).toFixed(2)) * 100);
+            });
+        };
+        window.addEventListener('scroll', updateProgress, { passive: true });
+        return () => { window.removeEventListener('scroll', updateProgress); cancelAnimationFrame(frame); };
+    }, []);
+    return progress;
+}
+
 /* ═══════════════════════════════════════════════════════════
-   DetailPage Component — SarkariResult-style single-column
+   DetailPage Component — 2026 Edition
    ═══════════════════════════════════════════════════════════ */
 export function DetailPage({ type }: { type: ContentType }) {
     const { slug } = useParams<{ slug: string }>();
-    const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-    const [related, setRelated] = useState<CardType[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [bookmarked, setBookmarked] = useState(false);
-    const [activeSection, setActiveSection] = useState('overview');
+    const queryClient = useQueryClient();
     const [copied, setCopied] = useState(false);
+    const readingProgress = useReadingProgress();
 
+    /* ── Automatic Caching & Data Fetching (TanStack Query) ── */
+    const { data: announcement, isPending: loading, isError, error } = useQuery({
+        queryKey: ['announcement', type, slug],
+        queryFn: async () => {
+            const res = await getAnnouncementBySlug(type, slug!);
+            trackEvent('detail_view', { type, slug });
+            return res.data;
+        },
+        enabled: !!slug,
+        staleTime: 5 * 60 * 1000, // Cache for 5 mins
+    });
+
+    /* Parallel fetch for related content */
+    const { data: related = [] } = useQuery({
+        queryKey: ['related', type],
+        queryFn: async () => {
+            const res = await getAnnouncementCards({ type, limit: 8, sort: 'newest' });
+            return res.data;
+        },
+        staleTime: 10 * 60 * 1000,
+    });
+
+    /* User Bookmarks (with optimistic UI updates) */
+    const { data: bookmarks = [] } = useQuery({
+        queryKey: ['bookmarks'],
+        queryFn: async () => (await getBookmarks()).data,
+        retry: false, // Don't retry if user is anonymous
+    });
+
+    const isBookmarked = useMemo(() => 
+        Array.isArray(bookmarks) && announcement ? bookmarks.some((b) => b.id === announcement.id) : false,
+    [bookmarks, announcement]);
+
+    const toggleBookmark = useMutation({
+        mutationFn: async () => {
+            if (!announcement) throw new Error("No announcement");
+            if (isBookmarked) await removeBookmark(announcement.id);
+            else await addBookmark(announcement.id);
+        },
+        onMutate: async () => {
+            // Optimistic UI update (Instant feedback, 2026 UX standard)
+            await queryClient.cancelQueries({ queryKey: ['bookmarks'] });
+            const prev = queryClient.getQueryData(['bookmarks']);
+            trackEvent(isBookmarked ? 'bookmark_remove' : 'bookmark_add', { slug: announcement?.slug });
+            
+            queryClient.setQueryData(['bookmarks'], (old: any[]) => {
+                if (!Array.isArray(old)) return old;
+                if (isBookmarked) return old.filter((b) => b.id !== announcement?.id);
+                return [...old, { id: announcement?.id }]; 
+            });
+            return { prev };
+        },
+        onError: (err, variables, context) => {
+            queryClient.setQueryData(['bookmarks'], context?.prev); // Rollback on failure
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+        }
+    });
+
+    /* Scroll to top on slug change */
     useEffect(() => {
         window.scrollTo(0, 0);
-        if (!slug) return;
-        let mounted = true;
-        setLoading(true); setError(null);
-        (async () => {
-            try {
-                const res = await getAnnouncementBySlug(type, slug);
-                if (!mounted) return;
-                setAnnouncement(res.data);
-                trackEvent('detail_view', { type, slug });
-                try {
-                    const rel = await getAnnouncementCards({ type, limit: 8, sort: 'newest' });
-                    if (mounted) setRelated(rel.data.filter((item) => item.slug !== slug).slice(0, 6));
-                } catch { if (mounted) setRelated([]); }
-                try {
-                    const bm = await getBookmarks();
-                    if (mounted && Array.isArray(bm.data) && bm.data.some((b) => b.id === res.data.id)) setBookmarked(true);
-                } catch { /* not logged in */ }
-            } catch (err: unknown) {
-                if (mounted) setError(err instanceof Error ? err.message : 'Failed to load announcement');
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        })();
-        return () => { mounted = false; };
-    }, [type, slug]);
+    }, [slug]);
 
-    /* Intersection observer for scroll-spy */
+    /* ── Document Title & Hash Scroll Sync ── */
     useEffect(() => {
-        if (!announcement) return;
-        const jd = announcement.jobDetails as JobDetailsData | undefined;
-        const ids = buildSections(announcement, jd).map((s) => s.id);
-        const observer = new IntersectionObserver(
-            (entries) => { for (const e of entries) { if (e.isIntersecting) { setActiveSection(e.target.id); break; } } },
-            { rootMargin: '-80px 0px -60% 0px', threshold: 0.1 },
-        );
-        for (const id of ids) { const el = document.getElementById(id); if (el) observer.observe(el); }
-        return () => observer.disconnect();
+        if (announcement) {
+            document.title = `${announcement.title} | SarkariExams.me`;
+            
+            // If URL has a hash (e.g. #dates), scroll to it after data loads
+            if (window.location.hash) {
+                const el = document.getElementById(window.location.hash.slice(1));
+                if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+            }
+        }
     }, [announcement]);
 
-    const toggleBookmark = useCallback(async () => {
-        if (!announcement) return;
-        try {
-            if (bookmarked) { await removeBookmark(announcement.id); setBookmarked(false); trackEvent('bookmark_remove', { slug: announcement.slug }); }
-            else { await addBookmark(announcement.id); setBookmarked(true); trackEvent('bookmark_add', { slug: announcement.slug }); }
-        } catch { /* not logged in */ }
-    }, [announcement, bookmarked]);
+    /* ── JSON-LD Schema for Google Jobs SEO ── */
+    const jsonLdSchema = useMemo(() => {
+        if (!announcement || type !== 'job') return null;
+        const jobDetails = announcement.jobDetails as JobDetailsData | undefined;
+        return JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "JobPosting",
+            "title": announcement.title,
+            "description": announcement.content ? DOMPurify.sanitize(announcement.content, { ALLOWED_TAGS: [] }) : `Recruitment details for ${announcement.title}`,
+            "datePosted": announcement.postedAt,
+            "validThrough": announcement.deadline || undefined,
+            "employmentType": "FULL_TIME",
+            "hiringOrganization": {
+                "@type": "Organization",
+                "name": announcement.organization || "Government Organization",
+                "sameAs": announcement.externalLink || "https://sarkariexams.me"
+            },
+            "jobLocation": {
+                "@type": "Place",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressCountry": "IN",
+                    "addressRegion": announcement.location || "India"
+                }
+            },
+            "baseSalary": jobDetails?.salary?.payScale ? {
+                "@type": "MonetaryAmount",
+                "currency": "INR",
+                "value": { "@type": "QuantitativeValue", "value": jobDetails.salary.payScale, "unitText": "MONTH" }
+            } : undefined
+        });
+    }, [announcement, type]);
 
     const handleCopyLink = useCallback(async () => {
         try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /**/ }
@@ -182,13 +273,13 @@ export function DetailPage({ type }: { type: ContentType }) {
     }
 
     /* ── Error ── */
-    if (error || !announcement) {
+    if (isError || !announcement) {
         return (
             <Layout>
                 <div className="sr-detail-error animate-fade-in">
                     <div className="sr-error-icon">😕</div>
                     <h2>Announcement Not Found</h2>
-                    <p>{error || 'This announcement may have been removed or is no longer available.'}</p>
+                    <p>{(error as Error)?.message || 'This announcement may have been removed or is no longer available.'}</p>
                     <div className="sr-error-actions">
                         <Link to={TYPE_ROUTES[type]} className="btn btn-accent">← Browse {TYPE_LABELS[type]}</Link>
                         <Link to="/" className="btn btn-outline">Go Home</Link>
@@ -204,6 +295,8 @@ export function DetailPage({ type }: { type: ContentType }) {
     const deadline = getDeadlineStatus(a.deadline);
     const isClosed = deadline?.cls === 'sr-badge-closed';
     const sections = buildSections(a, jd);
+    
+    const activeSection = useScrollSpy(sections.map(s => s.id));
 
     /* Countdown days for deadline stat */
     const daysLeft = a.deadline ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / 86_400_000) : null;
@@ -214,8 +307,9 @@ export function DetailPage({ type }: { type: ContentType }) {
     const isStale = daysSinceUpdate > 30;
 
     /* Filter related: hide expired, prioritize open listings */
-    const openRelated = related.filter((card) => !card.deadline || new Date(card.deadline).getTime() > Date.now());
-    const expiredRelated = related.filter((card) => card.deadline && new Date(card.deadline).getTime() <= Date.now());
+    const cleanedRelated = related.filter((item) => item.slug !== slug);
+    const openRelated = cleanedRelated.filter((card) => !card.deadline || new Date(card.deadline).getTime() > Date.now());
+    const expiredRelated = cleanedRelated.filter((card) => card.deadline && new Date(card.deadline).getTime() <= Date.now());
     const filteredRelated = [...openRelated, ...expiredRelated].slice(0, 6);
 
     const toNum = (v: unknown) => { const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? n : 0; };
@@ -223,6 +317,25 @@ export function DetailPage({ type }: { type: ContentType }) {
 
     return (
         <Layout>
+            {/* ── SEO Rich Snippets ── */}
+            {jsonLdSchema && (
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSchema }} />
+            )}
+
+            {/* ── 2026 Reading Progress Bar ── */}
+            <div 
+                aria-hidden="true"
+                style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, height: '4px',
+                    backgroundColor: 'var(--accent-blue, #2563eb)',
+                    transform: `scaleX(${readingProgress / 100})`,
+                    transformOrigin: '0% 50%',
+                    zIndex: 9999,
+                    transition: 'transform 0.1s ease-out'
+                }}
+            />
+
             <article className="sr-detail animate-fade-in">
                 {/* ─── Breadcrumb ─── */}
                 <nav className="sr-breadcrumb">
@@ -241,7 +354,11 @@ export function DetailPage({ type }: { type: ContentType }) {
                 )}
                 {isStale && !isClosed && (
                     <div className="sr-stale-banner">
-                        ℹ️ This page was last updated {daysSinceUpdate} days ago. Some information may have changed — please verify on the official website.
+                        <span className="sr-stale-icon">⏳</span> 
+                        <div>
+                            <strong>Older Update:</strong> This page was last verified {daysSinceUpdate} days ago. 
+                            Some parameters might have shifted. Please cross-reference with the official portal.
+                        </div>
                     </div>
                 )}
 
@@ -303,8 +420,14 @@ export function DetailPage({ type }: { type: ContentType }) {
                         ) : (
                             <span className="sr-btn-disabled">Link Not Available Yet</span>
                         )}
-                        <button type="button" className={`sr-btn-icon${bookmarked ? ' active' : ''}`} onClick={toggleBookmark} title={bookmarked ? "Saved" : "Save"}>
-                            {bookmarked ? '🔖' : '📑'}
+                        <button 
+                            type="button" 
+                            className={`sr-btn-icon${isBookmarked ? ' active' : ''}`} 
+                            onClick={() => toggleBookmark.mutate()} 
+                            title={isBookmarked ? "Saved" : "Save"}
+                            disabled={toggleBookmark.isPending}
+                        >
+                            {toggleBookmark.isPending ? '⏳' : isBookmarked ? '🔖' : '📑'}
                         </button>
                         <button type="button" className="sr-btn-icon hide-mobile" onClick={handlePrint} title="Print">🖨️</button>
                         <button type="button" className="sr-btn-icon" onClick={handleCopyLink} title="Share">
@@ -696,8 +819,13 @@ export function DetailPage({ type }: { type: ContentType }) {
                 ) : (
                     <span className="sr-mobile-primary" style={{ opacity: 0.5, pointerEvents: 'none' }}>Link Not Available</span>
                 )}
-                <button type="button" className={`sr-mobile-icon${bookmarked ? ' active' : ''}`} onClick={toggleBookmark}>
-                    {bookmarked ? '🔖' : '📑'}
+                <button 
+                    type="button" 
+                    className={`sr-mobile-icon${isBookmarked ? ' active' : ''}`} 
+                    onClick={() => toggleBookmark.mutate()}
+                    disabled={toggleBookmark.isPending}
+                >
+                    {toggleBookmark.isPending ? '⏳' : isBookmarked ? '🔖' : '📑'}
                 </button>
                 <button type="button" className="sr-mobile-icon" onClick={handleCopyLink}>
                     {copied ? '✅' : '🔗'}
