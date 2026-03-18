@@ -1911,6 +1911,40 @@ button.ops-kpi-card:hover::before {
     color: var(--text-muted);
 }
 
+.dash-widget-meta-line {
+    margin: 0 0 var(--space-3);
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+.dash-section {
+    margin-top: var(--space-4);
+}
+
+.dash-section-header {
+    margin-bottom: var(--space-3);
+}
+
+.dash-section-eyebrow {
+    margin: 0 0 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.dash-section-title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-family: var(--font-heading);
+}
+
+.dash-section-copy {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+}
+
 .dash-grid-2col {
     display: grid;
     gap: var(--space-4);

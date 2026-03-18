@@ -147,6 +147,28 @@ const okJson = (data: JsonValue, headers: Record<string, string> = {}) => ({
     body: JSON.stringify({ success: true, data }),
 });
 
+const DASH_TS = '2026-02-12T11:30:00.000Z';
+
+function buildWidget(input: {
+    id: string;
+    title: string;
+    description: string;
+    kind: 'metrics' | 'list' | 'traffic' | 'actions';
+    source: string;
+    status: 'ready' | 'empty' | 'forbidden' | 'error';
+    emptyState: { title: string; description: string };
+    data: JsonValue | null;
+    message?: string;
+    permission?: string;
+    drilldown?: string;
+}) {
+    return {
+        ...input,
+        updatedAt: DASH_TS,
+        stale: false,
+    };
+}
+
 function parseBody(route: Route): Record<string, unknown> {
     const raw = route.request().postData();
     if (!raw) return {};
@@ -165,7 +187,7 @@ function announcementsForStatus(status: string | null) {
 
 function buildDashboardSnapshot() {
     return {
-        generatedAt: '2026-02-12T11:30:00.000Z',
+        generatedAt: DASH_TS,
         displayName: 'admin',
         role: 'admin',
         permissions: {
@@ -185,111 +207,238 @@ function buildDashboardSnapshot() {
             primaryAction: { id: 'focus-security', label: 'Open Security', route: '/security', tone: 'danger' },
             secondaryAction: { id: 'focus-access', label: 'Users & Roles', route: '/users-roles', tone: 'subtle' },
         },
-        summary: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                metrics: [
-                    { key: 'total-posts', label: 'Total Posts', value: 128, route: '/manage-posts' },
-                    { key: 'published', label: 'Published', value: 92, route: '/manage-posts?status=published', tone: 'success' },
-                    { key: 'pending-review', label: 'Pending Review', value: 17, route: '/review', tone: 'warning' },
-                    { key: 'views', label: 'Total Views', value: 6400, route: '/reports' },
-                    { key: 'active-users', label: 'Active Users', value: 24, route: '/users-roles' },
-                    { key: 'subscribers', label: 'Subscribers', value: 512, route: '/reports' },
-                ],
+        sections: [
+            {
+                id: 'my-work',
+                title: 'My Work',
+                description: 'Assigned queue, pending approvals, my deadlines, and my recent changes.',
+                widgetIds: ['my-queue', 'pending-approvals', 'my-deadlines', 'recent-changes'],
             },
-        },
-        workload: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                metrics: [
-                    { key: 'pending-review', label: 'Pending Reviews', value: 17, route: '/review', tone: 'warning' },
-                    { key: 'unassigned', label: 'Unassigned Pending Reviews', value: 6, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
-                    { key: 'overdue', label: 'Overdue Review Items', value: 3, route: '/review?status=pending&sla=overdue', tone: 'danger' },
-                    { key: 'assigned', label: 'My Queue', value: 4, route: '/queue?assignee=me', tone: 'info' },
-                    { key: 'broken-links', label: 'Broken Links', value: 3, route: '/link-manager', tone: 'danger' },
-                ],
+            {
+                id: 'system-health',
+                title: 'System Health',
+                description: 'Alerts, security, audit, and platform signals.',
+                widgetIds: ['alerts', 'security', 'audit', 'traffic', 'top-content'],
             },
-        },
-        incidents: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                metrics: [
-                    { key: 'open-alerts', label: 'Open Alerts', value: 2, route: '/alerts', tone: 'warning' },
-                    { key: 'critical-alerts', label: 'Critical Alerts', value: 1, route: '/alerts?status=open&severity=critical', tone: 'danger' },
-                    { key: 'unresolved-errors', label: 'Unresolved Errors', value: 1, route: '/errors?status=new', tone: 'warning' },
-                    { key: 'high-risk-sessions', label: 'High-risk Sessions', value: 1, route: '/security?risk=high', tone: 'danger' },
-                ],
-                securityLocked: false,
-            },
-        },
-        traffic: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                totalVisits: 420,
-                series: [
-                    { date: '2026-02-06', views: 30 },
-                    { date: '2026-02-07', views: 45 },
-                    { date: '2026-02-08', views: 60 },
-                    { date: '2026-02-09', views: 75 },
-                    { date: '2026-02-10', views: 90 },
-                    { date: '2026-02-11', views: 45 },
-                    { date: '2026-02-12', views: 75 },
-                ],
-                sources: [
-                    { source: 'seo', label: 'Organic', views: 252, percentage: 60 },
-                    { source: 'direct', label: 'Direct', views: 105, percentage: 25 },
-                    { source: 'referral', label: 'Referral', views: 42, percentage: 10 },
-                    { source: 'social', label: 'Social', views: 21, percentage: 5 },
-                ],
-                topContent: [
-                    { id: 'ann-100', title: 'Assistant Clerk Recruitment 2026', type: 'job', views: 42, organization: 'SSC' },
-                ],
-            },
-        },
-        deadlines: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                items: [
-                    {
-                        id: 'ann-100',
-                        title: 'Assistant Clerk Recruitment 2026',
-                        type: 'job',
-                        deadline: '2026-02-14T00:00:00.000Z',
-                        organization: 'SSC',
-                        route: '/detailed-post?focus=ann-100',
-                    },
-                ],
-            },
-        },
-        activity: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                items: defaultAuditLogs.map((item) => ({
-                    id: item.id,
-                    title: 'Announcement Update',
-                    subtitle: item.actorEmail,
-                    createdAt: item.createdAt,
-                    route: '/audit',
-                })),
-            },
-        },
-        quickActions: {
-            status: 'ready',
-            updatedAt: '2026-02-12T11:30:00.000Z',
-            data: {
-                items: [
-                    { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.' },
-                    { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.' },
-                    { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.' },
-                    { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.' },
-                ],
-            },
+        ],
+        widgets: {
+            summary: buildWidget({
+                id: 'summary',
+                title: 'Operations Snapshot',
+                description: 'Current content, audience, and platform totals.',
+                kind: 'metrics',
+                source: 'mixed',
+                status: 'ready',
+                emptyState: { title: 'Overview unavailable', description: 'Summary metrics are unavailable for this role.' },
+                data: {
+                    metrics: [
+                        { key: 'total-posts', label: 'Total Posts', value: 128, route: '/manage-posts' },
+                        { key: 'published', label: 'Published', value: 92, route: '/manage-posts?status=published', tone: 'success' },
+                        { key: 'pending-review', label: 'Pending Review', value: 17, route: '/review', tone: 'warning' },
+                        { key: 'views', label: 'Total Views', value: 6400, route: '/reports' },
+                        { key: 'active-users', label: 'Active Users', value: 24, route: '/users-roles' },
+                        { key: 'subscribers', label: 'Subscribers', value: 512, route: '/reports' },
+                    ],
+                },
+            }),
+            'my-queue': buildWidget({
+                id: 'my-queue',
+                title: 'My Queue',
+                description: 'Assigned queue and review pressure tied to your account.',
+                kind: 'metrics',
+                source: 'announcements',
+                status: 'ready',
+                emptyState: { title: 'Queue is clear', description: 'No assigned or pending queue work right now.' },
+                drilldown: '/queue?assignee=me',
+                data: {
+                    metrics: [
+                        { key: 'pending-review', label: 'Pending Reviews', value: 17, route: '/review', tone: 'warning' },
+                        { key: 'unassigned', label: 'Unassigned Pending Reviews', value: 6, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
+                        { key: 'overdue', label: 'Overdue Review Items', value: 3, route: '/review?status=pending&sla=overdue', tone: 'danger' },
+                        { key: 'assigned', label: 'My Queue', value: 4, route: '/queue?assignee=me', tone: 'info' },
+                        { key: 'broken-links', label: 'Broken Links', value: 3, route: '/link-manager', tone: 'danger' },
+                    ],
+                },
+            }),
+            'pending-approvals': buildWidget({
+                id: 'pending-approvals',
+                title: 'Pending Approvals',
+                description: 'Approval load, expiry pressure, and execution backlog.',
+                kind: 'metrics',
+                source: 'admin_approval_requests',
+                status: 'ready',
+                emptyState: { title: 'Approvals are clear', description: 'No approval backlog is waiting on this role.' },
+                drilldown: '/approvals',
+                data: {
+                    metrics: [
+                        { key: 'pending', label: 'Pending', value: 2, route: '/approvals?status=pending', tone: 'warning' },
+                        { key: 'approved', label: 'Approved Pending Execution', value: 1, route: '/approvals?status=approved', tone: 'info' },
+                        { key: 'overdue', label: 'Overdue', value: 1, route: '/approvals', tone: 'danger' },
+                        { key: 'due-soon', label: 'Due Soon', value: 1, route: '/approvals', tone: 'warning' },
+                    ],
+                },
+            }),
+            'my-deadlines': buildWidget({
+                id: 'my-deadlines',
+                title: 'My Deadlines',
+                description: 'Upcoming deadlines for content already assigned to you.',
+                kind: 'list',
+                source: 'announcements',
+                status: 'ready',
+                emptyState: { title: 'No deadlines due', description: 'No assigned deadlines are due in the next 7 days.' },
+                data: {
+                    items: [
+                        {
+                            id: 'ann-100',
+                            title: 'Assistant Clerk Recruitment 2026',
+                            subtitle: 'SSC',
+                            meta: 'Published',
+                            route: '/detailed-post?focus=ann-100',
+                            timestamp: '2026-02-14T00:00:00.000Z',
+                        },
+                    ],
+                },
+            }),
+            'recent-changes': buildWidget({
+                id: 'recent-changes',
+                title: 'My Recent Changes',
+                description: 'Your latest content and administrative changes.',
+                kind: 'list',
+                source: 'announcements',
+                status: 'ready',
+                emptyState: { title: 'No recent changes', description: 'Your recent changes will appear here after the next update.' },
+                data: {
+                    items: defaultAuditLogs.map((item) => ({
+                        id: item.id,
+                        title: 'Announcement Update',
+                        subtitle: item.actorEmail,
+                        meta: 'Pending',
+                        route: '/manage-posts',
+                        timestamp: item.createdAt,
+                    })),
+                },
+            }),
+            alerts: buildWidget({
+                id: 'alerts',
+                title: 'Alerts',
+                description: 'Open alerts, critical issues, and unresolved errors.',
+                kind: 'metrics',
+                source: 'mixed',
+                status: 'ready',
+                emptyState: { title: 'No active alerts', description: 'There are no open alerts or unresolved error spikes right now.' },
+                drilldown: '/alerts',
+                data: {
+                    metrics: [
+                        { key: 'open-alerts', label: 'Open Alerts', value: 2, route: '/alerts', tone: 'warning' },
+                        { key: 'critical-alerts', label: 'Critical Alerts', value: 1, route: '/alerts?status=open&severity=critical', tone: 'danger' },
+                        { key: 'unresolved-errors', label: 'Unresolved Errors', value: 1, route: '/errors', tone: 'warning' },
+                    ],
+                },
+            }),
+            security: buildWidget({
+                id: 'security',
+                title: 'Security',
+                description: 'Risky sessions and blocked or suspicious activity.',
+                kind: 'metrics',
+                source: 'security_logs',
+                status: 'ready',
+                emptyState: { title: 'Security is calm', description: 'No active session anomalies or blocked events were detected.' },
+                drilldown: '/security',
+                data: {
+                    metrics: [
+                        { key: 'high-risk', label: 'High-risk Sessions', value: 1, route: '/security?risk=high', tone: 'danger' },
+                        { key: 'blocked', label: 'Blocked Requests', value: 1, route: '/security', tone: 'warning' },
+                        { key: 'failed-auth', label: 'Failed Auth Events', value: 2, route: '/security', tone: 'warning' },
+                        { key: 'events', label: 'Recent Security Events', value: 4, route: '/sessions', tone: 'info' },
+                    ],
+                },
+            }),
+            audit: buildWidget({
+                id: 'audit',
+                title: 'Audit Activity',
+                description: 'Recent administrative actions across the control plane.',
+                kind: 'list',
+                source: 'admin_audit_logs',
+                status: 'ready',
+                emptyState: { title: 'No audit activity', description: 'Administrative activity will appear here as actions are recorded.' },
+                drilldown: '/audit',
+                data: {
+                    items: defaultAuditLogs.map((item) => ({
+                        id: item.id,
+                        title: 'Announcement Update',
+                        subtitle: item.actorEmail,
+                        meta: 'Assistant Clerk Recruitment 2026',
+                        route: '/audit',
+                        timestamp: item.createdAt,
+                    })),
+                },
+            }),
+            traffic: buildWidget({
+                id: 'traffic',
+                title: 'Traffic Overview',
+                description: 'Seven-day traffic and source mix for the public platform.',
+                kind: 'traffic',
+                source: 'analytics_rollups',
+                status: 'ready',
+                emptyState: { title: 'No traffic data yet', description: 'Traffic charts will populate after announcement views are recorded.' },
+                drilldown: '/analytics',
+                data: {
+                    totalVisits: 420,
+                    series: [
+                        { date: '2026-02-06', views: 30 },
+                        { date: '2026-02-07', views: 45 },
+                        { date: '2026-02-08', views: 60 },
+                        { date: '2026-02-09', views: 75 },
+                        { date: '2026-02-10', views: 90 },
+                        { date: '2026-02-11', views: 45 },
+                        { date: '2026-02-12', views: 75 },
+                    ],
+                    sources: [
+                        { source: 'seo', label: 'Organic', views: 252, percentage: 60 },
+                        { source: 'direct', label: 'Direct', views: 105, percentage: 25 },
+                        { source: 'referral', label: 'Referral', views: 42, percentage: 10 },
+                        { source: 'social', label: 'Social', views: 21, percentage: 5 },
+                    ],
+                },
+            }),
+            'top-content': buildWidget({
+                id: 'top-content',
+                title: 'Top Content',
+                description: 'Most-viewed announcements in the last 24 hours.',
+                kind: 'list',
+                source: 'announcement_views',
+                status: 'ready',
+                emptyState: { title: 'No viewed posts yet', description: 'Top content will appear after public traffic events are recorded.' },
+                drilldown: '/analytics',
+                data: {
+                    items: [
+                        {
+                            id: 'ann-100',
+                            title: 'Assistant Clerk Recruitment 2026',
+                            subtitle: 'SSC',
+                            meta: '42 views',
+                            route: '/detailed-post?focus=ann-100',
+                        },
+                    ],
+                },
+            }),
+            'quick-actions': buildWidget({
+                id: 'quick-actions',
+                title: 'Quick Actions',
+                description: 'Only modules this role can successfully open are shown here.',
+                kind: 'actions',
+                source: 'modules',
+                status: 'ready',
+                emptyState: { title: 'No actions available', description: 'No quick actions are currently available for this role.' },
+                data: {
+                    items: [
+                        { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.' },
+                        { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.' },
+                        { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.' },
+                        { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.' },
+                    ],
+                },
+            }),
         },
     };
 }

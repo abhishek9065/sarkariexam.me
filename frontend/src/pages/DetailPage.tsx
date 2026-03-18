@@ -127,6 +127,24 @@ function useReadingProgress() {
     return progress;
 }
 
+function useRevealOnScroll() {
+    useEffect(() => {
+        const observer = new IntersectionObserver((entries) => {
+            for (const e of entries) {
+                if (e.isIntersecting) {
+                    e.target.classList.add('is-visible');
+                    observer.unobserve(e.target);
+                }
+            }
+        }, { threshold: 0.05, rootMargin: '0px 0px -50px 0px' });
+
+        setTimeout(() => {
+            document.querySelectorAll('.sr-section').forEach((el) => observer.observe(el));
+        }, 100);
+        return () => observer.disconnect();
+    }, []);
+}
+
 /* ═══════════════════════════════════════════════════════════
    DetailPage Component — 2026 Edition
    ═══════════════════════════════════════════════════════════ */
@@ -135,13 +153,33 @@ export function DetailPage({ type }: { type: ContentType }) {
     const queryClient = useQueryClient();
     const [copied, setCopied] = useState(false);
     const readingProgress = useReadingProgress();
+    useRevealOnScroll();
+
+    // ── Local Toast Interactions ── //
+    const [localToast, setLocalToast] = useState<{ message: string, id: number } | null>(null);
+    const showToast = useCallback((message: string) => {
+        setLocalToast({ message, id: Date.now() });
+    }, []);
+    useEffect(() => {
+        if (!localToast) return;
+        const timer = setTimeout(() => setLocalToast(null), 3500);
+        return () => clearTimeout(timer);
+    }, [localToast]);
+
+    // ── Back to Top ── //
+    const [showTopBtn, setShowTopBtn] = useState(false);
+    useEffect(() => {
+        const handler = () => setShowTopBtn(window.scrollY > 450);
+        window.addEventListener('scroll', handler, { passive: true });
+        return () => window.removeEventListener('scroll', handler);
+    }, []);
 
     /* ── Automatic Caching & Data Fetching (TanStack Query) ── */
     const { data: announcement, isPending: loading, isError, error } = useQuery({
         queryKey: ['announcement', type, slug],
         queryFn: async () => {
             const res = await getAnnouncementBySlug(type, slug!);
-            trackEvent('detail_view', { type, slug });
+            trackEvent('detail_view', { type, slug: slug! });
             return res.data;
         },
         enabled: !!slug,
@@ -165,9 +203,9 @@ export function DetailPage({ type }: { type: ContentType }) {
         retry: false, // Don't retry if user is anonymous
     });
 
-    const isBookmarked = useMemo(() => 
+    const isBookmarked = useMemo(() =>
         Array.isArray(bookmarks) && announcement ? bookmarks.some((b) => b.id === announcement.id) : false,
-    [bookmarks, announcement]);
+        [bookmarks, announcement]);
 
     const toggleBookmark = useMutation({
         mutationFn: async () => {
@@ -179,12 +217,13 @@ export function DetailPage({ type }: { type: ContentType }) {
             // Optimistic UI update (Instant feedback, 2026 UX standard)
             await queryClient.cancelQueries({ queryKey: ['bookmarks'] });
             const prev = queryClient.getQueryData(['bookmarks']);
-            trackEvent(isBookmarked ? 'bookmark_remove' : 'bookmark_add', { slug: announcement?.slug });
-            
+            trackEvent(isBookmarked ? 'bookmark_remove' : 'bookmark_add', { slug: announcement?.slug ?? '' });
+            showToast(isBookmarked ? 'Removed from saved jobs.' : 'Saved to your bookmarks! 📑');
+
             queryClient.setQueryData(['bookmarks'], (old: any[]) => {
                 if (!Array.isArray(old)) return old;
                 if (isBookmarked) return old.filter((b) => b.id !== announcement?.id);
-                return [...old, { id: announcement?.id }]; 
+                return [...old, { id: announcement?.id }];
             });
             return { prev };
         },
@@ -205,7 +244,7 @@ export function DetailPage({ type }: { type: ContentType }) {
     useEffect(() => {
         if (announcement) {
             document.title = `${announcement.title} | SarkariExams.me`;
-            
+
             // If URL has a hash (e.g. #dates), scroll to it after data loads
             if (window.location.hash) {
                 const el = document.getElementById(window.location.hash.slice(1));
@@ -248,12 +287,34 @@ export function DetailPage({ type }: { type: ContentType }) {
     }, [announcement, type]);
 
     const handleCopyLink = useCallback(async () => {
-        try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /**/ }
-    }, []);
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            setCopied(true);
+            showToast('Link copied to clipboard! 🔗');
+            setTimeout(() => setCopied(false), 2000);
+        } catch { /**/ }
+    }, [showToast]);
 
     const handlePrint = useCallback(() => {
         window.print(); trackEvent('print_page', { slug: announcement?.slug ?? '' });
     }, [announcement]);
+
+    const sections = useMemo(() => {
+        if (!announcement) return [];
+        return buildSections(announcement, announcement.jobDetails as JobDetailsData | undefined);
+    }, [announcement]);
+
+    const activeSection = useScrollSpy(useMemo(() => sections.map(s => s.id), [sections]));
+
+    /* ── Auto-Center Active Nav Link ── */
+    useEffect(() => {
+        if (activeSection) {
+            const link = document.querySelector(`.sr-nav-link[href="#${activeSection}"]`);
+            if (link) {
+                link.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+    }, [activeSection]);
 
     /* ── Loading skeleton ── */
     if (loading) {
@@ -294,9 +355,6 @@ export function DetailPage({ type }: { type: ContentType }) {
     const salary = formatSalary(a.salaryMin, a.salaryMax);
     const deadline = getDeadlineStatus(a.deadline);
     const isClosed = deadline?.cls === 'sr-badge-closed';
-    const sections = buildSections(a, jd);
-    
-    const activeSection = useScrollSpy(sections.map(s => s.id));
 
     /* Countdown days for deadline stat */
     const daysLeft = a.deadline ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / 86_400_000) : null;
@@ -323,16 +381,15 @@ export function DetailPage({ type }: { type: ContentType }) {
             )}
 
             {/* ── 2026 Reading Progress Bar ── */}
-            <div 
+            <div
                 aria-hidden="true"
                 style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, height: '4px',
-                    backgroundColor: 'var(--accent-blue, #2563eb)',
+                    position: 'fixed', top: 0, left: 0, right: 0, height: '4px',
+                    background: 'linear-gradient(90deg, #3b82f6, #ec4899, #f59e0b)',
                     transform: `scaleX(${readingProgress / 100})`,
-                    transformOrigin: '0% 50%',
-                    zIndex: 9999,
-                    transition: 'transform 0.1s ease-out'
+                    transformOrigin: '0% 50%', zIndex: 9999,
+                    transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: '0 0 12px rgba(236, 72, 153, 0.8)'
                 }}
             />
 
@@ -354,9 +411,9 @@ export function DetailPage({ type }: { type: ContentType }) {
                 )}
                 {isStale && !isClosed && (
                     <div className="sr-stale-banner">
-                        <span className="sr-stale-icon">⏳</span> 
+                        <span className="sr-stale-icon">⏳</span>
                         <div>
-                            <strong>Older Update:</strong> This page was last verified {daysSinceUpdate} days ago. 
+                            <strong>Older Update:</strong> This page was last verified {daysSinceUpdate} days ago.
                             Some parameters might have shifted. Please cross-reference with the official portal.
                         </div>
                     </div>
@@ -420,10 +477,10 @@ export function DetailPage({ type }: { type: ContentType }) {
                         ) : (
                             <span className="sr-btn-disabled">Link Not Available Yet</span>
                         )}
-                        <button 
-                            type="button" 
-                            className={`sr-btn-icon${isBookmarked ? ' active' : ''}`} 
-                            onClick={() => toggleBookmark.mutate()} 
+                        <button
+                            type="button"
+                            className={`sr-btn-icon${isBookmarked ? ' active' : ''}`}
+                            onClick={() => toggleBookmark.mutate()}
                             title={isBookmarked ? "Saved" : "Save"}
                             disabled={toggleBookmark.isPending}
                         >
@@ -442,7 +499,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                         {sections.map((s) => (
                             <a key={s.id} href={`#${s.id}`}
                                 className={`sr-nav-link${activeSection === s.id ? ' active' : ''}`}
-                                onClick={(e) => { e.preventDefault(); document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActiveSection(s.id); }}>
+                                onClick={(e) => { e.preventDefault(); document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
                                 {s.label}
                             </a>
                         ))}
@@ -819,9 +876,9 @@ export function DetailPage({ type }: { type: ContentType }) {
                 ) : (
                     <span className="sr-mobile-primary" style={{ opacity: 0.5, pointerEvents: 'none' }}>Link Not Available</span>
                 )}
-                <button 
-                    type="button" 
-                    className={`sr-mobile-icon${isBookmarked ? ' active' : ''}`} 
+                <button
+                    type="button"
+                    className={`sr-mobile-icon${isBookmarked ? ' active' : ''}`}
                     onClick={() => toggleBookmark.mutate()}
                     disabled={toggleBookmark.isPending}
                 >
@@ -831,6 +888,20 @@ export function DetailPage({ type }: { type: ContentType }) {
                     {copied ? '✅' : '🔗'}
                 </button>
             </div>
+
+            {localToast && (
+                <div key={localToast.id} className="sr-local-toast">
+                    {localToast.message}
+                </div>
+            )}
+
+            <button
+                className={`sr-back-to-top ${showTopBtn ? 'visible' : ''}`}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                aria-label="Scroll to top"
+            >
+                ↑
+            </button>
         </Layout>
     );
 }

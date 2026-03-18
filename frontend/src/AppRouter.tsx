@@ -48,7 +48,7 @@ function E2EErrorBoundaryOkPage() {
     );
 }
 
-function E2EErrorBoundaryCrashPage() {
+function E2EErrorBoundaryCrashPage(): ReactNode {
     throw new Error('Intentional e2e route crash');
 }
 

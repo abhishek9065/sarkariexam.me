@@ -377,7 +377,7 @@ const MODULE_PERMISSION_MAP: Partial<Record<AdminModuleKey, AdminPermission>> = 
     security: 'security:read',
     sessions: 'security:read',
     audit: 'audit:read',
-    reports: 'announcements:read',
+    reports: 'analytics:read',
     'community-moderation': 'admin:read',
     'error-reports': 'admin:read',
     settings: 'admin:write',

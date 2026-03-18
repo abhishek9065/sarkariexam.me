@@ -13,7 +13,7 @@ import { fallbackPermissionsSnapshot, hasAdminPermission, isAdminPortalRole } fr
 import { AuthContext, type LoginResult, type TwoFactorChallenge } from './auth-context';
 
 /** Backend returns `name` but our User type uses `username` — normalize it */
-function normalizeUser(raw: Record<string, unknown>): User {
+function normalizeUser(raw: any): User {
     return {
         ...(raw as User),
         username: (raw.username || raw.name || raw.email) as string,

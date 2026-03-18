@@ -3,9 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import type {
     AdminDashboardAction,
+    AdminDashboardListData,
     AdminDashboardMetric,
+    AdminDashboardMetricsData,
     AdminDashboardTrafficData,
     AdminDashboardWidget,
+    AdminDashboardWidgetId,
 } from '../types';
 import { OpsCard, OpsEmptyState, OpsErrorState } from '../components/ops';
 import { useAdminAuth } from '../app/useAdminAuth';
@@ -33,6 +36,15 @@ function formatRelativeTime(iso?: string): string {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
+}
+
+function formatTimestamp(iso?: string): string {
+    if (!iso) return 'No date';
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return iso;
+    const diff = Math.abs(Date.now() - parsed.getTime());
+    if (diff <= 7 * 24 * 60 * 60 * 1000) return formatRelativeTime(iso);
+    return parsed.toLocaleDateString('en-IN');
 }
 
 function getGreeting(): string {
@@ -68,12 +80,16 @@ function buttonClassForTone(tone?: string) {
     return 'admin-btn subtle';
 }
 
-function renderWidgetState<T>(widget: AdminDashboardWidget<T>, input: {
-    emptyTitle: string;
-    emptyDescription?: string;
+function humanizeWidgetSource(source: string): string {
+    return source
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function renderWidgetState<T>(widget: AdminDashboardWidget<T>, input?: {
     emptyIcon?: string;
-    forbiddenTitle?: string;
     forbiddenIcon?: string;
+    forbiddenTitle?: string;
 }) {
     if (widget.status === 'error') {
         return <OpsErrorState message={widget.message || 'Failed to load dashboard data.'} />;
@@ -81,8 +97,8 @@ function renderWidgetState<T>(widget: AdminDashboardWidget<T>, input: {
     if (widget.status === 'forbidden') {
         return (
             <OpsEmptyState
-                icon={input.forbiddenIcon ?? 'Lock'}
-                title={input.forbiddenTitle ?? 'Locked'}
+                icon={input?.forbiddenIcon ?? 'Lock'}
+                title={input?.forbiddenTitle ?? 'Locked'}
                 description={widget.message || 'You do not have permission to view this section.'}
             />
         );
@@ -90,16 +106,48 @@ function renderWidgetState<T>(widget: AdminDashboardWidget<T>, input: {
     if (widget.status === 'empty' || !widget.data) {
         return (
             <OpsEmptyState
-                icon={input.emptyIcon}
-                title={input.emptyTitle}
-                description={widget.message || input.emptyDescription}
+                icon={input?.emptyIcon}
+                title={widget.emptyState.title}
+                description={widget.message || widget.emptyState.description}
             />
         );
     }
     return null;
 }
 
-function MetricGrid({ metrics, onNavigate }: { metrics: AdminDashboardMetric[]; onNavigate: (route?: string) => void }) {
+function WidgetMetaLine<T>({ widget }: { widget: AdminDashboardWidget<T> }) {
+    const parts = [
+        `Source: ${humanizeWidgetSource(widget.source)}`,
+        widget.stale ? 'Cached snapshot may be stale' : `Updated ${formatRelativeTime(widget.updatedAt)}`,
+    ];
+    if (widget.status === 'ready' && widget.message) {
+        parts.push(widget.message);
+    }
+    return <p className="dash-widget-meta-line">{parts.join(' · ')}</p>;
+}
+
+function WidgetActions<T>({
+    widget,
+    onNavigate,
+}: {
+    widget: AdminDashboardWidget<T>;
+    onNavigate: (route?: string) => void;
+}) {
+    if (!widget.drilldown) return null;
+    return (
+        <button type="button" className="admin-btn subtle" onClick={() => onNavigate(widget.drilldown)}>
+            Open
+        </button>
+    );
+}
+
+function MetricGrid({
+    metrics,
+    onNavigate,
+}: {
+    metrics: AdminDashboardMetric[];
+    onNavigate: (route?: string) => void;
+}) {
     return (
         <div className="ops-kpi-grid">
             {metrics.map((metric) => (
@@ -121,6 +169,80 @@ function MetricGrid({ metrics, onNavigate }: { metrics: AdminDashboardMetric[]; 
     );
 }
 
+function ListWidget({
+    widget,
+    onNavigate,
+}: {
+    widget: AdminDashboardWidget<AdminDashboardListData>;
+    onNavigate: (route?: string) => void;
+}) {
+    const state = renderWidgetState(widget, {
+        emptyIcon: 'List',
+        forbiddenIcon: 'Lock',
+    });
+    if (state) return state;
+
+    return (
+        <div className="dash-list">
+            {widget.data!.items.map((item) => (
+                <button
+                    key={item.id}
+                    type="button"
+                    className="dash-list-item"
+                    onClick={() => onNavigate(item.route)}
+                    disabled={!item.route}
+                >
+                    <span className="dash-list-item-main">
+                        <span className="dash-list-item-title">{item.title}</span>
+                        <span className="dash-list-item-meta">
+                            {[item.subtitle, item.meta].filter(Boolean).join(' · ') || 'No metadata'}
+                        </span>
+                    </span>
+                    <span className="dash-list-item-side">{formatTimestamp(item.timestamp)}</span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function TopContentWidget({
+    widget,
+    onNavigate,
+}: {
+    widget: AdminDashboardWidget<AdminDashboardListData>;
+    onNavigate: (route?: string) => void;
+}) {
+    const state = renderWidgetState(widget, {
+        emptyIcon: 'Post',
+        forbiddenIcon: 'Lock',
+        forbiddenTitle: 'Top content locked',
+    });
+    if (state) return state;
+
+    return (
+        <div className="dash-viewed-list">
+            {widget.data!.items.map((item, index) => (
+                <button
+                    key={item.id}
+                    type="button"
+                    className="dash-viewed-item"
+                    onClick={() => onNavigate(item.route)}
+                    disabled={!item.route}
+                >
+                    <span className="dash-viewed-rank">{index + 1}</span>
+                    <span className="dash-viewed-info">
+                        <span className="dash-viewed-title">{item.title}</span>
+                        <span className="dash-viewed-meta">
+                            <span>{item.subtitle || 'Announcement'}</span>
+                            <span>{item.meta || ''}</span>
+                        </span>
+                    </span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
 function TrafficWidget({
     widget,
     onNavigate,
@@ -129,11 +251,9 @@ function TrafficWidget({
     onNavigate: (route?: string) => void;
 }) {
     const state = renderWidgetState(widget, {
-        emptyTitle: 'No traffic data yet',
-        emptyDescription: 'Traffic charts will populate after announcement views are recorded.',
         emptyIcon: 'Chart',
-        forbiddenTitle: 'Traffic locked',
         forbiddenIcon: 'Lock',
+        forbiddenTitle: 'Traffic locked',
     });
     if (state) return state;
 
@@ -175,7 +295,7 @@ function TrafficWidget({
                             key={entry.date}
                             type="button"
                             className="ops-chart-bar-wrap"
-                            onClick={() => onNavigate('/reports')}
+                            onClick={() => onNavigate(widget.drilldown)}
                         >
                             <div className="ops-chart-bar-value">{entry.views}</div>
                             <div
@@ -195,7 +315,7 @@ function TrafficWidget({
                         key={source.source}
                         type="button"
                         className="dash-traffic-legend-item"
-                        onClick={() => onNavigate('/reports')}
+                        onClick={() => onNavigate(widget.drilldown)}
                     >
                         <span className="dash-traffic-legend-dot" style={{ background: source.color }} />
                         <span>{source.label}</span>
@@ -207,55 +327,68 @@ function TrafficWidget({
     );
 }
 
-function TopContentWidget({
+function QuickActionsWidget({
     widget,
     onNavigate,
 }: {
-    widget: AdminDashboardWidget<AdminDashboardTrafficData>;
+    widget: AdminDashboardWidget<{ items: AdminDashboardAction[] }>;
     onNavigate: (route?: string) => void;
 }) {
-    if (widget.status === 'error') {
-        return <OpsErrorState message={widget.message || 'Failed to load top content.'} />;
-    }
-    if (widget.status === 'forbidden') {
-        return (
-            <OpsEmptyState
-                icon="Lock"
-                title="Top content locked"
-                description={widget.message || 'Analytics access is required to view top content.'}
-            />
-        );
-    }
-    if (!widget.data || widget.data.topContent.length === 0) {
-        return (
-            <OpsEmptyState
-                icon="Post"
-                title="No viewed posts yet"
-                description="Top viewed announcements will appear after traffic events are recorded."
-            />
-        );
-    }
+    const state = renderWidgetState(widget, {
+        emptyIcon: 'Bolt',
+    });
+    if (state) return state;
 
     return (
-        <div className="dash-viewed-list">
-            {widget.data.topContent.map((item, index) => (
+        <div className="dash-quick-action-grid">
+            {widget.data!.items.map((action) => (
                 <button
-                    key={item.id}
+                    key={action.id}
                     type="button"
-                    className="dash-viewed-item"
-                    onClick={() => onNavigate(`/detailed-post?focus=${encodeURIComponent(item.id)}`)}
+                    className="dash-quick-action"
+                    onClick={() => onNavigate(action.route)}
                 >
-                    <span className="dash-viewed-rank">{index + 1}</span>
-                    <span className="dash-viewed-info">
-                        <span className="dash-viewed-title">{item.title}</span>
-                        <span className="dash-viewed-meta">
-                            <span>{item.organization || item.type}</span>
-                            <span>{item.views.toLocaleString('en-IN')} views</span>
-                        </span>
-                    </span>
+                    <span className="dash-quick-action-title">{action.label}</span>
+                    <span className="dash-quick-action-copy">{action.description}</span>
                 </button>
             ))}
         </div>
+    );
+}
+
+function DashboardWidgetCard({
+    widget,
+    onNavigate,
+}: {
+    widget: AdminDashboardWidget<AdminDashboardMetricsData | AdminDashboardListData | AdminDashboardTrafficData | { items: AdminDashboardAction[] }>;
+    onNavigate: (route?: string) => void;
+}) {
+    let content: JSX.Element | null = null;
+    if (widget.kind === 'metrics') {
+        const state = renderWidgetState(widget as AdminDashboardWidget<AdminDashboardMetricsData>, {
+            emptyIcon: 'Chart',
+            forbiddenIcon: 'Lock',
+        });
+        content = state || <MetricGrid metrics={(widget.data as AdminDashboardMetricsData).metrics} onNavigate={onNavigate} />;
+    } else if (widget.kind === 'traffic') {
+        content = <TrafficWidget widget={widget as AdminDashboardWidget<AdminDashboardTrafficData>} onNavigate={onNavigate} />;
+    } else if (widget.kind === 'actions') {
+        content = <QuickActionsWidget widget={widget as AdminDashboardWidget<{ items: AdminDashboardAction[] }>} onNavigate={onNavigate} />;
+    } else if (widget.id === 'top-content') {
+        content = <TopContentWidget widget={widget as AdminDashboardWidget<AdminDashboardListData>} onNavigate={onNavigate} />;
+    } else {
+        content = <ListWidget widget={widget as AdminDashboardWidget<AdminDashboardListData>} onNavigate={onNavigate} />;
+    }
+
+    return (
+        <OpsCard
+            title={widget.title}
+            description={widget.description}
+            actions={<WidgetActions widget={widget} onNavigate={onNavigate} />}
+        >
+            <WidgetMetaLine widget={widget} />
+            {content}
+        </OpsCard>
     );
 }
 
@@ -265,23 +398,20 @@ export function DashboardPage() {
     const greeting = getGreeting();
 
     const dashboardQuery = useQuery({
-        queryKey: ['admin-dashboard-v2'],
+        queryKey: ['admin-dashboard-v3'],
         queryFn: () => getAdminDashboard(),
-        staleTime: 60_000,
+        staleTime: 30_000,
     });
 
     const snapshot = dashboardQuery.data;
     const displayName = snapshot?.displayName || user?.email?.split('@')[0] || 'Admin';
     const generatedAt = snapshot?.generatedAt;
+    const quickActions = snapshot?.widgets['quick-actions'].data?.items ?? [];
+    const createPostAction = quickActions.find((action) => action.id === 'create-post');
 
     const navigateTo = (route?: string) => {
         if (route) navigate(route);
     };
-
-    const quickActions = snapshot?.quickActions.data?.items ?? [];
-    const summaryMetrics = snapshot?.summary.data?.metrics ?? [];
-    const workloadMetrics = snapshot?.workload.data?.metrics ?? [];
-    const incidentMetrics = snapshot?.incidents.data?.metrics ?? [];
 
     return (
         <>
@@ -302,16 +432,16 @@ export function DashboardPage() {
                         </p>
                     </div>
                     <div className="dash-quick-actions">
-                        {snapshot?.permissions.announcementsWrite ? (
-                            <button type="button" className="admin-btn primary" onClick={() => navigate('/create-post')}>
-                                <span className="dash-btn-icon">+</span> New Post
+                        {createPostAction ? (
+                            <button type="button" className="admin-btn primary" onClick={() => navigateTo(createPostAction.route)}>
+                                <span className="dash-btn-icon">+</span> {createPostAction.label}
                             </button>
                         ) : null}
                         {snapshot?.focus.primaryAction ? (
                             <button
                                 type="button"
                                 className={buttonClassForTone(snapshot.focus.primaryAction.tone)}
-                                onClick={() => navigateTo(snapshot.focus.primaryAction?.route)}
+                                onClick={() => navigateTo(snapshot.focus.primaryAction.route)}
                             >
                                 {snapshot.focus.primaryAction.label}
                             </button>
@@ -320,7 +450,7 @@ export function DashboardPage() {
                             <button
                                 type="button"
                                 className={buttonClassForTone(snapshot.focus.secondaryAction.tone)}
-                                onClick={() => navigateTo(snapshot.focus.secondaryAction?.route)}
+                                onClick={() => navigateTo(snapshot.focus.secondaryAction.route)}
                             >
                                 {snapshot.focus.secondaryAction.label}
                             </button>
@@ -345,162 +475,33 @@ export function DashboardPage() {
             ) : null}
 
             {!dashboardQuery.isPending && !dashboardQuery.error && snapshot ? (
-                <MetricGrid metrics={summaryMetrics} onNavigate={navigateTo} />
+                <>
+                    <DashboardWidgetCard widget={snapshot.widgets.summary} onNavigate={navigateTo} />
+
+                    {snapshot.sections.map((section) => (
+                        <section key={section.id} className="dash-section">
+                            <header className="dash-section-header">
+                                <div>
+                                    <p className="dash-section-eyebrow">{section.id === 'my-work' ? 'My Work' : 'System Health'}</p>
+                                    <h2 className="dash-section-title">{section.title}</h2>
+                                    <p className="dash-section-copy">{section.description}</p>
+                                </div>
+                            </header>
+                            <div className="dash-grid-2col">
+                                {section.widgetIds.map((widgetId: AdminDashboardWidgetId) => (
+                                    <DashboardWidgetCard
+                                        key={widgetId}
+                                        widget={snapshot.widgets[widgetId]}
+                                        onNavigate={navigateTo}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+
+                    <DashboardWidgetCard widget={snapshot.widgets['quick-actions']} onNavigate={navigateTo} />
+                </>
             ) : null}
-
-            <div className="dash-grid-2col">
-                <OpsCard
-                    title="Operator Cockpit"
-                    description="Queue ownership, approvals, and workload signals for your current role."
-                >
-                    {snapshot ? (
-                        renderWidgetState(snapshot.workload, {
-                            emptyTitle: 'Queue is clear',
-                            emptyDescription: 'No active queue pressure right now.',
-                            emptyIcon: 'Queue',
-                            forbiddenTitle: 'Queue locked',
-                            forbiddenIcon: 'Lock',
-                        }) || <MetricGrid metrics={workloadMetrics} onNavigate={navigateTo} />
-                    ) : null}
-                </OpsCard>
-
-                <OpsCard
-                    title="Incident Strip"
-                    description="Alerts, unresolved errors, and security pressure."
-                    tone={snapshot?.incidents.data?.securityLocked ? 'muted' : 'default'}
-                >
-                    {snapshot ? (
-                        <>
-                            {renderWidgetState(snapshot.incidents, {
-                                emptyTitle: 'No incidents',
-                                emptyDescription: 'No active incidents or alert pressure right now.',
-                                emptyIcon: 'Shield',
-                            }) || <MetricGrid metrics={incidentMetrics} onNavigate={navigateTo} />}
-                            {snapshot.incidents.data?.securityLocked ? (
-                                <p className="dash-lock-note">High-risk session details stay hidden until security access is granted.</p>
-                            ) : null}
-                        </>
-                    ) : null}
-                </OpsCard>
-            </div>
-
-            <div className="dash-grid-2col">
-                <OpsCard
-                    title="Traffic Overview"
-                    description={
-                        snapshot?.traffic.data
-                            ? `Last 7 days · ${snapshot.traffic.data.totalVisits.toLocaleString('en-IN')} total visits`
-                            : 'Last 7 days'
-                    }
-                >
-                    {snapshot ? <TrafficWidget widget={snapshot.traffic} onNavigate={navigateTo} /> : null}
-                </OpsCard>
-
-                <OpsCard
-                    title="Most Viewed"
-                    description="Top announcement traffic in the last 24 hours."
-                >
-                    {snapshot ? <TopContentWidget widget={snapshot.traffic} onNavigate={navigateTo} /> : null}
-                </OpsCard>
-            </div>
-
-            <div className="dash-grid-2col">
-                <OpsCard
-                    title="Upcoming Deadlines"
-                    description="Posts with deadlines inside the next 7 days."
-                >
-                    {snapshot ? (
-                        renderWidgetState(snapshot.deadlines, {
-                            emptyTitle: 'No deadlines due',
-                            emptyDescription: 'No deadlines in the next 7 days.',
-                            emptyIcon: 'Clock',
-                            forbiddenTitle: 'Deadlines locked',
-                            forbiddenIcon: 'Lock',
-                        }) || (
-                            <div className="dash-list">
-                                {snapshot.deadlines.data?.items.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        className="dash-list-item"
-                                        onClick={() => navigate(item.route)}
-                                    >
-                                        <span className="dash-list-item-main">
-                                            <span className="dash-list-item-title">{item.title}</span>
-                                            <span className="dash-list-item-meta">{item.organization || item.type}</span>
-                                        </span>
-                                        <span className="dash-list-item-side">
-                                            {item.deadline ? new Date(item.deadline).toLocaleDateString('en-IN') : 'No date'}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        )
-                    ) : null}
-                </OpsCard>
-
-                <OpsCard
-                    title="Recent Activity"
-                    description="Latest administrative actions recorded in the audit ledger."
-                >
-                    {snapshot ? (
-                        renderWidgetState(snapshot.activity, {
-                            emptyTitle: 'No recent activity',
-                            emptyDescription: 'No recent audit activity yet.',
-                            emptyIcon: 'Log',
-                            forbiddenTitle: 'Activity locked',
-                            forbiddenIcon: 'Lock',
-                        }) || (
-                            <div className="dash-activity-list">
-                                {snapshot.activity.data?.items.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        className="dash-activity-item"
-                                        onClick={() => navigateTo(item.route)}
-                                    >
-                                        <span className="dash-activity-dot">A</span>
-                                        <span className="dash-activity-body">
-                                            <span className="dash-activity-action">{item.title}</span>
-                                            <span className="dash-activity-meta">
-                                                <span className="dash-activity-actor">{item.subtitle || 'System'}</span>
-                                                <span className="dash-activity-time">{formatRelativeTime(item.createdAt)}</span>
-                                            </span>
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        )
-                    ) : null}
-                </OpsCard>
-            </div>
-
-            <OpsCard
-                title="Quick Actions"
-                description="Jump straight into the modules this role can operate."
-            >
-                {snapshot ? (
-                    renderWidgetState(snapshot.quickActions, {
-                        emptyTitle: 'No actions available',
-                        emptyDescription: 'No quick actions are available for this role yet.',
-                        emptyIcon: 'Bolt',
-                    }) || (
-                        <div className="dash-quick-action-grid">
-                            {quickActions.map((action: AdminDashboardAction) => (
-                                <button
-                                    key={action.id}
-                                    type="button"
-                                    className="dash-quick-action"
-                                    onClick={() => navigate(action.route)}
-                                >
-                                    <span className="dash-quick-action-title">{action.label}</span>
-                                    <span className="dash-quick-action-copy">{action.description}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )
-                ) : null}
-            </OpsCard>
         </>
     );
 }

@@ -9,6 +9,28 @@ const jsonResponse = (data: unknown) => ({
     body: JSON.stringify({ success: true, data }),
 });
 
+const DASH_TS = '2026-03-07T08:30:00.000Z';
+
+function buildWidget<T>(input: {
+    id: string;
+    title: string;
+    description: string;
+    kind: 'metrics' | 'list' | 'traffic' | 'actions';
+    source: string;
+    status: 'ready' | 'empty' | 'forbidden' | 'error';
+    emptyState: { title: string; description: string };
+    data: T | null;
+    message?: string;
+    permission?: string;
+    drilldown?: string;
+}) {
+    return {
+        ...input,
+        updatedAt: DASH_TS,
+        stale: false,
+    };
+}
+
 function buildDashboardSnapshot(input: {
     me?: Record<string, unknown>;
     reports?: Record<string, unknown>;
@@ -90,7 +112,7 @@ function buildDashboardSnapshot(input: {
         && reports.mostViewed24h.length === 0;
 
     return {
-        generatedAt: '2026-03-07T08:30:00.000Z',
+        generatedAt: DASH_TS,
         displayName: 'admin',
         role,
         permissions: {
@@ -110,103 +132,221 @@ function buildDashboardSnapshot(input: {
             primaryAction: { id: 'focus-security', label: 'Open Security', route: '/security', tone: 'danger' },
             secondaryAction: { id: 'focus-access', label: 'Users & Roles', route: '/users-roles', tone: 'subtle' },
         },
-        summary: {
-            status: 'ready',
-            updatedAt: '2026-03-07T08:30:00.000Z',
-            data: {
-                metrics: [
-                    { key: 'total-posts', label: 'Total Posts', value: reports.summary.totalPosts, route: '/manage-posts' },
-                    { key: 'published', label: 'Published', value: 92, route: '/manage-posts?status=published', tone: 'success' },
-                    { key: 'pending-review', label: 'Pending Review', value: reports.summary.pendingReview, route: '/review', tone: 'warning' },
-                    { key: 'views', label: 'Total Views', value: 6400, route: '/reports' },
-                    { key: 'active-users', label: 'Active Users', value: 24, route: '/users-roles' },
-                    { key: 'subscribers', label: 'Subscribers', value: 512, route: '/reports' },
-                ],
+        sections: [
+            {
+                id: 'my-work',
+                title: 'My Work',
+                description: 'Assigned queue, pending approvals, my deadlines, and my recent changes.',
+                widgetIds: ['my-queue', 'pending-approvals', 'my-deadlines', 'recent-changes'],
             },
-        },
-        workload: {
-            status: 'ready',
-            updatedAt: '2026-03-07T08:30:00.000Z',
-            data: {
-                metrics: [
-                    { key: 'pending-review', label: 'Pending Reviews', value: reports.summary.pendingReview, route: '/review', tone: 'warning' },
-                    { key: 'unassigned', label: 'Unassigned Pending Reviews', value: reports.workflowSummary.unassignedPendingReview, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
-                    { key: 'overdue', label: 'Overdue Review Items', value: reports.workflowSummary.overdueReviewItems, route: '/review?status=pending&sla=overdue', tone: 'danger' },
-                    { key: 'assigned', label: 'My Queue', value: reports.workflowSummary.currentUserAssignedQueue, route: '/queue?assignee=me', tone: 'info' },
-                    { key: 'broken-links', label: 'Broken Links', value: reports.summary.brokenLinks, route: '/link-manager', tone: 'danger' },
-                ],
+            {
+                id: 'system-health',
+                title: 'System Health',
+                description: 'Alerts, security, audit, and platform signals.',
+                widgetIds: ['alerts', 'security', 'audit', 'traffic', 'top-content'],
             },
-        },
-        incidents: {
-            status: 'ready',
-            updatedAt: '2026-03-07T08:30:00.000Z',
-            data: {
-                metrics: [
-                    { key: 'open-alerts', label: 'Open Alerts', value: reports.incidentSummary.openCriticalAlerts, route: '/alerts', tone: 'warning' },
-                    { key: 'critical-alerts', label: 'Critical Alerts', value: reports.incidentSummary.openCriticalAlerts, route: '/alerts?status=open&severity=critical', tone: 'danger' },
-                    { key: 'unresolved-errors', label: 'Unresolved Errors', value: errorReports.length, route: '/errors?status=new', tone: 'warning' },
-                    { key: 'high-risk-sessions', label: 'High-risk Sessions', value: securityLogs.length, route: '/security?risk=high', tone: 'danger' },
-                ],
-                securityLocked: false,
-            },
-        },
-        traffic: trafficEmpty
-            ? {
-                status: 'empty',
-                updatedAt: '2026-03-07T08:30:00.000Z',
-                message: 'Traffic charts will populate after announcement views are recorded.',
-                data: {
-                    totalVisits: 0,
-                    series: [],
-                    sources: [],
-                    topContent: [],
-                },
-            }
-            : {
+        ],
+        widgets: {
+            summary: buildWidget({
+                id: 'summary',
+                title: 'Operations Snapshot',
+                description: 'Current content, audience, and platform totals.',
+                kind: 'metrics',
+                source: 'mixed',
                 status: 'ready',
-                updatedAt: '2026-03-07T08:30:00.000Z',
+                emptyState: { title: 'Overview unavailable', description: 'Summary metrics are unavailable for this role.' },
                 data: {
-                    totalVisits,
-                    series: reports.trafficSeries,
-                    sources: reports.trafficSources,
-                    topContent: reports.mostViewed24h,
+                    metrics: [
+                        { key: 'total-posts', label: 'Total Posts', value: reports.summary.totalPosts, route: '/manage-posts' },
+                        { key: 'published', label: 'Published', value: 92, route: '/manage-posts?status=published', tone: 'success' },
+                        { key: 'pending-review', label: 'Pending Review', value: reports.summary.pendingReview, route: '/review', tone: 'warning' },
+                        { key: 'views', label: 'Total Views', value: 6400, route: '/reports' },
+                        { key: 'active-users', label: 'Active Users', value: 24, route: '/users-roles' },
+                        { key: 'subscribers', label: 'Subscribers', value: 512, route: '/reports' },
+                    ],
                 },
-            },
-        deadlines: {
-            status: Array.isArray(reports.upcomingDeadlines) && reports.upcomingDeadlines.length > 0 ? 'ready' : 'empty',
-            updatedAt: '2026-03-07T08:30:00.000Z',
-            message: Array.isArray(reports.upcomingDeadlines) && reports.upcomingDeadlines.length > 0 ? undefined : 'No deadlines in the next 7 days.',
-            data: {
-                items: (reports.upcomingDeadlines ?? []).map((item: any) => ({
-                    ...item,
-                    route: `/detailed-post?focus=${encodeURIComponent(String(item.id ?? 'ann-1'))}`,
-                })),
-            },
-        },
-        activity: {
-            status: 'ready',
-            updatedAt: '2026-03-07T08:30:00.000Z',
-            data: {
-                items: auditLogs.map((item) => ({
-                    id: String(item.id ?? 'audit-1'),
-                    title: 'Announcement Update',
-                    subtitle: String(item.actorEmail ?? 'admin@sarkariexams.me'),
-                    createdAt: String(item.createdAt ?? '2026-03-07T08:00:00.000Z'),
-                    route: '/audit',
-                })),
-            },
-        },
-        quickActions: {
-            status: 'ready',
-            updatedAt: '2026-03-07T08:30:00.000Z',
-            data: {
-                items: [
-                    { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.' },
-                    { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.' },
-                    { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.' },
-                    { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.' },
-                ],
-            },
+            }),
+            'my-queue': buildWidget({
+                id: 'my-queue',
+                title: 'My Queue',
+                description: 'Assigned queue and review pressure tied to your account.',
+                kind: 'metrics',
+                source: 'announcements',
+                status: 'ready',
+                emptyState: { title: 'Queue is clear', description: 'No assigned or pending queue work right now.' },
+                drilldown: '/queue?assignee=me',
+                data: {
+                    metrics: [
+                        { key: 'pending-review', label: 'Pending Reviews', value: reports.summary.pendingReview, route: '/review', tone: 'warning' },
+                        { key: 'unassigned', label: 'Unassigned Pending Reviews', value: reports.workflowSummary.unassignedPendingReview, route: '/review?status=pending&assignee=unassigned', tone: 'warning' },
+                        { key: 'overdue', label: 'Overdue Review Items', value: reports.workflowSummary.overdueReviewItems, route: '/review?status=pending&sla=overdue', tone: 'danger' },
+                        { key: 'assigned', label: 'My Queue', value: reports.workflowSummary.currentUserAssignedQueue, route: '/queue?assignee=me', tone: 'info' },
+                        { key: 'broken-links', label: 'Broken Links', value: reports.summary.brokenLinks, route: '/link-manager', tone: 'danger' },
+                    ],
+                },
+            }),
+            'pending-approvals': buildWidget({
+                id: 'pending-approvals',
+                title: 'Pending Approvals',
+                description: 'Approval load, expiry pressure, and execution backlog.',
+                kind: 'metrics',
+                source: 'admin_approval_requests',
+                status: 'ready',
+                emptyState: { title: 'Approvals are clear', description: 'No approval backlog is waiting on this role.' },
+                drilldown: '/approvals',
+                data: {
+                    metrics: [
+                        { key: 'pending', label: 'Pending', value: 3, route: '/approvals?status=pending', tone: 'warning' },
+                        { key: 'approved', label: 'Approved Pending Execution', value: 1, route: '/approvals?status=approved', tone: 'info' },
+                        { key: 'overdue', label: 'Overdue', value: 1, route: '/approvals', tone: 'danger' },
+                        { key: 'due-soon', label: 'Due Soon', value: 2, route: '/approvals', tone: 'warning' },
+                    ],
+                },
+            }),
+            'my-deadlines': buildWidget({
+                id: 'my-deadlines',
+                title: 'My Deadlines',
+                description: 'Upcoming deadlines for content already assigned to you.',
+                kind: 'list',
+                source: 'announcements',
+                status: Array.isArray(reports.upcomingDeadlines) && reports.upcomingDeadlines.length > 0 ? 'ready' : 'empty',
+                emptyState: { title: 'No deadlines due', description: 'No assigned deadlines are due in the next 7 days.' },
+                data: {
+                    items: (reports.upcomingDeadlines ?? []).map((item: any) => ({
+                        id: String(item.id ?? 'ann-1'),
+                        title: String(item.title ?? 'Deadline item'),
+                        subtitle: String(item.organization ?? item.type ?? 'Announcement'),
+                        meta: 'Pending',
+                        route: `/detailed-post?focus=${encodeURIComponent(String(item.id ?? 'ann-1'))}`,
+                        timestamp: String(item.deadline ?? DASH_TS),
+                    })),
+                },
+                message: Array.isArray(reports.upcomingDeadlines) && reports.upcomingDeadlines.length > 0 ? undefined : 'No assigned deadlines are due in the next 7 days.',
+            }),
+            'recent-changes': buildWidget({
+                id: 'recent-changes',
+                title: 'My Recent Changes',
+                description: 'Your latest content and administrative changes.',
+                kind: 'list',
+                source: 'announcements',
+                status: 'ready',
+                emptyState: { title: 'No recent changes', description: 'Your recent changes will appear here after the next update.' },
+                data: {
+                    items: auditLogs.map((item) => ({
+                        id: String(item.id ?? 'audit-1'),
+                        title: String(item.title ?? 'Announcement Update'),
+                        subtitle: String(item.actorEmail ?? 'admin@sarkariexams.me'),
+                        meta: 'Pending',
+                        route: '/manage-posts',
+                        timestamp: String(item.createdAt ?? DASH_TS),
+                    })),
+                },
+            }),
+            alerts: buildWidget({
+                id: 'alerts',
+                title: 'Alerts',
+                description: 'Open alerts, critical issues, and unresolved errors.',
+                kind: 'metrics',
+                source: 'mixed',
+                status: 'ready',
+                emptyState: { title: 'No active alerts', description: 'There are no open alerts or unresolved error spikes right now.' },
+                drilldown: '/alerts',
+                data: {
+                    metrics: [
+                        { key: 'open-alerts', label: 'Open Alerts', value: reports.incidentSummary.openCriticalAlerts, route: '/alerts', tone: 'warning' },
+                        { key: 'critical-alerts', label: 'Critical Alerts', value: reports.incidentSummary.openCriticalAlerts, route: '/alerts?status=open&severity=critical', tone: 'danger' },
+                        { key: 'unresolved-errors', label: 'Unresolved Errors', value: errorReports.length, route: '/errors', tone: 'warning' },
+                    ],
+                },
+            }),
+            security: buildWidget({
+                id: 'security',
+                title: 'Security',
+                description: 'Risky sessions and blocked or suspicious activity.',
+                kind: 'metrics',
+                source: 'security_logs',
+                status: 'ready',
+                emptyState: { title: 'Security is calm', description: 'No active session anomalies or blocked events were detected.' },
+                drilldown: '/security',
+                data: {
+                    metrics: [
+                        { key: 'high-risk', label: 'High-risk Sessions', value: securityLogs.length, route: '/security?risk=high', tone: 'danger' },
+                        { key: 'blocked', label: 'Blocked Requests', value: 1, route: '/security', tone: 'warning' },
+                        { key: 'failed-auth', label: 'Failed Auth Events', value: 2, route: '/security', tone: 'warning' },
+                        { key: 'events', label: 'Recent Security Events', value: securityLogs.length, route: '/sessions', tone: 'info' },
+                    ],
+                },
+            }),
+            audit: buildWidget({
+                id: 'audit',
+                title: 'Audit Activity',
+                description: 'Recent administrative actions across the control plane.',
+                kind: 'list',
+                source: 'admin_audit_logs',
+                status: 'ready',
+                emptyState: { title: 'No audit activity', description: 'Administrative activity will appear here as actions are recorded.' },
+                drilldown: '/audit',
+                data: {
+                    items: auditLogs.map((item) => ({
+                        id: String(item.id ?? 'audit-1'),
+                        title: 'Announcement Update',
+                        subtitle: String(item.actorEmail ?? 'admin@sarkariexams.me'),
+                        meta: String(item.title ?? 'Audit entry'),
+                        route: '/audit',
+                        timestamp: String(item.createdAt ?? DASH_TS),
+                    })),
+                },
+            }),
+            traffic: buildWidget({
+                id: 'traffic',
+                title: 'Traffic Overview',
+                description: 'Seven-day traffic and source mix for the public platform.',
+                kind: 'traffic',
+                source: 'analytics_rollups',
+                status: trafficEmpty ? 'empty' : 'ready',
+                emptyState: { title: 'No traffic data yet', description: 'Traffic charts will populate after announcement views are recorded.' },
+                drilldown: '/analytics',
+                data: trafficEmpty
+                    ? { totalVisits: 0, series: [], sources: [] }
+                    : { totalVisits, series: reports.trafficSeries, sources: reports.trafficSources },
+                message: trafficEmpty ? 'Traffic charts will populate after announcement views are recorded.' : undefined,
+            }),
+            'top-content': buildWidget({
+                id: 'top-content',
+                title: 'Top Content',
+                description: 'Most-viewed announcements in the last 24 hours.',
+                kind: 'list',
+                source: 'announcement_views',
+                status: Array.isArray(reports.mostViewed24h) && reports.mostViewed24h.length > 0 ? 'ready' : 'empty',
+                emptyState: { title: 'No viewed posts yet', description: 'Top content will appear after public traffic events are recorded.' },
+                drilldown: '/analytics',
+                data: {
+                    items: (reports.mostViewed24h ?? []).map((item: any) => ({
+                        id: String(item.id ?? 'a-1'),
+                        title: String(item.title ?? 'Top content item'),
+                        subtitle: String(item.organization ?? item.type ?? 'Announcement'),
+                        meta: `${String(item.views ?? 0)} views`,
+                        route: `/detailed-post?focus=${encodeURIComponent(String(item.id ?? 'a-1'))}`,
+                    })),
+                },
+            }),
+            'quick-actions': buildWidget({
+                id: 'quick-actions',
+                title: 'Quick Actions',
+                description: 'Only modules this role can successfully open are shown here.',
+                kind: 'actions',
+                source: 'modules',
+                status: 'ready',
+                emptyState: { title: 'No actions available', description: 'No quick actions are currently available for this role.' },
+                data: {
+                    items: [
+                        { id: 'create-post', label: 'New Post', route: '/create-post', description: 'Open the unified content create flow.' },
+                        { id: 'manage-posts', label: 'Manage Posts', route: '/manage-posts', description: 'Open the post operations table.' },
+                        { id: 'review', label: 'Review Queue', route: '/review', description: 'Process pending review items.' },
+                        { id: 'alerts', label: 'Alerts', route: '/alerts', description: 'Open the operational alert feed.' },
+                    ],
+                },
+            }),
         },
     };
 }
@@ -820,7 +960,8 @@ test('dashboard traffic widgets render reports API traffic data instead of fallb
     });
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByText(/Last 7 days .*420 total visits/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Traffic Overview/i })).toBeVisible();
+    await expect(page.locator('.dash-donut-center')).toContainText('420');
     await expect(page.locator('.dash-traffic-legend')).toContainText('Organic');
     await expect(page.locator('.dash-traffic-legend')).toContainText('60%');
     await expect(page.locator('.dash-traffic-chart')).toContainText('105');
@@ -951,7 +1092,7 @@ test('dashboard exposes operator cockpit drilldowns', async ({ page }) => {
     await mockAuthenticatedAdmin(page);
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /Operator Cockpit/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /My Queue/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Unassigned pending reviews/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Overdue review items/i })).toBeVisible();
 });

@@ -44,7 +44,7 @@ export function JobsFilterPanel({
     onReset,
 }: Props) {
     /* Auto-apply: debounce search input, instant for dropdowns */
-    const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const isFirstMount = useRef(true);
 
     /* Auto-apply on dropdown changes (state, qualification, organization) */

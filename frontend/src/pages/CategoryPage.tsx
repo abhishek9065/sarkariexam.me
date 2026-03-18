@@ -128,11 +128,36 @@ function daysUntil(deadline?: string | null): number | null {
     return Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
 }
 
+/* ─── Custom UX Hooks ─── */
+function useRevealOnScroll() {
+    useEffect(() => {
+        const observer = new IntersectionObserver((entries) => {
+            for (const e of entries) {
+                if (e.isIntersecting) {
+                    e.target.classList.add('is-visible');
+                    observer.unobserve(e.target);
+                }
+            }
+        }, { threshold: 0.05, rootMargin: '0px 0px -30px 0px' });
+        
+        const timeoutId = setTimeout(() => {
+            document.querySelectorAll('.cat-main .ac-card, .cat-main .clr-row').forEach((el) => {
+                if (!el.classList.contains('cat-reveal')) {
+                    el.classList.add('cat-reveal');
+                    observer.observe(el);
+                }
+            });
+        }, 150);
+        return () => { clearTimeout(timeoutId); observer.disconnect(); };
+    });
+}
+
 /* ─── Component ─── */
 
 export function CategoryPage({ type }: { type: ContentType }) {
     const meta = SECTION_META[type];
     const [searchParams, setSearchParams] = useSearchParams();
+    useRevealOnScroll();
 
     /* URL-driven state */
     const sort = (searchParams.get('sort') as SortValue) || 'newest';

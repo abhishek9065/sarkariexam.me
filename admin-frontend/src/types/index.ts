@@ -314,6 +314,33 @@ export interface AdminReportSnapshot {
 export type AdminDashboardWidgetStatus = 'ready' | 'empty' | 'forbidden' | 'error';
 export type AdminDashboardMetricTone = 'neutral' | 'info' | 'warning' | 'danger' | 'success';
 export type AdminDashboardActionTone = 'primary' | 'subtle' | 'warning' | 'danger' | 'success';
+export type AdminDashboardWidgetKind = 'metrics' | 'list' | 'traffic' | 'actions';
+export type AdminDashboardDataSource =
+    | 'announcements'
+    | 'users'
+    | 'subscriptions'
+    | 'alerts'
+    | 'error_reports'
+    | 'security_logs'
+    | 'admin_audit_logs'
+    | 'analytics_rollups'
+    | 'announcement_views'
+    | 'admin_approval_requests'
+    | 'modules'
+    | 'mixed';
+export type AdminDashboardWidgetId =
+    | 'summary'
+    | 'my-queue'
+    | 'pending-approvals'
+    | 'my-deadlines'
+    | 'recent-changes'
+    | 'alerts'
+    | 'security'
+    | 'audit'
+    | 'traffic'
+    | 'top-content'
+    | 'quick-actions';
+export type AdminDashboardSectionId = 'my-work' | 'system-health';
 
 export interface AdminDashboardMetric {
     key: string;
@@ -332,10 +359,32 @@ export interface AdminDashboardAction {
     tone?: AdminDashboardActionTone;
 }
 
+export interface AdminDashboardWidgetEmptyState {
+    title: string;
+    description: string;
+}
+
+export interface AdminDashboardListItem {
+    id: string;
+    title: string;
+    subtitle?: string;
+    meta?: string;
+    route?: string;
+    timestamp?: string;
+}
+
 export interface AdminDashboardWidget<T> {
+    id: AdminDashboardWidgetId;
+    title: string;
+    description: string;
+    kind: AdminDashboardWidgetKind;
     status: AdminDashboardWidgetStatus;
     updatedAt: string;
+    source: AdminDashboardDataSource;
+    stale: boolean;
+    emptyState: AdminDashboardWidgetEmptyState;
     permission?: AdminPermission;
+    drilldown?: string;
     message?: string;
     data: T | null;
 }
@@ -359,36 +408,43 @@ export interface AdminDashboardFocus {
     secondaryAction?: AdminDashboardAction;
 }
 
-export interface AdminDashboardSummaryData {
+export interface AdminDashboardMetricsData {
     metrics: AdminDashboardMetric[];
-}
-
-export interface AdminDashboardWorkloadData {
-    metrics: AdminDashboardMetric[];
-}
-
-export interface AdminDashboardIncidentsData {
-    metrics: AdminDashboardMetric[];
-    securityLocked?: boolean;
 }
 
 export interface AdminDashboardTrafficData {
     totalVisits: number;
     series: Array<{ date: string; views: number }>;
     sources: Array<{ source: string; label: string; views: number; percentage: number }>;
-    topContent: Array<{ id: string; title: string; type: string; views: number; organization?: string }>;
 }
 
-export interface AdminDashboardDeadlinesData {
-    items: Array<{ id: string; title: string; type: string; deadline?: string; organization?: string; route: string }>;
+export interface AdminDashboardListData {
+    items: AdminDashboardListItem[];
 }
 
-export interface AdminDashboardActivityData {
-    items: Array<{ id: string; title: string; subtitle?: string; createdAt: string; route?: string }>;
-}
-
-export interface AdminDashboardQuickActionsData {
+export interface AdminDashboardActionsData {
     items: AdminDashboardAction[];
+}
+
+export interface AdminDashboardSection {
+    id: AdminDashboardSectionId;
+    title: string;
+    description: string;
+    widgetIds: AdminDashboardWidgetId[];
+}
+
+export interface AdminDashboardWidgets {
+    summary: AdminDashboardWidget<AdminDashboardMetricsData>;
+    'my-queue': AdminDashboardWidget<AdminDashboardMetricsData>;
+    'pending-approvals': AdminDashboardWidget<AdminDashboardMetricsData>;
+    'my-deadlines': AdminDashboardWidget<AdminDashboardListData>;
+    'recent-changes': AdminDashboardWidget<AdminDashboardListData>;
+    alerts: AdminDashboardWidget<AdminDashboardMetricsData>;
+    security: AdminDashboardWidget<AdminDashboardMetricsData>;
+    audit: AdminDashboardWidget<AdminDashboardListData>;
+    traffic: AdminDashboardWidget<AdminDashboardTrafficData>;
+    'top-content': AdminDashboardWidget<AdminDashboardListData>;
+    'quick-actions': AdminDashboardWidget<AdminDashboardActionsData>;
 }
 
 export interface AdminDashboardSnapshot {
@@ -397,13 +453,8 @@ export interface AdminDashboardSnapshot {
     role?: AdminPortalRole;
     permissions: AdminDashboardPermissions;
     focus: AdminDashboardFocus;
-    summary: AdminDashboardWidget<AdminDashboardSummaryData>;
-    workload: AdminDashboardWidget<AdminDashboardWorkloadData>;
-    incidents: AdminDashboardWidget<AdminDashboardIncidentsData>;
-    traffic: AdminDashboardWidget<AdminDashboardTrafficData>;
-    deadlines: AdminDashboardWidget<AdminDashboardDeadlinesData>;
-    activity: AdminDashboardWidget<AdminDashboardActivityData>;
-    quickActions: AdminDashboardWidget<AdminDashboardQuickActionsData>;
+    sections: AdminDashboardSection[];
+    widgets: AdminDashboardWidgets;
 }
 
 export interface AdminUser {

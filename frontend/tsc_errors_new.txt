@@ -1,0 +1,23 @@
+src/AppRouter.tsx(109,97): error TS2786: 'E2EErrorBoundaryCrashPage' cannot be used as a JSX component.
+  Its type '() => void' is not a valid JSX element type.
+    Type '() => void' is not assignable to type '(props: any) => ReactNode | Promise<ReactNode>'.
+      Type 'void' is not assignable to type 'ReactNode | Promise<ReactNode>'.
+src/components/category/JobsFilterPanel.tsx(47,25): error TS2554: Expected 1 arguments, but got 0.
+src/context/AuthContext.tsx(18,13): error TS2352: Conversion of type 'Record<string, unknown>' to type 'User' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Record<string, unknown>' is missing the following properties from type 'User': id, email, username, role
+src/context/AuthContext.tsx(54,44): error TS2345: Argument of type 'User' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'User'.
+src/context/AuthContext.tsx(76,40): error TS2345: Argument of type 'User' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'User'.
+src/context/AuthContext.tsx(128,40): error TS2345: Argument of type 'User' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'User'.
+src/pages/AdminPage.tsx(2409,9): error TS2322: Type '(tab: AdminTab) => void' is not assignable to type '(tab: string) => void'.
+  Types of parameters 'tab' and 'tab' are incompatible.
+    Type 'string' is not assignable to type 'AdminTab'.
+src/pages/AdminPage.tsx(2411,9): error TS2322: Type '(type: "admin_list_loaded" | "admin_filter_applied" | "admin_row_action_clicked" | "admin_review_decision_submitted" | "admin_bulk_preview_opened" | "admin_metric_drilldown_opened", metadata?: Record<string, unknown>) => void' is not assignable to type '(eventName: string, payload?: Record<string, unknown> | undefined) => void'.
+  Types of parameters 'type' and 'eventName' are incompatible.
+    Type 'string' is not assignable to type '"admin_list_loaded" | "admin_filter_applied" | "admin_row_action_clicked" | "admin_review_decision_submitted" | "admin_bulk_preview_opened" | "admin_metric_drilldown_opened"'.
+src/pages/DetailPage.tsx(144,47): error TS2322: Type 'string | undefined' is not assignable to type 'string | number | boolean'.
+  Type 'undefined' is not assignable to type 'string | number | boolean'.
+src/pages/DetailPage.tsx(182,77): error TS2322: Type 'string | undefined' is not assignable to type 'string | number | boolean'.
+  Type 'undefined' is not assignable to type 'string | number | boolean'.
