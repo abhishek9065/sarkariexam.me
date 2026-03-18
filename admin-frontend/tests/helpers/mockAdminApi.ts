@@ -12,6 +12,8 @@ const defaultAnnouncements = [
         title: 'Assistant Clerk Recruitment 2026',
         status: 'published',
         type: 'job',
+        postedBy: 'ops-admin@sarkariexams.me',
+        postedAt: '2026-02-07T10:00:00.000Z',
         updatedAt: '2026-02-10T10:00:00.000Z',
         updatedBy: 'ops-admin@sarkariexams.me',
     },
@@ -20,14 +22,20 @@ const defaultAnnouncements = [
         title: 'Revenue Inspector Pending Verification',
         status: 'pending',
         type: 'job',
+        postedBy: 'reviewer@sarkariexams.me',
+        postedAt: '2026-02-06T10:00:00.000Z',
         updatedAt: '2026-02-09T10:00:00.000Z',
         updatedBy: 'reviewer@sarkariexams.me',
+        assigneeEmail: 'admin@sarkariexams.me',
+        reviewDueAt: '2026-02-11T10:00:00.000Z',
     },
     {
         id: 'ann-s-1',
         title: 'Forest Guard Schedule Batch',
         status: 'scheduled',
         type: 'job',
+        postedBy: 'scheduler@sarkariexams.me',
+        postedAt: '2026-02-05T10:00:00.000Z',
         updatedAt: '2026-02-08T10:00:00.000Z',
         updatedBy: 'scheduler@sarkariexams.me',
     },
@@ -179,10 +187,58 @@ function parseBody(route: Route): Record<string, unknown> {
     }
 }
 
-function announcementsForStatus(status: string | null) {
-    if (status === 'pending') return defaultAnnouncements.filter((item) => item.status === 'pending');
-    if (status === 'scheduled') return defaultAnnouncements.filter((item) => item.status === 'scheduled');
-    return defaultAnnouncements;
+function announcementsForFilters(status: string | null, assignee: string | null) {
+    let items = [...defaultAnnouncements];
+    if (status === 'pending') items = items.filter((item) => item.status === 'pending');
+    if (status === 'scheduled') items = items.filter((item) => item.status === 'scheduled');
+    if (status === 'published') items = items.filter((item) => item.status === 'published');
+    if (assignee === 'me') items = items.filter((item) => item.assigneeEmail === 'admin@sarkariexams.me');
+    if (assignee === 'unassigned') items = items.filter((item) => !item.assigneeEmail);
+    if (assignee === 'assigned') items = items.filter((item) => Boolean(item.assigneeEmail));
+    return items;
+}
+
+function buildManagePostsWorkspace() {
+    const pending = defaultAnnouncements.filter((item) => item.status === 'pending');
+    const scheduled = defaultAnnouncements.filter((item) => item.status === 'scheduled');
+    const published = defaultAnnouncements.filter((item) => item.status === 'published');
+    const assignedToMe = defaultAnnouncements.filter((item) => item.assigneeEmail === 'admin@sarkariexams.me');
+
+    return {
+        generatedAt: DASH_TS,
+        capabilities: {
+            announcementsRead: true,
+            announcementsWrite: true,
+            announcementsApprove: true,
+            canManageSavedViews: true,
+            canManageSharedViews: true,
+        },
+        summary: {
+            total: defaultAnnouncements.length,
+            draft: 0,
+            pending: pending.length,
+            scheduled: scheduled.length,
+            published: published.length,
+            archived: 0,
+            assignedToMe: assignedToMe.length,
+            unassignedPending: pending.filter((item) => !item.assigneeEmail).length,
+            overdueReview: pending.filter((item) => item.reviewDueAt).length,
+            stalePending: pending.length,
+            accessibleSavedViews: 1,
+        },
+        pendingSla: {
+            pendingTotal: pending.length,
+            averageDays: 2.3,
+            staleCount: pending.length,
+        },
+        lanes: [
+            { id: 'my-queue', label: 'My Queue', description: 'Assigned draft, pending, and scheduled work tied to your account.', count: assignedToMe.length, status: 'all', assignee: 'me' },
+            { id: 'pending-review', label: 'Pending Review', description: 'Posts waiting on review or approval.', count: pending.length, status: 'pending' },
+            { id: 'scheduled', label: 'Scheduled', description: 'Posts queued for automatic publication.', count: scheduled.length, status: 'scheduled' },
+            { id: 'published', label: 'Published', description: 'Live posts currently visible on the public surface.', count: published.length, status: 'published' },
+            { id: 'all-posts', label: 'All Posts', description: 'All post states in one operational workspace.', count: defaultAnnouncements.length, status: 'all' },
+        ],
+    };
 }
 
 function buildDashboardSnapshot() {
@@ -525,8 +581,13 @@ export async function mockAdminApi(page: Page, options: AdminMockOptions = {}) {
             return;
         }
 
+        if (pathname === '/api/admin/manage-posts/workspace' && method === 'GET') {
+            await route.fulfill(okJson(buildManagePostsWorkspace()));
+            return;
+        }
+
         if (pathname === '/api/admin/announcements' && method === 'GET') {
-            await route.fulfill(okJson(announcementsForStatus(searchParams.get('status'))));
+            await route.fulfill(okJson(announcementsForFilters(searchParams.get('status'), searchParams.get('assignee'))));
             return;
         }
 
@@ -661,12 +722,12 @@ export async function mockAdminApi(page: Page, options: AdminMockOptions = {}) {
         }
 
         if (pathname === '/api/admin/views' && method === 'GET') {
-            await route.fulfill(okJson([{ id: 'mock-preset-id', name: 'Saved Preset' }]));
+            await route.fulfill(okJson([{ id: 'mock-preset-id', name: 'Saved Preset', scope: 'private', createdBy: 'admin-user-1' }]));
             return;
         }
 
         if (pathname === '/api/admin/views' && method === 'POST') {
-            await route.fulfill(okJson({ id: 'mock-preset-id', name: 'Saved Preset' }));
+            await route.fulfill(okJson({ id: 'mock-preset-id', name: 'Saved Preset', scope: 'private', createdBy: 'admin-user-1' }));
             return;
         }
 

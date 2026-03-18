@@ -2,6 +2,7 @@ export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 
 export type AnnouncementTypeFilter = 'job' | 'admit-card' | 'result' | 'answer-key' | 'syllabus' | 'admission';
 export type AnnouncementStatusFilter = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type AnnouncementSortOption = 'newest' | 'oldest' | 'updated' | 'deadline' | 'views';
+export type AdminAnnouncementAssigneeFilter = 'me' | 'unassigned' | 'assigned';
 export type AdminSettingKey =
     | 'states'
     | 'boards'
@@ -86,6 +87,8 @@ export interface AdminAnnouncementListItem {
     _id?: string;
     title?: string;
     status?: string;
+    postedBy?: string;
+    postedAt?: string;
     updatedAt?: string;
     publishedAt?: string;
     type?: string;
@@ -618,6 +621,47 @@ export interface AdminSavedView {
     updatedAt?: string;
     createdBy?: string;
     updatedBy?: string;
+}
+
+export type ManagePostsLaneId = 'my-queue' | 'pending-review' | 'scheduled' | 'published' | 'all-posts';
+
+export interface AdminManagePostsLane {
+    id: ManagePostsLaneId;
+    label: string;
+    description: string;
+    count: number;
+    status?: AnnouncementStatusFilter | 'all';
+    assignee?: AdminAnnouncementAssigneeFilter;
+}
+
+export interface AdminManagePostsWorkspaceSnapshot {
+    generatedAt: string;
+    capabilities: {
+        announcementsRead: boolean;
+        announcementsWrite: boolean;
+        announcementsApprove: boolean;
+        canManageSavedViews: boolean;
+        canManageSharedViews: boolean;
+    };
+    summary: {
+        total: number;
+        draft: number;
+        pending: number;
+        scheduled: number;
+        published: number;
+        archived: number;
+        assignedToMe: number;
+        unassignedPending: number;
+        overdueReview: number;
+        stalePending: number;
+        accessibleSavedViews: number;
+    };
+    pendingSla: {
+        pendingTotal: number;
+        averageDays: number;
+        staleCount: number;
+    };
+    lanes: AdminManagePostsLane[];
 }
 
 export interface AdminGlobalSearchResult {

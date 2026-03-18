@@ -246,6 +246,12 @@ function buildAdminQuery(filters?: {
     qualification?: string;
     status?: AnnouncementStatus | 'all';
     includeInactive?: boolean;
+    dateStart?: Date;
+    dateEnd?: Date;
+    author?: string;
+    assigneeMode?: 'me' | 'unassigned' | 'assigned';
+    assigneeUserId?: string;
+    assigneeEmail?: string;
 }): Filter<AnnouncementDoc> {
     const query: Filter<AnnouncementDoc> = {};
 
@@ -275,6 +281,65 @@ function buildAdminQuery(filters?: {
 
     if (filters?.qualification) {
         query.minQualification = { $regex: escapeRegex(filters.qualification), $options: 'i' };
+    }
+
+    if (filters?.dateStart || filters?.dateEnd) {
+        const updatedAt: { $gte?: Date; $lte?: Date } = {};
+        if (filters.dateStart) {
+            updatedAt.$gte = filters.dateStart;
+        }
+        if (filters.dateEnd) {
+            updatedAt.$lte = filters.dateEnd;
+        }
+        query.updatedAt = updatedAt;
+    }
+
+    if (filters?.author) {
+        query.postedBy = buildStringFilter(filters.author);
+    }
+
+    if (filters?.assigneeMode === 'unassigned') {
+        query.$and = [
+            ...(query.$and ?? []),
+            {
+                $or: [
+                    { assigneeUserId: { $exists: false } },
+                    { assigneeUserId: null },
+                    { assigneeUserId: '' },
+                ],
+            },
+            {
+                $or: [
+                    { assigneeEmail: { $exists: false } },
+                    { assigneeEmail: null },
+                    { assigneeEmail: '' },
+                ],
+            },
+        ];
+    } else if (filters?.assigneeMode === 'assigned') {
+        query.$and = [
+            ...(query.$and ?? []),
+            {
+                $or: [
+                    { assigneeUserId: { $exists: true, $nin: [null, ''] } },
+                    { assigneeEmail: { $exists: true, $nin: [null, ''] } },
+                ],
+            },
+        ];
+    } else if (filters?.assigneeUserId || filters?.assigneeEmail) {
+        const assigneeClauses: Filter<AnnouncementDoc>[] = [];
+        if (filters.assigneeUserId) {
+            assigneeClauses.push({ assigneeUserId: filters.assigneeUserId });
+        }
+        if (filters.assigneeEmail) {
+            assigneeClauses.push({ assigneeEmail: filters.assigneeEmail });
+        }
+        if (assigneeClauses.length > 0) {
+            query.$and = [
+                ...(query.$and ?? []),
+                { $or: assigneeClauses },
+            ];
+        }
     }
 
     if (filters?.search && filters.search.trim()) {
@@ -444,6 +509,12 @@ export class AnnouncementModelMongo {
         sort?: 'newest' | 'oldest' | 'deadline' | 'updated' | 'views';
         limit?: number;
         offset?: number;
+        dateStart?: Date;
+        dateEnd?: Date;
+        author?: string;
+        assigneeMode?: 'me' | 'unassigned' | 'assigned';
+        assigneeUserId?: string;
+        assigneeEmail?: string;
     }): Promise<Announcement[]> {
         try {
             const query = buildAdminQuery(filters);
@@ -475,6 +546,12 @@ export class AnnouncementModelMongo {
         qualification?: string;
         status?: AnnouncementStatus | 'all';
         includeInactive?: boolean;
+        dateStart?: Date;
+        dateEnd?: Date;
+        author?: string;
+        assigneeMode?: 'me' | 'unassigned' | 'assigned';
+        assigneeUserId?: string;
+        assigneeEmail?: string;
     }): Promise<number> {
         try {
             const query = buildAdminQuery(filters);

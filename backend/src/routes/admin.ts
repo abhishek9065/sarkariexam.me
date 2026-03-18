@@ -278,6 +278,10 @@ const adminListQuerySchema = z.object({
     search: z.string().trim().optional(),
     includeInactive: z.coerce.boolean().optional(),
     sort: z.enum(['newest', 'oldest', 'deadline', 'updated', 'views']).optional(),
+    dateStart: z.string().trim().optional(),
+    dateEnd: z.string().trim().optional(),
+    author: z.string().trim().optional(),
+    assignee: z.enum(['me', 'unassigned', 'assigned']).optional(),
 });
 
 const bulkUpdateSchema = z.object({
@@ -1789,6 +1793,105 @@ const DEFAULT_ORGANIZATION_BY_TYPE: Record<ContentType, string> = {
 };
 
 const canManageSharedViews = (role?: string) => role === 'admin';
+
+type ManagePostsLaneId = 'my-queue' | 'pending-review' | 'scheduled' | 'published' | 'all-posts';
+
+type ManagePostsLaneDefinition = {
+    id: ManagePostsLaneId;
+    label: string;
+    description: string;
+    status?: Announcement['status'] | 'all';
+    assignee?: 'me' | 'unassigned' | 'assigned';
+};
+
+type ManagePostsWorkspaceSnapshot = {
+    generatedAt: string;
+    capabilities: {
+        announcementsRead: boolean;
+        announcementsWrite: boolean;
+        announcementsApprove: boolean;
+        canManageSavedViews: boolean;
+        canManageSharedViews: boolean;
+    };
+    summary: {
+        total: number;
+        draft: number;
+        pending: number;
+        scheduled: number;
+        published: number;
+        archived: number;
+        assignedToMe: number;
+        unassignedPending: number;
+        overdueReview: number;
+        stalePending: number;
+        accessibleSavedViews: number;
+    };
+    pendingSla: {
+        pendingTotal: number;
+        averageDays: number;
+        staleCount: number;
+    };
+    lanes: Array<ManagePostsLaneDefinition & { count: number }>;
+};
+
+const MANAGE_POSTS_WORKSPACE_TTL_MS = 30_000;
+const managePostsWorkspaceCache = new Map<string, { expiresAt: number; snapshot: ManagePostsWorkspaceSnapshot }>();
+
+const MANAGE_POSTS_LANE_REGISTRY: ManagePostsLaneDefinition[] = [
+    {
+        id: 'my-queue',
+        label: 'My Queue',
+        description: 'Assigned draft, pending, and scheduled work tied to your account.',
+        assignee: 'me',
+    },
+    {
+        id: 'pending-review',
+        label: 'Pending Review',
+        description: 'Posts waiting on review or approval.',
+        status: 'pending',
+    },
+    {
+        id: 'scheduled',
+        label: 'Scheduled',
+        description: 'Posts queued for automatic publication.',
+        status: 'scheduled',
+    },
+    {
+        id: 'published',
+        label: 'Published',
+        description: 'Live posts currently visible on the public surface.',
+        status: 'published',
+    },
+    {
+        id: 'all-posts',
+        label: 'All Posts',
+        description: 'All post states in one operational workspace.',
+        status: 'all',
+    },
+];
+
+const cloneManagePostsWorkspaceSnapshot = (snapshot: ManagePostsWorkspaceSnapshot): ManagePostsWorkspaceSnapshot => (
+    JSON.parse(JSON.stringify(snapshot)) as ManagePostsWorkspaceSnapshot
+);
+
+const readCachedManagePostsWorkspaceSnapshot = (cacheKey: string) => {
+    if (config.nodeEnv === 'test') return null;
+    const cached = managePostsWorkspaceCache.get(cacheKey);
+    if (!cached) return null;
+    if (cached.expiresAt <= Date.now()) {
+        managePostsWorkspaceCache.delete(cacheKey);
+        return null;
+    }
+    return cloneManagePostsWorkspaceSnapshot(cached.snapshot);
+};
+
+const writeCachedManagePostsWorkspaceSnapshot = (cacheKey: string, snapshot: ManagePostsWorkspaceSnapshot) => {
+    if (config.nodeEnv === 'test') return;
+    managePostsWorkspaceCache.set(cacheKey, {
+        expiresAt: Date.now() + MANAGE_POSTS_WORKSPACE_TTL_MS,
+        snapshot: cloneManagePostsWorkspaceSnapshot(snapshot),
+    });
+};
 
 const diffComparableKeys = [
     'title',
@@ -4788,6 +4891,109 @@ governanceRouter.post('/audit-log/rebuild', requirePermission('admin:write'), re
 });
 
 /**
+ * GET /api/admin/manage-posts/workspace
+ * Manage Posts v2 snapshot for lanes, summary, and saved view health.
+ */
+announcementsRouter.get('/manage-posts/workspace', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const actorId = req.user?.userId ?? 'unknown';
+        const actorEmail = req.user?.email ?? '';
+        const actorRole = req.user?.role;
+        const cacheKey = JSON.stringify({
+            actorId,
+            actorEmail,
+            actorRole,
+        });
+        const cached = readCachedManagePostsWorkspaceSnapshot(cacheKey);
+        if (cached) {
+            return res.json({ data: cached });
+        }
+
+        const [announcements, counts, pendingSla, canWrite, canApprove] = await Promise.all([
+            AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 }),
+            AnnouncementModelMongo.getAdminCounts({ includeInactive: true }),
+            AnnouncementModelMongo.getPendingSlaSummary({ includeInactive: true, staleLimit: 10 }),
+            hasEffectivePermission(actorRole as any, 'announcements:write'),
+            hasEffectivePermission(actorRole as any, 'announcements:approve'),
+        ]);
+
+        const pendingReviewItems = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'pending');
+        const nowMs = Date.now();
+        const assignedToMe = announcements.filter((item: any) => {
+            const normalizedStatus = normalizeAnnouncementStatus(item.status);
+            if (!['draft', 'pending', 'scheduled'].includes(normalizedStatus)) return false;
+            return (
+                (actorId && item.assigneeUserId === actorId)
+                || (actorEmail && item.assigneeEmail === actorEmail)
+            );
+        });
+        const unassignedPending = pendingReviewItems.filter((item: any) => !item.assigneeUserId && !item.assigneeEmail);
+        const overdueReview = pendingReviewItems.filter((item: any) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < nowMs);
+
+        const viewsCollection = getCollection<AdminSavedViewDoc>('admin_saved_views');
+        const accessibleSavedViews = await viewsCollection.countDocuments({
+            module: 'manage-posts',
+            $or: [
+                { scope: 'shared' },
+                { scope: 'private', createdBy: actorId },
+            ],
+        } as any);
+
+        const lanes = MANAGE_POSTS_LANE_REGISTRY.map((lane) => {
+            if (lane.id === 'my-queue') {
+                return { ...lane, count: assignedToMe.length };
+            }
+            if (lane.status === 'pending') {
+                return { ...lane, count: counts.byStatus.pending };
+            }
+            if (lane.status === 'scheduled') {
+                return { ...lane, count: counts.byStatus.scheduled };
+            }
+            if (lane.status === 'published') {
+                return { ...lane, count: counts.byStatus.published };
+            }
+            return { ...lane, count: counts.total };
+        });
+
+        const snapshot: ManagePostsWorkspaceSnapshot = {
+            generatedAt: new Date().toISOString(),
+            capabilities: {
+                announcementsRead: true,
+                announcementsWrite: canWrite,
+                announcementsApprove: canApprove,
+                canManageSavedViews: canWrite,
+                canManageSharedViews: canManageSharedViews(actorRole),
+            },
+            summary: {
+                total: counts.total,
+                draft: counts.byStatus.draft,
+                pending: counts.byStatus.pending,
+                scheduled: counts.byStatus.scheduled,
+                published: counts.byStatus.published,
+                archived: counts.byStatus.archived,
+                assignedToMe: assignedToMe.length,
+                unassignedPending: unassignedPending.length,
+                overdueReview: overdueReview.length,
+                stalePending: pendingSla.stale.length,
+                accessibleSavedViews,
+            },
+            pendingSla: {
+                pendingTotal: pendingSla.pendingTotal,
+                averageDays: pendingSla.averageDays,
+                staleCount: pendingSla.stale.length,
+            },
+            lanes,
+        };
+
+        writeCachedManagePostsWorkspaceSnapshot(cacheKey, snapshot);
+        return res.json({ data: snapshot });
+    } catch (error) {
+        console.error('Manage posts workspace snapshot error:', error);
+        return res.status(500).json({ error: 'Failed to load manage posts workspace' });
+    }
+});
+
+/**
  * GET /api/admin/announcements
  * Get all announcements for admin management
  */
@@ -4799,6 +5005,18 @@ announcementsRouter.get('/announcements', requirePermission('announcements:read'
         }
 
         const filters = parseResult.data;
+        const dateStart = parseDateParam(filters.dateStart, 'start');
+        const dateEnd = parseDateParam(filters.dateEnd, 'end');
+        if (filters.dateStart && !dateStart) {
+            return res.status(400).json({ error: 'Invalid dateStart filter' });
+        }
+        if (filters.dateEnd && !dateEnd) {
+            return res.status(400).json({ error: 'Invalid dateEnd filter' });
+        }
+        const assigneeUserId = filters.assignee === 'me' ? req.user?.userId : undefined;
+        const assigneeEmail = filters.assignee === 'me' ? req.user?.email : undefined;
+        const assigneeMode = filters.assignee === 'me' ? undefined : filters.assignee;
+
         const [announcements, total] = await Promise.all([
             AnnouncementModelMongo.findAllAdmin({
                 limit: filters.limit,
@@ -4808,12 +5026,24 @@ announcementsRouter.get('/announcements', requirePermission('announcements:read'
                 search: filters.search,
                 includeInactive: filters.includeInactive,
                 sort: filters.sort,
+                dateStart,
+                dateEnd,
+                author: filters.author,
+                assigneeMode,
+                assigneeUserId,
+                assigneeEmail,
             }),
             AnnouncementModelMongo.countAdmin({
                 status: filters.status,
                 type: filters.type,
                 search: filters.search,
                 includeInactive: filters.includeInactive,
+                dateStart,
+                dateEnd,
+                author: filters.author,
+                assigneeMode,
+                assigneeUserId,
+                assigneeEmail,
             }),
         ]);
 

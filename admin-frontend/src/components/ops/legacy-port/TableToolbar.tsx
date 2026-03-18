@@ -141,22 +141,22 @@ export function TableToolbar({
                         type="date"
                         value={dateStart || ''}
                         onChange={(event) => onDateStartChange(event.target.value)}
-                        aria-label="Filter by Start Date"
-                        title="Start Date"
+                        aria-label="Updated after"
+                        title="Updated after"
                     />
                     <input
                         type="date"
                         value={dateEnd || ''}
                         onChange={(event) => onDateEndChange(event.target.value)}
-                        aria-label="Filter by End Date"
-                        title="End Date"
+                        aria-label="Updated before"
+                        title="Updated before"
                     />
                     <input
                         type="text"
-                        placeholder="Created by (Username or ID)"
+                        placeholder="Posted by (user ID or email)"
                         value={authorFilter || ''}
                         onChange={(event) => onAuthorFilterChange(event.target.value)}
-                        aria-label="Filter by author"
+                        aria-label="Filter by post author"
                     />
                 </div>
             ) : null}

@@ -351,6 +351,62 @@ function buildDashboardSnapshot(input: {
     };
 }
 
+function buildManagePostsWorkspaceSnapshot(input: {
+    me?: Record<string, unknown>;
+    announcements?: Array<Record<string, unknown>>;
+    permissions?: string[];
+    views?: Array<Record<string, unknown>>;
+} = {}) {
+    const announcements = input.announcements ?? [];
+    const role = typeof input.me?.role === 'string' ? input.me.role : 'admin';
+    const permissions = input.permissions ?? ['*'];
+    const canWrite = permissions.includes('*') || permissions.includes('announcements:write');
+    const canApprove = permissions.includes('*') || permissions.includes('announcements:approve');
+    const canManageSharedViews = role === 'admin';
+    const actorEmail = typeof input.me?.email === 'string' ? input.me.email : 'admin@sarkariexams.me';
+
+    const countByStatus = (status: string) => announcements.filter((item) => String(item.status ?? '') === status).length;
+    const pending = announcements.filter((item) => String(item.status ?? '') === 'pending');
+    const assignedToMe = announcements.filter((item) => String(item.assigneeEmail ?? '') === actorEmail);
+    const views = input.views ?? [];
+
+    return {
+        generatedAt: DASH_TS,
+        capabilities: {
+            announcementsRead: true,
+            announcementsWrite: canWrite,
+            announcementsApprove: canApprove,
+            canManageSavedViews: canWrite,
+            canManageSharedViews,
+        },
+        summary: {
+            total: announcements.length,
+            draft: countByStatus('draft'),
+            pending: countByStatus('pending'),
+            scheduled: countByStatus('scheduled'),
+            published: countByStatus('published'),
+            archived: countByStatus('archived'),
+            assignedToMe: assignedToMe.length,
+            unassignedPending: pending.filter((item) => !item.assigneeEmail).length,
+            overdueReview: pending.filter((item) => item.reviewDueAt).length,
+            stalePending: pending.length,
+            accessibleSavedViews: views.length,
+        },
+        pendingSla: {
+            pendingTotal: pending.length,
+            averageDays: pending.length > 0 ? 2.3 : 0,
+            staleCount: pending.length,
+        },
+        lanes: [
+            { id: 'my-queue', label: 'My Queue', description: 'Assigned draft, pending, and scheduled work tied to your account.', count: assignedToMe.length, status: 'all', assignee: 'me' },
+            { id: 'pending-review', label: 'Pending Review', description: 'Posts waiting on review or approval.', count: countByStatus('pending'), status: 'pending' },
+            { id: 'scheduled', label: 'Scheduled', description: 'Posts queued for automatic publication.', count: countByStatus('scheduled'), status: 'scheduled' },
+            { id: 'published', label: 'Published', description: 'Live posts currently visible on the public surface.', count: countByStatus('published'), status: 'published' },
+            { id: 'all-posts', label: 'All Posts', description: 'All post states in one operational workspace.', count: announcements.length, status: 'all' },
+        ],
+    };
+}
+
 async function mockUnauthenticatedAdmin(page: import('@playwright/test').Page) {
     await page.route('**/api/auth/csrf', async (route) => {
         await route.fulfill(jsonResponse({ csrfToken: 'test-csrf-token' }));
@@ -369,9 +425,11 @@ async function mockAuthenticatedAdmin(
     page: import('@playwright/test').Page,
     overrides: {
         me?: Record<string, unknown>;
+        permissions?: string[];
         reports?: Record<string, unknown>;
         auditLogs?: Array<Record<string, unknown>>;
         announcements?: Array<Record<string, unknown>>;
+        views?: Array<Record<string, unknown>>;
         users?: Array<Record<string, unknown>>;
         securityLogs?: Array<Record<string, unknown>>;
         errorReports?: Array<Record<string, unknown>>;
@@ -438,8 +496,8 @@ async function mockAuthenticatedAdmin(
 
     await page.route('**/api/admin-auth/permissions', async (route) => {
         await route.fulfill(jsonResponse({
-            role: 'admin',
-            permissions: ['*'],
+            role: typeof adminMe.role === 'string' ? adminMe.role : 'admin',
+            permissions: overrides.permissions ?? ['*'],
         }));
     });
 
@@ -450,6 +508,15 @@ async function mockAuthenticatedAdmin(
             auditLogs: overrides.auditLogs,
             securityLogs: overrides.securityLogs,
             errorReports: overrides.errorReports,
+        })));
+    });
+
+    await page.route('**/api/admin/manage-posts/workspace', async (route) => {
+        await route.fulfill(jsonResponse(buildManagePostsWorkspaceSnapshot({
+            me: adminMe,
+            announcements: overrides.announcements,
+            permissions: overrides.permissions,
+            views: overrides.views,
         })));
     });
 
@@ -513,14 +580,30 @@ async function mockAuthenticatedAdmin(
             }));
             return;
         }
+        const url = new URL(route.request().url());
+        const requestedStatus = url.searchParams.get('status');
+        const requestedAssignee = url.searchParams.get('assignee');
+        let data = [...(overrides.announcements ?? [])];
+        if (requestedStatus) {
+            data = data.filter((item) => String(item.status ?? '') === requestedStatus);
+        }
+        if (requestedAssignee === 'me') {
+            data = data.filter((item) => String(item.assigneeEmail ?? '') === adminMe.email);
+        }
+        if (requestedAssignee === 'unassigned') {
+            data = data.filter((item) => !item.assigneeEmail);
+        }
+        if (requestedAssignee === 'assigned') {
+            data = data.filter((item) => Boolean(item.assigneeEmail));
+        }
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
                 success: true,
-                data: overrides.announcements ?? [],
+                data,
                 meta: {
-                    total: (overrides.announcements ?? []).length,
+                    total: data.length,
                     limit: 40,
                     offset: 0,
                 },
@@ -546,8 +629,8 @@ async function mockAuthenticatedAdmin(
             contentType: 'application/json',
             body: JSON.stringify({
                 success: true,
-                data: [],
-                meta: { total: 0, limit: 100, offset: 0 },
+                data: overrides.views ?? [],
+                meta: { total: (overrides.views ?? []).length, limit: 100, offset: 0 },
             }),
         });
     });
@@ -1009,6 +1092,36 @@ test('manage posts applies tag deep links from admin search routes', async ({ pa
 
     await expect(page.getByLabel('Search announcements')).toHaveValue('Railway');
     await expect(page).not.toHaveURL(/tag=/i);
+});
+
+test('manage posts hides write actions for read-only roles while keeping lanes visible', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page, {
+        me: {
+            role: 'viewer',
+        },
+        permissions: ['admin:read', 'announcements:read'],
+        announcements: [
+            {
+                id: 'ann-1',
+                title: 'Railway Group D Recruitment 2026',
+                type: 'job',
+                status: 'pending',
+                organization: 'Railway Recruitment Board',
+                category: 'Latest Jobs',
+                updatedAt: '2026-03-07T08:00:00.000Z',
+                assigneeEmail: 'admin@sarkariexams.me',
+            },
+        ],
+    });
+    await page.goto('manage-posts', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByRole('button', { name: /^My Queue \(\d+\)$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Pending Review \(\d+\)$/i })).toBeVisible();
+    await expect(page.getByText(/Read-only access\./i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Save current filters/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Submit for review/i })).toHaveCount(0);
+    await expect(page.locator('tbody input[type="checkbox"]')).toHaveCount(0);
 });
 
 test('create post includes step-up controls for direct publish actions', async ({ page }) => {

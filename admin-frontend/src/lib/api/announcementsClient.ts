@@ -1,4 +1,5 @@
 import type {
+    AdminAnnouncementAssigneeFilter,
     AnnouncementTypeFilter,
     AdminAnnouncementListItem,
     AdminAnnouncementListResponse,
@@ -7,6 +8,7 @@ import type {
     AdminContentRecord,
     AdminDraftRecord,
     AdminGlobalSearchResult,
+    AdminManagePostsWorkspaceSnapshot,
     AdminRevisionEntry,
     AdminReviewPreview,
     AdminSavedView,
@@ -24,6 +26,7 @@ export async function getAdminAnnouncementsPaged(input: {
     dateStart?: string;
     dateEnd?: string;
     author?: string;
+    assignee?: AdminAnnouncementAssigneeFilter;
     includeInactive?: boolean;
 } = {}): Promise<AdminAnnouncementListResponse> {
     const params = new URLSearchParams();
@@ -36,6 +39,7 @@ export async function getAdminAnnouncementsPaged(input: {
     if (input.dateStart) params.set('dateStart', input.dateStart);
     if (input.dateEnd) params.set('dateEnd', input.dateEnd);
     if (input.author && input.author.trim()) params.set('author', input.author.trim());
+    if (input.assignee) params.set('assignee', input.assignee);
     if (input.includeInactive) params.set('includeInactive', 'true');
 
     const body = await request(`${ADMIN_API_PATHS.adminAnnouncements}?${params.toString()}`);
@@ -244,6 +248,39 @@ export async function updateAdminAnnouncement(
         body: JSON.stringify(payload),
     }, true);
     return typedData<AdminAnnouncementListItem>(body) ?? {} as AdminAnnouncementListItem;
+}
+
+export async function getManagePostsWorkspace(): Promise<AdminManagePostsWorkspaceSnapshot> {
+    const body = await request('/api/admin/manage-posts/workspace');
+    return typedData<AdminManagePostsWorkspaceSnapshot>(body) ?? {
+        generatedAt: new Date(0).toISOString(),
+        capabilities: {
+            announcementsRead: false,
+            announcementsWrite: false,
+            announcementsApprove: false,
+            canManageSavedViews: false,
+            canManageSharedViews: false,
+        },
+        summary: {
+            total: 0,
+            draft: 0,
+            pending: 0,
+            scheduled: 0,
+            published: 0,
+            archived: 0,
+            assignedToMe: 0,
+            unassignedPending: 0,
+            overdueReview: 0,
+            stalePending: 0,
+            accessibleSavedViews: 0,
+        },
+        pendingSla: {
+            pendingTotal: 0,
+            averageDays: 0,
+            staleCount: 0,
+        },
+        lanes: [],
+    };
 }
 
 export async function updateAnnouncementAssignment(

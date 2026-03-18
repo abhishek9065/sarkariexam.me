@@ -10,6 +10,18 @@ async function bootAuthenticatedShell(page: import('@playwright/test').Page, rou
     await expect(page.locator('.admin-layout')).toBeVisible({ timeout: 20_000 });
 }
 
+async function expectSensitiveActionsUnlocked(page: import('@playwright/test').Page) {
+    await expect(page.getByText(/Sensitive Actions Unlocked/i)).toBeVisible();
+}
+
+async function openCommandPalette(page: import('@playwright/test').Page) {
+    const shortcut = process.platform === 'darwin' ? 'Meta+k' : 'Control+k';
+    await page.keyboard.press(shortcut);
+    const paletteDialog = page.getByRole('dialog', { name: /Admin command palette/i });
+    await expect(paletteDialog).toBeVisible();
+    return paletteDialog;
+}
+
 test('announcements supports filter presets and row actions', async ({ page }) => {
     await bootAuthenticatedShell(page, 'announcements');
 
@@ -25,7 +37,7 @@ test('announcements supports filter presets and row actions', async ({ page }) =
 
 test('review supports preview and execute flow with escape-close confirm dialog', async ({ page }) => {
     await bootAuthenticatedShell(page, 'review');
-    await expect(page.getByText(/Step-up active/i)).toBeVisible();
+    await expectSensitiveActionsUnlocked(page);
 
     const checkboxes = page.locator('tbody input[type="checkbox"]');
     await checkboxes.nth(1).check();
@@ -50,7 +62,7 @@ test('review supports preview and execute flow with escape-close confirm dialog'
 
 test('bulk import enforces preview modal and confirm flow', async ({ page }) => {
     await bootAuthenticatedShell(page, 'bulk');
-    await expect(page.getByText(/Step-up active/i)).toBeVisible();
+    await expectSensitiveActionsUnlocked(page);
 
     await page.getByPlaceholder(/Paste announcement IDs/i).fill('ann-p-1 ann-s-1');
     await page.getByRole('button', { name: /Preview \(2\)/i }).click();
@@ -70,7 +82,7 @@ test('bulk import enforces preview modal and confirm flow', async ({ page }) => 
 
 test('sessions supports terminate flow with step-up and confirm dialog', async ({ page }) => {
     await bootAuthenticatedShell(page, 'sessions');
-    await expect(page.getByText(/Step-up active/i)).toBeVisible();
+    await expectSensitiveActionsUnlocked(page);
 
     await page.getByRole('button', { name: /^Terminate$/i }).click();
     await expect(page.getByRole('alertdialog')).toBeVisible();
@@ -80,7 +92,7 @@ test('sessions supports terminate flow with step-up and confirm dialog', async (
 
 test('approvals uses structured decision modal with focus and escape-close', async ({ page }) => {
     await bootAuthenticatedShell(page, 'approvals');
-    await expect(page.getByText(/Step-up active/i)).toBeVisible();
+    await expectSensitiveActionsUnlocked(page);
 
     await page.getByRole('button', { name: /^Reject$/i }).click();
     const decisionDialog = page.getByRole('dialog', { name: /Reject request/i });
@@ -100,7 +112,13 @@ test('approvals uses structured decision modal with focus and escape-close', asy
 test('compact mode keeps small controls at least 40px tall', async ({ page }) => {
     await bootAuthenticatedShell(page, 'dashboard');
 
-    await page.getByRole('button', { name: /Density: Comfortable/i }).click();
+    await page.getByRole('button', { name: /Command palette/i }).click();
+    const paletteDialog = page.getByRole('dialog', { name: /Admin command palette/i });
+    await expect(paletteDialog).toBeVisible();
+    const paletteInput = paletteDialog.getByPlaceholder(/Search commands, modules, or content/i);
+    await paletteInput.fill('toggle density');
+    await page.keyboard.press('Enter');
+    await expect(paletteDialog).toHaveCount(0);
     await page.getByRole('link', { name: /All Posts/i }).click();
 
     const compactControl = page.getByRole('button', { name: /Save current filters/i });
@@ -112,13 +130,10 @@ test('compact mode keeps small controls at least 40px tall', async ({ page }) =>
 test('keyboard opens command palette and focuses search input', async ({ page }) => {
     await bootAuthenticatedShell(page, 'dashboard');
 
-    await page.keyboard.press('ControlOrMeta+K');
-    const paletteDialog = page.getByRole('dialog', { name: /Admin command palette/i });
-    await expect(paletteDialog).toBeVisible();
-    const input = paletteDialog.getByPlaceholder(/Jump to module or search announcement/i);
+    const paletteDialog = await openCommandPalette(page);
+    const input = paletteDialog.getByPlaceholder(/Search commands, modules, or content/i);
     await expect(input).toBeFocused();
 
     await page.keyboard.press('Escape');
     await expect(paletteDialog).toHaveCount(0);
 });
-
