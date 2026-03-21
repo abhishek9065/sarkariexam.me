@@ -153,6 +153,31 @@ export async function createAnnouncementDraft(input: {
     return typedData<AdminDraftRecord>(body)!;
 }
 
+export async function getRecentEditorDrafts(input: {
+    limit?: number;
+    type?: AnnouncementTypeFilter;
+} = {}): Promise<{
+    data: AdminDraftRecord[];
+    meta: {
+        total: number;
+        limit: number;
+    };
+}> {
+    const params = new URLSearchParams();
+    params.set('limit', String(Math.max(1, Math.min(12, input.limit ?? 5))));
+    if (input.type) {
+        params.set('type', input.type);
+    }
+    const body = await request(`/api/admin/editor-drafts/recent?${params.toString()}`);
+    return {
+        data: toArray<AdminDraftRecord>(typedData<AdminDraftRecord[]>(body)),
+        meta: {
+            total: typedMeta(body).total,
+            limit: typedMeta(body).limit,
+        },
+    };
+}
+
 export async function autosaveAnnouncementDraft(id: string, payload: AdminAutosavePayload): Promise<{
     id: string;
     title: string;

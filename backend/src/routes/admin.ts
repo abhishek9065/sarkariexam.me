@@ -128,6 +128,9 @@ interface AdminTemplateDoc {
     shared: boolean;
     sections: string[];
     payload: Record<string, unknown>;
+    usageCount: number;
+    lastUsedAt?: Date;
+    lastUsedBy?: string;
     createdAt: Date;
     updatedAt: Date;
     createdBy?: string;
@@ -194,6 +197,18 @@ interface AdminSavedViewDoc {
     updatedBy?: string;
 }
 
+interface AdminAutosaveDoc {
+    announcementId: string;
+    userId: string;
+    editorSessionId?: string;
+    clientUpdatedAt?: Date;
+    cursor?: Record<string, unknown>;
+    title: string;
+    status: string;
+    version: number;
+    updatedAt: Date;
+}
+
 const statusSchema = z.enum(['draft', 'pending', 'scheduled', 'published', 'archived']);
 const sessionIdSchema = z.object({
     sessionId: z.string().min(8),
@@ -248,6 +263,7 @@ const adminAnnouncementBaseSchema = z.object({
         trendingScore: z.coerce.number().min(0).max(1_000_000).optional(),
     }).optional(),
     schema: z.record(z.unknown()).optional(),
+    templateId: z.string().trim().max(120).optional(),
 });
 
 const adminAnnouncementSchema = adminAnnouncementBaseSchema.superRefine((data, ctx) => {
@@ -466,6 +482,7 @@ const templateListQuerySchema = z.object({
         .enum(['true', 'false', 'all'])
         .optional()
         .default('all'),
+    search: z.string().trim().max(120).optional(),
     limit: z.coerce.number().int().min(1).max(200).default(100),
     offset: z.coerce.number().int().min(0).default(0),
 });
@@ -581,6 +598,11 @@ const announcementAutosaveSchema = adminAnnouncementPartialBaseSchema.extend({
 
 const announcementRevisionsQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+const recentEditorDraftsQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(12).default(5),
+    type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
 });
 
 const linkHealthSummaryQuerySchema = z.object({
@@ -1788,6 +1810,50 @@ const DEFAULT_ORGANIZATION_BY_TYPE: Record<ContentType, string> = {
 };
 
 const canManageSharedViews = (role?: string) => role === 'admin';
+const canManageSharedTemplates = (role?: string) => role === 'admin';
+
+const canAccessTemplate = (template: Pick<AdminTemplateDoc, 'shared' | 'createdBy'>, actorId: string, role?: string) =>
+    canManageSharedTemplates(role) || template.shared || template.createdBy === actorId;
+
+const canMutateTemplate = (template: Pick<AdminTemplateDoc, 'shared' | 'createdBy'>, actorId: string, role?: string) =>
+    canManageSharedTemplates(role) || (!template.shared && template.createdBy === actorId);
+
+const mapTemplateDocForClient = (doc: any) => ({
+    id: serializeId(doc._id),
+    ...doc,
+    usageCount: typeof doc.usageCount === 'number' ? doc.usageCount : 0,
+    lastUsedAt: doc.lastUsedAt ?? undefined,
+    lastUsedBy: doc.lastUsedBy ?? undefined,
+});
+
+const recordTemplateUsage = async (templateId: string | undefined, userId?: string) => {
+    if (!templateId) return;
+    try {
+        await getCollection<AdminTemplateDoc>('admin_templates').updateOne(
+            { _id: toMongoId(templateId) as any },
+            {
+                $inc: { usageCount: 1 },
+                $set: {
+                    lastUsedAt: new Date(),
+                    lastUsedBy: userId,
+                },
+            } as any
+        );
+    } catch (error) {
+        console.error('Template usage update error:', error);
+    }
+};
+
+const mapRecentEditorDraft = (input: { autosave: AdminAutosaveDoc; announcement: any }) => ({
+    id: input.announcement.id,
+    title: input.announcement.title,
+    type: input.announcement.type,
+    status: normalizeAnnouncementStatus(input.announcement.status),
+    category: input.announcement.category,
+    organization: input.announcement.organization,
+    updatedAt: input.autosave.updatedAt.toISOString(),
+    route: `/detailed-post?focus=${encodeURIComponent(input.announcement.id)}`,
+});
 
 const MANAGE_POSTS_WORKSPACE_TTL_MS = 30_000;
 
@@ -2728,6 +2794,21 @@ contentRouter.post('/announcements/draft', requirePermission('announcements:writ
         }
 
         const type = parsed.data.type;
+        const actorId = req.user?.userId ?? 'unknown';
+        if (parsed.data.templateId) {
+            const template = await getCollection<AdminTemplateDoc>('admin_templates').findOne({
+                _id: toMongoId(parsed.data.templateId) as any,
+            });
+            if (!template) {
+                return res.status(404).json({ error: 'Template not found' });
+            }
+            if (!canAccessTemplate(template, actorId, req.user?.role)) {
+                return res.status(403).json({ error: 'You do not have access to this template' });
+            }
+            if (template.type !== type) {
+                return res.status(400).json({ error: 'Template type does not match the requested draft type' });
+            }
+        }
         const now = new Date();
         const shortStamp = now.toISOString().slice(0, 16).replace('T', ' ');
         const title = parsed.data.title?.trim() || `Untitled ${type.toUpperCase()} Draft ${shortStamp}`;
@@ -2743,12 +2824,29 @@ contentRouter.post('/announcements/draft', requirePermission('announcements:writ
                 tags: [],
                 typeDetails: parsed.data.templateId ? { templateId: parsed.data.templateId } : undefined,
             },
-            req.user?.userId ?? 'system'
+            actorId
         );
+
+        await getCollection<AdminAutosaveDoc>('admin_autosaves').updateOne(
+            { announcementId: draft.id, userId: actorId },
+            {
+                $set: {
+                    announcementId: draft.id,
+                    userId: actorId,
+                    title: draft.title,
+                    status: draft.status ?? 'draft',
+                    version: draft.version ?? 1,
+                    updatedAt: new Date(),
+                },
+            },
+            { upsert: true }
+        );
+
+        await recordTemplateUsage(parsed.data.templateId, actorId);
 
         await audit(req, {
             action: 'announcement_draft_create',
-            userId: req.user?.userId,
+            userId: actorId,
             announcementId: draft.id,
             title: draft.title,
             metadata: { type: draft.type, templateId: parsed.data.templateId },
@@ -2860,6 +2958,55 @@ contentRouter.patch('/announcements/:id/autosave', requirePermission('announceme
     } catch (error) {
         console.error('Autosave error:', error);
         return res.status(500).json({ error: 'Failed to autosave announcement' });
+    }
+});
+
+/**
+ * GET /api/admin/editor-drafts/recent
+ * Fetch recent editor draft sessions for the current actor.
+ */
+contentRouter.get('/editor-drafts/recent', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = recentEditorDraftsQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const actorId = req.user?.userId ?? 'unknown';
+        const autosaves = await getCollection<AdminAutosaveDoc>('admin_autosaves')
+            .find({ userId: actorId })
+            .sort({ updatedAt: -1 })
+            .limit(Math.max(parsed.data.limit * 3, parsed.data.limit))
+            .toArray();
+
+        const announcementIds = [...new Set(autosaves.map((item) => item.announcementId).filter(Boolean))];
+        const announcements = await Promise.all(announcementIds.map((announcementId) => AnnouncementModelMongo.findById(announcementId)));
+        const announcementMap = new Map(
+            announcements
+                .filter((item): item is NonNullable<typeof item> => Boolean(item))
+                .map((item) => [item.id, item])
+        );
+
+        const data = autosaves
+            .map((autosave) => {
+                const announcement = announcementMap.get(autosave.announcementId);
+                if (!announcement) return null;
+                if (parsed.data.type && announcement.type !== parsed.data.type) return null;
+                return mapRecentEditorDraft({ autosave, announcement });
+            })
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+            .slice(0, parsed.data.limit);
+
+        return res.json({
+            data,
+            meta: {
+                total: data.length,
+                limit: parsed.data.limit,
+            },
+        });
+    } catch (error) {
+        console.error('Recent editor drafts error:', error);
+        return res.status(500).json({ error: 'Failed to load recent editor drafts' });
     }
 });
 
@@ -3572,14 +3719,37 @@ contentRouter.get('/templates', requirePermission('announcements:read'), async (
             return res.status(400).json({ error: parsed.error.flatten() });
         }
         const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
+        const actorId = req.user?.userId ?? 'unknown';
+        const role = req.user?.role;
         const filter: Record<string, unknown> = {};
         if (parsed.data.type !== 'all') filter.type = parsed.data.type;
         if (parsed.data.shared !== 'all') filter.shared = parsed.data.shared === 'true';
+        if (parsed.data.search) {
+            const regex = new RegExp(escapeRegex(parsed.data.search), 'i');
+            filter.$or = [
+                { name: { $regex: regex } },
+                { description: { $regex: regex } },
+            ];
+        }
+
+        const visibilityFilter = canManageSharedTemplates(role)
+            ? filter
+            : {
+                $and: [
+                    filter,
+                    {
+                        $or: [
+                            { shared: true },
+                            { createdBy: actorId },
+                        ],
+                    },
+                ],
+            };
 
         const [total, docs] = await Promise.all([
-            templatesCollection.countDocuments(filter),
+            templatesCollection.countDocuments(visibilityFilter as any),
             templatesCollection
-                .find(filter)
+                .find(visibilityFilter as any)
                 .sort({ updatedAt: -1 })
                 .skip(parsed.data.offset)
                 .limit(parsed.data.limit)
@@ -3587,7 +3757,7 @@ contentRouter.get('/templates', requirePermission('announcements:read'), async (
         ]);
 
         return res.json({
-            data: docs.map((doc: any) => ({ id: serializeId(doc._id), ...doc })),
+            data: docs.map(mapTemplateDocForClient),
             meta: { total, limit: parsed.data.limit, offset: parsed.data.offset },
         });
     } catch (error) {
@@ -3609,6 +3779,11 @@ contentRouter.post('/templates', requirePermission('announcements:write'), idemp
         const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
         const now = new Date();
         const payload = parsed.data;
+        const actorId = req.user?.userId ?? 'unknown';
+        const actorRole = req.user?.role;
+        if (payload.shared && !canManageSharedTemplates(actorRole)) {
+            return res.status(403).json({ error: 'Only admin can create shared templates' });
+        }
         const result = await templatesCollection.insertOne({
             type: payload.type,
             name: payload.name,
@@ -3616,10 +3791,13 @@ contentRouter.post('/templates', requirePermission('announcements:write'), idemp
             shared: payload.shared,
             sections: normalizeStringList(payload.sections),
             payload: payload.payload ?? {},
+            usageCount: 0,
+            lastUsedAt: undefined,
+            lastUsedBy: undefined,
             createdAt: now,
             updatedAt: now,
-            createdBy: req.user?.userId,
-            updatedBy: req.user?.userId,
+            createdBy: actorId,
+            updatedBy: actorId,
         });
 
         audit(req, {
@@ -3629,7 +3807,7 @@ contentRouter.post('/templates', requirePermission('announcements:write'), idemp
         }).catch(console.error);
 
         return res.status(201).json({
-            data: {
+            data: mapTemplateDocForClient({
                 id: serializeId(result.insertedId),
                 type: payload.type,
                 name: payload.name,
@@ -3637,9 +3815,15 @@ contentRouter.post('/templates', requirePermission('announcements:write'), idemp
                 shared: payload.shared,
                 sections: normalizeStringList(payload.sections),
                 payload: payload.payload ?? {},
+                usageCount: 0,
+                lastUsedAt: undefined,
+                lastUsedBy: undefined,
                 createdAt: now,
                 updatedAt: now,
-            },
+                createdBy: actorId,
+                updatedBy: actorId,
+                _id: result.insertedId,
+            }),
         });
     } catch (error) {
         console.error('Template create error:', error);
@@ -3659,9 +3843,21 @@ contentRouter.patch('/templates/:id', requirePermission('announcements:write'), 
         }
         const templateId = getPathParam(req.params.id);
         const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
+        const actorId = req.user?.userId ?? 'unknown';
+        const actorRole = req.user?.role;
+        const existing = await templatesCollection.findOne({ _id: toMongoId(templateId) as any });
+        if (!existing) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        if (!canMutateTemplate(existing, actorId, actorRole)) {
+            return res.status(403).json({ error: 'Only the owner or admin can update this template' });
+        }
+        if (parsed.data.shared !== undefined && parsed.data.shared !== existing.shared && !canManageSharedTemplates(actorRole)) {
+            return res.status(403).json({ error: 'Only admin can change shared template visibility' });
+        }
         const setData: Record<string, unknown> = {
             updatedAt: new Date(),
-            updatedBy: req.user?.userId,
+            updatedBy: actorId,
         };
         if (parsed.data.type !== undefined) setData.type = parsed.data.type;
         if (parsed.data.name !== undefined) setData.name = parsed.data.name;
@@ -3685,10 +3881,43 @@ contentRouter.patch('/templates/:id', requirePermission('announcements:write'), 
             metadata: { id: templateId },
         }).catch(console.error);
 
-        return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
+        return res.json({ data: mapTemplateDocForClient(updated) });
     } catch (error) {
         console.error('Template update error:', error);
         return res.status(500).json({ error: 'Failed to update template' });
+    }
+});
+
+/**
+ * DELETE /api/admin/templates/:id
+ * Delete posting template.
+ */
+contentRouter.delete('/templates/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+    try {
+        const templateId = getPathParam(req.params.id);
+        const templatesCollection = getCollection<AdminTemplateDoc>('admin_templates');
+        const actorId = req.user?.userId ?? 'unknown';
+        const actorRole = req.user?.role;
+        const existing = await templatesCollection.findOne({ _id: toMongoId(templateId) as any });
+        if (!existing) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        if (!canMutateTemplate(existing, actorId, actorRole)) {
+            return res.status(403).json({ error: 'Only the owner or admin can delete this template' });
+        }
+
+        await templatesCollection.deleteOne({ _id: toMongoId(templateId) as any });
+
+        audit(req, {
+            action: 'template_delete',
+            userId: actorId,
+            metadata: { id: templateId, name: existing.name },
+        }).catch(console.error);
+
+        return res.json({ data: { success: true, id: templateId } });
+    } catch (error) {
+        console.error('Template delete error:', error);
+        return res.status(500).json({ error: 'Failed to delete template' });
     }
 });
 
@@ -5272,6 +5501,22 @@ announcementsRouter.post('/announcements', requirePermission('announcements:writ
             }
         }
 
+        const userId = req.user?.userId ?? 'system';
+        if (parseResult.data.templateId) {
+            const template = await getCollection<AdminTemplateDoc>('admin_templates').findOne({
+                _id: toMongoId(parseResult.data.templateId) as any,
+            });
+            if (!template) {
+                return res.status(404).json({ error: 'Template not found' });
+            }
+            if (!canAccessTemplate(template, userId, role)) {
+                return res.status(403).json({ error: 'You do not have access to this template' });
+            }
+            if (template.type !== parseResult.data.type) {
+                return res.status(400).json({ error: 'Template type does not match the announcement type' });
+            }
+        }
+
         let approvalId: string | undefined;
         let approvalGate: ApprovalGateResult | undefined;
         if (status === 'published') {
@@ -5288,8 +5533,18 @@ announcementsRouter.post('/announcements', requirePermission('announcements:writ
             approvalId = approvalGate.approvalId;
         }
 
-        const userId = req.user?.userId ?? 'system';
-        const announcement = await AnnouncementModelMongo.create(parseResult.data as unknown as CreateAnnouncementDto, userId);
+        const createPayload = {
+            ...parseResult.data,
+            typeDetails: parseResult.data.templateId
+                ? {
+                    ...(parseResult.data.typeDetails ?? {}),
+                    templateId: parseResult.data.templateId,
+                }
+                : parseResult.data.typeDetails,
+        } as unknown as CreateAnnouncementDto;
+
+        const announcement = await AnnouncementModelMongo.create(createPayload, userId);
+        await recordTemplateUsage(parseResult.data.templateId, userId);
         audit(req, {
             action: 'create',
             announcementId: announcement.id,
@@ -5298,6 +5553,7 @@ announcementsRouter.post('/announcements', requirePermission('announcements:writ
             note,
             metadata: {
                 status: announcement.status,
+                templateId: parseResult.data.templateId,
                 ...approvalGateAuditMetadata(approvalGate),
             },
         }).catch(console.error);

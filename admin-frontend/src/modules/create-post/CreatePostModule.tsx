@@ -1,14 +1,20 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { ModuleScaffold } from '../../components/workspace';
-import { createAdminContentRecord, getTemplateRecords } from '../../lib/api/client';
-import type { AnnouncementTypeFilter, TemplateRecord } from '../../types';
+import {
+    autosaveAnnouncementDraft,
+    createAdminContentRecord,
+    createAnnouncementDraft,
+    getRecentEditorDrafts,
+    getTemplateRecords,
+} from '../../lib/api/client';
+import type { AdminAutosavePayload, AdminDraftRecord, AnnouncementTypeFilter, TemplateRecord } from '../../types';
 
 type FormState = {
     title: string;
@@ -163,6 +169,11 @@ const buildTypeDetails = (form: FormState): Record<string, unknown> => {
     };
 };
 
+const buildPersistedTypeDetails = (form: FormState, templateId?: string): Record<string, unknown> => ({
+    ...buildTypeDetails(form),
+    ...(templateId ? { templateId } : {}),
+});
+
 const typeCategoryDefaults: Record<AnnouncementTypeFilter, string> = {
     job: 'Latest Jobs',
     result: 'Results',
@@ -172,14 +183,60 @@ const typeCategoryDefaults: Record<AnnouncementTypeFilter, string> = {
     admission: 'Admission',
 };
 
+const resetTypeSpecificFields = (current: FormState, nextType: AnnouncementTypeFilter): FormState => ({
+    ...current,
+    type: nextType,
+    category: typeCategoryDefaults[nextType],
+    importantDates: '',
+    applyOnlineLink: '',
+    notificationPdfLink: '',
+    applicationFee: '',
+    ageLimit: '',
+    vacancyDetails: '',
+    eligibility: '',
+    selectionProcess: '',
+    salary: '',
+    resultType: '',
+    resultDate: '',
+    admitCardReleaseDate: '',
+    examDate: '',
+    objectionStart: '',
+    objectionEnd: '',
+    syllabusMarks: '',
+    counselingDates: '',
+});
+
+const buildDraftAutosavePayload = (form: FormState, templateId?: string): AdminAutosavePayload => ({
+    title: form.title.trim(),
+    type: form.type,
+    category: form.category.trim(),
+    organization: form.organization.trim(),
+    content: form.summary.trim() || undefined,
+    externalLink: form.externalLink.trim() || undefined,
+    deadline: form.deadline || undefined,
+    tags: parseLines(form.tags.replace(/,/g, '\n')),
+    typeDetails: buildPersistedTypeDetails(form, templateId),
+});
+
 export function CreatePostModule() {
     const queryClient = useQueryClient();
     const { notifyInfo, notifySuccess } = useAdminNotifications();
     const { hasValidStepUp, stepUpToken } = useAdminAuth();
+    const [searchParams] = useSearchParams();
 
     const [form, setForm] = useState<FormState>(defaultForm);
     const [templateId, setTemplateId] = useState<string>('');
     const [success, setSuccess] = useState<string>('');
+    const [draftShell, setDraftShell] = useState<AdminDraftRecord | null>(null);
+    const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+    const [lastAutosaveAt, setLastAutosaveAt] = useState<string>('');
+    const [lastSavedFingerprint, setLastSavedFingerprint] = useState('');
+    const [editorSessionId] = useState(() => `create-post-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    const requestedTemplateId = searchParams.get('template')?.trim() ?? '';
+    const requestedTemplateTypeParam = searchParams.get('type')?.trim();
+    const requestedTemplateType = requestedTemplateTypeParam && Object.hasOwn(typeCategoryDefaults, requestedTemplateTypeParam)
+        ? requestedTemplateTypeParam as AnnouncementTypeFilter
+        : null;
 
     const templatesQuery = useQuery({
         queryKey: ['admin-templates', form.type],
@@ -195,6 +252,11 @@ export function CreatePostModule() {
         () => templateOptions.find((item) => item.id === templateId),
         [templateId, templateOptions]
     );
+
+    const recentDraftsQuery = useQuery({
+        queryKey: ['admin-editor-drafts', form.type],
+        queryFn: () => getRecentEditorDrafts({ type: form.type, limit: 5 }),
+    });
 
     const createMutation = useMutation({
         mutationFn: async () => {
@@ -214,7 +276,8 @@ export function CreatePostModule() {
                 publishAt: form.status === 'scheduled' ? (form.publishAt || undefined) : undefined,
                 externalLink: form.externalLink.trim() || undefined,
                 tags: parseLines(form.tags.replace(/,/g, '\n')),
-                typeDetails: buildTypeDetails(form),
+                typeDetails: buildPersistedTypeDetails(form, templateId || undefined),
+                templateId: templateId || undefined,
             };
 
             if (requiresPublishStepUp && (!hasValidStepUp || !stepUpToken)) {
@@ -227,9 +290,14 @@ export function CreatePostModule() {
             setSuccess(`Created ${data.type} post: ${data.title}`);
             setForm(defaultForm);
             setTemplateId('');
+            setDraftShell(null);
+            setLastAutosaveAt('');
+            setLastSavedFingerprint('');
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['admin-announcements'] }),
                 queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-templates'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-editor-drafts'] }),
             ]);
             notifySuccess('Post created', 'Content is now in workflow queue.');
         },
@@ -239,20 +307,55 @@ export function CreatePostModule() {
         },
     });
 
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent) => {
-            if ((event.metaKey || event.ctrlKey) && (event.key === 's' || event.key === 'Enter')) {
-                event.preventDefault();
-                if (!createMutation.isPending && form.title && form.category && form.organization) {
-                    createMutation.mutate();
-                }
-            }
-        };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
-    }, [createMutation, form.title, form.category, form.organization]);
+    const startDraftMutation = useMutation({
+        mutationFn: async () => createAnnouncementDraft({
+            type: form.type,
+            title: form.title.trim() || undefined,
+            category: form.category.trim() || undefined,
+            organization: form.organization.trim() || undefined,
+            templateId: templateId || undefined,
+        }),
+        onSuccess: async (draft) => {
+            setDraftShell(draft);
+            setForm((current) => ({ ...current, status: 'draft' }));
+            setLastAutosaveAt(draft.updatedAt ?? new Date().toISOString());
+            setLastSavedFingerprint('');
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-announcements'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-editor-drafts'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
+            notifySuccess('Draft shell started', 'This editor now autosaves into a draft record you can continue in Detailed Post.');
+        },
+        onError: (error) => {
+            notifyInfo('Draft shell blocked', mapCreateErrorMessage(error));
+        },
+    });
 
-    const applyTemplate = (template: TemplateRecord) => {
+    const autosaveMutation = useMutation({
+        mutationFn: async () => {
+            if (!draftShell?.id) {
+                throw new Error('Missing draft shell for autosave.');
+            }
+            return autosaveAnnouncementDraft(draftShell.id, {
+                ...buildDraftAutosavePayload(form, templateId || undefined),
+                autosave: {
+                    editorSessionId,
+                    clientUpdatedAt: new Date().toISOString(),
+                },
+            });
+        },
+        onSuccess: async (data) => {
+            setLastAutosaveAt(data.updatedAt ?? new Date().toISOString());
+            setLastSavedFingerprint(autosaveFingerprint);
+            await queryClient.invalidateQueries({ queryKey: ['admin-editor-drafts'] });
+        },
+        onError: (error) => {
+            notifyInfo('Autosave paused', mapCreateErrorMessage(error));
+        },
+    });
+
+    const applyTemplate = useCallback((template: TemplateRecord) => {
         const payload = template.payload ?? {};
         setForm((current) => ({
             ...current,
@@ -274,7 +377,84 @@ export function CreatePostModule() {
                 : current.notificationPdfLink,
         }));
         notifyInfo('Template applied', `Applied template: ${template.name}`);
-    };
+    }, [notifyInfo]);
+
+    const recentDrafts = useMemo(
+        () => recentDraftsQuery.data?.data ?? [],
+        [recentDraftsQuery.data]
+    );
+
+    const autosaveFingerprint = useMemo(() => {
+        if (!draftShell?.id) return '';
+        return JSON.stringify({
+            templateId: templateId || null,
+            payload: buildDraftAutosavePayload(form, templateId || undefined),
+        });
+    }, [draftShell?.id, form, templateId]);
+
+    const draftEditorRoute = draftShell ? `/detailed-post?focus=${encodeURIComponent(draftShell.id)}` : '';
+
+    const resetComposer = useCallback(() => {
+        setForm(defaultForm);
+        setTemplateId('');
+        setSuccess('');
+        setDraftShell(null);
+        setAutosaveEnabled(true);
+        setLastAutosaveAt('');
+        setLastSavedFingerprint('');
+    }, []);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if ((event.metaKey || event.ctrlKey) && (event.key === 's' || event.key === 'Enter')) {
+                event.preventDefault();
+                if (draftShell?.id && autosaveEnabled && !autosaveMutation.isPending) {
+                    autosaveMutation.mutate();
+                    return;
+                }
+                if (!draftShell?.id && !createMutation.isPending && form.title && form.category && form.organization) {
+                    createMutation.mutate();
+                }
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [autosaveEnabled, autosaveMutation, createMutation, draftShell?.id, form.title, form.category, form.organization]);
+
+    useEffect(() => {
+        if (!requestedTemplateType) return;
+        if (form.type === requestedTemplateType) return;
+        setForm((current) => resetTypeSpecificFields(current, requestedTemplateType));
+        setTemplateId('');
+    }, [form.type, requestedTemplateType]);
+
+    useEffect(() => {
+        if (!requestedTemplateId || templateOptions.length === 0) return;
+        if (templateId === requestedTemplateId) return;
+        const template = templateOptions.find((item) => item.id === requestedTemplateId);
+        if (!template) return;
+        setTemplateId(template.id);
+        applyTemplate(template);
+    }, [applyTemplate, requestedTemplateId, templateId, templateOptions]);
+
+    useEffect(() => {
+        if (!draftShell?.id || !autosaveEnabled) return;
+        if (!autosaveFingerprint || autosaveFingerprint === lastSavedFingerprint) return;
+        if (autosaveMutation.isPending || startDraftMutation.isPending) return;
+
+        const timeout = window.setTimeout(() => {
+            autosaveMutation.mutate();
+        }, 1200);
+
+        return () => window.clearTimeout(timeout);
+    }, [
+        autosaveEnabled,
+        autosaveFingerprint,
+        autosaveMutation,
+        draftShell?.id,
+        lastSavedFingerprint,
+        startDraftMutation.isPending,
+    ]);
 
     const publishValidationMessage = getPublishValidationMessage(form);
 
@@ -292,48 +472,50 @@ export function CreatePostModule() {
                     { key: 'type', label: 'Type', value: form.type, hint: 'The editor adapts fields and template options.' },
                     { key: 'status', label: 'Workflow status', value: form.status, hint: 'Published posts require active step-up.' },
                     { key: 'template', label: 'Template', value: selectedTemplate?.name ?? 'None', hint: 'Templates prefill editorial structure.' },
+                    { key: 'draft-shell', label: 'Draft shell', value: draftShell ? 'Active' : 'Not started', hint: draftShell ? 'Changes now autosave into a recoverable draft.' : 'Start a draft shell to preserve in-progress work.' },
+                    { key: 'autosave', label: 'Autosave', value: draftShell ? (autosaveEnabled ? 'On' : 'Paused') : 'Draft required', hint: lastAutosaveAt ? `Last autosave ${new Date(lastAutosaveAt).toLocaleString()}` : 'Autosave activates after a draft shell is created.' },
                 ]}
                 headerActions={(
                     <>
-                        <button type="button" className="admin-btn subtle" onClick={() => setForm(defaultForm)}>
+                        <button type="button" className="admin-btn subtle" onClick={resetComposer}>
                             Reset editor
                         </button>
-                        <button type="button" className="admin-btn primary" onClick={() => createMutation.mutate()} disabled={!form.title || !form.category || !form.organization || createMutation.isPending}>
-                            {createMutation.isPending ? 'Creating...' : 'Create post'}
-                        </button>
+                        {draftShell ? (
+                            <Link to={draftEditorRoute} className="admin-btn primary">
+                                Open deep editor
+                            </Link>
+                        ) : (
+                            <>
+                                <button
+                                    type="button"
+                                    className="admin-btn"
+                                    onClick={() => startDraftMutation.mutate()}
+                                    disabled={!form.title || !form.category || !form.organization || startDraftMutation.isPending}
+                                >
+                                    {startDraftMutation.isPending ? 'Starting draft...' : 'Start draft shell'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="admin-btn primary"
+                                    onClick={() => createMutation.mutate()}
+                                    disabled={!form.title || !form.category || !form.organization || createMutation.isPending}
+                                >
+                                    {createMutation.isPending ? 'Creating...' : 'Create post'}
+                                </button>
+                            </>
+                        )}
                     </>
                 )}
             >
                 <OpsToolbar
                     controls={(
                         <>
-                        <select
-                            value={form.type}
-                            onChange={(event) => {
-                                const nextType = event.target.value as AnnouncementTypeFilter;
-                                setForm((current) => ({
-                                    ...current,
-                                    type: nextType,
-                                    category: typeCategoryDefaults[nextType],
-                                    // Reset type-specific fields to prevent state carry-over
-                                    importantDates: '',
-                                    applyOnlineLink: '',
-                                    notificationPdfLink: '',
-                                    applicationFee: '',
-                                    ageLimit: '',
-                                    vacancyDetails: '',
-                                    eligibility: '',
-                                    selectionProcess: '',
-                                    salary: '',
-                                    resultType: '',
-                                    resultDate: '',
-                                    admitCardReleaseDate: '',
-                                    examDate: '',
-                                    objectionStart: '',
-                                    objectionEnd: '',
-                                    syllabusMarks: '',
-                                    counselingDates: '',
-                                }));
+                            <select
+                                value={form.type}
+                                disabled={Boolean(draftShell)}
+                                onChange={(event) => {
+                                    const nextType = event.target.value as AnnouncementTypeFilter;
+                                    setForm((current) => resetTypeSpecificFields(current, nextType));
                                 setTemplateId('');
                             }}
                         >
@@ -365,21 +547,37 @@ export function CreatePostModule() {
                 actions={(
                     <>
                         <span className="ops-inline-muted">
-                            {form.status === 'published' && !hasValidStepUp
+                            {draftShell
+                                ? `Draft shell active${lastAutosaveAt ? ` | Last autosave ${new Date(lastAutosaveAt).toLocaleTimeString()}` : ''}`
+                                : form.status === 'published' && !hasValidStepUp
                                 ? 'Verify step-up first, then create published post.'
                                 : 'Review gate is active for high-risk publishing actions.'}
                         </span>
                         <button
                             type="button"
                             className="admin-btn small subtle"
-                            onClick={() => {
-                                setForm(defaultForm);
-                                setTemplateId('');
-                                setSuccess('');
-                            }}
+                            onClick={resetComposer}
                         >
                             Reset form
                         </button>
+                        {draftShell ? (
+                            <button
+                                type="button"
+                                className="admin-btn small subtle"
+                                onClick={() => setAutosaveEnabled((current) => !current)}
+                            >
+                                {autosaveEnabled ? 'Pause autosave' : 'Resume autosave'}
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                className="admin-btn small subtle"
+                                onClick={() => startDraftMutation.mutate()}
+                                disabled={!form.title || !form.category || !form.organization || startDraftMutation.isPending}
+                            >
+                                {startDraftMutation.isPending ? 'Starting draft...' : 'Start draft shell'}
+                            </button>
+                        )}
                         <button
                             type="button"
                             className="admin-btn small"
@@ -401,6 +599,9 @@ export function CreatePostModule() {
                 className="ops-editor-layout"
                 onSubmit={(event) => {
                     event.preventDefault();
+                    if (draftShell?.id) {
+                        return;
+                    }
                     setSuccess('');
                     createMutation.mutate();
                 }}
@@ -609,6 +810,7 @@ export function CreatePostModule() {
                         <div className="ops-stack">
                             <select
                                 value={form.status}
+                                disabled={Boolean(draftShell)}
                                 onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as FormState['status'] }))}
                                 className="ops-span-full"
                             >
@@ -650,18 +852,78 @@ export function CreatePostModule() {
                                 <div className="admin-alert warning">{publishValidationMessage}</div>
                             ) : null}
 
-                            <div className="ops-actions">
-                                <button type="submit" className="admin-btn primary">
-                                    {createMutation.isPending ? 'Creating...' : 'Create Post'}
-                                </button>
-                                <button
-                                    type="button"
-                                    className="admin-btn subtle"
-                                    onClick={() => setForm(defaultForm)}
-                                >
-                                    Clear Form
-                                </button>
+                            {draftShell ? (
+                                <div className="admin-alert info">
+                                    Draft shell active. Changes autosave into this draft and can be resumed in Detailed Post.
+                                </div>
+                            ) : null}
+
+                            <div className="ops-inline-muted">
+                                {draftShell
+                                    ? `Autosave: ${autosaveEnabled ? 'On' : 'Paused'}${autosaveMutation.isPending ? ' | Saving…' : ''}${lastAutosaveAt ? ` | Last saved ${new Date(lastAutosaveAt).toLocaleTimeString()}` : ''}`
+                                    : 'Use Start draft shell when you want recoverable in-progress work and a deep-editor handoff.'}
                             </div>
+
+                            <div className="ops-actions">
+                                {draftShell ? (
+                                    <>
+                                        <Link to={draftEditorRoute} className="admin-btn primary">
+                                            Open Deep Editor
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className="admin-btn subtle"
+                                            onClick={() => autosaveMutation.mutate()}
+                                            disabled={!autosaveEnabled || autosaveMutation.isPending}
+                                        >
+                                            {autosaveMutation.isPending ? 'Saving...' : 'Save now'}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button type="submit" className="admin-btn primary">
+                                            {createMutation.isPending ? 'Creating...' : 'Create Post'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="admin-btn subtle"
+                                            onClick={() => startDraftMutation.mutate()}
+                                            disabled={!form.title || !form.category || !form.organization || startDraftMutation.isPending}
+                                        >
+                                            {startDraftMutation.isPending ? 'Starting draft...' : 'Start Draft Shell'}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </OpsCard>
+
+                    <OpsCard title="Recent Draft Sessions" tone="muted">
+                        <div className="ops-stack">
+                            {recentDraftsQuery.isPending ? <div className="ops-inline-muted">Loading recent drafts...</div> : null}
+                            {recentDraftsQuery.isError ? <div className="admin-alert warning">Recent draft sessions could not be loaded.</div> : null}
+                            {!recentDraftsQuery.isPending && !recentDraftsQuery.isError && recentDrafts.length === 0 ? (
+                                <div className="ops-inline-muted">No recent draft sessions for this content type.</div>
+                            ) : null}
+                            {recentDrafts.map((draft) => (
+                                <div key={draft.id} className="ops-card">
+                                    <div className="ops-stack">
+                                        <strong>{draft.title}</strong>
+                                        <div className="ops-inline-muted">
+                                            {draft.organization ?? draft.category ?? draft.type}
+                                            {draft.updatedAt ? ` | ${new Date(draft.updatedAt).toLocaleString()}` : ''}
+                                        </div>
+                                        <div className="ops-actions">
+                                            <Link
+                                                to={draft.route ?? `/detailed-post?focus=${encodeURIComponent(draft.id)}`}
+                                                className="admin-btn small subtle"
+                                            >
+                                                Resume Draft
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </OpsCard>
                 </div>
@@ -670,7 +932,15 @@ export function CreatePostModule() {
             {createMutation.isError ? (
                 <OpsErrorState message={mapCreateErrorMessage(createMutation.error)} />
             ) : null}
+            {startDraftMutation.isError ? (
+                <OpsErrorState message={mapCreateErrorMessage(startDraftMutation.error)} />
+            ) : null}
             {success ? <div className="ops-success">{success}</div> : null}
+            {draftShell ? (
+                <div className="admin-alert info">
+                    Draft shell active: <strong>{draftShell.title}</strong>. Continue in <Link to={draftEditorRoute}>Detailed Post</Link>.
+                </div>
+            ) : null}
             {selectedTemplate ? (
                 <div className="admin-alert info">Using template: {selectedTemplate.name}</div>
             ) : null}

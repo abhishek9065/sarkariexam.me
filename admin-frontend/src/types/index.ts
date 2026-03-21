@@ -245,6 +245,9 @@ export interface TemplateRecord {
     shared: boolean;
     sections: string[];
     payload: Record<string, unknown>;
+    usageCount?: number;
+    lastUsedAt?: string;
+    lastUsedBy?: string;
     createdAt?: string;
     updatedAt?: string;
     createdBy?: string;
@@ -679,11 +682,15 @@ export interface AdminDraftRecord {
     title: string;
     type: AnnouncementTypeFilter;
     status: AnnouncementStatusFilter | 'draft';
+    category?: string;
+    organization?: string;
     updatedAt?: string;
+    route?: string;
 }
 
 export interface AdminAutosavePayload {
     title?: string;
+    type?: AnnouncementTypeFilter;
     category?: string;
     organization?: string;
     content?: string;

@@ -437,6 +437,7 @@ async function mockAuthenticatedAdmin(
         auditLogs?: Array<Record<string, unknown>>;
         announcements?: Array<Record<string, unknown>>;
         views?: Array<Record<string, unknown>>;
+        recentDrafts?: Array<Record<string, unknown>>;
         users?: Array<Record<string, unknown>>;
         securityLogs?: Array<Record<string, unknown>>;
         errorReports?: Array<Record<string, unknown>>;
@@ -490,6 +491,7 @@ async function mockAuthenticatedAdmin(
             createdAt: '2026-03-07T08:00:00.000Z',
         },
     ])];
+    const recentDraftsState = [...(overrides.recentDrafts ?? [])];
 
     await page.route('**/api/auth/csrf', async (route) => {
         await route.fulfill(jsonResponse({ csrfToken: 'test-csrf-token' }));
@@ -614,6 +616,64 @@ async function mockAuthenticatedAdmin(
                     limit: 40,
                     offset: 0,
                 },
+            }),
+        });
+    });
+
+    await page.route('**/api/admin/announcements/draft', async (route) => {
+        const payload = route.request().postDataJSON() as Record<string, unknown> | null;
+        const createdDraft = {
+            id: 'draft-shell-1',
+            title: String(payload?.title || 'Untitled JOB Draft'),
+            type: String(payload?.type || 'job'),
+            status: 'draft',
+            category: String(payload?.category || 'Latest Jobs'),
+            organization: String(payload?.organization || 'Government Department'),
+            updatedAt: '2026-03-07T09:05:00.000Z',
+            route: '/detailed-post?focus=draft-shell-1',
+        };
+        recentDraftsState.unshift(createdDraft);
+        await route.fulfill(jsonResponse(createdDraft));
+    });
+
+    await page.route('**/api/admin/announcements/*/autosave', async (route) => {
+        const payload = route.request().postDataJSON() as Record<string, unknown> | null;
+        const announcementId = new URL(route.request().url()).pathname.split('/').filter(Boolean).slice(-2, -1)[0] || 'draft-shell-1';
+        const existing = recentDraftsState.find((item) => String(item.id) === announcementId);
+        const updatedAt = '2026-03-07T09:06:00.000Z';
+        if (existing) {
+            existing.title = String(payload?.title || existing.title || 'Untitled JOB Draft');
+            existing.updatedAt = updatedAt;
+        } else {
+            recentDraftsState.unshift({
+                id: announcementId,
+                title: String(payload?.title || 'Untitled JOB Draft'),
+                type: String(payload?.type || 'job'),
+                status: 'draft',
+                category: String(payload?.category || 'Latest Jobs'),
+                organization: String(payload?.organization || 'Government Department'),
+                updatedAt,
+                route: `/detailed-post?focus=${announcementId}`,
+            });
+        }
+        await route.fulfill(jsonResponse({
+            id: announcementId,
+            title: String(payload?.title || 'Untitled JOB Draft'),
+            status: 'draft',
+            version: 2,
+            updatedAt,
+            autosaved: true,
+        }));
+    });
+
+    await page.route('**/api/admin/editor-drafts/recent**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                data: recentDraftsState,
+                meta: { total: recentDraftsState.length, limit: 5 },
             }),
         });
     });
@@ -1149,6 +1209,64 @@ test('create post includes step-up controls for direct publish actions', async (
     await expect(page.getByText(/Required before creating published posts from Create Post/i)).toBeVisible();
 });
 
+test('create post can start a draft shell and hand off into the deep editor', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.goto('create-post', { waitUntil: 'domcontentloaded' });
+
+    await page.getByPlaceholder('Post title').fill('UP Police Recruitment 2026');
+    await page.getByPlaceholder('Category').fill('Latest Jobs');
+    await page.getByPlaceholder('Organization').fill('UP Police');
+    await page.getByRole('button', { name: /Start draft shell/i }).first().click();
+
+    await expect(page.getByText(/Draft shell active/i).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open deep editor/i }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /Resume Draft/i })).toBeVisible();
+});
+
+test('templates workspace deep-links into create post with selected template context', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.route('**/api/admin/templates**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                data: [
+                    {
+                        id: 'tpl-1',
+                        type: 'job',
+                        name: 'Desk starter',
+                        description: 'Shared job starter',
+                        shared: true,
+                        sections: ['Important Dates', 'Eligibility'],
+                        payload: {
+                            category: 'Latest Jobs',
+                            summary: 'Template summary block',
+                            tags: ['desk', 'starter'],
+                        },
+                        usageCount: 4,
+                        updatedAt: '2026-03-07T08:00:00.000Z',
+                    },
+                ],
+                meta: { total: 1, limit: 50, offset: 0 },
+            }),
+        });
+    });
+
+    await page.goto('templates', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(/Desk starter/i)).toBeVisible();
+
+    await page
+        .locator('tr', { hasText: /Desk starter/i })
+        .getByRole('link', { name: /Create Post/i })
+        .click();
+
+    await expect(page).toHaveURL(/create-post\?template=tpl-1&type=job/i);
+    await expect(page.getByText(/Using template: Desk starter/i)).toBeVisible();
+});
+
 test('create post shows job-specific publish requirements before submit', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockAuthenticatedAdmin(page);
@@ -1158,7 +1276,7 @@ test('create post shows job-specific publish requirements before submit', async 
     await page.getByPlaceholder('Category').fill('Latest Jobs');
     await page.getByPlaceholder('Organization').fill('SSC');
     await page.locator('.ops-editor-rail select').first().selectOption('published');
-    await page.getByRole('button', { name: /Create Post/i }).click();
+    await page.locator('.ops-editor-rail').getByRole('button', { name: /Create Post/i }).click();
 
     await expect(page.locator('.ops-editor-rail .admin-alert.warning')).toContainText(/Add an Apply Online link before publishing or scheduling a Job post\./i);
     await expect(page.getByRole('alert')).toContainText(/Add an Apply Online link before publishing or scheduling a Job post\./i);

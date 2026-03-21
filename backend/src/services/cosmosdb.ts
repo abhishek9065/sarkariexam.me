@@ -234,6 +234,8 @@ async function createIndexes(): Promise<void> {
         const adminAuditLogs = database.collection('admin_audit_logs');
         const adminAccounts = database.collection('admin_accounts');
         const adminSavedViews = database.collection('admin_saved_views');
+        const adminTemplates = database.collection('admin_templates');
+        const adminAutosaves = database.collection('admin_autosaves');
         const userNotifications = database.collection('user_notifications');
         const trackedApplications = database.collection('tracked_applications');
         const reminderDispatchLogs = database.collection('reminder_dispatch_logs');
@@ -316,6 +318,13 @@ async function createIndexes(): Promise<void> {
         await adminSavedViews.createIndex({ module: 1, scope: 1, updatedAt: -1 });
         await adminSavedViews.createIndex({ createdBy: 1, module: 1, updatedAt: -1 });
         await adminSavedViews.createIndex({ scope: 1, updatedAt: -1 });
+        await adminTemplates.createIndex({ type: 1, shared: 1, updatedAt: -1 });
+        await adminTemplates.createIndex({ createdBy: 1, shared: 1, updatedAt: -1 });
+        await adminTemplates.createIndex({ shared: 1, name: 1 });
+        await adminTemplates.createIndex({ lastUsedAt: -1 });
+        await adminAutosaves.createIndex({ announcementId: 1, userId: 1 }, { unique: true });
+        await adminAutosaves.createIndex({ userId: 1, updatedAt: -1 });
+        await adminAutosaves.createIndex({ editorSessionId: 1, updatedAt: -1 });
 
         // User notifications
         await userNotifications.createIndex({ userId: 1, createdAt: -1 });

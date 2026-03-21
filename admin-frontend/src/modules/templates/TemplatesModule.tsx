@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 
+import { useAdminAuth } from '../../app/useAdminAuth';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
-import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold, PermissionState, RowActionMenu, type RowAction } from '../../components/workspace';
 import {
     createTemplateRecord,
+    deleteTemplateRecord,
     getTemplateRecords,
     updateTemplateRecord,
 } from '../../lib/api/client';
+import { hasAdminPermission } from '../../lib/adminRbac';
 import type { AnnouncementTypeFilter, TemplateRecord } from '../../types';
 
 type SharedFilter = 'all' | 'true' | 'false';
@@ -22,14 +26,14 @@ type TemplateFormState = {
     payloadJson: string;
 };
 
-const defaultTemplateForm: TemplateFormState = {
+const buildDefaultTemplateForm = (allowShared: boolean): TemplateFormState => ({
     type: 'job',
     name: '',
     description: '',
-    shared: true,
+    shared: allowShared,
     sections: '',
     payloadJson: '{}',
-};
+});
 
 const parseSectionLines = (value: string): string[] =>
     value
@@ -52,23 +56,54 @@ const parsePayloadJson = (value: string): Record<string, unknown> => {
 
 const sharedLabel = (shared: boolean) => (shared ? 'Shared' : 'Private');
 
+const duplicateTemplatePayload = (record: TemplateRecord): Omit<TemplateRecord, 'id'> => ({
+    type: record.type,
+    name: `${record.name} Copy`,
+    description: record.description,
+    shared: false,
+    sections: record.sections ?? [],
+    payload: record.payload ?? {},
+    usageCount: 0,
+    lastUsedAt: undefined,
+    lastUsedBy: undefined,
+    createdAt: undefined,
+    updatedAt: undefined,
+    createdBy: undefined,
+    updatedBy: undefined,
+});
+
 export function TemplatesModule() {
     const queryClient = useQueryClient();
     const { notifyError, notifyInfo, notifySuccess } = useAdminNotifications();
+    const { user, permissions } = useAdminAuth();
+
+    const actorId = user?.userId;
+    const actorRole = user?.role;
+    const canWriteTemplates = hasAdminPermission(permissions, actorRole, 'announcements:write');
+    const canManageSharedTemplates = actorRole === 'admin';
 
     const [typeFilter, setTypeFilter] = useState<AnnouncementTypeFilter | 'all'>('all');
     const [sharedFilter, setSharedFilter] = useState<SharedFilter>('all');
+    const [search, setSearch] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState<TemplateFormState>(defaultTemplateForm);
+    const [form, setForm] = useState<TemplateFormState>(() => buildDefaultTemplateForm(canManageSharedTemplates));
 
     const query = useQuery({
-        queryKey: ['admin-templates', typeFilter, sharedFilter],
-        queryFn: () => getTemplateRecords({ type: typeFilter, shared: sharedFilter, limit: 150 }),
+        queryKey: ['admin-templates', typeFilter, sharedFilter, search],
+        queryFn: () => getTemplateRecords({ type: typeFilter, shared: sharedFilter, search, limit: 150 }),
     });
 
     const templates = useMemo(() => query.data?.data ?? [], [query.data]);
     const sharedCount = useMemo(() => templates.filter((item) => item.shared).length, [templates]);
     const privateCount = useMemo(() => templates.filter((item) => !item.shared).length, [templates]);
+    const recentlyUsedCount = useMemo(() => templates.filter((item) => Boolean(item.lastUsedAt)).length, [templates]);
+
+    const invalidateTemplates = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['admin-templates'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+        ]);
+    };
 
     const createMutation = useMutation({
         mutationFn: async () =>
@@ -76,20 +111,24 @@ export function TemplatesModule() {
                 type: form.type,
                 name: form.name.trim(),
                 description: form.description.trim() || undefined,
-                shared: form.shared,
+                shared: canManageSharedTemplates ? form.shared : false,
                 sections: parseSectionLines(form.sections),
                 payload: parsePayloadJson(form.payloadJson),
+                usageCount: 0,
+                lastUsedAt: undefined,
+                lastUsedBy: undefined,
+                createdAt: undefined,
+                updatedAt: undefined,
+                createdBy: undefined,
+                updatedBy: undefined,
             }),
         onSuccess: async (record) => {
-            notifySuccess('Template created', `Template "${record.name}" is ready for speed posting.`);
-            setForm(defaultTemplateForm);
-            await queryClient.invalidateQueries({ queryKey: ['admin-templates'] });
+            notifySuccess('Template created', `Template "${record.name}" is ready for faster editorial starts.`);
+            setForm(buildDefaultTemplateForm(canManageSharedTemplates));
+            await invalidateTemplates();
         },
         onError: (error) => {
-            notifyError(
-                'Create failed',
-                error instanceof Error ? error.message : 'Unable to create template.'
-            );
+            notifyError('Create failed', error instanceof Error ? error.message : 'Unable to create template.');
         },
     });
 
@@ -102,7 +141,7 @@ export function TemplatesModule() {
                 type: form.type,
                 name: form.name.trim(),
                 description: form.description.trim() || undefined,
-                shared: form.shared,
+                shared: canManageSharedTemplates ? form.shared : false,
                 sections: parseSectionLines(form.sections),
                 payload: parsePayloadJson(form.payloadJson),
             });
@@ -110,29 +149,58 @@ export function TemplatesModule() {
         onSuccess: async (record) => {
             notifySuccess('Template updated', `Updated "${record.name}".`);
             setEditingId(null);
-            setForm(defaultTemplateForm);
-            await queryClient.invalidateQueries({ queryKey: ['admin-templates'] });
+            setForm(buildDefaultTemplateForm(canManageSharedTemplates));
+            await invalidateTemplates();
         },
         onError: (error) => {
-            notifyError(
-                'Update failed',
-                error instanceof Error ? error.message : 'Unable to update template.'
-            );
+            notifyError('Update failed', error instanceof Error ? error.message : 'Unable to update template.');
         },
     });
 
     const quickToggleMutation = useMutation({
         mutationFn: async (input: { id: string; shared: boolean }) => updateTemplateRecord(input.id, { shared: input.shared }),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-templates'] });
+        onSuccess: async (_, input) => {
+            notifySuccess(
+                'Visibility updated',
+                input.shared ? 'Template is now shared with the editorial team.' : 'Template is now private to your workspace.'
+            );
+            await invalidateTemplates();
         },
         onError: (error) => {
-            notifyError(
-                'Template update failed',
-                error instanceof Error ? error.message : 'Unable to change template visibility.'
-            );
+            notifyError('Template update failed', error instanceof Error ? error.message : 'Unable to change template visibility.');
         },
     });
+
+    const duplicateMutation = useMutation({
+        mutationFn: async (record: TemplateRecord) => createTemplateRecord(duplicateTemplatePayload(record)),
+        onSuccess: async (record) => {
+            notifySuccess('Template duplicated', `"${record.name}" was copied into your private workspace.`);
+            await invalidateTemplates();
+        },
+        onError: (error) => {
+            notifyError('Duplicate failed', error instanceof Error ? error.message : 'Unable to duplicate template.');
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => deleteTemplateRecord(id),
+        onSuccess: async () => {
+            notifySuccess('Template deleted', 'The template was removed from the workspace.');
+            if (editingId) {
+                setEditingId(null);
+                setForm(buildDefaultTemplateForm(canManageSharedTemplates));
+            }
+            await invalidateTemplates();
+        },
+        onError: (error) => {
+            notifyError('Delete failed', error instanceof Error ? error.message : 'Unable to delete template.');
+        },
+    });
+
+    const canEditTemplate = (record: TemplateRecord) =>
+        canManageSharedTemplates || (!record.shared && Boolean(actorId) && record.createdBy === actorId);
+
+    const canDeleteTemplate = (record: TemplateRecord) => canEditTemplate(record);
 
     const startEditing = (record: TemplateRecord) => {
         setEditingId(record.id);
@@ -140,7 +208,7 @@ export function TemplatesModule() {
             type: record.type,
             name: record.name,
             description: record.description ?? '',
-            shared: Boolean(record.shared),
+            shared: canManageSharedTemplates ? Boolean(record.shared) : false,
             sections: (record.sections ?? []).join('\n'),
             payloadJson: JSON.stringify(record.payload ?? {}, null, 2),
         });
@@ -149,24 +217,90 @@ export function TemplatesModule() {
 
     const resetEditor = () => {
         setEditingId(null);
-        setForm(defaultTemplateForm);
+        setForm(buildDefaultTemplateForm(canManageSharedTemplates));
+    };
+
+    const buildActions = (template: TemplateRecord): RowAction[] => {
+        const actions: RowAction[] = [];
+
+        if (canEditTemplate(template)) {
+            actions.push({
+                id: 'edit',
+                label: 'Edit',
+                onClick: () => startEditing(template),
+            });
+        }
+
+        if (canWriteTemplates) {
+            actions.push({
+                id: 'duplicate',
+                label: 'Duplicate',
+                onClick: () => duplicateMutation.mutate(template),
+                disabled: duplicateMutation.isPending,
+            });
+        }
+
+        if (canManageSharedTemplates) {
+            actions.push({
+                id: 'visibility',
+                label: template.shared ? 'Make private' : 'Make shared',
+                onClick: () => quickToggleMutation.mutate({ id: template.id, shared: !template.shared }),
+                disabled: quickToggleMutation.isPending,
+                tone: template.shared ? 'warning' : 'info',
+            });
+        }
+
+        if (canDeleteTemplate(template)) {
+            actions.push({
+                id: 'delete',
+                label: 'Delete',
+                onClick: () => deleteMutation.mutate(template.id),
+                disabled: deleteMutation.isPending,
+                tone: 'danger',
+            });
+        }
+
+        return actions;
     };
 
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+    if (!canWriteTemplates) {
+        return (
+            <ModuleScaffold
+                eyebrow="Publishing"
+                title="Templates"
+                description="Template management is limited to roles that can create editorial content."
+            >
+                <PermissionState
+                    title="Template management requires content-write access."
+                    description="You can still use shared templates from editorial workflows where your role allows them, but you cannot create or maintain template records from this workspace."
+                />
+            </ModuleScaffold>
+        );
+    }
 
     return (
         <ModuleScaffold
             eyebrow="Publishing"
             title="Templates"
-            description="Create and maintain posting templates with reusable content blocks and payload defaults."
+            description="Maintain reusable editorial scaffolds, ownership-aware private drafts, and shared templates for the publishing desk."
             metrics={[
                 { key: 'templates-total', label: 'Templates', value: templates.length },
                 { key: 'templates-shared', label: 'Shared', value: sharedCount, tone: sharedCount > 0 ? 'info' : 'neutral' },
                 { key: 'templates-private', label: 'Private', value: privateCount, tone: privateCount > 0 ? 'warning' : 'neutral' },
+                { key: 'templates-used', label: 'Recently Used', value: recentlyUsedCount, tone: recentlyUsedCount > 0 ? 'success' : 'neutral' },
             ]}
             filters={{
                 controls: (
                     <>
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search template name or description"
+                            aria-label="Search templates"
+                        />
                         <select
                             value={typeFilter}
                             onChange={(event) => setTypeFilter(event.target.value as AnnouncementTypeFilter | 'all')}
@@ -193,20 +327,23 @@ export function TemplatesModule() {
                 ),
                 actions: (
                     <>
-                        <span className="ops-inline-muted">Templates: {templates.length}</span>
-                        <button
-                            type="button"
-                            className="admin-btn small subtle"
-                            onClick={resetEditor}
-                        >
-                            {editingId ? 'Cancel edit' : 'Clear form'}
+                        <span className="ops-inline-muted">
+                            {canManageSharedTemplates
+                                ? 'Admins can curate shared templates. Editors keep private working copies.'
+                                : 'You can create and manage private templates. Shared templates are curated by admins.'}
+                        </span>
+                        <button type="button" className="admin-btn small subtle" onClick={resetEditor}>
+                            {editingId ? 'Cancel edit' : 'Reset form'}
                         </button>
                     </>
                 ),
             }}
         >
             <div className="ops-stack">
-                <OpsCard title={editingId ? 'Edit Template' : 'Create Template'} description="Maintain reusable section blocks and payload defaults for faster publishing.">
+                <OpsCard
+                    title={editingId ? 'Edit Template' : 'Create Template'}
+                    description="Templates feed directly into Create Post. Use private copies for experimentation and shared templates for standard desk workflows."
+                >
                     <form
                         className="ops-form-grid"
                         onSubmit={(event) => {
@@ -246,10 +383,11 @@ export function TemplatesModule() {
                         <label className="ops-row">
                             <input
                                 type="checkbox"
-                                checked={form.shared}
+                                checked={canManageSharedTemplates ? form.shared : false}
                                 onChange={(event) => setForm((current) => ({ ...current, shared: event.target.checked }))}
+                                disabled={!canManageSharedTemplates}
                             />
-                            <span>Shared template</span>
+                            <span>{canManageSharedTemplates ? 'Shared template' : 'Private template only for your role'}</span>
                         </label>
                         <textarea
                             className="ops-span-full"
@@ -265,9 +403,7 @@ export function TemplatesModule() {
                         />
                         <div className="ops-actions ops-span-full">
                             <button type="submit" className="admin-btn primary" disabled={isSubmitting}>
-                                {isSubmitting
-                                    ? (editingId ? 'Saving...' : 'Creating...')
-                                    : (editingId ? 'Save Template' : 'Create Template')}
+                                {isSubmitting ? (editingId ? 'Saving...' : 'Creating...') : (editingId ? 'Save Template' : 'Create Template')}
                             </button>
                             {editingId ? (
                                 <button type="button" className="admin-btn" onClick={resetEditor}>
@@ -281,18 +417,17 @@ export function TemplatesModule() {
                 {query.isPending ? <div className="admin-alert info">Loading templates...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load templates." /> : null}
                 {createMutation.error ? (
-                    <OpsErrorState
-                        message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create template.'}
-                    />
+                    <OpsErrorState message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create template.'} />
                 ) : null}
                 {updateMutation.error ? (
-                    <OpsErrorState
-                        message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update template.'}
-                    />
+                    <OpsErrorState message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update template.'} />
+                ) : null}
+                {deleteMutation.error ? (
+                    <OpsErrorState message={deleteMutation.error instanceof Error ? deleteMutation.error.message : 'Failed to delete template.'} />
                 ) : null}
 
                 {!query.isPending && !query.error && templates.length === 0 ? (
-                    <OpsEmptyState message="No templates available: Create shared templates to speed up posting workflows." />
+                    <OpsEmptyState message="No templates available: create private desk templates or curate shared publishing templates." />
                 ) : null}
 
                 {templates.length > 0 ? (
@@ -301,47 +436,49 @@ export function TemplatesModule() {
                             { key: 'name', label: 'Template' },
                             { key: 'type', label: 'Type' },
                             { key: 'visibility', label: 'Visibility' },
-                            { key: 'sections', label: 'Sections' },
+                            { key: 'usage', label: 'Usage' },
                             { key: 'updatedAt', label: 'Updated' },
                             { key: 'actions', label: 'Actions' },
                         ]}
                     >
-                        {templates.map((template) => (
-                            <tr key={template.id}>
-                                <td>
-                                    <strong>{template.name}</strong>
-                                    <div className="ops-inline-muted">{template.description || 'No description'}</div>
-                                </td>
-                                <td>{template.type}</td>
-                                <td>
-                                    <OpsBadge tone={template.shared ? 'info' : 'neutral'}>{sharedLabel(template.shared)}</OpsBadge>
-                                </td>
-                                <td>{template.sections.length}</td>
-                                <td>{template.updatedAt ? new Date(template.updatedAt).toLocaleString() : '-'}</td>
-                                <td>
-                                    <div className="ops-actions">
-                                        <button
-                                            type="button"
-                                            className="admin-btn small subtle"
-                                            onClick={() => startEditing(template)}
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="admin-btn small"
-                                            disabled={quickToggleMutation.isPending}
-                                            onClick={() => quickToggleMutation.mutate({
-                                                id: template.id,
-                                                shared: !template.shared,
-                                            })}
-                                        >
-                                            {template.shared ? 'Make private' : 'Make shared'}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                        {templates.map((template) => {
+                            const actions = buildActions(template);
+                            return (
+                                <tr key={template.id}>
+                                    <td>
+                                        <strong>{template.name}</strong>
+                                        <div className="ops-inline-muted">{template.description || 'No description'}</div>
+                                        {!template.shared && template.createdBy === actorId ? (
+                                            <div className="ops-inline-muted">Private working copy</div>
+                                        ) : null}
+                                    </td>
+                                    <td>{template.type}</td>
+                                    <td>
+                                        <OpsBadge tone={template.shared ? 'info' : 'neutral'}>{sharedLabel(template.shared)}</OpsBadge>
+                                    </td>
+                                    <td>
+                                        <div>{template.usageCount ?? 0} uses</div>
+                                        <div className="ops-inline-muted">
+                                            {template.lastUsedAt ? `Last used ${new Date(template.lastUsedAt).toLocaleString()}` : 'Not used yet'}
+                                        </div>
+                                    </td>
+                                    <td>{template.updatedAt ? new Date(template.updatedAt).toLocaleString() : '-'}</td>
+                                    <td>
+                                        <div className="ops-actions">
+                                            <Link
+                                                to={`/create-post?template=${encodeURIComponent(template.id)}&type=${encodeURIComponent(template.type)}`}
+                                                className="admin-btn small subtle"
+                                            >
+                                                Create Post
+                                            </Link>
+                                            {actions.length > 0 ? (
+                                                <RowActionMenu itemLabel={template.name} actions={actions} />
+                                            ) : null}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </OpsTable>
                 ) : null}
             </div>

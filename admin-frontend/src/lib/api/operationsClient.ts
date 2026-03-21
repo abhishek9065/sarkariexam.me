@@ -167,12 +167,14 @@ export async function updateMediaAsset(id: string, payload: Partial<Omit<MediaAs
 export async function getTemplateRecords(input: {
     type?: AnnouncementTypeFilter | 'all';
     shared?: 'true' | 'false' | 'all';
+    search?: string;
     limit?: number;
     offset?: number;
 } = {}): Promise<{ data: TemplateRecord[]; meta: { total: number; limit: number; offset: number } }> {
     const params = new URLSearchParams();
     params.set('type', input.type ?? 'all');
     params.set('shared', input.shared ?? 'all');
+    if (input.search?.trim()) params.set('search', input.search.trim());
     params.set('limit', String(input.limit ?? 100));
     params.set('offset', String(input.offset ?? 0));
     const body = await request(`${ADMIN_API_PATHS.adminTemplates}?${params.toString()}`);
@@ -203,6 +205,14 @@ export async function updateTemplateRecord(id: string, payload: Partial<Omit<Tem
         body: JSON.stringify(payload),
     }, true);
     return typedData<TemplateRecord>(body)!;
+}
+
+export async function deleteTemplateRecord(id: string): Promise<{ success: boolean; id: string }> {
+    const body = await request(`/api/admin/templates/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: mutationHeaders(),
+    }, true);
+    return typedData<{ success: boolean; id: string }>(body) ?? { success: false, id };
 }
 
 export async function getAdminAlerts(input: {
