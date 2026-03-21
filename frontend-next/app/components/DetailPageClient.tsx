@@ -255,7 +255,7 @@ export function DetailPage({ type }: { type: ContentType }) {
     return (
         <>
             <div className="hp sr-home animate-fade-in">
-            <article className="sr-detail">
+            <article className="sr-detail" data-testid="detail-page" data-detail-type={type}>
                 {/* ─── Breadcrumb ─── */}
                 <nav className="sr-breadcrumb">
                     <Link href="/">Home</Link>
