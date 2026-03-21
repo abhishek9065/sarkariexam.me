@@ -8,7 +8,7 @@ import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '..
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import { ModuleScaffold } from '../../components/workspace';
 import {
-    getAdminAnnouncements,
+    getAdminReviewWorkspace,
     getAdminRoleUsers,
     getReviewPreview,
     runBulkApprove,
@@ -40,8 +40,8 @@ export function ReviewModule() {
     const slaFilter = searchParams.get('sla');
 
     const query = useQuery({
-        queryKey: ['review-announcements', search],
-        queryFn: () => getAdminAnnouncements({ limit: 120, status: 'pending', search }),
+        queryKey: ['admin-review-workspace'],
+        queryFn: () => getAdminReviewWorkspace(),
     });
 
     const rosterQuery = useQuery({
@@ -49,7 +49,8 @@ export function ReviewModule() {
         queryFn: () => getAdminRoleUsers(),
     });
 
-    const rows = useMemo(() => query.data ?? [], [query.data]);
+    const rows = useMemo(() => query.data?.reviewQueue ?? [], [query.data]);
+    const workspaceSummary = query.data?.summary;
 
     const filteredRows = useMemo(() => {
         let baseRows = rows;
@@ -126,7 +127,10 @@ export function ReviewModule() {
         onSuccess: async () => {
             setSelectedIds([]);
             setPreview(null);
-            await queryClient.invalidateQueries({ queryKey: ['review-announcements'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('Review action applied', `Executed ${action} for selected announcements.`);
             void trackAdminTelemetry('admin_review_decision_submitted', {
                 action,
@@ -145,7 +149,10 @@ export function ReviewModule() {
                     : { assigneeUserId: target?.id, assigneeEmail: target?.email })));
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['review-announcements'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('Assignments updated', 'Selected review items were reassigned.');
         },
         onError: (error) => {
@@ -158,7 +165,10 @@ export function ReviewModule() {
             await Promise.all(selectedIds.map((id) => updateAnnouncementReviewSla(id, bulkDueAt || undefined)));
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['review-announcements'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('Review SLA updated', 'Selected review items now have a new due date.');
         },
         onError: (error) => {
@@ -174,15 +184,19 @@ export function ReviewModule() {
                 title="Review"
                 description="Assign, preview, approve, reject, and schedule content with one review language across the pipeline."
                 metrics={[
-                    { key: 'visible', label: 'Visible items', value: filteredRows.length, hint: `Filtered from ${rows.length} pending rows.` },
+                    { key: 'pending', label: 'Pending review', value: workspaceSummary?.pendingReview ?? rows.length, hint: `Visible queue slice loads ${rows.length} rows.` },
                     { key: 'selected', label: 'Selected', value: selectedIds.length, hint: 'Preview before executing.' },
-                    { key: 'overdue', label: 'Overdue SLA', value: filteredRows.filter((row) => row.reviewDueAt && new Date(row.reviewDueAt).getTime() < Date.now()).length, hint: 'Needs reviewer attention first.' },
+                    { key: 'overdue', label: 'Overdue SLA', value: workspaceSummary?.overdueReview ?? filteredRows.filter((row) => row.reviewDueAt && new Date(row.reviewDueAt).getTime() < Date.now()).length, hint: 'Needs reviewer attention first.' },
+                    { key: 'approvals', label: 'Pending approvals', value: workspaceSummary?.pendingApprovals ?? 0, hint: 'Approval queue shares the same pipeline snapshot.' },
                 ]}
                 headerActions={(
                     <>
                         <button type="button" className="admin-btn subtle" onClick={() => setActiveTab('all')}>
                             All pending
                         </button>
+                        <Link to="/approvals" className="admin-btn subtle">
+                            Approval desk
+                        </Link>
                         <button type="button" className="admin-btn primary" onClick={() => void query.refetch()}>
                             Refresh queue
                         </button>
@@ -329,7 +343,12 @@ export function ReviewModule() {
                                             onChange={toggleSelect}
                                         />
                                     </td>
-                                    <td>{item.title || 'Untitled'}</td>
+                                    <td>
+                                        <Link to={`/detailed-post?focus=${id}`} className="admin-link-inline">
+                                            {item.title || 'Untitled'}
+                                        </Link>
+                                        {item.organization ? <div className="ops-inline-muted">{item.organization}</div> : null}
+                                    </td>
                                     <td>
                                         <div>{item.assigneeEmail || 'Unassigned'}</div>
                                         {item.claimedByCurrentUser ? <div className="ops-inline-muted">Assigned to you</div> : null}

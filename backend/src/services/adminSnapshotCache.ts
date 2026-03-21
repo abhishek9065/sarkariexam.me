@@ -1,6 +1,6 @@
 import { config } from '../config.js';
 
-type AdminSnapshotNamespace = 'dashboard' | 'manage-posts';
+type AdminSnapshotNamespace = 'dashboard' | 'manage-posts' | 'review-workspace' | 'ops-workspace';
 
 type SnapshotEntry<T> = {
     expiresAt: number;

@@ -6,6 +6,12 @@ const {
     authState,
     getCollectionMock,
     createAnnouncementMock,
+    findAllAdminMock,
+    countAdminMock,
+    getPendingSlaSummaryMock,
+    getManagePostsWorkspaceSummaryMock,
+    getApprovalWorkflowSummaryMock,
+    listApprovalRequestsMock,
     findAnnouncementByIdMock,
     invalidateAnnouncementCachesMock,
     invalidateAdminSnapshotNamespacesMock,
@@ -19,6 +25,12 @@ const {
     },
     getCollectionMock: vi.fn(),
     createAnnouncementMock: vi.fn(),
+    findAllAdminMock: vi.fn(),
+    countAdminMock: vi.fn(),
+    getPendingSlaSummaryMock: vi.fn(),
+    getManagePostsWorkspaceSummaryMock: vi.fn(),
+    getApprovalWorkflowSummaryMock: vi.fn(),
+    listApprovalRequestsMock: vi.fn(),
     findAnnouncementByIdMock: vi.fn(),
     invalidateAnnouncementCachesMock: vi.fn().mockResolvedValue(undefined),
     invalidateAdminSnapshotNamespacesMock: vi.fn(),
@@ -40,9 +52,9 @@ vi.mock('../middleware/idempotency.js', () => ({
 
 vi.mock('../models/announcements.mongo.js', () => ({
     AnnouncementModelMongo: {
-        findAllAdmin: vi.fn().mockResolvedValue([]),
-        countAdmin: vi.fn().mockResolvedValue(0),
-        getPendingSlaSummary: vi.fn().mockResolvedValue({
+        findAllAdmin: findAllAdminMock,
+        countAdmin: countAdminMock,
+        getPendingSlaSummary: getPendingSlaSummaryMock.mockResolvedValue({
             pendingTotal: 0,
             averageDays: 0,
             buckets: { lt1: 0, d1_3: 0, d3_7: 0, gt7: 0 },
@@ -54,7 +66,7 @@ vi.mock('../models/announcements.mongo.js', () => ({
             byType: { job: 0, result: 0, 'admit-card': 0, syllabus: 0, 'answer-key': 0, admission: 0 },
         }),
         getAdminQaCounts: vi.fn().mockResolvedValue({ totalQaIssues: 0, pendingQaIssues: 0 }),
-        getManagePostsWorkspaceSummary: vi.fn().mockResolvedValue({
+        getManagePostsWorkspaceSummary: getManagePostsWorkspaceSummaryMock.mockResolvedValue({
             total: 0,
             byStatus: { draft: 0, pending: 0, scheduled: 0, published: 0, archived: 0 },
             assignedToMe: 0,
@@ -96,8 +108,8 @@ vi.mock('../services/adminApprovalPolicy.js', () => ({
 vi.mock('../services/adminApprovals.js', () => ({
     approveAdminApprovalRequest: vi.fn(),
     createAdminApprovalRequest: vi.fn(),
-    getAdminApprovalWorkflowSummary: vi.fn().mockResolvedValue({ pending: 0 }),
-    listAdminApprovalRequests: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    getAdminApprovalWorkflowSummary: getApprovalWorkflowSummaryMock.mockResolvedValue({ pending: 0, dueSoon: 0, overdue: 0, approvedPendingExecution: 0 }),
+    listAdminApprovalRequests: listApprovalRequestsMock.mockResolvedValue({ data: [], total: 0 }),
     markAdminApprovalExecuted: vi.fn().mockResolvedValue(undefined),
     rejectAdminApprovalRequest: vi.fn(),
     validateApprovalForExecution: vi.fn().mockResolvedValue({ ok: true }),
@@ -438,6 +450,28 @@ describe('admin template contracts', () => {
             type: 'job',
             status: 'draft',
         });
+        findAllAdminMock.mockResolvedValue([]);
+        countAdminMock.mockResolvedValue(0);
+        getPendingSlaSummaryMock.mockResolvedValue({
+            pendingTotal: 0,
+            averageDays: 0,
+            buckets: { lt1: 0, d1_3: 0, d3_7: 0, gt7: 0 },
+            stale: [],
+        });
+        getManagePostsWorkspaceSummaryMock.mockResolvedValue({
+            total: 0,
+            byStatus: { draft: 0, pending: 0, scheduled: 0, published: 0, archived: 0 },
+            assignedToMe: 0,
+            unassignedPending: 0,
+            overdueReview: 0,
+        });
+        getApprovalWorkflowSummaryMock.mockResolvedValue({
+            pending: 0,
+            dueSoon: 0,
+            overdue: 0,
+            approvedPendingExecution: 0,
+        });
+        listApprovalRequestsMock.mockResolvedValue({ data: [], total: 0 });
         findAnnouncementByIdMock.mockResolvedValue(null);
 
         getCollectionMock.mockImplementation((name: string) => {
@@ -624,5 +658,91 @@ describe('admin template contracts', () => {
                 route: '/detailed-post?focus=draft-1',
             }),
         ]);
+    });
+
+    it('returns a shared review workspace snapshot with queue and approval summary', async () => {
+        authState.userId = 'reviewer-user-1';
+        authState.email = 'reviewer@example.com';
+        authState.role = 'reviewer';
+
+        findAllAdminMock.mockImplementation(async (filters?: { status?: string }) => {
+            if (filters?.status === 'pending') {
+                return [
+                    {
+                        id: 'ann-pending-1',
+                        title: 'SSC CGL Recruitment 2026',
+                        type: 'job',
+                        status: 'pending',
+                        assigneeUserId: 'reviewer-user-1',
+                        assigneeEmail: 'reviewer@example.com',
+                    },
+                ];
+            }
+            if (filters?.status === 'scheduled') {
+                return [
+                    {
+                        id: 'ann-scheduled-1',
+                        title: 'Railway Admit Card 2026',
+                        type: 'admit-card',
+                        status: 'scheduled',
+                    },
+                ];
+            }
+            return [];
+        });
+        countAdminMock.mockImplementation(async (filters?: { status?: string; assigneeUserId?: string; assigneeEmail?: string }) => {
+            if (filters?.status === 'scheduled' && !filters.assigneeUserId && !filters.assigneeEmail) return 1;
+            if (filters?.status === 'pending' && filters.assigneeUserId) return 1;
+            if (filters?.status === 'scheduled' && filters.assigneeUserId) return 0;
+            return 0;
+        });
+        getPendingSlaSummaryMock.mockResolvedValue({
+            pendingTotal: 4,
+            averageDays: 2,
+            buckets: { lt1: 1, d1_3: 2, d3_7: 1, gt7: 0 },
+            stale: [],
+        });
+        getManagePostsWorkspaceSummaryMock.mockResolvedValue({
+            total: 0,
+            byStatus: { draft: 0, pending: 4, scheduled: 1, published: 0, archived: 0 },
+            assignedToMe: 1,
+            unassignedPending: 2,
+            overdueReview: 1,
+        });
+        getApprovalWorkflowSummaryMock.mockResolvedValue({
+            pending: 3,
+            dueSoon: 2,
+            overdue: 1,
+            approvedPendingExecution: 1,
+        });
+        listApprovalRequestsMock.mockResolvedValue({
+            data: [{ id: 'approval-1', action: 'publish_announcement', status: 'pending' }],
+            total: 1,
+        });
+        hasEffectivePermissionMock.mockImplementation(async (_role: string, permission: string) => (
+            permission === 'announcements:read'
+            || permission === 'announcements:write'
+            || permission === 'announcements:approve'
+            || permission === 'admin:read'
+        ));
+
+        const response = await request(app).get('/api/admin/review-workspace');
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.summary).toEqual(expect.objectContaining({
+            pendingReview: 4,
+            scheduled: 1,
+            unassignedPending: 2,
+            overdueReview: 1,
+            assignedToMe: 1,
+            pendingApprovals: 3,
+            dueSoonApprovals: 2,
+            approvedPendingExecution: 1,
+        }));
+        expect(response.body.data.reviewQueue[0]).toEqual(expect.objectContaining({
+            id: 'ann-pending-1',
+            claimedByCurrentUser: true,
+        }));
+        expect(response.body.data.approvals).toHaveLength(1);
     });
 });

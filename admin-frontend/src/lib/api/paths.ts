@@ -19,6 +19,8 @@ export const ADMIN_API_PATHS = {
     analyticsOverview: '/api/analytics/overview',
     adminAnnouncements: '/api/admin/announcements',
     adminApprovals: '/api/admin/approvals',
+    adminReviewWorkspace: '/api/admin/review-workspace',
+    adminOpsWorkspace: '/api/admin/ops-workspace',
     adminReviewPreview: '/api/admin/review/preview',
     adminAnnouncementBulkPreview: '/api/admin/announcements/bulk/preview',
     adminAnnouncementBulkApprove: '/api/admin/announcements/bulk-approve',

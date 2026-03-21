@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
@@ -7,7 +8,7 @@ import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { ModuleScaffold } from '../../components/workspace';
-import { approveAdminApproval, getAdminApprovals, rejectAdminApproval } from '../../lib/api/client';
+import { approveAdminApproval, getAdminApprovals, getAdminReviewWorkspace, rejectAdminApproval } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminApprovalItem } from '../../types';
 
@@ -37,9 +38,15 @@ export function ApprovalsModule() {
     const [modal, setModal] = useState<DecisionModalState | null>(null);
     const decisionNoteRef = useRef<HTMLTextAreaElement | null>(null);
 
+    const workspaceQuery = useQuery({
+        queryKey: ['admin-review-workspace'],
+        queryFn: () => getAdminReviewWorkspace(),
+    });
+
     const query = useQuery({
         queryKey: ['admin-approvals', status],
         queryFn: () => getAdminApprovals(status),
+        enabled: status !== 'pending',
     });
 
     const approveMutation = useMutation({
@@ -48,7 +55,11 @@ export function ApprovalsModule() {
             return approveAdminApproval(id, note, stepUpToken);
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-approvals'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-approvals'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('Approval completed', 'Approval request has been approved.');
             void trackAdminTelemetry('admin_review_decision_submitted', {
                 module: 'approvals',
@@ -64,7 +75,11 @@ export function ApprovalsModule() {
             return rejectAdminApproval(id, reason, stepUpToken);
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-approvals'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-approvals'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('Rejection completed', 'Approval request has been rejected.');
             void trackAdminTelemetry('admin_review_decision_submitted', {
                 module: 'approvals',
@@ -74,7 +89,9 @@ export function ApprovalsModule() {
         },
     });
 
-    const rows = query.data ?? [];
+    const rows = status === 'pending'
+        ? (workspaceQuery.data?.approvals ?? [])
+        : (query.data ?? []);
 
     const activeMutationError = useMemo(() => {
         if (approveMutation.isError) {
@@ -85,6 +102,9 @@ export function ApprovalsModule() {
         }
         return null;
     }, [approveMutation.error, approveMutation.isError, rejectMutation.error, rejectMutation.isError]);
+
+    const showPrimaryLoading = status === 'pending' ? workspaceQuery.isPending : query.isPending;
+    const showPrimaryError = status === 'pending' ? workspaceQuery.error : query.error;
 
     useEffect(() => {
         if (!modal) return undefined;
@@ -115,13 +135,28 @@ export function ApprovalsModule() {
                 description="Handle dual-control approval decisions with explicit status, timestamps, and reviewer notes."
                 metrics={[
                     { key: 'loaded', label: 'Loaded requests', value: rows.length, hint: `Current filter: ${status}.` },
-                    { key: 'pending', label: 'Pending', value: rows.filter((row) => row.status === 'pending').length, hint: 'Items waiting for decision.' },
-                    { key: 'executed', label: 'Executed', value: rows.filter((row) => row.status === 'executed').length, hint: 'Already actioned requests.' },
+                    { key: 'pending', label: 'Pending', value: workspaceQuery.data?.summary.pendingApprovals ?? rows.filter((row) => row.status === 'pending').length, hint: 'Items waiting for decision.' },
+                    { key: 'dueSoon', label: 'Due soon', value: workspaceQuery.data?.summary.dueSoonApprovals ?? 0, hint: 'Approval expiry risk across the pipeline.' },
+                    { key: 'execution', label: 'Approved pending execution', value: workspaceQuery.data?.summary.approvedPendingExecution ?? 0, hint: 'Approved actions waiting to be executed.' },
                 ]}
                 headerActions={(
-                    <button type="button" className="admin-btn primary" onClick={() => void query.refetch()}>
-                        Refresh approvals
-                    </button>
+                    <>
+                        <Link to="/review" className="admin-btn subtle">
+                            Review desk
+                        </Link>
+                        <button
+                            type="button"
+                            className="admin-btn primary"
+                            onClick={() => {
+                                void workspaceQuery.refetch();
+                                if (status !== 'pending') {
+                                    void query.refetch();
+                                }
+                            }}
+                        >
+                            Refresh approvals
+                        </button>
+                    </>
                 )}
             >
                 <OpsToolbar
@@ -144,15 +179,25 @@ export function ApprovalsModule() {
                     actions={
                         <>
                             <span className="ops-inline-muted">{rows.length} approvals loaded</span>
-                            <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                            <button
+                                type="button"
+                                className="admin-btn subtle small"
+                                onClick={() => {
+                                    void workspaceQuery.refetch();
+                                    if (status !== 'pending') {
+                                        void query.refetch();
+                                    }
+                                }}
+                            >
                                 Refresh
                             </button>
                         </>
                     }
                 />
 
-                {query.isPending ? <div className="admin-alert info">Loading approvals...</div> : null}
-                {query.error ? <OpsErrorState message="Failed to load approvals." /> : null}
+                {showPrimaryLoading ? <div className="admin-alert info">Loading approvals...</div> : null}
+                {showPrimaryError ? <OpsErrorState message="Failed to load approvals." /> : null}
+                {status !== 'pending' && workspaceQuery.error ? <div className="admin-alert warning">Pipeline summary is temporarily unavailable, but approval records are still loaded.</div> : null}
 
                 {rows.length > 0 ? (
                     <OpsTable
@@ -217,7 +262,9 @@ export function ApprovalsModule() {
                     </OpsTable>
                 ) : null}
 
-                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No approvals found. Approval requests are created when posts are submitted for review via the publish workflow. Use the Review module to submit posts that require dual-control approval." /> : null}
+                {!showPrimaryLoading && !showPrimaryError && rows.length === 0 ? (
+                    <OpsEmptyState message="No approvals found. Approval requests are created when posts are submitted for review via the publish workflow. Use the Review module to submit posts that require dual-control approval." />
+                ) : null}
 
                 {activeMutationError ? <OpsErrorState message={activeMutationError} /> : null}
             </ModuleScaffold>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { authenticateToken, optionalAuth, requirePermission } from '../middleware/auth.js';
+import { invalidateAdminSnapshotNamespaces } from '../services/adminSnapshotCache.js';
 import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import ErrorTracking from '../services/errorTracking.js';
 import { getPathParam } from '../utils/routeParams.js';
@@ -58,6 +59,7 @@ const updateSchema = z.object({
 });
 
 const reportsCollection = () => getCollection<ErrorReportDoc>('error_reports');
+const invalidateOpsDerivedState = () => invalidateAdminSnapshotNamespaces(['dashboard', 'ops-workspace']);
 
 router.post('/error-report', optionalAuth, async (req, res) => {
     const parseResult = reportSchema.safeParse(req.body);
@@ -86,6 +88,7 @@ router.post('/error-report', optionalAuth, async (req, res) => {
         };
 
         const result = await reportsCollection().insertOne(doc as any);
+        invalidateOpsDerivedState();
 
         ErrorTracking.captureMessage(`Client error report: ${doc.errorId}`, 'warning');
         ErrorTracking.addBreadcrumb({
@@ -169,6 +172,8 @@ router.patch('/error-reports/:id', authenticateToken, requirePermission('admin:w
         if (!result.matchedCount) {
             return res.status(404).json({ error: 'Report not found' });
         }
+
+        invalidateOpsDerivedState();
 
         const updated = await reportsCollection().findOne({ _id: toObjectId(id) } as any);
         if (!updated) {

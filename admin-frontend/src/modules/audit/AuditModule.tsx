@@ -7,7 +7,7 @@ import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
-import { getAdminAuditIntegrity, getAdminAuditLogs, rebuildAdminAuditLedger } from '../../lib/api/client';
+import { getAdminAuditIntegrity, getAdminAuditLogs, getAdminOpsWorkspace, rebuildAdminAuditLedger } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAuditLog } from '../../types';
 
@@ -93,7 +93,7 @@ export function AuditModule() {
     const [searchParams] = useSearchParams();
     const { formatDateTime } = useAdminPreferences();
     const { stepUpToken, hasValidStepUp } = useAdminAuth();
-    const { notifyError, notifyInfo, notifySuccess } = useAdminNotifications();
+    const { notifyError, notifySuccess } = useAdminNotifications();
     const queryClient = useQueryClient();
     const [action, setAction] = useState('');
     const [actorSearch, setActorSearch] = useState('');
@@ -106,6 +106,13 @@ export function AuditModule() {
         setStart(searchParams.get('start') || '');
         setEnd(searchParams.get('end') || '');
     }, [searchParams]);
+
+    const usesWorkspaceFeed = !action.trim() && !actorSearch.trim() && !start && !end;
+
+    const workspaceQuery = useQuery({
+        queryKey: ['admin-ops-workspace'],
+        queryFn: () => getAdminOpsWorkspace(),
+    });
 
     const rebuildMutation = useMutation({
         mutationFn: () => rebuildAdminAuditLedger(stepUpToken ?? ''),
@@ -128,6 +135,7 @@ export function AuditModule() {
             start: start || undefined,
             end: end || undefined,
         }),
+        enabled: !usesWorkspaceFeed,
     });
 
     const integrityQuery = useQuery({
@@ -136,7 +144,7 @@ export function AuditModule() {
         refetchInterval: 5 * 60 * 1000,
     });
 
-    const rows = useMemo(() => query.data ?? [], [query.data]);
+    const rows = useMemo(() => (usesWorkspaceFeed ? workspaceQuery.data?.audit ?? [] : query.data ?? []), [query.data, usesWorkspaceFeed, workspaceQuery.data]);
     const integrityData = integrityQuery.data;
     const integrityStatus = integrityData
         ? (integrityData.valid === true ? 'verified' : integrityData.valid === false ? 'invalid' : String(integrityData.status ?? integrityData.state ?? 'unknown'))
@@ -146,6 +154,8 @@ export function AuditModule() {
         : integrityStatus === 'unknown'
             ? 'warning'
             : 'danger';
+    const showPrimaryLoading = usesWorkspaceFeed ? workspaceQuery.isPending : query.isPending;
+    const showPrimaryError = usesWorkspaceFeed ? workspaceQuery.error : query.error;
 
     const actorChips = useMemo(() => {
         const unique = new Map<string, number>();
@@ -177,6 +187,12 @@ export function AuditModule() {
             eyebrow="Governance"
             title="Audit"
             description="Investigation-grade audit timeline with actor filters, record drill-ins, and immutable ledger checks."
+            metrics={[
+                { key: 'audit-loaded', label: 'Loaded Entries', value: rows.length },
+                { key: 'audit-actors', label: 'Unique Actors', value: uniqueActorCount, tone: uniqueActorCount > 0 ? 'info' : 'neutral' },
+                { key: 'audit-changes', label: 'Changed Records', value: changedRowCount, tone: changedRowCount > 0 ? 'warning' : 'neutral' },
+                { key: 'audit-integrity', label: 'Ledger Integrity', value: integrityStatus, tone: integrityTone },
+            ]}
         >
             <div className="ops-stack">
                 <OpsToolbar
@@ -201,7 +217,7 @@ export function AuditModule() {
                     actions={
                         <>
                             <span className="ops-inline-muted">{rows.length} events loaded</span>
-                            <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                            <button type="button" className="admin-btn subtle small" onClick={() => void Promise.all([workspaceQuery.refetch(), usesWorkspaceFeed ? Promise.resolve() : query.refetch()])}>
                                 Refresh
                             </button>
                             <button type="button" className="admin-btn subtle small" onClick={() => void integrityQuery.refetch()}>
@@ -249,29 +265,14 @@ export function AuditModule() {
                     </div>
                 ) : null}
 
-                <div className="ops-kpi-grid">
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Loaded Entries</div>
-                        <div className="ops-kpi-value">{rows.length}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Unique Actors</div>
-                        <div className="ops-kpi-value">{uniqueActorCount}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Content Diffs</div>
-                        <div className="ops-kpi-value">{changedRowCount}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Ledger Integrity</div>
-                        <div className="ops-kpi-value"><OpsBadge tone={integrityTone}>{integrityStatus}</OpsBadge></div>
-                    </div>
-                </div>
-
-                {integrityData?.reason ? <div className="admin-alert warning">Integrity detail: {String(integrityData.reason)}</div> : null}
-                {query.isPending ? <div className="admin-alert info">Loading audit logs...</div> : null}
-                {query.error ? <OpsErrorState message="Failed to load audit logs." /> : null}
-                {integrityQuery.error ? <OpsErrorState message="Failed to verify audit integrity." /> : null}
+                {showPrimaryLoading ? <div className="admin-alert info">Loading audit logs...</div> : null}
+                {showPrimaryError ? <OpsErrorState message="Failed to load audit logs." /> : null}
+                {!showPrimaryError && query.error && usesWorkspaceFeed ? (
+                    <div className="admin-alert warning">Filtered audit fetch is temporarily unavailable. The shared site-ops snapshot is still loaded.</div>
+                ) : null}
+                {rebuildMutation.isError ? (
+                    <OpsErrorState message={rebuildMutation.error instanceof Error ? rebuildMutation.error.message : 'Failed to rebuild audit ledger.'} />
+                ) : null}
 
                 {rows.length > 0 ? (
                     <OpsTable
@@ -279,13 +280,12 @@ export function AuditModule() {
                             { key: 'action', label: 'Action' },
                             { key: 'actor', label: 'Actor' },
                             { key: 'target', label: 'Target' },
-                            { key: 'context', label: 'Context' },
-                            { key: 'when', label: 'When' },
-                            { key: 'controls', label: 'Controls' },
+                            { key: 'meta', label: 'Details' },
+                            { key: 'time', label: 'When' },
+                            { key: 'actions', label: 'Actions' },
                         ]}
                     >
-                        {rows.map((row: AdminAuditLog, index: number) => {
-                            const actorLabel = extractActorLabel(row);
+                        {rows.map((row) => {
                             const targetId = extractTargetId(row);
                             const targetLabel = extractTargetLabel(row);
                             const requestId = extractRequestId(row);
@@ -294,69 +294,43 @@ export function AuditModule() {
                             const diffSummary = extractDiffSummary(row);
 
                             return (
-                                <tr key={row.id || `${row.action}-${index}`}>
+                                <tr key={String(row.id ?? `${row.action ?? 'audit'}-${row.createdAt ?? ''}`)}>
+                                    <td><OpsBadge tone={actionTone(row.action)}>{row.action || 'unknown'}</OpsBadge></td>
                                     <td>
-                                        <OpsBadge tone={actionTone(String(row.action || ''))}>{String(row.action ?? '-')}</OpsBadge>
-                                        {row.note ? <div className="ops-inline-muted">{String(row.note)}</div> : null}
+                                        <strong>{extractActorLabel(row)}</strong>
+                                        {row.userId ? <div className="ops-inline-muted">{row.userId}</div> : null}
                                     </td>
                                     <td>
-                                        <strong>{actorLabel}</strong>
-                                        {row.userId ? <div className="ops-inline-muted">User ID: <code>{row.userId}</code></div> : null}
+                                        <strong>{targetLabel}</strong>
+                                        {targetId ? <div className="ops-inline-muted">ID: {targetId}</div> : null}
                                     </td>
                                     <td>
-                                        {targetId ? (
-                                            <button
-                                                type="button"
-                                                className="admin-btn subtle small"
-                                                onClick={() => navigate(`/detailed-post?focus=${encodeURIComponent(targetId)}`)}
-                                            >
-                                                {targetLabel}
-                                            </button>
-                                        ) : (
-                                            <strong>{targetLabel}</strong>
-                                        )}
-                                        {targetId ? <div className="ops-inline-muted">Record: <code>{targetId}</code></div> : null}
-                                    </td>
-                                    <td>
-                                        {endpoint ? <div className="ops-inline-muted">{method ? `${method} ` : ''}{endpoint}</div> : null}
+                                        {diffSummary ? <div>{diffSummary}</div> : <div>-</div>}
                                         {requestId ? <div className="ops-inline-muted">Request: {requestId}</div> : null}
-                                        {diffSummary ? <div className="ops-inline-muted">{diffSummary}</div> : null}
+                                        {endpoint ? <div className="ops-inline-muted">{method ? `${method} ` : ''}{endpoint}</div> : null}
                                     </td>
-                                    <td>{formatDateTime(typeof row.createdAt === 'string' ? row.createdAt : undefined)}</td>
+                                    <td>{formatDateTime(row.createdAt)}</td>
                                     <td>
                                         <RowActionMenu
-                                            itemLabel={String(row.action ?? 'audit-entry')}
+                                            itemLabel={targetLabel}
                                             actions={[
                                                 {
                                                     id: 'filter-actor',
-                                                    label: 'Filter By Actor',
-                                                    disabled: !actorLabel || actorLabel === 'Unknown actor',
-                                                    onClick: () => {
-                                                        setActorSearch(actorLabel);
-                                                        notifyInfo('Actor filter applied', actorLabel);
-                                                    },
+                                                    label: 'Filter Actor',
+                                                    onClick: () => setActorSearch(extractActorLabel(row)),
                                                 },
                                                 {
-                                                    id: 'open-post',
+                                                    id: 'filter-action',
+                                                    label: 'Filter Action',
+                                                    onClick: () => setAction(String(row.action ?? '')),
+                                                },
+                                                {
+                                                    id: 'open-record',
                                                     label: 'Open Record',
                                                     disabled: !targetId,
                                                     onClick: () => {
                                                         if (!targetId) return;
                                                         navigate(`/detailed-post?focus=${encodeURIComponent(targetId)}`);
-                                                    },
-                                                },
-                                                {
-                                                    id: 'copy-request',
-                                                    label: 'Copy Request ID',
-                                                    disabled: !requestId,
-                                                    onClick: async () => {
-                                                        if (!requestId) return;
-                                                        try {
-                                                            await navigator.clipboard.writeText(requestId);
-                                                            notifySuccess('Copied', `Request ID copied: ${requestId}`);
-                                                        } catch {
-                                                            notifyError('Copy failed', 'Could not copy request ID.');
-                                                        }
                                                     },
                                                 },
                                             ]}
@@ -368,8 +342,8 @@ export function AuditModule() {
                     </OpsTable>
                 ) : null}
 
-                {!query.isPending && !query.error && rows.length === 0 ? (
-                    <OpsEmptyState message="No audit entries found." />
+                {!showPrimaryLoading && !showPrimaryError && rows.length === 0 ? (
+                    <OpsEmptyState message="No audit activity matches the current view." />
                 ) : null}
             </div>
         </ModuleScaffold>

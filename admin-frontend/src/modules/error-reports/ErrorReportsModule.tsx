@@ -6,7 +6,7 @@ import { useAdminAuth } from '../../app/useAdminAuth';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
-import { getErrorReports, updateErrorReport } from '../../lib/api/client';
+import { getErrorReports, getAdminOpsWorkspace, updateErrorReport } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminErrorReport } from '../../types';
 
@@ -26,13 +26,29 @@ export function ErrorReportsModule() {
     const [activeReportId, setActiveReportId] = useState<string | null>(null);
     const [adminNoteDraft, setAdminNoteDraft] = useState('');
 
+    const usesWorkspaceFeed = status === 'all' && !search.trim();
+
+    const workspaceQuery = useQuery({
+        queryKey: ['admin-ops-workspace'],
+        queryFn: () => getAdminOpsWorkspace(),
+    });
+
     const query = useQuery({
         queryKey: ['error-reports', status, search],
         queryFn: () => getErrorReports({
             status,
             limit: 50,
         }),
+        enabled: !usesWorkspaceFeed,
     });
+
+    const invalidateOpsQueries = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['error-reports'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-ops-workspace'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+        ]);
+    };
 
     const updateMutation = useMutation({
         mutationFn: ({ id, nextStatus, assigneeEmail, adminNote }: { id: string; nextStatus: 'new' | 'triaged' | 'resolved'; assigneeEmail?: string; adminNote?: string }) => updateErrorReport(id, {
@@ -41,15 +57,18 @@ export function ErrorReportsModule() {
             adminNote: adminNote ?? `Updated via admin vNext at ${new Date().toISOString()}`,
         }),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['error-reports'] });
+            await invalidateOpsQueries();
         },
     });
 
+    const baseRows = useMemo(
+        () => (usesWorkspaceFeed ? workspaceQuery.data?.errorReports ?? [] : query.data ?? []),
+        [query.data, usesWorkspaceFeed, workspaceQuery.data]
+    );
     const rows = useMemo(() => {
-        const loaded = query.data ?? [];
         const needle = search.trim().toLowerCase();
-        if (!needle) return loaded;
-        return loaded.filter((row) => {
+        if (!needle) return baseRows;
+        return baseRows.filter((row) => {
             const haystack = [
                 row.errorId,
                 row.message,
@@ -68,8 +87,16 @@ export function ErrorReportsModule() {
                 .toLowerCase();
             return haystack.includes(needle);
         });
-    }, [query.data, search]);
+    }, [baseRows, search]);
+    const summary = workspaceQuery.data?.summary;
     const statusSummary = useMemo(() => {
+        if (summary && usesWorkspaceFeed) {
+            return {
+                new: Math.max(summary.unresolvedErrors - summary.triagedErrors, 0),
+                triaged: summary.triagedErrors,
+                resolved: 0,
+            };
+        }
         return rows.reduce(
             (acc, row) => {
                 if (row.status === 'resolved') acc.resolved += 1;
@@ -79,11 +106,13 @@ export function ErrorReportsModule() {
             },
             { new: 0, triaged: 0, resolved: 0 }
         );
-    }, [rows]);
+    }, [rows, summary, usesWorkspaceFeed]);
     const activeReport = useMemo(
         () => rows.find((row) => row.id === activeReportId) ?? null,
         [activeReportId, rows]
     );
+    const showPrimaryLoading = usesWorkspaceFeed ? workspaceQuery.isPending : query.isPending;
+    const showPrimaryError = usesWorkspaceFeed ? workspaceQuery.error : query.error;
 
     useEffect(() => {
         if (!activeReport) {
@@ -129,6 +158,12 @@ export function ErrorReportsModule() {
             eyebrow="Monitoring"
             title="Error Reports"
             description="Triage client error reports with incident ownership, release context, and direct escalation links."
+            metrics={[
+                { key: 'errors-new', label: 'New', value: statusSummary.new, tone: statusSummary.new > 0 ? 'warning' : 'neutral' },
+                { key: 'errors-triaged', label: 'Triaged', value: statusSummary.triaged, tone: statusSummary.triaged > 0 ? 'info' : 'neutral' },
+                { key: 'errors-resolved', label: 'Resolved', value: statusSummary.resolved, tone: statusSummary.resolved > 0 ? 'success' : 'neutral' },
+                { key: 'errors-unresolved', label: 'Unresolved', value: summary?.unresolvedErrors ?? (statusSummary.new + statusSummary.triaged), tone: (summary?.unresolvedErrors ?? (statusSummary.new + statusSummary.triaged)) > 0 ? 'warning' : 'neutral' },
+            ]}
         >
             <div className="ops-stack">
                 <OpsToolbar
@@ -166,30 +201,18 @@ export function ErrorReportsModule() {
                             >
                                 Clear
                             </button>
-                            <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
+                            <button type="button" className="admin-btn small" onClick={() => void Promise.all([workspaceQuery.refetch(), usesWorkspaceFeed ? Promise.resolve() : query.refetch()])}>
                                 Refresh
                             </button>
                         </>
                     }
                 />
 
-                <div className="ops-kpi-grid">
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">New</div>
-                        <div className="ops-kpi-value">{statusSummary.new}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Triaged</div>
-                        <div className="ops-kpi-value">{statusSummary.triaged}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Resolved</div>
-                        <div className="ops-kpi-value">{statusSummary.resolved}</div>
-                    </div>
-                </div>
-
-                {query.isPending ? <div className="admin-alert info">Loading error reports...</div> : null}
-                {query.error ? <OpsErrorState message="Failed to load error reports." /> : null}
+                {showPrimaryLoading ? <div className="admin-alert info">Loading error reports...</div> : null}
+                {showPrimaryError ? <OpsErrorState message="Failed to load error reports." /> : null}
+                {!showPrimaryError && query.error && usesWorkspaceFeed ? (
+                    <div className="admin-alert warning">Direct report filters are temporarily unavailable. The shared site-ops snapshot is still loaded.</div>
+                ) : null}
                 {updateMutation.isError ? (
                     <OpsErrorState message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update report.'} />
                 ) : null}
@@ -243,60 +266,9 @@ export function ErrorReportsModule() {
                                                 onClick: () => updateStatus(row, 'resolved', row.assigneeEmail || user?.email),
                                             },
                                             {
-                                                id: 'mark-new',
-                                                label: 'Move Back To New',
-                                                disabled: updateMutation.isPending || row.status === 'new',
-                                                onClick: () => updateStatus(row, 'new', row.assigneeEmail),
-                                            },
-                                            {
                                                 id: 'investigate',
-                                                label: 'Investigate',
-                                                disabled: updateMutation.isPending,
-                                                onClick: () => setActiveReportId(row.id),
-                                            },
-                                            {
-                                                id: 'copy-error-id',
-                                                label: 'Copy Error ID',
-                                                onClick: async () => {
-                                                    try {
-                                                        await navigator.clipboard.writeText(row.errorId);
-                                                        notifySuccess('Copied', `Error ID copied: ${row.errorId}`);
-                                                    } catch {
-                                                        notifyError('Copy failed', 'Could not copy error ID.');
-                                                    }
-                                                },
-                                            },
-                                            {
-                                                id: 'copy-request-id',
-                                                label: 'Copy Request ID',
-                                                disabled: !row.requestId,
-                                                onClick: async () => {
-                                                    if (!row.requestId) return;
-                                                    try {
-                                                        await navigator.clipboard.writeText(row.requestId);
-                                                        notifySuccess('Copied', `Request ID copied: ${row.requestId}`);
-                                                    } catch {
-                                                        notifyError('Copy failed', 'Could not copy request ID.');
-                                                    }
-                                                },
-                                            },
-                                            {
-                                                id: 'open-affected-page',
-                                                label: 'Open Affected Page',
-                                                disabled: !row.pageUrl,
-                                                onClick: () => {
-                                                    if (!row.pageUrl) return;
-                                                    window.open(row.pageUrl, '_blank', 'noopener,noreferrer');
-                                                },
-                                            },
-                                            {
-                                                id: 'open-sentry',
-                                                label: 'Open Sentry Event',
-                                                disabled: !row.sentryEventUrl,
-                                                onClick: () => {
-                                                    if (!row.sentryEventUrl) return;
-                                                    window.open(row.sentryEventUrl, '_blank', 'noopener,noreferrer');
-                                                },
+                                                label: activeReportId === row.id ? 'Hide Detail' : 'Investigate',
+                                                onClick: () => setActiveReportId((current) => current === row.id ? null : row.id),
                                             },
                                         ]}
                                     />
@@ -312,17 +284,16 @@ export function ErrorReportsModule() {
                             <div className="ops-meta-row">
                                 <OpsBadge tone={statusTone(activeReport.status)}>{activeReport.status}</OpsBadge>
                                 <span>{activeReport.assigneeEmail || 'Unassigned'}</span>
-                                {activeReport.release ? <span>{activeReport.release}</span> : null}
+                                {activeReport.release ? <span>Release: {activeReport.release}</span> : null}
                             </div>
-                            <div className="ops-inline-muted">{activeReport.pageUrl || '-'}</div>
-                            {activeReport.userAgent ? <div className="ops-inline-muted">{activeReport.userAgent}</div> : null}
+                            <div className="ops-inline-muted">{activeReport.message}</div>
                             {activeReport.stack ? <pre className="ops-code-block">{activeReport.stack}</pre> : null}
                             {activeReport.componentStack ? <pre className="ops-code-block">{activeReport.componentStack}</pre> : null}
                             <textarea
                                 className="ops-textarea"
                                 value={adminNoteDraft}
                                 onChange={(event) => setAdminNoteDraft(event.target.value)}
-                                placeholder="Capture reproduction steps, scope, or fix status"
+                                placeholder="Capture reproduction steps, rollback notes, or ownership context"
                             />
                             <div className="ops-actions">
                                 <button
@@ -340,23 +311,14 @@ export function ErrorReportsModule() {
                                 >
                                     Save Admin Note
                                 </button>
-                                <button
-                                    type="button"
-                                    className="admin-btn subtle"
-                                    disabled={!activeReport.pageUrl}
-                                    onClick={() => {
-                                        if (!activeReport.pageUrl) return;
-                                        window.open(activeReport.pageUrl, '_blank', 'noopener,noreferrer');
-                                    }}
-                                >
-                                    Open Affected Page
-                                </button>
                             </div>
                         </div>
                     </OpsCard>
                 ) : null}
 
-                {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No reports found. Client-side errors will appear here automatically as users hit issues on the public site." /> : null}
+                {!showPrimaryLoading && !showPrimaryError && rows.length === 0 ? (
+                    <OpsEmptyState message="No error reports found for the current view." />
+                ) : null}
             </div>
         </ModuleScaffold>
     );

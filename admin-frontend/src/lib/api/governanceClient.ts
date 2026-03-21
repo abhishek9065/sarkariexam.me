@@ -1,6 +1,8 @@
 import type {
     AdminApprovalItem,
     AdminAuditLog,
+    AdminOpsWorkspaceSnapshot,
+    AdminReviewPipelineSnapshot,
     AdminSecurityLog,
     AdminSession,
     AdminSessionTerminateOthersResult,
@@ -115,6 +117,62 @@ export async function updateAdminSecurityIncident(
 export async function getAdminApprovals(status = 'pending'): Promise<AdminApprovalItem[]> {
     const body = await request(`${ADMIN_API_PATHS.adminApprovals}?status=${encodeURIComponent(status)}`);
     return toArray<AdminApprovalItem>(body?.data);
+}
+
+export async function getAdminReviewWorkspace(): Promise<AdminReviewPipelineSnapshot> {
+    const body = await request(ADMIN_API_PATHS.adminReviewWorkspace);
+    return typedData<AdminReviewPipelineSnapshot>(body) ?? {
+        generatedAt: new Date(0).toISOString(),
+        permissions: {
+            announcementsRead: false,
+            announcementsWrite: false,
+            announcementsApprove: false,
+        },
+        summary: {
+            pendingReview: 0,
+            scheduled: 0,
+            unassignedPending: 0,
+            overdueReview: 0,
+            assignedToMe: 0,
+            pendingApprovals: 0,
+            dueSoonApprovals: 0,
+            approvedPendingExecution: 0,
+        },
+        reviewQueue: [],
+        scheduledQueue: [],
+        approvals: [],
+    };
+}
+
+export async function getAdminOpsWorkspace(): Promise<AdminOpsWorkspaceSnapshot> {
+    const body = await request(ADMIN_API_PATHS.adminOpsWorkspace);
+    return typedData<AdminOpsWorkspaceSnapshot>(body) ?? {
+        generatedAt: new Date(0).toISOString(),
+        permissions: {
+            adminRead: false,
+            adminWrite: false,
+            auditRead: false,
+            securityRead: false,
+        },
+        summary: {
+            openAlerts: 0,
+            criticalAlerts: 0,
+            acknowledgedAlerts: 0,
+            unresolvedErrors: 0,
+            triagedErrors: 0,
+            highRiskSessions: 0,
+            mediumRiskSessions: 0,
+            activeSessions: 0,
+            uniqueSessionIps: 0,
+            activeSecurityIncidents: 0,
+            auditEvents: 0,
+        },
+        alerts: [],
+        security: [],
+        sessions: [],
+        errorReports: [],
+        audit: [],
+    };
 }
 
 export async function approveAdminApproval(

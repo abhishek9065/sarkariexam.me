@@ -8,7 +8,7 @@ import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
-import { getAdminSecurityLogs, updateAdminSecurityIncident } from '../../lib/api/client';
+import { getAdminOpsWorkspace, getAdminSecurityLogs, updateAdminSecurityIncident } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminSecurityLog } from '../../types';
 
@@ -78,6 +78,13 @@ export function SecurityModule() {
     const [incidentNoteDraft, setIncidentNoteDraft] = useState('');
     const riskFilter = searchParams.get('risk');
 
+    const usesWorkspaceFeed = !eventType.trim() && !ip.trim() && !endpoint.trim() && !start && !end;
+
+    const workspaceQuery = useQuery({
+        queryKey: ['admin-ops-workspace'],
+        queryFn: () => getAdminOpsWorkspace(),
+    });
+
     const query = useQuery({
         queryKey: ['admin-security-logs', eventType, ip, endpoint, start, end],
         queryFn: () => getAdminSecurityLogs({
@@ -89,7 +96,16 @@ export function SecurityModule() {
             start: start || undefined,
             end: end || undefined,
         }),
+        enabled: !usesWorkspaceFeed,
     });
+
+    const invalidateOpsQueries = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['admin-security-logs'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-ops-workspace'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+        ]);
+    };
 
     const updateMutation = useMutation({
         mutationFn: async ({
@@ -104,7 +120,7 @@ export function SecurityModule() {
             return updateAdminSecurityIncident(id, { incidentStatus, assigneeEmail, note }, stepUpToken);
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-security-logs'] });
+            await invalidateOpsQueries();
             notifySuccess('Incident updated', 'Security incident state was saved.');
         },
         onError: (error) => {
@@ -112,20 +128,26 @@ export function SecurityModule() {
         },
     });
 
+    const baseRows = useMemo(
+        () => (usesWorkspaceFeed ? workspaceQuery.data?.security ?? [] : query.data ?? []),
+        [query.data, usesWorkspaceFeed, workspaceQuery.data]
+    );
     const rows = useMemo(() => {
-        const loaded = query.data ?? [];
-        return loaded.filter((row) => {
+        return baseRows.filter((row) => {
             const tone = eventTone(toEventType(row));
             if (riskFilter === 'high' && tone !== 'danger') return false;
             if (statusFilter !== 'all' && (row.incidentStatus ?? 'new') !== statusFilter) return false;
             return true;
         });
-    }, [query.data, riskFilter, statusFilter]);
+    }, [baseRows, riskFilter, statusFilter]);
+    const summary = workspaceQuery.data?.summary;
     const riskyCount = useMemo(() => rows.filter((row) => { const tone = eventTone(toEventType(row)); return tone === 'danger' || tone === 'warning'; }).length, [rows]);
     const activeIncident = useMemo(
         () => rows.find((row) => String(row.id ?? '') === activeIncidentId) ?? null,
         [activeIncidentId, rows]
     );
+    const showPrimaryLoading = usesWorkspaceFeed ? workspaceQuery.isPending : query.isPending;
+    const showPrimaryError = usesWorkspaceFeed ? workspaceQuery.error : query.error;
 
     useEffect(() => {
         if (!activeIncident) {
@@ -146,6 +168,12 @@ export function SecurityModule() {
                 eyebrow="Monitoring"
                 title="Security"
                 description="Risk-forward security events with incident ownership, state transitions, and filterable logs."
+                metrics={[
+                    { key: 'security-loaded', label: 'Loaded Events', value: rows.length },
+                    { key: 'security-risky', label: 'Risky Events', value: riskyCount, tone: riskyCount > 0 ? 'warning' : 'neutral' },
+                    { key: 'security-high-risk-sessions', label: 'High-risk Sessions', value: summary?.highRiskSessions ?? 0, tone: (summary?.highRiskSessions ?? 0) > 0 ? 'danger' : 'neutral' },
+                    { key: 'security-active-incidents', label: 'Active Incidents', value: summary?.activeSecurityIncidents ?? rows.filter((row) => (row.incidentStatus ?? 'new') !== 'resolved').length, tone: (summary?.activeSecurityIncidents ?? 0) > 0 ? 'warning' : 'neutral' },
+                ]}
             >
                 <div className="ops-stack">
                     <OpsToolbar
@@ -197,26 +225,22 @@ export function SecurityModule() {
                                 >
                                     Clear
                                 </button>
-                                <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
+                                <button
+                                    type="button"
+                                    className="admin-btn small"
+                                    onClick={() => void Promise.all([workspaceQuery.refetch(), usesWorkspaceFeed ? Promise.resolve() : query.refetch()])}
+                                >
                                     Refresh
                                 </button>
                             </>
                         }
                     />
 
-                    <div className="ops-kpi-grid">
-                        <div className="ops-kpi-card">
-                            <div className="ops-kpi-label">Loaded Events</div>
-                            <div className="ops-kpi-value">{rows.length}</div>
-                        </div>
-                        <div className="ops-kpi-card">
-                            <div className="ops-kpi-label">Risky Events</div>
-                            <div className="ops-kpi-value">{riskyCount}</div>
-                        </div>
-                    </div>
-
-                    {query.isPending ? <div className="admin-alert info">Loading security logs...</div> : null}
-                    {query.error ? <OpsErrorState message="Failed to load security logs." /> : null}
+                    {showPrimaryLoading ? <div className="admin-alert info">Loading security logs...</div> : null}
+                    {showPrimaryError ? <OpsErrorState message="Failed to load security logs." /> : null}
+                    {!showPrimaryError && query.error && usesWorkspaceFeed ? (
+                        <div className="admin-alert warning">Direct security log filters are temporarily unavailable. The shared site-ops snapshot is still loaded.</div>
+                    ) : null}
 
                     {rows.length > 0 ? (
                         <OpsTable
@@ -386,7 +410,7 @@ export function SecurityModule() {
                         </OpsCard>
                     ) : null}
 
-                    {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No security logs found." /> : null}
+                    {!showPrimaryLoading && !showPrimaryError && rows.length === 0 ? <OpsEmptyState message="No security logs found." /> : null}
                     {updateMutation.isError ? (
                         <OpsErrorState message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update security incident.'} />
                     ) : null}

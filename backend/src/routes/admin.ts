@@ -149,6 +149,28 @@ interface AdminAlertDoc {
     updatedBy?: string;
 }
 
+interface AdminErrorReportDoc {
+    errorId: string;
+    message: string;
+    pageUrl?: string | null;
+    userAgent?: string | null;
+    note?: string | null;
+    stack?: string | null;
+    componentStack?: string | null;
+    createdAt: Date;
+    updatedAt?: Date;
+    userId?: string | null;
+    userEmail?: string | null;
+    status: 'new' | 'triaged' | 'resolved';
+    adminNote?: string | null;
+    assigneeEmail?: string | null;
+    release?: string | null;
+    requestId?: string | null;
+    sentryEventUrl?: string | null;
+    resolvedAt?: Date | null;
+    resolvedBy?: string | null;
+}
+
 interface AdminSettingsDoc {
     key: 'states' | 'boards' | 'tags' | 'workflow-defaults' | 'homepage-defaults' | 'alert-thresholds' | 'security-policy' | 'notification-routing';
     values?: string[];
@@ -353,6 +375,21 @@ const auditQuerySchema = z.object({
 const workflowOverviewQuerySchema = z.object({
     staleLimit: z.coerce.number().int().min(1).max(100).default(10),
     dueSoonMinutes: z.coerce.number().int().min(1).max(24 * 60).default(30),
+});
+
+const reviewWorkspaceQuerySchema = z.object({
+    reviewLimit: z.coerce.number().int().min(1).max(200).default(80),
+    scheduledLimit: z.coerce.number().int().min(1).max(200).default(80),
+    approvalLimit: z.coerce.number().int().min(1).max(100).default(20),
+    dueSoonMinutes: z.coerce.number().int().min(1).max(24 * 60).default(30),
+});
+
+const opsWorkspaceQuerySchema = z.object({
+    alertLimit: z.coerce.number().int().min(1).max(120).default(40),
+    securityLimit: z.coerce.number().int().min(1).max(120).default(40),
+    sessionLimit: z.coerce.number().int().min(1).max(80).default(20),
+    errorLimit: z.coerce.number().int().min(1).max(120).default(40),
+    auditLimit: z.coerce.number().int().min(1).max(120).default(40),
 });
 
 const auditIntegrityQuerySchema = z.object({
@@ -770,6 +807,33 @@ type DashboardPermissionFlags = {
     announcementsApprove: boolean;
     auditRead: boolean;
     securityRead: boolean;
+};
+
+type OpsWorkspacePermissions = Pick<DashboardPermissionFlags, 'adminRead' | 'adminWrite' | 'auditRead' | 'securityRead'>;
+
+type OpsWorkspaceSummary = {
+    openAlerts: number;
+    criticalAlerts: number;
+    acknowledgedAlerts: number;
+    unresolvedErrors: number;
+    triagedErrors: number;
+    highRiskSessions: number;
+    mediumRiskSessions: number;
+    activeSessions: number;
+    uniqueSessionIps: number;
+    activeSecurityIncidents: number;
+    auditEvents: number;
+};
+
+type OpsWorkspaceSnapshot = {
+    generatedAt: string;
+    permissions: OpsWorkspacePermissions;
+    summary: OpsWorkspaceSummary;
+    alerts: Array<Record<string, unknown>>;
+    security: Array<Record<string, unknown>>;
+    sessions: Array<Record<string, unknown>>;
+    errorReports: Array<Record<string, unknown>>;
+    audit: Array<Record<string, unknown>>;
 };
 
 const DASHBOARD_SNAPSHOT_TTL_MS = 30_000;
@@ -1856,6 +1920,8 @@ const mapRecentEditorDraft = (input: { autosave: AdminAutosaveDoc; announcement:
 });
 
 const MANAGE_POSTS_WORKSPACE_TTL_MS = 30_000;
+const REVIEW_WORKSPACE_TTL_MS = 20_000;
+const OPS_WORKSPACE_TTL_MS = 20_000;
 
 const readCachedManagePostsWorkspaceSnapshot = (cacheKey: string) =>
     readAdminSnapshotCache<ManagePostsWorkspaceSnapshot>('manage-posts', cacheKey);
@@ -1864,12 +1930,26 @@ const writeCachedManagePostsWorkspaceSnapshot = (cacheKey: string, snapshot: Man
     writeAdminSnapshotCache('manage-posts', cacheKey, snapshot, MANAGE_POSTS_WORKSPACE_TTL_MS);
 };
 
-const invalidateAdminSnapshotState = (...namespaces: Array<'dashboard' | 'manage-posts'>) => {
+const readCachedReviewWorkspaceSnapshot = (cacheKey: string) =>
+    readAdminSnapshotCache<any>('review-workspace', cacheKey);
+
+const writeCachedReviewWorkspaceSnapshot = (cacheKey: string, snapshot: any) => {
+    writeAdminSnapshotCache('review-workspace', cacheKey, snapshot, REVIEW_WORKSPACE_TTL_MS);
+};
+
+const readCachedOpsWorkspaceSnapshot = (cacheKey: string) =>
+    readAdminSnapshotCache<OpsWorkspaceSnapshot>('ops-workspace', cacheKey);
+
+const writeCachedOpsWorkspaceSnapshot = (cacheKey: string, snapshot: OpsWorkspaceSnapshot) => {
+    writeAdminSnapshotCache('ops-workspace', cacheKey, snapshot, OPS_WORKSPACE_TTL_MS);
+};
+
+const invalidateAdminSnapshotState = (...namespaces: Array<'dashboard' | 'manage-posts' | 'review-workspace' | 'ops-workspace'>) => {
     invalidateAdminSnapshotNamespaces(namespaces);
 };
 
 const invalidateAdminAnnouncementDerivedState = async (context: string) => {
-    invalidateAdminSnapshotState('dashboard', 'manage-posts');
+    invalidateAdminSnapshotState('dashboard', 'manage-posts', 'review-workspace', 'ops-workspace');
     await invalidateAnnouncementCaches().catch((err) => {
         console.error(`Failed to invalidate announcement caches after ${context}:`, err);
     });
@@ -1978,6 +2058,67 @@ const serializeId = (value: unknown) => {
     }
     return typeof value === 'string' ? value : String(value ?? '');
 };
+
+const toIsoStringOrUndefined = (value: unknown) => {
+    if (!value) return undefined;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string') return value;
+    return String(value);
+};
+
+const mapAlertDocForClient = (doc: any) => ({
+    id: serializeId(doc?._id),
+    source: doc?.source,
+    severity: doc?.severity,
+    message: doc?.message,
+    status: doc?.status,
+    metadata: doc?.metadata && typeof doc.metadata === 'object' ? doc.metadata : undefined,
+    createdAt: toIsoStringOrUndefined(doc?.createdAt),
+    updatedAt: toIsoStringOrUndefined(doc?.updatedAt ?? doc?.createdAt),
+    createdBy: doc?.createdBy,
+    updatedBy: doc?.updatedBy,
+});
+
+const mapErrorReportDocForClient = (doc: any) => ({
+    id: serializeId(doc?._id),
+    errorId: String(doc?.errorId ?? ''),
+    message: String(doc?.message ?? ''),
+    pageUrl: doc?.pageUrl ?? null,
+    userAgent: doc?.userAgent ?? null,
+    note: doc?.note ?? null,
+    stack: doc?.stack ?? null,
+    componentStack: doc?.componentStack ?? null,
+    createdAt: toIsoStringOrUndefined(doc?.createdAt),
+    updatedAt: toIsoStringOrUndefined(doc?.updatedAt),
+    userId: doc?.userId ?? null,
+    userEmail: doc?.userEmail ?? null,
+    status: doc?.status ?? 'new',
+    adminNote: doc?.adminNote ?? null,
+    assigneeEmail: doc?.assigneeEmail ?? null,
+    release: doc?.release ?? null,
+    requestId: doc?.requestId ?? null,
+    sentryEventUrl: doc?.sentryEventUrl ?? null,
+    resolvedAt: toIsoStringOrUndefined(doc?.resolvedAt),
+    resolvedBy: doc?.resolvedBy ?? null,
+});
+
+const mapAuditLogDocForClient = (doc: any) => ({
+    id: serializeId(doc?._id),
+    ...doc,
+    createdAt: toIsoStringOrUndefined(doc?.createdAt),
+});
+
+const mapSecurityLogForClient = (doc: any) => ({
+    id: serializeId(doc?._id ?? doc?.id),
+    eventType: String(doc?.eventType ?? doc?.event_type ?? ''),
+    endpoint: doc?.endpoint ?? '',
+    ipAddress: doc?.ipAddress ?? doc?.ip_address ?? '',
+    createdAt: toIsoStringOrUndefined(doc?.createdAt ?? doc?.created_at),
+    incidentStatus: doc?.incidentStatus,
+    assigneeEmail: doc?.assigneeEmail,
+    note: doc?.note,
+    metadata: doc?.metadata && typeof doc.metadata === 'object' ? doc.metadata : {},
+});
 
 const DEFAULT_HOME_SECTIONS: Omit<HomeSectionDoc, 'updatedAt' | 'updatedBy'>[] = [
     { key: 'latest-jobs', title: 'Latest Jobs', itemType: 'job', sortRule: 'newest', pinnedIds: [], highlightIds: [] },
@@ -3989,6 +4130,7 @@ operationsRouter.post('/alerts', requirePermission('admin:write'), idempotency()
             userId: req.user?.userId,
             metadata: { source: payload.source, severity: payload.severity },
         }).catch(console.error);
+        invalidateAdminSnapshotState('dashboard', 'ops-workspace');
 
         return res.status(201).json({
             data: {
@@ -4042,6 +4184,7 @@ operationsRouter.patch('/alerts/:id', requirePermission('admin:write'), idempote
             userId: req.user?.userId,
             metadata: { id: alertId },
         }).catch(console.error);
+        invalidateAdminSnapshotState('dashboard', 'ops-workspace');
         return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
     } catch (error) {
         console.error('Alert update error:', error);
@@ -4723,6 +4866,7 @@ operationsRouter.patch('/security/logs/:id/status', requirePermission('admin:wri
                 assigneeEmail: parsed.data.assigneeEmail || null,
             },
         });
+        invalidateAdminSnapshotState('dashboard', 'ops-workspace');
 
         return res.json({ data: updated });
     } catch (error) {
@@ -4787,6 +4931,7 @@ operationsRouter.post('/sessions/terminate', requirePermission('security:read'),
         if (!removed) {
             return res.status(404).json({ error: 'Session not found' });
         }
+        invalidateAdminSnapshotState('dashboard', 'ops-workspace');
         SecurityLogger.log({
             ip_address: req.ip,
             event_type: 'admin_session_terminated',
@@ -4811,6 +4956,7 @@ operationsRouter.post('/sessions/terminate-others', requirePermission('security:
         }
         const removed = await terminateOtherSessions(req.user.userId, req.user.sessionId);
         if (removed > 0) {
+            invalidateAdminSnapshotState('dashboard', 'ops-workspace');
             SecurityLogger.log({
                 ip_address: req.ip,
                 event_type: 'admin_session_terminated',
@@ -4884,6 +5030,258 @@ governanceRouter.get('/workflow/overview', requirePermission('announcements:read
 });
 
 /**
+ * GET /api/admin/review-workspace
+ * Shared review pipeline snapshot for review, queue, and approvals surfaces.
+ */
+governanceRouter.get('/review-workspace', requirePermission('announcements:read'), async (req, res) => {
+    try {
+        const parsed = reviewWorkspaceQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const actorId = req.user?.userId ?? '';
+        const actorEmail = req.user?.email ?? '';
+        const actorRole = req.user?.role;
+        const permissions = {
+            announcementsRead: await hasEffectivePermission(actorRole, 'announcements:read' as Permission),
+            announcementsWrite: await hasEffectivePermission(actorRole, 'announcements:write' as Permission),
+            announcementsApprove: await hasEffectivePermission(actorRole, 'announcements:approve' as Permission),
+        };
+
+        const cacheKey = JSON.stringify({
+            actorId,
+            actorEmail,
+            actorRole,
+            permissions,
+            ...parsed.data,
+        });
+        const cached = readCachedReviewWorkspaceSnapshot(cacheKey);
+        if (cached) {
+            return res.json({ data: cached });
+        }
+
+        const { reviewLimit, scheduledLimit, approvalLimit, dueSoonMinutes } = parsed.data;
+        const [
+            reviewQueue,
+            scheduledQueue,
+            pendingSlaSummary,
+            managePostsSummary,
+            scheduledCount,
+            assignedPendingCount,
+            assignedScheduledCount,
+            approvalSummary,
+            approvalList,
+        ] = await Promise.all([
+            AnnouncementModelMongo.findAllAdmin({
+                status: 'pending',
+                limit: reviewLimit,
+                sort: 'updated',
+                includeInactive: true,
+            }),
+            AnnouncementModelMongo.findAllAdmin({
+                status: 'scheduled',
+                limit: scheduledLimit,
+                sort: 'updated',
+                includeInactive: true,
+            }),
+            AnnouncementModelMongo.getPendingSlaSummary({ includeInactive: true, staleLimit: 10 }),
+            AnnouncementModelMongo.getManagePostsWorkspaceSummary({
+                includeInactive: true,
+                assigneeUserId: actorId || undefined,
+                assigneeEmail: actorEmail || undefined,
+            }),
+            AnnouncementModelMongo.countAdmin({ status: 'scheduled', includeInactive: true }),
+            AnnouncementModelMongo.countAdmin({
+                status: 'pending',
+                includeInactive: true,
+                assigneeUserId: actorId || undefined,
+                assigneeEmail: actorEmail || undefined,
+            }),
+            AnnouncementModelMongo.countAdmin({
+                status: 'scheduled',
+                includeInactive: true,
+                assigneeUserId: actorId || undefined,
+                assigneeEmail: actorEmail || undefined,
+            }),
+            permissions.announcementsApprove
+                ? getAdminApprovalWorkflowSummary({ dueSoonMinutes })
+                : Promise.resolve(null),
+            permissions.announcementsApprove
+                ? listAdminApprovalRequests({ status: 'pending', limit: approvalLimit, offset: 0 })
+                : Promise.resolve({ data: [], total: 0 }),
+        ]);
+
+        const mapPipelineAnnouncement = (item: Announcement) => ({
+            ...item,
+            claimedByCurrentUser: Boolean(
+                (actorId && item.assigneeUserId === actorId)
+                || (actorEmail && item.assigneeEmail === actorEmail)
+            ),
+        });
+
+        const snapshot = {
+            generatedAt: new Date().toISOString(),
+            permissions,
+            summary: {
+                pendingReview: pendingSlaSummary.pendingTotal,
+                scheduled: scheduledCount,
+                unassignedPending: managePostsSummary.unassignedPending,
+                overdueReview: managePostsSummary.overdueReview,
+                assignedToMe: assignedPendingCount + assignedScheduledCount,
+                pendingApprovals: approvalSummary?.pending ?? 0,
+                dueSoonApprovals: approvalSummary?.dueSoon ?? 0,
+                approvedPendingExecution: approvalSummary?.approvedPendingExecution ?? 0,
+            },
+            reviewQueue: reviewQueue.map(mapPipelineAnnouncement),
+            scheduledQueue: scheduledQueue.map(mapPipelineAnnouncement),
+            approvals: approvalList.data,
+        };
+
+        writeCachedReviewWorkspaceSnapshot(cacheKey, snapshot);
+
+        return res.json({ data: snapshot });
+    } catch (error) {
+        console.error('Admin review workspace error:', error);
+        return res.status(500).json({ error: 'Failed to load review workspace' });
+    }
+});
+
+/**
+ * GET /api/admin/ops-workspace
+ * Shared site-ops snapshot for alerts, security, sessions, error reports, and audit surfaces.
+ */
+governanceRouter.get('/ops-workspace', requirePermission('admin:read'), async (req, res) => {
+    try {
+        const parsed = opsWorkspaceQuerySchema.safeParse(req.query ?? {});
+        if (!parsed.success) {
+            return res.status(400).json({ error: parsed.error.flatten() });
+        }
+
+        const actorRole = req.user?.role;
+        const permissions: OpsWorkspacePermissions = {
+            adminRead: await hasEffectivePermission(actorRole, 'admin:read' as Permission),
+            adminWrite: await hasEffectivePermission(actorRole, 'admin:write' as Permission),
+            auditRead: await hasEffectivePermission(actorRole, 'audit:read' as Permission),
+            securityRead: await hasEffectivePermission(actorRole, 'security:read' as Permission),
+        };
+
+        const cacheKey = JSON.stringify({
+            actorRole,
+            sessionId: req.user?.sessionId ?? '',
+            permissions,
+            ...parsed.data,
+        });
+        const cached = readCachedOpsWorkspaceSnapshot(cacheKey);
+        if (cached) {
+            return res.json({ data: cached });
+        }
+
+        const { alertLimit, securityLimit, sessionLimit, errorLimit, auditLimit } = parsed.data;
+        const [
+            alertDocs,
+            openAlerts,
+            criticalAlerts,
+            acknowledgedAlerts,
+            errorDocs,
+            unresolvedErrors,
+            triagedErrors,
+            sessionsRaw,
+            securityFeed,
+            auditDocs,
+            auditEvents,
+        ] = await Promise.all([
+            permissions.adminRead
+                ? getCollection<AdminAlertDoc>('admin_alerts')
+                    .find({ status: { $in: ['open', 'acknowledged'] } } as any)
+                    .sort({ updatedAt: -1, createdAt: -1 })
+                    .limit(alertLimit)
+                    .toArray()
+                : Promise.resolve([] as AdminAlertDoc[]),
+            permissions.adminRead
+                ? getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'open' } as any)
+                : Promise.resolve(0),
+            permissions.adminRead
+                ? getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'open', severity: 'critical' } as any)
+                : Promise.resolve(0),
+            permissions.adminRead
+                ? getCollection<AdminAlertDoc>('admin_alerts').countDocuments({ status: 'acknowledged' } as any)
+                : Promise.resolve(0),
+            permissions.adminRead
+                ? getCollection<AdminErrorReportDoc>('error_reports')
+                    .find({ status: { $ne: 'resolved' } } as any)
+                    .sort({ createdAt: -1 })
+                    .limit(errorLimit)
+                    .toArray()
+                : Promise.resolve([] as AdminErrorReportDoc[]),
+            permissions.adminRead
+                ? getCollection<AdminErrorReportDoc>('error_reports').countDocuments({ status: { $ne: 'resolved' } } as any)
+                : Promise.resolve(0),
+            permissions.adminRead
+                ? getCollection<AdminErrorReportDoc>('error_reports').countDocuments({ status: 'triaged' } as any)
+                : Promise.resolve(0),
+            permissions.securityRead ? listAdminSessions() : Promise.resolve([] as any[]),
+            permissions.securityRead ? getRecentSecurityLogsSafe(Math.max(securityLimit, 80)) : Promise.resolve({ data: [] as any[], total: 0 }),
+            permissions.auditRead
+                ? getCollection<any>('admin_audit_logs').find({}).sort({ createdAt: -1 }).limit(auditLimit).toArray()
+                : Promise.resolve([] as any[]),
+            permissions.auditRead
+                ? getCollection<any>('admin_audit_logs').countDocuments({} as any)
+                : Promise.resolve(0),
+        ]);
+
+        const riskRank: Record<string, number> = { high: 3, medium: 2, low: 1 };
+        const sessions = sessionsRaw
+            .map((record) => mapSessionForClient(record, req.user?.sessionId))
+            .sort((left, right) => {
+                const riskDelta = (riskRank[right.riskScore ?? 'low'] ?? 0) - (riskRank[left.riskScore ?? 'low'] ?? 0);
+                if (riskDelta !== 0) return riskDelta;
+                return String(right.lastActivity ?? '').localeCompare(String(left.lastActivity ?? ''));
+            })
+            .slice(0, sessionLimit);
+        const security = (securityFeed.data ?? []).map(mapSecurityLogForClient).slice(0, securityLimit);
+        const alerts = alertDocs.map(mapAlertDocForClient);
+        const errorReports = errorDocs.map(mapErrorReportDocForClient);
+        const audit = auditDocs.map(mapAuditLogDocForClient);
+
+        const summary: OpsWorkspaceSummary = {
+            openAlerts,
+            criticalAlerts,
+            acknowledgedAlerts,
+            unresolvedErrors,
+            triagedErrors,
+            highRiskSessions: sessionsRaw.filter((session: any) => session.riskScore === 'high').length,
+            mediumRiskSessions: sessionsRaw.filter((session: any) => session.riskScore === 'medium').length,
+            activeSessions: sessionsRaw.length,
+            uniqueSessionIps: new Set(sessionsRaw.map((session: any) => String(session.ip ?? '')).filter(Boolean)).size,
+            activeSecurityIncidents: security.filter((entry) => {
+                const status = String(entry.incidentStatus ?? 'new');
+                return status === 'new' || status === 'investigating';
+            }).length,
+            auditEvents,
+        };
+
+        const snapshot: OpsWorkspaceSnapshot = {
+            generatedAt: new Date().toISOString(),
+            permissions,
+            summary,
+            alerts,
+            security,
+            sessions,
+            errorReports,
+            audit,
+        };
+
+        writeCachedOpsWorkspaceSnapshot(cacheKey, snapshot);
+
+        return res.json({ data: snapshot });
+    } catch (error) {
+        console.error('Admin ops workspace error:', error);
+        return res.status(500).json({ error: 'Failed to load ops workspace' });
+    }
+});
+
+/**
  * POST /api/admin/approvals/:id/approve
  * Approve a pending high-risk action.
  */
@@ -4918,6 +5316,7 @@ governanceRouter.post('/approvals/:id/approve', requirePermission('announcements
             endpoint: '/api/admin/approvals/:id/approve',
             metadata: { approvalId, approvedBy: req.user?.email },
         });
+        invalidateAdminSnapshotState('dashboard', 'review-workspace');
         return res.json({ data: approved.approval });
     } catch (error) {
         console.error('Admin approval approve error:', error);
@@ -4959,6 +5358,7 @@ governanceRouter.post('/approvals/:id/reject', requirePermission('announcements:
             endpoint: '/api/admin/approvals/:id/reject',
             metadata: { approvalId, rejectedBy: req.user?.email },
         });
+        invalidateAdminSnapshotState('dashboard', 'review-workspace');
         return res.json({ data: rejected.approval });
     } catch (error) {
         console.error('Admin approval reject error:', error);

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
 import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
-import { createAdminAlert, getAdminAlerts, updateAdminAlert } from '../../lib/api/client';
+import { createAdminAlert, getAdminAlerts, getAdminOpsWorkspace, updateAdminAlert } from '../../lib/api/client';
 import type { AdminAlert } from '../../types';
 
 type AlertSourceFilter = 'deadline' | 'schedule' | 'link' | 'traffic' | 'manual' | 'all';
@@ -44,15 +44,39 @@ export function AlertsModule() {
     const [status, setStatus] = useState<AlertStatusFilter>('all');
     const [form, setForm] = useState<AlertFormState>(defaultAlertForm);
 
+    const isDefaultFeed = source === 'all' && severity === 'all' && status === 'all';
+
+    const workspaceQuery = useQuery({
+        queryKey: ['admin-ops-workspace'],
+        queryFn: () => getAdminOpsWorkspace(),
+    });
+
     const query = useQuery({
         queryKey: ['admin-alerts', source, severity, status],
         queryFn: () => getAdminAlerts({ source, severity, status, limit: 150 }),
+        enabled: !isDefaultFeed,
     });
 
-    const alerts = useMemo(() => query.data?.data ?? [], [query.data]);
-    const openCount = useMemo(() => alerts.filter((item) => item.status === 'open').length, [alerts]);
-    const criticalCount = useMemo(() => alerts.filter((item) => item.severity === 'critical').length, [alerts]);
-    const acknowledgedCount = useMemo(() => alerts.filter((item) => item.status === 'acknowledged').length, [alerts]);
+    const alerts = useMemo(
+        () => (isDefaultFeed ? workspaceQuery.data?.alerts ?? [] : query.data?.data ?? []),
+        [isDefaultFeed, query.data, workspaceQuery.data]
+    );
+    const summary = workspaceQuery.data?.summary;
+    const openCount = summary?.openAlerts ?? alerts.filter((item) => item.status === 'open').length;
+    const criticalCount = summary?.criticalAlerts ?? alerts.filter((item) => item.status === 'open' && item.severity === 'critical').length;
+    const acknowledgedCount = summary?.acknowledgedAlerts ?? alerts.filter((item) => item.status === 'acknowledged').length;
+    const unresolvedErrors = summary?.unresolvedErrors ?? 0;
+
+    const showPrimaryLoading = isDefaultFeed ? workspaceQuery.isPending : query.isPending;
+    const showPrimaryError = isDefaultFeed ? workspaceQuery.error : query.error;
+
+    const invalidateOpsQueries = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['admin-alerts'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-ops-workspace'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+        ]);
+    };
 
     const createMutation = useMutation({
         mutationFn: async () =>
@@ -65,7 +89,7 @@ export function AlertsModule() {
         onSuccess: async () => {
             notifySuccess('Alert created', 'Manual alert added to operations feed.');
             setForm(defaultAlertForm);
-            await queryClient.invalidateQueries({ queryKey: ['admin-alerts'] });
+            await invalidateOpsQueries();
         },
         onError: (error) => {
             notifyError(
@@ -79,7 +103,7 @@ export function AlertsModule() {
         mutationFn: async (input: { id: string; status: AdminAlert['status'] }) =>
             updateAdminAlert(input.id, { status: input.status }),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-alerts'] });
+            await invalidateOpsQueries();
         },
         onError: (error) => {
             notifyError(
@@ -94,21 +118,21 @@ export function AlertsModule() {
             eyebrow="Monitoring"
             title="Alerts"
             description="Monitor and manage operational alerts for deadlines, schedules, links, and traffic."
-            meta={<span>{alerts.length} alerts currently in the operations feed.</span>}
+            meta={<span>{alerts.length} alerts currently visible in this workspace.</span>}
             headerActions={(
                 <button
                     type="button"
                     className="admin-btn subtle"
-                    onClick={() => void query.refetch()}
+                    onClick={() => void Promise.all([workspaceQuery.refetch(), isDefaultFeed ? Promise.resolve() : query.refetch()])}
                 >
                     Refresh
                 </button>
             )}
             metrics={[
-                { key: 'total-alerts', label: 'Total Alerts', value: alerts.length },
                 { key: 'open-alerts', label: 'Open', value: openCount, tone: openCount > 0 ? 'warning' : 'neutral' },
                 { key: 'critical-alerts', label: 'Critical', value: criticalCount, tone: criticalCount > 0 ? 'danger' : 'neutral' },
                 { key: 'acknowledged-alerts', label: 'Acknowledged', value: acknowledgedCount },
+                { key: 'unresolved-errors', label: 'Unresolved Errors', value: unresolvedErrors, tone: unresolvedErrors > 0 ? 'warning' : 'neutral' },
             ]}
             filters={{
                 controls: (
@@ -139,6 +163,7 @@ export function AlertsModule() {
                     <>
                         <span className="ops-inline-muted">Open: {openCount}</span>
                         <span className="ops-inline-muted">Critical: {criticalCount}</span>
+                        <span className="ops-inline-muted">Errors: {unresolvedErrors}</span>
                     </>
                 ),
             }}
@@ -192,13 +217,16 @@ export function AlertsModule() {
                     </form>
                 </OpsCard>
 
-                {query.isPending ? <div className="admin-alert info">Loading alerts...</div> : null}
-                {query.error ? <OpsErrorState message="Failed to load alerts." /> : null}
+                {showPrimaryLoading ? <div className="admin-alert info">Loading alerts...</div> : null}
+                {showPrimaryError ? <OpsErrorState message="Failed to load alerts." /> : null}
+                {!showPrimaryError && query.error && isDefaultFeed ? (
+                    <div className="admin-alert warning">Filtered alert feed is temporarily unavailable. The shared operations snapshot is still loaded.</div>
+                ) : null}
                 {createMutation.error ? (
                     <OpsErrorState message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create alert.'} />
                 ) : null}
 
-                {!query.isPending && !query.error && alerts.length === 0 ? (
+                {!showPrimaryLoading && !showPrimaryError && alerts.length === 0 ? (
                     <OpsEmptyState message="No alerts in feed: All clear right now. Create manual alerts when operational action is required." />
                 ) : null}
 

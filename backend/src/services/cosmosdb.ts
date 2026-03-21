@@ -243,6 +243,7 @@ async function createIndexes(): Promise<void> {
         const communityQa = database.collection('community_qa');
         const communityGroups = database.collection('community_groups');
         const communityFlags = database.collection('community_flags');
+        const adminAlerts = database.collection('admin_alerts');
         const errorReports = database.collection('error_reports');
         const adminApprovalRequests = database.collection('admin_approval_requests');
 
@@ -265,6 +266,9 @@ async function createIndexes(): Promise<void> {
         await announcements.createIndex({ isActive: 1, status: 1, viewCount: -1, _id: -1 });
         await announcements.createIndex({ isActive: 1, status: 1, organization: 1, updatedAt: -1 });
         await announcements.createIndex({ isActive: 1, status: 1, category: 1, updatedAt: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, assigneeUserId: 1, updatedAt: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, assigneeEmail: 1, updatedAt: -1 });
+        await announcements.createIndex({ isActive: 1, status: 1, reviewDueAt: 1, updatedAt: -1 });
         // Note: Text indexes are not supported in Cosmos DB MongoDB API
         // Use regex search instead (already implemented in model)
 
@@ -297,6 +301,18 @@ async function createIndexes(): Promise<void> {
         await securityLogs.createIndex({ created_at: -1 });
         await securityLogs.createIndex({ ip_address: 1 });
         await securityLogs.createIndex({ event_type: 1, created_at: -1 });
+        await securityLogs.createIndex({ incidentStatus: 1, created_at: -1 });
+        await securityLogs.createIndex({ assigneeEmail: 1, incidentStatus: 1, created_at: -1 });
+
+        // Admin alerts indexes
+        await adminAlerts.createIndex({ status: 1, updatedAt: -1 });
+        await adminAlerts.createIndex({ severity: 1, status: 1, updatedAt: -1 });
+        await adminAlerts.createIndex({ source: 1, status: 1, updatedAt: -1 });
+
+        // Error report indexes
+        await errorReports.createIndex({ status: 1, createdAt: -1 });
+        await errorReports.createIndex({ assigneeEmail: 1, status: 1, updatedAt: -1 });
+        await errorReports.createIndex({ release: 1, createdAt: -1 });
 
         // Analytics indexes
         await analyticsEvents.createIndex({ createdAt: -1 });

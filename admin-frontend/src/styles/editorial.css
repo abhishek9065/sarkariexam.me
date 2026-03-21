@@ -429,6 +429,18 @@ body[data-admin-app='vnext']::before {
     font-size: 0.84rem;
 }
 
+.admin-link-inline {
+    color: var(--text-strong);
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.admin-link-inline:hover,
+.admin-link-inline:focus-visible {
+    color: var(--accent-strong);
+    text-decoration: underline;
+}
+
 .workspace-panel,
 .ops-card,
 .workspace-inspector,

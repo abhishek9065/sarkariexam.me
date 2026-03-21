@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
-import { getAdminAnnouncements, updateAnnouncementAssignment, updateAnnouncementReviewSla } from '../../lib/api/client';
+import { getAdminReviewWorkspace, updateAnnouncementAssignment, updateAnnouncementReviewSla } from '../../lib/api/client';
 import type { AdminAnnouncementListItem } from '../../types';
 
 const queueStatusTone = (status?: string) => {
@@ -33,14 +33,9 @@ export function QueueModule() {
     const [sort, setSort] = useState<'updated' | 'title'>('updated');
     const assigneeFilter = searchParams.get('assignee');
 
-    const pendingQuery = useQuery({
-        queryKey: ['admin-queue', 'pending'],
-        queryFn: () => getAdminAnnouncements({ status: 'pending', limit: 60, sort: 'newest' }),
-    });
-
-    const scheduledQuery = useQuery({
-        queryKey: ['admin-queue', 'scheduled'],
-        queryFn: () => getAdminAnnouncements({ status: 'scheduled', limit: 60, sort: 'newest' }),
+    const query = useQuery({
+        queryKey: ['admin-review-workspace'],
+        queryFn: () => getAdminReviewWorkspace(),
     });
 
     const assignmentMutation = useMutation({
@@ -48,7 +43,10 @@ export function QueueModule() {
             updateAnnouncementAssignment(id, { assigneeUserId, assigneeEmail })
         ),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-queue'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('Assignment updated', 'Queue ownership was updated.');
         },
         onError: (error) => {
@@ -59,7 +57,10 @@ export function QueueModule() {
     const slaMutation = useMutation({
         mutationFn: ({ id, reviewDueAt }: { id: string; reviewDueAt?: string }) => updateAnnouncementReviewSla(id, reviewDueAt),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-queue'] });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['admin-review-workspace'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+            ]);
             notifySuccess('SLA updated', 'Review due date was updated.');
         },
         onError: (error) => {
@@ -68,8 +69,8 @@ export function QueueModule() {
     });
 
     const rows = useMemo(() => {
-        const pendingRows = pendingQuery.data ?? [];
-        const scheduledRows = scheduledQuery.data ?? [];
+        const pendingRows = query.data?.reviewQueue ?? [];
+        const scheduledRows = query.data?.scheduledQueue ?? [];
         const merged = view === 'pending'
             ? pendingRows
             : view === 'scheduled'
@@ -101,15 +102,15 @@ export function QueueModule() {
         }
 
         return sorted;
-    }, [assigneeFilter, pendingQuery.data, scheduledQuery.data, search, sort, user?.email, user?.id, view]);
+    }, [assigneeFilter, query.data, search, sort, user?.email, user?.id, view]);
 
-    const loading = pendingQuery.isPending || scheduledQuery.isPending;
-    const hasError = pendingQuery.error || scheduledQuery.error;
+    const loading = query.isPending;
+    const hasError = query.error;
     const filterSummary = `${rows.length} rows | view=${view} | sort=${sort}${assigneeFilter ? ` | assignee=${assigneeFilter}` : ''}`;
 
-    const pendingCount = pendingQuery.data?.length ?? 0;
-    const scheduledCount = scheduledQuery.data?.length ?? 0;
-    const mineCount = rows.filter((row) => row.claimedByCurrentUser).length;
+    const pendingCount = query.data?.summary.pendingReview ?? (query.data?.reviewQueue.length ?? 0);
+    const scheduledCount = query.data?.summary.scheduled ?? (query.data?.scheduledQueue.length ?? 0);
+    const mineCount = query.data?.summary.assignedToMe ?? rows.filter((row) => row.claimedByCurrentUser).length;
 
     return (
         <ModuleScaffold
@@ -126,7 +127,10 @@ export function QueueModule() {
                     <button type="button" className="admin-btn subtle" onClick={() => setView('combined')}>
                         Combined queue
                     </button>
-                    <button type="button" className="admin-btn primary" onClick={() => void pendingQuery.refetch()}>
+                    <Link to="/review" className="admin-btn subtle">
+                        Review desk
+                    </Link>
+                    <button type="button" className="admin-btn primary" onClick={() => void query.refetch()}>
                         Refresh queue
                     </button>
                 </>
@@ -175,8 +179,7 @@ export function QueueModule() {
                                 type="button"
                                 className="admin-btn small"
                                 onClick={() => {
-                                    void pendingQuery.refetch();
-                                    void scheduledQuery.refetch();
+                                    void query.refetch();
                                 }}
                             >
                                 Refresh

@@ -8,7 +8,7 @@ import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
 import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
-import { getAdminSessions, terminateAdminSessionById, terminateOtherAdminSessions } from '../../lib/api/client';
+import { getAdminOpsWorkspace, terminateAdminSessionById, terminateOtherAdminSessions } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminSession } from '../../types';
 
@@ -28,10 +28,18 @@ export function SessionsModule() {
     const [search, setSearch] = useState('');
     const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
 
-    const query = useQuery({
-        queryKey: ['admin-sessions'],
-        queryFn: () => getAdminSessions(),
+    const workspaceQuery = useQuery({
+        queryKey: ['admin-ops-workspace'],
+        queryFn: () => getAdminOpsWorkspace(),
     });
+
+    const invalidateOpsQueries = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['admin-sessions'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-ops-workspace'] }),
+            queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
+        ]);
+    };
 
     const terminateMutation = useMutation({
         mutationFn: async (sessionId: string) => {
@@ -41,7 +49,7 @@ export function SessionsModule() {
             return terminateAdminSessionById(sessionId, stepUpToken);
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
+            await invalidateOpsQueries();
         },
     });
 
@@ -53,11 +61,12 @@ export function SessionsModule() {
             return terminateOtherAdminSessions(stepUpToken);
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
+            await invalidateOpsQueries();
         },
     });
 
-    const rows = useMemo(() => query.data ?? [], [query.data]);
+    const rows = useMemo(() => workspaceQuery.data?.sessions ?? [], [workspaceQuery.data]);
+    const summary = workspaceQuery.data?.summary;
     const focusSessionId = searchParams.get('sessionId') || searchParams.get('focus');
 
     useEffect(() => {
@@ -84,6 +93,13 @@ export function SessionsModule() {
     }, [riskFilter, rows, search]);
 
     const riskSummary = useMemo(() => {
+        if (summary) {
+            return {
+                low: Math.max(summary.activeSessions - summary.highRiskSessions - summary.mediumRiskSessions, 0),
+                medium: summary.mediumRiskSessions,
+                high: summary.highRiskSessions,
+            };
+        }
         return rows.reduce(
             (acc, row) => {
                 if (row.riskScore === 'high') acc.high += 1;
@@ -93,7 +109,7 @@ export function SessionsModule() {
             },
             { low: 0, medium: 0, high: 0 }
         );
-    }, [rows]);
+    }, [rows, summary]);
 
     useEffect(() => {
         void trackAdminTelemetry('admin_module_viewed', { module: 'sessions', count: rows.length });
@@ -106,11 +122,12 @@ export function SessionsModule() {
                 eyebrow="System"
                 title="Sessions"
                 description="Review active sessions, risk posture, and terminate suspicious logins safely."
-                meta={<span>{rows.length} active sessions currently visible in this workspace.</span>}
+                meta={<span>{summary?.activeSessions ?? rows.length} active sessions currently visible in this workspace.</span>}
                 metrics={[
                     { key: 'sessions-low', label: 'Low Risk', value: riskSummary.low, tone: riskSummary.low > 0 ? 'success' : 'neutral' },
                     { key: 'sessions-medium', label: 'Medium Risk', value: riskSummary.medium, tone: riskSummary.medium > 0 ? 'warning' : 'neutral' },
                     { key: 'sessions-high', label: 'High Risk', value: riskSummary.high, tone: riskSummary.high > 0 ? 'danger' : 'neutral' },
+                    { key: 'session-ips', label: 'Unique IPs', value: summary?.uniqueSessionIps ?? new Set(rows.map((row) => row.ip)).size },
                 ]}
                 filters={{
                     controls: (
@@ -168,7 +185,7 @@ export function SessionsModule() {
                             >
                                 Terminate Others
                             </button>
-                            <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                            <button type="button" className="admin-btn subtle small" onClick={() => void workspaceQuery.refetch()}>
                                 Refresh
                             </button>
                         </>
@@ -180,8 +197,8 @@ export function SessionsModule() {
                         <div className="admin-alert info">Step-up verification is required before terminating sessions.</div>
                     ) : null}
 
-                    {query.isPending ? <div className="admin-alert info">Loading sessions...</div> : null}
-                    {query.error ? <OpsErrorState message="Failed to load sessions." /> : null}
+                    {workspaceQuery.isPending ? <div className="admin-alert info">Loading sessions...</div> : null}
+                    {workspaceQuery.error ? <OpsErrorState message="Failed to load sessions." /> : null}
                     {terminateMutation.isError ? (
                         <OpsErrorState message={terminateMutation.error instanceof Error ? terminateMutation.error.message : 'Failed to terminate session.'} />
                     ) : null}
@@ -258,7 +275,7 @@ export function SessionsModule() {
                         </OpsTable>
                     ) : null}
 
-                    {!query.isPending && !query.error && filteredRows.length === 0 ? (
+                    {!workspaceQuery.isPending && !workspaceQuery.error && filteredRows.length === 0 ? (
                         <OpsEmptyState message={rows.length === 0 ? 'No active sessions found.' : 'No sessions match current filters.'} />
                     ) : null}
 

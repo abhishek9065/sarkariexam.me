@@ -414,6 +414,229 @@ function buildManagePostsWorkspaceSnapshot(input: {
     };
 }
 
+function buildReviewWorkspaceSnapshot(input: {
+    me?: Record<string, unknown>;
+    announcements?: Array<Record<string, unknown>>;
+    approvals?: Array<Record<string, unknown>>;
+    permissions?: string[];
+} = {}) {
+    const me = input.me ?? { id: 'admin-user-1', email: 'admin@sarkariexams.me', role: 'admin' };
+    const announcements = input.announcements ?? [
+        {
+            id: 'ann-review-1',
+            title: 'SSC CGL Recruitment 2026',
+            status: 'pending',
+            type: 'job',
+            updatedAt: '2026-03-08T08:00:00.000Z',
+            assigneeUserId: 'admin-user-1',
+            assigneeEmail: 'admin@sarkariexams.me',
+            reviewDueAt: '2026-03-09T08:00:00.000Z',
+        },
+        {
+            id: 'ann-review-2',
+            title: 'UP Police Result 2026',
+            status: 'pending',
+            type: 'result',
+            updatedAt: '2026-03-07T08:00:00.000Z',
+            reviewDueAt: '2026-03-06T08:00:00.000Z',
+        },
+        {
+            id: 'ann-queue-1',
+            title: 'Railway Admit Card 2026',
+            status: 'scheduled',
+            type: 'admit-card',
+            updatedAt: '2026-03-08T06:00:00.000Z',
+            assigneeUserId: 'admin-user-1',
+            assigneeEmail: 'admin@sarkariexams.me',
+        },
+    ];
+    const approvals = input.approvals ?? [
+        {
+            id: 'approval-1',
+            action: 'publish_announcement',
+            status: 'pending',
+            requestedBy: 'editor@sarkariexams.me',
+            requestedAt: '2026-03-08T07:00:00.000Z',
+        },
+    ];
+
+    const reviewQueue = announcements
+        .filter((item) => String(item.status ?? '') === 'pending')
+        .map((item) => ({
+            ...item,
+            claimedByCurrentUser: String(item.assigneeUserId ?? '') === String(me.id ?? '')
+                || String(item.assigneeEmail ?? '') === String(me.email ?? ''),
+        }));
+    const scheduledQueue = announcements
+        .filter((item) => String(item.status ?? '') === 'scheduled')
+        .map((item) => ({
+            ...item,
+            claimedByCurrentUser: String(item.assigneeUserId ?? '') === String(me.id ?? '')
+                || String(item.assigneeEmail ?? '') === String(me.email ?? ''),
+        }));
+
+    return {
+        generatedAt: DASH_TS,
+        permissions: {
+            announcementsRead: true,
+            announcementsWrite: true,
+            announcementsApprove: (input.permissions ?? ['*']).includes('*') || (input.permissions ?? []).includes('announcements:approve'),
+        },
+        summary: {
+            pendingReview: reviewQueue.length,
+            scheduled: scheduledQueue.length,
+            unassignedPending: reviewQueue.filter((item) => !item.assigneeUserId && !item.assigneeEmail).length,
+            overdueReview: reviewQueue.filter((item) => item.reviewDueAt && new Date(String(item.reviewDueAt)).getTime() < Date.now()).length,
+            assignedToMe: [...reviewQueue, ...scheduledQueue].filter((item) => item.claimedByCurrentUser).length,
+            pendingApprovals: approvals.filter((item) => String(item.status ?? 'pending') === 'pending').length,
+            dueSoonApprovals: approvals.filter((item) => String(item.status ?? 'pending') === 'pending').length,
+            approvedPendingExecution: approvals.filter((item) => String(item.status ?? '') === 'approved').length,
+        },
+        reviewQueue,
+        scheduledQueue,
+        approvals,
+    };
+}
+
+function buildOpsWorkspaceSnapshot(input: {
+    auditLogs?: Array<Record<string, unknown>>;
+    securityLogs?: Array<Record<string, unknown>>;
+    errorReports?: Array<Record<string, unknown>>;
+    sessions?: Array<Record<string, unknown>>;
+} = {}) {
+    const alerts = [
+        {
+            id: 'alert-1',
+            source: 'manual',
+            severity: 'critical',
+            message: 'Manual escalation pending acknowledgement',
+            status: 'open',
+            updatedAt: DASH_TS,
+        },
+        {
+            id: 'alert-2',
+            source: 'link',
+            severity: 'warning',
+            message: 'Broken link cluster detected',
+            status: 'acknowledged',
+            updatedAt: DASH_TS,
+        },
+    ];
+    const security = input.securityLogs ?? [
+        {
+            id: '101',
+            eventType: 'admin_security_alert',
+            endpoint: '/api/auth/admin/login',
+            ipAddress: '127.0.0.1',
+            incidentStatus: 'new',
+            assigneeEmail: null,
+            note: '',
+            createdAt: '2026-03-07T08:00:00.000Z',
+            metadata: {
+                email: 'admin@sarkariexams.me',
+                device: 'Desktop',
+                browser: 'Chrome',
+                os: 'Windows',
+                sessionId: 'session-high',
+                reason: 'new_device_login',
+            },
+        },
+    ];
+    const errorReports = input.errorReports ?? [
+        {
+            id: 'err-1',
+            errorId: 'frontend_error_boundary',
+            message: 'Boundary caught render failure',
+            pageUrl: 'https://example.com/result/ssc-cgl',
+            userEmail: 'candidate@example.com',
+            note: 'Clicked share button before crash',
+            status: 'new',
+            assigneeEmail: 'admin@sarkariexams.me',
+            adminNote: 'Needs route-level repro',
+            release: 'web@1.2.3',
+            requestId: 'req-123',
+            stack: 'Error: boundary failure\\n    at DetailPage.tsx:41:13',
+            componentStack: 'at DetailPage\\n    at ErrorBoundary',
+            sentryEventUrl: 'https://example.sentry.io/issues/1',
+            createdAt: '2026-03-07T08:00:00.000Z',
+        },
+    ];
+    const sessions = input.sessions ?? [
+        {
+            id: 'session-high',
+            userId: 'admin-user-1',
+            email: 'admin@sarkariexams.me',
+            device: 'Windows Desktop',
+            browser: 'Chrome',
+            os: 'Windows 11',
+            ip: '127.0.0.1',
+            loginTime: '2026-03-07T07:00:00.000Z',
+            lastActivity: '2026-03-07T08:00:00.000Z',
+            isCurrentSession: false,
+            isActive: true,
+            riskScore: 'high',
+            actions: ['/api/auth/admin/login', '/api/admin/security'],
+        },
+        {
+            id: 'session-low',
+            userId: 'admin-user-1',
+            email: 'admin@sarkariexams.me',
+            device: 'MacBook Pro',
+            browser: 'Safari',
+            os: 'macOS',
+            ip: '10.0.0.3',
+            loginTime: '2026-03-07T06:00:00.000Z',
+            lastActivity: '2026-03-07T08:10:00.000Z',
+            isCurrentSession: true,
+            isActive: true,
+            riskScore: 'low',
+            actions: ['/api/admin/dashboard'],
+        },
+    ];
+    const audit = input.auditLogs ?? [
+        {
+            id: 'audit-1',
+            action: 'update',
+            announcementId: 'ann-42',
+            title: 'SSC CGL Recruitment 2026',
+            actorEmail: 'admin@sarkariexams.me',
+            createdAt: '2026-03-07T08:00:00.000Z',
+            metadata: {
+                requestId: 'req-audit-42',
+                fields: ['status', 'publishAt', 'seo'],
+            },
+        },
+    ];
+
+    return {
+        generatedAt: DASH_TS,
+        permissions: {
+            adminRead: true,
+            adminWrite: true,
+            auditRead: true,
+            securityRead: true,
+        },
+        summary: {
+            openAlerts: alerts.filter((item) => item.status === 'open').length,
+            criticalAlerts: alerts.filter((item) => item.status === 'open' && item.severity === 'critical').length,
+            acknowledgedAlerts: alerts.filter((item) => item.status === 'acknowledged').length,
+            unresolvedErrors: errorReports.filter((item) => String(item.status ?? 'new') !== 'resolved').length,
+            triagedErrors: errorReports.filter((item) => String(item.status ?? '') === 'triaged').length,
+            highRiskSessions: sessions.filter((item) => String(item.riskScore ?? '') === 'high').length,
+            mediumRiskSessions: sessions.filter((item) => String(item.riskScore ?? '') === 'medium').length,
+            activeSessions: sessions.length,
+            uniqueSessionIps: new Set(sessions.map((item) => String(item.ip ?? '')).filter(Boolean)).size,
+            activeSecurityIncidents: security.filter((item) => String(item.incidentStatus ?? 'new') !== 'resolved').length,
+            auditEvents: audit.length,
+        },
+        alerts,
+        security,
+        sessions,
+        errorReports,
+        audit,
+    };
+}
+
 async function mockUnauthenticatedAdmin(page: import('@playwright/test').Page) {
     await page.route('**/api/auth/csrf', async (route) => {
         await route.fulfill(jsonResponse({ csrfToken: 'test-csrf-token' }));
@@ -436,6 +659,7 @@ async function mockAuthenticatedAdmin(
         reports?: Record<string, unknown>;
         auditLogs?: Array<Record<string, unknown>>;
         announcements?: Array<Record<string, unknown>>;
+        approvals?: Array<Record<string, unknown>>;
         views?: Array<Record<string, unknown>>;
         recentDrafts?: Array<Record<string, unknown>>;
         users?: Array<Record<string, unknown>>;
@@ -491,6 +715,57 @@ async function mockAuthenticatedAdmin(
             createdAt: '2026-03-07T08:00:00.000Z',
         },
     ])];
+    const sessionsState = [...(overrides.sessions ?? [
+        {
+            id: 'session-high',
+            userId: 'admin-user-1',
+            email: 'admin@sarkariexams.me',
+            ip: '127.0.0.1',
+            userAgent: 'Mozilla/5.0',
+            device: 'Desktop',
+            browser: 'Chrome',
+            os: 'Windows 11',
+            loginTime: '2026-03-07T07:00:00.000Z',
+            lastActivity: '2026-03-07T08:00:00.000Z',
+            expiresAt: '2026-03-08T07:00:00.000Z',
+            isCurrentSession: false,
+            isActive: true,
+            riskScore: 'high',
+            actions: ['/api/auth/admin/login', '/api/admin/security'],
+        },
+        {
+            id: 'session-low',
+            userId: 'admin-user-1',
+            email: 'admin@sarkariexams.me',
+            ip: '10.0.0.3',
+            userAgent: 'Mozilla/5.0',
+            device: 'MacBook Pro',
+            browser: 'Safari',
+            os: 'macOS',
+            loginTime: '2026-03-07T06:00:00.000Z',
+            lastActivity: '2026-03-07T08:10:00.000Z',
+            expiresAt: '2026-03-08T06:00:00.000Z',
+            isCurrentSession: true,
+            isActive: true,
+            riskScore: 'low',
+            actions: ['/api/admin/dashboard'],
+        },
+    ])];
+    const auditLogsState = [...(overrides.auditLogs ?? [
+        {
+            id: 'audit-1',
+            action: 'update',
+            announcementId: 'ann-42',
+            title: 'SSC CGL Recruitment 2026',
+            userId: 'admin-user-1',
+            actorEmail: 'admin@sarkariexams.me',
+            createdAt: '2026-03-07T08:00:00.000Z',
+            metadata: {
+                requestId: 'req-audit-42',
+                fields: ['status', 'publishAt', 'seo'],
+            },
+        },
+    ])];
     const recentDraftsState = [...(overrides.recentDrafts ?? [])];
 
     await page.route('**/api/auth/csrf', async (route) => {
@@ -527,6 +802,46 @@ async function mockAuthenticatedAdmin(
             permissions: overrides.permissions,
             views: overrides.views,
         })));
+    });
+
+    await page.route('**/api/admin/review-workspace**', async (route) => {
+        await route.fulfill(jsonResponse(buildReviewWorkspaceSnapshot({
+            me: adminMe,
+            announcements: overrides.announcements,
+            approvals: overrides.approvals,
+            permissions: overrides.permissions,
+        })));
+    });
+
+    await page.route('**/api/admin/ops-workspace**', async (route) => {
+        await route.fulfill(jsonResponse(buildOpsWorkspaceSnapshot({
+            auditLogs: auditLogsState,
+            securityLogs: securityLogsState,
+            errorReports: errorReportsState,
+            sessions: sessionsState,
+        })));
+    });
+
+    await page.route('**/api/admin/approvals**', async (route) => {
+        const status = new URL(route.request().url()).searchParams.get('status') ?? 'pending';
+        const approvals = overrides.approvals ?? [
+            {
+                id: 'approval-1',
+                action: 'publish_announcement',
+                status: 'pending',
+                requestedBy: 'editor@sarkariexams.me',
+                requestedAt: '2026-03-08T07:00:00.000Z',
+            },
+            {
+                id: 'approval-2',
+                action: 'bulk_update',
+                status: 'approved',
+                requestedBy: 'admin@sarkariexams.me',
+                requestedAt: '2026-03-07T07:00:00.000Z',
+            },
+        ];
+        const data = status === 'all' ? approvals : approvals.filter((item) => String(item.status ?? '') === status);
+        await route.fulfill(jsonResponse(data));
     });
 
     await page.route('**/api/admin/reports', async (route) => {
@@ -816,42 +1131,7 @@ async function mockAuthenticatedAdmin(
     });
 
     await page.route('**/api/admin/sessions', async (route) => {
-        await route.fulfill(jsonResponse(overrides.sessions ?? [
-            {
-                id: 'session-high',
-                userId: 'admin-user-1',
-                email: 'admin@sarkariexams.me',
-                ip: '127.0.0.1',
-                userAgent: 'Mozilla/5.0',
-                device: 'Desktop',
-                browser: 'Chrome',
-                os: 'Windows',
-                loginTime: '2026-03-07T07:40:00.000Z',
-                lastActivity: '2026-03-07T08:00:00.000Z',
-                expiresAt: '2026-03-07T12:00:00.000Z',
-                isCurrentSession: false,
-                isActive: true,
-                riskScore: 'high',
-                actions: ['/api/auth/admin/login', '/api/admin/security'],
-            },
-            {
-                id: 'session-low',
-                userId: 'admin-user-1',
-                email: 'admin@sarkariexams.me',
-                ip: '10.10.0.5',
-                userAgent: 'Mozilla/5.0',
-                device: 'Desktop',
-                browser: 'Chrome',
-                os: 'Windows',
-                loginTime: '2026-03-07T06:40:00.000Z',
-                lastActivity: '2026-03-07T07:45:00.000Z',
-                expiresAt: '2026-03-07T12:00:00.000Z',
-                isCurrentSession: true,
-                isActive: true,
-                riskScore: 'low',
-                actions: ['/api/admin/dashboard'],
-            },
-        ]));
+        await route.fulfill(jsonResponse(sessionsState));
     });
 
     await page.route('**/api/support/error-reports**', async (route) => {
@@ -875,25 +1155,7 @@ async function mockAuthenticatedAdmin(
     });
 
     await page.route('**/api/admin/audit-log**', async (route) => {
-        await route.fulfill(jsonResponse(overrides.auditLogs ?? [
-            {
-                id: 'audit-1',
-                action: 'update',
-                announcementId: 'ann-42',
-                title: 'SSC CGL Recruitment 2026',
-                userId: 'admin-user-1',
-                actorEmail: 'admin@sarkariexams.me',
-                createdAt: '2026-03-07T08:00:00.000Z',
-                note: 'Updated publish workflow metadata',
-                metadata: {
-                    title: 'SSC CGL Recruitment 2026',
-                    endpoint: '/api/admin/announcements/ann-42',
-                    method: 'PATCH',
-                    requestId: 'req-audit-42',
-                    fields: ['status', 'publishAt', 'seo'],
-                },
-            },
-        ]));
+        await route.fulfill(jsonResponse(auditLogsState));
     });
 
     await page.route('**/api/admin/settings/**', async (route) => {
@@ -1302,7 +1564,7 @@ test('review diff links stay inside the admin router basename', async ({ page })
     });
     await page.goto('review', { waitUntil: 'domcontentloaded' });
 
-    await page.getByRole('link', { name: /Review Diffs/i }).click();
+    await page.getByRole('link', { name: /SSC CGL Recruitment 2026/i }).click();
     await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/detailed-post\\?focus=ann-1$`));
     await expect(page.getByRole('heading', { name: /Detailed Post/i })).toBeVisible();
 });
@@ -1342,6 +1604,23 @@ test('dashboard exposes operator cockpit drilldowns', async ({ page }) => {
     await expect(page.getByRole('heading', { name: /My Queue/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Unassigned pending reviews/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Overdue review items/i })).toBeVisible();
+});
+
+test('review pipeline modules share the unified workspace snapshot', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+
+    await page.goto('review', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('link', { name: /Approval desk/i })).toBeVisible();
+    await expect(page.getByText(/Pending approvals/i).first()).toBeVisible();
+
+    await page.goto('queue', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('link', { name: /Review desk/i })).toBeVisible();
+    await expect(page.getByText(/Assigned to me/i).first()).toBeVisible();
+
+    await page.goto('approvals', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('link', { name: /Review desk/i })).toBeVisible();
+    await expect(page.getByText(/Approved pending execution/i).first()).toBeVisible();
 });
 
 test('access control workspace renders roster and role matrix', async ({ page }) => {

@@ -248,6 +248,55 @@ function buildManagePostsWorkspace() {
     };
 }
 
+function buildOpsWorkspace() {
+    const alerts = [
+        {
+            id: 'alert-1',
+            source: 'manual',
+            severity: 'critical',
+            message: 'Manual escalation pending acknowledgement',
+            status: 'open',
+            updatedAt: DASH_TS,
+        },
+        {
+            id: 'alert-2',
+            source: 'link',
+            severity: 'warning',
+            message: 'Broken link cluster detected',
+            status: 'acknowledged',
+            updatedAt: DASH_TS,
+        },
+    ];
+
+    return {
+        generatedAt: DASH_TS,
+        permissions: {
+            adminRead: true,
+            adminWrite: true,
+            auditRead: true,
+            securityRead: true,
+        },
+        summary: {
+            openAlerts: alerts.filter((item) => item.status === 'open').length,
+            criticalAlerts: alerts.filter((item) => item.status === 'open' && item.severity === 'critical').length,
+            acknowledgedAlerts: alerts.filter((item) => item.status === 'acknowledged').length,
+            unresolvedErrors: defaultErrorReports.filter((item) => item.status !== 'resolved').length,
+            triagedErrors: defaultErrorReports.filter((item) => item.status === 'triaged').length,
+            highRiskSessions: defaultSessions.filter((item) => item.riskScore === 'high').length,
+            mediumRiskSessions: defaultSessions.filter((item) => item.riskScore === 'medium').length,
+            activeSessions: defaultSessions.length,
+            uniqueSessionIps: new Set(defaultSessions.map((item) => item.ip)).size,
+            activeSecurityIncidents: defaultSecurityLogs.filter((item) => String(item.incidentStatus ?? 'new') !== 'resolved').length,
+            auditEvents: defaultAuditLogs.length,
+        },
+        alerts,
+        security: defaultSecurityLogs,
+        sessions: defaultSessions,
+        errorReports: defaultErrorReports,
+        audit: defaultAuditLogs,
+    };
+}
+
 function buildDashboardSnapshot() {
     return {
         generatedAt: DASH_TS,
@@ -590,6 +639,11 @@ export async function mockAdminApi(page: Page, options: AdminMockOptions = {}) {
 
         if (pathname === '/api/admin/manage-posts/workspace' && method === 'GET') {
             await route.fulfill(okJson(buildManagePostsWorkspace()));
+            return;
+        }
+
+        if (pathname === '/api/admin/ops-workspace' && method === 'GET') {
+            await route.fulfill(okJson(buildOpsWorkspace()));
             return;
         }
 

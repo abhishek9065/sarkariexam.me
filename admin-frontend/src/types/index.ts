@@ -522,6 +522,60 @@ export interface AdminApprovalItem {
     [key: string]: unknown;
 }
 
+export interface AdminReviewPipelineSummary {
+    pendingReview: number;
+    scheduled: number;
+    unassignedPending: number;
+    overdueReview: number;
+    assignedToMe: number;
+    pendingApprovals: number;
+    dueSoonApprovals: number;
+    approvedPendingExecution: number;
+}
+
+export interface AdminReviewPipelineSnapshot {
+    generatedAt: string;
+    permissions: {
+        announcementsRead: boolean;
+        announcementsWrite: boolean;
+        announcementsApprove: boolean;
+    };
+    summary: AdminReviewPipelineSummary;
+    reviewQueue: AdminAnnouncementListItem[];
+    scheduledQueue: AdminAnnouncementListItem[];
+    approvals: AdminApprovalItem[];
+}
+
+export interface AdminOpsWorkspaceSummary {
+    openAlerts: number;
+    criticalAlerts: number;
+    acknowledgedAlerts: number;
+    unresolvedErrors: number;
+    triagedErrors: number;
+    highRiskSessions: number;
+    mediumRiskSessions: number;
+    activeSessions: number;
+    uniqueSessionIps: number;
+    activeSecurityIncidents: number;
+    auditEvents: number;
+}
+
+export interface AdminOpsWorkspaceSnapshot {
+    generatedAt: string;
+    permissions: {
+        adminRead: boolean;
+        adminWrite: boolean;
+        auditRead: boolean;
+        securityRead: boolean;
+    };
+    summary: AdminOpsWorkspaceSummary;
+    alerts: AdminAlert[];
+    security: AdminSecurityLog[];
+    sessions: AdminSession[];
+    errorReports: AdminErrorReport[];
+    audit: AdminAuditLog[];
+}
+
 export interface AdminStepUpGrant {
     token: string;
     expiresAt: string;
