@@ -258,7 +258,7 @@ export async function getManagePostsWorkspace(): Promise<AdminManagePostsWorkspa
             announcementsRead: false,
             announcementsWrite: false,
             announcementsApprove: false,
-            canManageSavedViews: false,
+            canManagePrivateViews: false,
             canManageSharedViews: false,
         },
         summary: {

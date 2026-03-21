@@ -1,5 +1,7 @@
 import type { Page, Route } from '@playwright/test';
 
+import { MANAGE_POSTS_LANE_REGISTRY } from '../../src/lib/managePostsContract';
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 interface AdminMockOptions {
@@ -210,7 +212,7 @@ function buildManagePostsWorkspace() {
             announcementsRead: true,
             announcementsWrite: true,
             announcementsApprove: true,
-            canManageSavedViews: true,
+            canManagePrivateViews: true,
             canManageSharedViews: true,
         },
         summary: {
@@ -231,13 +233,18 @@ function buildManagePostsWorkspace() {
             averageDays: 2.3,
             staleCount: pending.length,
         },
-        lanes: [
-            { id: 'my-queue', label: 'My Queue', description: 'Assigned draft, pending, and scheduled work tied to your account.', count: assignedToMe.length, status: 'all', assignee: 'me' },
-            { id: 'pending-review', label: 'Pending Review', description: 'Posts waiting on review or approval.', count: pending.length, status: 'pending' },
-            { id: 'scheduled', label: 'Scheduled', description: 'Posts queued for automatic publication.', count: scheduled.length, status: 'scheduled' },
-            { id: 'published', label: 'Published', description: 'Live posts currently visible on the public surface.', count: published.length, status: 'published' },
-            { id: 'all-posts', label: 'All Posts', description: 'All post states in one operational workspace.', count: defaultAnnouncements.length, status: 'all' },
-        ],
+        lanes: MANAGE_POSTS_LANE_REGISTRY.map((lane) => ({
+            ...lane,
+            count: lane.id === 'my-queue'
+                ? assignedToMe.length
+                : lane.id === 'pending-review'
+                    ? pending.length
+                    : lane.id === 'scheduled'
+                        ? scheduled.length
+                        : lane.id === 'published'
+                            ? published.length
+                            : defaultAnnouncements.length,
+        })),
     };
 }
 

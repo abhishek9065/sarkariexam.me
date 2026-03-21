@@ -228,7 +228,7 @@ export function CreatePostModule() {
             setTemplateId('');
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['admin-announcements'] }),
-                queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] }),
+                queryClient.invalidateQueries({ queryKey: ['admin-dashboard-v3'] }),
             ]);
             notifySuccess('Post created', 'Content is now in workflow queue.');
         },

@@ -630,8 +630,10 @@ export interface AdminManagePostsLane {
     label: string;
     description: string;
     count: number;
-    status?: AnnouncementStatusFilter | 'all';
-    assignee?: AdminAnnouncementAssigneeFilter;
+    filters: {
+        status?: AnnouncementStatusFilter | 'all';
+        assignee?: AdminAnnouncementAssigneeFilter;
+    };
 }
 
 export interface AdminManagePostsWorkspaceSnapshot {
@@ -640,7 +642,7 @@ export interface AdminManagePostsWorkspaceSnapshot {
         announcementsRead: boolean;
         announcementsWrite: boolean;
         announcementsApprove: boolean;
-        canManageSavedViews: boolean;
+        canManagePrivateViews: boolean;
         canManageSharedViews: boolean;
     };
     summary: {

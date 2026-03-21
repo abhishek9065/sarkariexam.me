@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { MANAGE_POSTS_LANE_REGISTRY } from '../src/lib/managePostsContract';
+
 const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin-vnext';
 const escapedAdminBasename = adminBasename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -376,7 +378,7 @@ function buildManagePostsWorkspaceSnapshot(input: {
             announcementsRead: true,
             announcementsWrite: canWrite,
             announcementsApprove: canApprove,
-            canManageSavedViews: canWrite,
+            canManagePrivateViews: true,
             canManageSharedViews,
         },
         summary: {
@@ -397,13 +399,18 @@ function buildManagePostsWorkspaceSnapshot(input: {
             averageDays: pending.length > 0 ? 2.3 : 0,
             staleCount: pending.length,
         },
-        lanes: [
-            { id: 'my-queue', label: 'My Queue', description: 'Assigned draft, pending, and scheduled work tied to your account.', count: assignedToMe.length, status: 'all', assignee: 'me' },
-            { id: 'pending-review', label: 'Pending Review', description: 'Posts waiting on review or approval.', count: countByStatus('pending'), status: 'pending' },
-            { id: 'scheduled', label: 'Scheduled', description: 'Posts queued for automatic publication.', count: countByStatus('scheduled'), status: 'scheduled' },
-            { id: 'published', label: 'Published', description: 'Live posts currently visible on the public surface.', count: countByStatus('published'), status: 'published' },
-            { id: 'all-posts', label: 'All Posts', description: 'All post states in one operational workspace.', count: announcements.length, status: 'all' },
-        ],
+        lanes: MANAGE_POSTS_LANE_REGISTRY.map((lane) => ({
+            ...lane,
+            count: lane.id === 'my-queue'
+                ? assignedToMe.length
+                : lane.id === 'pending-review'
+                    ? countByStatus('pending')
+                    : lane.id === 'scheduled'
+                        ? countByStatus('scheduled')
+                        : lane.id === 'published'
+                            ? countByStatus('published')
+                            : announcements.length,
+        })),
     };
 }
 
@@ -1094,7 +1101,7 @@ test('manage posts applies tag deep links from admin search routes', async ({ pa
     await expect(page).not.toHaveURL(/tag=/i);
 });
 
-test('manage posts hides write actions for read-only roles while keeping lanes visible', async ({ page }) => {
+test('manage posts keeps private saved views for read-only roles while hiding write actions', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockAuthenticatedAdmin(page, {
         me: {
@@ -1119,9 +1126,18 @@ test('manage posts hides write actions for read-only roles while keeping lanes v
     await expect(page.getByRole('button', { name: /^My Queue \(\d+\)$/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Pending Review \(\d+\)$/i })).toBeVisible();
     await expect(page.getByText(/Read-only access\./i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Save current filters/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Save current filters/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Submit for review/i })).toHaveCount(0);
     await expect(page.locator('tbody input[type="checkbox"]')).toHaveCount(0);
+});
+
+test('manage posts shows local step-up recovery for write-capable roles', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockAuthenticatedAdmin(page);
+    await page.goto('manage-posts', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByRole('heading', { name: /Manage Posts Step-Up/i })).toBeVisible();
+    await expect(page.getByText(/Unlock bulk publish, expire, and homepage pin actions without leaving this workspace/i)).toBeVisible();
 });
 
 test('create post includes step-up controls for direct publish actions', async ({ page }) => {

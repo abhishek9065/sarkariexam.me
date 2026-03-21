@@ -3,6 +3,10 @@ import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 
 import { config } from '../config.js';
+import {
+    MANAGE_POSTS_LANE_REGISTRY,
+    type ManagePostsWorkspaceSnapshot,
+} from '../contracts/managePostsContract.js';
 import { authenticateToken, requireAdminStepUp, requirePermission } from '../middleware/auth.js';
 import { idempotency } from '../middleware/idempotency.js';
 import { getAdminSloSnapshot } from '../middleware/responseTime.js';
@@ -24,6 +28,7 @@ import { getAdminAuditLogsPaged, rebuildAdminAuditLedger, recordAdminAudit, veri
 import { ADMIN_PERMISSION_LIST, ADMIN_PORTAL_ROLES, getAdminPermissionsSnapshot } from '../services/adminPermissions.js';
 import { upsertAdminRoleOverride } from '../services/adminRoleOverrides.js';
 import { getAdminSession, listAdminSessions, mapSessionForClient, terminateAdminSession, terminateOtherSessions } from '../services/adminSessions.js';
+import { invalidateAdminSnapshotNamespaces, readAdminSnapshotCache, writeAdminSnapshotCache } from '../services/adminSnapshotCache.js';
 import { revokeAdminStepUpGrantsForUser } from '../services/adminStepUp.js';
 import {
     getAnnouncementViewTrafficSources,
@@ -747,7 +752,6 @@ type DashboardPermissionFlags = {
 
 const DASHBOARD_SNAPSHOT_TTL_MS = 30_000;
 const DASHBOARD_WIDGET_STALE_MS = 15_000;
-const dashboardSnapshotCache = new Map<string, { expiresAt: number; snapshot: any }>();
 
 const DASHBOARD_SECTION_REGISTRY: DashboardSection[] = [
     {
@@ -949,8 +953,6 @@ const DASHBOARD_ACTION_CATALOG: DashboardActionDefinition[] = [
     { id: 'audit', label: 'Audit Log', description: 'Review the latest administrative actions.', tone: 'subtle', routeKey: 'audit' },
     { id: 'users-roles', label: 'Users & Roles', description: 'Review access, roles, and account posture.', tone: 'subtle', routeKey: 'users-roles' },
 ];
-
-const cloneDashboardValue = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 const hasDashboardPermission = (permissions: DashboardPermissionFlags, permission: Permission): boolean => {
     switch (permission) {
@@ -1174,20 +1176,13 @@ const withDashboardFreshness = <T extends { generatedAt?: string; widgets?: Reco
 };
 
 const readCachedDashboardSnapshot = (cacheKey: string) => {
-    const cached = dashboardSnapshotCache.get(cacheKey);
+    const cached = readAdminSnapshotCache<any>('dashboard', cacheKey);
     if (!cached) return null;
-    if (cached.expiresAt <= Date.now()) {
-        dashboardSnapshotCache.delete(cacheKey);
-        return null;
-    }
-    return withDashboardFreshness(cloneDashboardValue(cached.snapshot));
+    return withDashboardFreshness(cached);
 };
 
 const writeCachedDashboardSnapshot = (cacheKey: string, snapshot: Record<string, unknown>) => {
-    dashboardSnapshotCache.set(cacheKey, {
-        expiresAt: Date.now() + DASHBOARD_SNAPSHOT_TTL_MS,
-        snapshot: cloneDashboardValue(snapshot),
-    });
+    writeAdminSnapshotCache('dashboard', cacheKey, snapshot, DASHBOARD_SNAPSHOT_TTL_MS);
 };
 
 const buildAdminDashboardSnapshot = async (req: any) => {
@@ -1794,103 +1789,28 @@ const DEFAULT_ORGANIZATION_BY_TYPE: Record<ContentType, string> = {
 
 const canManageSharedViews = (role?: string) => role === 'admin';
 
-type ManagePostsLaneId = 'my-queue' | 'pending-review' | 'scheduled' | 'published' | 'all-posts';
-
-type ManagePostsLaneDefinition = {
-    id: ManagePostsLaneId;
-    label: string;
-    description: string;
-    status?: Announcement['status'] | 'all';
-    assignee?: 'me' | 'unassigned' | 'assigned';
-};
-
-type ManagePostsWorkspaceSnapshot = {
-    generatedAt: string;
-    capabilities: {
-        announcementsRead: boolean;
-        announcementsWrite: boolean;
-        announcementsApprove: boolean;
-        canManageSavedViews: boolean;
-        canManageSharedViews: boolean;
-    };
-    summary: {
-        total: number;
-        draft: number;
-        pending: number;
-        scheduled: number;
-        published: number;
-        archived: number;
-        assignedToMe: number;
-        unassignedPending: number;
-        overdueReview: number;
-        stalePending: number;
-        accessibleSavedViews: number;
-    };
-    pendingSla: {
-        pendingTotal: number;
-        averageDays: number;
-        staleCount: number;
-    };
-    lanes: Array<ManagePostsLaneDefinition & { count: number }>;
-};
-
 const MANAGE_POSTS_WORKSPACE_TTL_MS = 30_000;
-const managePostsWorkspaceCache = new Map<string, { expiresAt: number; snapshot: ManagePostsWorkspaceSnapshot }>();
 
-const MANAGE_POSTS_LANE_REGISTRY: ManagePostsLaneDefinition[] = [
-    {
-        id: 'my-queue',
-        label: 'My Queue',
-        description: 'Assigned draft, pending, and scheduled work tied to your account.',
-        assignee: 'me',
-    },
-    {
-        id: 'pending-review',
-        label: 'Pending Review',
-        description: 'Posts waiting on review or approval.',
-        status: 'pending',
-    },
-    {
-        id: 'scheduled',
-        label: 'Scheduled',
-        description: 'Posts queued for automatic publication.',
-        status: 'scheduled',
-    },
-    {
-        id: 'published',
-        label: 'Published',
-        description: 'Live posts currently visible on the public surface.',
-        status: 'published',
-    },
-    {
-        id: 'all-posts',
-        label: 'All Posts',
-        description: 'All post states in one operational workspace.',
-        status: 'all',
-    },
-];
-
-const cloneManagePostsWorkspaceSnapshot = (snapshot: ManagePostsWorkspaceSnapshot): ManagePostsWorkspaceSnapshot => (
-    JSON.parse(JSON.stringify(snapshot)) as ManagePostsWorkspaceSnapshot
-);
-
-const readCachedManagePostsWorkspaceSnapshot = (cacheKey: string) => {
-    if (config.nodeEnv === 'test') return null;
-    const cached = managePostsWorkspaceCache.get(cacheKey);
-    if (!cached) return null;
-    if (cached.expiresAt <= Date.now()) {
-        managePostsWorkspaceCache.delete(cacheKey);
-        return null;
-    }
-    return cloneManagePostsWorkspaceSnapshot(cached.snapshot);
-};
+const readCachedManagePostsWorkspaceSnapshot = (cacheKey: string) =>
+    readAdminSnapshotCache<ManagePostsWorkspaceSnapshot>('manage-posts', cacheKey);
 
 const writeCachedManagePostsWorkspaceSnapshot = (cacheKey: string, snapshot: ManagePostsWorkspaceSnapshot) => {
-    if (config.nodeEnv === 'test') return;
-    managePostsWorkspaceCache.set(cacheKey, {
-        expiresAt: Date.now() + MANAGE_POSTS_WORKSPACE_TTL_MS,
-        snapshot: cloneManagePostsWorkspaceSnapshot(snapshot),
+    writeAdminSnapshotCache('manage-posts', cacheKey, snapshot, MANAGE_POSTS_WORKSPACE_TTL_MS);
+};
+
+const invalidateAdminSnapshotState = (...namespaces: Array<'dashboard' | 'manage-posts'>) => {
+    invalidateAdminSnapshotNamespaces(namespaces);
+};
+
+const invalidateAdminAnnouncementDerivedState = async (context: string) => {
+    invalidateAdminSnapshotState('dashboard', 'manage-posts');
+    await invalidateAnnouncementCaches().catch((err) => {
+        console.error(`Failed to invalidate announcement caches after ${context}:`, err);
     });
+};
+
+const invalidateManagePostsWorkspaceState = () => {
+    invalidateAdminSnapshotState('manage-posts');
 };
 
 const diffComparableKeys = [
@@ -2603,7 +2523,7 @@ contentRouter.get('/views', requirePermission('announcements:read'), async (req,
  * POST /api/admin/views
  * Create saved view.
  */
-contentRouter.post('/views', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.post('/views', requirePermission('announcements:read'), idempotency(), async (req, res) => {
     try {
         const parsed = adminViewCreateSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2652,6 +2572,8 @@ contentRouter.post('/views', requirePermission('announcements:write'), idempoten
             metadata: { module: parsed.data.module, scope: parsed.data.scope },
         });
 
+        invalidateManagePostsWorkspaceState();
+
         return res.status(201).json({
             data: {
                 id: serializeId(result.insertedId),
@@ -2673,7 +2595,7 @@ contentRouter.post('/views', requirePermission('announcements:write'), idempoten
  * PATCH /api/admin/views/:id
  * Update saved view.
  */
-contentRouter.patch('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.patch('/views/:id', requirePermission('announcements:read'), idempotency(), async (req, res) => {
     try {
         const parsed = adminViewPatchSchema.safeParse(req.body ?? {});
         if (!parsed.success) {
@@ -2744,6 +2666,8 @@ contentRouter.patch('/views/:id', requirePermission('announcements:write'), idem
             metadata: { viewId },
         });
 
+        invalidateManagePostsWorkspaceState();
+
         return res.json({ data: { id: serializeId((updated as any)._id), ...(updated as any) } });
     } catch (error) {
         console.error('Admin view patch error:', error);
@@ -2755,7 +2679,7 @@ contentRouter.patch('/views/:id', requirePermission('announcements:write'), idem
  * DELETE /api/admin/views/:id
  * Delete saved view.
  */
-contentRouter.delete('/views/:id', requirePermission('announcements:write'), idempotency(), async (req, res) => {
+contentRouter.delete('/views/:id', requirePermission('announcements:read'), idempotency(), async (req, res) => {
     try {
         const viewId = getPathParam(req.params.id);
         const actorId = req.user?.userId ?? 'unknown';
@@ -2782,6 +2706,8 @@ contentRouter.delete('/views/:id', requirePermission('announcements:write'), ide
             userId: actorId,
             metadata: { viewId },
         });
+
+        invalidateManagePostsWorkspaceState();
 
         return res.json({ data: { success: true, id: viewId } });
     } catch (error) {
@@ -2827,6 +2753,8 @@ contentRouter.post('/announcements/draft', requirePermission('announcements:writ
             title: draft.title,
             metadata: { type: draft.type, templateId: parsed.data.templateId },
         });
+
+        await invalidateAdminAnnouncementDerivedState('draft create');
 
         return res.status(201).json({ data: draft });
     } catch (error) {
@@ -2914,6 +2842,10 @@ contentRouter.patch('/announcements/:id/autosave', requirePermission('announceme
             },
             { upsert: true }
         );
+
+        if (hasMutationFields) {
+            await invalidateAdminAnnouncementDerivedState('announcement autosave');
+        }
 
         return res.json({
             data: {
@@ -4909,26 +4841,16 @@ announcementsRouter.get('/manage-posts/workspace', requirePermission('announceme
             return res.json({ data: cached });
         }
 
-        const [announcements, counts, pendingSla, canWrite, canApprove] = await Promise.all([
-            AnnouncementModelMongo.findAllAdmin({ includeInactive: true, limit: 2000 }),
-            AnnouncementModelMongo.getAdminCounts({ includeInactive: true }),
+        const [workspaceSummary, pendingSla, canWrite, canApprove] = await Promise.all([
+            AnnouncementModelMongo.getManagePostsWorkspaceSummary({
+                includeInactive: true,
+                assigneeUserId: actorId,
+                assigneeEmail: actorEmail,
+            }),
             AnnouncementModelMongo.getPendingSlaSummary({ includeInactive: true, staleLimit: 10 }),
             hasEffectivePermission(actorRole as any, 'announcements:write'),
             hasEffectivePermission(actorRole as any, 'announcements:approve'),
         ]);
-
-        const pendingReviewItems = announcements.filter((item: any) => normalizeAnnouncementStatus(item.status) === 'pending');
-        const nowMs = Date.now();
-        const assignedToMe = announcements.filter((item: any) => {
-            const normalizedStatus = normalizeAnnouncementStatus(item.status);
-            if (!['draft', 'pending', 'scheduled'].includes(normalizedStatus)) return false;
-            return (
-                (actorId && item.assigneeUserId === actorId)
-                || (actorEmail && item.assigneeEmail === actorEmail)
-            );
-        });
-        const unassignedPending = pendingReviewItems.filter((item: any) => !item.assigneeUserId && !item.assigneeEmail);
-        const overdueReview = pendingReviewItems.filter((item: any) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < nowMs);
 
         const viewsCollection = getCollection<AdminSavedViewDoc>('admin_saved_views');
         const accessibleSavedViews = await viewsCollection.countDocuments({
@@ -4941,18 +4863,18 @@ announcementsRouter.get('/manage-posts/workspace', requirePermission('announceme
 
         const lanes = MANAGE_POSTS_LANE_REGISTRY.map((lane) => {
             if (lane.id === 'my-queue') {
-                return { ...lane, count: assignedToMe.length };
+                return { ...lane, count: workspaceSummary.assignedToMe };
             }
-            if (lane.status === 'pending') {
-                return { ...lane, count: counts.byStatus.pending };
+            if (lane.filters.status === 'pending') {
+                return { ...lane, count: workspaceSummary.byStatus.pending };
             }
-            if (lane.status === 'scheduled') {
-                return { ...lane, count: counts.byStatus.scheduled };
+            if (lane.filters.status === 'scheduled') {
+                return { ...lane, count: workspaceSummary.byStatus.scheduled };
             }
-            if (lane.status === 'published') {
-                return { ...lane, count: counts.byStatus.published };
+            if (lane.filters.status === 'published') {
+                return { ...lane, count: workspaceSummary.byStatus.published };
             }
-            return { ...lane, count: counts.total };
+            return { ...lane, count: workspaceSummary.total };
         });
 
         const snapshot: ManagePostsWorkspaceSnapshot = {
@@ -4961,19 +4883,19 @@ announcementsRouter.get('/manage-posts/workspace', requirePermission('announceme
                 announcementsRead: true,
                 announcementsWrite: canWrite,
                 announcementsApprove: canApprove,
-                canManageSavedViews: canWrite,
+                canManagePrivateViews: true,
                 canManageSharedViews: canManageSharedViews(actorRole),
             },
             summary: {
-                total: counts.total,
-                draft: counts.byStatus.draft,
-                pending: counts.byStatus.pending,
-                scheduled: counts.byStatus.scheduled,
-                published: counts.byStatus.published,
-                archived: counts.byStatus.archived,
-                assignedToMe: assignedToMe.length,
-                unassignedPending: unassignedPending.length,
-                overdueReview: overdueReview.length,
+                total: workspaceSummary.total,
+                draft: workspaceSummary.byStatus.draft,
+                pending: workspaceSummary.byStatus.pending,
+                scheduled: workspaceSummary.byStatus.scheduled,
+                published: workspaceSummary.byStatus.published,
+                archived: workspaceSummary.byStatus.archived,
+                assignedToMe: workspaceSummary.assignedToMe,
+                unassignedPending: workspaceSummary.unassignedPending,
+                overdueReview: workspaceSummary.overdueReview,
                 stalePending: pendingSla.stale.length,
                 accessibleSavedViews,
             },
@@ -5129,9 +5051,7 @@ announcementsRouter.patch('/announcements/:id/assignment', requirePermission('an
             },
         });
 
-        await invalidateAnnouncementCaches().catch((err) => {
-            console.error('Failed to invalidate caches after assignment update:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('assignment update');
 
         return res.json({
             data: {
@@ -5174,9 +5094,7 @@ announcementsRouter.patch('/announcements/:id/review-sla', requirePermission('an
             },
         });
 
-        await invalidateAnnouncementCaches().catch((err) => {
-            console.error('Failed to invalidate caches after review SLA update:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('review SLA update');
 
         return res.json({ data: updated });
     } catch (error) {
@@ -5387,9 +5305,7 @@ announcementsRouter.post('/announcements', requirePermission('announcements:writ
         await dispatchPublishNotifications([announcement]).catch((err) => {
             console.error('Failed to dispatch publish notifications after admin create:', err);
         });
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin create:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin create');
         return res.status(201).json({ data: announcement });
     } catch (error) {
         console.error('Create announcement error:', error);
@@ -5613,9 +5529,7 @@ announcementsRouter.post('/announcements/bulk', requirePermission('announcements
         await dispatchPublishNotificationsByIds(publishTransitionIds).catch((err) => {
             console.error('Failed to dispatch publish notifications after admin bulk update:', err);
         });
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin bulk update:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin bulk update');
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk update error:', error);
@@ -5688,9 +5602,7 @@ announcementsRouter.post('/announcements/bulk-approve', requirePermission('annou
         await dispatchPublishNotificationsByIds(publishTransitionIds).catch((err) => {
             console.error('Failed to dispatch publish notifications after admin bulk approve:', err);
         });
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin bulk approve:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin bulk approve');
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk approve error:', error);
@@ -5733,9 +5645,7 @@ announcementsRouter.post('/announcements/bulk-reject', requirePermission('announ
             metadata: { count: ids.length },
         }).catch(console.error);
 
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin bulk reject:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin bulk reject');
         return res.json({ data: result });
     } catch (error) {
         console.error('Bulk reject error:', error);
@@ -5858,9 +5768,7 @@ announcementsRouter.put('/announcements/:id', requirePermission('announcements:w
             });
         }
         await finalizeApprovalExecution(req, approvalId);
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin update:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin update');
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Update announcement error:', error);
@@ -5953,9 +5861,7 @@ announcementsRouter.post('/announcements/:id/revert/:version', requirePermission
         }).catch(console.error);
 
         await finalizeApprovalExecution(req, approvalId);
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin revert:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin revert');
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Revert announcement error:', error);
@@ -6020,9 +5926,7 @@ announcementsRouter.post('/announcements/:id/approve', requirePermission('announ
             });
         }
         await finalizeApprovalExecution(req, approvalGate.approvalId);
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin approve:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin approve');
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Approve announcement error:', error);
@@ -6058,9 +5962,7 @@ announcementsRouter.post('/announcements/:id/reject', requirePermission('announc
             userId: req.user?.userId,
             note,
         }).catch(console.error);
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin reject:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin reject');
         return res.json({ data: announcement });
     } catch (error) {
         console.error('Reject announcement error:', error);
@@ -6160,9 +6062,7 @@ announcementsRouter.post('/announcements/:id/rollback', requirePermission('annou
         }).catch(console.error);
 
         await finalizeApprovalExecution(req, approvalId);
-        await invalidateAnnouncementCaches().catch((err) => {
-            console.error('Failed to invalidate caches after admin rollback:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin rollback');
 
         return res.json({ data: updated });
     } catch (error) {
@@ -6198,9 +6098,7 @@ announcementsRouter.delete('/announcements/:id', requirePermission('announcement
             },
         }).catch(console.error);
         await finalizeApprovalExecution(req, approvalGate.approvalId);
-        await invalidateAnnouncementCaches().catch(err => {
-            console.error('Failed to invalidate caches after admin delete:', err);
-        });
+        await invalidateAdminAnnouncementDerivedState('admin delete');
         return res.json({ message: 'Announcement deleted' });
     } catch (error) {
         console.error('Delete announcement error:', error);

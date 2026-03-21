@@ -640,6 +640,125 @@ export class AnnouncementModelMongo {
         }
     }
 
+    static async getManagePostsWorkspaceSummary(options?: {
+        includeInactive?: boolean;
+        assigneeUserId?: string;
+        assigneeEmail?: string;
+    }): Promise<{
+        total: number;
+        byStatus: Record<AnnouncementStatus, number>;
+        assignedToMe: number;
+        unassignedPending: number;
+        overdueReview: number;
+    }> {
+        try {
+            const query = buildAdminQuery({ includeInactive: options?.includeInactive });
+            const assigneeClauses: Filter<AnnouncementDoc>[] = [];
+            if (options?.assigneeUserId) {
+                assigneeClauses.push({ assigneeUserId: options.assigneeUserId });
+            }
+            if (options?.assigneeEmail) {
+                assigneeClauses.push({ assigneeEmail: options.assigneeEmail });
+            }
+
+            const results = await this.collection.aggregate([
+                { $match: query },
+                {
+                    $addFields: {
+                        normalizedStatus: { $ifNull: ['$status', DEFAULT_STATUS] },
+                    },
+                },
+                {
+                    $facet: {
+                        total: [{ $count: 'value' }],
+                        byStatus: [{ $group: { _id: '$normalizedStatus', count: { $sum: 1 } } }],
+                        assignedToMe: assigneeClauses.length > 0
+                            ? [
+                                { $match: { $or: assigneeClauses } },
+                                { $count: 'value' },
+                            ]
+                            : [
+                                { $match: { _id: { $exists: false } } },
+                                { $count: 'value' },
+                            ],
+                        unassignedPending: [
+                            {
+                                $match: {
+                                    normalizedStatus: 'pending',
+                                    $and: [
+                                        {
+                                            $or: [
+                                                { assigneeUserId: { $exists: false } },
+                                                { assigneeUserId: null },
+                                                { assigneeUserId: '' },
+                                            ],
+                                        },
+                                        {
+                                            $or: [
+                                                { assigneeEmail: { $exists: false } },
+                                                { assigneeEmail: null },
+                                                { assigneeEmail: '' },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            },
+                            { $count: 'value' },
+                        ],
+                        overdueReview: [
+                            {
+                                $match: {
+                                    normalizedStatus: 'pending',
+                                    reviewDueAt: { $type: 'date', $lt: new Date() },
+                                },
+                            },
+                            { $count: 'value' },
+                        ],
+                    },
+                },
+            ]).toArray();
+
+            const summary = results[0] ?? {};
+            const byStatus: Record<AnnouncementStatus, number> = {
+                draft: 0,
+                pending: 0,
+                scheduled: 0,
+                published: 0,
+                archived: 0,
+            };
+
+            for (const entry of summary.byStatus ?? []) {
+                const status = entry._id as AnnouncementStatus;
+                if (status && status in byStatus) {
+                    byStatus[status] = entry.count;
+                }
+            }
+
+            return {
+                total: summary.total?.[0]?.value ?? 0,
+                byStatus,
+                assignedToMe: summary.assignedToMe?.[0]?.value ?? 0,
+                unassignedPending: summary.unassignedPending?.[0]?.value ?? 0,
+                overdueReview: summary.overdueReview?.[0]?.value ?? 0,
+            };
+        } catch (error) {
+            console.error('[MongoDB] getManagePostsWorkspaceSummary error:', error);
+            return {
+                total: 0,
+                byStatus: {
+                    draft: 0,
+                    pending: 0,
+                    scheduled: 0,
+                    published: 0,
+                    archived: 0,
+                },
+                assignedToMe: 0,
+                unassignedPending: 0,
+                overdueReview: 0,
+            };
+        }
+    }
+
     static async getAdminQaCounts(options?: { includeInactive?: boolean }): Promise<{
         totalQaIssues: number;
         pendingQaIssues: number;
