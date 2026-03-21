@@ -6,7 +6,9 @@ This is a full-stack government jobs portal (Sarkari Result) built with TypeScri
 
 ## Architecture
 
-- **Frontend**: React 18 + TypeScript + Vite (in `frontend/`)
+- **Frontend** (public-facing SPA): React 19 + TypeScript + Vite (in `frontend/`)
+- **Frontend Next** (Next.js public-facing app): Next.js 16 + React 19 + TypeScript (in `frontend-next/`)
+- **Admin Frontend** (admin SPA): React 19 + TypeScript + Vite (in `admin-frontend/`)
 - **Backend**: Node.js 22 + Express + TypeScript (in `backend/`)
 - **Database**: MongoDB for local development; Azure Cosmos DB (MongoDB API) in production
 - **Reverse Proxy**: Nginx (in `nginx/`)
@@ -29,6 +31,21 @@ This is a full-stack government jobs portal (Sarkari Result) built with TypeScri
 - `npm run test:e2e` — Run Playwright E2E tests
 - `npm run test:e2e:admin` — Run admin-specific E2E tests
 
+### Admin Frontend (`cd admin-frontend`)
+- `npm run dev` — Start Vite dev server
+- `npm run build` — Production build to `dist/`
+- `npm run preview` — Preview production build
+- `npm run lint` — Run ESLint
+- `npm run test:e2e:ci` — Run Playwright smoke tests (CI)
+- `npm run test:e2e:full` — Run full Playwright E2E suite
+- `npm run test:e2e:integration` — Run integration E2E tests
+
+### Frontend Next (`cd frontend-next`)
+- `npm run dev` — Start Next.js dev server
+- `npm run build` — Production build
+- `npm start` — Run production server
+- `npm run lint` — Run ESLint
+
 ## Key Directories
 
 ```
@@ -39,6 +56,8 @@ backend/src/
 ├── services/      # Business logic (DB, email, analytics, RBAC, audit)
 └── tests/         # Vitest unit tests
 
+backend/tests/      # Additional Vitest integration tests
+
 frontend/src/
 ├── pages/         # Page components (Home, Detail, Admin, etc.)
 ├── components/    # UI components organized by category
@@ -46,6 +65,22 @@ frontend/src/
 └── hooks/         # Custom hooks for data fetching and UI logic
 
 frontend/tests/     # Playwright E2E test specs
+
+admin-frontend/src/
+├── app/           # App-level providers and layout (AdminLayout, RequireAdminAuth)
+├── modules/       # Feature modules (analytics, approvals, manage-posts, settings, etc.)
+├── components/    # Shared admin UI components
+├── routes/        # Route definitions (AppRoutes)
+├── config/        # Module registry (adminModules.ts)
+├── lib/           # Shared utilities and helpers
+└── types/         # TypeScript type definitions
+
+admin-frontend/tests/  # Playwright E2E test specs for admin
+
+frontend-next/app/
+├── components/    # Shared UI components (Header, Footer, etc.)
+├── lib/           # Shared utilities
+└── [route]/       # Next.js App Router page directories (jobs, results, admit-cards, etc.)
 ```
 
 ## Coding Conventions
@@ -62,6 +97,7 @@ frontend/tests/     # Playwright E2E test specs
 
 - **Backend**: Vitest for unit/integration tests in `backend/src/tests/` and `backend/tests/`.
 - **Frontend**: Playwright for E2E tests in `frontend/tests/`.
+- **Admin Frontend**: Playwright for E2E tests in `admin-frontend/tests/`.
 - CI runs backend build + tests, frontend build, and Playwright smoke tests on PRs.
 
 ## Security Considerations
