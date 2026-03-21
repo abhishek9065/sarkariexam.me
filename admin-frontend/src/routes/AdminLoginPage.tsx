@@ -235,24 +235,49 @@ export function AdminLoginPage() {
                 : sessionStage === 'locked_out'
                     ? { tone: 'danger' as const, label: 'Rate Limited' }
                     : { tone: 'success' as const, label: 'Session Ready' };
+    const modeBadge = mode === 'forgot-password'
+        ? { tone: 'warning' as const, label: 'Recovery' }
+        : mode === 'reset-password'
+            ? { tone: 'info' as const, label: 'Reset Password' }
+            : { tone: 'info' as const, label: 'Session Sign-In' };
+    const railItems = [
+        {
+            title: 'Session auth',
+            description: mode === 'login'
+                ? 'Sign in with password and two-factor to enter the console.'
+                : 'Recovery stays isolated from editorial work until the session is restored.',
+        },
+        {
+            title: 'Step-up later',
+            description: 'Publish, approval, delete, and account controls still require fresh verification inside the console.',
+        },
+        {
+            title: 'Desktop workflow',
+            description: 'The rebuilt admin is optimized for dense editorial, review, and governance work on large screens.',
+        },
+    ];
+    const workspaceGroups = ['Today', 'Content Desk', 'Review Pipeline', 'Governance', 'Monitoring'];
 
     return (
         <div className="admin-login-wrap">
-            <div className="admin-login-card">
-                <div className="admin-login-logo">SE</div>
-                <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
-                <p className="admin-login-subtitle">{loginSubtitle}</p>
-                <div className="ops-row wrap admin-login-badges">
-                    <OpsBadge tone="info">Session Sign-In</OpsBadge>
-                    <OpsBadge tone={stageBadge.tone}>
-                        {stageBadge.label}
-                    </OpsBadge>
-                </div>
-                <div className="admin-alert info">
-                    Session sign-in gets you into the console. Step-up verification is requested later for publish, delete, approvals, and other sensitive actions.
-                </div>
+            <div className="admin-login-card admin-login-shell">
+                <div className="admin-login-grid">
+                    <div className="admin-login-main">
+                        <div className="admin-login-header">
+                            <div className="admin-login-logo">SE</div>
+                            <p className="admin-login-kicker">Editorial Operations Console</p>
+                            <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
+                            <p className="admin-login-subtitle">{loginSubtitle}</p>
+                            <div className="ops-row wrap admin-login-badges">
+                                <OpsBadge tone={modeBadge.tone}>{modeBadge.label}</OpsBadge>
+                                <OpsBadge tone={stageBadge.tone}>{stageBadge.label}</OpsBadge>
+                            </div>
+                            <div className="admin-alert info">
+                                Session sign-in gets you into the console. Step-up verification is requested later for publish, delete, approvals, and other sensitive actions.
+                            </div>
+                        </div>
 
-                <form
+                        <form
                     className="admin-login-form"
                     onSubmit={async (event) => {
                         event.preventDefault();
@@ -469,17 +494,70 @@ export function AdminLoginPage() {
                     </div>
                 ) : null}
 
-                <div className="ops-actions">
-                    {mode !== 'login' ? (
-                        <button type="button" className="admin-btn small subtle" onClick={() => switchMode('login')}>
-                            Back to Sign In
-                        </button>
-                    ) : null}
-                    {mode === 'login' ? (
-                        <button type="button" className="admin-btn small subtle" onClick={() => switchMode('forgot-password')}>
-                            Forgot Password
-                        </button>
-                    ) : null}
+                        <div className="ops-actions admin-login-footer-actions">
+                            {mode !== 'login' ? (
+                                <button type="button" className="admin-btn small subtle" onClick={() => switchMode('login')}>
+                                    Back to Sign In
+                                </button>
+                            ) : null}
+                            {mode === 'login' ? (
+                                <button type="button" className="admin-btn small subtle" onClick={() => switchMode('forgot-password')}>
+                                    Forgot Password
+                                </button>
+                            ) : null}
+                            <a className="admin-btn small subtle" href="/admin-legacy">
+                                Open Legacy Rollback
+                            </a>
+                        </div>
+                    </div>
+
+                    <aside className="admin-login-rail" aria-label="Admin login workflow">
+                        <section className="admin-login-rail-card">
+                            <p className="admin-login-rail-kicker">Access Model</p>
+                            <h2 className="admin-login-rail-title">Session first. Step-up later.</h2>
+                            <p className="admin-login-rail-copy">
+                                The new admin console separates entry authentication from high-risk operations. You only see
+                                step-up prompts once a live session is already active inside the workspace.
+                            </p>
+                            <ul className="admin-login-checklist">
+                                {railItems.map((item) => (
+                                    <li key={item.title} className="admin-login-check-item">
+                                        <strong>{item.title}</strong>
+                                        <span>{item.description}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+
+                        <section className="admin-login-rail-card">
+                            <p className="admin-login-rail-kicker">Workspace Groups</p>
+                            <h2 className="admin-login-rail-title">Built for editorial operations.</h2>
+                            <p className="admin-login-rail-copy">
+                                Navigation is grouped around the daily publishing workflow instead of isolated tools.
+                            </p>
+                            <div className="admin-login-flow-list">
+                                {workspaceGroups.map((group) => (
+                                    <span key={group} className="admin-login-flow-chip">{group}</span>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="admin-login-rail-card admin-login-support">
+                            <p className="admin-login-rail-kicker">Need a Different Entry Point?</p>
+                            <h2 className="admin-login-rail-title">Keep operators moving.</h2>
+                            <p className="admin-login-rail-copy">
+                                Public browsing and rollback access stay available without leaving the current deployment path.
+                            </p>
+                            <div className="ops-actions">
+                                <a className="admin-btn subtle" href="/">
+                                    View Public Site
+                                </a>
+                                <a className="admin-btn subtle" href="/admin-legacy">
+                                    Open Legacy Admin
+                                </a>
+                            </div>
+                        </section>
+                    </aside>
                 </div>
             </div>
         </div>
