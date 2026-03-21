@@ -1200,7 +1200,7 @@ export function AdminPage() {
         }
     };
 
-    const handleEdit = (item: Announcement) => {
+    const handleEdit = useCallback((item: Announcement) => {
         if (!canWriteAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
             return;
@@ -1244,7 +1244,8 @@ export function AdminPage() {
             setActiveAdminTab('add');
             setMessage(`Editing: ${item.title}`);
         }
-    };
+    }, [canWriteAnnouncements, trackAdminEvent]);
+
     const handleDuplicate = (item: Announcement) => {
         if (!canWriteAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
@@ -1296,7 +1297,7 @@ export function AdminPage() {
         const item = scheduledAnnouncements.find(i => i.id === itemId);
         if (!item) return;
 
-        if (!window.confirm(`Reschedule "${item.title}" to ${formatDate(newDate)}?`)) {
+        if (!window.confirm(`Reschedule "${item.title}" to ${formatDate(newDate.toISOString())}?`)) {
             return;
         }
 
@@ -1326,7 +1327,7 @@ export function AdminPage() {
                 const errorBody = await response.json().catch(() => ({}));
                 setMessage(getApiErrorMessage(errorBody, 'Failed to reschedule.'));
             } else {
-                setMessage(`Rescheduled to ${formatDate(newDate)}`);
+                setMessage(`Rescheduled to ${formatDate(newDate.toISOString())}`);
                 refreshAdminSummary();
             }
         } catch (error) {
@@ -2379,7 +2380,7 @@ export function AdminPage() {
 
     const pendingTotal = pendingSlaStats.pendingTotal;
     const scheduledTotal = scheduledAnnouncements.length;
-    const activeTabMeta = ADMIN_TAB_META[activeAdminTab];
+    const activeTabMeta = ADMIN_TAB_META[activeAdminTab] || ADMIN_TAB_META['analytics'];
     const opsPulse = [
         {
             tab: 'review' as AdminTab,
@@ -2771,7 +2772,7 @@ export function AdminPage() {
         if (!target) return;
         setPendingEditId(null);
         handleEdit(target);
-    }, [pendingEditId, announcements]);
+    }, [pendingEditId, announcements, handleEdit]);
 
     if (!canReadAdmin) {
         return (

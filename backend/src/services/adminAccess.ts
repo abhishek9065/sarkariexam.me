@@ -35,7 +35,7 @@ const getAdminPasswordResetKey = (userId: string) => `auth:admin_password_reset:
 
 export const buildAdminResetUrl = (email: string, token: string) => {
     const frontendBase = config.frontendUrl.replace(/\/$/, '');
-    const url = new URL(`${frontendBase}/admin-vnext/login`);
+    const url = new URL(`${frontendBase}/admin/login`);
     url.searchParams.set('mode', 'reset-password');
     url.searchParams.set('email', email);
     url.hash = new URLSearchParams({ token }).toString();

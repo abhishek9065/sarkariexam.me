@@ -15,7 +15,14 @@ const normalizeBasename = (value: string) => {
 
 const configuredAdminBasename = normalizeBasename(import.meta.env.VITE_ADMIN_BASENAME ?? '/admin-vnext');
 const currentPath = typeof window !== 'undefined' ? window.location.pathname : configuredAdminBasename;
-const adminBasename = currentPath.startsWith('/admin-vnext') ? '/admin-vnext' : configuredAdminBasename;
+
+const resolveAdminBasename = (pathname: string) => {
+    if (pathname.startsWith('/admin-vnext')) return '/admin-vnext';
+    if (pathname.startsWith('/admin')) return '/admin';
+    return configuredAdminBasename;
+};
+
+const adminBasename = resolveAdminBasename(currentPath);
 const ADMIN_SW_CLEANUP_KEY = 'admin-vnext-sw-cleanup-ran';
 
 const cleanupLegacyServiceWorker = () => {

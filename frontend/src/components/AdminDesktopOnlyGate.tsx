@@ -33,8 +33,8 @@ export function AdminDesktopOnlyGate({ children }: AdminDesktopOnlyGateProps) {
                     Use a laptop/desktop browser with minimum width 1120px.
                 </p>
                 <div className="admin-desktop-gate-actions">
-                    <a className="admin-desktop-gate-link" href="/admin-vnext">
-                        Open Admin vNext
+                    <a className="admin-desktop-gate-link" href="/admin">
+                        Open Admin Console
                     </a>
                 </div>
             </section>

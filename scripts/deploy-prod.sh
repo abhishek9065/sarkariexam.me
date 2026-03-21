@@ -314,8 +314,8 @@ check_public_detail_route() {
 purge_cloudflare_cache || true
 
 echo "Public route checks:"
-check_public_route "/admin" "admin legacy default" "admin-legacy-default"
-check_public_route "/admin-vnext" "admin vNext preview" "admin-vnext"
+check_public_route "/admin" "admin vNext default" "admin-vnext"
+check_public_route "/admin-vnext" "admin vNext alias" "admin-vnext"
 check_public_route "/admin-legacy" "legacy rollback" "admin-legacy"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"

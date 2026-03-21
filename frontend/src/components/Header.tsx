@@ -43,10 +43,15 @@ const normalizeAdminPortalPath = (value?: string | null) => {
 const configuredAdminPortalPath = normalizeAdminPortalPath(import.meta.env.VITE_ADMIN_PORTAL_PATH as string | undefined);
 const adminPortalCandidates = Array.from(new Set([
     configuredAdminPortalPath,
-    '/admin-vnext',
     '/admin',
+    '/admin-vnext',
     '/admin-legacy',
 ].filter((item): item is string => Boolean(item))));
+
+function isVnextAdminRoute(response: Response): boolean {
+    const appHeader = response.headers.get('x-sarkari-app')?.trim().toLowerCase() ?? '';
+    return appHeader === 'admin-vnext' || appHeader === 'admin-vnext-default';
+}
 
 async function resolveReachableAdminPortalPath(candidates: string[]): Promise<string> {
     if (typeof window === 'undefined') {
@@ -67,7 +72,13 @@ async function resolveReachableAdminPortalPath(candidates: string[]): Promise<st
                 || response.status === 403
                 || response.status === 405
             ) {
-                return candidate;
+                if (isVnextAdminRoute(response)) {
+                    return candidate;
+                }
+
+                if (!response.headers.get('x-sarkari-app') && candidate === '/admin-vnext') {
+                    return candidate;
+                }
             }
         } catch {
             // Try next fallback.

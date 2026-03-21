@@ -240,23 +240,23 @@ export function AdminLayout() {
             },
             {
                 id: 'open-admin',
-                label: 'Open Stable Admin',
-                description: '/admin legacy default route',
+                label: 'Open Admin Console',
+                description: '/admin primary admin route',
                 onSelect: () => {
                     window.location.href = '/admin';
                 },
             },
             {
                 id: 'open-preview',
-                label: 'Open vNext Preview',
-                description: '/admin-vnext premium preview route',
+                label: 'Open Admin Alias',
+                description: '/admin-vnext compatibility alias',
                 onSelect: () => {
                     window.location.href = '/admin-vnext';
                 },
             },
             {
                 id: 'open-legacy',
-                label: 'Open Legacy Alias',
+                label: 'Open Legacy Rollback',
                 description: '/admin-legacy rollback alias',
                 onSelect: () => {
                     window.location.href = '/admin-legacy';

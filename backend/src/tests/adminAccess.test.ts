@@ -85,7 +85,7 @@ describe('admin access roster', () => {
   it('builds admin reset links with the token in the fragment, not the query string', () => {
     const url = new URL(buildAdminResetUrl('admin@sarkariexams.me', 'reset-token-123'));
 
-    expect(url.pathname).toBe('/admin-vnext/login');
+    expect(url.pathname).toBe('/admin/login');
     expect(url.searchParams.get('mode')).toBe('reset-password');
     expect(url.searchParams.get('email')).toBe('admin@sarkariexams.me');
     expect(url.searchParams.get('token')).toBeNull();
