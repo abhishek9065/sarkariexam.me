@@ -97,6 +97,7 @@ import { AuditTab } from './admin/tabs/AuditTab';
 import { SecurityTab } from './admin/tabs/SecurityTab';
 import { BulkTab } from './admin/tabs/BulkTab';
 import { ReviewQueueTab } from './admin/tabs/ReviewQueueTab';
+import { useModalLock } from '../hooks/useCoreUX';
 import { useAdminCommandPalette } from './admin/hooks/useAdminCommandPalette';
 import './AdminPage.css';
 
@@ -256,6 +257,13 @@ export function AdminPage() {
     const [backupCodesStatus, setBackupCodesStatus] = useState<BackupCodesStatus | null>(null);
     const [backupCodesLoading, setBackupCodesLoading] = useState(false);
     const [backupCodesModal, setBackupCodesModal] = useState<{ codes: string[]; generatedAt: string } | null>(null);
+
+    /* ─── UX: A11y Modal Lock & Escape Key ─── */
+    useModalLock(!!bulkPreview, () => setBulkPreview(null));
+    useModalLock(!!reviewPreview, () => setReviewPreview(null));
+    useModalLock(showPreview, () => setShowPreview(false));
+    useModalLock(!!versionTarget, () => setVersionTarget(null));
+    useModalLock(!!backupCodesModal, () => setBackupCodesModal(null));
 
     const pageSize = 15;
     const auditTotalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
@@ -2406,9 +2414,9 @@ export function AdminPage() {
         announcements,
         listAnnouncements,
         listQuery,
-        handleNavSelect: handleNavSelect as (tab: string) => void,
+        handleNavSelect,
         handleShellSearch,
-        trackAdminEvent: trackAdminEvent as (eventName: string, payload?: Record<string, unknown>) => void,
+        trackAdminEvent,
         handleEditById,
         setIsCommandPaletteOpen,
         setCommandPaletteQuery,
@@ -4568,7 +4576,3 @@ function AdminPageWithProvider() {
 }
 
 export default AdminPageWithProvider;
-
-
-
-
