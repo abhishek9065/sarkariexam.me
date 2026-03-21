@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import {
     checkLinks,
@@ -44,6 +45,9 @@ export function LinkManagerModule() {
     });
 
     const rows = useMemo(() => query.data?.data ?? [], [query.data]);
+    const activeCount = useMemo(() => rows.filter((item) => item.status === 'active').length, [rows]);
+    const expiredCount = useMemo(() => rows.filter((item) => item.status === 'expired').length, [rows]);
+    const brokenCount = useMemo(() => rows.filter((item) => item.status === 'broken').length, [rows]);
 
     const createMutation = useMutation({
         mutationFn: async () => createLinkRecord(form),
@@ -87,9 +91,24 @@ export function LinkManagerModule() {
     return (
         <>
             <AdminStepUpCard />
-            <OpsCard title="Link Manager" description="Store official/PDF links, run health checks, and replace URLs everywhere.">
-                <OpsToolbar
-                    controls={(
+            <ModuleScaffold
+                eyebrow="Site Ops"
+                title="Link Manager"
+                description="Store official/PDF links, run health checks, and replace URLs everywhere."
+                meta={<span>{rows.length} links in the current working set.</span>}
+                headerActions={(
+                    <button type="button" className="admin-btn subtle" disabled={checkMutation.isPending} onClick={() => checkMutation.mutate()}>
+                        {checkMutation.isPending ? 'Checking...' : 'Run Link Check'}
+                    </button>
+                )}
+                metrics={[
+                    { key: 'links-total', label: 'Rows', value: rows.length },
+                    { key: 'links-active', label: 'Active', value: activeCount, tone: activeCount > 0 ? 'success' : 'neutral' },
+                    { key: 'links-expired', label: 'Expired', value: expiredCount, tone: expiredCount > 0 ? 'warning' : 'neutral' },
+                    { key: 'links-broken', label: 'Broken', value: brokenCount, tone: brokenCount > 0 ? 'danger' : 'neutral' },
+                ]}
+                filters={{
+                    controls: (
                         <>
                             <input
                                 type="search"
@@ -110,134 +129,133 @@ export function LinkManagerModule() {
                                 <option value="broken">Broken</option>
                             </select>
                         </>
-                    )}
-                    actions={(
-                        <>
-                            <button type="button" className="admin-btn small" disabled={checkMutation.isPending} onClick={() => checkMutation.mutate()}>
-                                {checkMutation.isPending ? 'Checking...' : 'Run Link Check'}
+                    ),
+                    actions: <span className="ops-inline-muted">Use replace-everywhere for URL migrations.</span>,
+                }}
+            >
+                <div className="ops-stack">
+                    <OpsCard title="Register Link" description="Capture canonical URLs, PDFs, and notes for downstream publishing.">
+                        <div className="ops-form-grid three">
+                            <input
+                                value={form.label}
+                                onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+                                placeholder="Label (Apply Online)"
+                            />
+                            <input
+                                value={form.url}
+                                onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
+                                placeholder="https://..."
+                            />
+                            <select
+                                value={form.type}
+                                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as typeof form.type }))}
+                            >
+                                <option value="official">Official</option>
+                                <option value="pdf">PDF</option>
+                                <option value="external">External</option>
+                            </select>
+                            <select
+                                value={form.status}
+                                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as typeof form.status }))}
+                            >
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="broken">Broken</option>
+                            </select>
+                            <input
+                                value={form.announcementId}
+                                onChange={(event) => setForm((current) => ({ ...current, announcementId: event.target.value }))}
+                                placeholder="Announcement ID (optional)"
+                            />
+                            <button
+                                type="button"
+                                className="admin-btn primary"
+                                disabled={createMutation.isPending || !form.label.trim() || !form.url.trim()}
+                                onClick={() => createMutation.mutate()}
+                            >
+                                {createMutation.isPending ? 'Saving...' : 'Add Link'}
                             </button>
-                            <span className="ops-inline-muted">Rows: {rows.length}</span>
-                        </>
-                    )}
-                />
+                            <textarea
+                                className="ops-span-full"
+                                value={form.notes}
+                                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+                                placeholder="Notes (optional)"
+                            />
+                        </div>
+                    </OpsCard>
 
-                <div className="ops-form-grid three">
-                    <input
-                        value={form.label}
-                        onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
-                        placeholder="Label (Apply Online)"
-                    />
-                    <input
-                        value={form.url}
-                        onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
-                        placeholder="https://..."
-                    />
-                    <select
-                        value={form.type}
-                        onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as typeof form.type }))}
-                    >
-                        <option value="official">Official</option>
-                        <option value="pdf">PDF</option>
-                        <option value="external">External</option>
-                    </select>
-                    <select
-                        value={form.status}
-                        onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as typeof form.status }))}
-                    >
-                        <option value="active">Active</option>
-                        <option value="expired">Expired</option>
-                        <option value="broken">Broken</option>
-                    </select>
-                    <input
-                        value={form.announcementId}
-                        onChange={(event) => setForm((current) => ({ ...current, announcementId: event.target.value }))}
-                        placeholder="Announcement ID (optional)"
-                    />
-                    <button
-                        type="button"
-                        className="admin-btn primary"
-                        disabled={createMutation.isPending || !form.label.trim() || !form.url.trim()}
-                        onClick={() => createMutation.mutate()}
-                    >
-                        {createMutation.isPending ? 'Saving...' : 'Add Link'}
-                    </button>
-                    <textarea
-                        className="ops-span-full"
-                        value={form.notes}
-                        onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                        placeholder="Notes (optional)"
-                    />
+                    <OpsCard title="Replace Everywhere" description="Use session step-up before running wide URL replacements across announcements and stored links." tone="muted">
+                        <div className="ops-form-grid three">
+                            <input
+                                value={replaceForm.fromUrl}
+                                onChange={(event) => setReplaceForm((current) => ({ ...current, fromUrl: event.target.value }))}
+                                placeholder="Replace URL from"
+                            />
+                            <input
+                                value={replaceForm.toUrl}
+                                onChange={(event) => setReplaceForm((current) => ({ ...current, toUrl: event.target.value }))}
+                                placeholder="Replace URL to"
+                            />
+                            <select
+                                value={replaceForm.scope}
+                                onChange={(event) => setReplaceForm((current) => ({ ...current, scope: event.target.value as typeof replaceForm.scope }))}
+                            >
+                                <option value="all">Scope: All</option>
+                                <option value="links">Links only</option>
+                                <option value="announcements">Announcements only</option>
+                            </select>
+                            <button
+                                type="button"
+                                className="admin-btn danger ops-span-full"
+                                disabled={replaceMutation.isPending || !replaceForm.fromUrl.trim() || !replaceForm.toUrl.trim() || !hasValidStepUp}
+                                onClick={() => replaceMutation.mutate()}
+                            >
+                                {replaceMutation.isPending ? 'Replacing...' : 'Update Link Everywhere'}
+                            </button>
+                        </div>
+                    </OpsCard>
+
+                    {query.isPending ? <div className="admin-alert info">Loading links...</div> : null}
+                    {query.error ? <OpsErrorState message="Failed to load links." /> : null}
+                    {rows.length > 0 ? (
+                        <OpsTable
+                            columns={[
+                                { key: 'label', label: 'Label' },
+                                { key: 'url', label: 'URL' },
+                                { key: 'type', label: 'Type' },
+                                { key: 'status', label: 'Status' },
+                                { key: 'actions', label: 'Actions' },
+                            ]}
+                        >
+                            {rows.map((row) => (
+                                <tr key={row.id}>
+                                    <td>{row.label}</td>
+                                    <td><a href={row.url} target="_blank" rel="noreferrer">{row.url}</a></td>
+                                    <td>{row.type}</td>
+                                    <td>
+                                        <OpsBadge tone={toneByStatus(row.status) as 'neutral' | 'success' | 'warning' | 'danger'}>
+                                            {row.status}
+                                        </OpsBadge>
+                                    </td>
+                                    <td>
+                                        <div className="ops-actions">
+                                            <button type="button" className="admin-btn small subtle" onClick={() => patchMutation.mutate({ id: row.id, status: 'active' })}>
+                                                Mark Active
+                                            </button>
+                                            <button type="button" className="admin-btn small" onClick={() => patchMutation.mutate({ id: row.id, status: 'broken' })}>
+                                                Mark Broken
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </OpsTable>
+                    ) : null}
+                    {!query.isPending && !query.error && rows.length === 0 ? (
+                        <OpsEmptyState message="No links found for current filters." />
+                    ) : null}
                 </div>
-
-                <div className="ops-form-grid three">
-                    <input
-                        value={replaceForm.fromUrl}
-                        onChange={(event) => setReplaceForm((current) => ({ ...current, fromUrl: event.target.value }))}
-                        placeholder="Replace URL from"
-                    />
-                    <input
-                        value={replaceForm.toUrl}
-                        onChange={(event) => setReplaceForm((current) => ({ ...current, toUrl: event.target.value }))}
-                        placeholder="Replace URL to"
-                    />
-                    <select
-                        value={replaceForm.scope}
-                        onChange={(event) => setReplaceForm((current) => ({ ...current, scope: event.target.value as typeof replaceForm.scope }))}
-                    >
-                        <option value="all">Scope: All</option>
-                        <option value="links">Links only</option>
-                        <option value="announcements">Announcements only</option>
-                    </select>
-                    <button
-                        type="button"
-                        className="admin-btn danger ops-span-full"
-                        disabled={replaceMutation.isPending || !replaceForm.fromUrl.trim() || !replaceForm.toUrl.trim() || !hasValidStepUp}
-                        onClick={() => replaceMutation.mutate()}
-                    >
-                        {replaceMutation.isPending ? 'Replacing...' : 'Update Link Everywhere'}
-                    </button>
-                </div>
-
-                {query.isPending ? <div className="admin-alert info">Loading links...</div> : null}
-                {query.error ? <OpsErrorState message="Failed to load links." /> : null}
-                {rows.length > 0 ? (
-                    <OpsTable
-                        columns={[
-                            { key: 'label', label: 'Label' },
-                            { key: 'url', label: 'URL' },
-                            { key: 'type', label: 'Type' },
-                            { key: 'status', label: 'Status' },
-                            { key: 'actions', label: 'Actions' },
-                        ]}
-                    >
-                        {rows.map((row) => (
-                            <tr key={row.id}>
-                                <td>{row.label}</td>
-                                <td><a href={row.url} target="_blank" rel="noreferrer">{row.url}</a></td>
-                                <td>{row.type}</td>
-                                <td>
-                                    <OpsBadge tone={toneByStatus(row.status) as 'neutral' | 'success' | 'warning' | 'danger'}>
-                                        {row.status}
-                                    </OpsBadge>
-                                </td>
-                                <td>
-                                    <div className="ops-actions">
-                                        <button type="button" className="admin-btn small subtle" onClick={() => patchMutation.mutate({ id: row.id, status: 'active' })}>
-                                            Mark Active
-                                        </button>
-                                        <button type="button" className="admin-btn small" onClick={() => patchMutation.mutate({ id: row.id, status: 'broken' })}>
-                                            Mark Broken
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </OpsTable>
-                ) : null}
-                {!query.isPending && !query.error && rows.length === 0 ? (
-                    <OpsEmptyState message="No links found for current filters." />
-                ) : null}
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

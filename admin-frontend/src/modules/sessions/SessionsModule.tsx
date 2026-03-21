@@ -5,7 +5,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import { getAdminSessions, terminateAdminSessionById, terminateOtherAdminSessions } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
@@ -101,86 +102,80 @@ export function SessionsModule() {
     return (
         <>
             <AdminStepUpCard />
-            <OpsCard title="Sessions" description="Review active sessions, risk posture, and terminate suspicious logins safely.">
+            <ModuleScaffold
+                eyebrow="System"
+                title="Sessions"
+                description="Review active sessions, risk posture, and terminate suspicious logins safely."
+                meta={<span>{rows.length} active sessions currently visible in this workspace.</span>}
+                metrics={[
+                    { key: 'sessions-low', label: 'Low Risk', value: riskSummary.low, tone: riskSummary.low > 0 ? 'success' : 'neutral' },
+                    { key: 'sessions-medium', label: 'Medium Risk', value: riskSummary.medium, tone: riskSummary.medium > 0 ? 'warning' : 'neutral' },
+                    { key: 'sessions-high', label: 'High Risk', value: riskSummary.high, tone: riskSummary.high > 0 ? 'danger' : 'neutral' },
+                ]}
+                filters={{
+                    controls: (
+                        <>
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search by email, device, browser, or IP"
+                            />
+                            <select
+                                value={riskFilter}
+                                onChange={(event) => setRiskFilter(event.target.value as 'all' | 'low' | 'medium' | 'high')}
+                            >
+                                <option value="all">All risk levels</option>
+                                <option value="high">High risk</option>
+                                <option value="medium">Medium risk</option>
+                                <option value="low">Low risk</option>
+                            </select>
+                            <span className="ops-inline-muted">
+                                {filteredRows.length} of {rows.length} sessions
+                            </span>
+                        </>
+                    ),
+                    actions: (
+                        <>
+                            {!hasValidStepUp ? <span className="ops-inline-muted">Step-up required for session termination</span> : null}
+                            <button
+                                type="button"
+                                className="admin-btn danger small"
+                                disabled={terminateOthersMutation.isPending || !hasValidStepUp}
+                                onClick={async () => {
+                                    const allowed = await confirm({
+                                        title: 'Terminate all other sessions?',
+                                        message: 'This will sign out every other active session for your account.',
+                                        confirmText: 'Terminate Others',
+                                        cancelText: 'Cancel',
+                                        variant: 'warning',
+                                    });
+                                    if (!allowed) return;
+                                    terminateOthersMutation.mutate(undefined, {
+                                        onSuccess: (result) => {
+                                            const removedCount = result.removed ?? result.terminatedCount ?? 0;
+                                            notifySuccess('Sessions terminated', `Removed ${removedCount} session(s).`);
+                                            void trackAdminTelemetry('admin_session_action', {
+                                                action: 'terminate_others',
+                                                removed: removedCount,
+                                            });
+                                        },
+                                        onError: (error) => {
+                                            notifyError('Terminate failed', error instanceof Error ? error.message : 'Failed to terminate sessions.');
+                                        },
+                                    });
+                                }}
+                            >
+                                Terminate Others
+                            </button>
+                            <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
+                                Refresh
+                            </button>
+                        </>
+                    ),
+                }}
+            >
                 <div className="ops-stack">
-                    <OpsToolbar
-                        controls={
-                            <>
-                                <input
-                                    type="search"
-                                    value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
-                                    placeholder="Search by email, device, browser, or IP"
-                                />
-                                <select
-                                    value={riskFilter}
-                                    onChange={(event) => setRiskFilter(event.target.value as 'all' | 'low' | 'medium' | 'high')}
-                                >
-                                    <option value="all">All risk levels</option>
-                                    <option value="high">High risk</option>
-                                    <option value="medium">Medium risk</option>
-                                    <option value="low">Low risk</option>
-                                </select>
-                                <span className="ops-inline-muted">
-                                    {filteredRows.length} of {rows.length} sessions
-                                </span>
-                            </>
-                        }
-                        actions={
-                            <>
-                                {!hasValidStepUp ? <span className="ops-inline-muted">Step-up required for session termination</span> : null}
-                                <button
-                                    type="button"
-                                    className="admin-btn danger small"
-                                    disabled={terminateOthersMutation.isPending || !hasValidStepUp}
-                                    onClick={async () => {
-                                        const allowed = await confirm({
-                                            title: 'Terminate all other sessions?',
-                                            message: 'This will sign out every other active session for your account.',
-                                            confirmText: 'Terminate Others',
-                                            cancelText: 'Cancel',
-                                            variant: 'warning',
-                                        });
-                                        if (!allowed) return;
-                                        terminateOthersMutation.mutate(undefined, {
-                                            onSuccess: (result) => {
-                                                const removedCount = result.removed ?? result.terminatedCount ?? 0;
-                                                notifySuccess('Sessions terminated', `Removed ${removedCount} session(s).`);
-                                                void trackAdminTelemetry('admin_session_action', {
-                                                    action: 'terminate_others',
-                                                    removed: removedCount,
-                                                });
-                                            },
-                                            onError: (error) => {
-                                                notifyError('Terminate failed', error instanceof Error ? error.message : 'Failed to terminate sessions.');
-                                            },
-                                        });
-                                    }}
-                                >
-                                    Terminate Others
-                                </button>
-                                <button type="button" className="admin-btn subtle small" onClick={() => void query.refetch()}>
-                                    Refresh
-                                </button>
-                            </>
-                        }
-                    />
-
-                    <div className="ops-kpi-grid">
-                        <div className="ops-kpi-card">
-                            <div className="ops-kpi-label">Low Risk</div>
-                            <div className="ops-kpi-value">{riskSummary.low}</div>
-                        </div>
-                        <div className="ops-kpi-card">
-                            <div className="ops-kpi-label">Medium Risk</div>
-                            <div className="ops-kpi-value">{riskSummary.medium}</div>
-                        </div>
-                        <div className="ops-kpi-card">
-                            <div className="ops-kpi-label">High Risk</div>
-                            <div className="ops-kpi-value">{riskSummary.high}</div>
-                        </div>
-                    </div>
-
                     {!hasValidStepUp ? (
                         <div className="admin-alert info">Step-up verification is required before terminating sessions.</div>
                     ) : null}
@@ -267,8 +262,6 @@ export function SessionsModule() {
                         <OpsEmptyState message={rows.length === 0 ? 'No active sessions found.' : 'No sessions match current filters.'} />
                     ) : null}
 
-
-
                     {rows.length > 0 && filteredRows.length !== rows.length ? (
                         <div className="ops-inline-muted">
                             Showing {filteredRows.length} of {rows.length} sessions.
@@ -281,7 +274,7 @@ export function SessionsModule() {
                         </div>
                     ) : null}
                 </div>
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

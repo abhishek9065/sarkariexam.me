@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold } from '../../components/workspace';
 import { approveAdminApproval, getAdminApprovals, rejectAdminApproval } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminApprovalItem } from '../../types';
@@ -108,7 +109,21 @@ export function ApprovalsModule() {
     return (
         <>
             <AdminStepUpCard />
-            <OpsCard title="Approvals" description="Pending approval queue with dual-control visibility.">
+            <ModuleScaffold
+                eyebrow="Review Pipeline"
+                title="Approvals"
+                description="Handle dual-control approval decisions with explicit status, timestamps, and reviewer notes."
+                metrics={[
+                    { key: 'loaded', label: 'Loaded requests', value: rows.length, hint: `Current filter: ${status}.` },
+                    { key: 'pending', label: 'Pending', value: rows.filter((row) => row.status === 'pending').length, hint: 'Items waiting for decision.' },
+                    { key: 'executed', label: 'Executed', value: rows.filter((row) => row.status === 'executed').length, hint: 'Already actioned requests.' },
+                ]}
+                headerActions={(
+                    <button type="button" className="admin-btn primary" onClick={() => void query.refetch()}>
+                        Refresh approvals
+                    </button>
+                )}
+            >
                 <OpsToolbar
                     compact
                     controls={
@@ -205,7 +220,7 @@ export function ApprovalsModule() {
                 {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No approvals found. Approval requests are created when posts are submitted for review via the publish workflow. Use the Review module to submit posts that require dual-control approval." /> : null}
 
                 {activeMutationError ? <OpsErrorState message={activeMutationError} /> : null}
-            </OpsCard>
+            </ModuleScaffold>
 
             {modal ? (
                 <div className="ops-modal-overlay" role="presentation" onClick={() => setModal(null)}>

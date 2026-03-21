@@ -4,8 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
+import { ModuleScaffold } from '../../components/workspace';
 import {
     getAdminAnnouncements,
     getAdminRoleUsers,
@@ -168,7 +169,26 @@ export function ReviewModule() {
     return (
         <>
             <AdminStepUpCard />
-            <OpsCard title="Review" description="Review queue with ownership, SLA control, and preview-first approval decisions.">
+            <ModuleScaffold
+                eyebrow="Review Pipeline"
+                title="Review"
+                description="Assign, preview, approve, reject, and schedule content with one review language across the pipeline."
+                metrics={[
+                    { key: 'visible', label: 'Visible items', value: filteredRows.length, hint: `Filtered from ${rows.length} pending rows.` },
+                    { key: 'selected', label: 'Selected', value: selectedIds.length, hint: 'Preview before executing.' },
+                    { key: 'overdue', label: 'Overdue SLA', value: filteredRows.filter((row) => row.reviewDueAt && new Date(row.reviewDueAt).getTime() < Date.now()).length, hint: 'Needs reviewer attention first.' },
+                ]}
+                headerActions={(
+                    <>
+                        <button type="button" className="admin-btn subtle" onClick={() => setActiveTab('all')}>
+                            All pending
+                        </button>
+                        <button type="button" className="admin-btn primary" onClick={() => void query.refetch()}>
+                            Refresh queue
+                        </button>
+                    </>
+                )}
+            >
                 <OpsToolbar
                     controls={
                         <>
@@ -395,7 +415,7 @@ export function ReviewModule() {
                     <OpsErrorState message={executeMutation.error instanceof Error ? executeMutation.error.message : 'Failed to execute action.'} />
                 ) : null}
                 {executeMutation.isSuccess ? <div className="ops-success">Review action applied.</div> : null}
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

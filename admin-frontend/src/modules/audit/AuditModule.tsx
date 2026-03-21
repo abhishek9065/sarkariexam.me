@@ -4,8 +4,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
-import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
 import { getAdminAuditIntegrity, getAdminAuditLogs, rebuildAdminAuditLedger } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAuditLog } from '../../types';
@@ -172,7 +173,11 @@ export function AuditModule() {
     }, [actorSearch, integrityStatus, rows.length]);
 
     return (
-        <OpsCard title="Audit" description="Investigation-grade audit timeline with actor filters, record drill-ins, and immutable ledger checks.">
+        <ModuleScaffold
+            eyebrow="Governance"
+            title="Audit"
+            description="Investigation-grade audit timeline with actor filters, record drill-ins, and immutable ledger checks."
+        >
             <div className="ops-stack">
                 <OpsToolbar
                     controls={
@@ -319,7 +324,7 @@ export function AuditModule() {
                                     </td>
                                     <td>{formatDateTime(typeof row.createdAt === 'string' ? row.createdAt : undefined)}</td>
                                     <td>
-                                        <ActionOverflowMenu
+                                        <RowActionMenu
                                             itemLabel={String(row.action ?? 'audit-entry')}
                                             actions={[
                                                 {
@@ -367,6 +372,6 @@ export function AuditModule() {
                     <OpsEmptyState message="No audit entries found." />
                 ) : null}
             </div>
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

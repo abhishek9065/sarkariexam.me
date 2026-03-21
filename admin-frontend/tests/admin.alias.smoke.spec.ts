@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin';
+
 async function mockUnauthenticatedSession(page: import('@playwright/test').Page) {
     await page.route('**/api/admin-auth/me', async (route) => {
         await route.fulfill({
@@ -20,6 +22,7 @@ async function mockUnauthenticatedSession(page: import('@playwright/test').Page)
 
 test.describe('admin vNext alias smoke', () => {
     test('login screen renders on alias route', async ({ page }) => {
+        test.skip(adminBasename !== '/admin-vnext', 'Alias validation runs when basename is /admin-vnext.');
         await mockUnauthenticatedSession(page);
         await page.goto('login', { waitUntil: 'domcontentloaded' });
 
@@ -28,6 +31,7 @@ test.describe('admin vNext alias smoke', () => {
     });
 
     test('protected alias route redirects unauthenticated user to login', async ({ page }) => {
+        test.skip(adminBasename !== '/admin-vnext', 'Alias validation runs when basename is /admin-vnext.');
         await mockUnauthenticatedSession(page);
 
         await page.goto('dashboard', { waitUntil: 'domcontentloaded' });

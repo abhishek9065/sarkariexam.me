@@ -7,12 +7,14 @@ import { useAdminPreferences } from './useAdminPreferences';
 import { useLocalStorageState } from '../lib/useLocalStorageState';
 import { getAdminAlerts, getAdminAnnouncements, searchAdminEntities } from '../lib/api/client';
 import { hasAdminPermission } from '../lib/adminRbac';
-import { OpsCard, KeyboardShortcutsOverlay } from '../components/ops';
-import { OpsBreadcrumb } from '../components/ops/OpsBreadcrumb';
+import { KeyboardShortcutsOverlay, OpsBreadcrumb } from '../components/ops';
+import { useAdminNotifications } from '../components/ops/legacy-port';
 import {
-    AdminCommandPalette,
-    useAdminNotifications,
-} from '../components/ops/legacy-port';
+    AdminCommandSurface,
+    InspectorDrawer,
+    PermissionState,
+    WorkspaceHeader,
+} from '../components/workspace';
 import {
     adminModuleNavItems,
     getModuleByPath,
@@ -25,24 +27,23 @@ import {
     type ModuleGroupKey,
 } from '../config/adminModules';
 
-const SIDEBAR_COLLAPSED_KEY = 'admin-vnext-sidebar-collapsed';
-const DENSITY_KEY = 'admin-vnext-density';
-const GROUP_COLLAPSE_KEY = 'admin-vnext-nav-group-collapsed';
+const SIDEBAR_COLLAPSED_KEY = 'admin-v3-sidebar-collapsed';
+const DENSITY_KEY = 'admin-v3-density';
+const GROUP_COLLAPSE_KEY = 'admin-v3-nav-group-collapsed';
 
 type AdminDensity = 'comfortable' | 'compact';
-
 type GroupCollapseState = Record<ModuleGroupKey, boolean>;
 
 const defaultGroupCollapseState: GroupCollapseState = {
-    dashboard: false,
-    posts: false,
-    review: false,
-    homepage: false,
-    links: false,
-    media: false,
-    users: false,
-    logs: false,
-    settings: false,
+    today: false,
+    'content-desk': false,
+    'review-pipeline': false,
+    publishing: false,
+    'site-ops': false,
+    'audience-seo': false,
+    governance: false,
+    monitoring: false,
+    system: false,
 };
 
 const parseGroupCollapseState = (raw: string): GroupCollapseState => {
@@ -58,14 +59,20 @@ const parseGroupCollapseState = (raw: string): GroupCollapseState => {
     }
 };
 
+function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    if (hour < 21) return 'Good evening';
+    return 'Good night';
+}
+
 export function AdminLayout() {
     const { user, permissions, logout, hasValidStepUp } = useAdminAuth();
     const { timeZoneMode, setTimeZoneMode, timeZoneLabel } = useAdminPreferences();
     const { notifyInfo, notifyError } = useAdminNotifications();
-
     const location = useLocation();
     const navigate = useNavigate();
-
     const searchInputRef = useRef<HTMLInputElement | null>(null);
 
     const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorageState<boolean>(SIDEBAR_COLLAPSED_KEY, false);
@@ -78,10 +85,7 @@ export function AdminLayout() {
         defaultGroupCollapseState,
         parseGroupCollapseState
     );
-    const [theme, setTheme] = useLocalStorageState<'dark' | 'light'>('admin-vnext-theme', 'dark');
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
-
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [paletteQuery, setPaletteQuery] = useState('');
     const [alertsOpen, setAlertsOpen] = useState(false);
@@ -99,7 +103,9 @@ export function AdminLayout() {
         : null;
 
     const enabledNavItems = useMemo(
-        () => adminModuleNavItems.filter((item) => isAdminModuleEnabled(item.key) && canAccessModule(item.key)),
+        () => adminModuleNavItems
+            .filter((item) => isAdminModuleEnabled(item.key) && canAccessModule(item.key))
+            .sort((a, b) => a.priority - b.priority),
         [canAccessModule]
     );
 
@@ -107,20 +113,21 @@ export function AdminLayout() {
         () => MODULE_GROUP_ORDER.map((group) => ({
             key: group,
             label: groupedModuleLabels[group],
+            icon: groupedModuleIcons[group],
             items: enabledNavItems.filter((item) => item.group === group),
         })).filter((group) => group.items.length > 0),
         [enabledNavItems]
     );
 
     const paletteAnnouncementsQuery = useQuery({
-        queryKey: ['admin-command-palette-announcements'],
+        queryKey: ['admin-command-surface-announcements'],
         queryFn: () => getAdminAnnouncements({ limit: 120, status: 'all' }),
         staleTime: 60_000,
     });
 
     const alertsQuery = useQuery({
-        queryKey: ['admin-topbar-alerts'],
-        queryFn: () => getAdminAlerts({ status: 'open', limit: 8, offset: 0 }),
+        queryKey: ['admin-shell-alerts'],
+        queryFn: () => getAdminAlerts({ status: 'open', limit: 6, offset: 0 }),
         staleTime: 45_000,
         refetchInterval: 90_000,
     });
@@ -134,11 +141,8 @@ export function AdminLayout() {
 
     useEffect(() => {
         document.body.dataset.adminDensity = density;
+        document.body.dataset.theme = 'light';
     }, [density]);
-
-    useEffect(() => {
-        document.body.dataset.theme = theme;
-    }, [theme]);
 
     useEffect(() => {
         setAlertsOpen(false);
@@ -158,14 +162,11 @@ export function AdminLayout() {
             if (!target.closest('.admin-topbar-profile')) {
                 setProfileOpen(false);
             }
-            if (mobileMenuOpen && !target.closest('.admin-sidebar') && !target.closest('.admin-mobile-menu-btn')) {
-                setMobileMenuOpen(false);
-            }
         };
 
         document.addEventListener('click', onDocumentClick);
         return () => document.removeEventListener('click', onDocumentClick);
-    }, [mobileMenuOpen]);
+    }, []);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -215,6 +216,7 @@ export function AdminLayout() {
                 setPaletteQuery('');
                 setAlertsOpen(false);
                 setTopSearchFocused(false);
+                setProfileOpen(false);
             }
         };
 
@@ -234,92 +236,81 @@ export function AdminLayout() {
             ...moduleCommands,
             {
                 id: 'create-post',
-                label: 'Create New Post',
-                description: 'Open unified create post flow',
+                label: 'Create new post',
+                description: 'Open the unified editorial create flow.',
                 onSelect: () => navigate('/create-post'),
             },
             {
-                id: 'open-admin',
-                label: 'Open Admin Console',
-                description: '/admin primary admin route',
-                onSelect: () => {
-                    window.location.href = '/admin';
-                },
+                id: 'open-live-site',
+                label: 'Open live site',
+                description: 'View the public site in a new tab.',
+                onSelect: () => window.open('/', '_blank', 'noreferrer'),
             },
             {
-                id: 'open-preview',
-                label: 'Open Admin Alias',
-                description: '/admin-vnext compatibility alias',
+                id: 'open-admin-alias',
+                label: 'Open /admin-vnext alias',
+                description: 'Open the compatibility alias for the rebuilt console.',
                 onSelect: () => {
                     window.location.href = '/admin-vnext';
                 },
             },
             {
                 id: 'open-legacy',
-                label: 'Open Legacy Rollback',
-                description: '/admin-legacy rollback alias',
+                label: 'Open /admin-legacy rollback',
+                description: 'Use the legacy admin for rollback scenarios.',
                 onSelect: () => {
                     window.location.href = '/admin-legacy';
                 },
             },
             {
+                id: 'toggle-density',
+                label: density === 'comfortable' ? 'Switch to compact density' : 'Switch to comfortable density',
+                description: 'Change table and control density for editorial work.',
+                onSelect: () => setDensity((current) => (current === 'comfortable' ? 'compact' : 'comfortable')),
+            },
+            {
                 id: 'logout',
-                label: 'Logout',
-                description: 'Sign out from admin session',
+                label: 'Sign out',
+                description: 'End the current admin session.',
                 onSelect: async () => {
                     await logout();
                     navigate('/login', { replace: true });
                 },
             },
-            {
-                id: 'toggle-density',
-                label: 'Toggle Density',
-                description: density === 'comfortable' ? 'Switch to compact' : 'Switch to comfortable',
-                onSelect: () => setDensity((current) => (current === 'comfortable' ? 'compact' : 'comfortable')),
-            },
         ];
-    }, [enabledNavItems, logout, navigate, density, setDensity]);
+    }, [density, enabledNavItems, logout, navigate, setDensity]);
 
     const searchResults = globalSearchQuery.data?.data ?? [];
     const openSearchResults = topSearchFocused && (globalSearchQuery.isFetching || topSearch.trim().length >= 2);
     const alerts = alertsQuery.data?.data ?? [];
+    const activeGroupLabel = activeModule ? groupedModuleLabels[activeModule.group] : 'Today';
+    const primaryAction = activeModule?.defaultPrimaryAction;
 
     return (
-        <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+        <div className={`admin-layout editorial-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
             <aside className="admin-sidebar" aria-label="Admin navigation shell">
                 <div className="admin-brand">
                     <div className="admin-brand-mark">SE</div>
                     <div className="admin-brand-text">
                         <h1 className="admin-brand-title">SarkariExams</h1>
-                        <span className="admin-brand-subtitle">Admin Console</span>
+                        <span className="admin-brand-subtitle">Editorial Operations Console</span>
                     </div>
                 </div>
 
-                <div className="admin-sidebar-controls" style={{ display: 'flex', gap: 4 }}>
+                <div className="admin-sidebar-controls">
                     <button
                         type="button"
                         className="admin-btn subtle icon-only small"
                         onClick={() => setSidebarCollapsed((current) => !current)}
-                        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                        data-tooltip={sidebarCollapsed ? 'Expand' : 'Collapse'}
+                        aria-label={sidebarCollapsed ? 'Expand navigation rail' : 'Collapse navigation rail'}
                     >
                         {sidebarCollapsed ? '▸' : '◂'}
                     </button>
                     <button
                         type="button"
                         className="admin-btn subtle icon-only small"
-                        onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
-                        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                        data-tooltip={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                    >
-                        {theme === 'dark' ? '☼' : '☾'}
-                    </button>
-                    <button
-                        type="button"
-                        className="admin-btn subtle icon-only small"
                         onClick={() => setPaletteOpen(true)}
-                        aria-label="Command palette"
-                        data-tooltip="⌘K"
+                        aria-label="Open command surface"
                     >
                         ⌘
                     </button>
@@ -327,23 +318,6 @@ export function AdminLayout() {
 
                 <nav className="admin-nav" aria-label="Admin modules">
                     {navGroups.map((group) => {
-                        /* Single-item groups render as a direct link (no collapsible wrapper) */
-                        if (group.items.length === 1) {
-                            const item = group.items[0];
-                            return (
-                                <NavLink
-                                    key={group.key}
-                                    to={item.to}
-                                    className={({ isActive }) => `admin-nav-link admin-nav-solo${isActive ? ' active' : ''}`}
-                                    title={item.summary}
-                                >
-                                    <span className="admin-nav-icon">{item.icon}</span>
-                                    <span className="admin-nav-label">{group.label}</span>
-                                </NavLink>
-                            );
-                        }
-
-                        /* Multi-item groups render with a collapsible toggle */
                         const isCollapsed = collapsedGroups[group.key];
                         return (
                             <section key={group.key} className={`admin-nav-group${isCollapsed ? ' collapsed' : ''}`}>
@@ -359,7 +333,7 @@ export function AdminLayout() {
                                     aria-expanded={!isCollapsed}
                                     aria-controls={`admin-nav-group-${group.key}`}
                                 >
-                                    <span className="admin-nav-icon">{groupedModuleIcons[group.key]}</span>
+                                    <span className="admin-nav-icon">{group.icon}</span>
                                     <span className="admin-nav-group-title">{group.label}</span>
                                 </button>
                                 <div id={`admin-nav-group-${group.key}`} className="admin-nav-group-items">
@@ -383,15 +357,17 @@ export function AdminLayout() {
                 <div className="admin-sidebar-footer">
                     <div className="admin-sidebar-stats">
                         <div className="admin-sidebar-stat">
-                            📦 <span className="admin-sidebar-stat-value">{enabledNavItems.length}</span> modules
+                            <span className="ops-live-dot" /> {enabledNavItems.length} active modules
                         </div>
-                        <div className="admin-sidebar-stat">
-                            <span className="ops-live-dot" /> <span className="admin-sidebar-stat-value">Online</span>
-                        </div>
+                        <div className="admin-sidebar-stat">{density === 'compact' ? 'Compact density' : 'Comfortable density'}</div>
                     </div>
                     <a className="admin-nav-link" href="/" target="_blank" rel="noreferrer">
-                        <span className="admin-nav-icon">{'\u2197'}</span>
-                        <span className="admin-nav-label">View Live Site</span>
+                        <span className="admin-nav-icon">↗</span>
+                        <span className="admin-nav-label">View live site</span>
+                    </a>
+                    <a className="admin-nav-link" href="/admin-legacy">
+                        <span className="admin-nav-icon">↺</span>
+                        <span className="admin-nav-label">Open legacy rollback</span>
                     </a>
                 </div>
             </aside>
@@ -399,14 +375,10 @@ export function AdminLayout() {
             <main className="admin-main">
                 <header className="admin-topbar">
                     <div className="admin-topbar-left">
-                        <button
-                            type="button"
-                            className="admin-btn subtle admin-mobile-menu-btn"
-                            onClick={() => setMobileMenuOpen((current) => !current)}
-                            aria-label="Toggle mobile menu"
-                        >
-                            ☰
-                        </button>
+                        <div className="admin-topbar-heading">
+                            <span className="admin-topbar-kicker">{getGreeting()}</span>
+                            <strong>{user?.email ?? 'Unknown admin'}</strong>
+                        </div>
                         <div className="admin-topbar-search">
                             <input
                                 ref={searchInputRef}
@@ -454,7 +426,14 @@ export function AdminLayout() {
                             className="admin-btn primary"
                             onClick={() => navigate('/create-post')}
                         >
-                            + New Post
+                            New post
+                        </button>
+                        <button
+                            type="button"
+                            className="admin-btn subtle"
+                            onClick={() => setPaletteOpen(true)}
+                        >
+                            Command
                         </button>
                         <div className="admin-topbar-alerts">
                             <button
@@ -463,7 +442,7 @@ export function AdminLayout() {
                                 onClick={() => setAlertsOpen((current) => !current)}
                                 aria-expanded={alertsOpen}
                             >
-                                {'\uD83D\uDD14'}{alerts.length > 0 ? ` ${alerts.length}` : ''}
+                                Alerts{alerts.length > 0 ? ` ${alerts.length}` : ''}
                             </button>
                             {alertsOpen ? (
                                 <div className="admin-topbar-alerts-panel" role="dialog" aria-label="Open alerts">
@@ -495,39 +474,43 @@ export function AdminLayout() {
                             aria-label="Admin timezone"
                             title="Change how dates and times are displayed"
                         >
-                            <option value="local">🕐 Local</option>
-                            <option value="ist">🇮🇳 IST</option>
-                            <option value="utc">🌐 UTC</option>
+                            <option value="local">Local</option>
+                            <option value="ist">IST</option>
+                            <option value="utc">UTC</option>
                         </select>
-                        <div className="admin-topbar-profile" onClick={() => setProfileOpen((c) => !c)}>
-                            <div className="admin-topbar-avatar">
-                                {(user?.email ?? 'A').charAt(0).toUpperCase()}
-                            </div>
-                            <div className="admin-topbar-identity">
-                                <div className="admin-topbar-title">{user?.email ?? 'Unknown admin'}</div>
-                                <div className="admin-topbar-meta">
-                                    <span className="admin-topbar-role">{user?.role ?? 'none'}</span>
-                                    {hasValidStepUp ? (
-                                        <span className="admin-chiplet success">{'\u2713'} Sensitive Actions Unlocked</span>
-                                    ) : (
-                                        <span className="admin-chiplet warning">{'\u26A0'} Sensitive Actions Locked</span>
-                                    )}
+                        <div className="admin-topbar-profile">
+                            <button
+                                type="button"
+                                className="admin-profile-trigger"
+                                onClick={() => setProfileOpen((current) => !current)}
+                                aria-expanded={profileOpen}
+                            >
+                                <div className="admin-topbar-avatar">
+                                    {(user?.email ?? 'A').charAt(0).toUpperCase()}
                                 </div>
-                            </div>
+                                <div className="admin-topbar-identity">
+                                    <div className="admin-topbar-title">{user?.email ?? 'Unknown admin'}</div>
+                                    <div className="admin-topbar-meta">
+                                        <span className="admin-topbar-role">{user?.role ?? 'none'}</span>
+                                        {hasValidStepUp ? (
+                                            <span className="admin-chiplet success">Sensitive actions unlocked</span>
+                                        ) : (
+                                            <span className="admin-chiplet warning">Sensitive actions locked</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </button>
                             {profileOpen ? (
-                                <div className="admin-profile-dropdown" onClick={(e) => e.stopPropagation()}>
+                                <div className="admin-profile-dropdown" onClick={(event) => event.stopPropagation()}>
                                     <div className="admin-profile-dropdown-header">
                                         <div className="admin-profile-dropdown-name">{user?.email?.split('@')[0] ?? 'Admin'}</div>
                                         <div className="admin-profile-dropdown-email">{user?.email ?? ''}</div>
                                     </div>
-                                    <button type="button" className="admin-profile-dropdown-item" onClick={() => { setTheme((c) => c === 'dark' ? 'light' : 'dark'); setProfileOpen(false); }}>
-                                        {theme === 'dark' ? '☼' : '☾'} {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                                    </button>
-                                    <button type="button" className="admin-profile-dropdown-item" onClick={() => { setDensity((c) => c === 'comfortable' ? 'compact' : 'comfortable'); setProfileOpen(false); }}>
-                                        {density === 'comfortable' ? '▤' : '▥'} {density === 'comfortable' ? 'Compact Mode' : 'Comfortable Mode'}
+                                    <button type="button" className="admin-profile-dropdown-item" onClick={() => { setDensity((current) => current === 'comfortable' ? 'compact' : 'comfortable'); setProfileOpen(false); }}>
+                                        {density === 'comfortable' ? 'Switch to compact density' : 'Switch to comfortable density'}
                                     </button>
                                     <button type="button" className="admin-profile-dropdown-item" onClick={() => { navigate('/settings'); setProfileOpen(false); }}>
-                                        ⚙️ Settings
+                                        Open settings
                                     </button>
                                     <div className="admin-profile-dropdown-divider" />
                                     <button
@@ -542,7 +525,7 @@ export function AdminLayout() {
                                             }
                                         }}
                                     >
-                                        🚪 Sign Out
+                                        Sign out
                                     </button>
                                 </div>
                             ) : null}
@@ -552,42 +535,116 @@ export function AdminLayout() {
 
                 <OpsBreadcrumb />
 
-                <section className="admin-context" aria-live="polite">
-                    <div className="admin-context-main">
-                        <span className="admin-context-kicker">Admin Console</span>
-                        <h2 className="admin-context-title">{activeModule?.label ?? 'Dashboard'}</h2>
-                        <p className="admin-context-summary">{activeModule?.summary ?? 'Overview of activity, traffic, and operations.'}</p>
-                    </div>
-                    <div className="admin-context-pills">
-                        <span className="admin-context-pill">{'\u23F1'} {timeZoneLabel}</span>
-                        <span className="admin-context-pill">{activeModule ? '\u2713 Live' : '\u2302 Home'}</span>
-                    </div>
-                </section>
-
-                <div className="admin-shell-content">
-                    {moduleAccessDenied && activeModule ? (
-                        <OpsCard
-                            title="Access Restricted"
-                            description="You do not have access to this module."
-                            tone="danger"
-                        >
-                            <div className="admin-alert warning">
-                                You do not have access. Required permission: <code>{activeModuleRequiredPermission}</code>.
-                            </div>
-                        </OpsCard>
-                    ) : (
-                        <div key={location.pathname} className="admin-page-transition">
-                            <Outlet />
-                        </div>
+                <WorkspaceHeader
+                    eyebrow={activeGroupLabel}
+                    title={activeModule?.label ?? 'Today'}
+                    description={activeModule?.summary ?? 'Run the editorial, publishing, governance, and monitoring workflow from one console.'}
+                    meta={(
+                        <>
+                            <span className="workspace-meta-pill">{timeZoneLabel}</span>
+                            <span className="workspace-meta-pill">{activeModule?.layoutMode ?? 'dashboard'} layout</span>
+                            <span className="workspace-meta-pill">{activeModule?.pageArchetype ?? 'dashboard'} archetype</span>
+                        </>
                     )}
+                    actions={(
+                        <>
+                            {primaryAction && primaryAction.to !== location.pathname ? (
+                                <button
+                                    type="button"
+                                    className="admin-btn subtle"
+                                    onClick={() => navigate(primaryAction.to)}
+                                >
+                                    {primaryAction.label}
+                                </button>
+                            ) : null}
+                            <button
+                                type="button"
+                                className="admin-btn primary"
+                                onClick={() => navigate('/manage-posts')}
+                            >
+                                Open workbench
+                            </button>
+                        </>
+                    )}
+                />
+
+                <div className="admin-shell-grid">
+                    <section className="admin-shell-content">
+                        {moduleAccessDenied && activeModule ? (
+                            <PermissionState
+                                title="You do not have access to this workspace."
+                                description="The route is active, but the current role does not include the permission required to open it."
+                                detail={<>Required permission: <code>{activeModuleRequiredPermission}</code>.</>}
+                            />
+                        ) : (
+                            <div key={location.pathname} className="admin-page-transition">
+                                <Outlet />
+                            </div>
+                        )}
+                    </section>
+
+                    <aside className="admin-shell-rail">
+                        <InspectorDrawer title="Session" description="Current operator context and safety state.">
+                            <dl className="workspace-definition-list">
+                                <div>
+                                    <dt>Role</dt>
+                                    <dd>{user?.role ?? 'none'}</dd>
+                                </div>
+                                <div>
+                                    <dt>Timezone</dt>
+                                    <dd>{timeZoneLabel}</dd>
+                                </div>
+                                <div>
+                                    <dt>Density</dt>
+                                    <dd>{density}</dd>
+                                </div>
+                                <div>
+                                    <dt>Sensitive actions</dt>
+                                    <dd>{hasValidStepUp ? 'Unlocked' : 'Locked'}</dd>
+                                </div>
+                            </dl>
+                        </InspectorDrawer>
+
+                        <InspectorDrawer title="Open Alerts" description="Immediate operational issues from the alert feed.">
+                            {alerts.length > 0 ? (
+                                <div className="workspace-stack">
+                                    {alerts.map((alert) => (
+                                        <button
+                                            key={alert.id}
+                                            type="button"
+                                            className="workspace-list-button"
+                                            onClick={() => navigate('/alerts')}
+                                        >
+                                            <strong>{alert.message}</strong>
+                                            <span>{alert.severity}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="ops-inline-muted">No open alerts right now.</p>
+                            )}
+                        </InspectorDrawer>
+
+                        <InspectorDrawer title="Command Hints" description="Keyboard shortcuts and route compatibility.">
+                            <div className="workspace-stack">
+                                <div className="workspace-shortcut-item"><strong>Ctrl/Cmd + K</strong><span>Open command surface</span></div>
+                                <div className="workspace-shortcut-item"><strong>/</strong><span>Focus global search</span></div>
+                                <div className="workspace-shortcut-item"><strong>N</strong><span>Open create-post</span></div>
+                                <div className="workspace-shortcut-item"><strong>/admin-vnext</strong><span>Compatibility alias remains active</span></div>
+                            </div>
+                        </InspectorDrawer>
+                    </aside>
                 </div>
             </main>
 
-            <AdminCommandPalette
+            <AdminCommandSurface
                 open={paletteOpen}
                 query={paletteQuery}
                 onQueryChange={setPaletteQuery}
-                onClose={() => { setPaletteOpen(false); setPaletteQuery(''); }}
+                onClose={() => {
+                    setPaletteOpen(false);
+                    setPaletteQuery('');
+                }}
                 commands={commandPaletteCommands}
                 announcements={paletteAnnouncementsQuery.data ?? []}
                 onOpenAnnouncement={(id) => {

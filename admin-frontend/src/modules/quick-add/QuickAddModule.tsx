@@ -3,8 +3,9 @@ import { useMutation } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
+import { OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold } from '../../components/workspace';
 import { createAdminAnnouncement } from '../../lib/api/client';
 
 const defaultForm = {
@@ -72,7 +73,26 @@ export function QuickAddModule() {
                 title="Step-up Verification"
                 description="Required before creating published posts from Quick Add."
             />
-            <OpsCard title="Quick Add" description="Fast posting flow for operations teams.">
+            <ModuleScaffold
+                eyebrow="Content Desk"
+                title="Quick Add"
+                description="Use the fast lane for urgent operational updates without leaving the publishing workflow."
+                metrics={[
+                    { key: 'type', label: 'Type', value: form.type, hint: 'Switch type to adjust the posting lane.' },
+                    { key: 'status', label: 'Status', value: form.status, hint: visibilityHint },
+                    { key: 'stepup', label: 'Sensitive actions', value: hasValidStepUp ? 'Unlocked' : 'Locked', hint: 'Published posts require step-up verification.' },
+                ]}
+                headerActions={(
+                    <>
+                        <button type="button" className="admin-btn subtle" onClick={() => setForm(defaultForm)}>
+                            Reset form
+                        </button>
+                        <button type="button" className="admin-btn primary" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+                            {mutation.isPending ? 'Creating...' : 'Create announcement'}
+                        </button>
+                    </>
+                )}
+            >
                 <OpsToolbar
                     compact
                     controls={
@@ -195,7 +215,7 @@ export function QuickAddModule() {
                     <OpsErrorState message={mutation.error instanceof Error ? mutation.error.message : 'Failed to create announcement.'} />
                 ) : null}
                 {successMessage ? <div className="ops-success">{successMessage}</div> : null}
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

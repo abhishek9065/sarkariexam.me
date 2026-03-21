@@ -32,23 +32,19 @@ export type AdminModuleKey =
     | 'error-reports'
     | 'settings';
 
-/**
- * Consolidated sidebar groups (9 items)
- * ─────────────────────────────────────
- * Dashboard · Posts · Review & Approvals
- * Homepage · Links · Media
- * Users & Roles · Logs · Settings
- */
 export type ModuleGroupKey =
-    | 'dashboard'
-    | 'posts'
-    | 'review'
-    | 'homepage'
-    | 'links'
-    | 'media'
-    | 'users'
-    | 'logs'
-    | 'settings';
+    | 'today'
+    | 'content-desk'
+    | 'review-pipeline'
+    | 'publishing'
+    | 'site-ops'
+    | 'audience-seo'
+    | 'governance'
+    | 'monitoring'
+    | 'system';
+
+export type AdminModuleArchetype = 'dashboard' | 'table' | 'form' | 'board' | 'timeline' | 'roster' | 'incident' | 'settings';
+export type AdminModuleLayoutMode = 'dashboard' | 'table' | 'board' | 'form' | 'timeline';
 
 export type AdminModuleNavItem = {
     key: AdminModuleKey;
@@ -58,296 +54,384 @@ export type AdminModuleNavItem = {
     icon: string;
     group: ModuleGroupKey;
     summary: string;
+    priority: number;
+    pageArchetype: AdminModuleArchetype;
+    layoutMode: AdminModuleLayoutMode;
+    defaultPrimaryAction?: {
+        label: string;
+        to: string;
+    };
 };
 
+const createItem = (item: AdminModuleNavItem) => item;
+
 export const adminModuleNavItems: AdminModuleNavItem[] = [
-    // ─── Dashboard ───
-    {
+    createItem({
         key: 'dashboard',
         to: '/dashboard',
-        label: 'Dashboard',
-        shortLabel: 'DB',
-        icon: '\u2302',
-        group: 'dashboard',
-        summary: 'Daily operations KPIs, deadlines and quick actions.',
-    },
-
-    // ─── Posts ───
-    {
+        label: 'Today',
+        shortLabel: 'TD',
+        icon: '◌',
+        group: 'today',
+        summary: 'Editorial command desk for assignments, incidents, and priority drilldowns.',
+        priority: 10,
+        pageArchetype: 'dashboard',
+        layoutMode: 'dashboard',
+        defaultPrimaryAction: { label: 'Open workbench', to: '/manage-posts' },
+    }),
+    createItem({
         key: 'manage-posts',
         to: '/manage-posts',
-        label: 'All Posts',
-        shortLabel: 'AP',
-        icon: '\u2630',
-        group: 'posts',
-        summary: 'High-volume listing with filters, saved views, and bulk actions.',
-    },
-    {
+        label: 'Manage Posts',
+        shortLabel: 'MP',
+        icon: '≣',
+        group: 'content-desk',
+        summary: 'Main workbench for filters, lanes, saved views, and bulk editorial operations.',
+        priority: 20,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+        defaultPrimaryAction: { label: 'New post', to: '/create-post' },
+    }),
+    createItem({
         key: 'create-post',
         to: '/create-post',
-        label: 'New Post',
-        shortLabel: 'NP',
-        icon: '\u271A',
-        group: 'posts',
-        summary: 'Unified create wizard for all Sarkari content types.',
-    },
-    {
-        key: 'job',
-        to: '/job',
-        label: 'Jobs',
-        shortLabel: 'JB',
-        icon: '\uD83D\uDCBC',
-        group: 'posts',
-        summary: 'Recruitment posts, vacancy details and timeline controls.',
-    },
-    {
-        key: 'result',
-        to: '/result',
-        label: 'Results',
-        shortLabel: 'RS',
-        icon: '\uD83C\uDFC6',
-        group: 'posts',
-        summary: 'Result publication, links and cutoff references.',
-    },
-    {
-        key: 'admit-card',
-        to: '/admit-card',
-        label: 'Admit Cards',
-        shortLabel: 'AC',
-        icon: '\uD83C\uDFAB',
-        group: 'posts',
-        summary: 'Admit card dates, downloads and region-wise links.',
-    },
-    {
-        key: 'answer-key',
-        to: '/answer-key',
-        label: 'Answer Keys',
-        shortLabel: 'AK',
-        icon: '\uD83D\uDD11',
-        group: 'posts',
-        summary: 'Answer key releases and objection window management.',
-    },
-    {
-        key: 'syllabus',
-        to: '/syllabus',
-        label: 'Syllabus',
-        shortLabel: 'SY',
-        icon: '\uD83D\uDCDA',
-        group: 'posts',
-        summary: 'Syllabus docs and marks-breakdown publishing.',
-    },
-    {
-        key: 'admission',
-        to: '/admission',
-        label: 'Admissions',
-        shortLabel: 'AD',
-        icon: '\uD83C\uDF93',
-        group: 'posts',
-        summary: 'Admission and counseling workflow updates.',
-    },
-    {
+        label: 'Create Post',
+        shortLabel: 'CP',
+        icon: '+',
+        group: 'content-desk',
+        summary: 'Unified editor entry for full-form content creation.',
+        priority: 21,
+        pageArchetype: 'form',
+        layoutMode: 'form',
+        defaultPrimaryAction: { label: 'Quick Add', to: '/quick-add' },
+    }),
+    createItem({
         key: 'quick-add',
         to: '/quick-add',
         label: 'Quick Add',
         shortLabel: 'QA',
-        icon: '\u26A1',
-        group: 'posts',
-        summary: 'Fast lightweight posting flow for urgent updates.',
-    },
-    {
+        icon: '↯',
+        group: 'content-desk',
+        summary: 'Fast lane for urgent, high-volume updates.',
+        priority: 22,
+        pageArchetype: 'form',
+        layoutMode: 'form',
+        defaultPrimaryAction: { label: 'Open full editor', to: '/create-post' },
+    }),
+    createItem({
         key: 'detailed-post',
         to: '/detailed-post',
         label: 'Detailed Post',
         shortLabel: 'DP',
-        icon: '\uD83D\uDCDD',
-        group: 'posts',
-        summary: 'Deep editor with autosave and revision timeline support.',
-    },
-    {
+        icon: '✎',
+        group: 'content-desk',
+        summary: 'Deep editorial workspace with revisions, autosave, and preview links.',
+        priority: 23,
+        pageArchetype: 'form',
+        layoutMode: 'form',
+    }),
+    createItem({
+        key: 'job',
+        to: '/job',
+        label: 'Jobs',
+        shortLabel: 'JB',
+        icon: '◫',
+        group: 'publishing',
+        summary: 'Recruitment publishing lane and content list.',
+        priority: 30,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+        defaultPrimaryAction: { label: 'Create job', to: '/create-post' },
+    }),
+    createItem({
+        key: 'result',
+        to: '/result',
+        label: 'Results',
+        shortLabel: 'RS',
+        icon: '◎',
+        group: 'publishing',
+        summary: 'Results publication queue and release controls.',
+        priority: 31,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+        defaultPrimaryAction: { label: 'Create result', to: '/create-post' },
+    }),
+    createItem({
+        key: 'admit-card',
+        to: '/admit-card',
+        label: 'Admit Cards',
+        shortLabel: 'AC',
+        icon: '▣',
+        group: 'publishing',
+        summary: 'Admit card release lane and date management.',
+        priority: 32,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'answer-key',
+        to: '/answer-key',
+        label: 'Answer Keys',
+        shortLabel: 'AK',
+        icon: '⌘',
+        group: 'publishing',
+        summary: 'Answer key release and objection window management.',
+        priority: 33,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'syllabus',
+        to: '/syllabus',
+        label: 'Syllabus',
+        shortLabel: 'SY',
+        icon: '☰',
+        group: 'publishing',
+        summary: 'Syllabus publishing and document upkeep.',
+        priority: 34,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'admission',
+        to: '/admission',
+        label: 'Admissions',
+        shortLabel: 'AD',
+        icon: '◇',
+        group: 'publishing',
+        summary: 'Admission and counselling content operations.',
+        priority: 35,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'templates',
         to: '/templates',
         label: 'Templates',
         shortLabel: 'TP',
-        icon: '\uD83D\uDCC4',
-        group: 'posts',
-        summary: 'Shared posting templates and section block presets.',
-    },
-    {
+        icon: '▤',
+        group: 'publishing',
+        summary: 'Shared editorial templates and content scaffolds.',
+        priority: 36,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'bulk',
         to: '/bulk',
         label: 'Bulk Import',
         shortLabel: 'BK',
-        icon: '\uD83D\uDCE6',
-        group: 'posts',
-        summary: 'Preview and execute batch operations safely.',
-    },
-
-    // ─── Review & Approvals ───
-    {
+        icon: '⇵',
+        group: 'publishing',
+        summary: 'Preview-first bulk import and execution workflow.',
+        priority: 37,
+        pageArchetype: 'form',
+        layoutMode: 'form',
+    }),
+    createItem({
         key: 'review',
         to: '/review',
-        label: 'Review Queue',
-        shortLabel: 'RQ',
-        icon: '\uD83D\uDD0D',
-        group: 'review',
-        summary: 'Policy-aware review queue with preview-first workflow.',
-    },
-    {
+        label: 'Review',
+        shortLabel: 'RV',
+        icon: '□',
+        group: 'review-pipeline',
+        summary: 'Policy-aware review queue with ownership and SLA control.',
+        priority: 40,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'approvals',
         to: '/approvals',
         label: 'Approvals',
-        shortLabel: 'AR',
-        icon: '\u2705',
-        group: 'review',
-        summary: 'Approval decisions and change requests with notes.',
-    },
-    {
+        shortLabel: 'AP',
+        icon: '✓',
+        group: 'review-pipeline',
+        summary: 'Dual-control approval decisions and escalation notes.',
+        priority: 41,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'queue',
         to: '/queue',
-        label: 'Scheduled Queue',
+        label: 'Queue',
         shortLabel: 'QU',
-        icon: '\uD83D\uDD52',
-        group: 'review',
-        summary: 'Scheduled/pending ownership and execution queue states.',
-    },
-
-    // ─── Homepage ───
-    {
+        icon: '↻',
+        group: 'review-pipeline',
+        summary: 'Pending and scheduled execution queue with ownership controls.',
+        priority: 42,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'homepage-sections',
         to: '/homepage-sections',
         label: 'Homepage Sections',
         shortLabel: 'HS',
-        icon: '\uD83C\uDFE0',
-        group: 'homepage',
-        summary: 'Homepage pinning, ranking and section sort controls.',
-    },
-
-    // ─── Links ───
-    {
+        icon: '⌂',
+        group: 'site-ops',
+        summary: 'Homepage ranking, section pinning, and front-page sequencing.',
+        priority: 50,
+        pageArchetype: 'board',
+        layoutMode: 'board',
+    }),
+    createItem({
         key: 'link-manager',
         to: '/link-manager',
         label: 'Link Manager',
         shortLabel: 'LK',
-        icon: '\uD83D\uDD17',
-        group: 'links',
-        summary: 'Centralized link records, health checks and replace workflows.',
-    },
-
-    // ─── Media / PDFs ───
-    {
+        icon: '∞',
+        group: 'site-ops',
+        summary: 'Stable URLs, link health, and replacement workflow.',
+        priority: 51,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'media-pdfs',
         to: '/media-pdfs',
-        label: 'Media / PDFs',
+        label: 'Media and PDFs',
         shortLabel: 'MD',
-        icon: '\uD83D\uDCC1',
-        group: 'media',
-        summary: 'Manage uploaded PDF/media metadata and stable URLs.',
-    },
-
-    // ─── Users & Roles ───
-    {
-        key: 'users-roles',
-        to: '/users-roles',
-        label: 'Users & Roles',
-        shortLabel: 'UR',
-        icon: '\uD83D\uDC65',
-        group: 'users',
-        summary: 'Role matrix and admin account governance controls.',
-    },
-
-    // ─── Logs ───
-    {
-        key: 'security',
-        to: '/security',
-        label: 'Security Log',
-        shortLabel: 'SC',
-        icon: '\uD83D\uDEE1\uFE0F',
-        group: 'logs',
-        summary: 'Security event log and filterable incident visibility.',
-    },
-    {
-        key: 'audit',
-        to: '/audit',
-        label: 'Audit Log',
-        shortLabel: 'AU',
-        icon: '\uD83D\uDCCB',
-        group: 'logs',
-        summary: 'Audit timeline for publish, edit, and role operations.',
-    },
-    {
-        key: 'sessions',
-        to: '/sessions',
-        label: 'Sessions',
-        shortLabel: 'SS',
-        icon: '\uD83D\uDD12',
-        group: 'logs',
-        summary: 'Admin session controls and terminations.',
-    },
-    {
-        key: 'alerts',
-        to: '/alerts',
-        label: 'Alerts',
-        shortLabel: 'AL',
-        icon: '\uD83D\uDD14',
-        group: 'logs',
-        summary: 'Operational alerts for deadlines, schedules and link failures.',
-    },
-    {
-        key: 'error-reports',
-        to: '/errors',
-        label: 'Error Reports',
-        shortLabel: 'ER',
-        icon: '\u26A0',
-        group: 'logs',
-        summary: 'Application error triage and resolution workflows.',
-    },
-    {
+        icon: '▥',
+        group: 'site-ops',
+        summary: 'Document inventory and media reference management.',
+        priority: 52,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
         key: 'analytics',
         to: '/analytics',
         label: 'Analytics',
         shortLabel: 'AN',
-        icon: '\uD83D\uDCC8',
-        group: 'logs',
-        summary: 'Traffic and trend snapshots for operational decision support.',
-    },
-    {
+        icon: '∆',
+        group: 'audience-seo',
+        summary: 'Audience trends, CTR, and anomaly review.',
+        priority: 60,
+        pageArchetype: 'dashboard',
+        layoutMode: 'dashboard',
+    }),
+    createItem({
         key: 'reports',
         to: '/reports',
         label: 'Reports',
         shortLabel: 'RP',
-        icon: '\uD83D\uDCCA',
-        group: 'logs',
-        summary: 'Broken links, expiries, and traffic snapshots.',
-    },
-    {
-        key: 'community-moderation',
-        to: '/community',
-        label: 'Community',
-        shortLabel: 'CM',
-        icon: '\uD83D\uDCAC',
-        group: 'logs',
-        summary: 'Moderation queue for community reports and flags.',
-    },
-
-    // ─── Settings ───
-    {
-        key: 'settings',
-        to: '/settings',
-        label: 'Configuration',
-        shortLabel: 'ST',
-        icon: '\u2699',
-        group: 'settings',
-        summary: 'States, boards, tags and core admin configuration.',
-    },
-    {
+        icon: '≋',
+        group: 'audience-seo',
+        summary: 'Traffic, deadlines, broken links, and content reporting.',
+        priority: 61,
+        pageArchetype: 'dashboard',
+        layoutMode: 'dashboard',
+    }),
+    createItem({
         key: 'seo-tools',
         to: '/seo-tools',
         label: 'SEO Tools',
         shortLabel: 'SEO',
-        icon: '\uD83D\uDD0E',
-        group: 'settings',
-        summary: 'Meta/canonical/schema controls per content record.',
-    },
+        icon: '⌕',
+        group: 'audience-seo',
+        summary: 'Meta, schema, canonical, and discoverability controls.',
+        priority: 62,
+        pageArchetype: 'form',
+        layoutMode: 'form',
+    }),
+    createItem({
+        key: 'users-roles',
+        to: '/users-roles',
+        label: 'Users and Roles',
+        shortLabel: 'UR',
+        icon: '◍',
+        group: 'governance',
+        summary: 'Access governance, roles, and admin roster management.',
+        priority: 70,
+        pageArchetype: 'roster',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'audit',
+        to: '/audit',
+        label: 'Audit',
+        shortLabel: 'AU',
+        icon: '⋮',
+        group: 'governance',
+        summary: 'Administrative activity timeline and change history.',
+        priority: 71,
+        pageArchetype: 'timeline',
+        layoutMode: 'timeline',
+    }),
+    createItem({
+        key: 'community-moderation',
+        to: '/community',
+        label: 'Community Moderation',
+        shortLabel: 'CM',
+        icon: '◐',
+        group: 'governance',
+        summary: 'Moderation queue for community-reported issues.',
+        priority: 72,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'alerts',
+        to: '/alerts',
+        label: 'Alerts',
+        shortLabel: 'AL',
+        icon: '!',
+        group: 'monitoring',
+        summary: 'Operational alert feed with severity triage.',
+        priority: 80,
+        pageArchetype: 'incident',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'security',
+        to: '/security',
+        label: 'Security',
+        shortLabel: 'SC',
+        icon: '◈',
+        group: 'monitoring',
+        summary: 'Security events, blocked activity, and risk sessions.',
+        priority: 81,
+        pageArchetype: 'incident',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'sessions',
+        to: '/sessions',
+        label: 'Sessions',
+        shortLabel: 'SS',
+        icon: '◗',
+        group: 'monitoring',
+        summary: 'Session inventory, termination controls, and drift checks.',
+        priority: 82,
+        pageArchetype: 'table',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'error-reports',
+        to: '/errors',
+        label: 'Error Reports',
+        shortLabel: 'ER',
+        icon: '⚑',
+        group: 'monitoring',
+        summary: 'Application error triage and follow-up.',
+        priority: 83,
+        pageArchetype: 'incident',
+        layoutMode: 'table',
+    }),
+    createItem({
+        key: 'settings',
+        to: '/settings',
+        label: 'Settings',
+        shortLabel: 'ST',
+        icon: '⚙',
+        group: 'system',
+        summary: 'Boards, tags, states, and core control-plane configuration.',
+        priority: 90,
+        pageArchetype: 'settings',
+        layoutMode: 'form',
+    }),
 ];
 
 const MODULE_PERMISSION_MAP: Partial<Record<AdminModuleKey, AdminPermission>> = {
@@ -398,20 +482,14 @@ const configuredTokens = configuredModulesRaw
     : [];
 
 const hasWildcard = configuredTokens.includes('*') || configuredTokens.includes('all');
-
-const configuredModuleSet = hasWildcard || configuredTokens.length === 0
-    ? null
+const enabledModules = hasWildcard || configuredTokens.length === 0
+    ? allModuleKeys
     : new Set<AdminModuleKey>(
         configuredTokens.filter((token): token is AdminModuleKey => allModuleKeys.has(token as AdminModuleKey))
     );
 
-export const isModuleGateEnabled = configuredModuleSet !== null;
-
 export function isAdminModuleEnabled(key: AdminModuleKey): boolean {
-    if (!configuredModuleSet) {
-        return true;
-    }
-    return configuredModuleSet.has(key);
+    return enabledModules.has(key);
 }
 
 export function getModuleByPath(pathname: string): AdminModuleNavItem | undefined {
@@ -421,39 +499,38 @@ export function getModuleByPath(pathname: string): AdminModuleNavItem | undefine
     return adminModuleNavItems.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`));
 }
 
-/** Sidebar group metadata — ordered as they appear in the sidebar */
 export const MODULE_GROUP_ORDER: ModuleGroupKey[] = [
-    'dashboard',
-    'posts',
-    'review',
-    'homepage',
-    'links',
-    'media',
-    'users',
-    'logs',
-    'settings',
+    'today',
+    'content-desk',
+    'review-pipeline',
+    'publishing',
+    'site-ops',
+    'audience-seo',
+    'governance',
+    'monitoring',
+    'system',
 ];
 
 export const groupedModuleLabels: Record<ModuleGroupKey, string> = {
-    dashboard: 'Dashboard',
-    posts: 'Posts',
-    review: 'Review & Approvals',
-    homepage: 'Homepage',
-    links: 'Links',
-    media: 'Media / PDFs',
-    users: 'Users & Roles',
-    logs: 'Logs',
-    settings: 'Settings',
+    today: 'Today',
+    'content-desk': 'Content Desk',
+    'review-pipeline': 'Review Pipeline',
+    publishing: 'Publishing',
+    'site-ops': 'Site Ops',
+    'audience-seo': 'Audience and SEO',
+    governance: 'Governance',
+    monitoring: 'Monitoring',
+    system: 'System',
 };
 
 export const groupedModuleIcons: Record<ModuleGroupKey, string> = {
-    dashboard: '\u2302',
-    posts: '\uD83D\uDCDD',
-    review: '\uD83D\uDD0D',
-    homepage: '\uD83C\uDFE0',
-    links: '\uD83D\uDD17',
-    media: '\uD83D\uDCC1',
-    users: '\uD83D\uDC65',
-    logs: '\uD83D\uDCCB',
-    settings: '\u2699',
+    today: '◌',
+    'content-desk': '≣',
+    'review-pipeline': '✓',
+    publishing: '◇',
+    'site-ops': '⌂',
+    'audience-seo': '∆',
+    governance: '◍',
+    monitoring: '!',
+    system: '⚙',
 };

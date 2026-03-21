@@ -6,6 +6,7 @@ import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold } from '../../components/workspace';
 import {
     autosaveAnnouncementDraft,
     createAnnouncementDraft,
@@ -275,7 +276,26 @@ export function DetailedPostModule() {
                 title="Step-up Verification"
                 description="Required for revision restore and other high-risk detailed-post actions."
             />
-            <OpsCard title="Detailed Post" description="Deep editor with server autosave, revision timeline, and restore controls.">
+            <ModuleScaffold
+                eyebrow="Content Desk"
+                title="Detailed Post"
+                description="Edit, compare revisions, autosave drafts, and preview the public route from one deep editorial workspace."
+                metrics={[
+                    { key: 'selected', label: 'Selected record', value: selectedId || 'None', hint: 'Pick a post from the list to enter editor mode.' },
+                    { key: 'autosave', label: 'Autosave', value: autosaveEnabled ? 'On' : 'Off', hint: lastAutosaveAt ? `Last autosave ${new Date(lastAutosaveAt).toLocaleString()}` : 'Autosave waits until a record is selected.' },
+                    { key: 'dirty', label: 'Unsaved changes', value: isDirty ? 'Yes' : 'No', hint: previewUrl ? `Preview route: ${previewUrl}` : 'Preview appears when the post has a public slug.' },
+                ]}
+                headerActions={(
+                    <>
+                        <button type="button" className="admin-btn subtle" onClick={() => duplicateMutation.mutate()} disabled={!selectedId || duplicateMutation.isPending}>
+                            {duplicateMutation.isPending ? 'Duplicating...' : 'Duplicate as draft'}
+                        </button>
+                        <button type="button" className="admin-btn primary" onClick={() => mutation.mutate()} disabled={!selectedId || mutation.isPending}>
+                            {mutation.isPending ? 'Saving...' : 'Save changes'}
+                        </button>
+                    </>
+                )}
+            >
                 <div className="ops-stack">
                     <OpsToolbar
                         compact
@@ -571,7 +591,7 @@ export function DetailedPostModule() {
                         <OpsErrorState message={duplicateMutation.error instanceof Error ? duplicateMutation.error.message : 'Failed to duplicate draft.'} />
                     ) : null}
                 </div>
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

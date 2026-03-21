@@ -19,7 +19,7 @@ export function OpsCard({
 }: OpsCardProps) {
     const toneClass = tone === 'default' ? '' : ` ${tone}`;
     return (
-        <section className={`ops-card${toneClass}${className ? ` ${className}` : ''}`}>
+        <section className={`ops-card workspace-panel${toneClass}${className ? ` ${className}` : ''}`}>
             {title || description || actions ? (
                 <header className="ops-card-header">
                     <div>

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AdminAuthProvider } from '../app/AdminAuthProvider';
+import { AdminDesktopGate } from '../app/AdminDesktopGate';
 import { AdminLayout } from '../app/AdminLayout';
 import { AdminPreferencesProvider } from '../app/AdminPreferencesContext';
 import { RequireAdminAuth } from '../app/RequireAdminAuth';
@@ -66,14 +67,16 @@ export function AppRoutes() {
                             <Route
                                 path="/login"
                                 element={(
-                                    <Suspense fallback={<OpsSkeleton lines={2} />}>
-                                        <AdminLoginPage />
-                                    </Suspense>
+                                    <AdminDesktopGate>
+                                        <Suspense fallback={<OpsSkeleton lines={2} />}>
+                                            <AdminLoginPage />
+                                        </Suspense>
+                                    </AdminDesktopGate>
                                 )}
                             />
 
                             <Route element={<RequireAdminAuth />}>
-                                <Route element={<AdminLayout />}>
+                                <Route element={<AdminDesktopGate><AdminLayout /></AdminDesktopGate>}>
                                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                                     <Route path="/dashboard" element={gatedModule('dashboard', 'Dashboard', 'Operations metrics and quick actions.', <DashboardPage />)} />
                                     <Route path="/analytics" element={gatedModule('analytics', 'Analytics', 'Operational insight and trend views.', <AnalyticsModule />)} />

@@ -5,8 +5,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
-import { OpsCard, OpsErrorState } from '../../components/ops';
-import { TableToolbar, useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
+import { OpsErrorState } from '../../components/ops';
+import { InspectorDrawer, ModuleScaffold } from '../../components/workspace';
+import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
 import {
     createAdminSavedView,
     createAnnouncementDraft,
@@ -24,6 +25,7 @@ import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import { MANAGE_POSTS_LANE_REGISTRY } from '../../lib/managePostsContract';
 import type { AnnouncementTypeFilter } from '../../types';
 import { ManagePostsBulkActionBar } from './ManagePostsBulkActionBar';
+import { ManagePostsFilterRail } from './ManagePostsFilterRail';
 import { ManagePostsSavedViewDialog } from './ManagePostsSavedViewDialog';
 import { ManagePostsTable } from './ManagePostsTable';
 import { useManagePostsState } from './useManagePostsState';
@@ -501,18 +503,50 @@ export function ManagePostsModule() {
     if (author.trim()) filterSummaryParts.push(`author=${author.trim()}`);
     const filterSummary = filterSummaryParts.join(' | ');
 
-    return (
-        <OpsCard title="Manage Posts" description="Capability-aware workflow workspace for queue lanes, saved views, and preview-first list operations.">
-            {workspaceQuery.isSuccess ? (
-                <ManagePostsWorkspaceHeader
-                    workspace={workspaceQuery.data}
-                    summaryCards={summaryCards}
-                    activeLaneId={activeLaneId}
-                    onSelectLane={onSelectLaneById}
-                    formatDateTime={formatDateTime}
-                />
-            ) : null}
+    const inspector = (
+        <>
+            <InspectorDrawer title="Workspace rules" description="The workbench is capability-driven and lane-oriented.">
+                <div className="workspace-stack">
+                    <div className="workspace-shortcut-item"><strong>Current lane</strong><span>{activeLaneId || 'all-posts'}</span></div>
+                    <div className="workspace-shortcut-item"><strong>Saved views</strong><span>{canManagePrivateViews ? 'Private views enabled' : 'Read-only preset access'}</span></div>
+                    <div className="workspace-shortcut-item"><strong>Publishing</strong><span>{canApprove ? 'This role can publish after step-up' : 'Publishing stays approval-gated'}</span></div>
+                </div>
+            </InspectorDrawer>
+            <InspectorDrawer title="Keyboard flow" description="Keep the workbench moving without leaving the table.">
+                <div className="workspace-stack">
+                    <div className="workspace-shortcut-item"><strong>N</strong><span>Create a new post</span></div>
+                    <div className="workspace-shortcut-item"><strong>Ctrl/Cmd + S</strong><span>Save or update current view</span></div>
+                    <div className="workspace-shortcut-item"><strong>Ctrl/Cmd + Enter</strong><span>Submit selected posts for review</span></div>
+                </div>
+            </InspectorDrawer>
+        </>
+    );
 
+    return (
+        <ModuleScaffold
+            eyebrow="Content Desk"
+            title="Manage Posts"
+            description="Run the editorial inbox from one workbench: lanes, filters, saved views, assignment pressure, and preview-first bulk actions."
+            metrics={summaryCards.map((card) => ({
+                key: card.key,
+                label: card.label,
+                value: card.value,
+                hint: card.hint,
+            }))}
+            headerActions={(
+                <>
+                    <button type="button" className="admin-btn subtle" onClick={() => navigate('/queue')}>
+                        Open queue
+                    </button>
+                    {canWrite ? (
+                        <button type="button" className="admin-btn primary" onClick={() => navigate('/create-post')}>
+                            New post
+                        </button>
+                    ) : null}
+                </>
+            )}
+            inspector={inspector}
+        >
             {workspaceQuery.error ? <OpsErrorState message="Failed to load manage-posts workspace summary." /> : null}
 
             {!canWrite ? (
@@ -521,14 +555,23 @@ export function ManagePostsModule() {
                 </div>
             ) : null}
 
-            {canWrite ? (
-                <AdminStepUpCard
-                    title="Manage Posts Step-Up"
-                    description="Unlock bulk publish, expire, and homepage pin actions without leaving this workspace."
+            {workspaceQuery.isSuccess ? (
+                <ManagePostsWorkspaceHeader
+                    workspace={workspaceQuery.data}
+                    activeLaneId={activeLaneId}
+                    onSelectLane={onSelectLaneById}
+                    formatDateTime={formatDateTime}
                 />
             ) : null}
 
-            <TableToolbar
+            {canWrite ? (
+                <AdminStepUpCard
+                    title="Manage Posts Step-Up"
+                    description="Unlock publish, expire, and homepage pin flows without leaving the workbench."
+                />
+            ) : null}
+
+            <ManagePostsFilterRail
                 searchQuery={search}
                 onSearchChange={(value) => {
                     setSearch(value);
@@ -687,6 +730,6 @@ export function ManagePostsModule() {
                     createViewMutation.mutate();
                 }}
             />
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

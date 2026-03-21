@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import {
     createTemplateRecord,
@@ -66,6 +67,8 @@ export function TemplatesModule() {
     });
 
     const templates = useMemo(() => query.data?.data ?? [], [query.data]);
+    const sharedCount = useMemo(() => templates.filter((item) => item.shared).length, [templates]);
+    const privateCount = useMemo(() => templates.filter((item) => !item.shared).length, [templates]);
 
     const createMutation = useMutation({
         mutationFn: async () =>
@@ -152,9 +155,17 @@ export function TemplatesModule() {
     const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
     return (
-        <OpsCard title="Templates" description="Create and maintain posting templates with reusable content blocks and payload defaults.">
-            <OpsToolbar
-                controls={(
+        <ModuleScaffold
+            eyebrow="Publishing"
+            title="Templates"
+            description="Create and maintain posting templates with reusable content blocks and payload defaults."
+            metrics={[
+                { key: 'templates-total', label: 'Templates', value: templates.length },
+                { key: 'templates-shared', label: 'Shared', value: sharedCount, tone: sharedCount > 0 ? 'info' : 'neutral' },
+                { key: 'templates-private', label: 'Private', value: privateCount, tone: privateCount > 0 ? 'warning' : 'neutral' },
+            ]}
+            filters={{
+                controls: (
                     <>
                         <select
                             value={typeFilter}
@@ -179,8 +190,8 @@ export function TemplatesModule() {
                             <option value="false">Private</option>
                         </select>
                     </>
-                )}
-                actions={(
+                ),
+                actions: (
                     <>
                         <span className="ops-inline-muted">Templates: {templates.length}</span>
                         <button
@@ -191,145 +202,149 @@ export function TemplatesModule() {
                             {editingId ? 'Cancel edit' : 'Clear form'}
                         </button>
                     </>
-                )}
-            />
+                ),
+            }}
+        >
+            <div className="ops-stack">
+                <OpsCard title={editingId ? 'Edit Template' : 'Create Template'} description="Maintain reusable section blocks and payload defaults for faster publishing.">
+                    <form
+                        className="ops-form-grid"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (editingId) {
+                                updateMutation.mutate();
+                            } else {
+                                createMutation.mutate();
+                            }
+                        }}
+                    >
+                        <select
+                            value={form.type}
+                            onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as AnnouncementTypeFilter }))}
+                            aria-label="Template type"
+                        >
+                            <option value="job">Job</option>
+                            <option value="result">Result</option>
+                            <option value="admit-card">Admit Card</option>
+                            <option value="answer-key">Answer Key</option>
+                            <option value="syllabus">Syllabus</option>
+                            <option value="admission">Admission</option>
+                        </select>
+                        <input
+                            value={form.name}
+                            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                            placeholder="Template name"
+                            required
+                            minLength={2}
+                        />
+                        <input
+                            className="ops-span-full"
+                            value={form.description}
+                            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                            placeholder="Description (optional)"
+                        />
+                        <label className="ops-row">
+                            <input
+                                type="checkbox"
+                                checked={form.shared}
+                                onChange={(event) => setForm((current) => ({ ...current, shared: event.target.checked }))}
+                            />
+                            <span>Shared template</span>
+                        </label>
+                        <textarea
+                            className="ops-span-full"
+                            value={form.sections}
+                            onChange={(event) => setForm((current) => ({ ...current, sections: event.target.value }))}
+                            placeholder="Section blocks (one per line): Important Dates, Application Fee, Age Limit..."
+                        />
+                        <textarea
+                            className="ops-span-full ops-textarea"
+                            value={form.payloadJson}
+                            onChange={(event) => setForm((current) => ({ ...current, payloadJson: event.target.value }))}
+                            placeholder='Template payload JSON, e.g. {"category":"Latest Jobs","tags":["state","graduate"]}'
+                        />
+                        <div className="ops-actions ops-span-full">
+                            <button type="submit" className="admin-btn primary" disabled={isSubmitting}>
+                                {isSubmitting
+                                    ? (editingId ? 'Saving...' : 'Creating...')
+                                    : (editingId ? 'Save Template' : 'Create Template')}
+                            </button>
+                            {editingId ? (
+                                <button type="button" className="admin-btn" onClick={resetEditor}>
+                                    Cancel
+                                </button>
+                            ) : null}
+                        </div>
+                    </form>
+                </OpsCard>
 
-            <form
-                className="ops-form-grid"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    if (editingId) {
-                        updateMutation.mutate();
-                    } else {
-                        createMutation.mutate();
-                    }
-                }}
-            >
-                <select
-                    value={form.type}
-                    onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as AnnouncementTypeFilter }))}
-                    aria-label="Template type"
-                >
-                    <option value="job">Job</option>
-                    <option value="result">Result</option>
-                    <option value="admit-card">Admit Card</option>
-                    <option value="answer-key">Answer Key</option>
-                    <option value="syllabus">Syllabus</option>
-                    <option value="admission">Admission</option>
-                </select>
-                <input
-                    value={form.name}
-                    onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                    placeholder="Template name"
-                    required
-                    minLength={2}
-                />
-                <input
-                    className="ops-span-full"
-                    value={form.description}
-                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                    placeholder="Description (optional)"
-                />
-                <label className="ops-row">
-                    <input
-                        type="checkbox"
-                        checked={form.shared}
-                        onChange={(event) => setForm((current) => ({ ...current, shared: event.target.checked }))}
+                {query.isPending ? <div className="admin-alert info">Loading templates...</div> : null}
+                {query.error ? <OpsErrorState message="Failed to load templates." /> : null}
+                {createMutation.error ? (
+                    <OpsErrorState
+                        message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create template.'}
                     />
-                    <span>Shared template</span>
-                </label>
-                <textarea
-                    className="ops-span-full"
-                    value={form.sections}
-                    onChange={(event) => setForm((current) => ({ ...current, sections: event.target.value }))}
-                    placeholder="Section blocks (one per line): Important Dates, Application Fee, Age Limit..."
-                />
-                <textarea
-                    className="ops-span-full ops-textarea"
-                    value={form.payloadJson}
-                    onChange={(event) => setForm((current) => ({ ...current, payloadJson: event.target.value }))}
-                    placeholder='Template payload JSON, e.g. {"category":"Latest Jobs","tags":["state","graduate"]}'
-                />
-                <div className="ops-actions ops-span-full">
-                    <button type="submit" className="admin-btn primary" disabled={isSubmitting}>
-                        {isSubmitting
-                            ? (editingId ? 'Saving...' : 'Creating...')
-                            : (editingId ? 'Save Template' : 'Create Template')}
-                    </button>
-                    {editingId ? (
-                        <button type="button" className="admin-btn" onClick={resetEditor}>
-                            Cancel
-                        </button>
-                    ) : null}
-                </div>
-            </form>
+                ) : null}
+                {updateMutation.error ? (
+                    <OpsErrorState
+                        message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update template.'}
+                    />
+                ) : null}
 
-            {query.isPending ? <div className="admin-alert info">Loading templates...</div> : null}
-            {query.error ? <OpsErrorState message="Failed to load templates." /> : null}
-            {createMutation.error ? (
-                <OpsErrorState
-                    message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create template.'}
-                />
-            ) : null}
-            {updateMutation.error ? (
-                <OpsErrorState
-                    message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update template.'}
-                />
-            ) : null}
+                {!query.isPending && !query.error && templates.length === 0 ? (
+                    <OpsEmptyState message="No templates available: Create shared templates to speed up posting workflows." />
+                ) : null}
 
-            {!query.isPending && !query.error && templates.length === 0 ? (
-                <OpsEmptyState message="No templates available: Create shared templates to speed up posting workflows." />
-            ) : null}
-
-            {templates.length > 0 ? (
-                <OpsTable
-                    columns={[
-                        { key: 'name', label: 'Template' },
-                        { key: 'type', label: 'Type' },
-                        { key: 'visibility', label: 'Visibility' },
-                        { key: 'sections', label: 'Sections' },
-                        { key: 'updatedAt', label: 'Updated' },
-                        { key: 'actions', label: 'Actions' },
-                    ]}
-                >
-                    {templates.map((template) => (
-                        <tr key={template.id}>
-                            <td>
-                                <strong>{template.name}</strong>
-                                <div className="ops-inline-muted">{template.description || 'No description'}</div>
-                            </td>
-                            <td>{template.type}</td>
-                            <td>
-                                <OpsBadge tone={template.shared ? 'info' : 'neutral'}>{sharedLabel(template.shared)}</OpsBadge>
-                            </td>
-                            <td>{template.sections.length}</td>
-                            <td>{template.updatedAt ? new Date(template.updatedAt).toLocaleString() : '-'}</td>
-                            <td>
-                                <div className="ops-actions">
-                                    <button
-                                        type="button"
-                                        className="admin-btn small subtle"
-                                        onClick={() => startEditing(template)}
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="admin-btn small"
-                                        disabled={quickToggleMutation.isPending}
-                                        onClick={() => quickToggleMutation.mutate({
-                                            id: template.id,
-                                            shared: !template.shared,
-                                        })}
-                                    >
-                                        {template.shared ? 'Make private' : 'Make shared'}
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                </OpsTable>
-            ) : null}
-        </OpsCard>
+                {templates.length > 0 ? (
+                    <OpsTable
+                        columns={[
+                            { key: 'name', label: 'Template' },
+                            { key: 'type', label: 'Type' },
+                            { key: 'visibility', label: 'Visibility' },
+                            { key: 'sections', label: 'Sections' },
+                            { key: 'updatedAt', label: 'Updated' },
+                            { key: 'actions', label: 'Actions' },
+                        ]}
+                    >
+                        {templates.map((template) => (
+                            <tr key={template.id}>
+                                <td>
+                                    <strong>{template.name}</strong>
+                                    <div className="ops-inline-muted">{template.description || 'No description'}</div>
+                                </td>
+                                <td>{template.type}</td>
+                                <td>
+                                    <OpsBadge tone={template.shared ? 'info' : 'neutral'}>{sharedLabel(template.shared)}</OpsBadge>
+                                </td>
+                                <td>{template.sections.length}</td>
+                                <td>{template.updatedAt ? new Date(template.updatedAt).toLocaleString() : '-'}</td>
+                                <td>
+                                    <div className="ops-actions">
+                                        <button
+                                            type="button"
+                                            className="admin-btn small subtle"
+                                            onClick={() => startEditing(template)}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="admin-btn small"
+                                            disabled={quickToggleMutation.isPending}
+                                            onClick={() => quickToggleMutation.mutate({
+                                                id: template.id,
+                                                shared: !template.shared,
+                                            })}
+                                        >
+                                            {template.shared ? 'Make private' : 'Make shared'}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </OpsTable>
+                ) : null}
+            </div>
+        </ModuleScaffold>
     );
 }

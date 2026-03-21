@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
+import { OpsErrorState } from '../../components/ops';
+import { ModuleScaffold } from '../../components/workspace';
 import { getAnalyticsOverview } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 
@@ -53,84 +54,81 @@ export function AnalyticsModule() {
     ];
 
     return (
-        <OpsCard title="Analytics" description="High-density operations analytics with trend windows and anomaly lane.">
+        <ModuleScaffold
+            eyebrow="Audience & SEO"
+            title="Analytics"
+            description="High-density operations analytics with trend windows and anomaly lane."
+            meta={<span>{days} day window compared with {compareDays} days.</span>}
+            headerActions={(
+                <button type="button" className="admin-btn subtle" onClick={() => void query.refetch()}>
+                    Refresh
+                </button>
+            )}
+            metrics={cards.map((card) => ({
+                key: card.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                label: card.label,
+                value: card.isPercent
+                    ? (card.value === 0 ? 'N/A' : `${card.value.toFixed(1)}%`)
+                    : card.value.toLocaleString('en-IN'),
+            }))}
+            filters={{
+                compact: true,
+                controls: (
+                    <>
+                        <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
+                            <option value={7}>Last 7 days</option>
+                            <option value={14}>Last 14 days</option>
+                            <option value={30}>Last 30 days</option>
+                            <option value={60}>Last 60 days</option>
+                            <option value={90}>Last 90 days</option>
+                        </select>
+                        <select value={compareDays} onChange={(event) => setCompareDays(Number(event.target.value))}>
+                            <option value={7}>Compare 7 days</option>
+                            <option value={14}>Compare 14 days</option>
+                            <option value={30}>Compare 30 days</option>
+                            <option value={60}>Compare 60 days</option>
+                        </select>
+                    </>
+                ),
+                actions: <span className="ops-inline-muted">Window: {days}d vs {compareDays}d</span>,
+            }}
+        >
             <div className="ops-stack">
-                <OpsToolbar
-                    compact
-                    controls={
-                        <>
-                            <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
-                                <option value={7}>Last 7 days</option>
-                                <option value={14}>Last 14 days</option>
-                                <option value={30}>Last 30 days</option>
-                                <option value={60}>Last 60 days</option>
-                                <option value={90}>Last 90 days</option>
-                            </select>
-                            <select value={compareDays} onChange={(event) => setCompareDays(Number(event.target.value))}>
-                                <option value={7}>Compare 7 days</option>
-                                <option value={14}>Compare 14 days</option>
-                                <option value={30}>Compare 30 days</option>
-                                <option value={60}>Compare 60 days</option>
-                            </select>
-                        </>
-                    }
-                    actions={
-                        <>
-                            <span className="ops-inline-muted">Window: {days}d vs {compareDays}d</span>
-                            <button type="button" className="admin-btn small" onClick={() => void query.refetch()}>
-                                Refresh
-                            </button>
-                        </>
-                    }
-                />
-
                 {query.isPending ? <div className="admin-alert info">Loading analytics...</div> : null}
                 {query.error ? <OpsErrorState message="Failed to load analytics overview." /> : null}
 
-                {!query.isPending && !query.error ? (
-                    <>
-                        <div className="ops-kpi-grid">
-                            {cards.map((card) => (
-                                <button
-                                    key={card.label}
-                                    type="button"
-                                    className="ops-kpi-card"
-                                    onClick={() => {
-                                        void trackAdminTelemetry('admin_metric_drilldown_opened', {
-                                            module: 'analytics',
-                                            metric: card.label,
-                                            value: card.value,
-                                            days,
-                                            compareDays,
-                                        });
-                                    }}
-                                >
-                                    <div className="ops-kpi-label">{card.label}</div>
-                                    <div className="ops-kpi-value">
-                                        {card.isPercent
-                                            ? (card.value === 0 ? 'N/A' : `${card.value.toFixed(1)}%`)
-                                            : card.value.toLocaleString('en-IN')}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-
-                        {anomalyList.length > 0 ? (
-                            <div className="ops-card muted">
-                                <h3 className="ops-card-title">Anomaly Lane</h3>
-                                <ul className="ops-list">
-                                    {anomalyList.map((item, index) => {
-                                        const message = typeof item === 'object' && item && 'message' in item
-                                            ? String((item as Record<string, unknown>).message)
-                                            : 'Anomaly detected';
-                                        return <li key={`${message}-${index}`}>{message}</li>;
-                                    })}
-                                </ul>
-                            </div>
-                        ) : null}
-                    </>
+                {!query.isPending && !query.error && anomalyList.length > 0 ? (
+                    <div className="ops-card muted">
+                        <h3 className="ops-card-title">Anomaly Lane</h3>
+                        <ul className="ops-list">
+                            {anomalyList.map((item, index) => {
+                                const message = typeof item === 'object' && item && 'message' in item
+                                    ? String((item as Record<string, unknown>).message)
+                                    : 'Anomaly detected';
+                                return (
+                                    <li key={`${message}-${index}`}>
+                                        <button
+                                            type="button"
+                                            className="admin-btn ghost"
+                                            onClick={() => {
+                                                void trackAdminTelemetry('admin_metric_drilldown_opened', {
+                                                    module: 'analytics',
+                                                    metric: message,
+                                                    value: 1,
+                                                    days,
+                                                    compareDays,
+                                                });
+                                            }}
+                                        >
+                                            {message}
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
                 ) : null}
             </div>
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

@@ -6,6 +6,7 @@ import { useAdminAuth } from '../../app/useAdminAuth';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsCard, OpsErrorState, OpsToolbar } from '../../components/ops';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold } from '../../components/workspace';
 import { createAdminContentRecord, getTemplateRecords } from '../../lib/api/client';
 import type { AnnouncementTypeFilter, TemplateRecord } from '../../types';
 
@@ -283,10 +284,29 @@ export function CreatePostModule() {
                 title="Step-up Verification"
                 description="Required before creating published posts from Create Post."
             />
-            <OpsCard title="Create Post" description="Unified create flow for Job, Result, Admit Card, Answer Key, Syllabus, and Admission.">
-            <OpsToolbar
-                controls={(
+            <ModuleScaffold
+                eyebrow="Content Desk"
+                title="Create Post"
+                description="Open the full editorial create flow for Jobs, Results, Admit Cards, Answer Keys, Syllabus, and Admissions."
+                metrics={[
+                    { key: 'type', label: 'Type', value: form.type, hint: 'The editor adapts fields and template options.' },
+                    { key: 'status', label: 'Workflow status', value: form.status, hint: 'Published posts require active step-up.' },
+                    { key: 'template', label: 'Template', value: selectedTemplate?.name ?? 'None', hint: 'Templates prefill editorial structure.' },
+                ]}
+                headerActions={(
                     <>
+                        <button type="button" className="admin-btn subtle" onClick={() => setForm(defaultForm)}>
+                            Reset editor
+                        </button>
+                        <button type="button" className="admin-btn primary" onClick={() => createMutation.mutate()} disabled={!form.title || !form.category || !form.organization || createMutation.isPending}>
+                            {createMutation.isPending ? 'Creating...' : 'Create post'}
+                        </button>
+                    </>
+                )}
+            >
+                <OpsToolbar
+                    controls={(
+                        <>
                         <select
                             value={form.type}
                             onChange={(event) => {
@@ -654,7 +674,7 @@ export function CreatePostModule() {
             {selectedTemplate ? (
                 <div className="admin-alert info">Using template: {selectedTemplate.name}</div>
             ) : null}
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

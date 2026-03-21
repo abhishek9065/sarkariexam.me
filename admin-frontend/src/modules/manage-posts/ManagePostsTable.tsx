@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 
-import { ActionOverflowMenu } from '../../components/ops/legacy-port';
 import { OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { RowActionMenu } from '../../components/workspace';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminAnnouncementListItem } from '../../types';
 
@@ -210,7 +210,7 @@ export function ManagePostsTable({
                         </td>
                         <td>{formatDateTime(item.updatedAt || item.publishedAt || item.postedAt)}</td>
                         <td>
-                            <ActionOverflowMenu
+                            <RowActionMenu
                                 itemLabel={item.title || id || 'announcement'}
                                 actions={rowActions}
                             />

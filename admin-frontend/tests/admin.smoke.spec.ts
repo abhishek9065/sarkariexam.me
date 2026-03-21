@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { MANAGE_POSTS_LANE_REGISTRY } from '../src/lib/managePostsContract';
 
-const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin-vnext';
+const adminBasename = process.env.VITE_ADMIN_BASENAME || '/admin';
 const escapedAdminBasename = adminBasename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const jsonResponse = (data: unknown) => ({
@@ -971,13 +971,13 @@ test('admin login can complete two-factor setup challenge', async ({ page }) => 
     await expect(page.getByText(/Two-factor enabled\. Sign in again with your authenticator code/i)).toBeVisible();
 });
 
-test('admin shows login screen on mobile viewport (responsive)', async ({ page }) => {
+test('admin shows desktop-required gate on mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 1200 });
     await mockUnauthenticatedAdmin(page);
     await page.goto('login', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Open the editorial console on a larger screen/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open legacy rollback/i })).toBeVisible();
 });
 
 test('admin protected routes redirect to login on desktop', async ({ page }) => {
@@ -989,12 +989,12 @@ test('admin protected routes redirect to login on desktop', async ({ page }) => 
     await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
-test('admin protected routes redirect to login on mobile (responsive)', async ({ page }) => {
+test('admin protected routes show desktop-required gate on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 1200 });
     await mockUnauthenticatedAdmin(page);
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Open the editorial console on a larger screen/i })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
@@ -1010,16 +1010,16 @@ test('primary login action keeps desktop button size standard', async ({ page })
     expect(height).toBeGreaterThanOrEqual(44);
 });
 
-test('authenticated dashboard renders premium desktop shell', async ({ page }) => {
+test('authenticated dashboard renders editorial desktop shell', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockAuthenticatedAdmin(page);
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /^Dashboard$/i })).toBeVisible();
-    await expect(page.getByText('admin@sarkariexams.me')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Command palette/i })).toBeVisible();
+    await expect(page.locator('.workspace-header-title').filter({ hasText: /^Dashboard$/i })).toBeVisible();
+    await expect(page.locator('.admin-topbar-title').filter({ hasText: 'admin@sarkariexams.me' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Command$/i })).toBeVisible();
 
-    const primaryAction = page.getByRole('button', { name: /^\+ New Post$/i });
+    const primaryAction = page.getByRole('button', { name: /^New post$/i });
     const height = await primaryAction.evaluate((node) => node.getBoundingClientRect().height);
     expect(height).toBeGreaterThanOrEqual(44);
 });
@@ -1126,7 +1126,7 @@ test('manage posts keeps private saved views for read-only roles while hiding wr
     await expect(page.getByRole('button', { name: /^My Queue \(\d+\)$/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Pending Review \(\d+\)$/i })).toBeVisible();
     await expect(page.getByText(/Read-only access\./i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Save current filters/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Save view$/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Submit for review/i })).toHaveCount(0);
     await expect(page.locator('tbody input[type="checkbox"]')).toHaveCount(0);
 });
@@ -1137,7 +1137,7 @@ test('manage posts shows local step-up recovery for write-capable roles', async 
     await page.goto('manage-posts', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('heading', { name: /Manage Posts Step-Up/i })).toBeVisible();
-    await expect(page.getByText(/Unlock bulk publish, expire, and homepage pin actions without leaving this workspace/i)).toBeVisible();
+    await expect(page.getByText(/Unlock publish, expire, and homepage pin flows without leaving the workbench/i)).toBeVisible();
 });
 
 test('create post includes step-up controls for direct publish actions', async ({ page }) => {
@@ -1211,8 +1211,8 @@ test('detailed post shows revision comparison and duplicate draft controls', asy
 
     await expect(page.getByText(/Compare with v3/i)).toBeVisible();
     await expect(page.getByText(/Published with SEO update/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Duplicate as draft/i })).toBeVisible();
-    await page.getByRole('button', { name: /Duplicate as draft/i }).click();
+    await expect(page.getByRole('button', { name: /Duplicate as draft/i }).first()).toBeVisible();
+    await page.getByRole('button', { name: /Duplicate as draft/i }).first().click();
     await expect(page.getByText(/Draft duplicated/i)).toBeVisible();
 });
 
@@ -1424,18 +1424,19 @@ test('sidebar exposes full admin operations information architecture', async ({ 
     await mockAuthenticatedAdmin(page);
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('link', { name: /Dashboard/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /All Posts/i })).toBeVisible();
-    await expect(page.locator('.admin-nav-link', { hasText: /New Post/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Homepage/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Links/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Templates/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Alerts/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Media \/ PDFs/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /SEO Tools/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Users & Roles/i })).toBeVisible();
-    await expect(page.locator('a[href$="/reports"]')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Configuration/i })).toBeVisible();
+    const sidebar = page.locator('.admin-sidebar');
+    await expect(sidebar.getByRole('link', { name: /Today/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Manage Posts/i }).first()).toBeVisible();
+    await expect(sidebar.locator('.admin-nav-link', { hasText: /Create Post/i })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Homepage Sections/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Link Manager/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Templates/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Alerts/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Media and PDFs/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /SEO Tools/i }).first()).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Users and Roles/i }).first()).toBeVisible();
+    await expect(sidebar.locator('a[href$="/reports"]')).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: /Settings/i }).first()).toBeVisible();
 });
 
 test('admin-vnext alias serves login shell when basename is admin-vnext', async ({ page }) => {

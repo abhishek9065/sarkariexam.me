@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { ModuleScaffold } from '../../components/workspace';
 import { getAdminAnnouncements } from '../../lib/api/client';
 import type { AdminAnnouncementListItem, AnnouncementStatusFilter, AnnouncementTypeFilter } from '../../types';
 
@@ -41,7 +42,16 @@ export function ContentTypeListModule({ type, title, description }: Props) {
     );
 
     return (
-        <OpsCard title={title} description={description}>
+        <ModuleScaffold
+            eyebrow="Publishing"
+            title={title}
+            description={description}
+            metrics={[
+                { key: 'loaded', label: 'Loaded records', value: rows.length, hint: 'Filtered to the first 100 records for this lane.' },
+                { key: 'status', label: 'Status filter', value: status, hint: 'Use status and sort to shape the lane.' },
+                { key: 'sort', label: 'Sort order', value: sort, hint: 'The list keeps one consistent table pattern.' },
+            ]}
+        >
             <OpsToolbar
                 controls={(
                     <>
@@ -121,6 +131,6 @@ export function ContentTypeListModule({ type, title, description }: Props) {
             {!query.isPending && !query.error && rows.length === 0 ? (
                 <OpsEmptyState message="No records found for the selected filters." />
             ) : null}
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

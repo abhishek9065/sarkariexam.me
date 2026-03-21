@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { OpsCard, OpsEmptyState, OpsErrorState } from '../components/ops';
 import { useAdminAuth } from '../app/useAdminAuth';
+import { ModuleScaffold } from '../components/workspace';
 import { getAdminDashboard } from '../lib/api/client';
 
 const TRAFFIC_SOURCE_COLORS: Record<string, string> = {
@@ -414,7 +415,11 @@ export function DashboardPage() {
     };
 
     return (
-        <>
+        <ModuleScaffold
+            eyebrow="Today"
+            title="Dashboard"
+            description="The editorial command desk for today’s assignments, approvals, incidents, and performance signals."
+        >
             <div className="ops-card dash-hero-card">
                 <div className="dash-hero-header">
                     <div>
@@ -502,6 +507,6 @@ export function DashboardPage() {
                     <DashboardWidgetCard widget={snapshot.widgets['quick-actions']} onNavigate={navigateTo} />
                 </>
             ) : null}
-        </>
+        </ModuleScaffold>
     );
 }

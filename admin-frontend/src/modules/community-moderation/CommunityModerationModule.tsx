@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
-import { ActionOverflowMenu, useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { useAdminNotifications, useConfirmDialog } from '../../components/ops/legacy-port';
+import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
 import {
     getCommunityFlags,
     getCommunityForums,
@@ -81,7 +82,11 @@ export function CommunityModerationModule() {
     }, [tab]);
 
     return (
-        <OpsCard title="Community Moderation" description="Triage community flags and review content surfaces with fast moderation actions.">
+        <ModuleScaffold
+            eyebrow="Governance"
+            title="Community Moderation"
+            description="Triage community flags and review content surfaces with fast moderation actions."
+        >
             <div className="ops-stack">
                 <div className="ops-actions">
                     <button type="button" className={`admin-btn ${tab === 'flags' ? 'primary' : 'subtle'}`} onClick={() => setTab('flags')}>
@@ -186,7 +191,7 @@ export function CommunityModerationModule() {
                                         <td><OpsBadge tone={statusTone(row.status)}>{row.status}</OpsBadge></td>
                                         <td>{formatDateTime(row.createdAt)}</td>
                                         <td>
-                                            <ActionOverflowMenu
+                                            <RowActionMenu
                                                 itemLabel={`flag ${row.id}`}
                                                 actions={[
                                                     {
@@ -347,6 +352,6 @@ export function CommunityModerationModule() {
                     Show Triage Tip
                 </button>
             </div>
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

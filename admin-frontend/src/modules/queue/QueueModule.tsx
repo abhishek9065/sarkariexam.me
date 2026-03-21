@@ -4,8 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
-import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
+import { OpsBadge, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
 import { getAdminAnnouncements, updateAnnouncementAssignment, updateAnnouncementReviewSla } from '../../lib/api/client';
 import type { AdminAnnouncementListItem } from '../../types';
 
@@ -106,8 +107,31 @@ export function QueueModule() {
     const hasError = pendingQuery.error || scheduledQuery.error;
     const filterSummary = `${rows.length} rows | view=${view} | sort=${sort}${assigneeFilter ? ` | assignee=${assigneeFilter}` : ''}`;
 
+    const pendingCount = pendingQuery.data?.length ?? 0;
+    const scheduledCount = scheduledQuery.data?.length ?? 0;
+    const mineCount = rows.filter((row) => row.claimedByCurrentUser).length;
+
     return (
-        <OpsCard title="Queue" description="Pending and scheduled content queue with ownership controls and review SLA visibility.">
+        <ModuleScaffold
+            eyebrow="Review Pipeline"
+            title="Queue"
+            description="Track pending and scheduled execution with clear ownership, SLA pressure, and fast assignment controls."
+            metrics={[
+                { key: 'pending', label: 'Pending queue', value: pendingCount, hint: 'Items waiting for review or publish.' },
+                { key: 'scheduled', label: 'Scheduled queue', value: scheduledCount, hint: 'Items already time-bound for release.' },
+                { key: 'mine', label: 'Assigned to me', value: mineCount, hint: 'Queue work already claimed by this operator.' },
+            ]}
+            headerActions={(
+                <>
+                    <button type="button" className="admin-btn subtle" onClick={() => setView('combined')}>
+                        Combined queue
+                    </button>
+                    <button type="button" className="admin-btn primary" onClick={() => void pendingQuery.refetch()}>
+                        Refresh queue
+                    </button>
+                </>
+            )}
+        >
             <div className="ops-stack">
                 <OpsToolbar
                     controls={
@@ -161,21 +185,6 @@ export function QueueModule() {
                     }
                 />
 
-                <div className="ops-count-grid">
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Pending queue</div>
-                        <div className="ops-kpi-value">{pendingQuery.data?.length ?? 0}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Scheduled queue</div>
-                        <div className="ops-kpi-value">{scheduledQuery.data?.length ?? 0}</div>
-                    </div>
-                    <div className="ops-kpi-card">
-                        <div className="ops-kpi-label">Assigned to me</div>
-                        <div className="ops-kpi-value">{rows.filter((row) => row.claimedByCurrentUser).length}</div>
-                    </div>
-                </div>
-
                 {loading ? <div className="admin-alert info">Loading queue...</div> : null}
                 {hasError ? <OpsErrorState message="Failed to load queue." /> : null}
                 {rows.length > 0 ? (
@@ -220,7 +229,7 @@ export function QueueModule() {
                                     </td>
                                     <td>{formatDateTime(row.updatedAt || row.publishedAt)}</td>
                                     <td>
-                                        <ActionOverflowMenu
+                                        <RowActionMenu
                                             itemLabel={row.title || row.id || row._id || 'queue item'}
                                             actions={[
                                                 {
@@ -270,6 +279,6 @@ export function QueueModule() {
                 ) : null}
                 {!loading && !hasError && rows.length === 0 ? <OpsEmptyState message="Queue is empty for selected view." /> : null}
             </div>
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

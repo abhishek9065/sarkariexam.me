@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
+import { ModuleScaffold } from '../../components/workspace';
 import { OpsBadge, OpsCard, OpsErrorState } from '../../components/ops';
 import {
     generateAdminBackupCodes,
@@ -918,18 +919,17 @@ function AdminSecurityWorkspace() {
 
 export function SettingsModule() {
     return (
-        <>
-            <OpsCard
-                title="Configuration Workspace"
-                description="Manage taxonomy, workflow defaults, homepage posture, security policy, and operator routing from a single admin route."
-            >
-                <div className="ops-meta-row">
-                    <OpsBadge tone="info">Access Control</OpsBadge>
-                    <OpsBadge tone="warning">Workflow</OpsBadge>
-                    <OpsBadge tone="success">Incident Response</OpsBadge>
-                </div>
-            </OpsCard>
-
+        <ModuleScaffold
+            eyebrow="System"
+            title="Configuration Workspace"
+            description="Manage taxonomy, workflow defaults, homepage posture, security policy, and operator routing from a single admin route."
+            metrics={[
+                { key: 'settings-taxonomy', label: 'Taxonomies', value: 3, tone: 'info' },
+                { key: 'settings-policies', label: 'Policy Packs', value: 4, tone: 'warning' },
+                { key: 'settings-auth', label: 'Auth Workspace', value: 1, tone: 'success' },
+            ]}
+        >
+            <div className="ops-stack">
             <ListSettingEditor
                 settingKey="states"
                 title="States List"
@@ -952,6 +952,7 @@ export function SettingsModule() {
             <SecurityPolicyEditor />
             <NotificationRoutingEditor />
             <AdminSecurityWorkspace />
-        </>
+            </div>
+        </ModuleScaffold>
     );
 }

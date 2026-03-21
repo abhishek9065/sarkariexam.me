@@ -12,7 +12,7 @@ type OpsTableProps = {
 
 export function OpsTable({ columns, children }: OpsTableProps) {
     return (
-        <div className="ops-table-wrap">
+        <div className="ops-table-wrap workspace-table-wrap">
             <table className="ops-table">
                 <thead>
                     <tr>

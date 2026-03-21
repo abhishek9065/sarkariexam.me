@@ -9,7 +9,7 @@ export function OpsBreadcrumb() {
         return (
             <nav className="ops-breadcrumb" aria-label="Breadcrumb">
                 <ol>
-                    <li className="ops-breadcrumb-current">Dashboard</li>
+                <li className="ops-breadcrumb-current">Today</li>
                 </ol>
             </nav>
         );
@@ -21,7 +21,7 @@ export function OpsBreadcrumb() {
        This covers single-item groups like Links/Link Manager and Media / PDFs. */
     const groupItemCount = adminModuleNavItems.filter((item) => item.group === mod.group).length;
     const isGroupRedundant =
-        mod.group === 'dashboard'
+        mod.group === 'today'
         || groupItemCount === 1
         || groupLabel === mod.label
         || mod.label.toLowerCase().includes(groupLabel.toLowerCase());
@@ -30,7 +30,7 @@ export function OpsBreadcrumb() {
         <nav className="ops-breadcrumb" aria-label="Breadcrumb">
             <ol>
                 <li>
-                    <Link to="/dashboard">Home</Link>
+                    <Link to="/dashboard">Today</Link>
                 </li>
                 {!isGroupRedundant && (
                     <li>

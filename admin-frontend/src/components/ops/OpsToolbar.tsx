@@ -8,9 +8,9 @@ type OpsToolbarProps = {
 
 export function OpsToolbar({ controls, actions, compact = false }: OpsToolbarProps) {
     return (
-        <div className="ops-toolbar">
-            <div className={`ops-toolbar-grid${compact ? ' two' : ''}`}>{controls}</div>
-            {actions ? <div className="ops-toolbar-actions">{actions}</div> : null}
+        <div className={`ops-toolbar workspace-filter-rail${compact ? ' compact' : ''}`}>
+            <div className={`ops-toolbar-grid workspace-filter-controls${compact ? ' two compact' : ''}`}>{controls}</div>
+            {actions ? <div className="ops-toolbar-actions workspace-filter-actions">{actions}</div> : null}
         </div>
     );
 }

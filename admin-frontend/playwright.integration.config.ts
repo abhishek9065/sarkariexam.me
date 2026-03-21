@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-const configuredBasename = process.env.VITE_ADMIN_BASENAME || '/admin-vnext';
+const configuredBasename = process.env.VITE_ADMIN_BASENAME || '/admin';
 const adminBasename = configuredBasename.startsWith('/') ? configuredBasename : `/${configuredBasename}`;
 const adminBasePath = adminBasename.endsWith('/') ? adminBasename : `${adminBasename}/`;
 const baseURL = `http://127.0.0.1:4175${adminBasePath}`;

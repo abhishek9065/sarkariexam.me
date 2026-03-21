@@ -6,7 +6,8 @@ import { useAdminAuth } from '../../app/useAdminAuth';
 import { useAdminPreferences } from '../../app/useAdminPreferences';
 import { AdminStepUpCard } from '../../components/AdminStepUpCard';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
-import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
 import { getAdminSecurityLogs, updateAdminSecurityIncident } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminSecurityLog } from '../../types';
@@ -141,7 +142,11 @@ export function SecurityModule() {
     return (
         <>
             <AdminStepUpCard />
-            <OpsCard title="Security" description="Risk-forward security events with incident ownership, state transitions, and filterable logs.">
+            <ModuleScaffold
+                eyebrow="Monitoring"
+                title="Security"
+                description="Risk-forward security events with incident ownership, state transitions, and filterable logs."
+            >
                 <div className="ops-stack">
                     <OpsToolbar
                         controls={
@@ -270,7 +275,7 @@ export function SecurityModule() {
                                                     Related Sessions
                                                 </button>
                                             </div>
-                                            <ActionOverflowMenu
+                                            <RowActionMenu
                                                 itemLabel={eventLabel}
                                                 actions={[
                                                     {
@@ -386,7 +391,7 @@ export function SecurityModule() {
                         <OpsErrorState message={updateMutation.error instanceof Error ? updateMutation.error.message : 'Failed to update security incident.'} />
                     ) : null}
                 </div>
-            </OpsCard>
+            </ModuleScaffold>
         </>
     );
 }

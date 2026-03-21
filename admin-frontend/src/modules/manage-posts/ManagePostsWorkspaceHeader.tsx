@@ -1,15 +1,8 @@
 import type { AdminManagePostsWorkspaceSnapshot } from '../../types';
-
-type SummaryCard = {
-    key: string;
-    label: string;
-    value: number | string;
-    hint: string;
-};
+import { ActionBar } from '../../components/workspace';
 
 type ManagePostsWorkspaceHeaderProps = {
     workspace: AdminManagePostsWorkspaceSnapshot;
-    summaryCards: SummaryCard[];
     activeLaneId: string;
     onSelectLane: (laneId: string) => void;
     formatDateTime: (value?: string | null) => string;
@@ -17,23 +10,13 @@ type ManagePostsWorkspaceHeaderProps = {
 
 export function ManagePostsWorkspaceHeader({
     workspace,
-    summaryCards,
     activeLaneId,
     onSelectLane,
     formatDateTime,
 }: ManagePostsWorkspaceHeaderProps) {
     return (
         <>
-            <div className="ops-kpi-grid">
-                {summaryCards.map((card) => (
-                    <div key={card.key} className="ops-kpi-card">
-                        <div className="ops-kpi-label">{card.label}</div>
-                        <div className="ops-kpi-value">{card.value}</div>
-                        <div className="ops-kpi-trend neutral">{card.hint}</div>
-                    </div>
-                ))}
-            </div>
-            <div className="ops-actions" aria-label="Manage post lanes">
+            <ActionBar aria-label="Manage post lanes">
                 {workspace.lanes.map((lane) => (
                     <button
                         key={lane.id}
@@ -45,7 +28,7 @@ export function ManagePostsWorkspaceHeader({
                     </button>
                 ))}
                 <span className="ops-inline-muted">Workspace refreshed {formatDateTime(workspace.generatedAt)}</span>
-            </div>
+            </ActionBar>
         </>
     );
 }

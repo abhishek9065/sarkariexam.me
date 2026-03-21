@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
+import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable } from '../../components/ops';
+import { ModuleScaffold } from '../../components/workspace';
 import { useAdminNotifications } from '../../components/ops/legacy-port';
 import { createAdminAlert, getAdminAlerts, updateAdminAlert } from '../../lib/api/client';
 import type { AdminAlert } from '../../types';
@@ -51,6 +52,7 @@ export function AlertsModule() {
     const alerts = useMemo(() => query.data?.data ?? [], [query.data]);
     const openCount = useMemo(() => alerts.filter((item) => item.status === 'open').length, [alerts]);
     const criticalCount = useMemo(() => alerts.filter((item) => item.severity === 'critical').length, [alerts]);
+    const acknowledgedCount = useMemo(() => alerts.filter((item) => item.status === 'acknowledged').length, [alerts]);
 
     const createMutation = useMutation({
         mutationFn: async () =>
@@ -88,9 +90,28 @@ export function AlertsModule() {
     });
 
     return (
-        <OpsCard title="Alerts" description="Monitor and manage operational alerts for deadlines, schedules, links, and traffic.">
-            <OpsToolbar
-                controls={(
+        <ModuleScaffold
+            eyebrow="Monitoring"
+            title="Alerts"
+            description="Monitor and manage operational alerts for deadlines, schedules, links, and traffic."
+            meta={<span>{alerts.length} alerts currently in the operations feed.</span>}
+            headerActions={(
+                <button
+                    type="button"
+                    className="admin-btn subtle"
+                    onClick={() => void query.refetch()}
+                >
+                    Refresh
+                </button>
+            )}
+            metrics={[
+                { key: 'total-alerts', label: 'Total Alerts', value: alerts.length },
+                { key: 'open-alerts', label: 'Open', value: openCount, tone: openCount > 0 ? 'warning' : 'neutral' },
+                { key: 'critical-alerts', label: 'Critical', value: criticalCount, tone: criticalCount > 0 ? 'danger' : 'neutral' },
+                { key: 'acknowledged-alerts', label: 'Acknowledged', value: acknowledgedCount },
+            ]}
+            filters={{
+                controls: (
                     <>
                         <select value={source} onChange={(event) => setSource(event.target.value as AlertSourceFilter)}>
                             <option value="all">Source: All</option>
@@ -113,152 +134,134 @@ export function AlertsModule() {
                             <option value="resolved">Resolved</option>
                         </select>
                     </>
-                )}
-                actions={(
+                ),
+                actions: (
                     <>
                         <span className="ops-inline-muted">Open: {openCount}</span>
                         <span className="ops-inline-muted">Critical: {criticalCount}</span>
-                        <button
-                            type="button"
-                            className="admin-btn small subtle"
-                            onClick={() => void query.refetch()}
-                        >
-                            Refresh
-                        </button>
                     </>
-                )}
-            />
+                ),
+            }}
+        >
+            <div className="ops-stack">
+                <OpsCard title="Create Manual Alert" description="Send a manual alert into the operations feed for urgent follow-up." tone="muted">
+                    <form
+                        className="ops-form-grid"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            createMutation.mutate();
+                        }}
+                    >
+                        <select
+                            value={form.source}
+                            onChange={(event) =>
+                                setForm((current) => ({ ...current, source: event.target.value as AlertFormState['source'] }))}
+                            aria-label="Alert source"
+                        >
+                            <option value="manual">Manual</option>
+                            <option value="deadline">Deadline</option>
+                            <option value="schedule">Schedule</option>
+                            <option value="link">Link Health</option>
+                            <option value="traffic">Traffic</option>
+                        </select>
+                        <select
+                            value={form.severity}
+                            onChange={(event) =>
+                                setForm((current) => ({ ...current, severity: event.target.value as AlertFormState['severity'] }))}
+                            aria-label="Alert severity"
+                        >
+                            <option value="info">Info</option>
+                            <option value="warning">Warning</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                        <button
+                            type="submit"
+                            className="admin-btn primary"
+                            disabled={createMutation.isPending || !form.message.trim()}
+                        >
+                            {createMutation.isPending ? 'Creating...' : 'Create Alert'}
+                        </button>
+                        <textarea
+                            className="ops-span-full"
+                            value={form.message}
+                            onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
+                            placeholder="Alert message"
+                            required
+                            minLength={3}
+                        />
+                    </form>
+                </OpsCard>
 
-            <div className="ops-kpi-grid">
-                <div className="ops-kpi-card">
-                    <div className="ops-kpi-label">Total Alerts</div>
-                    <div className="ops-kpi-value">{alerts.length}</div>
-                </div>
-                <div className="ops-kpi-card">
-                    <div className="ops-kpi-label">Open</div>
-                    <div className="ops-kpi-value">{openCount}</div>
-                </div>
-                <div className="ops-kpi-card">
-                    <div className="ops-kpi-label">Critical</div>
-                    <div className="ops-kpi-value">{criticalCount}</div>
-                </div>
+                {query.isPending ? <div className="admin-alert info">Loading alerts...</div> : null}
+                {query.error ? <OpsErrorState message="Failed to load alerts." /> : null}
+                {createMutation.error ? (
+                    <OpsErrorState message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create alert.'} />
+                ) : null}
+
+                {!query.isPending && !query.error && alerts.length === 0 ? (
+                    <OpsEmptyState message="No alerts in feed: All clear right now. Create manual alerts when operational action is required." />
+                ) : null}
+
+                {alerts.length > 0 ? (
+                    <OpsTable
+                        columns={[
+                            { key: 'message', label: 'Alert' },
+                            { key: 'source', label: 'Source' },
+                            { key: 'severity', label: 'Severity' },
+                            { key: 'status', label: 'Status' },
+                            { key: 'updatedAt', label: 'Updated' },
+                            { key: 'actions', label: 'Actions' },
+                        ]}
+                    >
+                        {alerts.map((alert) => (
+                            <tr key={alert.id}>
+                                <td>{alert.message}</td>
+                                <td>{alert.source}</td>
+                                <td>
+                                    <OpsBadge tone={toneBySeverity(alert.severity)}>{alert.severity}</OpsBadge>
+                                </td>
+                                <td>
+                                    <OpsBadge tone={toneByStatus(alert.status)}>{alert.status}</OpsBadge>
+                                </td>
+                                <td>{alert.updatedAt ? new Date(alert.updatedAt).toLocaleString() : '-'}</td>
+                                <td>
+                                    <div className="ops-actions">
+                                        {alert.status !== 'acknowledged' ? (
+                                            <button
+                                                type="button"
+                                                className="admin-btn small subtle"
+                                                disabled={patchMutation.isPending}
+                                                onClick={() => patchMutation.mutate({ id: alert.id, status: 'acknowledged' })}
+                                            >
+                                                Acknowledge
+                                            </button>
+                                        ) : null}
+                                        {alert.status !== 'resolved' ? (
+                                            <button
+                                                type="button"
+                                                className="admin-btn small"
+                                                disabled={patchMutation.isPending}
+                                                onClick={() => patchMutation.mutate({ id: alert.id, status: 'resolved' })}
+                                            >
+                                                Resolve
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="admin-btn small subtle"
+                                                disabled={patchMutation.isPending}
+                                                onClick={() => patchMutation.mutate({ id: alert.id, status: 'open' })}
+                                            >
+                                                Reopen
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </OpsTable>
+                ) : null}
             </div>
-
-            <form
-                className="ops-form-grid"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    createMutation.mutate();
-                }}
-            >
-                <select
-                    value={form.source}
-                    onChange={(event) =>
-                        setForm((current) => ({ ...current, source: event.target.value as AlertFormState['source'] }))}
-                    aria-label="Alert source"
-                >
-                    <option value="manual">Manual</option>
-                    <option value="deadline">Deadline</option>
-                    <option value="schedule">Schedule</option>
-                    <option value="link">Link Health</option>
-                    <option value="traffic">Traffic</option>
-                </select>
-                <select
-                    value={form.severity}
-                    onChange={(event) =>
-                        setForm((current) => ({ ...current, severity: event.target.value as AlertFormState['severity'] }))}
-                    aria-label="Alert severity"
-                >
-                    <option value="info">Info</option>
-                    <option value="warning">Warning</option>
-                    <option value="critical">Critical</option>
-                </select>
-                <button
-                    type="submit"
-                    className="admin-btn primary"
-                    disabled={createMutation.isPending || !form.message.trim()}
-                >
-                    {createMutation.isPending ? 'Creating...' : 'Create Alert'}
-                </button>
-                <textarea
-                    className="ops-span-full"
-                    value={form.message}
-                    onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
-                    placeholder="Alert message"
-                    required
-                    minLength={3}
-                />
-            </form>
-
-            {query.isPending ? <div className="admin-alert info">Loading alerts...</div> : null}
-            {query.error ? <OpsErrorState message="Failed to load alerts." /> : null}
-            {createMutation.error ? (
-                <OpsErrorState message={createMutation.error instanceof Error ? createMutation.error.message : 'Failed to create alert.'} />
-            ) : null}
-
-            {!query.isPending && !query.error && alerts.length === 0 ? (
-                <OpsEmptyState message="No alerts in feed: All clear right now. Create manual alerts when operational action is required." />
-            ) : null}
-
-            {alerts.length > 0 ? (
-                <OpsTable
-                    columns={[
-                        { key: 'message', label: 'Alert' },
-                        { key: 'source', label: 'Source' },
-                        { key: 'severity', label: 'Severity' },
-                        { key: 'status', label: 'Status' },
-                        { key: 'updatedAt', label: 'Updated' },
-                        { key: 'actions', label: 'Actions' },
-                    ]}
-                >
-                    {alerts.map((alert) => (
-                        <tr key={alert.id}>
-                            <td>{alert.message}</td>
-                            <td>{alert.source}</td>
-                            <td>
-                                <OpsBadge tone={toneBySeverity(alert.severity)}>{alert.severity}</OpsBadge>
-                            </td>
-                            <td>
-                                <OpsBadge tone={toneByStatus(alert.status)}>{alert.status}</OpsBadge>
-                            </td>
-                            <td>{alert.updatedAt ? new Date(alert.updatedAt).toLocaleString() : '-'}</td>
-                            <td>
-                                <div className="ops-actions">
-                                    {alert.status !== 'acknowledged' ? (
-                                        <button
-                                            type="button"
-                                            className="admin-btn small subtle"
-                                            disabled={patchMutation.isPending}
-                                            onClick={() => patchMutation.mutate({ id: alert.id, status: 'acknowledged' })}
-                                        >
-                                            Acknowledge
-                                        </button>
-                                    ) : null}
-                                    {alert.status !== 'resolved' ? (
-                                        <button
-                                            type="button"
-                                            className="admin-btn small"
-                                            disabled={patchMutation.isPending}
-                                            onClick={() => patchMutation.mutate({ id: alert.id, status: 'resolved' })}
-                                        >
-                                            Resolve
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            className="admin-btn small subtle"
-                                            disabled={patchMutation.isPending}
-                                            onClick={() => patchMutation.mutate({ id: alert.id, status: 'open' })}
-                                        >
-                                            Reopen
-                                        </button>
-                                    )}
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                </OpsTable>
-            ) : null}
-        </OpsCard>
+        </ModuleScaffold>
     );
 }

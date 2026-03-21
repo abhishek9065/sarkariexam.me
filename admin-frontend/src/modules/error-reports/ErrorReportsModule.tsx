@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAdminAuth } from '../../app/useAdminAuth';
 import { OpsBadge, OpsCard, OpsEmptyState, OpsErrorState, OpsTable, OpsToolbar } from '../../components/ops';
-import { ActionOverflowMenu, useAdminNotifications } from '../../components/ops/legacy-port';
+import { useAdminNotifications } from '../../components/ops/legacy-port';
+import { ModuleScaffold, RowActionMenu } from '../../components/workspace';
 import { getErrorReports, updateErrorReport } from '../../lib/api/client';
 import { trackAdminTelemetry } from '../../lib/adminTelemetry';
 import type { AdminErrorReport } from '../../types';
@@ -124,7 +125,11 @@ export function ErrorReportsModule() {
     };
 
     return (
-        <OpsCard title="Error Reports" description="Triage client error reports with incident ownership, release context, and direct escalation links.">
+        <ModuleScaffold
+            eyebrow="Monitoring"
+            title="Error Reports"
+            description="Triage client error reports with incident ownership, release context, and direct escalation links."
+        >
             <div className="ops-stack">
                 <OpsToolbar
                     compact
@@ -216,7 +221,7 @@ export function ErrorReportsModule() {
                                 </td>
                                 <td><OpsBadge tone={statusTone(row.status)}>{row.status}</OpsBadge></td>
                                 <td>
-                                    <ActionOverflowMenu
+                                    <RowActionMenu
                                         itemLabel={row.errorId}
                                         actions={[
                                             {
@@ -353,6 +358,6 @@ export function ErrorReportsModule() {
 
                 {!query.isPending && !query.error && rows.length === 0 ? <OpsEmptyState message="No reports found. Client-side errors will appear here automatically as users hit issues on the public site." /> : null}
             </div>
-        </OpsCard>
+        </ModuleScaffold>
     );
 }
