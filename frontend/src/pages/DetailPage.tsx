@@ -220,7 +220,7 @@ export function DetailPage({ type }: { type: ContentType }) {
             trackEvent(isBookmarked ? 'bookmark_remove' : 'bookmark_add', { slug: announcement?.slug ?? '' });
             showToast(isBookmarked ? 'Removed from saved jobs.' : 'Saved to your bookmarks! 📑');
 
-            queryClient.setQueryData(['bookmarks'], (old: any[]) => {
+            queryClient.setQueryData(['bookmarks'], (old: CardType[] | undefined) => {
                 if (!Array.isArray(old)) return old;
                 if (isBookmarked) return old.filter((b) => b.id !== announcement?.id);
                 return [...old, { id: announcement?.id }];

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type DependencyList } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '../components/AnnouncementCard';
@@ -129,7 +129,7 @@ function daysUntil(deadline?: string | null): number | null {
 }
 
 /* ─── Custom UX Hooks ─── */
-function useRevealOnScroll() {
+function useRevealOnScroll(dependencies: DependencyList) {
     useEffect(() => {
         const observer = new IntersectionObserver((entries) => {
             for (const e of entries) {
@@ -149,7 +149,7 @@ function useRevealOnScroll() {
             });
         }, 150);
         return () => { clearTimeout(timeoutId); observer.disconnect(); };
-    });
+    }, dependencies);
 }
 
 /* ─── Component ─── */
@@ -157,7 +157,6 @@ function useRevealOnScroll() {
 export function CategoryPage({ type }: { type: ContentType }) {
     const meta = SECTION_META[type];
     const [searchParams, setSearchParams] = useSearchParams();
-    useRevealOnScroll();
 
     /* URL-driven state */
     const sort = (searchParams.get('sort') as SortValue) || 'newest';
@@ -175,6 +174,8 @@ export function CategoryPage({ type }: { type: ContentType }) {
     const [hasMore, setHasMore] = useState(false);
     const [nextCursor, setNextCursor] = useState<string | undefined>();
     const [total, setTotal] = useState<number | undefined>();
+
+    useRevealOnScroll([cards, viewMode]);
 
     /* Filter dropdown options */
     const [filterOptionSets, setFilterOptionSets] = useState(FALLBACK_OPTIONS);

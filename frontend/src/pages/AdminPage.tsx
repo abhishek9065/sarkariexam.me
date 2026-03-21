@@ -2033,6 +2033,11 @@ export function AdminPage() {
         setReviewPreview(null);
     };
 
+    const reviewActionRefs = useRef({ handleBulkApprove, handleBulkReject, handleBulkSchedule });
+    useEffect(() => {
+        reviewActionRefs.current = { handleBulkApprove, handleBulkReject, handleBulkSchedule };
+    });
+
     const handleBulkQaFix = async () => {
         if (!canWriteAnnouncements) {
             setMessage(READ_ONLY_MESSAGE);
@@ -2687,15 +2692,15 @@ export function AdminPage() {
             const key = event.key.toLowerCase();
             if (key === 'a' && canApproveAnnouncements && selectedIds.size > 0 && !reviewLoading) {
                 event.preventDefault();
-                void handleBulkApprove();
+                void reviewActionRefs.current.handleBulkApprove();
             }
             if (key === 'r' && canApproveAnnouncements && selectedIds.size > 0 && !reviewLoading) {
                 event.preventDefault();
-                void handleBulkReject();
+                void reviewActionRefs.current.handleBulkReject();
             }
             if (key === 's' && canWriteAnnouncements && selectedIds.size > 0 && !reviewLoading) {
                 event.preventDefault();
-                void handleBulkSchedule();
+                void reviewActionRefs.current.handleBulkSchedule();
             }
         };
 
@@ -2708,10 +2713,7 @@ export function AdminPage() {
         enableAdminReviewV3,
         isLoggedIn,
         reviewLoading,
-        selectedIds.size,
-        handleBulkApprove,
-        handleBulkReject,
-        handleBulkSchedule,
+        selectedIds.size
     ]);
 
     useEffect(() => {

@@ -12,23 +12,25 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build for production (static export to /app/out)
+# Build production standalone server
 RUN npm run build
 
-# Production stage - serve with nginx (identical to Vite frontend)
-FROM nginx:alpine AS production
+# Runtime stage
+FROM node:22-alpine AS production
 
-# Copy built static files to nginx
-COPY --from=builder /app/out /usr/share/nginx/html
+WORKDIR /app
 
-# Copy custom nginx config for SPA routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-# Expose port
-EXPOSE 80
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
-# Health check
+EXPOSE 3000
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80 || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000 || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]
