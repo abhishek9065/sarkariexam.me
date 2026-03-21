@@ -205,7 +205,8 @@ export function removeBookmark(announcementId: string) {
 }
 
 /* ─── Token helpers ─── */
-export function setAuthToken(_token: string | null) {
+export function setAuthToken(token: string | null) {
+    void token;
     // Cookie-based auth — no-op in Next.js
 }
 

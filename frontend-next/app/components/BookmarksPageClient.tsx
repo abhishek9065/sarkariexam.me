@@ -1,14 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '@/app/components/AnnouncementCard';
+import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
 import { getBookmarks, removeBookmark } from '@/app/lib/api';
-function buildAnnouncementDetailPath(type: string, slug: string, _source?: string) { return `/${type}/${slug}`; }
 import type { AnnouncementCard as CardType } from '@/app/lib/types';
+import '@/app/components/PublicSurface.css';
 
 type SortMode = 'newest' | 'deadline' | 'type';
 type ViewMode = 'grid' | 'compact';
+
+function buildAnnouncementDetailPath(type: string, slug: string) {
+    return `/${type}/${slug}`;
+}
 
 function toTimestamp(value?: string | null): number {
     if (!value) return Number.POSITIVE_INFINITY;
@@ -16,6 +21,17 @@ function toTimestamp(value?: string | null): number {
     const time = date.getTime();
     return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
 }
+
+const SORT_LABELS: Record<SortMode, string> = {
+    newest: 'Newest',
+    deadline: 'Deadline',
+    type: 'Type',
+};
+
+const VIEW_LABELS: Record<ViewMode, string> = {
+    grid: 'Grid',
+    compact: 'Compact',
+};
 
 export function BookmarksPage() {
     const [bookmarks, setBookmarks] = useState<CardType[]>([]);
@@ -53,7 +69,7 @@ export function BookmarksPage() {
     }, []);
 
     useEffect(() => {
-        fetchBookmarks();
+        void fetchBookmarks();
     }, [fetchBookmarks]);
 
     const sortedBookmarks = useMemo(() => {
@@ -84,18 +100,51 @@ export function BookmarksPage() {
     }, []);
 
     return (
-        <>
-            <div className="bookmarks-page animate-fade-in">
-                <div className="section-header bookmarks-header">
-                    <h1>🔖 My Bookmarks</h1>
-                    {bookmarks.length > 0 && <span className="badge">{bookmarks.length} saved</span>}
+        <div className="hp public-shell">
+            <section className="public-hero">
+                <span className="public-kicker">Saved Updates</span>
+                <div className="public-hero-grid">
+                    <div className="public-hero-main">
+                        <h1 className="public-title">
+                            My <span className="public-title-accent">Bookmarks</span>
+                        </h1>
+                        <p className="public-sub">
+                            Keep a personal shortlist of important jobs, results, admit cards, and notifications. This page now follows the same
+                            public browsing system as the homepage and category feeds.
+                        </p>
+                    </div>
+                    <div className="public-hero-stats">
+                        <div className="public-stat-card">
+                            <span className="public-stat-value">{bookmarks.length}</span>
+                            <span className="public-stat-label">Saved items</span>
+                        </div>
+                        <div className="public-stat-card">
+                            <span className="public-stat-value">{SORT_LABELS[sort]}</span>
+                            <span className="public-stat-label">Current sort</span>
+                        </div>
+                        <div className="public-stat-card">
+                            <span className="public-stat-value">{VIEW_LABELS[viewMode]}</span>
+                            <span className="public-stat-label">Current view</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <PublicCategoryRail />
+
+            <section className="public-panel">
+                <div className="public-panel-header">
+                    <div>
+                        <h2 className="public-panel-title">Saved list</h2>
+                        <p className="public-panel-copy">Switch between card and compact views, or remove items you no longer need to track.</p>
+                    </div>
                 </div>
 
-                <div className="bookmarks-toolbar card">
-                    <label className="bookmarks-toolbar-item">
-                        Sort
+                <div className="public-toolbar">
+                    <label className="public-toolbar-group">
+                        <span className="public-toolbar-label">Sort by</span>
                         <select
-                            className="input"
+                            className="public-toolbar-select"
                             value={sort}
                             onChange={(event) => setSort(event.target.value as SortMode)}
                         >
@@ -105,82 +154,92 @@ export function BookmarksPage() {
                         </select>
                     </label>
 
-                    <div className="bookmarks-view-toggle" role="group" aria-label="Bookmark view mode">
-                        <button
-                            type="button"
-                            className={`bookmarks-view-btn${viewMode === 'grid' ? ' active' : ''}`}
-                            onClick={() => setViewMode('grid')}
-                        >
-                            Grid
-                        </button>
-                        <button
-                            type="button"
-                            className={`bookmarks-view-btn${viewMode === 'compact' ? ' active' : ''}`}
-                            onClick={() => setViewMode('compact')}
-                        >
-                            Compact
-                        </button>
+                    <div className="public-toolbar-group">
+                        <span className="public-toolbar-label">View mode</span>
+                        <div className="public-pill-toggle" role="group" aria-label="Bookmark view mode">
+                            <button
+                                type="button"
+                                className={`public-toolbar-pill${viewMode === 'grid' ? ' active' : ''}`}
+                                onClick={() => setViewMode('grid')}
+                            >
+                                Grid
+                            </button>
+                            <button
+                                type="button"
+                                className={`public-toolbar-pill${viewMode === 'compact' ? ' active' : ''}`}
+                                onClick={() => setViewMode('compact')}
+                            >
+                                Compact
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {loading ? (
-                    <div className="grid-auto">
-                        {Array.from({ length: 6 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
-                    </div>
-                ) : error ? (
-                    <div className="empty-state">
-                        <span className="empty-state-icon">⚠️</span>
-                        <h3>Something went wrong</h3>
-                        <p className="text-muted">Could not load your bookmarks. Please try again.</p>
-                        <button type="button" className="btn btn-accent" onClick={() => void fetchBookmarks()}>Retry</button>
-                    </div>
-                ) : sortedBookmarks.length === 0 ? (
-                    <div className="empty-state">
-                        <span className="empty-state-icon">🔖</span>
-                        <h3>No bookmarks yet</h3>
-                        <p className="text-muted">Save announcements to quickly access them later.</p>
-                    </div>
-                ) : viewMode === 'grid' ? (
-                    <div className="grid-auto">
-                        {sortedBookmarks.map((card) => (
-                            <div key={card.id} className="bookmark-card-wrapper">
-                                <AnnouncementCard card={card} sourceTag="bookmarks_grid" />
-                                <button
-                                    type="button"
-                                    className="bookmark-remove-btn"
-                                    onClick={() => handleRemove(card.id)}
-                                    disabled={removing.has(card.id)}
-                                    title="Remove bookmark"
-                                >
-                                    {removing.has(card.id) ? '⏳' : '✕'}
-                                </button>
+                <div style={{ marginTop: 'var(--space-4)' }}>
+                    {loading ? (
+                        <div className="public-bookmark-grid">
+                            {Array.from({ length: 6 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
+                        </div>
+                    ) : error ? (
+                        <div className="public-empty-state">
+                            <span className="public-empty-icon">⚠️</span>
+                            <h3>Could not load bookmarks</h3>
+                            <p>The saved list did not load successfully. Try again and we will refetch your bookmarked announcements.</p>
+                            <div className="public-actions-row">
+                                <button type="button" className="public-primary-btn" onClick={() => void fetchBookmarks()}>Retry</button>
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="bookmarks-compact-list">
-                        {sortedBookmarks.map((card) => (
-                            <div key={card.id} className="bookmarks-compact-row">
-                                <Link
-                                    href={buildAnnouncementDetailPath(card.type, card.slug, 'bookmarks_compact')}
-                                    className="bookmarks-compact-link"
-                                >
-                                    <strong>{card.title}</strong>
-                                    <span>{card.organization || 'Government update'}</span>
-                                </Link>
-                                <button
-                                    type="button"
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => handleRemove(card.id)}
-                                    disabled={removing.has(card.id)}
-                                >
-                                    {removing.has(card.id) ? 'Removing...' : 'Remove'}
-                                </button>
+                        </div>
+                    ) : sortedBookmarks.length === 0 ? (
+                        <div className="public-empty-state">
+                            <span className="public-empty-icon">🔖</span>
+                            <h3>No bookmarks yet</h3>
+                            <p>Save announcements from category feeds or detail pages to build your own shortlist here.</p>
+                            <div className="public-actions-row">
+                                <Link href="/jobs" className="public-secondary-link">Browse Jobs</Link>
+                                <Link href="/results" className="public-secondary-link">Browse Results</Link>
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </>
+                        </div>
+                    ) : viewMode === 'grid' ? (
+                        <div className="public-bookmark-grid">
+                            {sortedBookmarks.map((card) => (
+                                <div key={card.id} className="public-bookmark-card">
+                                    <AnnouncementCard card={card} sourceTag="bookmarks_grid" />
+                                    <button
+                                        type="button"
+                                        className="public-icon-btn public-bookmark-remove"
+                                        onClick={() => handleRemove(card.id)}
+                                        disabled={removing.has(card.id)}
+                                        title="Remove bookmark"
+                                    >
+                                        {removing.has(card.id) ? '...' : '×'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="public-bookmark-list">
+                            {sortedBookmarks.map((card) => (
+                                <div key={card.id} className="public-panel public-bookmark-row">
+                                    <Link href={buildAnnouncementDetailPath(card.type, card.slug)} className="public-bookmark-row-link">
+                                        <div className="public-bookmark-row-main">
+                                            <strong>{card.title}</strong>
+                                            <span>{card.organization || 'Government update'}{card.location ? ` • ${card.location}` : ''}</span>
+                                        </div>
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        className="public-compact-remove"
+                                        onClick={() => handleRemove(card.id)}
+                                        disabled={removing.has(card.id)}
+                                    >
+                                        {removing.has(card.id) ? 'Removing...' : 'Remove'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </section>
+        </div>
     );
 }

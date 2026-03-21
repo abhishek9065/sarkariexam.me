@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { AnnouncementCard } from '@/app/lib/types';
 type SourceTag = string;
-function buildAnnouncementDetailPath(type: string, slug: string, _source?: string) { return `/${type}/${slug}`; }
+function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
 interface Props {
     card: AnnouncementCard;
     sourceTag: SourceTag;

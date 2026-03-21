@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
 type SourceTag = string;
-function buildAnnouncementDetailPath(type: string, slug: string, _source?: string) { return `/${type}/${slug}`; }
+function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
 // analytics removed
-const trackEvent = (..._args: unknown[]) => { };
-const trackScrollDepth = (_page: string) => () => { };
+function trackEvent(...args: unknown[]) { void args; }
 const TYPE_LABELS: Record<ContentType, string> = {
     job: 'Job', result: 'Result', 'admit-card': 'Admit Card',
     'answer-key': 'Answer Key', admission: 'Admission', syllabus: 'Syllabus',

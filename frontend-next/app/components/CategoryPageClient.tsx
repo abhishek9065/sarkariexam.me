@@ -1,18 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '@/app/components/AnnouncementCard';
 import { CategoryListRow } from '@/app/components/category/CategoryListRow';
 import { getAnnouncementCards, getOrganizations } from '@/app/lib/api';
-// analytics removed
-const trackEvent = (..._args: unknown[]) => { };
-const trackScrollDepth = (_page: string) => () => { };
 import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
+// analytics removed
+const trackEvent = () => {};
+import '@/app/components/HomePage.css';
 import '@/app/components/CategoryPage.css';
-
-/* ─── Section-specific configuration ─── */
 
 interface SectionMeta {
     title: string;
@@ -32,45 +30,45 @@ const SECTION_META: Record<ContentType, SectionMeta> = {
     job: {
         title: 'Latest Jobs',
         icon: '💼',
-        description: 'New government job notifications updated daily.',
-        searchPlaceholder: 'Search job title, department, state…',
+        description: 'Track fresh government recruitment, application deadlines, and major hiring drives from one dense workspace.',
+        searchPlaceholder: 'Search job title, department, state...',
         chips: ['SSC', 'UPSC', 'Railway', 'Bank', 'Defence', 'Police'],
         filters: [
             { key: 'organization', label: 'Exam / Category', optionsKey: 'organizations' },
             { key: 'location', label: 'State', optionsKey: 'states' },
             { key: 'qualification', label: 'Qualification', optionsKey: 'qualifications' },
         ],
-        urgentLabel: '🔥 Closing Soon',
+        urgentLabel: 'Closing Soon',
     },
     result: {
         title: 'Results',
         icon: '📊',
-        description: 'Check exam results, merit lists, and cut-off marks.',
-        searchPlaceholder: 'Search exam / board / roll no keywords…',
+        description: 'Follow new result releases, merit lists, and official score updates without leaving the homepage design language.',
+        searchPlaceholder: 'Search exam, board, or result keyword...',
         chips: ['UPSC', 'SSC', 'Railway', 'State PSC', 'Bank'],
         filters: [
             { key: 'organization', label: 'Exam / Board', optionsKey: 'organizations' },
             { key: 'location', label: 'State', optionsKey: 'states' },
         ],
-        urgentLabel: '📌 Latest Results',
+        urgentLabel: 'Latest Results',
     },
     'admit-card': {
         title: 'Admit Cards',
         icon: '🎫',
-        description: 'Download hall tickets for upcoming examinations.',
-        searchPlaceholder: 'Search exam name, region…',
+        description: 'Find upcoming exam hall tickets, region-specific downloads, and near-term exam access links in one place.',
+        searchPlaceholder: 'Search exam name, region, or board...',
         chips: ['RRB', 'SSC', 'UPPSC', 'Bank PO', 'Defence'],
         filters: [
             { key: 'organization', label: 'Exam', optionsKey: 'organizations' },
             { key: 'location', label: 'Region / State', optionsKey: 'states' },
         ],
-        urgentLabel: '📅 Exams This Week',
+        urgentLabel: 'Exam Week',
     },
     'answer-key': {
         title: 'Answer Keys',
         icon: '🔑',
-        description: 'View official answer keys and raise objections.',
-        searchPlaceholder: 'Search exam, paper / set…',
+        description: 'Browse official answer keys, response sheets, and objection windows in the same public browsing experience.',
+        searchPlaceholder: 'Search exam, paper, or set...',
         chips: ['NTA', 'SSC', 'CBSE', 'State PSC', 'Railway'],
         filters: [
             { key: 'organization', label: 'Exam', optionsKey: 'organizations' },
@@ -80,8 +78,8 @@ const SECTION_META: Record<ContentType, SectionMeta> = {
     syllabus: {
         title: 'Syllabus',
         icon: '📚',
-        description: 'Exam syllabus, patterns, and preparation material.',
-        searchPlaceholder: 'Search exam, subject…',
+        description: 'Open the latest exam syllabus, subject pattern, and preparation references from a cleaner category workspace.',
+        searchPlaceholder: 'Search exam, subject, or level...',
         chips: ['SSC CGL', 'UPSC', 'Railway', 'NDA', 'Bank PO'],
         filters: [
             { key: 'organization', label: 'Exam', optionsKey: 'organizations' },
@@ -91,8 +89,8 @@ const SECTION_META: Record<ContentType, SectionMeta> = {
     admission: {
         title: 'Admissions',
         icon: '🎓',
-        description: 'University and college admission notifications.',
-        searchPlaceholder: 'Search university, course, entrance exam…',
+        description: 'Watch university admissions, counselling windows, and course notifications inside the same public browsing system.',
+        searchPlaceholder: 'Search university, course, or entrance exam...',
         chips: ['UG', 'PG', 'Engineering', 'Medical', 'Diploma'],
         filters: [
             { key: 'organization', label: 'University / Board', optionsKey: 'organizations' },
@@ -101,6 +99,15 @@ const SECTION_META: Record<ContentType, SectionMeta> = {
         ],
     },
 };
+
+const CATEGORY_LINKS: Array<{ type: ContentType; label: string; icon: string; href: string }> = [
+    { type: 'job', label: 'Latest Jobs', icon: '💼', href: '/jobs' },
+    { type: 'result', label: 'Results', icon: '📊', href: '/results' },
+    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: '/admit-card' },
+    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: '/answer-key' },
+    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: '/syllabus' },
+    { type: 'admission', label: 'Admissions', icon: '🎓', href: '/admission' },
+];
 
 const SORT_OPTIONS = [
     { value: 'newest', label: 'Newest First' },
@@ -125,21 +132,30 @@ const FALLBACK_OPTIONS = {
     organizations: ['SSC', 'UPSC', 'Railway', 'Banking', 'Defence', 'State PSC', 'Teaching'],
 };
 
-/* ─── Helpers ─── */
+const FILTER_ARIA_LABELS: Record<'organization' | 'location' | 'qualification', string> = {
+    organization: 'Organization',
+    location: 'State',
+    qualification: 'Qualification',
+};
 
 function daysUntil(deadline?: string | null): number | null {
     if (!deadline) return null;
     return Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
 }
 
-/* ─── Component ─── */
+function splitTitle(title: string): { lead: string; accent: string } {
+    const words = title.trim().split(/\s+/);
+    if (words.length <= 1) return { lead: '', accent: title };
+    const accent = words.pop() || title;
+    return { lead: words.join(' '), accent };
+}
 
 export function CategoryPage({ type }: { type: ContentType }) {
     const meta = SECTION_META[type];
+    const { lead, accent } = splitTitle(meta.title);
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    /* URL-driven state */
     const sort = (searchParams.get('sort') as SortValue) || 'newest';
     const search = searchParams.get('q') || '';
     const location = searchParams.get('location') || '';
@@ -147,7 +163,6 @@ export function CategoryPage({ type }: { type: ContentType }) {
     const organization = searchParams.get('organization') || '';
     const viewMode: ViewMode = (searchParams.get('view') as ViewMode) || 'compact';
 
-    /* Data state */
     const [cards, setCards] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -155,14 +170,8 @@ export function CategoryPage({ type }: { type: ContentType }) {
     const [hasMore, setHasMore] = useState(false);
     const [nextCursor, setNextCursor] = useState<string | undefined>();
     const [total, setTotal] = useState<number | undefined>();
-
-    /* Filter dropdown options */
     const [filterOptionSets, setFilterOptionSets] = useState(FALLBACK_OPTIONS);
-
-    /* Sidebar / sheet draft (matches URL until user clicks Apply) */
     const [draft, setDraft] = useState({ search, location, qualification, organization });
-
-    /* Mobile bottom-sheet */
     const [sheetOpen, setSheetOpen] = useState(false);
 
     useEffect(() => {
@@ -170,40 +179,44 @@ export function CategoryPage({ type }: { type: ContentType }) {
         return () => { document.body.style.overflow = ''; };
     }, [sheetOpen]);
 
-    const filterAriaLabelByKey: Record<'organization' | 'location' | 'qualification', string> = {
-        organization: 'Organization',
-        location: 'State',
-        qualification: 'Qualification',
-    };
+    const replaceParams = useCallback((params: URLSearchParams) => {
+        const next = params.toString();
+        router.replace(next ? `?${next}` : window.location.pathname);
+    }, [router]);
 
-    /* ─── Fetch filter options ─── */
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
                 const res = await getOrganizations();
-                const orgs = [...new Set((res.data || []).map((s) => s.trim()).filter(Boolean))];
+                const orgs = [...new Set((res.data || []).map((value) => value.trim()).filter(Boolean))];
                 if (!cancelled && orgs.length > 0) {
                     setFilterOptionSets((prev) => ({ ...prev, organizations: orgs }));
                 }
-            } catch { /* keep fallback */ }
+            } catch {
+                /* keep fallback options */
+            }
         })();
         return () => { cancelled = true; };
     }, [type]);
 
-    /* Keep draft in sync when URL changes */
     useEffect(() => {
         setDraft({ search, location, qualification, organization });
     }, [search, location, qualification, organization]);
 
-    /* ─── Fetch cards ─── */
     const fetchCards = useCallback(async (cursor?: string) => {
         const isInitial = !cursor;
-        if (isInitial) { setLoading(true); setFetchError(false); } else setLoadingMore(true);
+        if (isInitial) {
+            setLoading(true);
+            setFetchError(false);
+        } else {
+            setLoadingMore(true);
+        }
 
         try {
             const res = await getAnnouncementCards({
-                type, sort,
+                type,
+                sort,
                 search: search || undefined,
                 location: location || undefined,
                 qualification: qualification || undefined,
@@ -211,68 +224,68 @@ export function CategoryPage({ type }: { type: ContentType }) {
                 limit: type === 'job' ? JOB_PAGE_SIZE : DEFAULT_PAGE_SIZE,
                 cursor,
             });
-            if (isInitial) setCards(res.data);
-            else setCards((prev) => [...prev, ...res.data]);
+            if (isInitial) {
+                setCards(res.data);
+            } else {
+                setCards((prev) => [...prev, ...res.data]);
+            }
             setHasMore(res.hasMore ?? false);
             setNextCursor(res.nextCursor);
             if (res.total !== undefined) setTotal(res.total);
-        } catch (err) {
-            console.error('Failed to fetch cards:', err);
+        } catch (error) {
+            console.error('Failed to fetch cards:', error);
             if (isInitial) setFetchError(true);
         } finally {
             setLoading(false);
             setLoadingMore(false);
         }
-    }, [type, sort, search, location, qualification, organization]);
+    }, [location, organization, qualification, search, sort, type]);
 
     useEffect(() => {
         setCards([]);
         setNextCursor(undefined);
-        fetchCards();
+        void fetchCards();
     }, [fetchCards]);
 
-    /* ─── URL param helpers ─── */
-    const updateParam = useCallback(
-        (key: string, value: string) => {
-            const p = new URLSearchParams(searchParams.toString());
-            if (value) p.set(key, value); else p.delete(key);
-            router.replace(`?${p.toString()}`);
-        },
-        [searchParams, router.replace],
-    );
+    const updateParam = useCallback((key: string, value: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value) params.set(key, value);
+        else params.delete(key);
+        replaceParams(params);
+    }, [replaceParams, searchParams]);
 
     const applyFilters = useCallback(() => {
-        const p = new URLSearchParams(searchParams.toString());
+        const params = new URLSearchParams(searchParams.toString());
         const mapping: Array<[keyof typeof draft, string]> = [
-            ['search', 'q'], ['location', 'location'], ['qualification', 'qualification'], ['organization', 'organization'],
+            ['search', 'q'],
+            ['location', 'location'],
+            ['qualification', 'qualification'],
+            ['organization', 'organization'],
         ];
-        for (const [dk, uk] of mapping) {
-            if (draft[dk]) p.set(uk, draft[dk]); else p.delete(uk);
+        for (const [draftKey, urlKey] of mapping) {
+            if (draft[draftKey]) params.set(urlKey, draft[draftKey]);
+            else params.delete(urlKey);
         }
-        router.replace(`?${p.toString()}`);
+        replaceParams(params);
         setSheetOpen(false);
         trackEvent('filter_apply', { type, ...draft });
-    }, [draft, searchParams, router.replace, type]);
+    }, [draft, replaceParams, searchParams, type]);
 
     const resetFilters = useCallback(() => {
         setDraft({ search: '', location: '', qualification: '', organization: '' });
-        const p = new URLSearchParams(searchParams.toString());
-        for (const k of ['q', 'location', 'qualification', 'organization']) p.delete(k);
-        router.replace(`?${p.toString()}`);
+        const params = new URLSearchParams(searchParams.toString());
+        for (const key of ['q', 'location', 'qualification', 'organization']) params.delete(key);
+        replaceParams(params);
         setSheetOpen(false);
         trackEvent('filter_reset', { type });
-    }, [searchParams, router.replace, type]);
+    }, [replaceParams, searchParams, type]);
 
-    const removeFilter = useCallback(
-        (key: 'q' | 'location' | 'qualification' | 'organization') => {
-            updateParam(key, '');
-            const draftKey = key === 'q' ? 'search' : key;
-            setDraft((prev) => ({ ...prev, [draftKey]: '' }));
-        },
-        [updateParam],
-    );
+    const removeFilter = useCallback((key: 'q' | 'location' | 'qualification' | 'organization') => {
+        updateParam(key, '');
+        const draftKey = key === 'q' ? 'search' : key;
+        setDraft((prev) => ({ ...prev, [draftKey]: '' }));
+    }, [updateParam]);
 
-    /* ─── Derived data ─── */
     const activeFilters = useMemo(() => {
         const list: Array<{ label: string; key: 'q' | 'location' | 'qualification' | 'organization' }> = [];
         if (search) list.push({ label: `"${search}"`, key: 'q' });
@@ -280,257 +293,327 @@ export function CategoryPage({ type }: { type: ContentType }) {
         if (qualification) list.push({ label: qualification, key: 'qualification' });
         if (organization) list.push({ label: organization, key: 'organization' });
         return list;
-    }, [search, location, qualification, organization]);
+    }, [location, organization, qualification, search]);
 
-    /* Closing-soon / pinned strip (max 3) */
     const urgentItems = useMemo(() => {
         if (!meta.urgentLabel) return [];
-        return cards.filter((c) => {
-            const d = daysUntil(c.deadline);
-            return d !== null && d >= 0 && d <= 7;
+        return cards.filter((card) => {
+            const remaining = daysUntil(card.deadline);
+            return remaining !== null && remaining >= 0 && remaining <= 7;
         }).slice(0, 3);
     }, [cards, meta.urgentLabel]);
 
-    /* ─── Shared filter controls renderer ─── */
-    const renderFilterFields = (prefix: string) => (
+    const resultSummary = useMemo(() => {
+        if (loading) return 'Loading live updates...';
+        if (total !== undefined) return `${cards.length.toLocaleString()} shown of ${total.toLocaleString()} updates`;
+        if (cards.length > 0) return `${cards.length.toLocaleString()} updates loaded`;
+        return 'No updates available right now';
+    }, [cards.length, loading, total]);
+
+    const renderFilterFields = useCallback((prefix: 'cat-home-filter' | 'cat-sheet') => (
         <>
-            {meta.filters.map((f) => {
-                const draftKey = f.key as keyof typeof draft;
+            {meta.filters.map((filter) => {
+                const draftKey = filter.key as keyof typeof draft;
                 return (
-                    <div key={f.key} className={`${prefix}-group`}>
-                        <label className={`${prefix}-label`}>{f.label}</label>
+                    <div key={filter.key} className={`${prefix}-group`}>
+                        <label className={`${prefix}-label`}>{filter.label}</label>
                         <select
                             className={`${prefix}-select`}
-                            aria-label={filterAriaLabelByKey[f.key]}
+                            aria-label={FILTER_ARIA_LABELS[filter.key]}
                             value={draft[draftKey]}
-                            onChange={(e) => setDraft((prev) => ({ ...prev, [draftKey]: e.target.value }))}
+                            onChange={(event) => setDraft((prev) => ({ ...prev, [draftKey]: event.target.value }))}
                         >
                             <option value="">All</option>
-                            {filterOptionSets[f.optionsKey].map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
+                            {filterOptionSets[filter.optionsKey].map((option) => (
+                                <option key={option} value={option}>{option}</option>
                             ))}
                         </select>
                     </div>
                 );
             })}
         </>
-    );
+    ), [draft, filterOptionSets, meta.filters]);
 
     return (
         <>
-            {/* Breadcrumb */}
-            <nav className="cat-breadcrumb">
-                <Link href="/">Home</Link>
-                <span className="cat-breadcrumb-sep">›</span>
-                <span className="cat-breadcrumb-current">{meta.title}</span>
-            </nav>
+            <div className="hp cat-home" data-testid={`category-page-${type}`}>
+                <nav className="cat-home-breadcrumb" aria-label="Breadcrumb">
+                    <Link href="/">Home</Link>
+                    <span className="cat-home-breadcrumb-sep">/</span>
+                    <span className="cat-home-breadcrumb-current">{meta.title}</span>
+                </nav>
 
-            {/* Hero v2 with integrated search */}
-            <section className="cat-hero-v2 animate-fade-in">
-                <div className="cat-hero-v2-inner">
-                    <div className="cat-hero-v2-icon"><span>{meta.icon}</span></div>
-                    <div className="cat-hero-v2-text">
-                        <h1 className="cat-hero-v2-title">{meta.title}</h1>
-                        <p className="cat-hero-v2-desc">{meta.description}</p>
-                    </div>
-                    {total !== undefined && (
-                        <div className="cat-hero-v2-count">
-                            <span className="cat-hero-v2-count-num">{total.toLocaleString()}</span>
-                            <span className="cat-hero-v2-count-label">Total</span>
+                <section className="hp-hero cat-home-hero">
+                    <div className="cat-home-kicker">Homepage-style browsing</div>
+                    <div className="cat-home-hero-panel">
+                        <div className="cat-home-hero-copy">
+                            <div className="cat-home-icon" aria-hidden="true">{meta.icon}</div>
+                            <div>
+                                <h1 className="hp-hero-title">
+                                    {lead ? `${lead} ` : ''}
+                                    <span className="hp-hero-accent">{accent}</span>
+                                </h1>
+                                <p className="hp-hero-sub">{meta.description}</p>
+                            </div>
                         </div>
-                    )}
-                </div>
-                <div className="cat-hero-search">
-                    <span className="cat-hero-search-icon">🔍</span>
-                    <input
-                        type="text"
-                        placeholder={meta.searchPlaceholder}
-                        value={draft.search}
-                        onChange={(e) => setDraft((prev) => ({ ...prev, search: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }}
-                    />
-                </div>
-            </section>
+                        <div className="cat-home-stats" aria-label="Category summary">
+                            <div className="cat-home-stat">
+                                <span className="cat-home-stat-value">{loading ? '...' : (total ?? cards.length).toLocaleString()}</span>
+                                <span className="cat-home-stat-label">Live updates</span>
+                            </div>
+                            <div className="cat-home-stat">
+                                <span className="cat-home-stat-value">{urgentItems.length.toLocaleString()}</span>
+                                <span className="cat-home-stat-label">Closing soon</span>
+                            </div>
+                            <div className="cat-home-stat">
+                                <span className="cat-home-stat-value">{activeFilters.length.toLocaleString()}</span>
+                                <span className="cat-home-stat-label">Active filters</span>
+                            </div>
+                        </div>
+                    </div>
 
-            {/* 2-column layout: sidebar + results */}
-            <div className="cat-layout">
-                {/* Desktop filter sidebar */}
-                <aside className="cat-sidebar" data-testid="jobs-filter-panel">
-                    <h2 className="cat-sidebar-title">🎛️ Filters</h2>
-                    <div className="cat-sidebar-group">
-                        <label className="cat-sidebar-label">Search</label>
+                    <form
+                        className="hp-search cat-home-search"
+                        role="search"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            applyFilters();
+                        }}
+                    >
+                        <span className="hp-search-icon" aria-hidden="true">🔍</span>
                         <input
-                            type="text"
-                            className="cat-sidebar-input"
-                            aria-label="Search"
+                            className="hp-search-input"
+                            type="search"
                             placeholder={meta.searchPlaceholder}
                             value={draft.search}
-                            onChange={(e) => setDraft((prev) => ({ ...prev, search: e.target.value }))}
-                            onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }}
+                            onChange={(event) => setDraft((prev) => ({ ...prev, search: event.target.value }))}
+                            aria-label={meta.searchPlaceholder}
                         />
-                    </div>
-                    {renderFilterFields('cat-sidebar')}
+                        <button className="hp-search-btn" type="submit">Search</button>
+                    </form>
+                </section>
 
-                    <div className="cat-sidebar-group">
-                        <label className="cat-sidebar-label">Sort By</label>
-                        <select className="cat-sidebar-select" value={sort} onChange={(e) => updateParam('sort', e.target.value)}>
-                            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                    </div>
+                <nav className="hp-cats cat-home-cats" aria-label="Browse categories">
+                    {CATEGORY_LINKS.map((category) => (
+                        <Link
+                            key={category.type}
+                            href={category.href}
+                            className={`hp-cat-card cat-home-cat-card${category.type === type ? ' is-active' : ''}`}
+                        >
+                            <span className="hp-cat-icon">{category.icon}</span>
+                            <span className="hp-cat-label">{category.label}</span>
+                        </Link>
+                    ))}
+                </nav>
 
-                    <div className="cat-sidebar-actions">
-                        <button type="button" className="cat-sidebar-apply" onClick={applyFilters}>Apply Filters</button>
-                        <button type="button" className="cat-sidebar-reset" onClick={resetFilters}>Reset</button>
+                <section className="home-dense-box cat-home-filter-card" data-testid="jobs-filter-panel">
+                    <div className="home-dense-box-header">
+                        <h2>Refine {meta.title}</h2>
+                        <button type="button" className="cat-home-filter-reset" onClick={resetFilters}>Reset all</button>
                     </div>
-                </aside>
+                    <div className="cat-home-filter-grid">
+                        {renderFilterFields('cat-home-filter')}
+                        <div className="cat-home-filter-group">
+                            <label className="cat-home-filter-label">Sort by</label>
+                            <select
+                                className="cat-home-filter-select"
+                                value={sort}
+                                onChange={(event) => updateParam('sort', event.target.value)}
+                            >
+                                {SORT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="cat-home-filter-actions">
+                            <button type="button" className="cat-home-filter-apply" onClick={applyFilters}>Apply filters</button>
+                        </div>
+                    </div>
+                </section>
 
-                {/* Main results column */}
-                <main className="cat-main">
-                    {/* Toolbar */}
-                    <div className="cat-toolbar">
-                        <button type="button" className="cat-filter-trigger" onClick={() => setSheetOpen(true)}>
-                            🎛️ Filters
-                            {activeFilters.length > 0 && <span className="cat-filter-badge">{activeFilters.length}</span>}
-                        </button>
-                        <span className="cat-results-count">
-                            {!loading && total !== undefined
-                                ? `Showing ${cards.length > 0 ? 1 : 0}–${cards.length} of ${total.toLocaleString()}`
-                                : !loading && cards.length > 0 ? `${cards.length} results` : ''}
-                        </span>
-                        <select className="cat-toolbar-sort" value={sort} onChange={(e) => updateParam('sort', e.target.value)}>
-                            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                        <div className="cat-view-toggle-v2" role="group" aria-label="View mode">
-                            <button type="button" className={`cat-view-btn-v2${viewMode === 'compact' ? ' active' : ''}`} onClick={() => updateParam('view', 'compact')} title="List">☰</button>
-                            <button type="button" className={`cat-view-btn-v2${viewMode === 'card' ? ' active' : ''}`} onClick={() => updateParam('view', 'card')} title="Cards">▦</button>
+                <section className="home-dense-box cat-home-results-box">
+                    <div className="cat-home-results-head">
+                        <div>
+                            <div className="home-dense-box-header">
+                                <h2>{meta.title} feed</h2>
+                            </div>
+                            <p className="cat-home-results-copy">{resultSummary}</p>
+                        </div>
+                        <div className="cat-home-results-controls">
+                            <button type="button" className="cat-home-mobile-filter" onClick={() => setSheetOpen(true)}>
+                                Filters
+                                {activeFilters.length > 0 && <span className="cat-home-filter-badge">{activeFilters.length}</span>}
+                            </button>
+                            <select
+                                className="cat-home-toolbar-sort"
+                                value={sort}
+                                onChange={(event) => updateParam('sort', event.target.value)}
+                                aria-label="Sort results"
+                            >
+                                {SORT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                            <div className="cat-home-view-toggle" role="group" aria-label="View mode">
+                                <button
+                                    type="button"
+                                    className={`cat-home-view-btn${viewMode === 'compact' ? ' active' : ''}`}
+                                    onClick={() => updateParam('view', 'compact')}
+                                    title="List view"
+                                >
+                                    List
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`cat-home-view-btn${viewMode === 'card' ? ' active' : ''}`}
+                                    onClick={() => updateParam('view', 'card')}
+                                    title="Card view"
+                                >
+                                    Cards
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Active filters */}
                     {activeFilters.length > 0 && (
-                        <div className="cat-active-filters">
-                            {activeFilters.map((f) => (
-                                <span key={f.key} className="cat-active-tag">
-                                    {f.label}
-                                    <button type="button" onClick={() => removeFilter(f.key)} aria-label={`Remove ${f.label}`}>✕</button>
+                        <div className="cat-home-active-filters">
+                            {activeFilters.map((filter) => (
+                                <span key={filter.key} className="cat-home-active-tag">
+                                    {filter.label}
+                                    <button type="button" onClick={() => removeFilter(filter.key)} aria-label={`Remove ${filter.label}`}>
+                                        x
+                                    </button>
                                 </span>
                             ))}
-                            <button type="button" className="cat-clear-all" onClick={resetFilters}>Clear all</button>
+                            <button type="button" className="cat-home-clear-all" onClick={resetFilters}>Clear all</button>
                         </div>
                     )}
 
-                    {/* Urgent strip */}
-                    {!loading && urgentItems.length > 0 && meta.urgentLabel && (
-                        <div className="cat-urgent-strip">
-                            <span className="cat-urgent-label">{meta.urgentLabel}</span>
-                            {urgentItems.map((c) => {
-                                const d = daysUntil(c.deadline);
-                                return (
-                                    <Link key={c.id} href={`/${c.type}/${c.slug}`} className="cat-urgent-item">
-                                        {c.title.length > 40 ? c.title.slice(0, 40) + '…' : c.title}
-                                        {d !== null && d >= 0 && <span className="cat-urgent-days">{d === 0 ? 'Today' : `${d}d`}</span>}
-                                    </Link>
-                                );
-                            })}
+                    <div className="cat-home-highlights">
+                        <div className="cat-home-chip-rail">
+                            <span className="cat-home-chip-label">Popular searches</span>
+                            {meta.chips.map((chip) => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    className={`cat-home-chip${search === chip ? ' active' : ''}`}
+                                    onClick={() => {
+                                        const nextSearch = search === chip ? '' : chip;
+                                        setDraft((prev) => ({ ...prev, search: nextSearch }));
+                                        updateParam('q', nextSearch);
+                                        trackEvent('chip_click', { type, chip });
+                                    }}
+                                >
+                                    {chip}
+                                </button>
+                            ))}
                         </div>
-                    )}
 
-                    {/* Quick chips */}
-                    <div className="cat-chips-v2">
-                        <span className="cat-chips-v2-label">Popular:</span>
-                        {meta.chips.map((chip) => (
-                            <button
-                                key={chip}
-                                type="button"
-                                className={`cat-chip-v2${search === chip ? ' active' : ''}`}
-                                onClick={() => {
-                                    const next = search === chip ? '' : chip;
-                                    setDraft((prev) => ({ ...prev, search: next }));
-                                    updateParam('q', next);
-                                    trackEvent('chip_click', { type, chip });
-                                }}
-                            >
-                                {chip}
-                            </button>
-                        ))}
+                        {!loading && urgentItems.length > 0 && meta.urgentLabel && (
+                            <div className="cat-home-urgent" aria-label={meta.urgentLabel}>
+                                <span className="cat-home-urgent-label">{meta.urgentLabel}</span>
+                                <div className="cat-home-urgent-links">
+                                    {urgentItems.map((card) => {
+                                        const remaining = daysUntil(card.deadline);
+                                        return (
+                                            <Link key={card.id} href={`/${card.type}/${card.slug}`} className="cat-home-urgent-link">
+                                                <span>{card.title.length > 44 ? `${card.title.slice(0, 44)}...` : card.title}</span>
+                                                {remaining !== null && remaining >= 0 && (
+                                                    <span className="cat-home-urgent-days">{remaining === 0 ? 'Today' : `${remaining}d`}</span>
+                                                )}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Results */}
                     {loading ? (
                         <div className="cat-skeleton-grid">
-                            {Array.from({ length: 8 }).map((_, i) => <AnnouncementCardSkeleton key={i} />)}
+                            {Array.from({ length: 8 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
                         </div>
                     ) : viewMode === 'compact' ? (
-                        <div className="cat-compact-list animate-fade-in" data-testid="category-compact-list">
-                            {cards.map((card, i) => <CategoryListRow key={card.id} card={card} sourceTag="category_compact" index={i + 1} />)}
+                        <div className="cat-compact-list" data-testid="category-compact-list">
+                            {cards.map((card, index) => (
+                                <CategoryListRow key={card.id} card={card} sourceTag="category_compact" index={index + 1} />
+                            ))}
                         </div>
                     ) : (
-                        <div className="cat-cards-grid animate-fade-in">
-                            {cards.map((card) => <AnnouncementCard key={card.id} card={card} showType={false} sourceTag="category_list" />)}
+                        <div className="cat-cards-grid">
+                            {cards.map((card) => (
+                                <AnnouncementCard key={card.id} card={card} showType={false} sourceTag="category_list" />
+                            ))}
                         </div>
                     )}
 
-                    {/* Empty */}
                     {!loading && cards.length === 0 && !fetchError && (
                         <div className="cat-empty">
                             <span className="cat-empty-icon">📭</span>
                             <h3>No {meta.title.toLowerCase()} found</h3>
-                            <p>Try adjusting your search filters or check back later for new updates.</p>
+                            <p>Try another keyword, clear a filter, or check again after the next official update.</p>
                         </div>
                     )}
 
-                    {/* Error */}
                     {!loading && fetchError && (
                         <div className="cat-empty cat-empty-error">
                             <span className="cat-empty-icon">⚠️</span>
-                            <h3>Something went wrong</h3>
-                            <p>Could not load {meta.title.toLowerCase()}. Please try again.</p>
-                            <button type="button" className="btn btn-accent" onClick={() => void fetchCards()}>Retry</button>
+                            <h3>Unable to load {meta.title.toLowerCase()}</h3>
+                            <p>The category feed did not load successfully. Try again and we will refetch the latest updates.</p>
+                            <button type="button" className="cat-home-filter-apply" onClick={() => void fetchCards()}>Retry</button>
                         </div>
                     )}
 
-                    {/* Load more */}
                     {hasMore && !loading && (
                         <div className="cat-load-more">
-                            <button type="button" className="cat-load-more-btn" onClick={() => fetchCards(nextCursor)} disabled={loadingMore}>
-                                {loadingMore ? (
-                                    <><span className="spinner" style={{ width: 16, height: 16 }} /> Loading…</>
-                                ) : 'Load More →'}
+                            <button
+                                type="button"
+                                className="cat-load-more-btn"
+                                onClick={() => void fetchCards(nextCursor)}
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? 'Loading...' : 'Load more updates'}
                             </button>
                         </div>
                     )}
-                </main>
+                </section>
             </div>
 
-            {/* Mobile bottom-sheet */}
             {sheetOpen && (
                 <div className="cat-sheet-overlay" onClick={() => setSheetOpen(false)}>
-                    <div className="cat-sheet" onClick={(e) => e.stopPropagation()}>
+                    <div className="cat-sheet" onClick={(event) => event.stopPropagation()}>
                         <div className="cat-sheet-handle"><span /></div>
                         <div className="cat-sheet-header">
-                            <h3>Filters</h3>
-                            <button type="button" className="cat-sheet-close" onClick={() => setSheetOpen(false)}>✕</button>
+                            <h3>Refine {meta.title}</h3>
+                            <button type="button" className="cat-sheet-close" onClick={() => setSheetOpen(false)}>x</button>
                         </div>
                         <div className="cat-sheet-body">
                             <div className="cat-sheet-group">
-                                <label>Search</label>
+                                <label className="cat-sheet-label">Search</label>
                                 <input
-                                    type="text"
+                                    className="cat-sheet-input"
+                                    type="search"
                                     placeholder={meta.searchPlaceholder}
                                     value={draft.search}
-                                    onChange={(e) => setDraft((prev) => ({ ...prev, search: e.target.value }))}
+                                    onChange={(event) => setDraft((prev) => ({ ...prev, search: event.target.value }))}
                                 />
                             </div>
                             {renderFilterFields('cat-sheet')}
                             <div className="cat-sheet-group">
-                                <label>Sort By</label>
-                                <select value={sort} onChange={(e) => updateParam('sort', e.target.value)}>
-                                    {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                <label className="cat-sheet-label">Sort by</label>
+                                <select
+                                    className="cat-sheet-select"
+                                    value={sort}
+                                    onChange={(event) => updateParam('sort', event.target.value)}
+                                >
+                                    {SORT_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
                                 </select>
                             </div>
                         </div>
                         <div className="cat-sheet-footer">
-                            <button type="button" className="cat-sheet-apply" onClick={applyFilters}>Apply Filters</button>
+                            <button type="button" className="cat-sheet-apply" onClick={applyFilters}>Apply filters</button>
                             <button type="button" className="cat-sheet-reset" onClick={resetFilters}>Reset</button>
                         </div>
                     </div>

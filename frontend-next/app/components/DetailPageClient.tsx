@@ -7,9 +7,9 @@ import DOMPurify from 'dompurify';
 import { AnnouncementCard } from '@/app/components/AnnouncementCard';
 import { getAnnouncementBySlug, getAnnouncementCards, addBookmark, removeBookmark, getBookmarks } from '@/app/lib/api';
 // analytics removed
-const trackEvent = (..._args: unknown[]) => {};
-const trackScrollDepth = (_page: string) => () => {};
+const trackEvent = () => {};
 import type { Announcement, AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
+import '@/app/components/HomePage.css';
 import '@/app/components/DetailPage.css';
 
 /* ── JobDetails sub-types (mirrors admin JobPostingForm) ── */
@@ -44,6 +44,10 @@ const TYPE_LABELS: Record<ContentType, string> = {
     job: 'Latest Jobs', result: 'Results', 'admit-card': 'Admit Cards',
     'answer-key': 'Answer Keys', admission: 'Admissions', syllabus: 'Syllabus',
 };
+const TYPE_ICONS: Record<ContentType, string> = {
+    job: '💼', result: '📊', 'admit-card': '🎫',
+    'answer-key': '🔑', admission: '🎓', syllabus: '📚',
+};
 const TYPE_ROUTES: Record<ContentType, string> = {
     job: '/jobs', result: '/results', 'admit-card': '/admit-card',
     'answer-key': '/answer-key', admission: '/admission', syllabus: '/syllabus',
@@ -52,6 +56,22 @@ const TYPE_CTA: Record<ContentType, string> = {
     job: 'Apply Online', result: 'Check Result', 'admit-card': 'Download Admit Card',
     'answer-key': 'Download Answer Key', admission: 'Apply Now', syllabus: 'View Syllabus',
 };
+const TYPE_SUMMARIES: Record<ContentType, string> = {
+    job: 'Official recruitment summary, eligibility, deadlines, and apply links collected into one clean briefing.',
+    result: 'Result release details, official links, and the key exam summary are grouped into one readable page.',
+    'admit-card': 'Exam access details, admit card links, and supporting instructions stay visible in one structured layout.',
+    'answer-key': 'Answer key links, objection windows, and the main exam context are organized into one focused page.',
+    admission: 'Admission notice, course details, deadlines, and application links are grouped into one reliable reference.',
+    syllabus: 'Syllabus, exam pattern, and useful supporting details are arranged into one quick reading surface.',
+};
+const CATEGORY_LINKS: Array<{ type: ContentType; label: string; icon: string; href: string }> = [
+    { type: 'job', label: 'Latest Jobs', icon: '💼', href: '/jobs' },
+    { type: 'result', label: 'Results', icon: '📊', href: '/results' },
+    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: '/admit-card' },
+    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: '/answer-key' },
+    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: '/syllabus' },
+    { type: 'admission', label: 'Admissions', icon: '🎓', href: '/admission' },
+];
 
 /* ── Helpers ── */
 function formatDate(dateStr?: string | null): string {
@@ -224,10 +244,18 @@ export function DetailPage({ type }: { type: ContentType }) {
 
     const toNum = (v: unknown) => { const n = typeof v === 'number' ? v : Number(v); return Number.isFinite(n) ? n : 0; };
     const fmtCount = (v?: number | null) => toNum(v).toLocaleString('en-IN');
+    const heroSummary = [
+        TYPE_SUMMARIES[a.type],
+        a.organization ? `${a.organization} notification.` : '',
+        a.location ? `Relevant for ${a.location}.` : '',
+    ].filter(Boolean).join(' ');
+    const postedLabel = formatDate(a.postedAt);
+    const updatedLabel = formatDate(a.updatedAt);
 
     return (
         <>
-            <article className="sr-detail animate-fade-in">
+            <div className="hp sr-home animate-fade-in">
+            <article className="sr-detail">
                 {/* ─── Breadcrumb ─── */}
                 <nav className="sr-breadcrumb">
                     <Link href="/">Home</Link>
@@ -235,6 +263,19 @@ export function DetailPage({ type }: { type: ContentType }) {
                     <Link href={TYPE_ROUTES[type]}>{TYPE_LABELS[type]}</Link>
                     <span className="sr-bc-sep">›</span>
                     <span className="sr-bc-current">{a.title}</span>
+                </nav>
+
+                <nav className="hp-cats sr-category-rail" aria-label="Browse public categories">
+                    {CATEGORY_LINKS.map((category) => (
+                        <Link
+                            key={category.type}
+                            href={category.href}
+                            className={`hp-cat-card sr-category-card${category.type === type ? ' is-active' : ''}`}
+                        >
+                            <span className="hp-cat-icon">{category.icon}</span>
+                            <span className="hp-cat-label">{category.label}</span>
+                        </Link>
+                    ))}
                 </nav>
 
                 {/* ─── Stale/Expired Warnings ─── */}
@@ -251,51 +292,65 @@ export function DetailPage({ type }: { type: ContentType }) {
 
                 {/* ─── Hero Header ─── */}
                 <header className="sr-hero">
-                    {/* Status Banner — prominent, full width */}
-                    {deadline && (
-                        <div className={`sr-status-banner ${deadline.cls}`}>
-                            <span className="sr-status-icon">{isClosed ? '🔴' : daysLeft !== null && daysLeft <= 3 ? '🔥' : '🟢'}</span>
-                            <span className="sr-status-text">{deadline.label}</span>
-                            {daysLeft !== null && daysLeft > 0 && !isClosed && <span className="sr-status-countdown">({daysLeft} days to apply)</span>}
-                            <span className="sr-status-date">Updated: {formatDate(a.updatedAt)}</span>
-                        </div>
-                    )}
-                    <h1 className="sr-title">{a.title}</h1>
-                    {a.organization && <p className="sr-org">{a.organization}</p>}
-
-                    {/* Quick Stats */}
-                    <div className="sr-stats-grid">
-                        {a.totalPosts != null && a.totalPosts > 0 && (
-                            <div className="sr-stat-card sr-stat-vacancy">
-                                <span className="sr-stat-label">Total Posts</span>
-                                <strong className="sr-stat-value">{a.totalPosts.toLocaleString('en-IN')}</strong>
-                            </div>
-                        )}
-                        {a.deadline && (
-                            <div className={`sr-stat-card ${deadlineStatCls}`}>
-                                <span className="sr-stat-label">Last Date</span>
-                                <strong className="sr-stat-value">{formatDate(a.deadline)}</strong>
-                                {daysLeft !== null && daysLeft >= 0 && !isClosed && (
-                                    <span className="sr-stat-countdown">{daysLeft === 0 ? 'Today!' : `${daysLeft} days left`}</span>
-                                )}
-                                {isClosed && <span className="sr-stat-countdown sr-stat-expired">Expired</span>}
-                            </div>
-                        )}
-                        {a.minQualification && (
-                            <div className="sr-stat-card sr-stat-qual">
-                                <span className="sr-stat-label">Qualification</span>
-                                <strong className="sr-stat-value">{a.minQualification}</strong>
-                            </div>
-                        )}
-                        {salary && (
-                            <div className="sr-stat-card sr-stat-salary">
-                                <span className="sr-stat-label">Salary</span>
-                                <strong className="sr-stat-value">{salary}</strong>
-                            </div>
+                    <div className="sr-hero-kicker-row">
+                        <span className="sr-hero-kicker">{TYPE_ICONS[type]} {TYPE_LABELS[type]}</span>
+                        {deadline && (
+                            <span className={`sr-hero-status-pill ${deadline.cls}`}>
+                                {deadline.label}
+                                {daysLeft !== null && daysLeft > 0 && !isClosed ? ` • ${daysLeft}d left` : ''}
+                            </span>
                         )}
                     </div>
 
-                    {/* Action Bar */}
+                    <div className="sr-hero-layout">
+                        <div className="sr-hero-primary">
+                            <h1 className="sr-title">{a.title}</h1>
+                            <p className="sr-hero-summary">{heroSummary}</p>
+                            <div className="sr-hero-meta">
+                                {a.organization && <span className="sr-hero-meta-chip">🏛 {a.organization}</span>}
+                                {a.location && <span className="sr-hero-meta-chip">📍 {a.location}</span>}
+                                <span className="sr-hero-meta-chip">🗓 Posted {postedLabel}</span>
+                                <span className="sr-hero-meta-chip">🔄 Updated {updatedLabel}</span>
+                                {a.viewCount != null && a.viewCount > 0 && (
+                                    <span className="sr-hero-meta-chip">👁 {a.viewCount.toLocaleString('en-IN')} views</span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="sr-hero-aside">
+                            <div className="sr-stats-grid">
+                                {a.totalPosts != null && a.totalPosts > 0 && (
+                                    <div className="sr-stat-card sr-stat-vacancy">
+                                        <span className="sr-stat-label">Total Posts</span>
+                                        <strong className="sr-stat-value">{a.totalPosts.toLocaleString('en-IN')}</strong>
+                                    </div>
+                                )}
+                                {a.deadline && (
+                                    <div className={`sr-stat-card ${deadlineStatCls}`}>
+                                        <span className="sr-stat-label">Last Date</span>
+                                        <strong className="sr-stat-value">{formatDate(a.deadline)}</strong>
+                                        {daysLeft !== null && daysLeft >= 0 && !isClosed && (
+                                            <span className="sr-stat-countdown">{daysLeft === 0 ? 'Today!' : `${daysLeft} days left`}</span>
+                                        )}
+                                        {isClosed && <span className="sr-stat-countdown sr-stat-expired">Expired</span>}
+                                    </div>
+                                )}
+                                {a.minQualification && (
+                                    <div className="sr-stat-card sr-stat-qual">
+                                        <span className="sr-stat-label">Qualification</span>
+                                        <strong className="sr-stat-value">{a.minQualification}</strong>
+                                    </div>
+                                )}
+                                {salary && (
+                                    <div className="sr-stat-card sr-stat-salary">
+                                        <span className="sr-stat-label">Salary</span>
+                                        <strong className="sr-stat-value">{salary}</strong>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="sr-action-bar hide-on-print">
                         {isClosed ? (
                             <span className="sr-btn-closed">❌ Application Closed</span>
@@ -687,6 +742,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                     </section>
                 )}
             </article>
+            </div>
 
             {/* ─── Sticky Mobile CTA ─── */}
             <div className="sr-mobile-cta">

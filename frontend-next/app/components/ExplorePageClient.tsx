@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
+import '@/app/components/PublicSurface.css';
 
-/* Organization quick-links moved out from old homepage/footer */
 const ORG_GROUPS: Array<{ heading: string; items: Array<{ label: string; to: string }> }> = [
     {
         heading: 'Central Government',
@@ -41,35 +42,65 @@ const ORG_GROUPS: Array<{ heading: string; items: Array<{ label: string; to: str
 ];
 
 export function ExplorePage() {
+    const totalCollections = ORG_GROUPS.length;
+    const totalLinks = ORG_GROUPS.reduce((sum, group) => sum + group.items.length, 0);
+
     return (
-        <>
-            <div className="explore-page">
-                <section className="explore-hero">
-                    <h1 className="explore-title">Explore Organizations</h1>
-                    <p className="explore-desc">
-                        Browse government job vacancies by organization, state, or sector.
-                    </p>
-                </section>
+        <div className="hp public-shell">
+            <section className="public-hero">
+                <span className="public-kicker">Explore Public Categories</span>
+                <div className="public-hero-grid">
+                    <div className="public-hero-main">
+                        <h1 className="public-title">
+                            Explore <span className="public-title-accent">Organizations</span>
+                        </h1>
+                        <p className="public-sub">
+                            Browse government updates by exam body, state board, or sector. This page is now aligned with the same public-site
+                            design language as the homepage, category feeds, and detail pages.
+                        </p>
+                    </div>
+                    <div className="public-hero-stats">
+                        <div className="public-stat-card">
+                            <span className="public-stat-value">{totalCollections}</span>
+                            <span className="public-stat-label">Collections</span>
+                        </div>
+                        <div className="public-stat-card">
+                            <span className="public-stat-value">{totalLinks}</span>
+                            <span className="public-stat-label">Direct shortcuts</span>
+                        </div>
+                        <div className="public-stat-card">
+                            <span className="public-stat-value">Jobs + Exams</span>
+                            <span className="public-stat-label">Coverage</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                <div className="explore-grid">
-                    {ORG_GROUPS.map((group) => (
-                        <section key={group.heading} className="explore-group">
-                            <h2 className="explore-group-title">{group.heading}</h2>
-                            <div className="explore-chips">
-                                {group.items.map((item) => (
-                                    <Link key={item.label} href={item.to} className="explore-chip">
-                                        {item.label}
-                                    </Link>
-                                ))}
+            <PublicCategoryRail />
+
+            <div className="public-explore-grid">
+                {ORG_GROUPS.map((group) => (
+                    <section key={group.heading} className="public-panel">
+                        <div className="public-panel-header">
+                            <div>
+                                <h2 className="public-panel-title">{group.heading}</h2>
+                                <p className="public-panel-copy">{group.items.length} direct filters to jump into the live category feeds.</p>
                             </div>
-                        </section>
-                    ))}
-                </div>
-
-                <div className="explore-back">
-                    <Link href="/" className="explore-back-btn">← Back to Home</Link>
-                </div>
+                        </div>
+                        <div className="public-explore-links">
+                            {group.items.map((item) => (
+                                <Link key={item.label} href={item.to} className="public-link-chip">
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                ))}
             </div>
-        </>
+
+            <div className="public-back-row">
+                <Link href="/" className="public-secondary-link">Back to Home</Link>
+            </div>
+        </div>
     );
 }

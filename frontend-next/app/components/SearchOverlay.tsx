@@ -1,14 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getSearchSuggestions, getTrendingSearches } from '@/app/lib/api';
 import type { SearchSuggestion, ContentType } from '@/app/lib/types';
-function buildAnnouncementDetailPath(type: string, slug: string, _source?: string) { return `/${type}/${slug}`; }
+function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
 // analytics removed
-const trackEvent = (..._args: unknown[]) => {};
-const trackScrollDepth = (_page: string) => () => {};
+function trackEvent(...args: unknown[]) { void args; }
 const TYPE_ICONS: Record<ContentType, string> = {
     job: '💼',
     result: '📊',
@@ -63,7 +61,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     const [loading, setLoading] = useState(false);
     const [selectedIdx, setSelectedIdx] = useState(-1);
     const inputRef = useRef<HTMLInputElement>(null);
-    const navigate = useRouter();
+    const router = useRouter();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -137,7 +135,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
         trackEvent('search_select', { type: suggestion.type, slug: suggestion.slug });
         router.push(buildAnnouncementDetailPath(suggestion.type, suggestion.slug, 'search_overlay'));
         onClose();
-    }, [navigate, onClose]);
+    }, [onClose, router]);
 
     const openSearchResults = useCallback((term: string) => {
         const cleaned = term.trim();
@@ -146,7 +144,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
         trackEvent('search_submit', { query: cleaned });
         router.push(`/jobs?q=${encodeURIComponent(cleaned)}&source=search_overlay`);
         onClose();
-    }, [navigate, onClose]);
+    }, [onClose, router]);
 
     const handleClearRecent = useCallback(() => {
         clearRecentSearches();

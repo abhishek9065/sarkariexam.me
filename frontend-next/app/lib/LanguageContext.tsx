@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 
 import { LanguageContext, type LanguageCode, type LanguageContextValue } from './language-context';
 
@@ -54,14 +54,13 @@ const TRANSLATIONS: Record<LanguageCode, Record<string, string>> = {
 };
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-    const [language, setLanguageState] = useState<LanguageCode>('en');
-
-    useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY) as LanguageCode | null;
-        if (stored === 'en' || stored === 'hi') {
-            setLanguageState(stored);
+    const [language, setLanguageState] = useState<LanguageCode>(() => {
+        if (typeof window === 'undefined') {
+            return 'en';
         }
-    }, []);
+        const stored = window.localStorage.getItem(STORAGE_KEY) as LanguageCode | null;
+        return stored === 'en' || stored === 'hi' ? stored : 'en';
+    });
 
     const setLanguage = useCallback((lang: LanguageCode) => {
         setLanguageState(lang);
@@ -81,7 +80,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         setLanguage,
         toggleLanguage,
         t: (key: string) => TRANSLATIONS[language][key] || TRANSLATIONS.en[key] || key,
-    }), [language]);
+    }), [language, setLanguage, toggleLanguage]);
 
     return (
         <LanguageContext.Provider value={value}>
@@ -89,4 +88,3 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         </LanguageContext.Provider>
     );
 }
-

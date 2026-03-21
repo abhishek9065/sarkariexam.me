@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getBookmarkIds, getHomepageFeed, getSearchSuggestions } from '@/app/lib/api';
-function buildAnnouncementDetailPath(type: string, slug: string, _source?: string) { return `/${type}/${slug}`; }
+function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
 type SourceTag = string;
 // analytics removed
-const trackEvent = (..._args: unknown[]) => {};
-const trackScrollDepth = (_page: string) => () => {};
+function trackEvent(...args: unknown[]) { void args; }
+function trackScrollDepth(page: string) { void page; return () => {}; }
 import { useAuth } from '@/app/lib/useAuth';
 import type { AnnouncementCard, ContentType, HomepageFeedSections, SearchSuggestion } from '@/app/lib/types';
 
@@ -273,6 +273,7 @@ export function HomePage() {
     const [activeFilter, setActiveFilter] = useState<'all' | ContentType>('all');
     const [userPrefs, setUserPrefs] = useState<ContentType[]>(getSavedPrefs());
     const [showPicker, setShowPicker] = useState(!user && !hasDismissedPicker());
+    const queryTrimmed = searchQuery.trim();
 
     // Predictive Search State
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
@@ -287,15 +288,13 @@ export function HomePage() {
 
     // Fetch predictive search suggestions
     useEffect(() => {
-        const q = searchQuery.trim();
-        if (!q || q.length < 2) {
-            setSuggestions([]);
+        if (!queryTrimmed || queryTrimmed.length < 2) {
             return;
         }
         let active = true;
         const timer = setTimeout(async () => {
             try {
-                const res = await getSearchSuggestions(q);
+                const res = await getSearchSuggestions(queryTrimmed);
                 if (active && mountedRef.current) setSuggestions(res.data || []);
             } catch {
                 if (active && mountedRef.current) setSuggestions([]);
@@ -305,7 +304,7 @@ export function HomePage() {
             active = false;
             clearTimeout(timer);
         };
-    }, [searchQuery]);
+    }, [queryTrimmed]);
 
     // Handle click outside for suggestions dropdown
     useEffect(() => {
@@ -324,12 +323,6 @@ export function HomePage() {
         return cleanup;
     }, []);
 
-    useEffect(() => {
-        if (user) {
-            setShowPicker(false);
-        }
-    }, [user]);
-
     const homepageQuery = useQuery({
         queryKey: ['homepage-feed'],
         queryFn: () => getHomepageFeed(),
@@ -341,11 +334,16 @@ export function HomePage() {
         enabled: Boolean(user) && homepageQuery.isSuccess,
     });
 
-    const updates = homepageQuery.data?.data.latest ?? [];
-    const homepageSections = homepageQuery.data?.data.sections ?? HOMEPAGE_EMPTY_SECTIONS;
+    const homepageData = homepageQuery.data?.data;
+    const updates = useMemo(() => homepageData?.latest ?? [], [homepageData]);
+    const homepageSections = useMemo(() => homepageData?.sections ?? HOMEPAGE_EMPTY_SECTIONS, [homepageData]);
+    const homepageAdmitCards = homepageSections['admit-card'];
+    const homepageAnswerKeys = homepageSections['answer-key'];
     const bookmarkedIds = useMemo(() => new Set(bookmarkIdsQuery.data?.data ?? []), [bookmarkIdsQuery.data]);
     const loading = homepageQuery.isPending;
     const showLoadError = homepageQuery.isError && updates.length === 0;
+    const visibleSuggestions = queryTrimmed.length >= 2 ? suggestions : [];
+    const isPreferencePickerVisible = !user && showPicker;
 
     /* Filter + personalization logic */
     const filteredUpdates = useMemo(() => {
@@ -374,12 +372,12 @@ export function HomePage() {
 
     const denseJobs = useMemo(() => makeDenseItems(homepageSections.job, 'home_box_jobs', '/jobs'), [homepageSections.job, makeDenseItems]);
     const denseResults = useMemo(() => makeDenseItems(homepageSections.result, 'home_box_results', '/results'), [homepageSections.result, makeDenseItems]);
-    const denseAdmit = useMemo(() => makeDenseItems(homepageSections['admit-card'], 'home_box_admit', '/admit-card'), [homepageSections['admit-card'], makeDenseItems]);
-    const denseAnswerKey = useMemo(() => makeDenseItems(homepageSections['answer-key'], 'home_box_answer_key', '/answer-key'), [homepageSections['answer-key'], makeDenseItems]);
+    const denseAdmit = useMemo(() => makeDenseItems(homepageAdmitCards, 'home_box_admit', '/admit-card'), [homepageAdmitCards, makeDenseItems]);
+    const denseAnswerKey = useMemo(() => makeDenseItems(homepageAnswerKeys, 'home_box_answer_key', '/answer-key'), [homepageAnswerKeys, makeDenseItems]);
     const denseSyllabus = useMemo(() => makeDenseItems(homepageSections.syllabus, 'home_box_syllabus', '/syllabus'), [homepageSections.syllabus, makeDenseItems]);
     const denseAdmission = useMemo(() => makeDenseItems(homepageSections.admission, 'home_box_admission', '/admission'), [homepageSections.admission, makeDenseItems]);
     const denseImportant = useMemo(() => makeDenseItems(updates, 'home_box_important', '/jobs'), [makeDenseItems, updates]);
-    const denseCertificate = useMemo(() => makeDenseItems(homepageSections['admit-card'], 'home_box_certificate', '/admit-card'), [homepageSections['admit-card'], makeDenseItems]);
+    const denseCertificate = useMemo(() => makeDenseItems(homepageAdmitCards, 'home_box_certificate', '/admit-card'), [homepageAdmitCards, makeDenseItems]);
 
     const [mobileMajorTab, setMobileMajorTab] = useState<'job' | 'admit-card' | 'result'>('job');
     const mobileMajorItems = useMemo(() => {
@@ -469,7 +467,11 @@ export function HomePage() {
                                 placeholder="Search jobs, exams, results..."
                                 value={searchQuery}
                                 onChange={(e) => {
-                                    setSearchQuery(e.target.value);
+                                    const nextValue = e.target.value;
+                                    setSearchQuery(nextValue);
+                                    if (nextValue.trim().length < 2) {
+                                        setSuggestions([]);
+                                    }
                                     setShowSuggestions(true);
                                 }}
                                 onFocus={() => setShowSuggestions(true)}
@@ -478,11 +480,11 @@ export function HomePage() {
                             <button className="hp-search-btn" type="submit">Search</button>
 
                             {/* Predictive Search Dropdown */}
-                            {showSuggestions && searchQuery.trim().length >= 2 && (
+                            {showSuggestions && queryTrimmed.length >= 2 && (
                                 <div className="hp-search-suggestions">
-                                    {suggestions.length > 0 ? (
+                                    {visibleSuggestions.length > 0 ? (
                                         <ul className="hp-search-suggest-list">
-                                            {suggestions.map((s, idx) => (
+                                            {visibleSuggestions.map((s, idx) => (
                                                 <li key={idx}>
                                                     <Link
                                                         href={buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay' as SourceTag)}
@@ -639,7 +641,7 @@ export function HomePage() {
                     </section>
 
                     {/* ═══ PREFERENCE PICKER (anonymous, first visit) ═══ */}
-                    {showPicker && (
+                    {isPreferencePickerVisible && (
                         <PreferencePicker onDone={(prefs) => {
                             setUserPrefs(prefs);
                             setShowPicker(false);
@@ -648,7 +650,7 @@ export function HomePage() {
                     )}
 
                     {/* ═══ FOR YOU (personalized, when prefs exist) ═══ */}
-                    {!showPicker && forYouItems.length > 0 && (
+                    {!isPreferencePickerVisible && forYouItems.length > 0 && (
                         <section className="hp-for-you">
                             <div className="hp-section-header">
                                 <h2 className="hp-section-title">⚡ For You</h2>
