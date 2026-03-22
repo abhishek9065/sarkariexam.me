@@ -123,7 +123,7 @@ export function TemplatesModule() {
                 updatedBy: undefined,
             }),
         onSuccess: async (record) => {
-            notifySuccess('Template created', `Template "${record.name}" is ready for faster editorial starts.`);
+            notifySuccess('Template created', `Template "${record.name}" is ready for faster post creation.`);
             setForm(buildDefaultTemplateForm(canManageSharedTemplates));
             await invalidateTemplates();
         },
@@ -162,7 +162,7 @@ export function TemplatesModule() {
         onSuccess: async (_, input) => {
             notifySuccess(
                 'Visibility updated',
-                input.shared ? 'Template is now shared with the editorial team.' : 'Template is now private to your workspace.'
+                input.shared ? 'Template is now shared across the admin team.' : 'Template is now private to your workspace.'
             );
             await invalidateTemplates();
         },
@@ -270,11 +270,11 @@ export function TemplatesModule() {
             <ModuleScaffold
                 eyebrow="Publishing"
                 title="Templates"
-                description="Template management is limited to roles that can create editorial content."
+                description="Template management is limited to roles that can create posts."
             >
                 <PermissionState
                     title="Template management requires content-write access."
-                    description="You can still use shared templates from editorial workflows where your role allows them, but you cannot create or maintain template records from this workspace."
+                    description="You can still use shared templates where your role allows them, but you cannot create or maintain template records from this workspace."
                 />
             </ModuleScaffold>
         );
@@ -284,7 +284,7 @@ export function TemplatesModule() {
         <ModuleScaffold
             eyebrow="Publishing"
             title="Templates"
-            description="Maintain reusable editorial scaffolds, ownership-aware private drafts, and shared templates for the publishing desk."
+            description="Maintain reusable post scaffolds, ownership-aware private drafts, and shared templates for the publishing desk."
             metrics={[
                 { key: 'templates-total', label: 'Templates', value: templates.length },
                 { key: 'templates-shared', label: 'Shared', value: sharedCount, tone: sharedCount > 0 ? 'info' : 'neutral' },

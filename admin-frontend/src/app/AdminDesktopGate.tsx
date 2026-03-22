@@ -31,9 +31,9 @@ export function AdminDesktopGate({ children }: AdminDesktopGateProps) {
                 <div className="admin-desktop-gate-card">
                     <div className="admin-desktop-gate-mark">SE</div>
                     <p className="admin-desktop-gate-kicker">Desktop Required</p>
-                    <h1>Open the editorial console on a larger screen.</h1>
+                    <h1>Open SarkariExams Admin on a larger screen.</h1>
                     <p>
-                        The rebuilt SarkariExams admin is optimized for dense editorial, review, and governance workflows.
+                        SarkariExams Admin is designed for full-table workflows, post editing, reviews, and settings management.
                         Use a desktop or laptop viewport at 1120px or wider to continue.
                     </p>
                     <div className="admin-desktop-gate-actions">
@@ -41,7 +41,7 @@ export function AdminDesktopGate({ children }: AdminDesktopGateProps) {
                             View public site
                         </a>
                         <a className="admin-btn subtle" href="/admin-legacy">
-                            Open legacy rollback
+                            Open legacy admin
                         </a>
                     </div>
                 </div>

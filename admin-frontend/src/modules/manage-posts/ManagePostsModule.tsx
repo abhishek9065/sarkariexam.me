@@ -526,7 +526,7 @@ export function ManagePostsModule() {
         <ModuleScaffold
             eyebrow="Content Desk"
             title="Manage Posts"
-            description="Run the editorial inbox from one workbench: lanes, filters, saved views, assignment pressure, and preview-first bulk actions."
+            description="Run the post inbox from one workbench: lanes, filters, saved views, assignment pressure, and preview-first bulk actions."
             metrics={summaryCards.map((card) => ({
                 key: card.key,
                 label: card.label,

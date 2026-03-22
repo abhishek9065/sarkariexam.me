@@ -418,7 +418,7 @@ export function DashboardPage() {
         <ModuleScaffold
             eyebrow="Today"
             title="Dashboard"
-            description="The editorial command desk for today’s assignments, approvals, incidents, and performance signals."
+            description="Your main admin desk for today’s assignments, approvals, incidents, and performance signals."
         >
             <div className="ops-card dash-hero-card">
                 <div className="dash-hero-header">

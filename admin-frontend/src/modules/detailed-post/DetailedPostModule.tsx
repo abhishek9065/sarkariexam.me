@@ -279,7 +279,7 @@ export function DetailedPostModule() {
             <ModuleScaffold
                 eyebrow="Content Desk"
                 title="Detailed Post"
-                description="Edit, compare revisions, autosave drafts, and preview the public route from one deep editorial workspace."
+                description="Edit, compare revisions, autosave drafts, and preview the public route from one deep post workspace."
                 metrics={[
                     { key: 'selected', label: 'Selected record', value: selectedId || 'None', hint: 'Pick a post from the list to enter editor mode.' },
                     { key: 'autosave', label: 'Autosave', value: autosaveEnabled ? 'On' : 'Off', hint: lastAutosaveAt ? `Last autosave ${new Date(lastAutosaveAt).toLocaleString()}` : 'Autosave waits until a record is selected.' },

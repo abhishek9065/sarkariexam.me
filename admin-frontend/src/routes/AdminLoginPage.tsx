@@ -242,18 +242,18 @@ export function AdminLoginPage() {
             : { tone: 'info' as const, label: 'Session Sign-In' };
     const railItems = [
         {
-            title: 'Session auth',
+            title: 'Same account flow',
             description: mode === 'login'
-                ? 'Sign in with password and two-factor to enter the console.'
-                : 'Recovery stays isolated from editorial work until the session is restored.',
+                ? 'Use your admin password and two-factor code to enter the same SarkariExams workspace.'
+                : 'Recovery stays separate until your account access is restored.',
         },
         {
-            title: 'Step-up later',
-            description: 'Publish, approval, delete, and account controls still require fresh verification inside the console.',
+            title: 'Extra check for risky actions',
+            description: 'Publish, approval, delete, and account controls still ask for fresh verification inside admin.',
         },
         {
-            title: 'Desktop workflow',
-            description: 'The rebuilt admin is optimized for dense editorial, review, and governance work on large screens.',
+            title: 'Desktop workspace',
+            description: 'The admin stays desktop-first so posts, tables, reviews, and settings remain easy to manage.',
         },
     ];
     const workspaceGroups = ['Today', 'Content Desk', 'Review Pipeline', 'Governance', 'Monitoring'];
@@ -265,15 +265,15 @@ export function AdminLoginPage() {
                     <div className="admin-login-main">
                         <div className="admin-login-header">
                             <div className="admin-login-logo">SE</div>
-                            <p className="admin-login-kicker">Editorial Operations Console</p>
-                            <h1 className="admin-login-title">SarkariExams Admin vNext</h1>
+                            <p className="admin-login-kicker">SarkariExams.me Admin</p>
+                            <h1 className="admin-login-title">Welcome back</h1>
                             <p className="admin-login-subtitle">{loginSubtitle}</p>
                             <div className="ops-row wrap admin-login-badges">
                                 <OpsBadge tone={modeBadge.tone}>{modeBadge.label}</OpsBadge>
                                 <OpsBadge tone={stageBadge.tone}>{stageBadge.label}</OpsBadge>
                             </div>
                             <div className="admin-alert info">
-                                Session sign-in gets you into the console. Step-up verification is requested later for publish, delete, approvals, and other sensitive actions.
+                                Sign in opens admin. A separate verification is only requested later for publishing, deletes, approvals, and other sensitive actions.
                             </div>
                         </div>
 
@@ -506,7 +506,7 @@ export function AdminLoginPage() {
                                 </button>
                             ) : null}
                             <a className="admin-btn small subtle" href="/admin-legacy">
-                                Open Legacy Rollback
+                                Open Legacy Admin
                             </a>
                         </div>
                     </div>
@@ -514,10 +514,9 @@ export function AdminLoginPage() {
                     <aside className="admin-login-rail" aria-label="Admin login workflow">
                         <section className="admin-login-rail-card">
                             <p className="admin-login-rail-kicker">Access Model</p>
-                            <h2 className="admin-login-rail-title">Session first. Step-up later.</h2>
+                            <h2 className="admin-login-rail-title">One SarkariExams account, with safer admin checks.</h2>
                             <p className="admin-login-rail-copy">
-                                The new admin console separates entry authentication from high-risk operations. You only see
-                                step-up prompts once a live session is already active inside the workspace.
+                                The admin now follows the same product language as the main site, while still keeping extra checks for high-risk actions.
                             </p>
                             <ul className="admin-login-checklist">
                                 {railItems.map((item) => (
@@ -531,9 +530,9 @@ export function AdminLoginPage() {
 
                         <section className="admin-login-rail-card">
                             <p className="admin-login-rail-kicker">Workspace Groups</p>
-                            <h2 className="admin-login-rail-title">Built for editorial operations.</h2>
+                            <h2 className="admin-login-rail-title">Built around the real SarkariExams workflow.</h2>
                             <p className="admin-login-rail-copy">
-                                Navigation is grouped around the daily publishing workflow instead of isolated tools.
+                                Navigation stays grouped around posts, review, monitoring, and site controls instead of disconnected tools.
                             </p>
                             <div className="admin-login-flow-list">
                                 {workspaceGroups.map((group) => (
@@ -544,9 +543,9 @@ export function AdminLoginPage() {
 
                         <section className="admin-login-rail-card admin-login-support">
                             <p className="admin-login-rail-kicker">Need a Different Entry Point?</p>
-                            <h2 className="admin-login-rail-title">Keep operators moving.</h2>
+                            <h2 className="admin-login-rail-title">Switch paths without losing context.</h2>
                             <p className="admin-login-rail-copy">
-                                Public browsing and rollback access stay available without leaving the current deployment path.
+                                Public browsing and the older admin route both remain available from the same deployment.
                             </p>
                             <div className="ops-actions">
                                 <a className="admin-btn subtle" href="/">

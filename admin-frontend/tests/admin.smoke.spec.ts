@@ -1250,7 +1250,8 @@ test('admin login screen renders on desktop', async ({ page }) => {
     await mockUnauthenticatedAdmin(page);
     await page.goto('login', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+    await expect(page.getByText(/SarkariExams\.me Admin/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
 });
 
@@ -1298,8 +1299,8 @@ test('admin shows desktop-required gate on mobile viewport', async ({ page }) =>
     await mockUnauthenticatedAdmin(page);
     await page.goto('login', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /Open the editorial console on a larger screen/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Open legacy rollback/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Open SarkariExams Admin on a larger screen/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open legacy admin/i })).toBeVisible();
 });
 
 test('admin protected routes redirect to login on desktop', async ({ page }) => {
@@ -1307,7 +1308,7 @@ test('admin protected routes redirect to login on desktop', async ({ page }) => 
     await mockUnauthenticatedAdmin(page);
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
@@ -1316,7 +1317,7 @@ test('admin protected routes show desktop-required gate on mobile', async ({ pag
     await mockUnauthenticatedAdmin(page);
     await page.goto('dashboard', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /Open the editorial console on a larger screen/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Open SarkariExams Admin on a larger screen/i })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${escapedAdminBasename}/login$`));
 });
 
@@ -1339,7 +1340,8 @@ test('authenticated dashboard renders editorial desktop shell', async ({ page })
 
     await expect(page.locator('.workspace-header-title').filter({ hasText: /^Dashboard$/i })).toBeVisible();
     await expect(page.locator('.admin-topbar-title').filter({ hasText: 'admin@sarkariexams.me' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Command$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^All Posts$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Command$/i })).toHaveCount(0);
 
     const primaryAction = page.getByRole('button', { name: /^New post$/i });
     const height = await primaryAction.evaluate((node) => node.getBoundingClientRect().height);
@@ -1843,6 +1845,6 @@ test('admin-vnext alias serves login shell when basename is admin-vnext', async 
     await mockUnauthenticatedAdmin(page);
     await page.goto('/admin-vnext/login', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('heading', { name: /SarkariExams Admin vNext/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Sign in$/i })).toBeVisible();
 });

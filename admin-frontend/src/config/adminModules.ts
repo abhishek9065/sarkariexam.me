@@ -57,6 +57,7 @@ export type AdminModuleNavItem = {
     priority: number;
     pageArchetype: AdminModuleArchetype;
     layoutMode: AdminModuleLayoutMode;
+    showInNavigation?: boolean;
     defaultPrimaryAction?: {
         label: string;
         to: string;
@@ -73,7 +74,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         shortLabel: 'TD',
         icon: '◌',
         group: 'today',
-        summary: 'Editorial command desk for assignments, incidents, and priority drilldowns.',
+        summary: 'Main admin desk for assignments, incidents, and priority drilldowns.',
         priority: 10,
         pageArchetype: 'dashboard',
         layoutMode: 'dashboard',
@@ -86,7 +87,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         shortLabel: 'MP',
         icon: '≣',
         group: 'content-desk',
-        summary: 'Main workbench for filters, lanes, saved views, and bulk editorial operations.',
+        summary: 'Main workbench for filters, lanes, saved views, and bulk post operations.',
         priority: 20,
         pageArchetype: 'table',
         layoutMode: 'table',
@@ -103,7 +104,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 21,
         pageArchetype: 'form',
         layoutMode: 'form',
-        defaultPrimaryAction: { label: 'Quick Add', to: '/quick-add' },
+        defaultPrimaryAction: { label: 'Open posts', to: '/manage-posts' },
     }),
     createItem({
         key: 'quick-add',
@@ -116,6 +117,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 22,
         pageArchetype: 'form',
         layoutMode: 'form',
+        showInNavigation: false,
         defaultPrimaryAction: { label: 'Open full editor', to: '/create-post' },
     }),
     createItem({
@@ -125,10 +127,11 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         shortLabel: 'DP',
         icon: '✎',
         group: 'content-desk',
-        summary: 'Deep editorial workspace with revisions, autosave, and preview links.',
+        summary: 'Deep post workspace with revisions, autosave, and preview links.',
         priority: 23,
         pageArchetype: 'form',
         layoutMode: 'form',
+        showInNavigation: false,
     }),
     createItem({
         key: 'job',
@@ -211,7 +214,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         shortLabel: 'TP',
         icon: '▤',
         group: 'publishing',
-        summary: 'Shared editorial templates and content scaffolds.',
+        summary: 'Shared templates and content scaffolds.',
         priority: 36,
         pageArchetype: 'table',
         layoutMode: 'table',
@@ -227,6 +230,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 37,
         pageArchetype: 'form',
         layoutMode: 'form',
+        showInNavigation: false,
     }),
     createItem({
         key: 'review',
@@ -311,6 +315,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 60,
         pageArchetype: 'dashboard',
         layoutMode: 'dashboard',
+        showInNavigation: false,
     }),
     createItem({
         key: 'reports',
@@ -323,6 +328,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 61,
         pageArchetype: 'dashboard',
         layoutMode: 'dashboard',
+        showInNavigation: false,
     }),
     createItem({
         key: 'seo-tools',
@@ -359,6 +365,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 71,
         pageArchetype: 'timeline',
         layoutMode: 'timeline',
+        showInNavigation: false,
     }),
     createItem({
         key: 'community-moderation',
@@ -371,6 +378,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 72,
         pageArchetype: 'table',
         layoutMode: 'table',
+        showInNavigation: false,
     }),
     createItem({
         key: 'alerts',
@@ -383,6 +391,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 80,
         pageArchetype: 'incident',
         layoutMode: 'table',
+        showInNavigation: false,
     }),
     createItem({
         key: 'security',
@@ -395,6 +404,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 81,
         pageArchetype: 'incident',
         layoutMode: 'table',
+        showInNavigation: false,
     }),
     createItem({
         key: 'sessions',
@@ -407,6 +417,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 82,
         pageArchetype: 'table',
         layoutMode: 'table',
+        showInNavigation: false,
     }),
     createItem({
         key: 'error-reports',
@@ -419,6 +430,7 @@ export const adminModuleNavItems: AdminModuleNavItem[] = [
         priority: 83,
         pageArchetype: 'incident',
         layoutMode: 'table',
+        showInNavigation: false,
     }),
     createItem({
         key: 'settings',
@@ -512,15 +524,15 @@ export const MODULE_GROUP_ORDER: ModuleGroupKey[] = [
 ];
 
 export const groupedModuleLabels: Record<ModuleGroupKey, string> = {
-    today: 'Today',
-    'content-desk': 'Content Desk',
-    'review-pipeline': 'Review Pipeline',
-    publishing: 'Publishing',
-    'site-ops': 'Site Ops',
-    'audience-seo': 'Audience and SEO',
-    governance: 'Governance',
+    today: 'Dashboard',
+    'content-desk': 'Posts',
+    'review-pipeline': 'Review',
+    publishing: 'Content Types',
+    'site-ops': 'Website',
+    'audience-seo': 'SEO',
+    governance: 'Admin Team',
     monitoring: 'Monitoring',
-    system: 'System',
+    system: 'Settings',
 };
 
 export const groupedModuleIcons: Record<ModuleGroupKey, string> = {

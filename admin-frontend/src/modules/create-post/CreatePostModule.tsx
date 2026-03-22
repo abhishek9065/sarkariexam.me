@@ -467,11 +467,11 @@ export function CreatePostModule() {
             <ModuleScaffold
                 eyebrow="Content Desk"
                 title="Create Post"
-                description="Open the full editorial create flow for Jobs, Results, Admit Cards, Answer Keys, Syllabus, and Admissions."
+                description="Open the main SarkariExams create flow for Jobs, Results, Admit Cards, Answer Keys, Syllabus, and Admissions."
                 metrics={[
                     { key: 'type', label: 'Type', value: form.type, hint: 'The editor adapts fields and template options.' },
                     { key: 'status', label: 'Workflow status', value: form.status, hint: 'Published posts require active step-up.' },
-                    { key: 'template', label: 'Template', value: selectedTemplate?.name ?? 'None', hint: 'Templates prefill editorial structure.' },
+                    { key: 'template', label: 'Template', value: selectedTemplate?.name ?? 'None', hint: 'Templates prefill the post structure.' },
                     { key: 'draft-shell', label: 'Draft shell', value: draftShell ? 'Active' : 'Not started', hint: draftShell ? 'Changes now autosave into a recoverable draft.' : 'Start a draft shell to preserve in-progress work.' },
                     { key: 'autosave', label: 'Autosave', value: draftShell ? (autosaveEnabled ? 'On' : 'Paused') : 'Draft required', hint: lastAutosaveAt ? `Last autosave ${new Date(lastAutosaveAt).toLocaleString()}` : 'Autosave activates after a draft shell is created.' },
                 ]}
