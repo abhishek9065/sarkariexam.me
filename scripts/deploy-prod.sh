@@ -238,7 +238,7 @@ check_public_redirect() {
   local location
 
   headers="$(curl -k -sS -I "$url" || true)"
-  status="$(printf '%s' "$headers" | tr -d '\r' | awk 'toupper($1) ~ /^HTTP\\// { code=$2 } END { print code }')"
+  status="$(printf '%s' "$headers" | tr -d '\r' | awk '/^HTTP\// { code=$2 } END { print code }')"
   location="$(printf '%s' "$headers" | tr -d '\r' | grep -i '^Location:' | tail -n1 | awk -F': ' '{print $2}')"
 
   if [[ "$status" != "302" ]]; then
