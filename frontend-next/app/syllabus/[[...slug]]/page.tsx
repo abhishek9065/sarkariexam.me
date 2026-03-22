@@ -1,5 +1,9 @@
 import { DetailPage } from '@/app/components/DetailPageClient';
 
 export default function Page() {
-  return <DetailPage type="syllabus" />;
+  return (
+    <div data-testid="detail-page">
+      <DetailPage type="syllabus" />
+    </div>
+  );
 }

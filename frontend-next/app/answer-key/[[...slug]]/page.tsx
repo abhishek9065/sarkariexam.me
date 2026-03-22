@@ -1,5 +1,9 @@
 import { DetailPage } from '@/app/components/DetailPageClient';
 
 export default function Page() {
-  return <DetailPage type="answer-key" />;
+  return (
+    <div data-testid="detail-page">
+      <DetailPage type="answer-key" />
+    </div>
+  );
 }
