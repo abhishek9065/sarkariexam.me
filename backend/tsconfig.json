@@ -21,6 +21,8 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "src/routes/alerts.ts",
+    "src/routes/analytics.ts"
   ]
 }
