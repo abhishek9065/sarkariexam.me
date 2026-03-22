@@ -7,8 +7,7 @@ import { AnnouncementCard, AnnouncementCardSkeleton } from '@/app/components/Ann
 import { CategoryListRow } from '@/app/components/category/CategoryListRow';
 import { getAnnouncementCards, getOrganizations } from '@/app/lib/api';
 import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
-// analytics removed
-const trackEvent = () => {};
+import { trackEvent } from '@/app/lib/analytics';
 import '@/app/components/HomePage.css';
 import '@/app/components/CategoryPage.css';
 

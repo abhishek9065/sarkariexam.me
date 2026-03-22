@@ -6,8 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import { AnnouncementCard } from '@/app/components/AnnouncementCard';
 import { getAnnouncementBySlug, getAnnouncementCards, addBookmark, removeBookmark, getBookmarks } from '@/app/lib/api';
-// analytics removed
-const trackEvent = () => {};
+import { trackEvent } from '@/app/lib/analytics';
 import type { Announcement, AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
 import '@/app/components/HomePage.css';
 import '@/app/components/DetailPage.css';

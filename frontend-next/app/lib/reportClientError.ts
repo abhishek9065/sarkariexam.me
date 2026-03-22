@@ -1,6 +1,6 @@
 import { getApiBaseCandidates } from './apiBase';
 
-const API_BASE_CANDIDATES = getApiBaseCandidates(null ? String(null) : null);
+const API_BASE_CANDIDATES = getApiBaseCandidates();
 const DEDUPE_MAP = new Map<string, number>();
 const DEFAULT_DEDUPE_WINDOW_MS = 60_000;
 

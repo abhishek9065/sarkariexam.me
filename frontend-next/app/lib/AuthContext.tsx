@@ -13,10 +13,23 @@ import type { User } from '@/app/lib/types';
 import { AuthContext, type LoginResult, type TwoFactorChallenge } from './auth-context';
 
 /** Backend returns `name` but our User type uses `username` — normalize it */
-function normalizeUser(raw: Record<string, unknown>): User {
+function normalizeUser(raw: User | Record<string, unknown>): User {
+    // If already a User with username, return as-is
+    if ('username' in raw && raw.username) {
+        return raw as User;
+    }
+    
+    // Otherwise normalize from Record<string, unknown>
+    const record = raw as Record<string, unknown>;
     return {
-        ...(raw as User),
-        username: (raw.username || raw.name || raw.email) as string,
+        id: String(record.id || ''),
+        email: String(record.email || ''),
+        username: String(record.username || record.name || record.email || ''),
+        role: String(record.role || 'user'),
+        isActive: record.isActive ? Boolean(record.isActive) : undefined,
+        createdAt: record.createdAt ? String(record.createdAt) : undefined,
+        lastLogin: record.lastLogin ? String(record.lastLogin) : undefined,
+        twoFactorEnabled: record.twoFactorEnabled ? Boolean(record.twoFactorEnabled) : undefined,
     };
 }
 

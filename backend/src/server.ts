@@ -20,6 +20,8 @@ import {
   blockSuspiciousAgents,
   validateContentType,
 } from './middleware/security.js';
+import alertsRouter from './routes/alerts.js';
+import analyticsRouter from './routes/analytics.js';
 import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
 import bookmarksRouter from './routes/bookmarks.js';
@@ -219,6 +221,8 @@ app.use(
   }),
   authRouter
 );
+app.use('/api/alerts', alertsRouter);
+app.use('/api/analytics', analyticsRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/bookmarks', bookmarksRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
