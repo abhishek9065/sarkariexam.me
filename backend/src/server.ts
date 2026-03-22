@@ -209,22 +209,6 @@ app.get('/metrics', (req, res) => {
 });
 
 // Core Routes (MongoDB-based)
-const retiredRouteHandler = (req: express.Request, res: express.Response) => {
-  res.status(410).json({
-    error: 'This legacy endpoint has been removed',
-    code: 'ROUTE_REMOVED',
-    message: `The requested retired endpoint "${req.originalUrl}" is no longer available.`,
-    requestId: req.requestId,
-  });
-};
-
-app.use('/api/admin', retiredRouteHandler);
-app.use('/api/admin-auth', retiredRouteHandler);
-app.use('/api/auth/admin', retiredRouteHandler);
-app.use('/api/analytics', retiredRouteHandler);
-app.use('/api/graphql', retiredRouteHandler);
-app.use('/api/bulk', retiredRouteHandler);
-
 app.use(
   '/api/auth',
   csrfProtection({

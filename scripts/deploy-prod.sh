@@ -228,39 +228,6 @@ check_public_route_assets() {
   echo "ok (${label} assets -> ${url}, assets=${asset_count})"
 }
 
-check_public_redirect() {
-  local path="$1"
-  local label="$2"
-  local expected_location="$3"
-  local url="${PUBLIC_BASE_URL}${path}"
-  local headers
-  local status
-  local location
-  local expected_absolute=""
-  local expected_absolute_no_slash=""
-
-  headers="$(curl -k -sS -I "$url" || true)"
-  status="$(printf '%s' "$headers" | tr -d '\r' | awk '/^HTTP\// { code=$2 } END { print code }')"
-  location="$(printf '%s' "$headers" | tr -d '\r' | grep -i '^Location:' | tail -n1 | awk -F': ' '{print $2}')"
-
-  if [[ "$expected_location" == /* ]]; then
-    expected_absolute="${PUBLIC_BASE_URL%/}${expected_location}"
-    expected_absolute_no_slash="${expected_absolute%/}"
-  fi
-
-  if [[ "$status" != "302" ]]; then
-    echo "ERROR: ${label} expected redirect status 302 for ${url}, got '${status:-missing}'"
-    return 1
-  fi
-
-  if [[ "$location" != "$expected_location" && "$location" != "$expected_absolute" && "$location" != "$expected_absolute_no_slash" ]]; then
-    echo "ERROR: ${label} expected Location=${expected_location}, got '${location:-missing}' for ${url}"
-    return 1
-  fi
-
-  echo "ok (${label} -> ${url}, redirect=${location})"
-}
-
 get_public_detail_slug() {
   local type="$1"
   local payload
@@ -320,9 +287,6 @@ check_public_detail_route() {
 purge_cloudflare_cache || true
 
 echo "Public route checks:"
-check_public_redirect "/admin" "retired legacy route" "/"
-check_public_redirect "/admin-vnext" "retired legacy preview route" "/"
-check_public_redirect "/admin-legacy" "retired legacy alias route" "/"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
 check_public_detail_route "job" 'data-testid="detail-page"'

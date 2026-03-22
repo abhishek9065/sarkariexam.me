@@ -3,12 +3,11 @@ name: "CodeQL Config"
 # Scan only production application code to reduce false positives from tests/fixtures.
 paths:
   - backend/src
-  - frontend/src
+  - frontend-next/app
 
 paths-ignore:
   - backend/src/tests
   - backend/tests
-  - frontend/tests
   - "**/*.test.ts"
   - "**/*.spec.ts"
   - "**/*.d.ts"

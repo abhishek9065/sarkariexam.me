@@ -1,73 +1,46 @@
-# Sarkari Result - Copilot Instructions
+# SarkariExams.me - Copilot Instructions
 
 ## Project Overview
 
-This is a full-stack government jobs portal (Sarkari Result) built with TypeScript. It aggregates job listings, exam results, admit cards, and answer keys for Indian government positions.
+This is a public government jobs and exam updates platform built with TypeScript. The live product surface is the Next.js app in `frontend-next/`, backed by the Express API in `backend/`.
 
 ## Architecture
 
-- **Frontend**: React 18 + TypeScript + Vite (in `frontend/`)
+- **Public frontend**: Next.js 16 + React 19 (in `frontend-next/`)
 - **Backend**: Node.js 22 + Express + TypeScript (in `backend/`)
-- **Database**: MongoDB for local development; Azure Cosmos DB (MongoDB API) in production
+- **Database**: MongoDB locally; Azure Cosmos DB (MongoDB API) in production
 - **Reverse Proxy**: Nginx (in `nginx/`)
-- **Deployment**: Docker + Docker Compose on DigitalOcean
+- **Deployment**: Docker Compose on DigitalOcean
 
 ## Development Commands
 
 ### Backend (`cd backend`)
-- `npm run dev` — Start dev server with hot reload (tsx watch)
+- `npm run dev` — Start the API with hot reload
 - `npm run build` — Compile TypeScript to `dist/`
-- `npm start` — Run production server
+- `npm start` — Run the production build
 - `npm run lint` — Run ESLint
-- `npm test` — Run unit tests (Vitest)
+- `npm test` — Run Vitest
+- `npm run test:ci` — Run Vitest plus OpenAPI parity checks
 
-### Frontend (`cd frontend`)
-- `npm run dev` — Start Vite dev server (port 5173)
-- `npm run build` — Production build to `dist/`
-- `npm run preview` — Preview production build
+### Public Frontend (`cd frontend-next`)
+- `npm run dev` — Start the Next.js dev server
+- `npm run build` — Production build
+- `npm start` — Run the production server
 - `npm run lint` — Run ESLint
-- `npm run test:e2e` — Run Playwright E2E tests
-- `npm run test:e2e:admin` — Run admin-specific E2E tests
 
 ## Key Directories
 
-```
+```text
 backend/src/
-├── routes/        # Express route handlers (auth, jobs, admin, etc.)
-├── models/        # MongoDB document schemas and mock data
-├── middleware/     # Auth, security, rate limiting, caching, CSRF
-├── services/      # Business logic (DB, email, analytics, RBAC, audit)
-└── tests/         # Vitest unit tests
-
-frontend/src/
-├── pages/         # Page components (Home, Detail, Admin, etc.)
-├── components/    # UI components organized by category
-├── context/       # React Context providers (Auth, Theme, Language)
-└── hooks/         # Custom hooks for data fetching and UI logic
-
-frontend/tests/     # Playwright E2E test specs
+frontend-next/app/
+nginx/
+scripts/
 ```
 
-## Coding Conventions
+## Conventions
 
-- Use TypeScript for all source files (both frontend and backend).
-- Use Zod for request validation in backend routes.
-- Use React Query (TanStack) for data fetching on the frontend.
-- Use React Context for global state (auth, theme, language).
-- Follow existing ESLint configurations in each workspace.
-- Backend API routes are prefixed with `/api/`.
-- Use environment variables for all secrets and configuration (see `.env.example`).
-
-## Testing
-
-- **Backend**: Vitest for unit/integration tests in `backend/src/tests/` and `backend/tests/`.
-- **Frontend**: Playwright for E2E tests in `frontend/tests/`.
-- CI runs backend build + tests, frontend build, and Playwright smoke tests on PRs.
-
-## Security Considerations
-
-- Admin routes require JWT + optional 2FA (TOTP).
-- Rate limiting is applied to auth and admin endpoints.
-- CSRF protection is enabled for state-changing requests.
-- Helmet middleware sets security headers.
-- Admin features include dual-approval workflows, step-up authentication, and audit logging.
+- Use TypeScript for all source files.
+- Use Zod for backend request validation.
+- Keep backend routes under `/api/`.
+- Prefer relative same-origin API calls from the frontend unless there is a clear deployment reason not to.
+- Keep repo docs and workflows aligned with the active `backend + frontend-next + nginx` stack.

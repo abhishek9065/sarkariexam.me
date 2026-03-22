@@ -87,8 +87,6 @@ const databaseUrl = getDbConnectionString();
 const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefined);
 
 const defaultCorsOrigins = [
-  'http://localhost:4173',
-  'http://localhost:5173',
   'http://localhost:3000',
   'https://sarkariexams.me',
   'https://www.sarkariexams.me'

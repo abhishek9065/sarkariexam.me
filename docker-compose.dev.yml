@@ -21,11 +21,6 @@ services:
     depends_on:
       - mongo
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-
   nginx:
     volumes:
       - ./nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
