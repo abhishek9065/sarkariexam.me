@@ -236,22 +236,29 @@ check_public_redirect() {
   local headers
   local status
   local location
+  local expected_absolute=""
+  local expected_absolute_no_slash=""
 
   headers="$(curl -k -sS -I "$url" || true)"
   status="$(printf '%s' "$headers" | tr -d '\r' | awk '/^HTTP\// { code=$2 } END { print code }')"
   location="$(printf '%s' "$headers" | tr -d '\r' | grep -i '^Location:' | tail -n1 | awk -F': ' '{print $2}')"
+
+  if [[ "$expected_location" == /* ]]; then
+    expected_absolute="${PUBLIC_BASE_URL%/}${expected_location}"
+    expected_absolute_no_slash="${expected_absolute%/}"
+  fi
 
   if [[ "$status" != "302" ]]; then
     echo "ERROR: ${label} expected redirect status 302 for ${url}, got '${status:-missing}'"
     return 1
   fi
 
-  if [[ "$location" != "$expected_location" ]]; then
+  if [[ "$location" != "$expected_location" && "$location" != "$expected_absolute" && "$location" != "$expected_absolute_no_slash" ]]; then
     echo "ERROR: ${label} expected Location=${expected_location}, got '${location:-missing}' for ${url}"
     return 1
   fi
 
-  echo "ok (${label} -> ${url}, redirect=${expected_location})"
+  echo "ok (${label} -> ${url}, redirect=${location})"
 }
 
 get_public_detail_slug() {
