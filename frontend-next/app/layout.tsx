@@ -6,7 +6,6 @@ import "@/app/components/CategoryPage.css";
 import "@/app/components/MobileBottomNav.css";
 import { Providers } from "./providers";
 import { AppChrome } from "@/app/components/AppChrome";
-import { AnalyticsInitializer } from "@/app/components/AnalyticsInitializer";
 
 export const metadata: Metadata = {
   title: "SarkariExams.me — Sarkari Results, Admit Cards & Latest Government Jobs",
@@ -18,11 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>
-          <AnalyticsInitializer />
           <AppChrome>{children}</AppChrome>
         </Providers>
       </body>
     </html>
   );
 }
-
