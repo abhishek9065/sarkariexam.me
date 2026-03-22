@@ -2,7 +2,7 @@
 
 import { createContext } from 'react';
 
-import type { AdminPermission, AdminPermissionsSnapshot, User } from '@/app/lib/types';
+import type { User } from '@/app/lib/types';
 
 interface AuthState {
     user: User | null;
@@ -22,11 +22,6 @@ export interface AuthContextValue extends AuthState {
     register: (email: string, name: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     clearError: () => void;
-    isAdmin: boolean;
-    hasAdminPortalAccess: boolean;
-    adminPermissions: AdminPermissionsSnapshot | null;
-    can: (permission: AdminPermission) => boolean;
-    canAny: (permissions: AdminPermission[]) => boolean;
     twoFactorChallenge: TwoFactorChallenge | null;
     clearTwoFactorChallenge: () => void;
 }

@@ -267,7 +267,7 @@ JWT_SECRET=K8xPqR2mN5vB7yC1dF4gH6jL9pS3wE0tU8iO2aZ5nM=
 
 ```bash
 # Build and start production services (takes 3-5 minutes first time)
-docker compose up -d --build nginx backend frontend admin-frontend
+docker compose up -d --build nginx backend frontend
 ```
 
 **What this does:**
@@ -437,7 +437,7 @@ docker compose restart
 ### Update application
 ```bash
 git pull --ff-only origin main
-docker compose up -d --build nginx backend frontend admin-frontend
+docker compose up -d --build nginx backend frontend
 # Recommended guarded path:
 # bash scripts/deploy-prod.sh
 ```

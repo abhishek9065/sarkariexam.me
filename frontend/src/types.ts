@@ -2,58 +2,8 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
-export type AdminPortalRole = 'admin' | 'editor' | 'contributor' | 'reviewer' | 'viewer';
-export type AdminPermission =
-    | 'admin:read'
-    | 'admin:write'
-    | 'analytics:read'
-    | 'announcements:read'
-    | 'announcements:write'
-    | 'announcements:approve'
-    | 'announcements:delete'
-    | 'audit:read'
-    | 'security:read';
 export type NumberLocalePref = 'auto' | 'en-IN' | 'en-US';
 export type MetricCategory = 'traffic' | 'engagement' | 'conversion' | 'risk';
-export type AdminRowAction = 'view' | 'edit' | 'publish_toggle' | 'boost' | 'delete';
-export type AdminTab =
-    | 'analytics'
-    | 'list'
-    | 'review'
-    | 'add'
-    | 'detailed'
-    | 'bulk'
-    | 'queue'
-    | 'security'
-    | 'users'
-    | 'audit'
-    | 'community'
-    | 'errors'
-    | 'approvals';
-
-export interface AdminPermissionsSnapshot {
-    role: AdminPortalRole;
-    roles: Record<AdminPortalRole, string[]>;
-    tabs: Record<AdminTab, AdminPermission>;
-    highRiskActions: string[];
-}
-
-export interface AdminUiFlags {
-    admin_nav_ux_v2: boolean;
-    admin_analytics_ux_v2: boolean;
-    admin_lists_ux_v2: boolean;
-    admin_lists_v3: boolean;
-    admin_review_v3: boolean;
-    admin_analytics_v3: boolean;
-    admin_command_palette_v1: boolean;
-}
-
-export interface AdminV3Flags {
-    admin_lists_v3: boolean;
-    admin_review_v3: boolean;
-    admin_analytics_v3: boolean;
-    admin_command_palette_v1: boolean;
-}
 
 export interface MetricDefinition {
     key: 'ctr' | 'drop_off_rate' | 'tracking_coverage' | 'conversion_rate';
@@ -136,7 +86,7 @@ export interface User {
     id: string;
     email: string;
     username: string;
-    role: 'user' | AdminPortalRole | string;
+    role: string;
     isActive?: boolean;
     createdAt?: string;
     lastLogin?: string;

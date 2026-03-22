@@ -76,7 +76,7 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/admin(?:\/|$)/, /^\/admin-vnext(?:\/|$)/, /^\/api(?:\/|$)/],
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {

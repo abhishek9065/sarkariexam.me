@@ -57,7 +57,6 @@ const totalCssBytes = cssStats.reduce((sum, item) => sum + item.bytes, 0);
 
 const sortedJs = [...appJsStats].sort((a, b) => b.bytes - a.bytes);
 const largestJs = sortedJs[0] || null;
-const adminChunk = sortedJs.find((item) => /admin/i.test(path.basename(item.name)));
 
 const budgets = [
     {
@@ -81,16 +80,6 @@ const budgets = [
     },
 ];
 
-if (adminChunk) {
-    budgets.push({
-        key: 'adminChunk',
-        label: 'Admin-related chunk',
-        bytes: adminChunk.bytes,
-        budget: 340 * 1024,
-        file: adminChunk.name,
-    });
-}
-
 const evaluations = budgets.map((metric) => ({
     ...metric,
     overBudget: metric.bytes > metric.budget,
@@ -107,7 +96,6 @@ const report = {
         cssFiles: cssStats.length,
     },
     largestJs: largestJs ? { name: largestJs.name, bytes: largestJs.bytes } : null,
-    adminChunk: adminChunk ? { name: adminChunk.name, bytes: adminChunk.bytes } : null,
     excludedServiceWorkerJs: serviceWorkerJsStats.map((item) => ({ name: item.name, bytes: item.bytes })),
     budgets: evaluations,
     topJsChunks: sortedJs.slice(0, 8).map((item) => ({ name: item.name, bytes: item.bytes })),

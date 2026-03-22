@@ -39,7 +39,7 @@ const readHeaderToken = (req: Request): string | undefined => {
   return undefined;
 };
 
-const getAuthCookieNames = () => [AUTH_COOKIE_NAME, config.adminAuthCookieName];
+const getAuthCookieNames = () => [AUTH_COOKIE_NAME];
 
 export const generateCsrfToken = (): string => crypto.randomBytes(32).toString('base64url');
 

@@ -210,11 +210,6 @@ export function setAuthToken(token: string | null) {
     // Cookie-based auth — no-op in Next.js
 }
 
-/* ─── Admin permissions ─── */
-export function getAdminPermissions() {
-    return apiFetch<{ data: import('./types').AdminPermissionsSnapshot }>('/auth/admin/permissions');
-}
-
 /* ─── Profile ─── */
 export interface ProfileWidgetData {
     trackedCounts: Record<string, number>;

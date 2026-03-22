@@ -1,5 +1,4 @@
 import type {
-    AdminPermissionsSnapshot,
     Announcement,
     AnnouncementCard,
     AuthResponse,
@@ -311,10 +310,6 @@ export function register(email: string, name: string, password: string) {
 
 export function getMe() {
     return apiFetch<{ data: { user: User } }>('/auth/me');
-}
-
-export function getAdminPermissions() {
-    return apiFetch<{ data: AdminPermissionsSnapshot }>('/auth/admin/permissions');
 }
 
 export function logout() {

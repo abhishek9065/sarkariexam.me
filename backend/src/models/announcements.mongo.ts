@@ -495,7 +495,7 @@ export class AnnouncementModelMongo {
     }
 
     /**
-     * Find all announcements for admin views (includes drafts and scheduled items)
+     * Find all announcements including non-public states such as drafts and scheduled items.
      */
     static async findAllAdmin(filters?: {
         type?: ContentType;

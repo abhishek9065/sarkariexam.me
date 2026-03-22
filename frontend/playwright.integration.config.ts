@@ -21,8 +21,6 @@ export default defineConfig({
                 NODE_ENV: process.env.NODE_ENV || 'integration',
                 PORT: String(backendPort),
                 JWT_SECRET: process.env.JWT_SECRET || 'integration-test-secret',
-                ADMIN_SETUP_KEY: process.env.ADMIN_SETUP_KEY || 'integration-admin-setup-key',
-                TOTP_ENCRYPTION_KEY: process.env.TOTP_ENCRYPTION_KEY || 'integration-totp-encryption-key',
                 COSMOS_CONNECTION_STRING: process.env.COSMOS_CONNECTION_STRING || '',
                 MONGODB_URI: process.env.MONGODB_URI || '',
             },

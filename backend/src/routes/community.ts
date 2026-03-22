@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 
-import { authenticateToken, optionalAuth, requirePermission } from '../middleware/auth.js';
-import { getCollectionAsync, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
-import { getPathParam } from '../utils/routeParams.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { getCollectionAsync } from '../services/cosmosdb.js';
 
 const router = Router();
 
@@ -68,11 +67,6 @@ const qaCreateSchema = z.object({
     author: z.string().trim().min(2).max(60).optional().default('Guest'),
 });
 
-const qaAnswerSchema = z.object({
-    answer: z.string().trim().min(2).max(2000),
-    answeredBy: z.string().trim().min(2).max(60).optional(),
-});
-
 const groupCreateSchema = z.object({
     name: z.string().trim().min(3).max(80),
     topic: z.string().trim().min(3).max(120),
@@ -85,11 +79,6 @@ const flagCreateSchema = z.object({
     entityId: z.string().trim().min(1),
     reason: z.string().trim().min(3).max(300),
     reporter: z.string().trim().min(2).max(60).optional(),
-});
-
-const flagListSchema = listQuerySchema.extend({
-    status: z.enum(['open', 'reviewed', 'resolved']).optional(),
-    entityType: z.enum(['forum', 'qa', 'group']).optional(),
 });
 
 const formatDoc = (doc: any) => {
@@ -150,25 +139,6 @@ router.post('/forums', async (req, res) => {
     }
 });
 
-router.delete('/forums/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
-        return res.status(400).json({ error: 'Invalid forum id' });
-    }
-
-    try {
-        const col = await forumsCollection();
-        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
-        if (!result.deletedCount) {
-            return res.status(404).json({ error: 'Forum post not found' });
-        }
-        return res.json({ message: 'Forum post deleted' });
-    } catch (error) {
-        console.error('Forum delete error:', error);
-        return res.status(500).json({ error: 'Failed to delete forum post' });
-    }
-});
-
 router.get('/qa', async (req, res) => {
     const parseResult = listQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
@@ -218,61 +188,6 @@ router.post('/qa', async (req, res) => {
     } catch (error) {
         console.error('QA create error:', error);
         return res.status(500).json({ error: 'Failed to create question' });
-    }
-});
-
-router.patch('/qa/:id/answer', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
-        return res.status(400).json({ error: 'Invalid question id' });
-    }
-    const parseResult = qaAnswerSchema.safeParse(req.body);
-    if (!parseResult.success) {
-        return res.status(400).json({ error: parseResult.error.flatten() });
-    }
-
-    try {
-        const now = new Date();
-        const update: Partial<QaDoc> = {
-            answer: parseResult.data.answer,
-            updatedAt: now,
-            answeredBy: parseResult.data.answeredBy ?? null,
-        };
-        const col = await qaCollection();
-        const updateResult = await col.updateOne(
-            { _id: toObjectId(id) } as any,
-            { $set: update }
-        );
-        if (!updateResult.matchedCount) {
-            return res.status(404).json({ error: 'Question not found' });
-        }
-        const updatedDoc = await col.findOne({ _id: toObjectId(id) } as any);
-        if (!updatedDoc) {
-            return res.status(404).json({ error: 'Question not found' });
-        }
-        return res.json({ data: formatDoc(updatedDoc) });
-    } catch (error) {
-        console.error('QA answer error:', error);
-        return res.status(500).json({ error: 'Failed to answer question' });
-    }
-});
-
-router.delete('/qa/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
-        return res.status(400).json({ error: 'Invalid question id' });
-    }
-
-    try {
-        const col = await qaCollection();
-        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
-        if (!result.deletedCount) {
-            return res.status(404).json({ error: 'Question not found' });
-        }
-        return res.json({ message: 'Question deleted' });
-    } catch (error) {
-        console.error('QA delete error:', error);
-        return res.status(500).json({ error: 'Failed to delete question' });
     }
 });
 
@@ -329,54 +244,6 @@ router.post('/groups', async (req, res) => {
     }
 });
 
-router.delete('/groups/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
-        return res.status(400).json({ error: 'Invalid group id' });
-    }
-
-    try {
-        const col = await groupsCollection();
-        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
-        if (!result.deletedCount) {
-            return res.status(404).json({ error: 'Study group not found' });
-        }
-        return res.json({ message: 'Study group deleted' });
-    } catch (error) {
-        console.error('Group delete error:', error);
-        return res.status(500).json({ error: 'Failed to delete study group' });
-    }
-});
-
-router.get('/flags', authenticateToken, requirePermission('admin:read'), async (req, res) => {
-    const parseResult = flagListSchema.safeParse(req.query);
-    if (!parseResult.success) {
-        return res.status(400).json({ error: parseResult.error.flatten() });
-    }
-
-    try {
-        const limit = parseResult.data.limit ?? 20;
-        const offset = parseResult.data.offset ?? 0;
-        const query: Partial<FlagDoc> = {};
-        if (parseResult.data.status) query.status = parseResult.data.status;
-        if (parseResult.data.entityType) query.entityType = parseResult.data.entityType;
-        const col = await flagsCollection();
-        const [items, total] = await Promise.all([
-            col
-                .find(query as any)
-                .sort({ createdAt: -1 })
-                .skip(offset)
-                .limit(limit)
-                .toArray(),
-            col.countDocuments(query as any),
-        ]);
-        return res.json({ data: items.map(formatDoc), count: total });
-    } catch (error) {
-        console.error('Flags fetch error:', error);
-        return res.status(500).json({ error: 'Failed to load flags' });
-    }
-});
-
 router.post('/flags', optionalAuth, async (req, res) => {
     const parseResult = flagCreateSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -401,25 +268,6 @@ router.post('/flags', optionalAuth, async (req, res) => {
     } catch (error) {
         console.error('Flag create error:', error);
         return res.status(500).json({ error: 'Failed to submit report' });
-    }
-});
-
-router.delete('/flags/:id', authenticateToken, requirePermission('admin:write'), async (req, res) => {
-    const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
-        return res.status(400).json({ error: 'Invalid flag id' });
-    }
-
-    try {
-        const col = await flagsCollection();
-        const result = await col.deleteOne({ _id: toObjectId(id) } as any);
-        if (!result.deletedCount) {
-            return res.status(404).json({ error: 'Flag not found' });
-        }
-        return res.json({ message: 'Flag resolved' });
-    } catch (error) {
-        console.error('Flag delete error:', error);
-        return res.status(500).json({ error: 'Failed to resolve flag' });
     }
 });
 

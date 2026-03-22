@@ -1,19 +1,17 @@
 import { Suspense, lazy, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SkeletonLoader } from './components/SkeletonLoader';
-import { AdminDesktopOnlyGate } from './components/AdminDesktopOnlyGate';
 import { Layout } from './components/Layout';
 
 /* Lazy-loaded pages */
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
 const CategoryPage = lazy(() => import('./pages/CategoryPage').then((m) => ({ default: m.CategoryPage })));
 const DetailPage = lazy(() => import('./pages/DetailPage').then((m) => ({ default: m.DetailPage })));
-const AdminPage = lazy(() => import('./pages/AdminPage'));
 const StaticPage = lazy(() => import('./pages/StaticPage').then((m) => ({ default: m.StaticPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage').then((m) => ({ default: m.BookmarksPage })));
@@ -90,9 +88,10 @@ export default function App() {
                                     <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                                     <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
 
-                                    {/* Robust legacy admin default + explicit rollback alias */}
-                                    <Route path="/admin/*" element={<ProtectedRoute requireAdmin><AdminDesktopOnlyGate><AdminPage /></AdminDesktopOnlyGate></ProtectedRoute>} />
-                                    <Route path="/admin-legacy/*" element={<ProtectedRoute requireAdmin><AdminDesktopOnlyGate><AdminPage /></AdminDesktopOnlyGate></ProtectedRoute>} />
+                                    {/* Retired legacy routes */}
+                                    <Route path="/admin/*" element={<Navigate to="/" replace />} />
+                                    <Route path="/admin-vnext/*" element={<Navigate to="/" replace />} />
+                                    <Route path="/admin-legacy/*" element={<Navigate to="/" replace />} />
 
                                     {/* Static pages */}
                                     <Route path="/about" element={<StaticPage type="about" />} />

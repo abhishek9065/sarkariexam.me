@@ -12,11 +12,6 @@ const NOOP_AUTH: AuthContextValue = {
     register: async () => {},
     logout: async () => {},
     clearError: () => {},
-    isAdmin: false,
-    hasAdminPortalAccess: false,
-    adminPermissions: null,
-    can: () => false,
-    canAny: () => false,
     twoFactorChallenge: null,
     clearTwoFactorChallenge: () => {},
 };

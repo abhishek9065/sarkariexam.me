@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { ObjectId, WithId, Document } from 'mongodb';
 
-import { getCollection, getCollectionAsync } from '../services/cosmosdb.js';
+import { getCollection } from '../services/cosmosdb.js';
 
 /**
  * User document interface for MongoDB
@@ -12,7 +12,7 @@ interface UserDoc extends Document {
     username: string;
     passwordHash: string;
     passwordHistory?: Array<{ hash: string; changedAt: Date }>;
-    role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor' | 'user';
+    role: string;
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -29,7 +29,7 @@ export interface User {
     id: string;
     email: string;
     username: string;
-    role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor' | 'user';
+    role: string;
     isActive: boolean;
     createdAt: string;
     lastLogin?: string;
@@ -100,7 +100,7 @@ export class UserModelMongo {
         email: string;
         username: string;
         password: string;
-        role?: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor' | 'user';
+        role?: string;
     }): Promise<User> {
         try {
             const passwordHash = await bcrypt.hash(data.password, 10);
@@ -174,7 +174,7 @@ export class UserModelMongo {
         username: string;
         email: string;
         password: string;
-        role: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor' | 'user';
+        role: string;
         isActive: boolean;
         twoFactorEnabled: boolean;
         twoFactorSecret: string | null;
@@ -244,10 +244,10 @@ export class UserModelMongo {
     }
 
     /**
-     * Get all users (admin only) with optional filtering
+     * Get all users with optional filtering
      */
     static async findAll(filters?: {
-        role?: 'admin' | 'editor' | 'reviewer' | 'viewer' | 'contributor' | 'user';
+        role?: string;
         isActive?: boolean;
         skip?: number;
         limit?: number;
@@ -318,20 +318,6 @@ export class UserModelMongo {
         } catch (error) {
             console.error('[MongoDB] isPasswordReused error:', error);
             return false;
-        }
-    }
-
-    static async hasAdminPortalUser(): Promise<boolean> {
-        try {
-            const collection = await getCollectionAsync<UserDoc>('users');
-            const doc = await collection.findOne(
-                { role: { $in: ['admin', 'editor', 'reviewer', 'viewer', 'contributor'] } },
-                { projection: { _id: 1 } }
-            );
-            return Boolean(doc);
-        } catch (error) {
-            console.error('[MongoDB] hasAdminPortalUser error:', error);
-            throw error;
         }
     }
 

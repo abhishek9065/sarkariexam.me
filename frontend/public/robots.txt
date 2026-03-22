@@ -10,5 +10,3 @@ Sitemap: https://sarkariresult.com/sitemap.xml
 # Crawl delay
 Crawl-delay: 1
 
-# Disallow admin pages
-Disallow: /admin

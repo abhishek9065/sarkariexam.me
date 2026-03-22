@@ -80,7 +80,7 @@ export function ProfilePage() {
                     <div className="profile-header-info">
                         <h1 className="profile-name">{user.username}</h1>
                         <p className="text-muted">{user.email}</p>
-                        <span className={`badge badge-${user.role === 'admin' ? 'job' : 'result'}`}>
+                        <span className="badge badge-result">
                             {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                         </span>
                     </div>

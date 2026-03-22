@@ -10,7 +10,6 @@ services:
       - "443:443"
     depends_on:
       - frontend
-      - admin-frontend
       - backend
     restart: unless-stopped
     networks:
@@ -71,25 +70,6 @@ services:
       - sarkari-network
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Admin Frontend (vNext)
-  admin-frontend:
-    build:
-      context: ./admin-frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_ADMIN_BASENAME: ${VITE_ADMIN_BASENAME:-/admin}
-    container_name: sarkari-admin-frontend
-    expose:
-      - "80"
-    restart: unless-stopped
-    networks:
-      - sarkari-network
-    healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:80" ]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -8,8 +8,6 @@
   },
   "include": [
     "src/middleware/cloudflare.ts",
-    "src/middleware/requestId.ts",
-    "src/services/adminStepUp.ts",
-    "src/services/adminApprovals.ts"
+    "src/middleware/requestId.ts"
   ]
 }

@@ -1,6 +1,5 @@
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
-import { recordAdminAudit } from './adminAudit.js';
 import { invalidateAnnouncementCaches } from './cacheInvalidation.js';
 import { getCollection } from './cosmosdb.js';
 
@@ -85,13 +84,6 @@ export async function runAutomationJobs() {
                 { status: 'published', note: 'Auto-published by scheduling automation' } as any,
                 'system'
             );
-            recordAdminAudit({
-                action: 'update' as any,
-                announcementId: post._id.toHexString(),
-                title: post.title,
-                userId: 'system',
-                note: 'Auto-published by scheduling automation'
-            }).catch(console.error);
             cachesInvalidated = true;
         }
 
@@ -110,13 +102,6 @@ export async function runAutomationJobs() {
                 { status: 'archived', note: 'Auto-archived by expiry automation' } as any,
                 'system'
             );
-            recordAdminAudit({
-                action: 'update' as any,
-                announcementId: post._id.toHexString(),
-                title: post.title,
-                userId: 'system',
-                note: 'Auto-archived by expiry automation'
-            }).catch(console.error);
             cachesInvalidated = true;
         }
 

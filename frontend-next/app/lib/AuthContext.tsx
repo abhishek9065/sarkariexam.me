@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import {
-    getAdminPermissions,
     getMe,
     setAuthToken,
     login as apiLogin,
@@ -10,8 +9,7 @@ import {
     logout as apiLogout,
     ApiRequestError,
 } from '@/app/lib/api';
-import type { AdminPermission, AdminPermissionsSnapshot, User } from '@/app/lib/types';
-import { fallbackPermissionsSnapshot, hasAdminPermission, isAdminPortalRole } from '@/app/lib/adminRbac';
+import type { User } from '@/app/lib/types';
 import { AuthContext, type LoginResult, type TwoFactorChallenge } from './auth-context';
 
 /** Backend returns `name` but our User type uses `username` — normalize it */
@@ -29,22 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: null,
     });
     const [twoFactorChallenge, setTwoFactorChallenge] = useState<TwoFactorChallenge | null>(null);
-    const [adminPermissions, setAdminPermissions] = useState<AdminPermissionsSnapshot | null>(null);
-
-    const syncAdminPermissions = useCallback(async (user: User | null) => {
-        if (!user || !isAdminPortalRole(user.role)) {
-            setAdminPermissions(null);
-            return;
-        }
-
-        try {
-            const res = await getAdminPermissions();
-            setAdminPermissions(res.data);
-        } catch (error) {
-            console.warn('Admin permissions fetch failed, using fallback mapping.', error);
-            setAdminPermissions(fallbackPermissionsSnapshot(user.role));
-        }
-    }, []);
 
     /* Bootstrap from the cookie-backed session. */
     useEffect(() => {
@@ -56,11 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const user = normalizeUser(res.data.user);
                 if (canceled) return;
                 setState({ user, loading: false, error: null });
-                await syncAdminPermissions(user);
             } catch {
                 setAuthToken(null);
                 if (canceled) return;
-                setAdminPermissions(null);
                 setState({ user: null, loading: false, error: null });
             }
         })();
@@ -68,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => {
             canceled = true;
         };
-    }, [syncAdminPermissions]);
+    }, []);
 
     const login = useCallback(async (email: string, password?: string, twoFactorCode?: string, challengeToken?: string): Promise<LoginResult> => {
         setState((s) => ({ ...s, loading: true, error: null }));
@@ -77,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setTwoFactorChallenge(null);
             const user = normalizeUser(res.data.user);
             setState({ user, loading: false, error: null });
-            await syncAdminPermissions(user);
             return 'success';
         } catch (err: unknown) {
             /* Handle 2FA challenge */
@@ -104,9 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setState((s) => ({
                         ...s,
                         loading: false,
-                        error: 'Two-factor authentication setup is required. Please contact your administrator.',
+                        error: 'Additional verification setup is required for this account.',
                     }));
-                    throw new Error('Two-factor authentication setup is required. Please contact your administrator.');
+                    throw new Error('Additional verification setup is required for this account.');
                 }
             }
 
@@ -121,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setState((s) => ({ ...s, loading: false, error: message }));
             throw err;
         }
-    }, [syncAdminPermissions]);
+    }, []);
 
     const register = useCallback(async (email: string, name: string, password: string) => {
         setState((s) => ({ ...s, loading: true, error: null }));
@@ -129,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const res = await apiRegister(email, name, password);
             const user = normalizeUser(res.data.user);
             setState({ user, loading: false, error: null });
-            await syncAdminPermissions(user);
         } catch (err: unknown) {
             const message = err instanceof ApiRequestError
                 ? (
@@ -142,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setState((s) => ({ ...s, loading: false, error: message }));
             throw err;
         }
-    }, [syncAdminPermissions]);
+    }, []);
 
     const logout = useCallback(async () => {
         try {
@@ -151,7 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.warn('Backend logout failed; clearing local auth state anyway.', error);
         }
         setAuthToken(null);
-        setAdminPermissions(null);
         setTwoFactorChallenge(null);
         setState({ user: null, loading: false, error: null });
     }, []);
@@ -164,22 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTwoFactorChallenge(null);
     }, []);
 
-    const hasAdminPortalAccess = isAdminPortalRole(state.user?.role);
-    const isAdmin = hasAdminPortalAccess;
-
-    const can = useCallback((permission: AdminPermission): boolean => {
-        if (!state.user || !isAdminPortalRole(state.user.role)) return false;
-        return hasAdminPermission(adminPermissions, state.user.role, permission);
-    }, [adminPermissions, state.user]);
-
-    const canAny = useCallback((permissions: AdminPermission[]): boolean => {
-        return permissions.some((permission) => can(permission));
-    }, [can]);
-
     return (
         <AuthContext.Provider value={{
             ...state, login, register, logout, clearError,
-            isAdmin, hasAdminPortalAccess, adminPermissions, can, canAny, twoFactorChallenge, clearTwoFactorChallenge,
+            twoFactorChallenge, clearTwoFactorChallenge,
         }}>
             {children}
         </AuthContext.Provider>

@@ -9,7 +9,7 @@ import { trackEvent } from '../utils/analytics';
 import type { Announcement, AnnouncementCard as CardType, ContentType } from '../types';
 import './DetailPage.css';
 
-/* ── JobDetails sub-types (mirrors admin JobPostingForm) ── */
+/* ── JobDetails sub-types ── */
 interface JDImportantDate { name: string; date: string }
 interface JDApplicationFee { category: string; amount: number }
 interface JDAgeRelaxation { category: string; years: number; maxAge: number }

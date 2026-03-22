@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-const PROD_BASE_URL = process.env.PROD_BASE_URL || process.env.ADMIN_BASE_URL;
+const PROD_BASE_URL = process.env.PROD_BASE_URL;
 
 test.describe('@prod Public site probes', () => {
     test.beforeEach(async ({ page }) => {
-        test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL (or ADMIN_BASE_URL) to run production probes.');
+        test.skip(!PROD_BASE_URL, 'Set PROD_BASE_URL to run production probes.');
         await page.goto(PROD_BASE_URL as string, { waitUntil: 'domcontentloaded' });
     });
 

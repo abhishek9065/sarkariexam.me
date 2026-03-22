@@ -1,5 +1,31 @@
 import './JobDetailsRenderer.css';
-import type { JobDetails } from '../admin/JobPostingForm';
+
+interface JobDetailsImportantDate { name: string; date: string }
+interface JobDetailsApplicationFee { category: string; amount: number }
+interface JobDetailsAgeRelaxation { category: string; years: number; maxAge: number }
+interface JobDetailsVacancyDetail { category: string; male: number; female: number; total: number }
+interface JobDetailsExamSubject { name: string; questions: number; marks: number }
+interface JobDetailsSelectionStep { step: number; name: string; description: string }
+interface JobDetailsImportantLink { label: string; url: string; type: 'primary' | 'secondary' }
+interface JobDetailsFaq { question: string; answer: string }
+
+interface JobDetails {
+    importantDates?: JobDetailsImportantDate[];
+    applicationFees?: JobDetailsApplicationFee[];
+    ageLimits?: { minAge: number; maxAge: number; asOnDate: string; relaxations: JobDetailsAgeRelaxation[] };
+    vacancies?: { total: number; details: JobDetailsVacancyDetail[] };
+    eligibility?: { nationality: string; domicile: string; education: string; additional: string[] };
+    salary?: { payLevel: string; payScale: string; inHandSalary: string };
+    physicalRequirements?: {
+        male: { heightGeneral: string; heightSCST: string; chestNormal: string; chestExpanded: string; running: string };
+        female: { heightGeneral: string; heightSCST: string; running: string };
+    };
+    examPattern?: { totalQuestions: number; totalMarks: number; duration: string; negativeMarking: string; subjects: JobDetailsExamSubject[] };
+    selectionProcess?: JobDetailsSelectionStep[];
+    howToApply?: string[];
+    importantLinks?: JobDetailsImportantLink[];
+    faqs?: JobDetailsFaq[];
+}
 
 interface JobDetailsRendererProps {
     jobDetails: JobDetails;

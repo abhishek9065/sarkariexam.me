@@ -1,7 +1,6 @@
 import type { Request } from 'express';
 
 import { getClientIP } from '../middleware/security.js';
-import type { UserRole } from '../types.js';
 
 import RedisCache from './redis.js';
 
@@ -9,7 +8,7 @@ import RedisCache from './redis.js';
 type ActivityRecord = {
     lastSeen: number;
     isAuthenticated: boolean;
-    role?: UserRole;
+    role?: string;
 };
 
 const activeUsers = new Map<string, ActivityRecord>();
@@ -78,7 +77,7 @@ const normalizeActivityRecord = (record: any): ActivityRecord | null => {
     return {
         lastSeen,
         isAuthenticated: Boolean((record as any).isAuthenticated),
-        role: typeof (record as any).role === 'string' ? (record as any).role as UserRole : undefined,
+        role: typeof (record as any).role === 'string' ? (record as any).role : undefined,
     };
 };
 
@@ -90,16 +89,11 @@ const computeStatsFromMemory = (windowMinutes: number) => {
     let total = 0;
     let authenticated = 0;
     let anonymous = 0;
-    let admins = 0;
-
     for (const entry of activeUsers.values()) {
         if (entry.lastSeen < cutoff) continue;
         total += 1;
         if (entry.isAuthenticated) {
             authenticated += 1;
-            if (entry.role === 'admin') {
-                admins += 1;
-            }
         } else {
             anonymous += 1;
         }
@@ -111,7 +105,6 @@ const computeStatsFromMemory = (windowMinutes: number) => {
         total,
         authenticated,
         anonymous,
-        admins,
     };
 };
 
@@ -153,8 +146,6 @@ const computeStatsFromRedis = async (windowMinutes: number) => {
     let total = 0;
     let authenticated = 0;
     let anonymous = 0;
-    let admins = 0;
-
     const recordEntries = await Promise.all(index.map(async (key) => {
         const raw = await RedisCache.get(getRedisRecordKey(key));
         return { key, record: normalizeActivityRecord(raw) };
@@ -190,9 +181,6 @@ const computeStatsFromRedis = async (windowMinutes: number) => {
         total += 1;
         if (record.isAuthenticated) {
             authenticated += 1;
-            if (record.role === 'admin') {
-                admins += 1;
-            }
         } else {
             anonymous += 1;
         }
@@ -208,7 +196,6 @@ const computeStatsFromRedis = async (windowMinutes: number) => {
         total,
         authenticated,
         anonymous,
-        admins,
     };
 };
 

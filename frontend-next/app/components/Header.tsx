@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/app/lib/useTheme';
 import { useAuth } from '@/app/lib/useAuth';
 import { useLanguage } from '@/app/lib/useLanguage';
@@ -30,70 +30,9 @@ const MORE_LINKS: Array<{ to: string; label: string }> = [
     { to: '/privacy', label: 'Privacy' },
     { to: '/disclaimer', label: 'Disclaimer' },
 ];
-
-
-
-const normalizeAdminPortalPath = (value?: string | null) => {
-    if (!value) return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    return withLeadingSlash.endsWith('/') && withLeadingSlash.length > 1
-        ? withLeadingSlash.slice(0, -1)
-        : withLeadingSlash;
-};
-
-const configuredAdminPortalPath = normalizeAdminPortalPath(null);
-const adminPortalCandidates = Array.from(new Set([
-    configuredAdminPortalPath,
-    '/admin',
-    '/admin-vnext',
-    '/admin-legacy',
-].filter((item): item is string => Boolean(item))));
-
-function isVnextAdminRoute(response: Response): boolean {
-    const appHeader = response.headers.get('x-sarkari-app')?.trim().toLowerCase() ?? '';
-    return appHeader === 'admin-vnext' || appHeader === 'admin-vnext-default';
-}
-
-async function resolveReachableAdminPortalPath(candidates: string[]): Promise<string> {
-    if (typeof window === 'undefined') {
-        return candidates[0] ?? '/admin';
-    }
-
-    for (const candidate of candidates) {
-        try {
-            const response = await fetch(candidate, {
-                method: 'HEAD',
-                credentials: 'include',
-                redirect: 'manual',
-                cache: 'no-store',
-            });
-            if (
-                (response.status >= 200 && response.status < 400)
-                || response.status === 401
-                || response.status === 403
-                || response.status === 405
-            ) {
-                if (isVnextAdminRoute(response)) {
-                    return candidate;
-                }
-
-                if (!response.headers.get('x-sarkari-app') && candidate === '/admin-vnext') {
-                    return candidate;
-                }
-            }
-        } catch {
-            // Try next fallback.
-        }
-    }
-
-    return candidates[0] ?? '/admin';
-}
-
 export function Header() {
     const { theme, toggleTheme } = useTheme();
-    const { user, logout, hasAdminPortalAccess } = useAuth();
+    const { user, logout } = useAuth();
     const { language, toggleLanguage, t } = useLanguage();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -105,46 +44,22 @@ export function Header() {
     const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
-    const [adminNavBusy, setAdminNavBusy] = useState(false);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const moreMenuRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        setMobileOpen(false);
-        setUserMenuOpen(false);
-        setMoreOpen(false);
-    }, [pathname]);
-
-    // Close dropdowns on outside click (stable listener via refs)
-    const userMenuOpenRef = useRef(userMenuOpen);
-    userMenuOpenRef.current = userMenuOpen;
-    const moreOpenRef = useRef(moreOpen);
-    moreOpenRef.current = moreOpen;
+    const loginRequested = searchParams.get('login') === '1';
 
     useEffect(() => {
         const handleClickOutside = (e: globalThis.MouseEvent) => {
-            if (userMenuOpenRef.current && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+            if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
                 setUserMenuOpen(false);
             }
-            if (moreOpenRef.current && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+            if (moreOpen && moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
                 setMoreOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    useEffect(() => {
-        if (searchParams.get('login') === '1') {
-            setAuthTab('login');
-            setAuthOpen(true);
-            const cleaned = new URLSearchParams(searchParams.toString());
-            cleaned.delete('login');
-            router.replace(`?${cleaned.toString()}`);
-        }
-    }, [searchParams, router]);
-
-
+    }, [moreOpen, userMenuOpen]);
 
     const openLogin = () => {
         setAuthTab('login');
@@ -156,22 +71,13 @@ export function Header() {
         setAuthOpen(true);
     };
 
-    const preferredAdminPortalPath = adminPortalCandidates[0] ?? '/admin';
-
-    const navigateToAdminPortal = async (event: MouseEvent<HTMLAnchorElement>) => {
-        event.preventDefault();
-        if (adminNavBusy) return;
-
-        setAdminNavBusy(true);
-        setUserMenuOpen(false);
-        setMobileOpen(false);
-
-        try {
-            const target = await resolveReachableAdminPortalPath(adminPortalCandidates);
-            window.location.assign(target);
-        } finally {
-            setAdminNavBusy(false);
-        }
+    const closeAuth = () => {
+        setAuthOpen(false);
+        if (!loginRequested) return;
+        const cleaned = new URLSearchParams(searchParams.toString());
+        cleaned.delete('login');
+        const nextQuery = cleaned.toString();
+        router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
     };
 
     return (
@@ -195,6 +101,11 @@ export function Header() {
                                     key={link.to}
                                     href={link.to}
                                     className={`header-nav-link${pathname === link.to ? ' active' : ''}`}
+                                    onClick={() => {
+                                        setMobileOpen(false);
+                                        setUserMenuOpen(false);
+                                        setMoreOpen(false);
+                                    }}
                                 >
                                     {t(link.labelKey)}
                                 </Link>
@@ -213,7 +124,13 @@ export function Header() {
                                 {moreOpen && (
                                     <div className="header-more-menu card" role="menu">
                                         {MORE_LINKS.map((item) => (
-                                            <Link key={item.to} href={item.to} className="header-more-item" role="menuitem">
+                                            <Link
+                                                key={item.to}
+                                                href={item.to}
+                                                className="header-more-item"
+                                                role="menuitem"
+                                                onClick={() => setMoreOpen(false)}
+                                            >
                                                 {item.label}
                                             </Link>
                                         ))}
@@ -274,17 +191,6 @@ export function Header() {
                                             <Link href="/bookmarks" className="user-dropdown-item" role="menuitem">
                                                 🔖 {t('header.bookmarks')}
                                             </Link>
-                                            {hasAdminPortalAccess && (
-                                                <a
-                                                    href={preferredAdminPortalPath}
-                                                    className="user-dropdown-item"
-                                                    role="menuitem"
-                                                    onClick={(event) => void navigateToAdminPortal(event)}
-                                                    aria-disabled={adminNavBusy}
-                                                >
-                                                    ⚙️ {t('header.admin')}
-                                                </a>
-                                            )}
                                             <hr className="user-dropdown-divider" />
                                             <button
                                                 type="button"
@@ -373,16 +279,6 @@ export function Header() {
                                     <Link href="/bookmarks" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
                                         🔖 {t('header.bookmarks')}
                                     </Link>
-                                    {hasAdminPortalAccess && (
-                                        <a
-                                            href={preferredAdminPortalPath}
-                                            className="header-mobile-link"
-                                            onClick={(event) => void navigateToAdminPortal(event)}
-                                            aria-disabled={adminNavBusy}
-                                        >
-                                            ⚙️ {t('header.admin')}
-                                        </a>
-                                    )}
                                     <button
                                         type="button"
                                         className="header-mobile-link"
@@ -424,7 +320,11 @@ export function Header() {
             </header>
 
             <SearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
-            <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} initialTab={authTab} />
+            <AuthModal
+                isOpen={authOpen || loginRequested}
+                onClose={closeAuth}
+                initialTab={loginRequested ? 'login' : authTab}
+            />
         </>
     );
 }

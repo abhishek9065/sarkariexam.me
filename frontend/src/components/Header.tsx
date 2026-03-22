@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/useAuth';
@@ -27,70 +27,9 @@ const MORE_LINKS: Array<{ to: string; label: string }> = [
     { to: '/privacy', label: 'Privacy' },
     { to: '/disclaimer', label: 'Disclaimer' },
 ];
-
-
-
-const normalizeAdminPortalPath = (value?: string | null) => {
-    if (!value) return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    return withLeadingSlash.endsWith('/') && withLeadingSlash.length > 1
-        ? withLeadingSlash.slice(0, -1)
-        : withLeadingSlash;
-};
-
-const configuredAdminPortalPath = normalizeAdminPortalPath(import.meta.env.VITE_ADMIN_PORTAL_PATH as string | undefined);
-const adminPortalCandidates = Array.from(new Set([
-    configuredAdminPortalPath,
-    '/admin',
-    '/admin-vnext',
-    '/admin-legacy',
-].filter((item): item is string => Boolean(item))));
-
-function isVnextAdminRoute(response: Response): boolean {
-    const appHeader = response.headers.get('x-sarkari-app')?.trim().toLowerCase() ?? '';
-    return appHeader === 'admin-vnext' || appHeader === 'admin-vnext-default';
-}
-
-async function resolveReachableAdminPortalPath(candidates: string[]): Promise<string> {
-    if (typeof window === 'undefined') {
-        return candidates[0] ?? '/admin';
-    }
-
-    for (const candidate of candidates) {
-        try {
-            const response = await fetch(candidate, {
-                method: 'HEAD',
-                credentials: 'include',
-                redirect: 'manual',
-                cache: 'no-store',
-            });
-            if (
-                (response.status >= 200 && response.status < 400)
-                || response.status === 401
-                || response.status === 403
-                || response.status === 405
-            ) {
-                if (isVnextAdminRoute(response)) {
-                    return candidate;
-                }
-
-                if (!response.headers.get('x-sarkari-app') && candidate === '/admin-vnext') {
-                    return candidate;
-                }
-            }
-        } catch {
-            // Try next fallback.
-        }
-    }
-
-    return candidates[0] ?? '/admin';
-}
-
 export function Header() {
     const { theme, toggleTheme } = useTheme();
-    const { user, logout, hasAdminPortalAccess } = useAuth();
+    const { user, logout } = useAuth();
     const { language, toggleLanguage, t } = useLanguage();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -101,7 +40,6 @@ export function Header() {
     const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
-    const [adminNavBusy, setAdminNavBusy] = useState(false);
     const userMenuRef = useRef<HTMLDivElement>(null);
     const moreMenuRef = useRef<HTMLDivElement>(null);
 
@@ -138,9 +76,6 @@ export function Header() {
             setSearchParams(searchParams, { replace: true });
         }
     }, [searchParams, setSearchParams]);
-
-
-
     const openLogin = () => {
         setAuthTab('login');
         setAuthOpen(true);
@@ -149,24 +84,6 @@ export function Header() {
     const openRegister = () => {
         setAuthTab('register');
         setAuthOpen(true);
-    };
-
-    const preferredAdminPortalPath = adminPortalCandidates[0] ?? '/admin';
-
-    const navigateToAdminPortal = async (event: MouseEvent<HTMLAnchorElement>) => {
-        event.preventDefault();
-        if (adminNavBusy) return;
-
-        setAdminNavBusy(true);
-        setUserMenuOpen(false);
-        setMobileOpen(false);
-
-        try {
-            const target = await resolveReachableAdminPortalPath(adminPortalCandidates);
-            window.location.assign(target);
-        } finally {
-            setAdminNavBusy(false);
-        }
     };
 
     return (
@@ -269,17 +186,6 @@ export function Header() {
                                             <Link to="/bookmarks" className="user-dropdown-item" role="menuitem">
                                                 🔖 {t('header.bookmarks')}
                                             </Link>
-                                            {hasAdminPortalAccess && (
-                                                <a
-                                                    href={preferredAdminPortalPath}
-                                                    className="user-dropdown-item"
-                                                    role="menuitem"
-                                                    onClick={(event) => void navigateToAdminPortal(event)}
-                                                    aria-disabled={adminNavBusy}
-                                                >
-                                                    ⚙️ {t('header.admin')}
-                                                </a>
-                                            )}
                                             <hr className="user-dropdown-divider" />
                                             <button
                                                 type="button"
@@ -368,16 +274,6 @@ export function Header() {
                                     <Link to="/bookmarks" className="header-mobile-link" onClick={() => setMobileOpen(false)}>
                                         🔖 {t('header.bookmarks')}
                                     </Link>
-                                    {hasAdminPortalAccess && (
-                                        <a
-                                            href={preferredAdminPortalPath}
-                                            className="header-mobile-link"
-                                            onClick={(event) => void navigateToAdminPortal(event)}
-                                            aria-disabled={adminNavBusy}
-                                        >
-                                            ⚙️ {t('header.admin')}
-                                        </a>
-                                    )}
                                     <button
                                         type="button"
                                         className="header-mobile-link"

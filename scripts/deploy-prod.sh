@@ -53,14 +53,6 @@ require_var() {
 MISSING_KEYS=()
 require_var "COSMOS_CONNECTION_STRING"
 require_var "JWT_SECRET"
-require_var "ADMIN_SETUP_KEY"
-require_var "TOTP_ENCRYPTION_KEY"
-
-ADMIN_EMAIL_ALLOWLIST_VALUE="$(read_env_var "ADMIN_EMAIL_ALLOWLIST")"
-ADMIN_DOMAIN_ALLOWLIST_VALUE="$(read_env_var "ADMIN_DOMAIN_ALLOWLIST")"
-if [[ -z "$ADMIN_EMAIL_ALLOWLIST_VALUE" && -z "$ADMIN_DOMAIN_ALLOWLIST_VALUE" ]]; then
-  MISSING_KEYS+=("ADMIN_EMAIL_ALLOWLIST|ADMIN_DOMAIN_ALLOWLIST")
-fi
 
 if [[ "${#MISSING_KEYS[@]}" -gt 0 ]]; then
   echo "ERROR: missing required production env var(s) in .env:"
@@ -76,7 +68,7 @@ echo "Validating compose config..."
 docker compose --env-file .env config >/dev/null
 
 echo "Building and starting services..."
-docker compose --env-file .env up -d --build nginx backend frontend admin-frontend
+docker compose --env-file .env up -d --build --remove-orphans nginx backend frontend
 
 echo "Container status:"
 docker compose ps
@@ -133,25 +125,6 @@ wait_for_backend_endpoint() {
 
 wait_for_backend_health
 wait_for_backend_endpoint
-
-run_admin_accounts_migration() {
-  if [[ "${DEPLOY_SKIP_ADMIN_MIGRATION:-false}" == "true" ]]; then
-    echo "NOTICE: DEPLOY_SKIP_ADMIN_MIGRATION=true, skipping admin_accounts migration."
-    return 0
-  fi
-
-  echo "Running admin account migration (idempotent)..."
-  if docker compose exec -T backend npm run migrate:admin-accounts; then
-    echo "Admin account migration completed."
-    return 0
-  fi
-
-  echo "ERROR: admin account migration failed."
-  docker compose logs --tail=120 backend || true
-  return 1
-}
-
-run_admin_accounts_migration
 
 echo "Backend health (container internal):"
 docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
@@ -255,6 +228,32 @@ check_public_route_assets() {
   echo "ok (${label} assets -> ${url}, assets=${asset_count})"
 }
 
+check_public_redirect() {
+  local path="$1"
+  local label="$2"
+  local expected_location="$3"
+  local url="${PUBLIC_BASE_URL}${path}"
+  local headers
+  local status
+  local location
+
+  headers="$(curl -k -sS -I "$url" || true)"
+  status="$(printf '%s' "$headers" | tr -d '\r' | awk 'toupper($1) ~ /^HTTP\\// { code=$2 } END { print code }')"
+  location="$(printf '%s' "$headers" | tr -d '\r' | grep -i '^Location:' | tail -n1 | awk -F': ' '{print $2}')"
+
+  if [[ "$status" != "302" ]]; then
+    echo "ERROR: ${label} expected redirect status 302 for ${url}, got '${status:-missing}'"
+    return 1
+  fi
+
+  if [[ "$location" != "$expected_location" ]]; then
+    echo "ERROR: ${label} expected Location=${expected_location}, got '${location:-missing}' for ${url}"
+    return 1
+  fi
+
+  echo "ok (${label} -> ${url}, redirect=${expected_location})"
+}
+
 get_public_detail_slug() {
   local type="$1"
   local payload
@@ -314,9 +313,9 @@ check_public_detail_route() {
 purge_cloudflare_cache || true
 
 echo "Public route checks:"
-check_public_route "/admin" "admin vNext default" "admin-vnext"
-check_public_route "/admin-vnext" "admin vNext alias" "admin-vnext"
-check_public_route "/admin-legacy" "legacy rollback" "admin-legacy"
+check_public_redirect "/admin" "retired legacy route" "/"
+check_public_redirect "/admin-vnext" "retired legacy preview route" "/"
+check_public_redirect "/admin-legacy" "retired legacy alias route" "/"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
 check_public_detail_route "job" 'data-testid="detail-page"'
