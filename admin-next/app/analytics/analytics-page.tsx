@@ -58,42 +58,43 @@ export function AnalyticsPage() {
               title="Total Views"
               value={overview.totalViews?.toLocaleString() || '0'}
               icon={Eye}
-              trend={overview.viewsTrend}
+              trend={overview.comparison?.viewsDeltaPct}
             />
             <KpiCard
               title="Total Searches"
               value={overview.totalSearches?.toLocaleString() || '0'}
               icon={Search}
-              trend={overview.searchesTrend}
+              trend={overview.comparison?.searchesDeltaPct}
             />
             <KpiCard
               title="Avg CTR"
-              value={`${(overview.avgCtr || 0).toFixed(1)}%`}
+              value={`${(overview.clickThroughRate || 0).toFixed(1)}%`}
               icon={MousePointerClick}
+              trend={overview.comparison?.ctrDeltaPct}
             />
             <KpiCard
-              title="Subscriptions"
-              value={overview.subscriptions?.toLocaleString() || '0'}
+              title="Subscribers"
+              value={(overview.totalEmailSubscribers + overview.totalPushSubscribers)?.toLocaleString() || '0'}
               icon={BarChart3}
             />
           </div>
 
           {/* Views by type */}
-          {overview.viewsByType && Object.keys(overview.viewsByType).length > 0 && (
+          {overview.typeBreakdown && overview.typeBreakdown.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Views by Content Type</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {Object.entries(overview.viewsByType).map(([type, count]) => {
-                    const total = overview.totalViews || 1;
-                    const pct = ((count as number) / total * 100).toFixed(1);
+                  {overview.typeBreakdown.map(({ type, count }) => {
+                    const total = overview.totalAnnouncements || 1;
+                    const pct = (count / total * 100).toFixed(1);
                     return (
                       <div key={type} className="space-y-1">
                         <div className="flex items-center justify-between text-sm">
                           <span className="capitalize">{type.replace('-', ' ')}</span>
-                          <span className="font-medium tabular-nums">{(count as number).toLocaleString()} ({pct}%)</span>
+                          <span className="font-medium tabular-nums">{count.toLocaleString()} ({pct}%)</span>
                         </div>
                         <div className="h-2 rounded-full bg-muted overflow-hidden">
                           <div
@@ -117,10 +118,10 @@ export function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {overview.anomalies.map((anomaly: string, i: number) => (
+                  {overview.anomalies.map((anomaly, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm p-2 rounded bg-warning/10 text-warning-foreground">
                       <TrendingDown className="h-4 w-4 mt-0.5 shrink-0" />
-                      <span>{anomaly}</span>
+                      <span>{anomaly.message}</span>
                     </div>
                   ))}
                 </div>

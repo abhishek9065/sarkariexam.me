@@ -88,6 +88,7 @@ const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefine
 
 const defaultCorsOrigins = [
   'http://localhost:3000',
+  'http://localhost:3001',
   'https://sarkariexams.me',
   'https://www.sarkariexams.me'
 ];

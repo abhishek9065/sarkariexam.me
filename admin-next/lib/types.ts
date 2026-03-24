@@ -154,5 +154,14 @@ export interface SiteSettings {
   siteName: string;
   siteDescription: string;
   frontendUrl: string;
+  contactEmail: string;
+  defaultMetaTitle: string;
+  defaultMetaDescription: string;
+  googleAnalyticsId: string;
+  twitterUrl: string;
+  telegramUrl: string;
+  youtubeUrl: string;
+  maintenanceMode: boolean;
+  registrationEnabled: boolean;
   featureFlags: Record<string, boolean>;
 }
