@@ -1232,7 +1232,7 @@ export class AnnouncementModelMongo {
      * Create new announcement
      */
     static async create(data: CreateAnnouncementDto, userId: string): Promise<Announcement> {
-        const slug = this.generateSlug(data.title);
+        const slug = this.generateSlug(data.title, true); // Include timestamp for unique slug
         const now = new Date();
         const status = normalizeStatus(data.status);
         const publishAt = data.publishAt ? new Date(data.publishAt) : undefined;
@@ -1526,7 +1526,7 @@ export class AnnouncementModelMongo {
             try {
                 docs.push({
                     title: item.title,
-                    slug: this.generateSlug(item.title),
+                    slug: this.generateSlug(item.title, true), // Include timestamp for unique slug
                     type: item.type,
                     category: item.category,
                     organization: item.organization,
@@ -1694,13 +1694,16 @@ export class AnnouncementModelMongo {
 
     /**
      * Generate URL-safe slug
+     * @param text - The text to slugify
+     * @param includeTimestamp - Whether to include a timestamp for uniqueness (used for new slugs)
      */
-    private static generateSlug(text: string): string {
-        return text
+    private static generateSlug(text: string, includeTimestamp = false): string {
+        const slug = text
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '')
-            .substring(0, 200) + '-' + Date.now();
+            .substring(0, 200);
+        return includeTimestamp ? `${slug}-${Date.now()}` : slug;
     }
 
     /**

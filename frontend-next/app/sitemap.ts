@@ -62,25 +62,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ];
 
     // In production, fetch dynamic pages from API
-    // For now, return static pages
-    // TODO: Fetch announcements from API and add to sitemap
-    /*
     try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api'}/announcements/sitemap`);
-        const announcements = await response.json();
-        
-        const dynamicPages: MetadataRoute.Sitemap = announcements.data.map((item: any) => ({
-            url: `${baseUrl}/${item.type}/${item.slug}`,
-            lastModified: new Date(item.updatedAt || item.postedAt),
-            changeFrequency: 'daily' as const,
-            priority: 0.7,
-        }));
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+        const response = await fetch(`${apiBase}/announcements/sitemap`, {
+            next: { revalidate: 3600 }, // Cache for 1 hour
+        });
 
-        return [...staticPages, ...dynamicPages];
+        if (response.ok) {
+            const announcements = await response.json();
+
+            if (announcements?.data && Array.isArray(announcements.data)) {
+                const dynamicPages: MetadataRoute.Sitemap = announcements.data.map((item: { type: string; slug: string; updatedAt?: string; postedAt?: string }) => ({
+                    url: `${baseUrl}/${item.type}/${item.slug}`,
+                    lastModified: new Date(item.updatedAt || item.postedAt || new Date()),
+                    changeFrequency: 'daily' as const,
+                    priority: 0.7,
+                }));
+
+                return [...staticPages, ...dynamicPages];
+            }
+        }
     } catch (error) {
         console.error('Failed to fetch dynamic sitemap entries:', error);
     }
-    */
 
     return staticPages;
 }

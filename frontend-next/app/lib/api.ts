@@ -13,11 +13,18 @@ import { API_PATHS } from './apiPaths';
 import { getApiBaseCandidates } from './apiBase';
 
 /* ─── Base URL ─── */
+// Note: In serverless/SSR environments, these module-level variables persist across requests.
+// For production, consider using a cache with TTL or relying solely on HTTP-only cookies.
 const API_BASE_CANDIDATES = getApiBaseCandidates(null);
 const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
 let csrfTokenCache: string | null = null;
+
+/** Clear the CSRF cache - call this on logout or when user context changes */
+export function clearCsrfCache() {
+    csrfTokenCache = null;
+}
 
 function readCookie(name: string): string | null {
     if (typeof document === 'undefined') return null;
@@ -205,9 +212,15 @@ export function removeBookmark(announcementId: string) {
 }
 
 /* ─── Token helpers ─── */
+/**
+ * Clears the CSRF token cache on logout.
+ * Auth is cookie-based in Next.js, so this only clears the client-side cache.
+ */
 export function setAuthToken(token: string | null) {
-    void token;
-    // Cookie-based auth — no-op in Next.js
+    // Clear CSRF cache on logout
+    if (token === null) {
+        csrfTokenCache = null;
+    }
 }
 
 /* ─── Profile ─── */

@@ -45,8 +45,11 @@ export function generateWebSiteSchema() {
 export function generateJobPostingSchema(announcement: Announcement) {
     if (announcement.type !== 'job') return null;
 
-    const jobDetails = announcement.jobDetails;
-    
+    const jobDetails = announcement.jobDetails as Record<string, unknown> | undefined;
+    const jobLocation = typeof jobDetails?.location === 'string' ? jobDetails.location : null;
+    const jobSalary = typeof jobDetails?.salary === 'string' ? jobDetails.salary : null;
+    const jobQualification = typeof jobDetails?.qualification === 'string' ? jobDetails.qualification : null;
+
     return {
         '@context': 'https://schema.org',
         '@type': 'JobPosting',
@@ -69,20 +72,20 @@ export function generateJobPostingSchema(announcement: Announcement) {
             address: {
                 '@type': 'PostalAddress',
                 addressCountry: 'IN',
-                addressRegion: jobDetails?.location || 'India',
+                addressRegion: jobLocation || 'India',
             },
         },
-        baseSalary: jobDetails?.salary ? {
+        baseSalary: jobSalary ? {
             '@type': 'MonetaryAmount',
             currency: 'INR',
             value: {
                 '@type': 'QuantitativeValue',
-                value: jobDetails.salary,
+                value: jobSalary,
                 unitText: 'MONTH',
             },
         } : undefined,
         numberOfPositions: announcement.totalPosts,
-        qualifications: jobDetails?.qualification || undefined,
+        qualifications: jobQualification || undefined,
         url: `https://sarkariexams.me/job/${announcement.slug}`,
     };
 }

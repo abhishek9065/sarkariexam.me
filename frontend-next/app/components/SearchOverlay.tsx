@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { getSearchSuggestions, getTrendingSearches } from '@/app/lib/api';
 import type { SearchSuggestion, ContentType } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
-function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
+import { buildAnnouncementDetailPath } from '@/app/lib/urls';
 const TYPE_ICONS: Record<ContentType, string> = {
     job: '💼',
     result: '📊',

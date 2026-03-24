@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
+import { buildAnnouncementDetailPath } from '@/app/lib/urls';
 type SourceTag = string;
-function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
 const TYPE_LABELS: Record<ContentType, string> = {
     job: 'Job', result: 'Result', 'admit-card': 'Admit Card',
     'answer-key': 'Answer Key', admission: 'Admission', syllabus: 'Syllabus',

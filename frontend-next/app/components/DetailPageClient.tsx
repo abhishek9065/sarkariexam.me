@@ -83,7 +83,7 @@ function formatSalary(min?: number, max?: number): string | null {
     if (!min && !max) return null;
     if (min && max) return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')}`;
     if (min) return `₹${min.toLocaleString('en-IN')}+`;
-    return `Up to ₹${max!.toLocaleString('en-IN')}`;
+    return max != null ? `Up to ₹${max.toLocaleString('en-IN')}` : null;
 }
 
 function getDeadlineStatus(deadline?: string | null): { label: string; cls: string } | null {
@@ -121,7 +121,8 @@ function buildSections(a: Announcement, jd?: JobDetailsData): SectionDef[] {
    DetailPage Component — SarkariResult-style single-column
    ═══════════════════════════════════════════════════════════ */
 export function DetailPage({ type }: { type: ContentType }) {
-    const { slug } = useParams<{ slug: string }>();
+    const { slug } = useParams<{ slug: string | string[] }>();
+    const slugValue = Array.isArray(slug) ? slug[0] : slug;
     const [announcement, setAnnouncement] = useState<Announcement | null>(null);
     const [related, setRelated] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
@@ -129,21 +130,22 @@ export function DetailPage({ type }: { type: ContentType }) {
     const [bookmarked, setBookmarked] = useState(false);
     const [activeSection, setActiveSection] = useState('overview');
     const [copied, setCopied] = useState(false);
+    const [currentUrl, setCurrentUrl] = useState('');
 
     useEffect(() => {
         window.scrollTo(0, 0);
-        if (!slug) return;
+        if (!slugValue) return;
         let mounted = true;
         setLoading(true); setError(null);
         (async () => {
             try {
-                const res = await getAnnouncementBySlug(type, slug);
+                const res = await getAnnouncementBySlug(type, slugValue);
                 if (!mounted) return;
                 setAnnouncement(res.data);
                 trackEvent('detail_view', { type, slug });
                 try {
                     const rel = await getAnnouncementCards({ type, limit: 8, sort: 'newest' });
-                    if (mounted) setRelated(rel.data.filter((item) => item.slug !== slug).slice(0, 6));
+                    if (mounted) setRelated(rel.data.filter((item) => item.slug !== slugValue).slice(0, 6));
                 } catch { if (mounted) setRelated([]); }
                 try {
                     const bm = await getBookmarks();
@@ -156,7 +158,12 @@ export function DetailPage({ type }: { type: ContentType }) {
             }
         })();
         return () => { mounted = false; };
-    }, [type, slug]);
+    }, [type, slugValue]);
+
+    /* Get current URL for client-side only */
+    useEffect(() => {
+        setCurrentUrl(window.location.href);
+    }, [slugValue]);
 
     /* Intersection observer for scroll-spy */
     useEffect(() => {
@@ -180,7 +187,7 @@ export function DetailPage({ type }: { type: ContentType }) {
     }, [announcement, bookmarked]);
 
     const handleCopyLink = useCallback(async () => {
-        try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /**/ }
+        try { await navigator.clipboard.writeText(currentUrl || window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /**/ }
     }, []);
 
     const handlePrint = useCallback(() => {
@@ -404,7 +411,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                                 <div className="sr-info-row">
                                     <span className="sr-info-key">Official Website</span>
                                     <a href={a.externalLink} target="_blank" rel="noopener noreferrer" className="sr-info-val sr-info-link">
-                                        {(() => { try { return new URL(a.externalLink!).hostname; } catch { return 'Visit →'; } })()}
+                                        {(() => { try { return a.externalLink ? new URL(a.externalLink).hostname : 'Visit →'; } catch { return 'Visit →'; } })()}
                                     </a>
                                 </div>
                             )}
@@ -423,7 +430,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                                             <span className="sr-info-val sr-date-val">{formatDate(d.date)}</span>
                                         </div>
                                     ))
-                                    : a.importantDates!.map((d, i) => (
+                                    : a.importantDates?.map((d, i) => (
                                         <div key={d.id ?? i} className="sr-info-row">
                                             <span className="sr-info-key">{d.eventName}</span>
                                             <span className="sr-info-val sr-date-val">{formatDate(d.eventDate)}</span>
@@ -711,9 +718,9 @@ export function DetailPage({ type }: { type: ContentType }) {
                     <div className="sr-share-trust">
                         <div className="sr-share-row">
                             <span className="sr-share-label">📤 Share:</span>
-                            <a href={`https://wa.me/?text=${encodeURIComponent(a.title + ' - ' + window.location.href)}`}
+                            <a href={`https://wa.me/?text=${encodeURIComponent(a.title + ' - ' + currentUrl)}`}
                                 target="_blank" rel="noreferrer" className="sr-share-btn sr-share-wa">💬 WhatsApp</a>
-                            <a href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(a.title)}`}
+                            <a href={`https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodeURIComponent(a.title)}`}
                                 target="_blank" rel="noreferrer" className="sr-share-btn sr-share-tg">✈️ Telegram</a>
                             <button type="button" className="sr-share-btn sr-share-copy" onClick={handleCopyLink}>
                                 🔗 {copied ? 'Copied!' : 'Copy Link'}
