@@ -117,8 +117,12 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
   next();
 }
 
-export function requireAdmin(_req: Request, res: Response, _next: NextFunction): void {
-  res.status(410).json({ error: 'Administrative functionality has been removed' });
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user || req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+  next();
 }
 
 export function requirePermission(_permission: string) {

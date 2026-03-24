@@ -73,7 +73,7 @@ async function testCacheSystem() {
 
     // Test basic set/get
     setCache('test-key', { foo: 'bar' });
-    const val = getCache('test-key');
+    const val = getCache('test-key') as { foo: string } | null;
 
     if (val && val.foo === 'bar') {
         console.log('✅ Basic cache SET/GET working.');
