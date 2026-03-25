@@ -516,12 +516,20 @@ router.get('/subscribers/stats', async (_req, res) => {
 
 router.delete('/subscribers/:id', async (req, res) => {
   try {
-    const id = String(req.params.id);
+    const rawId = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
     const col = getCollection('subscriptions');
-    const result = await col.deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(rawId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
+    const result = await col.deleteOne({ _id: new ObjectId(rawId) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Subscriber not found' });
+    }
     return res.json({ message: 'Subscriber removed' });
   } catch (error) {
     console.error('[Admin] Delete subscriber error:', error);
@@ -620,12 +628,20 @@ const communityList = async (collectionName: string, req: express.Request, res: 
 
 const communityDelete = async (collectionName: string, req: express.Request, res: express.Response) => {
   try {
-    const id = String(req.params.id);
+    const rawId = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(rawId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
     const col = getCollection(collectionName);
-    const result = await col.deleteOne({ _id: new ObjectId(id) });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
+    const result = await col.deleteOne({ _id: new ObjectId(rawId) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
     return res.json({ message: 'Deleted' });
   } catch (error) {
     console.error(`[Admin] ${collectionName} delete error:`, error);
@@ -641,16 +657,22 @@ router.delete('/community/qa/:id', (req, res) => communityDelete('community_qa',
 
 router.patch('/community/qa/:id', async (req, res) => {
   try {
-    const id = String(req.params.id);
+    const rawId = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(rawId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
     const col = getCollection('community_qa');
     const schema = z.object({ answer: z.string().trim().min(1).max(2000) });
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
     const result = await col.updateOne(
-      { _id: new ObjectId(id) },
+      { _id: new ObjectId(rawId) },
       { $set: { answer: parse.data.answer, answeredBy: (req as any).user?.email || 'admin', updatedAt: new Date() } }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
@@ -689,16 +711,22 @@ router.get('/community/flags', async (req, res) => {
 
 router.patch('/community/flags/:id', async (req, res) => {
   try {
-    const id = String(req.params.id);
+    const rawId = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(rawId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
     const col = getCollection('community_flags');
     const schema = z.object({ status: z.enum(['reviewed', 'resolved']) });
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
     const result = await col.updateOne(
-      { _id: new ObjectId(id) },
+      { _id: new ObjectId(rawId) },
       { $set: { status: parse.data.status, updatedAt: new Date() } }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
@@ -738,8 +766,15 @@ router.get('/error-reports', async (req, res) => {
 
 router.patch('/error-reports/:id', async (req, res) => {
   try {
+    const rawId = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(rawId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
     const col = getCollection('error_reports');
     const schema = z.object({
       status: z.enum(['triaged', 'resolved']),
@@ -755,8 +790,7 @@ router.patch('/error-reports/:id', async (req, res) => {
       update.resolvedBy = (req as any).user?.email || 'admin';
     }
 
-    const id = String(req.params.id);
-    const result = await col.updateOne({ _id: new ObjectId(id) }, { $set: update });
+    const result = await col.updateOne({ _id: new ObjectId(rawId) }, { $set: update });
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Error report updated' });
   } catch (error) {
