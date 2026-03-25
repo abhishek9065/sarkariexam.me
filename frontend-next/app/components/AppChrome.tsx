@@ -1,7 +1,4 @@
-'use client';
-
 import { Suspense, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
 import { Footer } from '@/app/components/Footer';
 import { Header } from '@/app/components/Header';
 import { MobileBottomNav } from '@/app/components/MobileBottomNav';
@@ -25,8 +22,13 @@ const EXACT_HOME_ROUTE_PREFIXES = [
     '/privacy',
 ];
 
-export function AppChrome({ children }: { children: ReactNode }) {
-    const pathname = usePathname();
+export function AppChrome({
+    children,
+    pathname,
+}: {
+    children: ReactNode;
+    pathname: string;
+}) {
     const isHomePage = pathname === '/';
     const usesExactHomeShell = !isHomePage && EXACT_HOME_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 

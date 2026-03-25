@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import "@/app/components/HomePage.css";
 import "@/app/components/DetailPage.css";
@@ -12,12 +13,15 @@ export const metadata: Metadata = {
   description: "India's fastest, most reliable source for Sarkari Results, Admit Cards, and Latest Government Jobs across India.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headerStore = await headers();
+  const pathname = headerStore.get("x-pathname") ?? "/";
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>
-          <AppChrome>{children}</AppChrome>
+          <AppChrome pathname={pathname}>{children}</AppChrome>
         </Providers>
       </body>
     </html>
