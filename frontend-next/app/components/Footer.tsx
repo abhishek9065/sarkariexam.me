@@ -1,104 +1,93 @@
 import Link from 'next/link';
+import { EXAM_FAMILY_SHORTCUTS, STATE_SHORTCUTS } from '@/app/lib/ui';
 import { buildCategoryPath } from '@/app/lib/urls';
-const SOCIAL_LINKS = [
-    { label: 'Telegram', href: 'https://t.me/sarkariexamsme', icon: '✈️' },
-    { label: 'WhatsApp', href: 'https://wa.me/sarkariexamsme', icon: '💬' },
-    { label: 'YouTube', href: 'https://youtube.com/@sarkariexamsme', icon: '▶' },
-    { label: 'Instagram', href: 'https://instagram.com/sarkariexamsme', icon: '📸' },
-    { label: 'X', href: 'https://x.com/sarkariexamsme', icon: '𝕏' },
-    { label: 'Facebook', href: 'https://facebook.com/sarkariexamsme', icon: 'f' },
-    { label: 'LinkedIn', href: 'https://linkedin.com/company/sarkariexamsme', icon: 'in' },
-    { label: 'Threads', href: 'https://threads.net/@sarkariexamsme', icon: '@' },
-];
+import styles from './Footer.module.css';
 
-const FOOTER_SECTIONS = [
+const FOOTER_COLUMNS = [
     {
-        title: '📂 Browse',
+        title: 'Browse',
         links: [
-            { label: 'Latest Jobs', to: buildCategoryPath('job') },
-            { label: 'Results', to: buildCategoryPath('result') },
-            { label: 'Admit Cards', to: buildCategoryPath('admit-card') },
-            { label: 'Answer Keys', to: buildCategoryPath('answer-key') },
-            { label: 'Syllabus', to: buildCategoryPath('syllabus') },
-            { label: 'Admissions', to: buildCategoryPath('admission') },
+            { label: 'Latest Jobs', href: buildCategoryPath('job') },
+            { label: 'Results', href: buildCategoryPath('result') },
+            { label: 'Admit Cards', href: buildCategoryPath('admit-card') },
+            { label: 'Answer Keys', href: buildCategoryPath('answer-key') },
+            { label: 'Syllabus', href: buildCategoryPath('syllabus') },
+            { label: 'Admissions', href: buildCategoryPath('admission') },
         ],
     },
     {
-        title: '🏛️ Popular Exams',
+        title: 'Site',
         links: [
-            { label: 'SSC', to: '/jobs?q=SSC' },
-            { label: 'UPSC', to: '/jobs?q=UPSC' },
-            { label: 'Railway (RRB)', to: '/jobs?q=Railway' },
-            { label: 'Banking (IBPS)', to: '/jobs?q=IBPS' },
-            { label: 'Defence', to: '/jobs?q=Defence' },
-            { label: 'State PSC', to: '/jobs?q=PSC' },
-        ],
-    },
-    {
-        title: '🔗 Quick Links',
-        links: [
-            { label: 'About', to: '/about' },
-            { label: 'Contact', to: '/contact' },
-            { label: 'Explore Organizations', to: '/explore' },
-            { label: 'Advertise With Us', to: '/advertise' },
-            { label: 'Privacy Policy', to: '/privacy' },
-            { label: 'Disclaimer', to: '/disclaimer' },
+            { label: 'About', href: '/about' },
+            { label: 'Contact', href: '/contact' },
+            { label: 'Privacy', href: '/privacy' },
+            { label: 'Disclaimer', href: '/disclaimer' },
+            { label: 'Advertise', href: '/advertise' },
+            { label: 'Explore', href: '/explore' },
         ],
     },
 ];
 
 export function Footer() {
     return (
-        <footer className="footer" data-testid="app-footer">
-            <div className="container footer-inner">
-                <div className="footer-top">
-                    <div className="footer-brand">
-                        <span className="footer-brand-icon">📋</span>
-                        <div>
-                            <span className="footer-brand-name">
-                                Sarkari<span className="footer-brand-accent">Exams</span>.me
-                            </span>
-                            <span className="footer-brand-sub">Your Gateway to Government Careers</span>
+        <footer className={styles.footer} data-testid="app-footer">
+            <div className={`container ${styles.inner}`}>
+                <div className={styles.top}>
+                    <div className={styles.brand}>
+                        <span className={styles.brandMark}>SE</span>
+                        <div className={styles.brandCopy}>
+                            <strong>SarkariExams.me</strong>
+                            <p>Premium command center for government jobs, results, admit cards, and exam updates in India.</p>
                         </div>
                     </div>
-
-                    <div className="footer-social footer-social-grid">
-                        {SOCIAL_LINKS.map((item) => (
-                            <a
-                                key={item.label}
-                                href={item.href}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="footer-social-link"
-                                aria-label={item.label}
-                            >
-                                {item.icon}
-                            </a>
-                        ))}
+                    <div className={styles.trustBox}>
+                        <h3>Why users can trust this surface</h3>
+                        <ul>
+                            <li>Official-source links stay visible before every major action.</li>
+                            <li>Deadline urgency and stale-data warnings are surfaced early.</li>
+                            <li>Mobile scanning is prioritized over decorative clutter.</li>
+                        </ul>
                     </div>
                 </div>
 
-                {/* ── Categorized Link Sections ── */}
-                <div className="footer-sections">
-                    {FOOTER_SECTIONS.map((section) => (
-                        <div key={section.title} className="footer-section">
-                            <h3 className="footer-section-title">{section.title}</h3>
-                            <ul className="footer-section-list">
-                                {section.links.map((link) => (
-                                    <li key={link.label}>
-                                        <Link href={link.to}>{link.label}</Link>
-                                    </li>
+                <div className={styles.grid}>
+                    {FOOTER_COLUMNS.map((column) => (
+                        <section key={column.title}>
+                            <h3>{column.title}</h3>
+                            <div className={styles.linkList}>
+                                {column.links.map((link) => (
+                                    <Link key={link.href} href={link.href}>{link.label}</Link>
                                 ))}
-                            </ul>
-                        </div>
+                            </div>
+                        </section>
                     ))}
+
+                    <section>
+                        <h3>Popular exam families</h3>
+                        <div className={styles.chipList}>
+                            {EXAM_FAMILY_SHORTCUTS.map((item) => (
+                                <Link key={item.label} href={item.href} className={styles.chip}>{item.label}</Link>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3>State shortcuts</h3>
+                        <div className={styles.stateList}>
+                            {STATE_SHORTCUTS.map((state) => (
+                                <Link key={state} href={`/jobs?q=${encodeURIComponent(state)}`}>{state}</Link>
+                            ))}
+                        </div>
+                    </section>
                 </div>
 
-                <div className="footer-bottom">
-                    <p>© 2026 SarkariExams.me — All Rights Reserved</p>
-                    <p className="footer-disclaimer">
-                        <strong>Disclaimer:</strong> Content is for informational use only. Verify all details from official sources before acting. We do not collect any fees.
-                    </p>
+                <div className={styles.bottom}>
+                    <p>© 2026 SarkariExams.me. Information is provided for reference and must be verified from the official source before acting.</p>
+                    <div className={styles.channels}>
+                        <a href="https://t.me/sarkariexamsme" target="_blank" rel="noreferrer">Telegram</a>
+                        <a href="https://wa.me/sarkariexamsme" target="_blank" rel="noreferrer">WhatsApp</a>
+                        <a href="https://youtube.com/@sarkariexamsme" target="_blank" rel="noreferrer">YouTube</a>
+                    </div>
                 </div>
             </div>
         </footer>

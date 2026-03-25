@@ -2,40 +2,39 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { buildCategoryPath } from '@/app/lib/urls';
-import '@/app/components/MobileBottomNav.css';
+import { useState } from 'react';
+import { PRIMARY_NAV } from '@/app/lib/ui';
+import { SearchOverlay } from '@/app/components/SearchOverlay';
+import { Icon } from '@/app/components/Icon';
+import styles from './MobileBottomNav.module.css';
 
-const NAV_ITEMS = [
-    { key: 'home', label: 'Home', icon: '🏠', to: '/', matchPrefixes: ['/'] },
-    { key: 'jobs', label: 'Jobs', icon: '💼', to: buildCategoryPath('job'), matchPrefixes: ['/jobs', '/job'] },
-    { key: 'results', label: 'Results', icon: '📊', to: buildCategoryPath('result'), matchPrefixes: ['/results', '/result'] },
-    { key: 'admit', label: 'Admit Card', icon: '🎫', to: buildCategoryPath('admit-card'), matchPrefixes: ['/admit-cards', '/admit-card'] },
-];
+const NAV_ITEMS = [...PRIMARY_NAV.slice(0, 4)];
 
 export function MobileBottomNav() {
     const pathname = usePathname();
+    const [searchOpen, setSearchOpen] = useState(false);
 
-    // Check if the current route matches the nav item (Home is a special case)
-    const isActive = (matchPrefixes: string[]) => {
-        if (matchPrefixes.includes('/')) return pathname === '/';
-        return matchPrefixes.some((prefix) => pathname.startsWith(prefix));
+    const isActive = (prefixes: string[]) => {
+        if (prefixes.includes('/')) return pathname === '/';
+        return prefixes.some((prefix) => pathname.startsWith(prefix));
     };
 
     return (
-        <nav className="mobile-bottom-nav">
-            <ul className="mbn-list">
-                {NAV_ITEMS.map((item) => {
-                    const active = isActive(item.matchPrefixes);
-                    return (
-                        <li key={item.key} className={`mbn-item ${active ? 'active' : ''}`}>
-                            <Link href={item.to} className="mbn-link">
-                                <span className="mbn-icon" aria-hidden="true">{item.icon}</span>
-                                <span className="mbn-label">{item.label}</span>
-                            </Link>
-                        </li>
-                    );
-                })}
-            </ul>
-        </nav>
+        <>
+            <nav className={styles.nav} aria-label="Mobile bottom navigation">
+                {NAV_ITEMS.map((item) => (
+                    <Link key={item.key} href={item.href} className={`${styles.item}${isActive(item.matchPrefixes) ? ` ${styles.itemActive}` : ''}`}>
+                        <span className={styles.icon}><Icon name={item.icon as Parameters<typeof Icon>[0]['name']} /></span>
+                        <span>{item.labelEn}</span>
+                    </Link>
+                ))}
+                <button type="button" className={styles.item} onClick={() => setSearchOpen(true)}>
+                    <span className={styles.icon}><Icon name="Search" /></span>
+                    <span>Search</span>
+                </button>
+            </nav>
+
+            <SearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+        </>
     );
 }

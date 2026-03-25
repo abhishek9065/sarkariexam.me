@@ -346,3 +346,82 @@ export function getLiveMetrics() {
     timestamp: string;
   } }>('/admin/analytics/live');
 }
+
+// ─── Content Calendar ───
+export function getCalendarAnnouncements(params: { start: string; end: string; status?: string; type?: string }) {
+  return apiFetch<{ data: Array<{
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    deadline?: string;
+    publishAt?: string;
+    createdAt: string;
+  }> }>(`/admin/calendar${qs(params)}`);
+}
+
+export function bulkImportAnnouncements(data: unknown[]) {
+  return apiFetchWithCsrf<{ data: {
+    success: number;
+    failed: number;
+    errors: Array<{ row: number; error: string }>;
+    createdIds: string[];
+  } }>('/admin/bulk-import', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function getUpcomingDeadlines(limit = 10) {
+  return apiFetch<{ data: Array<{
+    id: string;
+    title: string;
+    deadline: string;
+    daysLeft: number;
+    type: string;
+  }> }>(`/admin/upcoming-deadlines${qs({ limit })}`);
+}
+
+// ─── Notification Campaigns ───
+export function getCampaigns() {
+  return apiFetch<{ data: Array<{
+    id: string;
+    title: string;
+    body: string;
+    status: string;
+    sentCount: number;
+    createdAt: string;
+    segment: { type: string; value: string };
+  }> }>('/admin/campaigns');
+}
+
+export function createCampaign(data: {
+  title: string;
+  body: string;
+  url?: string;
+  segment: { type: string; value: string };
+  scheduledAt?: string;
+}) {
+  return apiFetchWithCsrf<{ data: { id: string }; message: string }>('/admin/campaigns', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function sendCampaign(id: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/campaigns/${id}/send`, {
+    method: 'POST',
+  });
+}
+
+export function getSegments() {
+  return apiFetch<{ data: {
+    segments: {
+      states: string[];
+      categories: string[];
+      languages: string[];
+      totalUsers: number;
+    };
+    counts: Array<{ type: string; value: string; count: number }>;
+  } }>('/admin/segments');
+}

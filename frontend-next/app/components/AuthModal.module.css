@@ -1,0 +1,143 @@
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 92;
+    display: grid;
+    place-items: center;
+    padding: 20px 16px;
+    background: rgba(5, 14, 28, 0.62);
+    backdrop-filter: blur(12px);
+}
+
+.modal {
+    position: relative;
+    width: min(460px, 100%);
+    padding: 28px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 247, 251, 0.97));
+    box-shadow: var(--shadow-lg);
+}
+
+[data-theme="dark"] .modal {
+    background: linear-gradient(180deg, rgba(10, 19, 35, 0.98), rgba(8, 17, 31, 0.98));
+}
+
+.closeButton {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: transparent;
+    color: var(--text-soft);
+}
+
+.header {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-right: 40px;
+}
+
+.badge {
+    justify-self: start;
+    padding: 8px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.header h2 {
+    font-size: clamp(1.4rem, 4vw, 1.9rem);
+}
+
+.header p {
+    color: var(--text-soft);
+    line-height: 1.6;
+}
+
+.tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 18px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--bg-muted);
+}
+
+.tab {
+    min-height: 42px;
+    border-radius: 12px;
+    color: var(--text-soft);
+    font-weight: 800;
+}
+
+.tabActive {
+    background: var(--bg-strong);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+}
+
+.form {
+    display: grid;
+    gap: 14px;
+}
+
+.field {
+    display: grid;
+    gap: 8px;
+}
+
+.field span {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-soft);
+}
+
+.field input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--bg-strong);
+    color: var(--text);
+}
+
+.error {
+    padding: 12px 14px;
+    border: 1px solid rgba(217, 45, 32, 0.2);
+    border-radius: 14px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.primaryButton,
+.secondaryButton {
+    min-height: 48px;
+    border-radius: var(--radius-pill);
+    font-weight: 800;
+}
+
+.primaryButton {
+    background: linear-gradient(135deg, var(--accent), #4f46e5);
+    color: white;
+}
+
+.secondaryButton {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-soft);
+}

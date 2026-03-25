@@ -1028,4 +1028,121 @@ router.get('/analytics/live', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// CONTENT CALENDAR
+// ═══════════════════════════════════════════
+
+router.get('/calendar', async (req, res) => {
+  try {
+    const { start, end, status, type } = req.query;
+    if (!start || !end) {
+      return res.status(400).json({ error: 'start and end dates required' });
+    }
+
+    const { getCalendarAnnouncements } = await import('../services/calendar.js');
+    const announcements = await getCalendarAnnouncements(
+      new Date(start as string),
+      new Date(end as string),
+      { status: status as string, type: type as string }
+    );
+
+    return res.json({ data: announcements });
+  } catch (error) {
+    console.error('[Admin] Calendar error:', error);
+    return res.status(500).json({ error: 'Failed to fetch calendar data' });
+  }
+});
+
+router.post('/bulk-import', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { bulkImportAnnouncements } = await import('../services/calendar.js');
+    const result = await bulkImportAnnouncements(req.body, userId);
+
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('[Admin] Bulk import error:', error);
+    return res.status(500).json({ error: 'Failed to import announcements' });
+  }
+});
+
+router.get('/upcoming-deadlines', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 10;
+    const { getUpcomingDeadlines } = await import('../services/calendar.js');
+    const deadlines = await getUpcomingDeadlines(limit);
+    return res.json({ data: deadlines });
+  } catch (error) {
+    console.error('[Admin] Upcoming deadlines error:', error);
+    return res.status(500).json({ error: 'Failed to fetch deadlines' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// NOTIFICATION CAMPAIGNS
+// ═══════════════════════════════════════════
+
+router.get('/campaigns', async (req, res) => {
+  try {
+    const { getCampaigns } = await import('../services/notifications.js');
+    const campaigns = await getCampaigns();
+    return res.json({ data: campaigns });
+  } catch (error) {
+    console.error('[Admin] Campaigns error:', error);
+    return res.status(500).json({ error: 'Failed to fetch campaigns' });
+  }
+});
+
+router.post('/campaigns', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    const { createCampaign } = await import('../services/notifications.js');
+    const result = await createCampaign(req.body, userId);
+    
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ data: { id: result.campaignId }, message: 'Campaign created' });
+  } catch (error) {
+    console.error('[Admin] Create campaign error:', error);
+    return res.status(500).json({ error: 'Failed to create campaign' });
+  }
+});
+
+router.post('/campaigns/:id/send', async (req, res) => {
+  try {
+    const { sendCampaign } = await import('../services/notifications.js');
+    const result = await sendCampaign(req.params.id);
+    
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ message: 'Campaign sent' });
+  } catch (error) {
+    console.error('[Admin] Send campaign error:', error);
+    return res.status(500).json({ error: 'Failed to send campaign' });
+  }
+});
+
+router.get('/segments', async (req, res) => {
+  try {
+    const { getUserSegments, getSegmentUserCount } = await import('../services/notifications.js');
+    const segments = await getUserSegments();
+    
+    // Get counts for each segment
+    const segmentCounts = await Promise.all([
+      { type: 'all', value: 'all', count: segments.totalUsers },
+      ...segments.states.map(s => getSegmentUserCount('state', s).then(count => ({ type: 'state', value: s, count }))),
+      ...segments.categories.map(c => getSegmentUserCount('category', c).then(count => ({ type: 'category', value: c, count }))),
+    ]);
+    
+    return res.json({ data: { segments, counts: segmentCounts } });
+  } catch (error) {
+    console.error('[Admin] Segments error:', error);
+    return res.status(500).json({ error: 'Failed to fetch segments' });
+  }
+});
+
 export default router;

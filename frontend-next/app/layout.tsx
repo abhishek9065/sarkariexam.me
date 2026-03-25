@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "@/app/components/HomePage.css";
-import "@/app/components/DetailPage.css";
-import "@/app/components/CategoryPage.css";
-import "@/app/components/MobileBottomNav.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "SarkariExams.me — Sarkari Results, Admit Cards & Latest Government Jobs",
-  description: "India's fastest, most reliable source for Sarkari Results, Admit Cards, and Latest Government Jobs across India.",
+  title: "SarkariExams.me | Sarkari Results, Admit Cards, Government Jobs",
+  description: "Trust-first command center for Sarkari Results, Admit Cards, latest government jobs, admissions, and exam updates across India.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

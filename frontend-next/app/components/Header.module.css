@@ -1,0 +1,319 @@
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 70;
+}
+
+.trustBar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(90deg, #061327, #10203f 50%, #0a1730);
+    color: rgba(248, 251, 255, 0.85);
+}
+
+.trustBarInner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 42px;
+}
+
+.trustPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.trustCopy {
+    margin: 0;
+    font-size: 0.8rem;
+    color: rgba(248, 251, 255, 0.7);
+}
+
+.chrome {
+    border-bottom: 1px solid var(--border);
+    background: rgba(244, 247, 251, 0.84);
+    backdrop-filter: blur(14px);
+}
+
+[data-theme="dark"] .chrome {
+    background: rgba(8, 17, 31, 0.84);
+}
+
+.chromeInner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 20px;
+    min-height: var(--header-height);
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.brandMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent), #4f46e5);
+    color: white;
+    font-family: 'Manrope', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    box-shadow: var(--shadow-sm);
+}
+
+.brandCopy {
+    display: grid;
+}
+
+.brandCopy strong {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.05rem;
+}
+
+.brandCopy small {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.navLink,
+.moreButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: var(--radius-pill);
+    color: var(--text-soft);
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.navLink:hover,
+.moreButton:hover,
+.navLinkActive {
+    background: var(--bg-strong);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+}
+
+.moreWrap,
+.userWrap {
+    position: relative;
+}
+
+.moreMenu,
+.userMenu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 240px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(16px);
+}
+
+.moreItem,
+.userItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 0 12px;
+    border-radius: 14px;
+    color: var(--text-soft);
+    font-weight: 700;
+}
+
+.moreItem:hover,
+.userItem:hover {
+    background: var(--bg-muted);
+    color: var(--text);
+}
+
+.userMeta {
+    display: grid;
+    gap: 3px;
+    padding: 10px 12px 12px;
+}
+
+.userMeta span {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.iconButton,
+.avatarButton,
+.primaryButton,
+.textButton {
+    min-height: 42px;
+    border-radius: var(--radius-pill);
+    font-weight: 800;
+}
+
+.iconButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-strong);
+    color: var(--text-soft);
+}
+
+.avatarButton {
+    width: 42px;
+    padding: 0;
+    border: 1px solid var(--border);
+    background: var(--bg-strong);
+}
+
+.avatarButton span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    color: var(--text);
+    font-weight: 800;
+}
+
+.authButtons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.textButton {
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    background: var(--bg-strong);
+    color: var(--text);
+}
+
+.primaryButton {
+    padding: 0 16px;
+    background: linear-gradient(135deg, var(--accent), #4f46e5);
+    color: white;
+}
+
+.mobileOnly {
+    display: none;
+}
+
+.mobileMenu {
+    border-bottom: 1px solid var(--border);
+    background: rgba(244, 247, 251, 0.96);
+}
+
+[data-theme="dark"] .mobileMenu {
+    background: rgba(8, 17, 31, 0.96);
+}
+
+.mobileMenuInner {
+    display: grid;
+    gap: 16px;
+    padding: 16px 0 22px;
+}
+
+.mobilePrimary,
+.mobileSecondary {
+    display: grid;
+    gap: 10px;
+}
+
+.mobileLink,
+.mobileSecondaryLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-strong);
+    color: var(--text);
+    font-weight: 700;
+}
+
+.mobileLinkActive {
+    border-color: rgba(21, 94, 239, 0.3);
+    background: rgba(21, 94, 239, 0.08);
+}
+
+.mobileLinkIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    background: var(--bg-muted);
+}
+
+.mobileAuth {
+    display: flex;
+    gap: 10px;
+}
+
+.mobileAuth .textButton,
+.mobileAuth .primaryButton {
+    flex: 1 1 0;
+}
+
+@media (max-width: 1080px) {
+    .nav {
+        display: none;
+    }
+
+    .mobileOnly {
+        display: inline-flex;
+    }
+}
+
+@media (max-width: 768px) {
+    .trustCopy,
+    .authButtons,
+    .actions > .iconButton:nth-child(2) {
+        display: none;
+    }
+
+    .chromeInner {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .brandCopy small {
+        display: none;
+    }
+}

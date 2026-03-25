@@ -1,0 +1,47 @@
+.nav {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    z-index: 65;
+    display: none;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(14px);
+}
+
+[data-theme="dark"] .nav {
+    background: rgba(10, 19, 35, 0.92);
+}
+
+.item {
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+    min-height: 58px;
+    padding: 8px 4px;
+    border-radius: 16px;
+    color: var(--text-soft);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.itemActive {
+    background: rgba(21, 94, 239, 0.1);
+    color: var(--accent);
+}
+
+.icon {
+    font-size: 1.05rem;
+}
+
+@media (max-width: 768px) {
+    .nav {
+        display: grid;
+    }
+}

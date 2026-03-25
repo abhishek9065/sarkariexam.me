@@ -20,6 +20,8 @@ import {
   Sun,
   Moon,
   ChevronRight,
+  Calendar,
+  Megaphone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -29,10 +31,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/announcements', label: 'Announcements', icon: FileText },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/users', label: 'Users', icon: Users },
   { href: '/subscribers', label: 'Subscribers', icon: Mail },
   { href: '/community', label: 'Community', icon: MessageSquare },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/notifications', label: 'Notifications', icon: Megaphone },
   { href: '/error-reports', label: 'Error Reports', icon: AlertTriangle },
   { href: '/audit-log', label: 'Audit Log', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
