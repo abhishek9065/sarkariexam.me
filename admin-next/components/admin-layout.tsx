@@ -23,6 +23,9 @@ import {
   Calendar,
   Megaphone,
   CheckCircle,
+  Search,
+  ThumbsUp,
+  Server,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -37,10 +40,13 @@ const navItems = [
   { href: '/users', label: 'Users', icon: Users },
   { href: '/subscribers', label: 'Subscribers', icon: Mail },
   { href: '/community', label: 'Community', icon: MessageSquare },
+  { href: '/engagement', label: 'Engagement', icon: ThumbsUp },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/notifications', label: 'Notifications', icon: Megaphone },
+  { href: '/seo', label: 'SEO', icon: Search },
   { href: '/error-reports', label: 'Error Reports', icon: AlertTriangle },
   { href: '/audit-log', label: 'Audit Log', icon: History },
+  { href: '/system-admin', label: 'System', icon: Server },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
