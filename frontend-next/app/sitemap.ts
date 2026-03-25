@@ -74,8 +74,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ];
 
     // In production, fetch dynamic pages from API
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!apiBase) {
+        return staticPages;
+    }
+
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
         const response = await fetch(`${apiBase}/announcements/sitemap`, {
             next: { revalidate: 3600 }, // Cache for 1 hour
         });
@@ -95,7 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             }
         }
     } catch (error) {
-        console.error('Failed to fetch dynamic sitemap entries:', error);
+        console.warn('Failed to fetch dynamic sitemap entries:', error);
     }
 
     return staticPages;

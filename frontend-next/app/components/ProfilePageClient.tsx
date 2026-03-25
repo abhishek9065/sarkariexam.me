@@ -24,17 +24,11 @@ export function ProfilePage() {
     const { user, loading: authLoading } = useAuth();
     const [widgets, setWidgets] = useState<ProfileWidgetData | null>(null);
     const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
-    const [localSearches, setLocalSearches] = useState(getSavedSearchDrafts());
+    const [localSearches] = useState(getSavedSearchDrafts());
     const [notifications, setNotifications] = useState<UserNotificationItem[]>([]);
     const [trackedApplications, setTrackedApplications] = useState<TrackedApplicationItem[]>([]);
-    const [recentViews, setRecentViews] = useState(getRecentViews());
+    const [recentViews] = useState(getRecentViews());
     const [interests, setInterestState] = useState<ContentType[]>(getInterests());
-
-    useEffect(() => {
-        setRecentViews(getRecentViews());
-        setLocalSearches(getSavedSearchDrafts());
-        setInterestState(getInterests());
-    }, []);
 
     useEffect(() => {
         if (!user) return;

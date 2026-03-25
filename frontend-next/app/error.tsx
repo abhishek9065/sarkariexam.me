@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect } from 'react';
 import { reportClientError } from '@/app/lib/reportClientError';
 
@@ -27,12 +28,12 @@ export default function Error({
             <div className="error-content">
                 <h2>Something went wrong!</h2>
                 <p>We apologize for the inconvenience. Our team has been notified.</p>
-                <button onClick={() => reset()} className="error-button">
+                <button type="button" onClick={() => reset()} className="error-button">
                     Try again
                 </button>
-                <a href="/" className="error-link">
+                <Link href="/" className="error-link">
                     Return to homepage
-                </a>
+                </Link>
             </div>
         </div>
     );

@@ -1,5 +1,3 @@
-'use client';
-
 import type { Announcement, AnnouncementCard, ContentType, SearchSuggestion } from '@/app/lib/types';
 import { buildCategoryPath } from '@/app/lib/urls';
 

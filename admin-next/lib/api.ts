@@ -488,3 +488,48 @@ export function getSEOMetrics() {
     coverage: { indexed: number; noindex: number; missing: number };
   } }>('/admin/seo-metrics');
 }
+
+// ─── Low Priority: Backup & System ───
+export function getBackups(limit = 20) {
+  return apiFetch<{ data: any[] }>(`/admin/backups${qs({ limit })}`);
+}
+
+export function exportAnnouncementsToCSV(): Promise<Response> {
+  return fetch(`${API_BASE}/admin/export/announcements`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${getToken()}` },
+  });
+}
+
+export function getSecurityEvents(filters?: { type?: string; severity?: string }) {
+  return apiFetch<{ data: any[] }>(`/admin/security/events${qs(filters || {})}`);
+}
+
+export function getSecurityStats() {
+  return apiFetch<{ data: { totalEvents24h: number; criticalCount: number; failedLogins: number; suspiciousIPs: number; failedLoginsList: Array<{ ip: string; count: number }> } }>('/admin/security/stats');
+}
+
+export function getPerformanceSummary() {
+  return apiFetch<{ data: {
+    summary: { avgResponseTime: number; p95ResponseTime: number; p99ResponseTime: number; requestsPerMinute: number; errorRate: number };
+    slowEndpoints: Array<{ route: string; avgDuration: number; count: number }>;
+    errors: Array<{ code: number; count: number; percentage: number }>;
+  } }>('/admin/performance/summary');
+}
+
+export function getRateLimitStats() {
+  return apiFetch<{ data: {
+    totalHits24h: number;
+    uniqueIPs: number;
+    mostLimited: Array<{ key: string; count: number }>;
+    byEndpoint: Array<{ endpoint: string; hits: number; blocked: number }>;
+  } }>('/admin/rate-limit/stats');
+}
+
+export function getSystemHealth() {
+  return apiFetch<{ data: {
+    health: { status: string; checks: any };
+    services: { services: Array<{ name: string; status: string; lastChecked: string }> };
+    errors: Array<{ message: string; count: number; timestamp: string }>;
+  } }>('/admin/health');
+}

@@ -12,6 +12,7 @@ import { trackEvent } from '@/app/lib/analytics';
 import { getFallbackHomepageFeed } from '@/app/lib/fallbackData';
 import { getInterests, getRecentViews, getSavedSearchDrafts, setInterests, type SavedSearchDraft } from '@/app/lib/personalization';
 import type { AnnouncementCard as CardType, ContentType, HomepageFeedData } from '@/app/lib/types';
+import { withTimeout } from '@/app/lib/withTimeout';
 import {
     CATEGORY_META,
     EXAM_FAMILY_SHORTCUTS,
@@ -74,8 +75,8 @@ export function HomePage() {
     const [feed, setFeed] = useState<HomepageFeedData>(getFallbackHomepageFeed());
     const [loading, setLoading] = useState(true);
     const [bookmarkIds, setBookmarkIds] = useState<string[]>([]);
-    const [recentViews, setRecentViews] = useState(getRecentViews());
-    const [savedSearches, setSavedSearches] = useState<SavedSearchDraft[]>(getSavedSearchDrafts());
+    const [recentViews] = useState(getRecentViews());
+    const [savedSearches] = useState<SavedSearchDraft[]>(getSavedSearchDrafts());
     const [interests, setInterestState] = useState<ContentType[]>(() => {
         const stored = getInterests();
         return stored.length > 0 ? stored : ['job', 'result', 'admit-card'];
@@ -86,7 +87,7 @@ export function HomePage() {
 
         (async () => {
             try {
-                const response = await getHomepageFeed();
+                const response = await withTimeout(getHomepageFeed(), 3500);
                 if (!cancelled) {
                     setFeed(response.data);
                 }
@@ -107,11 +108,6 @@ export function HomePage() {
     }, []);
 
     useEffect(() => {
-        setRecentViews(getRecentViews());
-        setSavedSearches(getSavedSearchDrafts());
-    }, []);
-
-    useEffect(() => {
         if (!user) {
             setBookmarkIds([]);
             return;
@@ -121,7 +117,7 @@ export function HomePage() {
 
         (async () => {
             try {
-                const response = await getBookmarkIds();
+                const response = await withTimeout(getBookmarkIds(), 2500);
                 if (!cancelled) {
                     setBookmarkIds(response.data ?? []);
                 }

@@ -22,6 +22,7 @@ import {
     getDeadlineInfo,
 } from '@/app/lib/ui';
 import { useLanguage } from '@/app/lib/useLanguage';
+import { withTimeout } from '@/app/lib/withTimeout';
 
 type SortValue = 'newest' | 'oldest' | 'deadline' | 'views';
 type ViewMode = 'list' | 'cards';
@@ -135,7 +136,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
         (async () => {
             try {
-                const response = await getOrganizations();
+                const response = await withTimeout(getOrganizations(), 2500);
                 const next = [...new Set((response.data ?? []).filter(Boolean))];
                 if (!cancelled && next.length > 0) {
                     setOrganizations(next);
@@ -159,7 +160,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
 
         (async () => {
             try {
-                const response = await getAnnouncementCards({
+                const response = await withTimeout(getAnnouncementCards({
                     type,
                     search: search || undefined,
                     organization: organization || undefined,
@@ -167,7 +168,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
                     qualification: qualification || undefined,
                     sort,
                     limit: 48,
-                });
+                }), 3500);
                 if (!cancelled) {
                     const next = filterByDeadlineStatus(response.data ?? [], deadlineStatus);
                     setCards(sortCards(next, sort));

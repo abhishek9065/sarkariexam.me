@@ -15,7 +15,8 @@ import { pushRecentView } from '@/app/lib/personalization';
 import { generateArticleSchema, generateBreadcrumbSchema, generateFAQSchema, generateJobPostingSchema } from '@/app/lib/structuredData';
 import type { Announcement, AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
 import { buildCategoryPath } from '@/app/lib/urls';
-import { buildRecentView, formatDate, formatDateTime, formatRelativeTime, getDeadlineInfo } from '@/app/lib/ui';
+import { CATEGORY_META, buildRecentView, formatDate, formatDateTime, formatRelativeTime, getDeadlineInfo } from '@/app/lib/ui';
+import { withTimeout } from '@/app/lib/withTimeout';
 
 type FaqItem = { question: string; answer: string };
 type ImportantLink = { label: string; url: string };
@@ -81,7 +82,7 @@ export function DetailPage({ type }: { type: ContentType }) {
 
         (async () => {
             try {
-                const response = await getAnnouncementBySlug(type, slug);
+                const response = await withTimeout(getAnnouncementBySlug(type, slug), 3000);
                 if (!cancelled) {
                     setAnnouncement(response.data);
                     pushRecentView(buildRecentView(response.data));
@@ -103,7 +104,7 @@ export function DetailPage({ type }: { type: ContentType }) {
 
         (async () => {
             try {
-                const response = await getAnnouncementCards({ type, sort: 'newest', limit: 6 });
+                const response = await withTimeout(getAnnouncementCards({ type, sort: 'newest', limit: 6 }), 3000);
                 if (!cancelled) {
                     setRelated((response.data ?? []).filter((item) => item.slug !== slug).slice(0, 3));
                 }
@@ -116,7 +117,7 @@ export function DetailPage({ type }: { type: ContentType }) {
 
         (async () => {
             try {
-                const response = await getBookmarks();
+                const response = await withTimeout(getBookmarks(), 2500);
                 if (!cancelled) {
                     setBookmarked((response.data ?? []).some((item) => item.slug === slug));
                 }

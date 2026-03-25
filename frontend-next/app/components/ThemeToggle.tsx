@@ -1,20 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 import { getStoredTheme, setStoredTheme, getEffectiveTheme, applyTheme, watchSystemTheme, type Theme } from '@/app/lib/theme';
 
 export function ThemeToggle() {
-    const [theme, setTheme] = useState<Theme>('system');
-    const [mounted, setMounted] = useState(false);
+    const [, rerender] = useReducer((count: number) => count + 1, 0);
+    const theme: Theme = typeof window === 'undefined' ? 'system' : getStoredTheme();
 
     useEffect(() => {
-        setMounted(true);
-        setTheme(getStoredTheme());
-    }, []);
-
-    useEffect(() => {
-        if (!mounted) return;
-
         const effectiveTheme = getEffectiveTheme(theme);
         applyTheme(effectiveTheme);
 
@@ -23,14 +16,16 @@ export function ThemeToggle() {
                 applyTheme(systemTheme);
             });
         }
-    }, [theme, mounted]);
+        return undefined;
+    }, [theme]);
 
     const handleThemeChange = (newTheme: Theme) => {
-        setTheme(newTheme);
         setStoredTheme(newTheme);
+        applyTheme(getEffectiveTheme(newTheme));
+        rerender();
     };
 
-    if (!mounted) {
+    if (typeof window === 'undefined') {
         return <div className="theme-toggle-skeleton" />;
     }
 

@@ -48,8 +48,9 @@ export class ErrorBoundary extends Component<Props, State> {
                 <div className="error-boundary-fallback">
                     <div className="error-boundary-content">
                         <h2>Something went wrong</h2>
-                        <p>We're sorry for the inconvenience. The error has been reported to our team.</p>
+                        <p>We&apos;re sorry for the inconvenience. The error has been reported to our team.</p>
                         <button
+                            type="button"
                             onClick={() => {
                                 this.setState({ hasError: false, error: null });
                                 window.location.reload();

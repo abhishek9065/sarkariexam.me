@@ -1287,4 +1287,109 @@ router.get('/seo-metrics', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// LOW PRIORITY: BACKUP & SYSTEM
+// ═══════════════════════════════════════════
+
+// Backups
+router.get('/backups', async (req, res) => {
+  try {
+    const { getBackups } = await import('../services/backup.js');
+    const backups = await getBackups(parseInt(req.query.limit as string) || 20);
+    return res.json({ data: backups });
+  } catch (error) {
+    console.error('[Admin] Backups error:', error);
+    return res.status(500).json({ error: 'Failed to fetch backups' });
+  }
+});
+
+router.post('/export/announcements', async (req, res) => {
+  try {
+    const { exportAnnouncementsToCSV } = await import('../services/backup.js');
+    const csv = await exportAnnouncementsToCSV();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=announcements.csv');
+    return res.send(csv);
+  } catch (error) {
+    console.error('[Admin] Export error:', error);
+    return res.status(500).json({ error: 'Export failed' });
+  }
+});
+
+// Security Audit
+router.get('/security/events', async (req, res) => {
+  try {
+    const { getSecurityEvents } = await import('../services/security-audit.js');
+    const events = await getSecurityEvents({
+      type: req.query.type as string,
+      severity: req.query.severity as string,
+    }, parseInt(req.query.limit as string) || 100);
+    return res.json({ data: events });
+  } catch (error) {
+    console.error('[Admin] Security events error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
+router.get('/security/stats', async (req, res) => {
+  try {
+    const { getSecurityStats, getFailedLoginAttempts } = await import('../services/security-audit.js');
+    const [stats, failedLogins] = await Promise.all([
+      getSecurityStats(),
+      getFailedLoginAttempts(60),
+    ]);
+    return res.json({ data: { ...stats, failedLogins } });
+  } catch (error) {
+    console.error('[Admin] Security stats error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Performance
+router.get('/performance/summary', async (req, res) => {
+  try {
+    const { getPerformanceSummary, getSlowEndpoints, getErrorSummary } = await import('../services/performance.js');
+    const [summary, slowEndpoints, errors] = await Promise.all([
+      getPerformanceSummary(60),
+      getSlowEndpoints(10),
+      getErrorSummary(24),
+    ]);
+    return res.json({ data: { summary, slowEndpoints, errors } });
+  } catch (error) {
+    console.error('[Admin] Performance error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// Rate Limiting
+router.get('/rate-limit/stats', async (req, res) => {
+  try {
+    const { getRateLimitStats, getRateLimitByEndpoint } = await import('../services/rate-limit.js');
+    const [stats, byEndpoint] = await Promise.all([
+      getRateLimitStats(),
+      getRateLimitByEndpoint(),
+    ]);
+    return res.json({ data: { ...stats, byEndpoint } });
+  } catch (error) {
+    console.error('[Admin] Rate limit stats error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// System Health
+router.get('/health', async (req, res) => {
+  try {
+    const { getSystemHealth, getServiceStatus, getRecentErrors } = await import('../services/health.js');
+    const [health, services, errors] = await Promise.all([
+      getSystemHealth(),
+      getServiceStatus(),
+      getRecentErrors(5),
+    ]);
+    return res.json({ data: { health, services, errors } });
+  } catch (error) {
+    console.error('[Admin] Health error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
 export default router;

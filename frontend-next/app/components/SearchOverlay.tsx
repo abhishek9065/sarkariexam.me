@@ -9,6 +9,7 @@ import type { SearchSuggestion } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
 import { buildAnnouncementDetailPath } from '@/app/lib/urls';
 import { useLanguage } from '@/app/lib/useLanguage';
+import { withTimeout } from '@/app/lib/withTimeout';
 import { Icon } from '@/app/components/Icon';
 import styles from './SearchOverlay.module.css';
 
@@ -66,7 +67,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
         let cancelled = false;
         void (async () => {
             try {
-                const response = await getTrendingSearches(30, 8);
+                const response = await withTimeout(getTrendingSearches(30, 8), 2500);
                 if (cancelled) return;
                 const next = (response.data ?? [])
                     .map((item) => item.query?.trim())
@@ -110,7 +111,7 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
         const timer = window.setTimeout(async () => {
             setLoading(true);
             try {
-                const response = await getSearchSuggestions(term);
+                const response = await withTimeout(getSearchSuggestions(term), 2500);
                 const next = response.data ?? [];
                 setSuggestions(next.length > 0 ? next : getFallbackSearchSuggestions(term));
                 setSelectedIndex(-1);

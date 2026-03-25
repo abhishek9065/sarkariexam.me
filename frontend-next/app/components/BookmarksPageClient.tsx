@@ -32,11 +32,7 @@ export function BookmarksPage() {
     const [loading, setLoading] = useState(true);
     const [sort, setSort] = useState<SortMode>('newest');
     const [view, setView] = useState<ViewMode>('cards');
-    const [recentViews, setRecentViews] = useState(getRecentViews());
-
-    useEffect(() => {
-        setRecentViews(getRecentViews());
-    }, []);
+    const [recentViews] = useState(getRecentViews());
 
     useEffect(() => {
         if (!user) {
