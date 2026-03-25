@@ -34,8 +34,8 @@ jobs:
 
           if [ "$missing" -eq 1 ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Deployment is skipped because required DigitalOcean secrets are not configured."
-            exit 0
+            echo "Deployment is blocked because required DigitalOcean secrets are not configured."
+            exit 1
           fi
 
           echo "enabled=true" >> "$GITHUB_OUTPUT"
