@@ -5,10 +5,30 @@ import { usePathname } from 'next/navigation';
 import { Footer } from '@/app/components/Footer';
 import { Header } from '@/app/components/Header';
 import { MobileBottomNav } from '@/app/components/MobileBottomNav';
+import { ExactHomeShell } from '@/app/components/ExactHomeShell';
+
+const EXACT_HOME_ROUTE_PREFIXES = [
+    '/jobs',
+    '/results',
+    '/admit-cards',
+    '/answer-keys',
+    '/admissions',
+    '/syllabus',
+    '/job/',
+    '/result/',
+    '/admit-card/',
+    '/answer-key/',
+    '/admission/',
+    '/explore',
+    '/about',
+    '/contact',
+    '/privacy',
+];
 
 export function AppChrome({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const isHomePage = pathname === '/';
+    const usesExactHomeShell = !isHomePage && EXACT_HOME_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
     return (
         <div className={`app${isHomePage ? ' app-home' : ''}`}>
@@ -17,6 +37,12 @@ export function AppChrome({ children }: { children: ReactNode }) {
             {isHomePage ? (
                 <main id="main-content" className="home-main-content animate-fade-in">
                     <Suspense>{children}</Suspense>
+                </main>
+            ) : usesExactHomeShell ? (
+                <main id="main-content" className="home-main-content animate-fade-in">
+                    <ExactHomeShell>
+                        <Suspense>{children}</Suspense>
+                    </ExactHomeShell>
                 </main>
             ) : (
                 <>
