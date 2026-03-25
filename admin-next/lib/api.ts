@@ -216,6 +216,91 @@ export function getAnalyticsContent(days = 30) {
   return getContentAnalytics(50);
 }
 
+// ─── Subscribers ───
+export function getSubscribers(filters: { search?: string; limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/subscribers${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function getSubscriberStats() {
+  return apiFetch<{ data: { total: number; verified: number; unverified: number; byFrequency: Array<{ _id: string; count: number }> } }>('/admin/subscribers/stats');
+}
+
+export function deleteSubscriber(id: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/subscribers/${id}`, { method: 'DELETE' });
+}
+
+// ─── Push Subscribers ───
+export function getPushSubscribers(filters: { limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/push-subscribers${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function sendPushNotification(data: { title: string; body: string; url?: string }) {
+  return apiFetchWithCsrf<{ data: { sent: number; failed: number; total: number; message?: string } }>('/admin/push/send', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Community ───
+export function getCommunityForums(filters: { limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/forums${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function deleteCommunityForum(id: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/community/forums/${id}`, { method: 'DELETE' });
+}
+
+export function getCommunityQA(filters: { limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/qa${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function deleteCommunityQA(id: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/community/qa/${id}`, { method: 'DELETE' });
+}
+
+export function answerCommunityQA(id: string, answer: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/community/qa/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ answer }),
+  });
+}
+
+export function getCommunityGroups(filters: { limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/groups${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function deleteCommunityGroup(id: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/community/groups/${id}`, { method: 'DELETE' });
+}
+
+export function getCommunityFlags(filters: { status?: string; limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/flags${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function updateCommunityFlag(id: string, status: 'reviewed' | 'resolved') {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/community/flags/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+// ─── Error Reports ───
+export function getErrorReports(filters: { status?: string; limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/error-reports${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function updateErrorReport(id: string, data: { status: 'triaged' | 'resolved'; reviewNote?: string }) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/error-reports/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Audit Log ───
+export function getAuditLog(filters: { limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/audit-log${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
 // ─── Settings ───
 export function getSettings() {
   return apiFetch<{ data: SiteSettings }>('/admin/settings');

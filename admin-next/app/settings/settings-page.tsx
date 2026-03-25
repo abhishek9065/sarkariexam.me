@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Save, CheckCircle2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { Loader2, Save } from 'lucide-react';
 import type { SiteSettings } from '@/lib/types';
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
-  const [saved, setSaved] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-settings'],
@@ -34,9 +35,9 @@ export function SettingsPage() {
     mutationFn: () => updateSettings(form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      toast.success('Settings saved successfully');
     },
+    onError: (err: Error) => toast.error(err.message || 'Failed to save settings'),
   });
 
   const updateField = (field: string, value: string | boolean) => {
@@ -64,19 +65,6 @@ export function SettingsPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {saveMutation.error && (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-            {(saveMutation.error as Error)?.message || 'Failed to save settings'}
-          </div>
-        )}
-
-        {saved && (
-          <div className="flex items-center gap-2 rounded-lg border border-success/50 bg-success/10 p-3 text-sm text-success">
-            <CheckCircle2 className="h-4 w-4" />
-            Settings saved successfully
-          </div>
-        )}
-
         {/* General */}
         <Card>
           <CardHeader>
@@ -149,31 +137,21 @@ export function SettingsPage() {
             <CardTitle className="text-base">Feature Flags</CardTitle>
             <CardDescription>Toggle site features</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.maintenanceMode || false}
-                onChange={e => updateField('maintenanceMode', e.target.checked)}
-                className="h-4 w-4 rounded border-input"
-              />
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Maintenance Mode</p>
                 <p className="text-xs text-muted-foreground">Show maintenance page to visitors</p>
               </div>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.registrationEnabled !== false}
-                onChange={e => updateField('registrationEnabled', e.target.checked)}
-                className="h-4 w-4 rounded border-input"
-              />
+              <Switch checked={form.maintenanceMode || false} onCheckedChange={v => updateField('maintenanceMode', v)} />
+            </div>
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Registration Enabled</p>
                 <p className="text-xs text-muted-foreground">Allow new users to register</p>
               </div>
-            </label>
+              <Switch checked={form.registrationEnabled !== false} onCheckedChange={v => updateField('registrationEnabled', v)} />
+            </div>
           </CardContent>
         </Card>
 

@@ -470,24 +470,396 @@ router.get('/analytics/content', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// SETTINGS (lightweight in-memory for now)
+// SUBSCRIBERS (Email)
+// ═══════════════════════════════════════════
+
+router.get('/subscribers', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('subscriptions');
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+
+    const filter: Record<string, unknown> = {};
+    if (search) filter.email = { $regex: search, $options: 'i' };
+
+    const [items, total] = await Promise.all([
+      col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
+      col.countDocuments(filter),
+    ]);
+
+    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+  } catch (error) {
+    console.error('[Admin] Subscribers error:', error);
+    return res.status(500).json({ error: 'Failed to fetch subscribers' });
+  }
+});
+
+router.get('/subscribers/stats', async (_req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('subscriptions');
+    const [total, verified, byFrequency] = await Promise.all([
+      col.countDocuments(),
+      col.countDocuments({ verified: true }),
+      col.aggregate([
+        { $group: { _id: '$frequency', count: { $sum: 1 } } },
+      ]).toArray(),
+    ]);
+    return res.json({ data: { total, verified, unverified: total - verified, byFrequency } });
+  } catch (error) {
+    console.error('[Admin] Subscriber stats error:', error);
+    return res.status(500).json({ error: 'Failed to fetch subscriber stats' });
+  }
+});
+
+router.delete('/subscribers/:id', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const { ObjectId } = await import('mongodb');
+    const col = getCollection('subscriptions');
+    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ message: 'Subscriber removed' });
+  } catch (error) {
+    console.error('[Admin] Delete subscriber error:', error);
+    return res.status(500).json({ error: 'Failed to delete subscriber' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// PUSH SUBSCRIBERS
+// ═══════════════════════════════════════════
+
+router.get('/push-subscribers', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('push_subscriptions');
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+
+    const [items, total] = await Promise.all([
+      col.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
+      col.countDocuments(),
+    ]);
+
+    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), endpoint: d.endpoint, userId: d.userId, createdAt: d.createdAt })), total, count: items.length });
+  } catch (error) {
+    console.error('[Admin] Push subscribers error:', error);
+    return res.status(500).json({ error: 'Failed to fetch push subscribers' });
+  }
+});
+
+router.post('/push/send', async (req, res) => {
+  try {
+    const schema = z.object({
+      title: z.string().trim().min(1).max(200),
+      body: z.string().trim().min(1).max(1000),
+      url: z.string().trim().url().optional(),
+    });
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('push_subscriptions');
+    const subs = await col.find({}).toArray();
+
+    let sent = 0;
+    let failed = 0;
+
+    try {
+      const webpush = await import('web-push');
+      const { config } = await import('../config.js');
+      if (config.vapidPublicKey && config.vapidPrivateKey) {
+        webpush.default.setVapidDetails('mailto:admin@sarkariexams.me', config.vapidPublicKey, config.vapidPrivateKey);
+        const payload = JSON.stringify({ title: parse.data.title, body: parse.data.body, url: parse.data.url });
+        for (const sub of subs) {
+          try {
+            await webpush.default.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload);
+            sent++;
+          } catch { failed++; }
+        }
+      } else {
+        return res.json({ data: { sent: 0, failed: 0, total: subs.length, message: 'VAPID keys not configured' } });
+      }
+    } catch {
+      return res.json({ data: { sent: 0, failed: 0, total: subs.length, message: 'web-push not available' } });
+    }
+
+    return res.json({ data: { sent, failed, total: subs.length } });
+  } catch (error) {
+    console.error('[Admin] Push send error:', error);
+    return res.status(500).json({ error: 'Failed to send push notifications' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// COMMUNITY MODERATION
+// ═══════════════════════════════════════════
+
+const communityList = async (collectionName: string, req: express.Request, res: express.Response) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection(collectionName);
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+
+    const [items, total] = await Promise.all([
+      col.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
+      col.countDocuments(),
+    ]);
+
+    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+  } catch (error) {
+    console.error(`[Admin] ${collectionName} list error:`, error);
+    return res.status(500).json({ error: `Failed to fetch ${collectionName}` });
+  }
+};
+
+const communityDelete = async (collectionName: string, req: express.Request, res: express.Response) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const { ObjectId } = await import('mongodb');
+    const col = getCollection(collectionName);
+    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ message: 'Deleted' });
+  } catch (error) {
+    console.error(`[Admin] ${collectionName} delete error:`, error);
+    return res.status(500).json({ error: `Failed to delete from ${collectionName}` });
+  }
+};
+
+router.get('/community/forums', (req, res) => communityList('community_forums', req, res));
+router.delete('/community/forums/:id', (req, res) => communityDelete('community_forums', req, res));
+
+router.get('/community/qa', (req, res) => communityList('community_qa', req, res));
+router.delete('/community/qa/:id', (req, res) => communityDelete('community_qa', req, res));
+
+router.patch('/community/qa/:id', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const { ObjectId } = await import('mongodb');
+    const col = getCollection('community_qa');
+    const schema = z.object({ answer: z.string().trim().min(1).max(2000) });
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const result = await col.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { answer: parse.data.answer, answeredBy: (req as any).user?.email || 'admin', updatedAt: new Date() } }
+    );
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ message: 'Answer updated' });
+  } catch (error) {
+    console.error('[Admin] QA answer error:', error);
+    return res.status(500).json({ error: 'Failed to answer question' });
+  }
+});
+
+router.get('/community/groups', (req, res) => communityList('community_groups', req, res));
+router.delete('/community/groups/:id', (req, res) => communityDelete('community_groups', req, res));
+
+router.get('/community/flags', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('community_flags');
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+    const filter: Record<string, unknown> = {};
+    if (statusParam && ['open', 'reviewed', 'resolved'].includes(statusParam)) filter.status = statusParam;
+
+    const [items, total] = await Promise.all([
+      col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
+      col.countDocuments(filter),
+    ]);
+
+    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+  } catch (error) {
+    console.error('[Admin] Flags list error:', error);
+    return res.status(500).json({ error: 'Failed to fetch flags' });
+  }
+});
+
+router.patch('/community/flags/:id', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const { ObjectId } = await import('mongodb');
+    const col = getCollection('community_flags');
+    const schema = z.object({ status: z.enum(['reviewed', 'resolved']) });
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const result = await col.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { status: parse.data.status, updatedAt: new Date() } }
+    );
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ message: 'Flag updated' });
+  } catch (error) {
+    console.error('[Admin] Flag update error:', error);
+    return res.status(500).json({ error: 'Failed to update flag' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// ERROR REPORTS
+// ═══════════════════════════════════════════
+
+router.get('/error-reports', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('error_reports');
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+    const filter: Record<string, unknown> = {};
+    if (statusParam && ['new', 'triaged', 'resolved'].includes(statusParam)) filter.status = statusParam;
+
+    const [items, total] = await Promise.all([
+      col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
+      col.countDocuments(filter),
+    ]);
+
+    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+  } catch (error) {
+    console.error('[Admin] Error reports error:', error);
+    return res.status(500).json({ error: 'Failed to fetch error reports' });
+  }
+});
+
+router.patch('/error-reports/:id', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const { ObjectId } = await import('mongodb');
+    const col = getCollection('error_reports');
+    const schema = z.object({
+      status: z.enum(['triaged', 'resolved']),
+      reviewNote: z.string().trim().max(1000).optional(),
+    });
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const update: Record<string, unknown> = { status: parse.data.status, updatedAt: new Date() };
+    if (parse.data.reviewNote) update.reviewNote = parse.data.reviewNote;
+    if (parse.data.status === 'resolved') {
+      update.resolvedAt = new Date();
+      update.resolvedBy = (req as any).user?.email || 'admin';
+    }
+
+    const result = await col.updateOne({ _id: new ObjectId(req.params.id) }, { $set: update });
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    return res.json({ message: 'Error report updated' });
+  } catch (error) {
+    console.error('[Admin] Error report update error:', error);
+    return res.status(500).json({ error: 'Failed to update error report' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// AUDIT LOG
+// ═══════════════════════════════════════════
+
+router.get('/audit-log', async (req, res) => {
+  try {
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 50, offset: 0 };
+
+    const recentUpdates = await AnnouncementModel.findAllAdmin({
+      sort: 'updated',
+      limit,
+      offset,
+      includeInactive: true,
+    });
+
+    const entries = recentUpdates.announcements.map(a => ({
+      id: a.id,
+      title: a.title,
+      type: a.type,
+      status: a.status,
+      version: (a as any).version || 1,
+      updatedAt: a.updatedAt,
+      updatedBy: (a as any).updatedBy || (a as any).postedBy || 'system',
+    }));
+
+    return res.json({ data: entries, total: recentUpdates.total, count: entries.length });
+  } catch (error) {
+    console.error('[Admin] Audit log error:', error);
+    return res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// SETTINGS (with persistence)
 // ═══════════════════════════════════════════
 
 router.get('/settings', async (_req, res) => {
   try {
-    // Return current config-based settings (read-only for now)
+    const { getCollection } = await import('../services/cosmosdb.js');
     const { config } = await import('../config.js');
-    return res.json({
-      data: {
-        siteName: 'SarkariExams.me',
-        siteDescription: 'Public government jobs and exam updates platform',
-        frontendUrl: config.frontendUrl,
-        featureFlags: config.featureFlags,
-      },
-    });
+    const col = getCollection('site_settings');
+    const saved = await col.findOne({ _id: 'main' as any });
+
+    const defaults = {
+      siteName: 'SarkariExams.me',
+      siteDescription: 'Public government jobs and exam updates platform',
+      frontendUrl: config.frontendUrl,
+      contactEmail: '',
+      defaultMetaTitle: '',
+      defaultMetaDescription: '',
+      googleAnalyticsId: '',
+      twitterUrl: '',
+      telegramUrl: '',
+      youtubeUrl: '',
+      maintenanceMode: false,
+      registrationEnabled: true,
+      featureFlags: config.featureFlags || {},
+    };
+
+    return res.json({ data: { ...defaults, ...(saved || {}), _id: undefined } });
   } catch (error) {
     console.error('[Admin] Settings error:', error);
     return res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  try {
+    const { getCollection } = await import('../services/cosmosdb.js');
+    const col = getCollection('site_settings');
+
+    const schema = z.object({
+      siteName: z.string().trim().max(100).optional(),
+      siteDescription: z.string().trim().max(500).optional(),
+      contactEmail: z.string().email().optional().or(z.literal('')),
+      defaultMetaTitle: z.string().trim().max(70).optional(),
+      defaultMetaDescription: z.string().trim().max(160).optional(),
+      googleAnalyticsId: z.string().trim().max(50).optional(),
+      twitterUrl: z.string().trim().max(200).optional(),
+      telegramUrl: z.string().trim().max(200).optional(),
+      youtubeUrl: z.string().trim().max(200).optional(),
+      maintenanceMode: z.boolean().optional(),
+      registrationEnabled: z.boolean().optional(),
+      featureFlags: z.record(z.boolean()).optional(),
+    });
+
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    await col.updateOne(
+      { _id: 'main' as any },
+      { $set: { ...parse.data, updatedAt: new Date() } },
+      { upsert: true }
+    );
+
+    return res.json({ data: parse.data, message: 'Settings saved' });
+  } catch (error) {
+    console.error('[Admin] Settings save error:', error);
+    return res.status(500).json({ error: 'Failed to save settings' });
   }
 });
 

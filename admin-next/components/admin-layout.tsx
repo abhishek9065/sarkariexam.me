@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -13,23 +13,86 @@ import {
   Menu,
   X,
   Shield,
+  Mail,
+  MessageSquare,
+  AlertTriangle,
+  History,
+  Sun,
+  Moon,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/announcements', label: 'Announcements', icon: FileText },
   { href: '/users', label: 'Users', icon: Users },
+  { href: '/subscribers', label: 'Subscribers', icon: Mail },
+  { href: '/community', label: 'Community', icon: MessageSquare },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/error-reports', label: 'Error Reports', icon: AlertTriangle },
+  { href: '/audit-log', label: 'Audit Log', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
+
+function useDarkMode() {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('admin-theme');
+    const prefersDark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    setDark(prefersDark);
+    document.documentElement.classList.toggle('dark', prefersDark);
+  }, []);
+
+  const toggle = () => {
+    setDark(prev => {
+      const next = !prev;
+      localStorage.setItem('admin-theme', next ? 'dark' : 'light');
+      document.documentElement.classList.toggle('dark', next);
+      return next;
+    });
+  };
+
+  return { dark, toggle };
+}
+
+function Breadcrumbs({ pathname }: { pathname: string }) {
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 0) return <span className="text-sm font-medium">Dashboard</span>;
+
+  const crumbs = segments.map((seg, i) => {
+    const href = '/' + segments.slice(0, i + 1).join('/');
+    const label = seg.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const isLast = i === segments.length - 1;
+    return { href, label, isLast };
+  });
+
+  return (
+    <nav className="flex items-center gap-1 text-sm">
+      <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">Dashboard</Link>
+      {crumbs.map(c => (
+        <span key={c.href} className="flex items-center gap-1">
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          {c.isLast ? (
+            <span className="font-medium">{c.label}</span>
+          ) : (
+            <Link href={c.href} className="text-muted-foreground hover:text-foreground transition-colors">{c.label}</Link>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { dark, toggle: toggleDark } = useDarkMode();
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -124,7 +187,18 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
+          <div className="hidden sm:block">
+            <Breadcrumbs pathname={pathname} />
+          </div>
           <div className="flex-1" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={toggleDark} className="h-8 w-8">
+                {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{dark ? 'Light mode' : 'Dark mode'}</TooltipContent>
+          </Tooltip>
           <div className="text-sm text-muted-foreground">
             SarkariExams.me
           </div>
