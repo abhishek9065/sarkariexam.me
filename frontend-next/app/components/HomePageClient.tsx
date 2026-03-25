@@ -17,26 +17,37 @@ type PortalListItem = {
     isNew: boolean;
 };
 
+const CONTENT_TYPES: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
+
+const LIST_PATH_BY_TYPE: Record<ContentType, string> = {
+    job: '/jobs',
+    result: '/results',
+    'admit-card': '/admit-cards',
+    'answer-key': '/answer-keys',
+    syllabus: '/syllabus',
+    admission: '/admissions',
+};
+
 const HOME_NAV_LINKS = [
     { label: 'Home', to: '/' },
-    { label: 'Latest Jobs', to: '/jobs' },
-    { label: 'Results', to: '/results' },
-    { label: 'Admit Cards', to: '/admit-card' },
-    { label: 'Answer Keys', to: '/answer-key' },
-    { label: 'Syllabus', to: '/syllabus' },
-    { label: 'Certificates', to: '/jobs' },
-    { label: 'Important Links', to: '/jobs' },
+    { label: 'Latest Jobs', to: LIST_PATH_BY_TYPE.job },
+    { label: 'Results', to: LIST_PATH_BY_TYPE.result },
+    { label: 'Admit Cards', to: LIST_PATH_BY_TYPE['admit-card'] },
+    { label: 'Answer Keys', to: LIST_PATH_BY_TYPE['answer-key'] },
+    { label: 'Syllabus', to: LIST_PATH_BY_TYPE.syllabus },
+    { label: 'Certificates', to: LIST_PATH_BY_TYPE.job },
+    { label: 'Important Links', to: LIST_PATH_BY_TYPE.job },
 ];
 
 const QUICK_CATEGORIES = [
-    { label: 'Latest Jobs', to: '/jobs', color: 'orange', icon: '💼' },
-    { label: 'Results', to: '/results', color: 'green', icon: '📋' },
-    { label: 'Admit Cards', to: '/admit-card', color: 'blue', icon: '🪪' },
-    { label: 'Answer Keys', to: '/answer-key', color: 'red', icon: '🗝️' },
-    { label: 'Syllabus', to: '/syllabus', color: 'purple', icon: '📚' },
-    { label: 'Certificates', to: '/jobs', color: 'teal', icon: '🏅' },
-    { label: 'Exam Dates', to: '/jobs', color: 'yellow', icon: '📅' },
-    { label: 'Cut Off', to: '/jobs', color: 'pink', icon: '✂️' },
+    { label: 'Latest Jobs', to: LIST_PATH_BY_TYPE.job, color: 'orange', icon: '💼' },
+    { label: 'Results', to: LIST_PATH_BY_TYPE.result, color: 'green', icon: '📋' },
+    { label: 'Admit Cards', to: LIST_PATH_BY_TYPE['admit-card'], color: 'blue', icon: '🪪' },
+    { label: 'Answer Keys', to: LIST_PATH_BY_TYPE['answer-key'], color: 'red', icon: '🗝️' },
+    { label: 'Syllabus', to: LIST_PATH_BY_TYPE.syllabus, color: 'purple', icon: '📚' },
+    { label: 'Certificates', to: LIST_PATH_BY_TYPE.job, color: 'teal', icon: '🏅' },
+    { label: 'Exam Dates', to: LIST_PATH_BY_TYPE.job, color: 'yellow', icon: '📅' },
+    { label: 'Cut Off', to: LIST_PATH_BY_TYPE.job, color: 'pink', icon: '✂️' },
 ];
 
 const STATS = [
@@ -74,21 +85,21 @@ const FOOTER_COLUMNS = [
     {
         title: 'Quick Links',
         links: [
-            { label: 'Latest Jobs', to: '/jobs' },
-            { label: 'Results 2026', to: '/results' },
-            { label: 'Admit Cards', to: '/admit-card' },
-            { label: 'Answer Keys', to: '/answer-key' },
-            { label: 'Syllabus PDF', to: '/syllabus' },
+            { label: 'Latest Jobs', to: LIST_PATH_BY_TYPE.job },
+            { label: 'Results 2026', to: LIST_PATH_BY_TYPE.result },
+            { label: 'Admit Cards', to: LIST_PATH_BY_TYPE['admit-card'] },
+            { label: 'Answer Keys', to: LIST_PATH_BY_TYPE['answer-key'] },
+            { label: 'Syllabus PDF', to: LIST_PATH_BY_TYPE.syllabus },
         ],
     },
     {
         title: 'Exam Categories',
         links: [
-            { label: 'UPSC Exams', to: '/jobs?q=UPSC' },
-            { label: 'SSC Exams', to: '/jobs?q=SSC' },
-            { label: 'Railway (RRB)', to: '/jobs?q=Railway' },
-            { label: 'Banking (IBPS/SBI)', to: '/jobs?q=IBPS' },
-            { label: 'Defence Jobs', to: '/jobs?q=Defence' },
+            { label: 'UPSC Exams', to: `${LIST_PATH_BY_TYPE.job}?q=UPSC` },
+            { label: 'SSC Exams', to: `${LIST_PATH_BY_TYPE.job}?q=SSC` },
+            { label: 'Railway (RRB)', to: `${LIST_PATH_BY_TYPE.job}?q=Railway` },
+            { label: 'Banking (IBPS/SBI)', to: `${LIST_PATH_BY_TYPE.job}?q=IBPS` },
+            { label: 'Defence Jobs', to: `${LIST_PATH_BY_TYPE.job}?q=Defence` },
         ],
     },
     {
@@ -98,7 +109,7 @@ const FOOTER_COLUMNS = [
             { label: 'Contact Us', to: '/contact' },
             { label: 'Privacy Policy', to: '/privacy' },
             { label: 'Explore', to: '/explore' },
-            { label: 'Admissions', to: '/admission' },
+            { label: 'Admissions', to: LIST_PATH_BY_TYPE.admission },
         ],
     },
 ];
@@ -115,17 +126,14 @@ function buildAnnouncementDetailPath(type: string, slug: string) {
 }
 
 function buildCategoryPath(type: ContentType): string {
-    if (type === 'job') return '/jobs';
-    if (type === 'result') return '/results';
-    if (type === 'admit-card') return '/admit-card';
-    if (type === 'answer-key') return '/answer-key';
-    if (type === 'syllabus') return '/syllabus';
-    return '/admission';
+    return LIST_PATH_BY_TYPE[type];
 }
 
 function formatPortalDate(value?: string | null) {
     if (!value) return '--';
-    const date = new Date(value);
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp)) return '--';
+    const date = new Date(timestamp);
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
@@ -223,12 +231,27 @@ const FALLBACK_SECTIONS: HomepageFeedSections = {
 };
 
 function flattenSections(sections: HomepageFeedSections) {
-    return Object.values(sections)
-        .flat()
+    return CONTENT_TYPES
+        .flatMap((type) => sections[type] ?? [])
         .sort((left, right) => new Date(right.postedAt).getTime() - new Date(left.postedAt).getTime());
 }
 
-const FALLBACK_LATEST = flattenSections(FALLBACK_SECTIONS);
+function normalizeSections(
+    sections?: Partial<Record<ContentType, AnnouncementCard[]>> | null,
+): HomepageFeedSections {
+    return CONTENT_TYPES.reduce<HomepageFeedSections>((accumulator, type) => {
+        const cards = sections?.[type];
+        accumulator[type] = Array.isArray(cards) ? cards : FALLBACK_SECTIONS[type];
+        return accumulator;
+    }, {} as HomepageFeedSections);
+}
+
+function normalizeLatest(
+    latest: AnnouncementCard[] | undefined,
+    sections: HomepageFeedSections,
+): AnnouncementCard[] {
+    return Array.isArray(latest) && latest.length > 0 ? latest : flattenSections(sections);
+}
 
 function buildHref(card: AnnouncementCard) {
     return card.slug ? buildAnnouncementDetailPath(card.type, card.slug) : buildCategoryPath(card.type);
@@ -336,20 +359,14 @@ export function HomePage() {
     });
 
     const homepageData = homepageQuery.data?.data;
-    const hasLiveData = useMemo(() => {
-        if (!homepageData) return false;
-        if ((homepageData.latest?.length ?? 0) > 0) return true;
-        return Object.values(homepageData.sections ?? {}).some((section) => section.length > 0);
-    }, [homepageData]);
-
     const sections = useMemo(
-        () => (hasLiveData && homepageData?.sections ? homepageData.sections : FALLBACK_SECTIONS),
-        [hasLiveData, homepageData],
+        () => normalizeSections(homepageData?.sections),
+        [homepageData?.sections],
     );
 
     const latest = useMemo(
-        () => (hasLiveData && homepageData?.latest?.length ? homepageData.latest : FALLBACK_LATEST),
-        [hasLiveData, homepageData],
+        () => normalizeLatest(homepageData?.latest, sections),
+        [homepageData?.latest, sections],
     );
 
     const admitSection = sections['admit-card'];
@@ -362,7 +379,7 @@ export function HomePage() {
     const importantLinks = useMemo(() => mapCards(latest, 8), [latest]);
     const tickerItems = useMemo(() => latest.slice(0, 6).map((item) => item.title), [latest]);
     const featuredJob = sections.job[0];
-    const featuredJobHref = featuredJob ? buildHref(featuredJob) : '/jobs';
+    const featuredJobHref = featuredJob ? buildHref(featuredJob) : LIST_PATH_BY_TYPE.job;
     const calendarRows = useMemo(() => {
         const rows = [...sections.job.slice(0, 4), ...sections.result.slice(0, 2)];
         return rows.map((item) => ({
@@ -381,7 +398,7 @@ export function HomePage() {
         event.preventDefault();
         const query = searchQuery.trim();
         if (!query) return;
-        navigate.push(`/jobs?q=${encodeURIComponent(query)}&source=home`);
+        navigate.push(`${LIST_PATH_BY_TYPE.job}?q=${encodeURIComponent(query)}&source=home`);
     };
 
     return (
@@ -451,14 +468,14 @@ export function HomePage() {
                             title="Latest Results"
                             headerClassName="green"
                             items={results}
-                            viewAllTo="/results"
+                            viewAllTo={LIST_PATH_BY_TYPE.result}
                             viewAllLabel="All Results"
                         />
                         <SectionBox
                             title="Answer Keys"
                             headerClassName="red"
                             items={answerKeys}
-                            viewAllTo="/answer-key"
+                            viewAllTo={LIST_PATH_BY_TYPE['answer-key']}
                             viewAllLabel="All Keys"
                         />
                     </div>
@@ -484,7 +501,7 @@ export function HomePage() {
                             title="Latest Jobs"
                             headerClassName="orange"
                             items={jobs}
-                            viewAllTo="/jobs"
+                            viewAllTo={LIST_PATH_BY_TYPE.job}
                             viewAllLabel="All Jobs"
                         />
                     </div>
@@ -494,14 +511,14 @@ export function HomePage() {
                             title="Admit Cards"
                             headerClassName="blue"
                             items={admitCards}
-                            viewAllTo="/admit-card"
+                            viewAllTo={LIST_PATH_BY_TYPE['admit-card']}
                             viewAllLabel="All Admit Cards"
                         />
                         <SectionBox
                             title="Syllabus"
                             headerClassName="purple"
                             items={syllabus}
-                            viewAllTo="/syllabus"
+                            viewAllTo={LIST_PATH_BY_TYPE.syllabus}
                             viewAllLabel="All Syllabus"
                         />
                         <ImportantLinksBox items={importantLinks} />
@@ -511,11 +528,15 @@ export function HomePage() {
                 <section className="exact-home-panel">
                     <div className="exact-home-panel-header black">
                         <span>State-Wise Government Jobs</span>
-                        <Link href="/jobs">Browse All States</Link>
+                        <Link href={LIST_PATH_BY_TYPE.job}>Browse All States</Link>
                     </div>
                     <div className="exact-home-state-grid">
                         {STATE_LINKS.map((state) => (
-                            <Link key={state} href={`/jobs?q=${encodeURIComponent(state)}`} className="exact-home-state-link">
+                            <Link
+                                key={state}
+                                href={`${LIST_PATH_BY_TYPE.job}?q=${encodeURIComponent(state)}`}
+                                className="exact-home-state-link"
+                            >
                                 ▸ {state}
                             </Link>
                         ))}
@@ -525,7 +546,7 @@ export function HomePage() {
                 <section className="exact-home-panel">
                     <div className="exact-home-panel-header teal">
                         <span>Upcoming Exam Schedule</span>
-                        <Link href="/jobs">View Full Calendar</Link>
+                        <Link href={LIST_PATH_BY_TYPE.job}>View Full Calendar</Link>
                     </div>
                     <div className="exact-home-table-wrap">
                         <table className="exact-home-table">
