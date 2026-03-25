@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { RichTextEditor } from '@/components/rich-text-editor';
+import { AIAssistantPanel } from '@/components/ai-assistant-panel';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -373,6 +374,20 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
                 />
               </CardContent>
             </Card>
+
+            {/* AI Assistant */}
+            <AIAssistantPanel
+              title={form.title}
+              content={form.content.replace(/<[^>]+>/g, ' ')}
+              organization={form.organization}
+              deadline={form.deadline}
+              existingTags={form.tags}
+              onTagsSuggested={(tags) => setForm(prev => ({ ...prev, tags }))}
+              onMetaGenerated={(meta) => setForm(prev => ({ 
+                ...prev, 
+                seo: { ...prev.seo, metaTitle: meta.metaTitle, metaDescription: meta.metaDescription }
+              }))}
+            />
 
             {/* Tags */}
             <Card>

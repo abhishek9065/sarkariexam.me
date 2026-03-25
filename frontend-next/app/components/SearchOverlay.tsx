@@ -1,48 +1,40 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSearchSuggestions, getTrendingSearches } from '@/app/lib/api';
-import type { SearchSuggestion, ContentType } from '@/app/lib/types';
+import { EXAM_FAMILY_SHORTCUTS, CATEGORY_META, copyFor, groupSuggestionsByType } from '@/app/lib/ui';
+import type { SearchSuggestion } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
 import { buildAnnouncementDetailPath } from '@/app/lib/urls';
-const TYPE_ICONS: Record<ContentType, string> = {
-    job: '💼',
-    result: '📊',
-    'admit-card': '🎫',
-    'answer-key': '🔑',
-    admission: '🎓',
-    syllabus: '📚',
-};
+import { useLanguage } from '@/app/lib/useLanguage';
+import { Icon } from '@/app/components/Icon';
+import styles from './SearchOverlay.module.css';
 
-const QUICK_FILTERS: Array<{ label: string; query: string }> = [
-    { label: 'SSC', query: 'SSC' },
-    { label: 'UPSC', query: 'UPSC' },
-    { label: 'Railway', query: 'Railway' },
-    { label: 'Bank', query: 'Bank' },
-    { label: 'Defence', query: 'Defence' },
-    { label: 'Police', query: 'Police' },
-];
-
-const RECENT_KEY = 'sr_recent_searches';
+const RECENT_KEY = 'sr_recent_search_terms_v3';
 const MAX_RECENT = 8;
+const FALLBACK_TRENDING = ['SSC CGL', 'UPSC', 'RRB', 'Bank PO', 'Delhi Police', 'BPSC'];
 
-function getRecentSearches(): string[] {
+function getRecentSearchTerms(): string[] {
+    if (typeof window === 'undefined') return [];
     try {
-        return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').slice(0, MAX_RECENT);
-    } catch { return []; }
+        const raw = window.localStorage.getItem(RECENT_KEY);
+        return raw ? (JSON.parse(raw) as string[]).slice(0, MAX_RECENT) : [];
+    } catch {
+        return [];
+    }
 }
 
-function pushRecentSearch(term: string) {
-    try {
-        const existing = getRecentSearches().filter((t) => t.toLowerCase() !== term.toLowerCase());
-        existing.unshift(term);
-        localStorage.setItem(RECENT_KEY, JSON.stringify(existing.slice(0, MAX_RECENT)));
-    } catch { /* noop */ }
+function pushRecentSearchTerm(value: string) {
+    if (typeof window === 'undefined') return;
+    const next = getRecentSearchTerms().filter((item) => item.toLowerCase() !== value.toLowerCase());
+    next.unshift(value);
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(next.slice(0, MAX_RECENT)));
 }
 
-function clearRecentSearches() {
-    try { localStorage.removeItem(RECENT_KEY); } catch { /* noop */ }
+function clearRecentSearchTerms() {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(RECENT_KEY);
 }
 
 interface Props {
@@ -50,47 +42,43 @@ interface Props {
     onClose: () => void;
 }
 
-const FALLBACK_TRENDING = ['UPSC', 'SSC CGL', 'RRB ALP', 'NEET', 'Bank PO', 'India Post'];
-
 export function SearchOverlay({ isOpen, onClose }: Props) {
+    const router = useRouter();
+    const { language } = useLanguage();
+    const inputRef = useRef<HTMLInputElement>(null);
     const [query, setQuery] = useState('');
     const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
-    const [trendingTerms, setTrendingTerms] = useState<string[]>(FALLBACK_TRENDING);
-    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [recent, setRecent] = useState<string[]>([]);
+    const [trending, setTrending] = useState<string[]>(FALLBACK_TRENDING);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
     const [loading, setLoading] = useState(false);
-    const [selectedIdx, setSelectedIdx] = useState(-1);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const router = useRouter();
 
     useEffect(() => {
         if (!isOpen) return;
-
-        setTimeout(() => inputRef.current?.focus(), 100);
+        const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 80);
+        setRecent(getRecentSearchTerms());
         setQuery('');
         setSuggestions([]);
-        setSelectedIdx(-1);
-        setRecentSearches(getRecentSearches());
-        trackEvent('search_open');
+        setSelectedIndex(-1);
+        trackEvent('search_overlay_open');
 
-        let mounted = true;
-        (async () => {
+        let cancelled = false;
+        void (async () => {
             try {
-                const res = await getTrendingSearches(30, 8);
-                const terms = (res.data || [])
-                    .map((entry) => entry.query?.trim())
+                const response = await getTrendingSearches(30, 8);
+                if (cancelled) return;
+                const next = (response.data ?? [])
+                    .map((item) => item.query?.trim())
                     .filter((item): item is string => Boolean(item));
-                if (mounted && terms.length > 0) {
-                    setTrendingTerms(terms);
-                }
+                if (next.length > 0) setTrending(next);
             } catch {
-                if (mounted) {
-                    setTrendingTerms(FALLBACK_TRENDING);
-                }
+                if (!cancelled) setTrending(FALLBACK_TRENDING);
             }
         })();
 
         return () => {
-            mounted = false;
+            cancelled = true;
+            window.clearTimeout(focusTimer);
         };
     }, [isOpen]);
 
@@ -101,221 +89,223 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
     }, [isOpen]);
 
     useEffect(() => {
-        const handler = (event: KeyboardEvent) => {
+        if (!isOpen) return;
+        const onKeydown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') onClose();
         };
-        if (isOpen) document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
+        document.addEventListener('keydown', onKeydown);
+        return () => document.removeEventListener('keydown', onKeydown);
     }, [isOpen, onClose]);
 
     useEffect(() => {
-        if (query.length < 2) {
+        if (!isOpen) return;
+        const term = query.trim();
+        if (term.length < 2) {
             setSuggestions([]);
+            setSelectedIndex(-1);
             return;
         }
 
-        const timer = setTimeout(async () => {
+        const timer = window.setTimeout(async () => {
             setLoading(true);
             try {
-                const res = await getSearchSuggestions(query);
-                setSuggestions(res.data);
+                const response = await getSearchSuggestions(term);
+                setSuggestions(response.data ?? []);
+                setSelectedIndex(-1);
             } catch {
                 setSuggestions([]);
+                setSelectedIndex(-1);
             } finally {
                 setLoading(false);
             }
-        }, 250);
+        }, 220);
 
-        return () => clearTimeout(timer);
-    }, [query]);
+        return () => window.clearTimeout(timer);
+    }, [isOpen, query]);
 
-    const goTo = useCallback((suggestion: SearchSuggestion) => {
-        pushRecentSearch(suggestion.title);
-        trackEvent('search_select', { type: suggestion.type, slug: suggestion.slug });
-        router.push(buildAnnouncementDetailPath(suggestion.type, suggestion.slug, 'search_overlay'));
+    const groupedSuggestions = useMemo(() => groupSuggestionsByType(suggestions), [suggestions]);
+
+    const openSearchResults = useCallback((value: string) => {
+        const next = value.trim();
+        if (!next) return;
+        pushRecentSearchTerm(next);
+        setRecent(getRecentSearchTerms());
+        trackEvent('search_submit', { query: next, surface: 'global_overlay' });
+        router.push(`/jobs?q=${encodeURIComponent(next)}&source=search_overlay`);
         onClose();
     }, [onClose, router]);
 
-    const openSearchResults = useCallback((term: string) => {
-        const cleaned = term.trim();
-        if (!cleaned) return;
-        pushRecentSearch(cleaned);
-        trackEvent('search_submit', { query: cleaned });
-        router.push(`/jobs?q=${encodeURIComponent(cleaned)}&source=search_overlay`);
+    const openSuggestion = useCallback((item: SearchSuggestion) => {
+        pushRecentSearchTerm(item.title);
+        setRecent(getRecentSearchTerms());
+        trackEvent('search_suggestion_open', { slug: item.slug, type: item.type });
+        router.push(buildAnnouncementDetailPath(item.type, item.slug, 'search_overlay'));
         onClose();
     }, [onClose, router]);
-
-    const handleClearRecent = useCallback(() => {
-        clearRecentSearches();
-        setRecentSearches([]);
-    }, []);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        const flatSuggestions = groupedSuggestions.flatMap((group) => group.items);
         if (event.key === 'ArrowDown') {
             event.preventDefault();
-            setSelectedIdx((value) => Math.min(value + 1, suggestions.length - 1));
+            setSelectedIndex((current) => Math.min(current + 1, flatSuggestions.length - 1));
             return;
         }
-
         if (event.key === 'ArrowUp') {
             event.preventDefault();
-            setSelectedIdx((value) => Math.max(value - 1, -1));
+            setSelectedIndex((current) => Math.max(current - 1, -1));
             return;
         }
-
-        if (event.key !== 'Enter') {
-            return;
-        }
-
+        if (event.key !== 'Enter') return;
         event.preventDefault();
-        if (selectedIdx >= 0 && suggestions[selectedIdx]) {
-            goTo(suggestions[selectedIdx]);
+        const selected = flatSuggestions[selectedIndex];
+        if (selected) {
+            openSuggestion(selected);
             return;
         }
-
         openSearchResults(query);
     };
+
+    const suggestionIndexOffset = useMemo(() => {
+        const offsets = new Map<string, number>();
+        let cursor = 0;
+        groupedSuggestions.forEach((group) => {
+            offsets.set(group.type, cursor);
+            cursor += group.items.length;
+        });
+        return offsets;
+    }, [groupedSuggestions]);
 
     if (!isOpen) return null;
 
     return (
-        <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Search" onClick={onClose}>
-            <div className="search-overlay-content animate-slide-up" onClick={(event) => event.stopPropagation()}>
-                <div className="search-input-wrapper">
-                    <span className="search-input-icon">🔍</span>
+        <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="Search portal" onClick={onClose}>
+            <div className={`${styles.panel} animate-slide-up`} onClick={(event) => event.stopPropagation()}>
+                <div className={styles.inputRow}>
+                    <span className={styles.inputIcon}><Icon name="Search" /></span>
                     <input
                         ref={inputRef}
-                        className="search-input"
-                        type="text"
-                        placeholder="Search jobs, results, admit cards..."
+                        type="search"
+                        className={styles.input}
+                        placeholder={copyFor(language, 'Search jobs, results, boards, or states', 'जॉब्स, रिजल्ट, बोर्ड या स्टेट सर्च करें')}
                         value={query}
                         onChange={(event) => {
                             setQuery(event.target.value);
-                            setSelectedIdx(-1);
+                            setSelectedIndex(-1);
                         }}
                         onKeyDown={handleKeyDown}
-                        aria-label="Search announcements"
-                        aria-controls="search-results-list"
-                        aria-expanded={suggestions.length > 0}
-                        role="combobox"
+                        aria-label={copyFor(language, 'Search jobs and exams', 'जॉब्स और एग्जाम सर्च करें')}
                     />
-                    <div className="sr-only" aria-live="polite">
-                        {loading ? 'Searching...' : ''}
-                        {!loading && suggestions.length > 0 ? `${suggestions.length} suggestions found. Use up and down arrows to review.` : ''}
-                        {!loading && query.length >= 2 && suggestions.length === 0 ? 'No results found.' : ''}
-                    </div>
-                    <button type="button" className="search-close-btn" onClick={onClose} aria-label="Close search">
-                        ✕
+                    <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close search">
+                        <Icon name="Close" />
                     </button>
                 </div>
 
-                {query.trim().length === 0 && (
-                    <div className="search-idle-panels">
-                        {/* Quick Filters */}
-                        <div className="search-quick-filters">
-                            <h3>Quick Filters</h3>
-                            <div className="search-quick-chips">
-                                {QUICK_FILTERS.map((f) => (
-                                    <button
-                                        key={f.query}
-                                        type="button"
-                                        className="search-quick-chip"
-                                        onClick={() => openSearchResults(f.query)}
-                                    >
-                                        {f.label}
+                <div className={styles.body}>
+                    <div className={styles.leftPane}>
+                        <section className={styles.section}>
+                            <div className={styles.sectionHeader}>
+                                <h2>{copyFor(language, 'Exam families', 'एग्जाम फैमिली')}</h2>
+                                <p>{copyFor(language, 'Jump straight into the most common searches.', 'सबसे कॉमन सर्च पर सीधे जाएं।')}</p>
+                            </div>
+                            <div className={styles.chipGrid}>
+                                {EXAM_FAMILY_SHORTCUTS.map((item) => (
+                                    <button key={item.label} type="button" className={styles.chip} onClick={() => openSearchResults(item.label)}>
+                                        {item.label}
                                     </button>
                                 ))}
                             </div>
-                        </div>
+                        </section>
 
-                        {/* Recent Searches */}
-                        {recentSearches.length > 0 && (
-                            <div className="search-recent-panel">
-                                <div className="search-panel-header">
-                                    <h3>Recent Searches</h3>
-                                    <button type="button" className="search-clear-btn" onClick={handleClearRecent}>Clear</button>
+                        <section className={styles.section}>
+                            <div className={styles.sectionHeader}>
+                                <h2>{copyFor(language, 'Trending now', 'अभी ट्रेंडिंग')}</h2>
+                                <p>{copyFor(language, 'Popular search terms from recent user activity.', 'हाल की यूजर एक्टिविटी के लोकप्रिय सर्च टर्म।')}</p>
+                            </div>
+                            <div className={styles.trendingList}>
+                                {trending.map((item) => (
+                                    <button key={item} type="button" className={styles.trendingItem} onClick={() => openSearchResults(item)}>
+                                        <span className={styles.trendingSpark}><Icon name="Sparkles" /></span>
+                                        <span>{item}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+                    </div>
+
+                    <div className={styles.rightPane}>
+                        {query.trim().length === 0 ? (
+                            <section className={styles.section}>
+                                <div className={styles.sectionHeader}>
+                                    <h2>{copyFor(language, 'Recent searches', 'हाल की सर्च')}</h2>
+                                    <button type="button" className={styles.textAction} onClick={() => { clearRecentSearchTerms(); setRecent([]); }}>
+                                        {copyFor(language, 'Clear', 'क्लियर')}
+                                    </button>
                                 </div>
-                                <div className="search-recent-list">
-                                    {recentSearches.map((term) => (
-                                        <button
-                                            key={term}
-                                            type="button"
-                                            className="search-recent-item"
-                                            onClick={() => openSearchResults(term)}
-                                        >
-                                            <span className="search-recent-icon">🕐</span>
-                                            {term}
-                                        </button>
-                                    ))}
-                                </div>
+                                {recent.length === 0 ? (
+                                    <div className={styles.emptyState}>
+                                        <Icon name="Clock3" />
+                                        <p>{copyFor(language, 'Your recent searches will appear here.', 'आपकी हाल की सर्च यहाँ दिखेगी।')}</p>
+                                    </div>
+                                ) : (
+                                    <div className={styles.recentList}>
+                                        {recent.map((item) => (
+                                            <button key={item} type="button" className={styles.recentItem} onClick={() => openSearchResults(item)}>
+                                                <span>{item}</span>
+                                                <Icon name="ArrowRight" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        ) : loading ? (
+                            <div className={styles.loadingState}>
+                                <div className={styles.loadingDot} />
+                                <p>{copyFor(language, 'Finding official updates…', 'ऑफिशियल अपडेट खोजे जा रहे हैं…')}</p>
+                            </div>
+                        ) : groupedSuggestions.length === 0 ? (
+                            <div className={styles.emptyState}>
+                                <Icon name="Search" />
+                                <p>{copyFor(language, 'No direct matches. Search the full jobs feed with this term.', 'सीधा मैच नहीं मिला। इस टर्म से पूरा जॉब फीड खोजें।')}</p>
+                                <button type="button" className={styles.primaryButton} onClick={() => openSearchResults(query)}>
+                                    {copyFor(language, 'Search all jobs', 'सभी जॉब्स सर्च करें')}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className={styles.resultsList} role="listbox" aria-label="Search results">
+                                {groupedSuggestions.map((group) => (
+                                    <section key={group.type} className={styles.resultGroup}>
+                                        <div className={styles.resultGroupHeader}>
+                                            <span className={styles.resultGroupIcon}>{CATEGORY_META[group.type].icon}</span>
+                                            <h3>{copyFor(language, CATEGORY_META[group.type].labelEn, CATEGORY_META[group.type].labelHi)}</h3>
+                                        </div>
+                                        <div className={styles.groupItems}>
+                                            {group.items.map((item, index) => {
+                                                const absoluteIndex = (suggestionIndexOffset.get(group.type) ?? 0) + index;
+                                                return (
+                                                    <button
+                                                        key={`${item.type}-${item.slug}`}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={absoluteIndex === selectedIndex}
+                                                        className={`${styles.resultItem}${absoluteIndex === selectedIndex ? ` ${styles.resultItemActive}` : ''}`}
+                                                        onClick={() => openSuggestion(item)}
+                                                        onMouseEnter={() => setSelectedIndex(absoluteIndex)}
+                                                    >
+                                                        <div>
+                                                            <strong>{item.title}</strong>
+                                                            {item.organization && <span>{item.organization}</span>}
+                                                        </div>
+                                                        <Icon name="ArrowRight" />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                ))}
                             </div>
                         )}
-
-                        {/* Trending Searches */}
-                        <div className="search-trending-panel">
-                            <h3>🔥 Trending Searches</h3>
-                            <div className="search-trending-chips">
-                                {trendingTerms.map((term) => (
-                                    <button
-                                        key={term}
-                                        type="button"
-                                        className="search-trending-chip"
-                                        onClick={() => openSearchResults(term)}
-                                    >
-                                        {term}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
                     </div>
-                )}
-
-                {loading && (
-                    <div className="search-loading">
-                        <div className="spinner" style={{ width: 20, height: 20 }} />
-                    </div>
-                )}
-
-                {suggestions.length > 0 && (
-                    <ul id="search-results-list" className="search-suggestions" role="listbox" aria-label="Search suggestions">
-                        {suggestions.map((item, index) => (
-                            <li
-                                key={`${item.type}-${item.slug}`}
-                                className={`search-suggestion${index === selectedIdx ? ' selected' : ''}`}
-                                onClick={() => goTo(item)}
-                                onMouseEnter={() => setSelectedIdx(index)}
-                                role="option"
-                                aria-selected={index === selectedIdx}
-                            >
-                                <span className="search-suggestion-icon">{TYPE_ICONS[item.type]}</span>
-                                <div className="search-suggestion-info">
-                                    <span className="search-suggestion-title">{item.title}</span>
-                                    {item.organization && (
-                                        <span className="search-suggestion-org">{item.organization}</span>
-                                    )}
-                                </div>
-                                <span className={`badge badge-${item.type}`} style={{ fontSize: '0.65rem' }}>
-                                    {item.type}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-
-                {!loading && query.length >= 2 && suggestions.length === 0 && (
-                    <div className="search-empty">
-                        <p>
-                            No direct matches for <strong>{query}</strong>
-                        </p>
-                        <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            onClick={() => openSearchResults(query)}
-                        >
-                            Search all jobs for this term
-                        </button>
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     );

@@ -312,3 +312,37 @@ export function updateSettings(data: Partial<SiteSettings>) {
     body: JSON.stringify(data),
   });
 }
+
+// ─── AI Assistant ───
+export function generateMetaWithAI(data: { title: string; content: string; organization?: string }) {
+  return apiFetchWithCsrf<{ data: { metaTitle: string; metaDescription: string } }>('/admin/ai/generate-meta', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function suggestTagsWithAI(data: { title: string; content: string; organization?: string; existingTags?: string[] }) {
+  return apiFetchWithCsrf<{ data: Array<{ tag: string; confidence: number }> }>('/admin/ai/suggest-tags', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function generateSocialSummaryWithAI(data: { title: string; content: string; deadline?: string }) {
+  return apiFetchWithCsrf<{ data: { summary: string } }>('/admin/ai/social-summary', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Live Analytics ───
+export function getLiveMetrics() {
+  return apiFetch<{ data: {
+    activeUsers: number;
+    pageViews: number;
+    trendingSearches: Array<{ query: string; count: number }>;
+    topContent: Array<{ id: string; title: string; views: number; type: string }>;
+    geoData: Array<{ state: string; users: number }>;
+    timestamp: string;
+  } }>('/admin/analytics/live');
+}

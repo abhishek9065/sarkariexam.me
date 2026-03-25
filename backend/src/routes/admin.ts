@@ -905,4 +905,127 @@ router.put('/settings', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// AI CONTENT ASSISTANT
+// ═══════════════════════════════════════════
+
+const aiRateLimit = new Map<string, number[]>();
+
+function checkRateLimit(key: string, maxRequests = 50, windowMs = 3600000): boolean {
+  const now = Date.now();
+  const requests = aiRateLimit.get(key) || [];
+  const valid = requests.filter(t => now - t < windowMs);
+  if (valid.length >= maxRequests) return false;
+  valid.push(now);
+  aiRateLimit.set(key, valid);
+  return true;
+}
+
+router.post('/ai/generate-meta', async (req, res) => {
+  try {
+    const userKey = (req as any).user?.id || req.ip;
+    if (!checkRateLimit(userKey)) {
+      return res.status(429).json({ error: 'Rate limit exceeded. Max 50 AI requests/hour.' });
+    }
+
+    const schema = z.object({
+      title: z.string().min(5).max(200),
+      content: z.string().min(10),
+      organization: z.string().optional(),
+    });
+
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const { generateMetaDescription, generateMetaTitle } = await import('../services/ai.js');
+    const [description, title] = await Promise.all([
+      generateMetaDescription(parse.data.title, parse.data.content, parse.data.organization),
+      generateMetaTitle(parse.data.title),
+    ]);
+
+    return res.json({
+      data: {
+        metaTitle: title.content,
+        metaDescription: description.content,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin] AI meta generation error:', error);
+    return res.status(500).json({ error: 'AI service unavailable' });
+  }
+});
+
+router.post('/ai/suggest-tags', async (req, res) => {
+  try {
+    const userKey = (req as any).user?.id || req.ip;
+    if (!checkRateLimit(userKey)) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
+    }
+
+    const schema = z.object({
+      title: z.string().min(5),
+      content: z.string().min(10),
+      organization: z.string().optional(),
+      existingTags: z.array(z.string()).optional(),
+    });
+
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const { suggestTags } = await import('../services/ai.js');
+    const suggestions = await suggestTags(
+      parse.data.title,
+      parse.data.content,
+      parse.data.organization,
+      parse.data.existingTags
+    );
+
+    return res.json({ data: suggestions });
+  } catch (error) {
+    console.error('[Admin] AI tag suggestion error:', error);
+    return res.status(500).json({ error: 'AI service unavailable' });
+  }
+});
+
+router.post('/ai/social-summary', async (req, res) => {
+  try {
+    const userKey = (req as any).user?.id || req.ip;
+    if (!checkRateLimit(userKey)) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
+    }
+
+    const schema = z.object({
+      title: z.string().min(5),
+      content: z.string().min(10),
+      deadline: z.string().optional(),
+    });
+
+    const parse = schema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+    const { generateSocialSummary } = await import('../services/ai.js');
+    const summary = await generateSocialSummary(parse.data.title, parse.data.content, parse.data.deadline);
+
+    return res.json({ data: { summary: summary.content } });
+  } catch (error) {
+    console.error('[Admin] AI social summary error:', error);
+    return res.status(500).json({ error: 'AI service unavailable' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// LIVE ANALYTICS
+// ═══════════════════════════════════════════
+
+router.get('/analytics/live', async (req, res) => {
+  try {
+    const { getLiveMetrics } = await import('../services/live-analytics.js');
+    const metrics = await getLiveMetrics();
+    return res.json({ data: metrics });
+  } catch (error) {
+    console.error('[Admin] Live analytics error:', error);
+    return res.status(500).json({ error: 'Failed to fetch live metrics' });
+  }
+});
+
 export default router;

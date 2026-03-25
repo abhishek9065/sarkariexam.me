@@ -5,9 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { getAnalyticsOverview, getAnalyticsContent } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Eye, Search, MousePointerClick, TrendingUp, TrendingDown, Loader2, BarChart3,
+  Eye, Search, MousePointerClick, TrendingUp, TrendingDown, Loader2, BarChart3, Activity,
 } from 'lucide-react';
+import { LiveAnalyticsDashboard } from './live-dashboard';
 import type { AnalyticsOverview } from '@/lib/types';
 
 export function AnalyticsPage() {
@@ -36,21 +38,35 @@ export function AnalyticsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground mt-1">Platform performance overview</p>
         </div>
-        <Select value={days} onValueChange={setDays}>
-          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Last 7 days</SelectItem>
-            <SelectItem value="30">Last 30 days</SelectItem>
-            <SelectItem value="90">Last 90 days</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      {loadingOverview ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : overview ? (
+      <Tabs defaultValue="live" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="live" className="flex items-center gap-1.5">
+            <Activity className="h-4 w-4" />
+            Live
+          </TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="live">
+          <LiveAnalyticsDashboard />
+        </TabsContent>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div></div>
+            <Select value={days} onValueChange={setDays}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loadingOverview ? (
         <>
           {/* KPI cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -161,6 +177,8 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

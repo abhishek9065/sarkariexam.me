@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/app/lib/useAuth';
+import { useLanguage } from '@/app/lib/useLanguage';
+import { copyFor } from '@/app/lib/ui';
+import { Icon } from '@/app/components/Icon';
+import styles from './AuthModal.module.css';
 
 interface Props {
     isOpen: boolean;
@@ -10,6 +14,7 @@ interface Props {
 }
 
 export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
+    const { language } = useLanguage();
     const { login, register, error, clearError, twoFactorChallenge, clearTwoFactorChallenge } = useAuth();
     const [tab, setTab] = useState<'login' | 'register'>(initialTab);
     const [email, setEmail] = useState('');
@@ -17,291 +22,177 @@ export function AuthModal({ isOpen, onClose, initialTab = 'login' }: Props) {
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [twoFactorCode, setTwoFactorCode] = useState('');
-    const [submitting, setSubmitting] = useState(false);
     const [localError, setLocalError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
 
-    /* When the 2FA challenge is set, auto-transition to 2FA view */
-    const is2FAStep = !!twoFactorChallenge;
-
-    useEffect(() => {
-        if (isOpen) {
-            setEmail('');
-            setName('');
-            setPassword('');
-            setConfirm('');
-            setTwoFactorCode('');
-            setLocalError(null);
-            clearError();
-            clearTwoFactorChallenge();
-            setTab(initialTab);
-        }
-    }, [isOpen, initialTab, clearError, clearTwoFactorChallenge]);
+    const is2FA = Boolean(twoFactorChallenge);
+    const displayError = localError || error;
 
     useEffect(() => {
         if (!isOpen) return;
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
+        setTab(initialTab);
+        setEmail('');
+        setName('');
+        setPassword('');
+        setConfirm('');
+        setTwoFactorCode('');
+        setLocalError(null);
+        clearError();
+        clearTwoFactorChallenge();
+    }, [clearError, clearTwoFactorChallenge, initialTab, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeydown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', onKeydown);
+        return () => document.removeEventListener('keydown', onKeydown);
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 
-    const handleLoginSubmit = async (e: FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async (event: FormEvent) => {
+        event.preventDefault();
         setLocalError(null);
         setSubmitting(true);
         try {
             const result = await login(email, password);
-            if (result === 'success') {
-                onClose();
-            } else {
+            if (result === 'success') onClose();
+            if (result === 'two_factor_required') {
                 setPassword('');
                 setTwoFactorCode('');
             }
-            /* If 'two_factor_required', component will re-render to show 2FA step */
-        } catch {
-            /* error is stored in context */
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handle2FASubmit = async (e: FormEvent) => {
-        e.preventDefault();
+    const handleRegister = async (event: FormEvent) => {
+        event.preventDefault();
         setLocalError(null);
-
-        if (!twoFactorCode.trim()) {
-            setLocalError('Please enter your authentication code');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            await login(twoFactorChallenge!.email, undefined, twoFactorCode.trim(), twoFactorChallenge!.challengeToken);
-            onClose();
-        } catch {
-            /* error is stored in context */
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleRegisterSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        setLocalError(null);
-
         if (password !== confirm) {
-            setLocalError('Passwords do not match');
+            setLocalError(copyFor(language, 'Passwords do not match.', 'पासवर्ड मैच नहीं कर रहे हैं।'));
             return;
         }
         if (password.length < 8) {
-            setLocalError('Password must be at least 8 characters');
+            setLocalError(copyFor(language, 'Password must be at least 8 characters.', 'पासवर्ड कम से कम 8 अक्षर का होना चाहिए।'));
             return;
         }
-
         setSubmitting(true);
         try {
             await register(email, name, password);
             onClose();
-        } catch {
-            /* error is stored in context */
         } finally {
             setSubmitting(false);
         }
     };
 
-    const displayError = localError || error;
+    const handle2FA = async (event: FormEvent) => {
+        event.preventDefault();
+        setLocalError(null);
+        if (!twoFactorCode.trim() || !twoFactorChallenge) {
+            setLocalError(copyFor(language, 'Enter your authentication code.', 'अपना ऑथेंटिकेशन कोड दर्ज करें।'));
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await login(twoFactorChallenge.email, undefined, twoFactorCode.trim(), twoFactorChallenge.challengeToken);
+            onClose();
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
-        <div className="auth-overlay" role="dialog" aria-modal="true" aria-label="Authentication" onClick={onClose}>
-            <div className="auth-modal card" onClick={(e) => e.stopPropagation()}>
-                <button className="auth-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="Authentication" onClick={onClose}>
+            <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
+                <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close auth modal">
+                    <Icon name="Close" />
+                </button>
 
-                {/* ── 2FA Step ── */}
-                {is2FAStep ? (
-                    <>
-                        <div className="auth-2fa-header">
-                            <span className="auth-2fa-icon">🔐</span>
-                            <h3>Two-Factor Authentication</h3>
-                            <p className="text-muted" style={{ fontSize: 'var(--font-sm)', marginTop: 4 }}>
-                                Enter the 6-digit code from your authenticator app, or a backup code.
-                            </p>
-                        </div>
+                <div className={styles.header}>
+                    <span className={styles.badge}>{copyFor(language, 'Secure account access', 'सिक्योर अकाउंट एक्सेस')}</span>
+                    <h2>{copyFor(language, 'Track your exams with confidence', 'अपने एग्जाम्स को भरोसे के साथ ट्रैक करें')}</h2>
+                    <p>{copyFor(language, 'Bookmarks, saved searches, notifications, and personal tracking all live here.', 'बुकमार्क्स, सेव्ड सर्च, नोटिफिकेशन और पर्सनल ट्रैकिंग यहीं से मिलती है।')}</p>
+                </div>
 
-                        <form className="auth-form" onSubmit={handle2FASubmit}>
-                            {displayError && (
-                                <div id="auth-error-2fa" className="auth-error" aria-live="assertive">{displayError}</div>
-                            )}
-
-                            <label className="auth-label">
-                                Authentication Code
-                                <input
-                                    type="text"
-                                    className="input auth-2fa-input"
-                                    required
-                                    autoFocus
-                                    maxLength={20}
-                                    placeholder="123456"
-                                    value={twoFactorCode}
-                                    onChange={(e) => setTwoFactorCode(e.target.value)}
-                                    autoComplete="one-time-code"
-                                    inputMode="numeric"
-                                    pattern="[0-9a-zA-Z\-]*"
-                                    aria-describedby={displayError ? "auth-error-2fa" : undefined}
-                                />
-                            </label>
-
-                            <button
-                                type="submit"
-                                className="btn btn-accent btn-lg auth-submit"
-                                disabled={submitting}
-                            >
-                                {submitting ? 'Verifying…' : 'Verify'}
-                            </button>
-
-                            <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                style={{ alignSelf: 'center' }}
-                                onClick={() => {
-                                    clearTwoFactorChallenge();
-                                    clearError();
-                                    setPassword('');
-                                    setTwoFactorCode('');
-                                }}
-                            >
-                                ← Back to Sign In
-                            </button>
-                        </form>
-                    </>
+                {is2FA ? (
+                    <form className={styles.form} onSubmit={handle2FA}>
+                        <label className={styles.field}>
+                            <span>{copyFor(language, 'Authentication code', 'ऑथेंटिकेशन कोड')}</span>
+                            <input
+                                type="text"
+                                value={twoFactorCode}
+                                onChange={(event) => setTwoFactorCode(event.target.value)}
+                                autoFocus
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                placeholder="123456"
+                            />
+                        </label>
+                        {displayError && <div className={styles.error}>{displayError}</div>}
+                        <button type="submit" className={styles.primaryButton} disabled={submitting}>
+                            {submitting ? copyFor(language, 'Verifying…', 'वेरिफाई हो रहा है…') : copyFor(language, 'Verify code', 'कोड वेरिफाई करें')}
+                        </button>
+                        <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={() => {
+                                clearTwoFactorChallenge();
+                                clearError();
+                            }}
+                        >
+                            {copyFor(language, 'Back to sign in', 'साइन इन पर वापस जाएं')}
+                        </button>
+                    </form>
                 ) : (
                     <>
-                        {/* ── Normal Login/Register Tabs ── */}
-                        <div className="auth-tabs">
-                            <button
-                                className={`auth-tab${tab === 'login' ? ' active' : ''}`}
-                                onClick={() => { setTab('login'); setLocalError(null); clearError(); }}
-                            >
-                                Sign In
+                        <div className={styles.tabs} role="tablist" aria-label="Authentication tabs">
+                            <button type="button" className={`${styles.tab}${tab === 'login' ? ` ${styles.tabActive}` : ''}`} onClick={() => { setTab('login'); setLocalError(null); clearError(); }}>
+                                {copyFor(language, 'Sign in', 'साइन इन')}
                             </button>
-                            <button
-                                className={`auth-tab${tab === 'register' ? ' active' : ''}`}
-                                onClick={() => { setTab('register'); setLocalError(null); clearError(); }}
-                            >
-                                Register
+                            <button type="button" className={`${styles.tab}${tab === 'register' ? ` ${styles.tabActive}` : ''}`} onClick={() => { setTab('register'); setLocalError(null); clearError(); }}>
+                                {copyFor(language, 'Register', 'रजिस्टर')}
                             </button>
                         </div>
 
                         {tab === 'login' ? (
-                            <form className="auth-form" onSubmit={handleLoginSubmit}>
-                                {displayError && (
-                                    <div id="auth-error-login" className="auth-error" aria-live="assertive">{displayError}</div>
-                                )}
-
-                                <label className="auth-label">
-                                    Email
-                                    <input
-                                        type="email"
-                                        className="input"
-                                        required
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        autoComplete="email"
-                                        placeholder="you@example.com"
-                                        aria-describedby={displayError ? "auth-error-login" : undefined}
-                                    />
+                            <form className={styles.form} onSubmit={handleLogin}>
+                                <label className={styles.field}>
+                                    <span>{copyFor(language, 'Email address', 'ईमेल एड्रेस')}</span>
+                                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
                                 </label>
-
-                                <label className="auth-label">
-                                    Password
-                                    <input
-                                        type="password"
-                                        className="input"
-                                        required
-                                        minLength={8}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        autoComplete="current-password"
-                                        placeholder="••••••••"
-                                    />
+                                <label className={styles.field}>
+                                    <span>{copyFor(language, 'Password', 'पासवर्ड')}</span>
+                                    <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required minLength={8} />
                                 </label>
-
-                                <button
-                                    type="submit"
-                                    className="btn btn-accent btn-lg auth-submit"
-                                    disabled={submitting}
-                                >
-                                    {submitting ? 'Signing in…' : 'Sign In'}
+                                {displayError && <div className={styles.error}>{displayError}</div>}
+                                <button type="submit" className={styles.primaryButton} disabled={submitting}>
+                                    {submitting ? copyFor(language, 'Signing in…', 'साइन इन हो रहा है…') : copyFor(language, 'Sign in', 'साइन इन')}
                                 </button>
                             </form>
                         ) : (
-                            <form className="auth-form" onSubmit={handleRegisterSubmit}>
-                                {displayError && (
-                                    <div id="auth-error-register" className="auth-error" aria-live="assertive">{displayError}</div>
-                                )}
-
-                                <label className="auth-label">
-                                    Email
-                                    <input
-                                        type="email"
-                                        className="input"
-                                        required
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        autoComplete="email"
-                                        placeholder="you@example.com"
-                                        aria-describedby={displayError ? "auth-error-register" : undefined}
-                                    />
+                            <form className={styles.form} onSubmit={handleRegister}>
+                                <label className={styles.field}>
+                                    <span>{copyFor(language, 'Email address', 'ईमेल एड्रेस')}</span>
+                                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required />
                                 </label>
-
-                                <label className="auth-label">
-                                    Full Name
-                                    <input
-                                        type="text"
-                                        className="input"
-                                        required
-                                        minLength={2}
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        autoComplete="name"
-                                        placeholder="John Doe"
-                                    />
+                                <label className={styles.field}>
+                                    <span>{copyFor(language, 'Full name', 'पूरा नाम')}</span>
+                                    <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder={copyFor(language, 'Aspirant name', 'अभ्यर्थी का नाम')} required minLength={2} />
                                 </label>
-
-                                <label className="auth-label">
-                                    Password
-                                    <input
-                                        type="password"
-                                        className="input"
-                                        required
-                                        minLength={8}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        autoComplete="new-password"
-                                        placeholder="••••••••"
-                                    />
+                                <label className={styles.field}>
+                                    <span>{copyFor(language, 'Password', 'पासवर्ड')}</span>
+                                    <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required minLength={8} />
                                 </label>
-
-                                <label className="auth-label">
-                                    Confirm Password
-                                    <input
-                                        type="password"
-                                        className="input"
-                                        required
-                                        minLength={8}
-                                        value={confirm}
-                                        onChange={(e) => setConfirm(e.target.value)}
-                                        autoComplete="new-password"
-                                        placeholder="••••••••"
-                                    />
+                                <label className={styles.field}>
+                                    <span>{copyFor(language, 'Confirm password', 'पासवर्ड कन्फर्म करें')}</span>
+                                    <input type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} placeholder="••••••••" required minLength={8} />
                                 </label>
-
-                                <button
-                                    type="submit"
-                                    className="btn btn-accent btn-lg auth-submit"
-                                    disabled={submitting}
-                                >
-                                    {submitting ? 'Creating account…' : 'Create Account'}
+                                {displayError && <div className={styles.error}>{displayError}</div>}
+                                <button type="submit" className={styles.primaryButton} disabled={submitting}>
+                                    {submitting ? copyFor(language, 'Creating account…', 'अकाउंट बन रहा है…') : copyFor(language, 'Create account', 'अकाउंट बनाएं')}
                                 </button>
                             </form>
                         )}
