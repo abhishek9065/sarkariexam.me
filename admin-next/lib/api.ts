@@ -494,11 +494,18 @@ export function getBackups(limit = 20) {
   return apiFetch<{ data: any[] }>(`/admin/backups${qs({ limit })}`);
 }
 
-export function exportAnnouncementsToCSV(): Promise<Response> {
-  return fetch(`${API_BASE}/admin/export/announcements`, {
+export async function exportAnnouncementsToCSV(): Promise<Response> {
+  const csrfToken = await ensureCsrfToken();
+  const res = await fetch(`${API_BASE}/admin/export/announcements`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${getToken()}` },
+    headers: { [CSRF_HEADER_NAME]: csrfToken },
+    credentials: 'include',
   });
+  if (!res.ok) {
+    const body = await parseBody(res);
+    throw new ApiError(res.status, body);
+  }
+  return res;
 }
 
 export function getSecurityEvents(filters?: { type?: string; severity?: string }) {
