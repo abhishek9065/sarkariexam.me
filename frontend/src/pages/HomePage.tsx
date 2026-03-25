@@ -1,6 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent, KeyboardEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '../utils/router';
 import { Layout } from '../components/Layout';
 import { getBookmarkIds, getHomepageFeed, getSearchSuggestions } from '../utils/api';
 import { buildAnnouncementDetailPath } from '../utils/trackingLinks';
@@ -104,11 +105,13 @@ function dateGroup(dateStr?: string | null): 'today' | 'week' | 'older' {
     return 'older';
 }
 
-const GROUP_LABELS: Record<string, string> = {
+const GROUP_LABELS: Record<'today' | 'week' | 'older', string> = {
     today: '📌 Today',
     week: '📅 This Week',
     older: '📁 Earlier',
 };
+
+const DATE_GROUP_ORDER = ['today', 'week', 'older'] as const;
 
 /* ─── Skeleton ─── */
 function UpdateSkeleton() {
@@ -294,10 +297,15 @@ export function HomePage() {
         const timer = setTimeout(async () => {
             try {
                 const res = await getSearchSuggestions(q);
-                if (active && mountedRef.current) setSuggestions(res.data || []);
-                setSelectedSuggestIdx(-1); // Reset highlight on new results
+                if (active && mountedRef.current) {
+                    setSuggestions(res.data || []);
+                    setSelectedSuggestIdx(-1); // Reset highlight on new results
+                }
             } catch {
-                if (active && mountedRef.current) setSuggestions([]);
+                if (active && mountedRef.current) {
+                    setSuggestions([]);
+                    setSelectedSuggestIdx(-1);
+                }
             }
         }, 300);
         return () => {
@@ -398,7 +406,7 @@ export function HomePage() {
             groupMap.get(g)!.push(card);
         }
 
-        for (const key of ['today', 'week', 'older']) {
+        for (const key of DATE_GROUP_ORDER) {
             const items = groupMap.get(key);
             if (items && items.length > 0) {
                 groups.push({ key, label: GROUP_LABELS[key], items });
@@ -420,7 +428,7 @@ export function HomePage() {
         return updates.filter((u) => bookmarkedIds.has(u.id)).slice(0, 4);
     }, [updates, bookmarkedIds]);
 
-    const handleSearch = useCallback((e: React.FormEvent) => {
+    const handleSearch = useCallback((e: FormEvent) => {
         e.preventDefault();
         const q = searchQuery.trim();
         if (!q) return;
@@ -433,7 +441,7 @@ export function HomePage() {
     }, []);
 
     /* ─── UX: Keyboard Navigation for Search ─── */
-    const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleSearchKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
         if (!showSuggestions || suggestions.length === 0) return;
         
         if (e.key === 'ArrowDown') {
@@ -445,8 +453,9 @@ export function HomePage() {
         } else if (e.key === 'Enter' && selectedSuggestIdx >= 0) {
             e.preventDefault();
             const s = suggestions[selectedSuggestIdx];
+            if (!s) return;
             trackEvent('search_suggest_click', { slug: s.slug });
-            navigate(buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay' as SourceTag));
+            navigate(buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay'));
         }
     }, [showSuggestions, suggestions, selectedSuggestIdx, navigate]);
 
@@ -503,9 +512,9 @@ export function HomePage() {
                                     {suggestions.length > 0 ? (
                                         <ul className="hp-search-suggest-list">
                                             {suggestions.map((s, idx) => (
-                                                <li key={idx}>
+                                                <li key={`${s.slug}-${idx}`}>
                                                     <Link
-                                                        to={buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay' as SourceTag)}
+                                                        to={buildAnnouncementDetailPath(s.type, s.slug, 'search_overlay')}
                                                         className={`hp-search-suggest-link ${selectedSuggestIdx === idx ? 'focused-suggestion' : ''}`}
                                                         style={selectedSuggestIdx === idx ? { backgroundColor: 'var(--color-gray-100)' } : {}}
                                                         onClick={() => trackEvent('search_suggest_click', { slug: s.slug })}
@@ -664,7 +673,8 @@ export function HomePage() {
                         <PreferencePicker onDone={(prefs) => {
                             setUserPrefs(prefs);
                             setShowPicker(false);
-                            if (prefs.length > 0) setActiveFilter(prefs[0]);
+                            const firstPref = prefs[0];
+                            if (firstPref) setActiveFilter(firstPref);
                         }} />
                     )}
 
