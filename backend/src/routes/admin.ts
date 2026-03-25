@@ -516,10 +516,11 @@ router.get('/subscribers/stats', async (_req, res) => {
 
 router.delete('/subscribers/:id', async (req, res) => {
   try {
+    const id = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
     const col = getCollection('subscriptions');
-    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
+    const result = await col.deleteOne({ _id: new ObjectId(id) });
     if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Subscriber removed' });
   } catch (error) {
@@ -619,10 +620,11 @@ const communityList = async (collectionName: string, req: express.Request, res: 
 
 const communityDelete = async (collectionName: string, req: express.Request, res: express.Response) => {
   try {
+    const id = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
     const col = getCollection(collectionName);
-    const result = await col.deleteOne({ _id: new ObjectId(req.params.id) });
+    const result = await col.deleteOne({ _id: new ObjectId(id) });
     if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Deleted' });
   } catch (error) {
@@ -639,6 +641,7 @@ router.delete('/community/qa/:id', (req, res) => communityDelete('community_qa',
 
 router.patch('/community/qa/:id', async (req, res) => {
   try {
+    const id = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
     const col = getCollection('community_qa');
@@ -647,7 +650,7 @@ router.patch('/community/qa/:id', async (req, res) => {
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
     const result = await col.updateOne(
-      { _id: new ObjectId(req.params.id) },
+      { _id: new ObjectId(id) },
       { $set: { answer: parse.data.answer, answeredBy: (req as any).user?.email || 'admin', updatedAt: new Date() } }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
@@ -686,6 +689,7 @@ router.get('/community/flags', async (req, res) => {
 
 router.patch('/community/flags/:id', async (req, res) => {
   try {
+    const id = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
     const col = getCollection('community_flags');
@@ -694,7 +698,7 @@ router.patch('/community/flags/:id', async (req, res) => {
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
     const result = await col.updateOne(
-      { _id: new ObjectId(req.params.id) },
+      { _id: new ObjectId(id) },
       { $set: { status: parse.data.status, updatedAt: new Date() } }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
@@ -751,7 +755,8 @@ router.patch('/error-reports/:id', async (req, res) => {
       update.resolvedBy = (req as any).user?.email || 'admin';
     }
 
-    const result = await col.updateOne({ _id: new ObjectId(req.params.id) }, { $set: update });
+    const id = String(req.params.id);
+    const result = await col.updateOne({ _id: new ObjectId(id) }, { $set: update });
     if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Error report updated' });
   } catch (error) {
@@ -769,14 +774,17 @@ router.get('/audit-log', async (req, res) => {
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 50, offset: 0 };
 
-    const recentUpdates = await AnnouncementModel.findAllAdmin({
-      sort: 'updated',
-      limit,
-      offset,
-      includeInactive: true,
-    });
+    const [recentUpdates, total] = await Promise.all([
+      AnnouncementModel.findAllAdmin({
+        sort: 'updated',
+        limit,
+        offset,
+        includeInactive: true,
+      }),
+      AnnouncementModel.countAdmin({ includeInactive: true }),
+    ]);
 
-    const entries = recentUpdates.announcements.map(a => ({
+    const entries = recentUpdates.map(a => ({
       id: a.id,
       title: a.title,
       type: a.type,
@@ -786,7 +794,7 @@ router.get('/audit-log', async (req, res) => {
       updatedBy: (a as any).updatedBy || (a as any).postedBy || 'system',
     }));
 
-    return res.json({ data: entries, total: recentUpdates.total, count: entries.length });
+    return res.json({ data: entries, total, count: entries.length });
   } catch (error) {
     console.error('[Admin] Audit log error:', error);
     return res.status(500).json({ error: 'Failed to fetch audit log' });
