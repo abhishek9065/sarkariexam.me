@@ -11,16 +11,17 @@ import { SearchOverlay } from './SearchOverlay';
 import { AuthModal } from './AuthModal';
 
 interface NavLinkItem {
+    activePrefixes?: string[];
     to: string;
     labelKey: string;
 }
 
 const PRIMARY_LINKS: NavLinkItem[] = [
-    { to: '/', labelKey: 'nav.home' },
-    { to: buildCategoryPath('job'), labelKey: 'nav.jobs' },
-    { to: buildCategoryPath('result'), labelKey: 'nav.results' },
-    { to: buildCategoryPath('admit-card'), labelKey: 'nav.admitCard' },
-    { to: buildCategoryPath('answer-key'), labelKey: 'nav.answerKey' },
+    { to: '/', labelKey: 'nav.home', activePrefixes: ['/'] },
+    { to: buildCategoryPath('job'), labelKey: 'nav.jobs', activePrefixes: ['/jobs', '/job'] },
+    { to: buildCategoryPath('result'), labelKey: 'nav.results', activePrefixes: ['/results', '/result'] },
+    { to: buildCategoryPath('admit-card'), labelKey: 'nav.admitCard', activePrefixes: ['/admit-cards', '/admit-card'] },
+    { to: buildCategoryPath('answer-key'), labelKey: 'nav.answerKey', activePrefixes: ['/answer-keys', '/answer-key'] },
 ];
 
 const MORE_LINKS: Array<{ to: string; label: string }> = [
@@ -48,6 +49,12 @@ export function Header() {
     const userMenuRef = useRef<HTMLDivElement>(null);
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const loginRequested = searchParams.get('login') === '1';
+
+    const isNavActive = (link: NavLinkItem) => {
+        const prefixes = link.activePrefixes ?? [link.to];
+        if (prefixes.includes('/')) return pathname === '/';
+        return prefixes.some((prefix) => pathname.startsWith(prefix));
+    };
 
     useEffect(() => {
         const handleClickOutside = (e: globalThis.MouseEvent) => {
@@ -101,7 +108,7 @@ export function Header() {
                                 <Link
                                     key={link.to}
                                     href={link.to}
-                                    className={`header-nav-link${pathname === link.to ? ' active' : ''}`}
+                                    className={`header-nav-link${isNavActive(link) ? ' active' : ''}`}
                                     onClick={() => {
                                         setMobileOpen(false);
                                         setUserMenuOpen(false);
@@ -234,7 +241,7 @@ export function Header() {
                                 <Link
                                     key={link.to}
                                     href={link.to}
-                                    className={`header-mobile-link${pathname === link.to ? ' active' : ''}`}
+                                    className={`header-mobile-link${isNavActive(link) ? ' active' : ''}`}
                                     onClick={() => setMobileOpen(false)}
                                 >
                                     {t(link.labelKey)}

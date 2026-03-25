@@ -147,7 +147,7 @@ export function DetailPage({ type }: { type: ContentType }) {
                 const res = await getAnnouncementBySlug(type, slugValue);
                 if (!mounted) return;
                 setAnnouncement(res.data);
-                trackEvent('detail_view', { type, slug });
+                trackEvent('detail_view', { type, slug: slugValue });
                 try {
                     const rel = await getAnnouncementCards({ type, limit: 8, sort: 'newest' });
                     if (mounted) setRelated(rel.data.filter((item) => item.slug !== slugValue).slice(0, 6));
@@ -193,7 +193,7 @@ export function DetailPage({ type }: { type: ContentType }) {
 
     const handleCopyLink = useCallback(async () => {
         try { await navigator.clipboard.writeText(currentUrl || window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /**/ }
-    }, []);
+    }, [currentUrl]);
 
     const handlePrint = useCallback(() => {
         window.print(); trackEvent('print_page', { slug: announcement?.slug ?? '' });

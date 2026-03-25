@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
+import { buildCategoryPath } from '@/app/lib/urls';
 import '@/app/components/PublicSurface.css';
 
 const ORG_GROUPS: Array<{ heading: string; items: Array<{ label: string; to: string }> }> = [
@@ -36,7 +37,7 @@ const ORG_GROUPS: Array<{ heading: string; items: Array<{ label: string; to: str
             { label: 'Banking Jobs', to: '/jobs?q=Banking' },
             { label: 'TET', to: '/jobs?q=TET' },
             { label: 'Scholarships', to: '/jobs?q=Scholarship' },
-            { label: 'Admit Card Download', to: '/admit-card?q=download' },
+            { label: 'Admit Card Download', to: `${buildCategoryPath('admit-card')}?q=download` },
         ],
     },
 ];

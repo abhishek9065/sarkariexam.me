@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { buildCategoryPath } from '@/app/lib/urls';
 const SOCIAL_LINKS = [
     { label: 'Telegram', href: 'https://t.me/sarkariexamsme', icon: '✈️' },
     { label: 'WhatsApp', href: 'https://wa.me/sarkariexamsme', icon: '💬' },
@@ -14,12 +15,12 @@ const FOOTER_SECTIONS = [
     {
         title: '📂 Browse',
         links: [
-            { label: 'Latest Jobs', to: '/jobs' },
-            { label: 'Results', to: '/results' },
-            { label: 'Admit Cards', to: '/admit-card' },
-            { label: 'Answer Keys', to: '/answer-key' },
-            { label: 'Syllabus', to: '/syllabus' },
-            { label: 'Admissions', to: '/admission' },
+            { label: 'Latest Jobs', to: buildCategoryPath('job') },
+            { label: 'Results', to: buildCategoryPath('result') },
+            { label: 'Admit Cards', to: buildCategoryPath('admit-card') },
+            { label: 'Answer Keys', to: buildCategoryPath('answer-key') },
+            { label: 'Syllabus', to: buildCategoryPath('syllabus') },
+            { label: 'Admissions', to: buildCategoryPath('admission') },
         ],
     },
     {
