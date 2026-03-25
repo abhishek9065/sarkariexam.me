@@ -66,7 +66,7 @@ export function AnalyticsPage() {
             </Select>
           </div>
 
-          {loadingOverview ? (
+          {!loadingOverview && overview ? (
         <>
           {/* KPI cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -145,6 +145,10 @@ export function AnalyticsPage() {
             </Card>
           )}
         </>
+          ) : loadingOverview ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       ) : (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
