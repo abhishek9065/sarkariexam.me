@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Calendar,
   Megaphone,
+  CheckCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
@@ -32,6 +33,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/announcements', label: 'Announcements', icon: FileText },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/workflow', label: 'Workflow', icon: CheckCircle },
   { href: '/users', label: 'Users', icon: Users },
   { href: '/subscribers', label: 'Subscribers', icon: Mail },
   { href: '/community', label: 'Community', icon: MessageSquare },

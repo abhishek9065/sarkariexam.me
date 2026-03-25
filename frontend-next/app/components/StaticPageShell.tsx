@@ -1,34 +1,33 @@
 import type { ReactNode } from 'react';
 import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
-import '@/app/components/PublicSurface.css';
+import styles from '@/app/components/PortalSurface.module.css';
 
-interface StaticPageShellProps {
+type StaticPageShellProps = {
     icon: string;
     title: string;
     intro: string;
     eyebrow?: string;
     children: ReactNode;
-}
+};
 
-export function StaticPageShell({ icon, title, intro, eyebrow = 'Public Information', children }: StaticPageShellProps) {
+export function StaticPageShell({ icon, title, intro, eyebrow = 'Public information', children }: StaticPageShellProps) {
     return (
-        <div className="hp public-shell public-static-shell">
-            <section className="public-hero">
-                <span className="public-kicker">{eyebrow}</span>
-                <div className="public-hero-grid">
-                    <div className="public-hero-main">
-                        <div className="public-static-icon" aria-hidden="true">{icon}</div>
-                        <h1 className="public-title">{title}</h1>
-                        <p className="public-sub">{intro}</p>
+        <div className={styles.page}>
+            <section className={styles.hero}>
+                <div className={styles.heroGrid}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>{eyebrow}</span>
+                        <h1 className={styles.heroTitle}>{icon} {title}</h1>
+                        <p className={styles.heroSub}>{intro}</p>
                     </div>
                 </div>
             </section>
 
             <PublicCategoryRail />
 
-            <div className="public-panel public-static-body">
-                {children}
-            </div>
+            <section className={styles.panel}>
+                <div className={styles.staticBody}>{children}</div>
+            </section>
         </div>
     );
 }

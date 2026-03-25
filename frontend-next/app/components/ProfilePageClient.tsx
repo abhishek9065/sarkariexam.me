@@ -1,104 +1,95 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Icon } from '@/app/components/Icon';
+import styles from '@/app/components/PortalSurface.module.css';
 import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
-import { useAuth } from '@/app/lib/useAuth';
 import {
-    getProfileWidgets,
-    getProfileSavedSearches,
     getProfileNotifications,
+    getProfileSavedSearches,
+    getProfileWidgets,
     getTrackedApplications,
     type ProfileWidgetData,
     type SavedSearchItem,
     type TrackedApplicationItem,
     type UserNotificationItem,
 } from '@/app/lib/api';
-import '@/app/components/PublicSurface.css';
-
-function buildAnnouncementDetailPath(type: string, slug: string) {
-    return `/${type}/${slug}`;
-}
-
-function formatDate(value?: string | null): string {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+import { getInterests, getRecentViews, getSavedSearchDrafts, setInterests } from '@/app/lib/personalization';
+import type { ContentType } from '@/app/lib/types';
+import { CATEGORY_META, formatDate } from '@/app/lib/ui';
+import { useAuth } from '@/app/lib/useAuth';
 
 export function ProfilePage() {
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
-    const [loadingUtilities, setLoadingUtilities] = useState(true);
+    const { user, loading: authLoading } = useAuth();
     const [widgets, setWidgets] = useState<ProfileWidgetData | null>(null);
     const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
+    const [localSearches, setLocalSearches] = useState(getSavedSearchDrafts());
     const [notifications, setNotifications] = useState<UserNotificationItem[]>([]);
-    const [trackedApps, setTrackedApps] = useState<TrackedApplicationItem[]>([]);
+    const [trackedApplications, setTrackedApplications] = useState<TrackedApplicationItem[]>([]);
+    const [recentViews, setRecentViews] = useState(getRecentViews());
+    const [interests, setInterestState] = useState<ContentType[]>(getInterests());
+
+    useEffect(() => {
+        setRecentViews(getRecentViews());
+        setLocalSearches(getSavedSearchDrafts());
+        setInterestState(getInterests());
+    }, []);
 
     useEffect(() => {
         if (!user) return;
-        let mounted = true;
+        let cancelled = false;
 
         (async () => {
-            setLoadingUtilities(true);
-            try {
-                const [widgetsRes, savedRes, notificationsRes, trackedRes] = await Promise.allSettled([
-                    getProfileWidgets(7),
-                    getProfileSavedSearches(),
-                    getProfileNotifications(8),
-                    getTrackedApplications(),
-                ]);
+            const [widgetsRes, savedRes, notificationsRes, trackedRes] = await Promise.allSettled([
+                getProfileWidgets(14),
+                getProfileSavedSearches(),
+                getProfileNotifications(8),
+                getTrackedApplications(),
+            ]);
 
-                if (!mounted) return;
-                if (widgetsRes.status === 'fulfilled') setWidgets(widgetsRes.value.data);
-                if (savedRes.status === 'fulfilled') setSavedSearches(savedRes.value.data || []);
-                if (notificationsRes.status === 'fulfilled') setNotifications(notificationsRes.value.data || []);
-                if (trackedRes.status === 'fulfilled') setTrackedApps(trackedRes.value.data || []);
-            } catch (error) {
-                console.error('Failed to fetch profile utilities:', error);
-            } finally {
-                if (mounted) setLoadingUtilities(false);
-            }
+            if (cancelled) return;
+            if (widgetsRes.status === 'fulfilled') setWidgets(widgetsRes.value.data);
+            if (savedRes.status === 'fulfilled') setSavedSearches(savedRes.value.data ?? []);
+            if (notificationsRes.status === 'fulfilled') setNotifications(notificationsRes.value.data ?? []);
+            if (trackedRes.status === 'fulfilled') setTrackedApplications(trackedRes.value.data ?? []);
         })();
 
         return () => {
-            mounted = false;
+            cancelled = true;
         };
     }, [user]);
 
-    const trackedCount = useMemo(() => {
-        if (!widgets) return 0;
-        return Object.values(widgets.trackedCounts || {}).reduce((sum, count) => sum + count, 0);
-    }, [widgets]);
+    const toggleInterest = (type: ContentType) => {
+        const next = interests.includes(type) ? interests.filter((item) => item !== type) : [...interests, type];
+        const normalized = next.length > 0 ? next : [type];
+        setInterestState(normalized);
+        setInterests(normalized);
+    };
+
+    if (authLoading) {
+        return (
+            <div className={styles.page}>
+                <section className={styles.hero}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>Loading profile</span>
+                    </div>
+                </section>
+            </div>
+        );
+    }
 
     if (!user) {
         return (
-            <div className="hp public-shell">
-                <section className="public-hero">
-                    <span className="public-kicker">Personal Workspace</span>
-                    <div className="public-hero-grid">
-                        <div className="public-hero-main">
-                            <h1 className="public-title">
-                                Profile <span className="public-title-accent">Dashboard</span>
-                            </h1>
-                            <p className="public-sub">
-                                Track saved searches, notifications, and application activity from one personal workspace. Sign in from the header to unlock your profile data.
-                            </p>
-                        </div>
-                    </div>
-                </section>
-
-                <PublicCategoryRail />
-
-                <section className="public-panel public-auth-prompt">
-                    <div className="public-empty-state">
-                        <span className="public-empty-icon">👤</span>
-                        <h3>Sign in to view your profile</h3>
-                        <p>Your personal dashboard is available after login. Use the Sign In action in the header, then come back here to view saved searches, notifications, and tracked applications.</p>
-                        <div className="public-actions-row">
-                            <Link href="/" className="public-secondary-link">Go to Home</Link>
-                            <Link href="/bookmarks" className="public-secondary-link">Open Bookmarks</Link>
+            <div className={styles.page}>
+                <section className={styles.hero}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>Profile</span>
+                        <h1 className={styles.heroTitle}>Your personal exam workspace unlocks after sign in.</h1>
+                        <p className={styles.heroSub}>Bookmarks, saved searches, notifications, and tracked application widgets are tied to your account session.</p>
+                        <div className={styles.toolbarGroup}>
+                            <Link href="/?login=1" className={styles.primaryButton}>Sign in</Link>
+                            <Link href="/bookmarks" className={styles.secondaryButton}>Open bookmarks</Link>
                         </div>
                     </div>
                 </section>
@@ -107,198 +98,170 @@ export function ProfilePage() {
     }
 
     return (
-        <div className="hp public-shell">
-            <section className="public-hero">
-                <span className="public-kicker">Personal Workspace</span>
-                <div className="public-hero-grid">
-                    <div className="public-hero-main">
-                        <div className="public-profile-header">
-                            <div className="public-profile-avatar">
-                                {(user.username || user.email || '?')[0].toUpperCase()}
-                            </div>
-                            <div>
-                                <h1 className="public-profile-name">{user.username}</h1>
-                                <p className="public-sub">Your saved alerts, tracked applications, and personal update activity in one place.</p>
-                                <div className="public-profile-meta">
-                                    <span className="public-profile-chip">✉ {user.email}</span>
-                                    <span className="public-profile-chip">🔐 {user.role}</span>
-                                    <span className="public-profile-chip">✅ {user.isActive === false ? 'Inactive' : 'Active'}</span>
-                                </div>
-                            </div>
+        <div className={styles.page}>
+            <section className={styles.hero}>
+                <div className={styles.heroGrid}>
+                    <div className={styles.accountHero}>
+                        <span className={styles.avatar}>{(user.username || user.email)[0]?.toUpperCase()}</span>
+                        <span className={styles.heroKicker}>Member dashboard</span>
+                        <h1 className={styles.heroTitle}>{user.username}</h1>
+                        <p className={styles.heroSub}>Keep your focus areas, saved alerts, tracked deadlines, and recent reads in one stable dashboard.</p>
+                        <div className={styles.metaChips}>
+                            <span className={styles.metaChip}><Icon name="User" size={15} />{user.email}</span>
+                            <span className={styles.metaChip}><Icon name="ShieldCheck" size={15} />{user.role}</span>
+                            {user.createdAt ? <span className={styles.metaChip}><Icon name="CalendarClock" size={15} />Joined {formatDate(user.createdAt)}</span> : null}
                         </div>
                     </div>
-                    <div className="public-hero-stats">
-                        {user.createdAt && (
-                            <div className="public-stat-card">
-                                <span className="public-stat-value">{new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span>
-                                <span className="public-stat-label">Joined</span>
-                            </div>
-                        )}
-                        <div className="public-stat-card">
-                            <span className="public-stat-value">{trackedCount}</span>
-                            <span className="public-stat-label">Tracked items</span>
-                        </div>
-                        <div className="public-stat-card">
-                            <span className="public-stat-value">{savedSearches.length}</span>
-                            <span className="public-stat-label">Saved searches</span>
-                        </div>
+
+                    <div className={styles.heroStats}>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Upcoming deadlines</span><strong className={styles.statValue}>{widgets?.upcomingDeadlines.length ?? 0}</strong></div>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Saved searches</span><strong className={styles.statValue}>{savedSearches.length + localSearches.length}</strong></div>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Notifications</span><strong className={styles.statValue}>{notifications.length}</strong></div>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Tracked applications</span><strong className={styles.statValue}>{trackedApplications.length}</strong></div>
                     </div>
                 </div>
             </section>
 
             <PublicCategoryRail />
 
-            <div className="public-tablist" role="tablist" aria-label="Profile tabs">
-                <button
-                    type="button"
-                    className={`public-tab${activeTab === 'overview' ? ' active' : ''}`}
-                    onClick={() => setActiveTab('overview')}
-                >
-                    Overview
-                </button>
-                <button
-                    type="button"
-                    className={`public-tab${activeTab === 'settings' ? ' active' : ''}`}
-                    onClick={() => setActiveTab('settings')}
-                >
-                    Settings
-                </button>
-            </div>
-
-            {activeTab === 'overview' && (
-                <div className="public-profile-grid">
-                    <section className="public-panel">
-                        <div className="public-panel-header">
-                            <div>
-                                <h2 className="public-panel-title">Tracked Applications</h2>
-                                <p className="public-panel-copy">Monitor your active recruitment or admission tracking list.</p>
-                            </div>
+            <div className={styles.contentGrid}>
+                <div className={styles.mainStack}>
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Focus areas</p>
+                            <h2 className={styles.panelTitle}>Tune what the product should emphasize for you</h2>
                         </div>
-                        {loadingUtilities ? (
-                            <p className="public-panel-copy">Loading tracked items...</p>
-                        ) : trackedApps.length === 0 ? (
-                            <div className="public-empty-state">
-                                <span className="public-empty-icon">🧾</span>
-                                <h3>No tracked applications</h3>
-                                <p>Once you start tracking announcements, the latest status will show here.</p>
+                        <div className={styles.chipRow}>
+                            {(Object.keys(CATEGORY_META) as ContentType[]).map((type) => (
+                                <button key={type} type="button" className={`${styles.preferenceChip}${interests.includes(type) ? ` ${styles.preferenceChipActive}` : ''}`} onClick={() => toggleInterest(type)}>
+                                    {CATEGORY_META[type].shortEn}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    <div className={styles.dashboardGrid}>
+                        <section className={styles.dashboardCard}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Tracked applications</p>
+                                <h2 className={styles.panelTitle}>Status queue</h2>
                             </div>
-                        ) : (
-                            <div className="public-list">
-                                {trackedApps.slice(0, 5).map((item) => (
-                                    <div key={item.id} className="public-list-item">
-                                        <Link href={buildAnnouncementDetailPath(item.type, item.slug)}>{item.title}</Link>
-                                        <span className="public-list-meta">{item.status}</span>
+                            <div className={styles.moduleList}>
+                                {trackedApplications.length === 0 ? (
+                                    <p className={styles.sectionCopy}>No tracked applications yet.</p>
+                                ) : trackedApplications.slice(0, 6).map((item) => (
+                                    <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.moduleLink}>
+                                        <span className={styles.railItemTitle}>{item.title}</span>
+                                        <span className={styles.listMeta}>
+                                            <span>{item.status}</span>
+                                            {item.deadline ? <span>{formatDate(item.deadline)}</span> : null}
+                                        </span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className={styles.dashboardCard}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Notifications</p>
+                                <h2 className={styles.panelTitle}>Latest account signals</h2>
+                            </div>
+                            <div className={styles.moduleList}>
+                                {notifications.length === 0 ? (
+                                    <p className={styles.sectionCopy}>No recent notifications.</p>
+                                ) : notifications.map((item) => (
+                                    <div key={item.id} className={styles.listCard}>
+                                        <span className={styles.railItemTitle}>{item.title}</span>
+                                        <span className={styles.listMeta}>
+                                            <span>{item.source}</span>
+                                            <span>{formatDate(item.createdAt)}</span>
+                                        </span>
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </section>
+                        </section>
 
-                    <section className="public-panel">
-                        <div className="public-panel-header">
-                            <div>
-                                <h2 className="public-panel-title">Notifications</h2>
-                                <p className="public-panel-copy">Recent account and announcement notifications.</p>
+                        <section className={styles.dashboardCard}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Saved searches</p>
+                                <h2 className={styles.panelTitle}>Backend alerts</h2>
                             </div>
-                        </div>
-                        {loadingUtilities ? (
-                            <p className="public-panel-copy">Loading notifications...</p>
-                        ) : notifications.length === 0 ? (
-                            <div className="public-empty-state">
-                                <span className="public-empty-icon">🔔</span>
-                                <h3>No recent notifications</h3>
-                                <p>New alerts and saved-search updates will appear here.</p>
-                            </div>
-                        ) : (
-                            <div className="public-list">
-                                {notifications.slice(0, 5).map((item) => (
-                                    <div key={item.id} className="public-list-item">
-                                        {item.slug ? (
-                                            <Link href={buildAnnouncementDetailPath(item.type, item.slug)}>{item.title}</Link>
-                                        ) : (
-                                            <strong>{item.title}</strong>
-                                        )}
-                                        <span className="public-list-meta">{formatDate(item.createdAt)}</span>
+                            <div className={styles.moduleList}>
+                                {savedSearches.length === 0 ? (
+                                    <p className={styles.sectionCopy}>No account-synced saved searches yet.</p>
+                                ) : savedSearches.map((item) => (
+                                    <div key={item.id} className={styles.listCard}>
+                                        <span className={styles.railItemTitle}>{item.name}</span>
+                                        <span className={styles.listMeta}>
+                                            <span>{item.frequency}</span>
+                                            <span>{item.notificationsEnabled ? 'Notifications on' : 'Notifications off'}</span>
+                                        </span>
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </section>
+                        </section>
 
-                    <section className="public-panel">
-                        <div className="public-panel-header">
-                            <div>
-                                <h2 className="public-panel-title">Saved Searches</h2>
-                                <p className="public-panel-copy">Queries you have stored for repeated notification tracking.</p>
+                        <section className={styles.dashboardCard}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Recent views</p>
+                                <h2 className={styles.panelTitle}>Continue from your reading trail</h2>
                             </div>
-                        </div>
-                        {loadingUtilities ? (
-                            <p className="public-panel-copy">Loading saved searches...</p>
-                        ) : savedSearches.length === 0 ? (
-                            <div className="public-empty-state">
-                                <span className="public-empty-icon">🔎</span>
-                                <h3>No saved searches</h3>
-                                <p>Create a few targeted searches and they will appear here for quick reuse.</p>
-                            </div>
-                        ) : (
-                            <div className="public-list">
-                                {savedSearches.slice(0, 5).map((item) => (
-                                    <div key={item.id} className="public-list-item">
-                                        <strong>{item.name}</strong>
-                                        <span className="public-list-meta">{item.frequency}</span>
-                                    </div>
+                            <div className={styles.moduleList}>
+                                {recentViews.length === 0 ? (
+                                    <p className={styles.sectionCopy}>No recent reads yet.</p>
+                                ) : recentViews.map((item) => (
+                                    <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.moduleLink}>
+                                        <span className={styles.railItemTitle}>{item.title}</span>
+                                        <span className={styles.listMeta}>
+                                            <span>{item.organization}</span>
+                                            <span>{item.type}</span>
+                                        </span>
+                                    </Link>
                                 ))}
                             </div>
-                        )}
-                    </section>
-
-                    <section className="public-panel">
-                        <div className="public-panel-header">
-                            <div>
-                                <h2 className="public-panel-title">Widget Snapshot</h2>
-                                <p className="public-panel-copy">A quick pulse of upcoming deadlines and recommendation signals.</p>
-                            </div>
-                        </div>
-                        {loadingUtilities || !widgets ? (
-                            <p className="public-panel-copy">Loading widget summary...</p>
-                        ) : (
-                            <div className="public-mini-stat-grid">
-                                <div className="public-stat-card">
-                                    <span className="public-stat-value">{widgets.upcomingDeadlines.length}</span>
-                                    <span className="public-stat-label">Upcoming deadlines</span>
-                                </div>
-                                <div className="public-stat-card">
-                                    <span className="public-stat-value">{widgets.recommendationCount}</span>
-                                    <span className="public-stat-label">Recommendations</span>
-                                </div>
-                                <div className="public-stat-card">
-                                    <span className="public-stat-value">{widgets.savedSearchMatches}</span>
-                                    <span className="public-stat-label">Search matches</span>
-                                </div>
-                                <div className="public-stat-card">
-                                    <span className="public-stat-value">{widgets.windowDays}</span>
-                                    <span className="public-stat-label">Window days</span>
-                                </div>
-                            </div>
-                        )}
-                    </section>
+                        </section>
+                    </div>
                 </div>
-            )}
 
-            {activeTab === 'settings' && (
-                <section className="public-panel">
-                    <div className="public-panel-header">
-                        <div>
-                            <h2 className="public-panel-title">Account Settings</h2>
-                            <p className="public-panel-copy">This area remains intentionally light for now, but the shell is aligned with the rest of the public site.</p>
+                <aside className={styles.sideStack}>
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Widget snapshot</p>
+                            <h2 className={styles.panelTitle}>14-day signal</h2>
                         </div>
-                    </div>
-                    <div className="public-static-section">
-                        <p>Authentication, notification preferences, and alert tuning still rely on the existing backend endpoints and account flows.</p>
-                        <p>When the next pass lands, this settings area can expand into a full self-service preferences panel without changing the overall public design system again.</p>
-                    </div>
-                </section>
-            )}
+                        <div className={styles.moduleList}>
+                            <div className={styles.listCard}>
+                                <span className={styles.railItemTitle}>Recommendations</span>
+                                <span className={styles.listMeta}><span>{widgets?.recommendationCount ?? 0} matched items</span></span>
+                            </div>
+                            <div className={styles.listCard}>
+                                <span className={styles.railItemTitle}>Saved-search matches</span>
+                                <span className={styles.listMeta}><span>{widgets?.savedSearchMatches ?? 0} new matches</span></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Local drafts</p>
+                            <h2 className={styles.panelTitle}>Browser-only saved searches</h2>
+                        </div>
+                        <div className={styles.moduleList}>
+                            {localSearches.length === 0 ? (
+                                <p className={styles.sectionCopy}>Save a category search to see it here.</p>
+                            ) : localSearches.map((item) => (
+                                <Link key={item.id} href={`/jobs?q=${encodeURIComponent(item.query)}`} className={styles.moduleLink}>
+                                    <span className={styles.railItemTitle}>{item.name}</span>
+                                    <span className={styles.listMeta}>
+                                        <span>{item.query}</span>
+                                        <span>{formatDate(item.createdAt)}</span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                </aside>
+            </div>
         </div>
     );
 }

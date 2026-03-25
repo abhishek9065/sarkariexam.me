@@ -2,623 +2,525 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '@/app/components/AnnouncementCard';
+import { Icon } from '@/app/components/Icon';
+import styles from '@/app/components/PortalSurface.module.css';
+import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
 import { CategoryListRow } from '@/app/components/category/CategoryListRow';
 import { getAnnouncementCards, getOrganizations } from '@/app/lib/api';
-import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
-import { buildAnnouncementDetailPath, buildCategoryPath } from '@/app/lib/urls';
-import '@/app/components/HomePage.css';
-import '@/app/components/CategoryPage.css';
+import { getFallbackAnnouncementCards, getFallbackOrganizations } from '@/app/lib/fallbackData';
+import { pushSavedSearchDraft } from '@/app/lib/personalization';
+import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
+import {
+    CATEGORY_META,
+    EXAM_FAMILY_SHORTCUTS,
+    copyFor,
+    filterByDeadlineStatus,
+    formatDate,
+    getDeadlineInfo,
+} from '@/app/lib/ui';
+import { useLanguage } from '@/app/lib/useLanguage';
 
-interface SectionMeta {
-    title: string;
-    icon: string;
-    description: string;
-    searchPlaceholder: string;
-    chips: string[];
-    filters: Array<{
-        key: 'organization' | 'location' | 'qualification';
-        label: string;
-        optionsKey: 'organizations' | 'states' | 'qualifications';
-    }>;
-    urgentLabel?: string;
-}
+type SortValue = 'newest' | 'oldest' | 'deadline' | 'views';
+type ViewMode = 'list' | 'cards';
+type DeadlineStatus = 'all' | 'open' | 'closing' | 'expired';
 
-const SECTION_META: Record<ContentType, SectionMeta> = {
+const QUALIFICATIONS = ['10th Pass', '12th Pass', 'ITI', 'Diploma', 'Graduate', 'Post Graduate', 'Engineering'];
+const STATES = ['All India', 'Uttar Pradesh', 'Bihar', 'Rajasthan', 'Madhya Pradesh', 'Maharashtra', 'Delhi', 'Jharkhand', 'Punjab', 'Haryana', 'West Bengal'];
+
+const CATEGORY_COPY: Record<ContentType, { eyebrow: string; description: string; chips: string[] }> = {
     job: {
-        title: 'Latest Jobs',
-        icon: '💼',
-        description: 'Track fresh government recruitment, application deadlines, and major hiring drives from one dense workspace.',
-        searchPlaceholder: 'Search job title, department, state...',
-        chips: ['SSC', 'UPSC', 'Railway', 'Bank', 'Defence', 'Police'],
-        filters: [
-            { key: 'organization', label: 'Exam / Category', optionsKey: 'organizations' },
-            { key: 'location', label: 'State', optionsKey: 'states' },
-            { key: 'qualification', label: 'Qualification', optionsKey: 'qualifications' },
-        ],
-        urgentLabel: 'Closing Soon',
+        eyebrow: 'Eligibility-first browsing',
+        description: 'Dense, mobile-first recruitment browsing with deadline awareness, organization filters, qualification shortcuts, and saved searches.',
+        chips: ['SSC', 'UPSC', 'Railway', 'Banking', 'Police', 'Teaching'],
     },
     result: {
-        title: 'Results',
-        icon: '📊',
-        description: 'Follow new result releases, merit lists, and official score updates without leaving the homepage design language.',
-        searchPlaceholder: 'Search exam, board, or result keyword...',
-        chips: ['UPSC', 'SSC', 'Railway', 'State PSC', 'Bank'],
-        filters: [
-            { key: 'organization', label: 'Exam / Board', optionsKey: 'organizations' },
-            { key: 'location', label: 'State', optionsKey: 'states' },
-        ],
-        urgentLabel: 'Latest Results',
+        eyebrow: 'Result tracker',
+        description: 'Scan released scorecards and merit updates faster, without hunting across scattered boards and category pages.',
+        chips: ['UPSC', 'SSC', 'State PSC', 'Railway', 'Banking', 'Bihar'],
     },
     'admit-card': {
-        title: 'Admit Cards',
-        icon: '🎫',
-        description: 'Find upcoming exam hall tickets, region-specific downloads, and near-term exam access links in one place.',
-        searchPlaceholder: 'Search exam name, region, or board...',
-        chips: ['RRB', 'SSC', 'UPPSC', 'Bank PO', 'Defence'],
-        filters: [
-            { key: 'organization', label: 'Exam', optionsKey: 'organizations' },
-            { key: 'location', label: 'Region / State', optionsKey: 'states' },
-        ],
-        urgentLabel: 'Exam Week',
+        eyebrow: 'Exam access feed',
+        description: 'Find hall tickets, exam city slips, and region-wise admit card links from one clean command surface.',
+        chips: ['SSC', 'RRB', 'UPSC', 'NTA', 'Defence', 'Bank'],
     },
     'answer-key': {
-        title: 'Answer Keys',
-        icon: '🔑',
-        description: 'Browse official answer keys, response sheets, and objection windows in the same public browsing experience.',
-        searchPlaceholder: 'Search exam, paper, or set...',
-        chips: ['NTA', 'SSC', 'CBSE', 'State PSC', 'Railway'],
-        filters: [
-            { key: 'organization', label: 'Exam', optionsKey: 'organizations' },
-            { key: 'location', label: 'State', optionsKey: 'states' },
-        ],
+        eyebrow: 'Challenge windows',
+        description: 'Track provisional answer keys, objections, and final key updates without losing the exam context.',
+        chips: ['SSC', 'UPSC', 'Railway', 'CBSE', 'CTET', 'NTA'],
     },
     syllabus: {
-        title: 'Syllabus',
-        icon: '📚',
-        description: 'Open the latest exam syllabus, subject pattern, and preparation references from a cleaner category workspace.',
-        searchPlaceholder: 'Search exam, subject, or level...',
-        chips: ['SSC CGL', 'UPSC', 'Railway', 'NDA', 'Bank PO'],
-        filters: [
-            { key: 'organization', label: 'Exam', optionsKey: 'organizations' },
-            { key: 'qualification', label: 'Level', optionsKey: 'qualifications' },
-        ],
+        eyebrow: 'Preparation anchor',
+        description: 'Keep the official syllabus and exam pattern close while comparing updates across major exams and boards.',
+        chips: ['SSC CGL', 'UPSC', 'RRB', 'NDA', 'IBPS', 'Teaching'],
     },
     admission: {
-        title: 'Admissions',
-        icon: '🎓',
-        description: 'Watch university admissions, counselling windows, and course notifications inside the same public browsing system.',
-        searchPlaceholder: 'Search university, course, or entrance exam...',
-        chips: ['UG', 'PG', 'Engineering', 'Medical', 'Diploma'],
-        filters: [
-            { key: 'organization', label: 'University / Board', optionsKey: 'organizations' },
-            { key: 'location', label: 'State', optionsKey: 'states' },
-            { key: 'qualification', label: 'Course Level', optionsKey: 'qualifications' },
-        ],
+        eyebrow: 'Application window tracker',
+        description: 'Monitor admission forms, counselling timelines, and university entrance cycles from one deadline-focused workspace.',
+        chips: ['NEET UG', 'CUET', 'Engineering', 'Medical', 'Diploma', 'UP BEd'],
     },
 };
 
-const CATEGORY_LINKS: Array<{ type: ContentType; label: string; icon: string; href: string }> = [
-    { type: 'job', label: 'Latest Jobs', icon: '💼', href: buildCategoryPath('job') },
-    { type: 'result', label: 'Results', icon: '📊', href: buildCategoryPath('result') },
-    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: buildCategoryPath('admit-card') },
-    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: buildCategoryPath('answer-key') },
-    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: buildCategoryPath('syllabus') },
-    { type: 'admission', label: 'Admissions', icon: '🎓', href: buildCategoryPath('admission') },
-];
-
-const SORT_OPTIONS = [
-    { value: 'newest', label: 'Newest First' },
-    { value: 'deadline', label: 'Closing Soon' },
-    { value: 'views', label: 'Popular' },
-    { value: 'oldest', label: 'Oldest First' },
-] as const;
-
-type SortValue = (typeof SORT_OPTIONS)[number]['value'];
-type ViewMode = 'compact' | 'card';
-
-const DEFAULT_PAGE_SIZE = 20;
-const JOB_PAGE_SIZE = 50;
-
-const FALLBACK_OPTIONS = {
-    states: [
-        'Andhra Pradesh', 'Bihar', 'Delhi', 'Gujarat', 'Haryana',
-        'Karnataka', 'Madhya Pradesh', 'Maharashtra', 'Punjab',
-        'Rajasthan', 'Tamil Nadu', 'Uttar Pradesh', 'West Bengal',
-    ],
-    qualifications: ['10th Pass', '12th Pass', 'ITI', 'Diploma', 'Graduate', 'Post Graduate', 'Engineering'],
-    organizations: ['SSC', 'UPSC', 'Railway', 'Banking', 'Defence', 'State PSC', 'Teaching'],
-};
-
-const FILTER_ARIA_LABELS: Record<'organization' | 'location' | 'qualification', string> = {
-    organization: 'Organization',
-    location: 'State',
-    qualification: 'Qualification',
-};
-
-function daysUntil(deadline?: string | null): number | null {
-    if (!deadline) return null;
-    return Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000);
+function sortCards(cards: CardType[], sort: SortValue) {
+    const next = [...cards];
+    if (sort === 'views') {
+        return next.sort((left, right) => (right.viewCount ?? 0) - (left.viewCount ?? 0));
+    }
+    if (sort === 'oldest') {
+        return next.sort((left, right) => new Date(left.postedAt).getTime() - new Date(right.postedAt).getTime());
+    }
+    if (sort === 'deadline') {
+        return next.sort((left, right) => new Date(left.deadline ?? left.postedAt).getTime() - new Date(right.deadline ?? right.postedAt).getTime());
+    }
+    return next.sort((left, right) => new Date(right.postedAt).getTime() - new Date(left.postedAt).getTime());
 }
 
-function splitTitle(title: string): { lead: string; accent: string } {
-    const words = title.trim().split(/\s+/);
-    if (words.length <= 1) return { lead: '', accent: title };
-    const accent = words.pop() || title;
-    return { lead: words.join(' '), accent };
+function fallbackCardsForType(type: ContentType, filters: {
+    search: string;
+    organization: string;
+    location: string;
+    qualification: string;
+    deadlineStatus: DeadlineStatus;
+    sort: SortValue;
+}) {
+    const qualificationTerm = filters.qualification.toLowerCase();
+    const searched = getFallbackAnnouncementCards(type).filter((item) => {
+        const haystack = `${item.title} ${item.organization} ${item.location ?? ''}`.toLowerCase();
+        if (filters.search && !haystack.includes(filters.search.toLowerCase())) return false;
+        if (filters.organization && !item.organization.toLowerCase().includes(filters.organization.toLowerCase())) return false;
+        if (filters.location && !(item.location ?? '').toLowerCase().includes(filters.location.toLowerCase())) return false;
+        if (filters.qualification && !haystack.includes(qualificationTerm)) return false;
+        return true;
+    });
+
+    return sortCards(filterByDeadlineStatus(searched, filters.deadlineStatus), filters.sort);
 }
 
 export function CategoryPage({ type }: { type: ContentType }) {
-    const meta = SECTION_META[type];
-    const { lead, accent } = splitTitle(meta.title);
-    const searchParams = useSearchParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const { language } = useLanguage();
 
-    const sort = (searchParams.get('sort') as SortValue) || 'newest';
-    const search = searchParams.get('q') || '';
-    const location = searchParams.get('location') || '';
-    const qualification = searchParams.get('qualification') || '';
-    const organization = searchParams.get('organization') || '';
-    const viewMode: ViewMode = (searchParams.get('view') as ViewMode) || 'compact';
-
+    const meta = CATEGORY_META[type];
+    const copy = CATEGORY_COPY[type];
+    const [organizations, setOrganizations] = useState<string[]>(getFallbackOrganizations());
     const [cards, setCards] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [fetchError, setFetchError] = useState(false);
-    const [hasMore, setHasMore] = useState(false);
-    const [nextCursor, setNextCursor] = useState<string | undefined>();
-    const [total, setTotal] = useState<number | undefined>();
-    const [filterOptionSets, setFilterOptionSets] = useState(FALLBACK_OPTIONS);
-    const [draft, setDraft] = useState({ search, location, qualification, organization });
     const [sheetOpen, setSheetOpen] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(18);
+    const [draftSearch, setDraftSearch] = useState(searchParams.get('q') ?? '');
+    const [draftOrganization, setDraftOrganization] = useState(searchParams.get('organization') ?? '');
+    const [draftLocation, setDraftLocation] = useState(searchParams.get('location') ?? '');
+    const [draftQualification, setDraftQualification] = useState(searchParams.get('qualification') ?? '');
+
+    const sort = (searchParams.get('sort') as SortValue) || 'newest';
+    const view = (searchParams.get('view') as ViewMode) || 'list';
+    const deadlineStatus = (searchParams.get('status') as DeadlineStatus) || 'all';
+    const search = searchParams.get('q') ?? '';
+    const organization = searchParams.get('organization') ?? '';
+    const location = searchParams.get('location') ?? '';
+    const qualification = searchParams.get('qualification') ?? '';
 
     useEffect(() => {
-        if (sheetOpen) document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
-    }, [sheetOpen]);
-
-    const replaceParams = useCallback((params: URLSearchParams) => {
-        const next = params.toString();
-        router.replace(next ? `?${next}` : window.location.pathname);
-    }, [router]);
+        setDraftSearch(search);
+        setDraftOrganization(organization);
+        setDraftLocation(location);
+        setDraftQualification(qualification);
+    }, [location, organization, qualification, search]);
 
     useEffect(() => {
         let cancelled = false;
+
         (async () => {
             try {
-                const res = await getOrganizations();
-                const orgs = [...new Set((res.data || []).map((value) => value.trim()).filter(Boolean))];
-                if (!cancelled && orgs.length > 0) {
-                    setFilterOptionSets((prev) => ({ ...prev, organizations: orgs }));
+                const response = await getOrganizations();
+                const next = [...new Set((response.data ?? []).filter(Boolean))];
+                if (!cancelled && next.length > 0) {
+                    setOrganizations(next);
                 }
             } catch {
-                /* keep fallback options */
+                if (!cancelled) {
+                    setOrganizations(getFallbackOrganizations());
+                }
             }
         })();
-        return () => { cancelled = true; };
-    }, [type]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
-        setDraft({ search, location, qualification, organization });
-    }, [search, location, qualification, organization]);
+        let cancelled = false;
+        setLoading(true);
+        setVisibleCount(18);
 
-    const fetchCards = useCallback(async (cursor?: string) => {
-        const isInitial = !cursor;
-        if (isInitial) {
-            setLoading(true);
-            setFetchError(false);
-        } else {
-            setLoadingMore(true);
-        }
-
-        try {
-            const res = await getAnnouncementCards({
-                type,
-                sort,
-                search: search || undefined,
-                location: location || undefined,
-                qualification: qualification || undefined,
-                organization: organization || undefined,
-                limit: type === 'job' ? JOB_PAGE_SIZE : DEFAULT_PAGE_SIZE,
-                cursor,
-            });
-            if (isInitial) {
-                setCards(res.data);
-            } else {
-                setCards((prev) => [...prev, ...res.data]);
+        (async () => {
+            try {
+                const response = await getAnnouncementCards({
+                    type,
+                    search: search || undefined,
+                    organization: organization || undefined,
+                    location: location || undefined,
+                    qualification: qualification || undefined,
+                    sort,
+                    limit: 48,
+                });
+                if (!cancelled) {
+                    const next = filterByDeadlineStatus(response.data ?? [], deadlineStatus);
+                    setCards(sortCards(next, sort));
+                }
+            } catch {
+                if (!cancelled) {
+                    setCards(fallbackCardsForType(type, {
+                        search,
+                        organization,
+                        location,
+                        qualification,
+                        deadlineStatus,
+                        sort,
+                    }));
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
             }
-            setHasMore(res.hasMore ?? false);
-            setNextCursor(res.nextCursor);
-            if (res.total !== undefined) setTotal(res.total);
-        } catch (error) {
-            console.error('Failed to fetch cards:', error);
-            if (isInitial) setFetchError(true);
-        } finally {
-            setLoading(false);
-            setLoadingMore(false);
-        }
-    }, [location, organization, qualification, search, sort, type]);
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [deadlineStatus, location, organization, qualification, search, sort, type]);
 
     useEffect(() => {
-        setCards([]);
-        setNextCursor(undefined);
-        void fetchCards();
-    }, [fetchCards]);
+        if (!sheetOpen) return undefined;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [sheetOpen]);
 
-    const updateParam = useCallback((key: string, value: string) => {
+    const updateParams = (nextValues: Record<string, string>) => {
         const params = new URLSearchParams(searchParams.toString());
-        if (value) params.set(key, value);
-        else params.delete(key);
-        replaceParams(params);
-    }, [replaceParams, searchParams]);
+        Object.entries(nextValues).forEach(([key, value]) => {
+            if (value) params.set(key, value);
+            else params.delete(key);
+        });
+        const next = params.toString();
+        router.replace(next ? `?${next}` : window.location.pathname);
+    };
 
-    const applyFilters = useCallback(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        const mapping: Array<[keyof typeof draft, string]> = [
-            ['search', 'q'],
-            ['location', 'location'],
-            ['qualification', 'qualification'],
-            ['organization', 'organization'],
-        ];
-        for (const [draftKey, urlKey] of mapping) {
-            if (draft[draftKey]) params.set(urlKey, draft[draftKey]);
-            else params.delete(urlKey);
-        }
-        replaceParams(params);
+    const applyFilters = () => {
+        updateParams({
+            q: draftSearch,
+            organization: draftOrganization,
+            location: draftLocation,
+            qualification: draftQualification,
+        });
         setSheetOpen(false);
-        trackEvent('filter_apply', { type, ...draft });
-    }, [draft, replaceParams, searchParams, type]);
+        trackEvent('category_filters_apply', { type, q: draftSearch, organization: draftOrganization, location: draftLocation, qualification: draftQualification });
+    };
 
-    const resetFilters = useCallback(() => {
-        setDraft({ search: '', location: '', qualification: '', organization: '' });
-        const params = new URLSearchParams(searchParams.toString());
-        for (const key of ['q', 'location', 'qualification', 'organization']) params.delete(key);
-        replaceParams(params);
+    const resetFilters = () => {
+        setDraftSearch('');
+        setDraftOrganization('');
+        setDraftLocation('');
+        setDraftQualification('');
+        updateParams({ q: '', organization: '', location: '', qualification: '', status: '' });
         setSheetOpen(false);
-        trackEvent('filter_reset', { type });
-    }, [replaceParams, searchParams, type]);
+    };
 
-    const removeFilter = useCallback((key: 'q' | 'location' | 'qualification' | 'organization') => {
-        updateParam(key, '');
-        const draftKey = key === 'q' ? 'search' : key;
-        setDraft((prev) => ({ ...prev, [draftKey]: '' }));
-    }, [updateParam]);
+    const activeFilters = [
+        search ? { label: `“${search}”`, key: 'q' } : null,
+        organization ? { label: organization, key: 'organization' } : null,
+        location ? { label: location, key: 'location' } : null,
+        qualification ? { label: qualification, key: 'qualification' } : null,
+        deadlineStatus !== 'all' ? { label: deadlineStatus, key: 'status' } : null,
+    ].filter(Boolean) as Array<{ label: string; key: string }>;
 
-    const activeFilters = useMemo(() => {
-        const list: Array<{ label: string; key: 'q' | 'location' | 'qualification' | 'organization' }> = [];
-        if (search) list.push({ label: `"${search}"`, key: 'q' });
-        if (location) list.push({ label: location, key: 'location' });
-        if (qualification) list.push({ label: qualification, key: 'qualification' });
-        if (organization) list.push({ label: organization, key: 'organization' });
-        return list;
-    }, [location, organization, qualification, search]);
+    const visibleCards = cards.slice(0, visibleCount);
+    const closingSoon = cards.filter((item) => {
+        const deadline = getDeadlineInfo(item.deadline);
+        return deadline && !deadline.expired && deadline.daysLeft != null && deadline.daysLeft <= 7;
+    }).slice(0, 3);
 
-    const urgentItems = useMemo(() => {
-        if (!meta.urgentLabel) return [];
-        return cards.filter((card) => {
-            const remaining = daysUntil(card.deadline);
-            return remaining !== null && remaining >= 0 && remaining <= 7;
-        }).slice(0, 3);
-    }, [cards, meta.urgentLabel]);
-
-    const resultSummary = useMemo(() => {
-        if (loading) return 'Loading live updates...';
-        if (total !== undefined) return `${cards.length.toLocaleString()} shown of ${total.toLocaleString()} updates`;
-        if (cards.length > 0) return `${cards.length.toLocaleString()} updates loaded`;
-        return 'No updates available right now';
-    }, [cards.length, loading, total]);
-
-    const renderFilterFields = useCallback((prefix: 'cat-home-filter' | 'cat-sheet') => (
-        <>
-            {meta.filters.map((filter) => {
-                const draftKey = filter.key as keyof typeof draft;
-                return (
-                    <div key={filter.key} className={`${prefix}-group`}>
-                        <label className={`${prefix}-label`}>{filter.label}</label>
-                        <select
-                            className={`${prefix}-select`}
-                            aria-label={FILTER_ARIA_LABELS[filter.key]}
-                            value={draft[draftKey]}
-                            onChange={(event) => setDraft((prev) => ({ ...prev, [draftKey]: event.target.value }))}
-                        >
-                            <option value="">All</option>
-                            {filterOptionSets[filter.optionsKey].map((option) => (
-                                <option key={option} value={option}>{option}</option>
-                            ))}
-                        </select>
-                    </div>
-                );
-            })}
-        </>
-    ), [draft, filterOptionSets, meta.filters]);
+    const saveCurrentSearch = () => {
+        const label = search || organization || location || qualification || meta.labelEn;
+        pushSavedSearchDraft({
+            name: `${meta.shortEn}: ${label}`,
+            query: search || label,
+            type,
+        });
+        trackEvent('category_saved_search', { type, search, organization, location, qualification });
+    };
 
     return (
-        <>
-            <div className="hp cat-home" data-testid={`category-page-${type}`}>
-                <nav className="cat-home-breadcrumb" aria-label="Breadcrumb">
-                    <Link href="/">Home</Link>
-                    <span className="cat-home-breadcrumb-sep">/</span>
-                    <span className="cat-home-breadcrumb-current">{meta.title}</span>
-                </nav>
-
-                <section className="hp-hero cat-home-hero">
-                    <div className="cat-home-kicker">Homepage-style browsing</div>
-                    <div className="cat-home-hero-panel">
-                        <div className="cat-home-hero-copy">
-                            <div className="cat-home-icon" aria-hidden="true">{meta.icon}</div>
-                            <div>
-                                <h1 className="hp-hero-title">
-                                    {lead ? `${lead} ` : ''}
-                                    <span className="hp-hero-accent">{accent}</span>
-                                </h1>
-                                <p className="hp-hero-sub">{meta.description}</p>
-                            </div>
-                        </div>
-                        <div className="cat-home-stats" aria-label="Category summary">
-                            <div className="cat-home-stat">
-                                <span className="cat-home-stat-value">{loading ? '...' : (total ?? cards.length).toLocaleString()}</span>
-                                <span className="cat-home-stat-label">Live updates</span>
-                            </div>
-                            <div className="cat-home-stat">
-                                <span className="cat-home-stat-value">{urgentItems.length.toLocaleString()}</span>
-                                <span className="cat-home-stat-label">Closing soon</span>
-                            </div>
-                            <div className="cat-home-stat">
-                                <span className="cat-home-stat-value">{activeFilters.length.toLocaleString()}</span>
-                                <span className="cat-home-stat-label">Active filters</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <form
-                        className="hp-search cat-home-search"
-                        role="search"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            applyFilters();
-                        }}
-                    >
-                        <span className="hp-search-icon" aria-hidden="true">🔍</span>
-                        <input
-                            className="hp-search-input"
-                            type="search"
-                            placeholder={meta.searchPlaceholder}
-                            value={draft.search}
-                            onChange={(event) => setDraft((prev) => ({ ...prev, search: event.target.value }))}
-                            aria-label={meta.searchPlaceholder}
-                        />
-                        <button className="hp-search-btn" type="submit">Search</button>
-                    </form>
-                </section>
-
-                <nav className="hp-cats cat-home-cats" aria-label="Browse categories">
-                    {CATEGORY_LINKS.map((category) => (
-                        <Link
-                            key={category.type}
-                            href={category.href}
-                            className={`hp-cat-card cat-home-cat-card${category.type === type ? ' is-active' : ''}`}
-                        >
-                            <span className="hp-cat-icon">{category.icon}</span>
-                            <span className="hp-cat-label">{category.label}</span>
-                        </Link>
-                    ))}
-                </nav>
-
-                <section className="home-dense-box cat-home-filter-card" data-testid="jobs-filter-panel">
-                    <div className="home-dense-box-header">
-                        <h2>Refine {meta.title}</h2>
-                        <button type="button" className="cat-home-filter-reset" onClick={resetFilters}>Reset all</button>
-                    </div>
-                    <div className="cat-home-filter-grid">
-                        {renderFilterFields('cat-home-filter')}
-                        <div className="cat-home-filter-group">
-                            <label className="cat-home-filter-label">Sort by</label>
-                            <select
-                                className="cat-home-filter-select"
-                                value={sort}
-                                onChange={(event) => updateParam('sort', event.target.value)}
-                            >
-                                {SORT_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="cat-home-filter-actions">
-                            <button type="button" className="cat-home-filter-apply" onClick={applyFilters}>Apply filters</button>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="home-dense-box cat-home-results-box">
-                    <div className="cat-home-results-head">
-                        <div>
-                            <div className="home-dense-box-header">
-                                <h2>{meta.title} feed</h2>
-                            </div>
-                            <p className="cat-home-results-copy">{resultSummary}</p>
-                        </div>
-                        <div className="cat-home-results-controls">
-                            <button type="button" className="cat-home-mobile-filter" onClick={() => setSheetOpen(true)}>
-                                Filters
-                                {activeFilters.length > 0 && <span className="cat-home-filter-badge">{activeFilters.length}</span>}
-                            </button>
-                            <select
-                                className="cat-home-toolbar-sort"
-                                value={sort}
-                                onChange={(event) => updateParam('sort', event.target.value)}
-                                aria-label="Sort results"
-                            >
-                                {SORT_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
-                            <div className="cat-home-view-toggle" role="group" aria-label="View mode">
-                                <button
-                                    type="button"
-                                    className={`cat-home-view-btn${viewMode === 'compact' ? ' active' : ''}`}
-                                    onClick={() => updateParam('view', 'compact')}
-                                    title="List view"
-                                >
-                                    List
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`cat-home-view-btn${viewMode === 'card' ? ' active' : ''}`}
-                                    onClick={() => updateParam('view', 'card')}
-                                    title="Card view"
-                                >
-                                    Cards
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {activeFilters.length > 0 && (
-                        <div className="cat-home-active-filters">
-                            {activeFilters.map((filter) => (
-                                <span key={filter.key} className="cat-home-active-tag">
-                                    {filter.label}
-                                    <button type="button" onClick={() => removeFilter(filter.key)} aria-label={`Remove ${filter.label}`}>
-                                        x
-                                    </button>
-                                </span>
-                            ))}
-                            <button type="button" className="cat-home-clear-all" onClick={resetFilters}>Clear all</button>
-                        </div>
-                    )}
-
-                    <div className="cat-home-highlights">
-                        <div className="cat-home-chip-rail">
-                            <span className="cat-home-chip-label">Popular searches</span>
-                            {meta.chips.map((chip) => (
-                                <button
-                                    key={chip}
-                                    type="button"
-                                    className={`cat-home-chip${search === chip ? ' active' : ''}`}
-                                    onClick={() => {
-                                        const nextSearch = search === chip ? '' : chip;
-                                        setDraft((prev) => ({ ...prev, search: nextSearch }));
-                                        updateParam('q', nextSearch);
-                                        trackEvent('chip_click', { type, chip });
-                                    }}
-                                >
+        <div className={styles.page} data-testid={`category-page-${type}`}>
+            <section className={styles.hero}>
+                <div className={styles.heroGrid}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>
+                            <Icon name={meta.icon as Parameters<typeof Icon>[0]['name']} size={16} />
+                            {copy.eyebrow}
+                        </span>
+                        <h1 className={styles.heroTitle}>
+                            {meta.labelEn.split(' ')[0]}
+                            {' '}
+                            <span className={styles.heroAccent}>{meta.labelEn.split(' ').slice(1).join(' ') || meta.labelEn}</span>
+                        </h1>
+                        <p className={styles.heroSub}>{copy.description}</p>
+                        <div className={styles.heroMetaRow}>
+                            {copy.chips.map((chip) => (
+                                <button key={chip} type="button" className={styles.softChip} onClick={() => updateParams({ q: chip })}>
                                     {chip}
                                 </button>
                             ))}
                         </div>
-
-                        {!loading && urgentItems.length > 0 && meta.urgentLabel && (
-                            <div className="cat-home-urgent" aria-label={meta.urgentLabel}>
-                                <span className="cat-home-urgent-label">{meta.urgentLabel}</span>
-                                <div className="cat-home-urgent-links">
-                                    {urgentItems.map((card) => {
-                                        const remaining = daysUntil(card.deadline);
-                                        return (
-                                            <Link key={card.id} href={buildAnnouncementDetailPath(card.type, card.slug)} className="cat-home-urgent-link">
-                                                <span>{card.title.length > 44 ? `${card.title.slice(0, 44)}...` : card.title}</span>
-                                                {remaining !== null && remaining >= 0 && (
-                                                    <span className="cat-home-urgent-days">{remaining === 0 ? 'Today' : `${remaining}d`}</span>
-                                                )}
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
-                    {loading ? (
-                        <div className="cat-skeleton-grid">
-                            {Array.from({ length: 8 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
+                    <div className={styles.heroStats}>
+                        <div className={styles.statCard}>
+                            <span className={styles.statLabel}>Live updates</span>
+                            <strong className={styles.statValue}>{cards.length}</strong>
                         </div>
-                    ) : viewMode === 'compact' ? (
-                        <div className="cat-compact-list" data-testid="category-compact-list">
-                            {cards.map((card, index) => (
-                                <CategoryListRow key={card.id} card={card} sourceTag="category_compact" index={index + 1} />
-                            ))}
+                        <div className={styles.statCard}>
+                            <span className={styles.statLabel}>Closing soon</span>
+                            <strong className={styles.statValue}>{closingSoon.length}</strong>
                         </div>
-                    ) : (
-                        <div className="cat-cards-grid">
-                            {cards.map((card) => (
-                                <AnnouncementCard key={card.id} card={card} showType={false} sourceTag="category_list" />
-                            ))}
+                        <div className={styles.statCard}>
+                            <span className={styles.statLabel}>Active filters</span>
+                            <strong className={styles.statValue}>{activeFilters.length}</strong>
                         </div>
-                    )}
-
-                    {!loading && cards.length === 0 && !fetchError && (
-                        <div className="cat-empty">
-                            <span className="cat-empty-icon">📭</span>
-                            <h3>No {meta.title.toLowerCase()} found</h3>
-                            <p>Try another keyword, clear a filter, or check again after the next official update.</p>
-                        </div>
-                    )}
-
-                    {!loading && fetchError && (
-                        <div className="cat-empty cat-empty-error">
-                            <span className="cat-empty-icon">⚠️</span>
-                            <h3>Unable to load {meta.title.toLowerCase()}</h3>
-                            <p>The category feed did not load successfully. Try again and we will refetch the latest updates.</p>
-                            <button type="button" className="cat-home-filter-apply" onClick={() => void fetchCards()}>Retry</button>
-                        </div>
-                    )}
-
-                    {hasMore && !loading && (
-                        <div className="cat-load-more">
-                            <button
-                                type="button"
-                                className="cat-load-more-btn"
-                                onClick={() => void fetchCards(nextCursor)}
-                                disabled={loadingMore}
-                            >
-                                {loadingMore ? 'Loading...' : 'Load more updates'}
-                            </button>
-                        </div>
-                    )}
-                </section>
-            </div>
-
-            {sheetOpen && (
-                <div className="cat-sheet-overlay" onClick={() => setSheetOpen(false)}>
-                    <div className="cat-sheet" onClick={(event) => event.stopPropagation()}>
-                        <div className="cat-sheet-handle"><span /></div>
-                        <div className="cat-sheet-header">
-                            <h3>Refine {meta.title}</h3>
-                            <button type="button" className="cat-sheet-close" onClick={() => setSheetOpen(false)}>x</button>
-                        </div>
-                        <div className="cat-sheet-body">
-                            <div className="cat-sheet-group">
-                                <label className="cat-sheet-label">Search</label>
-                                <input
-                                    className="cat-sheet-input"
-                                    type="search"
-                                    placeholder={meta.searchPlaceholder}
-                                    value={draft.search}
-                                    onChange={(event) => setDraft((prev) => ({ ...prev, search: event.target.value }))}
-                                />
-                            </div>
-                            {renderFilterFields('cat-sheet')}
-                            <div className="cat-sheet-group">
-                                <label className="cat-sheet-label">Sort by</label>
-                                <select
-                                    className="cat-sheet-select"
-                                    value={sort}
-                                    onChange={(event) => updateParam('sort', event.target.value)}
-                                >
-                                    {SORT_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>{option.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="cat-sheet-footer">
-                            <button type="button" className="cat-sheet-apply" onClick={applyFilters}>Apply filters</button>
-                            <button type="button" className="cat-sheet-reset" onClick={resetFilters}>Reset</button>
+                        <div className={styles.statCard}>
+                            <span className={styles.statLabel}>Sort mode</span>
+                            <strong className={styles.statValue}>{sort}</strong>
                         </div>
                     </div>
                 </div>
-            )}
-        </>
+            </section>
+
+            <PublicCategoryRail activeType={type} />
+
+            <section className={styles.filterBar}>
+                <div className={styles.panelHeader}>
+                    <div className={styles.panelHeaderBlock}>
+                        <p className={styles.sectionEyebrow}>{copyFor(language, 'Search within this category', 'इस कैटेगरी में सर्च')}</p>
+                        <h2 className={styles.panelTitle}>Filters that actually narrow the feed</h2>
+                    </div>
+                    <div className={styles.toolbarGroup}>
+                        <button type="button" className={styles.secondaryButton} onClick={saveCurrentSearch}>
+                            <Icon name="Bookmark" size={16} />
+                            Save search
+                        </button>
+                        <button type="button" className={styles.secondaryButton} onClick={() => setSheetOpen(true)}>
+                            <Icon name="Filter" size={16} />
+                            Mobile filters
+                        </button>
+                    </div>
+                </div>
+
+                <div className={styles.filterGrid}>
+                    <label className={styles.field}>
+                        <span className={styles.fieldLabel}>Keyword</span>
+                        <input className={styles.fieldControl} value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} placeholder={`Search ${meta.shortEn.toLowerCase()}`} />
+                    </label>
+                    <label className={styles.field}>
+                        <span className={styles.fieldLabel}>Organization</span>
+                        <select className={styles.fieldSelect} value={draftOrganization} onChange={(event) => setDraftOrganization(event.target.value)}>
+                            <option value="">All organizations</option>
+                            {organizations.map((item) => <option key={item} value={item}>{item}</option>)}
+                        </select>
+                    </label>
+                    <label className={styles.field}>
+                        <span className={styles.fieldLabel}>State</span>
+                        <select className={styles.fieldSelect} value={draftLocation} onChange={(event) => setDraftLocation(event.target.value)}>
+                            <option value="">All states</option>
+                            {STATES.map((item) => <option key={item} value={item}>{item}</option>)}
+                        </select>
+                    </label>
+                    <label className={styles.field}>
+                        <span className={styles.fieldLabel}>Qualification</span>
+                        <select className={styles.fieldSelect} value={draftQualification} onChange={(event) => setDraftQualification(event.target.value)}>
+                            <option value="">All levels</option>
+                            {QUALIFICATIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                        </select>
+                    </label>
+                </div>
+
+                <div className={styles.toolbar}>
+                    <div className={styles.toolbarGroup}>
+                        <label className={styles.field}>
+                            <span className={styles.fieldLabel}>Deadline</span>
+                            <select className={styles.fieldSelect} value={deadlineStatus} onChange={(event) => updateParams({ status: event.target.value })}>
+                                <option value="all">All</option>
+                                <option value="open">Open</option>
+                                <option value="closing">Closing soon</option>
+                                <option value="expired">Expired</option>
+                            </select>
+                        </label>
+
+                        <label className={styles.field}>
+                            <span className={styles.fieldLabel}>Sort</span>
+                            <select className={styles.fieldSelect} value={sort} onChange={(event) => updateParams({ sort: event.target.value })}>
+                                <option value="newest">Newest first</option>
+                                <option value="deadline">Deadline</option>
+                                <option value="views">Most viewed</option>
+                                <option value="oldest">Oldest</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div className={styles.toolbarGroup}>
+                        <div className={styles.toggleGroup} role="group" aria-label="View mode">
+                            <button type="button" className={`${styles.toggleButton}${view === 'list' ? ` ${styles.toggleActive}` : ''}`} onClick={() => updateParams({ view: 'list' })}>List</button>
+                            <button type="button" className={`${styles.toggleButton}${view === 'cards' ? ` ${styles.toggleActive}` : ''}`} onClick={() => updateParams({ view: 'cards' })}>Cards</button>
+                        </div>
+                        <button type="button" className={styles.primaryButton} onClick={applyFilters}>Apply filters</button>
+                        <button type="button" className={styles.ghostButton} onClick={resetFilters}>Reset</button>
+                    </div>
+                </div>
+            </section>
+
+            {activeFilters.length > 0 ? (
+                <div className={styles.activeFilters}>
+                    {activeFilters.map((item) => (
+                        <span key={item.key} className={styles.activeChip}>
+                            {item.label}
+                            <button type="button" className={styles.linkButton} onClick={() => updateParams({ [item.key]: '' })}>×</button>
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+
+            <div className={styles.contentGrid}>
+                <div className={styles.mainStack}>
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeader}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Category feed</p>
+                                <h2 className={styles.panelTitle}>{cards.length} updates ready to scan</h2>
+                                <p className={styles.panelCopy}>Search, filter, switch view modes, and save the combination you return to often.</p>
+                            </div>
+                        </div>
+
+                        <div className={styles.resultsGrid}>
+                            {loading ? (
+                                Array.from({ length: 6 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)
+                            ) : cards.length === 0 ? (
+                                <div className={styles.emptyState}>
+                                    <Icon name="Search" size={24} />
+                                    <h3 className={styles.emptyTitle}>No matching updates</h3>
+                                    <p className={styles.sectionCopy}>Try a broader keyword or reset one of the filters.</p>
+                                </div>
+                            ) : view === 'cards' ? (
+                                <div className={styles.cardGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                                    {visibleCards.map((card) => (
+                                        <AnnouncementCard key={card.id} card={card} showType={false} sourceTag="category_cards" />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className={styles.listStack}>
+                                    {visibleCards.map((card, index) => (
+                                        <CategoryListRow key={card.id} card={card} sourceTag="category_list" index={index + 1} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {cards.length > visibleCount ? (
+                            <button type="button" className={styles.secondaryButton} onClick={() => setVisibleCount((current) => current + 12)}>
+                                Load more updates
+                            </button>
+                        ) : null}
+                    </section>
+                </div>
+
+                <aside className={styles.sideStack}>
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Closing soon</p>
+                            <h2 className={styles.panelTitle}>Don&apos;t miss these dates</h2>
+                        </div>
+                        <div className={styles.moduleList}>
+                            {closingSoon.length === 0 ? (
+                                <div className={styles.emptyState}>
+                                    <p className={styles.sectionCopy}>No urgent deadlines in the current filtered view.</p>
+                                </div>
+                            ) : closingSoon.map((item) => (
+                                <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.moduleLink}>
+                                    <span className={styles.railItemTitle}>{item.title}</span>
+                                    <span className={styles.listMeta}>
+                                        <span>{item.organization}</span>
+                                        <span>{formatDate(item.deadline)}</span>
+                                        <span>{getDeadlineInfo(item.deadline)?.label}</span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Popular search jumps</p>
+                            <h2 className={styles.panelTitle}>Shortcut terms</h2>
+                        </div>
+                        <div className={styles.chipRow}>
+                            {copy.chips.concat(EXAM_FAMILY_SHORTCUTS.slice(0, 4).map((item) => item.label)).slice(0, 8).map((chip) => (
+                                <button key={chip} type="button" className={styles.softChip} onClick={() => updateParams({ q: chip })}>
+                                    {chip}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+                </aside>
+            </div>
+
+            {sheetOpen ? (
+                <div className={styles.drawerBackdrop} onClick={() => setSheetOpen(false)}>
+                    <div className={styles.drawer} onClick={(event) => event.stopPropagation()}>
+                        <div className={styles.panelHeader}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Mobile filters</p>
+                                <h2 className={styles.panelTitle}>Refine {meta.labelEn}</h2>
+                            </div>
+                            <button type="button" className={styles.linkButton} onClick={() => setSheetOpen(false)}>Close</button>
+                        </div>
+
+                        <label className={styles.field}>
+                            <span className={styles.fieldLabel}>Keyword</span>
+                            <input className={styles.fieldControl} value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} />
+                        </label>
+                        <label className={styles.field}>
+                            <span className={styles.fieldLabel}>Organization</span>
+                            <select className={styles.fieldSelect} value={draftOrganization} onChange={(event) => setDraftOrganization(event.target.value)}>
+                                <option value="">All organizations</option>
+                                {organizations.map((item) => <option key={item} value={item}>{item}</option>)}
+                            </select>
+                        </label>
+                        <label className={styles.field}>
+                            <span className={styles.fieldLabel}>State</span>
+                            <select className={styles.fieldSelect} value={draftLocation} onChange={(event) => setDraftLocation(event.target.value)}>
+                                <option value="">All states</option>
+                                {STATES.map((item) => <option key={item} value={item}>{item}</option>)}
+                            </select>
+                        </label>
+                        <label className={styles.field}>
+                            <span className={styles.fieldLabel}>Qualification</span>
+                            <select className={styles.fieldSelect} value={draftQualification} onChange={(event) => setDraftQualification(event.target.value)}>
+                                <option value="">All levels</option>
+                                {QUALIFICATIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                            </select>
+                        </label>
+                        <div className={styles.toolbarGroup}>
+                            <button type="button" className={styles.primaryButton} onClick={applyFilters}>Apply</button>
+                            <button type="button" className={styles.ghostButton} onClick={resetFilters}>Reset</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+        </div>
     );
 }

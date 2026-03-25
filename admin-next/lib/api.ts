@@ -425,3 +425,66 @@ export function getSegments() {
     counts: Array<{ type: string; value: string; count: number }>;
   } }>('/admin/segments');
 }
+
+// ─── Workflow ───
+export function assignAnnouncement(data: { announcementId: string; assigneeUserId: string; assigneeEmail: string; reviewDueAt?: string }) {
+  return apiFetchWithCsrf('/admin/assign', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function approveAnnouncement(id: string, note?: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/approve/${id}`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function rejectAnnouncement(id: string, reason: string) {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/reject/${id}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function getPendingApprovals(assignee?: string) {
+  return apiFetch<{ data: any[] }>(`/admin/pending-approvals${qs(assignee ? { assignee } : {})}`);
+}
+
+export function getWorkflowLogs(id: string) {
+  return apiFetch<{ data: any[] }>(`/admin/workflow-logs/${id}`);
+}
+
+export function getSLAViolations() {
+  return apiFetch<{ data: Array<{ id: string; title: string; assignee?: string; hoursOverdue: number }> }>('/admin/sla-violations');
+}
+
+// ─── User Engagement ───
+export function getUserFeedback(limit = 50) {
+  return apiFetch<{ data: any[] }>(`/admin/feedback${qs({ limit })}`);
+}
+
+export function getCommentsPending(limit = 50) {
+  return apiFetch<{ data: any[] }>(`/admin/comments-pending${qs({ limit })}`);
+}
+
+export function moderateComment(id: string, action: 'approve' | 'reject') {
+  return apiFetchWithCsrf<{ message: string }>(`/admin/moderate-comment/${id}`, {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function getEngagementMetrics(days = 30) {
+  return apiFetch<{ data: { feedbackCount: number; commentsCount: number; bookmarksCount: number } }>(`/admin/engagement-metrics${qs({ days })}`);
+}
+
+// ─── SEO Monitoring ───
+export function getSEOMetrics() {
+  return apiFetch<{ data: {
+    metrics: { total: number; withMeta: number; indexed: number; withSchema: number; healthScore: number };
+    queries: Array<{ _id: string; count: number; lastSearched: string }>;
+    coverage: { indexed: number; noindex: number; missing: number };
+  } }>('/admin/seo-metrics');
+}

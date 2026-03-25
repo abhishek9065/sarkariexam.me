@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSearchSuggestions, getTrendingSearches } from '@/app/lib/api';
+import { getFallbackSearchSuggestions, getFallbackTrendingSearches } from '@/app/lib/fallbackData';
 import { EXAM_FAMILY_SHORTCUTS, CATEGORY_META, copyFor, groupSuggestionsByType } from '@/app/lib/ui';
 import type { SearchSuggestion } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
@@ -13,7 +14,7 @@ import styles from './SearchOverlay.module.css';
 
 const RECENT_KEY = 'sr_recent_search_terms_v3';
 const MAX_RECENT = 8;
-const FALLBACK_TRENDING = ['SSC CGL', 'UPSC', 'RRB', 'Bank PO', 'Delhi Police', 'BPSC'];
+const FALLBACK_TRENDING = getFallbackTrendingSearches();
 
 function getRecentSearchTerms(): string[] {
     if (typeof window === 'undefined') return [];
@@ -110,10 +111,11 @@ export function SearchOverlay({ isOpen, onClose }: Props) {
             setLoading(true);
             try {
                 const response = await getSearchSuggestions(term);
-                setSuggestions(response.data ?? []);
+                const next = response.data ?? [];
+                setSuggestions(next.length > 0 ? next : getFallbackSearchSuggestions(term));
                 setSelectedIndex(-1);
             } catch {
-                setSuggestions([]);
+                setSuggestions(getFallbackSearchSuggestions(term));
                 setSelectedIndex(-1);
             } finally {
                 setLoading(false);

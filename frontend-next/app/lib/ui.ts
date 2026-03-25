@@ -32,6 +32,38 @@ export type SearchGroup = {
     items: SearchSuggestion[];
 };
 
+export type HomepageUrgencyRail = {
+    key: string;
+    title: string;
+    description: string;
+    type?: ContentType;
+    items: AnnouncementCard[];
+};
+
+export type CategoryFilterState = {
+    search: string;
+    organization: string;
+    location: string;
+    qualification: string;
+    deadlineStatus: DeadlineStatus;
+    sort: 'newest' | 'oldest' | 'deadline' | 'views';
+    view: 'list' | 'cards';
+};
+
+export type DetailTrustMetadata = {
+    hasOfficialLink: boolean;
+    isStale: boolean;
+    deadlineLabel?: string;
+    sourceLabel: string;
+};
+
+export type DashboardModule = {
+    key: string;
+    title: string;
+    description: string;
+    count?: number;
+};
+
 export type RecentView = {
     id: string;
     title: string;

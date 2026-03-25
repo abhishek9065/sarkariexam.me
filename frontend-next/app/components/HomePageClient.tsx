@@ -2,588 +2,416 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getHomepageFeed } from '@/app/lib/api';
-import type { AnnouncementCard, ContentType, HomepageFeedSections } from '@/app/lib/types';
-import { CATEGORY_PATHS, buildAnnouncementDetailPath, buildCategoryPath } from '@/app/lib/urls';
+import { type FormEvent, useEffect, useState } from 'react';
+import { AnnouncementCard } from '@/app/components/AnnouncementCard';
+import { Icon } from '@/app/components/Icon';
+import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
+import styles from '@/app/components/PortalSurface.module.css';
+import { getBookmarkIds, getHomepageFeed } from '@/app/lib/api';
+import { trackEvent } from '@/app/lib/analytics';
+import { getFallbackHomepageFeed } from '@/app/lib/fallbackData';
+import { getInterests, getRecentViews, getSavedSearchDrafts, setInterests, type SavedSearchDraft } from '@/app/lib/personalization';
+import type { AnnouncementCard as CardType, ContentType, HomepageFeedData } from '@/app/lib/types';
+import {
+    CATEGORY_META,
+    EXAM_FAMILY_SHORTCUTS,
+    STATE_SHORTCUTS,
+    TRUST_PILLARS,
+    copyFor,
+    formatDate,
+    getDeadlineInfo,
+    getDaysUntil,
+    isFresh,
+} from '@/app/lib/ui';
+import { useAuth } from '@/app/lib/useAuth';
+import { useLanguage } from '@/app/lib/useLanguage';
 
-import '@/app/components/HomePage.css';
-
-type PortalListItem = {
-    id: string;
-    title: string;
-    href: string;
-    date: string;
-    isNew: boolean;
-};
-
-const CONTENT_TYPES: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
-
-const HOME_NAV_LINKS = [
-    { label: 'Home', to: '/' },
-    { label: 'Latest Jobs', to: CATEGORY_PATHS.job },
-    { label: 'Results', to: CATEGORY_PATHS.result },
-    { label: 'Admit Cards', to: CATEGORY_PATHS['admit-card'] },
-    { label: 'Answer Keys', to: CATEGORY_PATHS['answer-key'] },
-    { label: 'Syllabus', to: CATEGORY_PATHS.syllabus },
-    { label: 'Certificates', to: CATEGORY_PATHS.job },
-    { label: 'Important Links', to: CATEGORY_PATHS.job },
-];
-
-const QUICK_CATEGORIES = [
-    { label: 'Latest Jobs', to: CATEGORY_PATHS.job, color: 'orange', icon: '💼' },
-    { label: 'Results', to: CATEGORY_PATHS.result, color: 'green', icon: '📋' },
-    { label: 'Admit Cards', to: CATEGORY_PATHS['admit-card'], color: 'blue', icon: '🪪' },
-    { label: 'Answer Keys', to: CATEGORY_PATHS['answer-key'], color: 'red', icon: '🗝️' },
-    { label: 'Syllabus', to: CATEGORY_PATHS.syllabus, color: 'purple', icon: '📚' },
-    { label: 'Certificates', to: CATEGORY_PATHS.job, color: 'teal', icon: '🏅' },
-    { label: 'Exam Dates', to: CATEGORY_PATHS.job, color: 'yellow', icon: '📅' },
-    { label: 'Cut Off', to: CATEGORY_PATHS.job, color: 'pink', icon: '✂️' },
-];
-
-const STATS = [
-    { label: 'Active Jobs', value: '1,24,890' },
-    { label: 'Results Today', value: '38' },
-    { label: 'Admit Cards', value: '52' },
-    { label: 'Answer Keys', value: '19' },
-    { label: 'Total Vacancies', value: '3,48,200+' },
-];
-
-const STATE_LINKS = [
-    'Uttar Pradesh',
-    'Bihar',
-    'Rajasthan',
-    'Madhya Pradesh',
-    'Maharashtra',
-    'Gujarat',
-    'West Bengal',
-    'Karnataka',
-    'Tamil Nadu',
-    'Andhra Pradesh',
-    'Telangana',
-    'Odisha',
-    'Punjab',
-    'Haryana',
-    'Delhi',
-    'Jharkhand',
-    'Chhattisgarh',
-    'Assam',
-    'Uttarakhand',
-    'Himachal Pradesh',
-];
-
-const FOOTER_COLUMNS = [
-    {
-        title: 'Quick Links',
-        links: [
-            { label: 'Latest Jobs', to: CATEGORY_PATHS.job },
-            { label: 'Results 2026', to: CATEGORY_PATHS.result },
-            { label: 'Admit Cards', to: CATEGORY_PATHS['admit-card'] },
-            { label: 'Answer Keys', to: CATEGORY_PATHS['answer-key'] },
-            { label: 'Syllabus PDF', to: CATEGORY_PATHS.syllabus },
-        ],
-    },
-    {
-        title: 'Exam Categories',
-        links: [
-            { label: 'UPSC Exams', to: `${CATEGORY_PATHS.job}?q=UPSC` },
-            { label: 'SSC Exams', to: `${CATEGORY_PATHS.job}?q=SSC` },
-            { label: 'Railway (RRB)', to: `${CATEGORY_PATHS.job}?q=Railway` },
-            { label: 'Banking (IBPS/SBI)', to: `${CATEGORY_PATHS.job}?q=IBPS` },
-            { label: 'Defence Jobs', to: `${CATEGORY_PATHS.job}?q=Defence` },
-        ],
-    },
-    {
-        title: 'Help & Support',
-        links: [
-            { label: 'About Us', to: '/about' },
-            { label: 'Contact Us', to: '/contact' },
-            { label: 'Privacy Policy', to: '/privacy' },
-            { label: 'Explore', to: '/explore' },
-            { label: 'Admissions', to: CATEGORY_PATHS.admission },
-        ],
-    },
-];
-
-function slugify(value: string) {
-    return value
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-}
-
-function formatPortalDate(value?: string | null) {
-    if (!value) return '--';
-    const timestamp = Date.parse(value);
-    if (Number.isNaN(timestamp)) return '--';
-    const date = new Date(timestamp);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
-}
-
-function formatHeaderDate(value: Date) {
-    return new Intl.DateTimeFormat('en-IN', {
-        weekday: 'long',
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-    }).format(value);
-}
-
-function isNew(value?: string | null) {
-    if (!value) return false;
-    return Date.now() - new Date(value).getTime() < 72 * 3600_000;
-}
-
-function makeFallbackCard(
-    id: string,
-    type: ContentType,
-    title: string,
-    organization: string,
-    postedAt: string,
-    extra: Partial<AnnouncementCard> = {},
-): AnnouncementCard {
-    return {
-        id,
-        title,
-        slug: slugify(`${title}-${id}`),
-        type,
-        category: type,
-        organization,
-        postedAt,
-        viewCount: 0,
-        ...extra,
-    };
-}
-
-const FALLBACK_SECTIONS: HomepageFeedSections = {
-    job: [
-        makeFallbackCard('job-1', 'job', 'UPSC Civil Services 2026 Online Form - 1206 Posts', 'UPSC', '2026-03-23T08:00:00.000Z', { totalPosts: 1206, deadline: '2026-04-28T00:00:00.000Z' }),
-        makeFallbackCard('job-2', 'job', 'SSC CGL 2026 Notification - 17727 Vacancies', 'SSC', '2026-03-22T08:00:00.000Z', { totalPosts: 17727, deadline: '2026-04-19T00:00:00.000Z' }),
-        makeFallbackCard('job-3', 'job', 'RRB NTPC 2026 Recruitment Form', 'Railway Recruitment Board', '2026-03-21T08:00:00.000Z', { totalPosts: 11558, deadline: '2026-04-12T00:00:00.000Z' }),
-        makeFallbackCard('job-4', 'job', 'IBPS PO 2026 Notification and Registration', 'IBPS', '2026-03-20T08:00:00.000Z', { totalPosts: 4455 }),
-        makeFallbackCard('job-5', 'job', 'Indian Army Agniveer 2026 Recruitment', 'Indian Army', '2026-03-19T08:00:00.000Z'),
-        makeFallbackCard('job-6', 'job', 'SBI Clerk 2026 Junior Associate Form', 'State Bank of India', '2026-03-18T08:00:00.000Z', { totalPosts: 8773 }),
-        makeFallbackCard('job-7', 'job', 'DRDO Scientist B 2026 Online Form', 'DRDO', '2026-03-17T08:00:00.000Z'),
-        makeFallbackCard('job-8', 'job', 'NDA I 2026 Online Form - 400 Posts', 'UPSC', '2026-03-16T08:00:00.000Z', { totalPosts: 400 }),
-    ],
-    result: [
-        makeFallbackCard('result-1', 'result', 'UPSC CSE Prelims 2025 Result Declared', 'UPSC', '2026-03-23T07:30:00.000Z'),
-        makeFallbackCard('result-2', 'result', 'SSC CHSL Tier I Final Result 2025 Out', 'SSC', '2026-03-22T09:00:00.000Z'),
-        makeFallbackCard('result-3', 'result', 'RRB Group D Result 2025 Released', 'Railway Recruitment Board', '2026-03-21T09:00:00.000Z'),
-        makeFallbackCard('result-4', 'result', 'IBPS Clerk Mains Result 2025', 'IBPS', '2026-03-20T09:00:00.000Z'),
-        makeFallbackCard('result-5', 'result', 'CTET December 2025 Result Available', 'CBSE', '2026-03-19T09:00:00.000Z'),
-        makeFallbackCard('result-6', 'result', 'UP Police Constable Result 2025', 'UP Police Recruitment Board', '2026-03-18T09:00:00.000Z'),
-        makeFallbackCard('result-7', 'result', 'BPSC 70th Prelims Result 2025', 'BPSC', '2026-03-17T09:00:00.000Z'),
-        makeFallbackCard('result-8', 'result', 'SBI PO Final Result 2025 Published', 'State Bank of India', '2026-03-16T09:00:00.000Z'),
-    ],
-    'admit-card': [
-        makeFallbackCard('admit-1', 'admit-card', 'UPSC CDS I 2026 Admit Card', 'UPSC', '2026-03-23T10:00:00.000Z'),
-        makeFallbackCard('admit-2', 'admit-card', 'SSC GD Constable 2026 Admit Card Out', 'SSC', '2026-03-22T10:00:00.000Z'),
-        makeFallbackCard('admit-3', 'admit-card', 'RRB ALP 2026 CBT I Hall Ticket', 'Railway Recruitment Board', '2026-03-21T10:00:00.000Z'),
-        makeFallbackCard('admit-4', 'admit-card', 'IBPS RRB PO Admit Card 2026', 'IBPS', '2026-03-20T10:00:00.000Z'),
-        makeFallbackCard('admit-5', 'admit-card', 'NEET UG 2026 Admit Card Download', 'NTA', '2026-03-19T10:00:00.000Z'),
-        makeFallbackCard('admit-6', 'admit-card', 'JEE Main Session II 2026 Admit Card', 'NTA', '2026-03-18T10:00:00.000Z'),
-    ],
-    'answer-key': [
-        makeFallbackCard('key-1', 'answer-key', 'UPSC CAPF 2026 Answer Key Released', 'UPSC', '2026-03-23T11:00:00.000Z'),
-        makeFallbackCard('key-2', 'answer-key', 'SSC CPO 2026 Paper I Answer Key', 'SSC', '2026-03-22T11:00:00.000Z'),
-        makeFallbackCard('key-3', 'answer-key', 'RRB NTPC 2026 CBT I Answer Key', 'Railway Recruitment Board', '2026-03-21T11:00:00.000Z'),
-        makeFallbackCard('key-4', 'answer-key', 'IBPS PO 2026 Prelims Answer Key', 'IBPS', '2026-03-20T11:00:00.000Z'),
-        makeFallbackCard('key-5', 'answer-key', 'CTET February 2026 Answer Key', 'CBSE', '2026-03-19T11:00:00.000Z'),
-        makeFallbackCard('key-6', 'answer-key', 'NDA 2025 II Answer Key Download', 'UPSC', '2026-03-18T11:00:00.000Z'),
-    ],
-    syllabus: [
-        makeFallbackCard('syllabus-1', 'syllabus', 'UPSC Civil Services 2026 Syllabus PDF', 'UPSC', '2026-03-21T12:00:00.000Z'),
-        makeFallbackCard('syllabus-2', 'syllabus', 'SSC CGL 2026 Exam Pattern & Syllabus', 'SSC', '2026-03-20T12:00:00.000Z'),
-        makeFallbackCard('syllabus-3', 'syllabus', 'RRB NTPC 2026 CBT Syllabus Updated', 'Railway Recruitment Board', '2026-03-19T12:00:00.000Z'),
-        makeFallbackCard('syllabus-4', 'syllabus', 'IBPS PO 2026 Detailed Syllabus', 'IBPS', '2026-03-18T12:00:00.000Z'),
-        makeFallbackCard('syllabus-5', 'syllabus', 'SBI PO Prelims & Mains Syllabus 2026', 'State Bank of India', '2026-03-17T12:00:00.000Z'),
-        makeFallbackCard('syllabus-6', 'syllabus', 'NDA 2026 Mathematics & GAT Syllabus', 'UPSC', '2026-03-16T12:00:00.000Z'),
-    ],
-    admission: [
-        makeFallbackCard('admission-1', 'admission', 'NEET UG 2026 Online Application', 'NTA', '2026-03-23T06:00:00.000Z'),
-        makeFallbackCard('admission-2', 'admission', 'CUET UG 2026 Registration Form', 'NTA', '2026-03-22T06:00:00.000Z'),
-        makeFallbackCard('admission-3', 'admission', 'BHU Admission 2026 Counselling', 'Banaras Hindu University', '2026-03-21T06:00:00.000Z'),
-        makeFallbackCard('admission-4', 'admission', 'JEE Main 2026 Session II Registration', 'NTA', '2026-03-20T06:00:00.000Z'),
-        makeFallbackCard('admission-5', 'admission', 'UP BEd 2026 Admission Form', 'Bundelkhand University', '2026-03-19T06:00:00.000Z'),
-        makeFallbackCard('admission-6', 'admission', 'Bihar DElEd Admission 2026', 'BSEB', '2026-03-18T06:00:00.000Z'),
-    ],
-};
-
-function flattenSections(sections: HomepageFeedSections) {
-    return CONTENT_TYPES
-        .flatMap((type) => sections[type] ?? [])
-        .sort((left, right) => new Date(right.postedAt).getTime() - new Date(left.postedAt).getTime());
-}
-
-function normalizeSections(
-    sections?: Partial<Record<ContentType, AnnouncementCard[]>> | null,
-): HomepageFeedSections {
-    return CONTENT_TYPES.reduce<HomepageFeedSections>((accumulator, type) => {
-        const cards = sections?.[type];
-        accumulator[type] = Array.isArray(cards) ? cards : FALLBACK_SECTIONS[type];
-        return accumulator;
-    }, {} as HomepageFeedSections);
-}
-
-function normalizeLatest(
-    latest: AnnouncementCard[] | undefined,
-    sections: HomepageFeedSections,
-): AnnouncementCard[] {
-    return Array.isArray(latest) && latest.length > 0 ? latest : flattenSections(sections);
-}
-
-function buildHref(card: AnnouncementCard) {
-    return card.slug ? buildAnnouncementDetailPath(card.type, card.slug) : buildCategoryPath(card.type);
-}
-
-function mapCards(cards: AnnouncementCard[], count: number): PortalListItem[] {
-    return cards.slice(0, count).map((card) => ({
-        id: card.id,
-        title: card.title,
-        href: buildHref(card),
-        date: formatPortalDate(card.deadline ?? card.postedAt),
-        isNew: isNew(card.postedAt),
-    }));
-}
-
-function NewBadge() {
-    return <span className="exact-home-new-badge">NEW</span>;
-}
-
-function SectionBox({
+function RailSection({
     title,
-    headerClassName,
+    eyebrow,
     items,
-    viewAllTo,
-    viewAllLabel,
+    viewAllHref,
 }: {
     title: string;
-    headerClassName: string;
-    items: PortalListItem[];
-    viewAllTo: string;
-    viewAllLabel: string;
+    eyebrow: string;
+    items: CardType[];
+    viewAllHref: string;
 }) {
     return (
-        <section className="exact-home-section-box">
-            <div className={`exact-home-section-header ${headerClassName}`}>
-                <span>{title}</span>
-                <Link href={viewAllTo}>{viewAllLabel}</Link>
-            </div>
-            <div className="exact-home-section-body">
-                {items.map((item, index) => (
-                    <Link
-                        key={item.id}
-                        href={item.href}
-                        className={`exact-home-section-row${index % 2 === 1 ? ' is-alt' : ''}`}
-                    >
-                        <span className="exact-home-section-title">
-                            {item.title}
-                            {item.isNew && <NewBadge />}
-                        </span>
-                        <span className="exact-home-section-date">{item.date}</span>
-                    </Link>
-                ))}
-            </div>
-        </section>
-    );
-}
-
-function ImportantLinksBox({ items }: { items: PortalListItem[] }) {
-    return (
-        <section className="exact-home-section-box">
-            <div className="exact-home-section-header purple">
-                <span>Important Links</span>
-            </div>
-            <div className="exact-home-section-body">
-                {items.map((item, index) => (
-                    <Link
-                        key={item.id}
-                        href={item.href}
-                        className={`exact-home-section-row${index % 2 === 1 ? ' is-alt' : ''}`}
-                    >
-                        <span className="exact-home-section-title">▸ {item.title}</span>
-                    </Link>
-                ))}
-            </div>
-        </section>
-    );
-}
-
-function Ticker({ items }: { items: string[] }) {
-    const track = [...items, ...items];
-
-    return (
-        <section className="exact-home-ticker" aria-label="Latest updates">
-            <div className="exact-home-ticker-label">LATEST</div>
-            <div className="exact-home-ticker-window">
-                <div className="exact-home-ticker-track">
-                    {track.map((item, index) => (
-                        <span key={`${item}-${index}`} className="exact-home-ticker-item">
-                            {item}
-                        </span>
-                    ))}
+        <section className={styles.railCard}>
+            <div className={styles.railHead}>
+                <div className={styles.sectionHeaderBlock}>
+                    <p className={styles.sectionEyebrow}>{eyebrow}</p>
+                    <h2 className={styles.railTitle}>{title}</h2>
                 </div>
+                <Link href={viewAllHref} className={styles.linkButton}>View all</Link>
+            </div>
+            <div className={styles.railBody}>
+                {items.map((item) => {
+                    const deadlineInfo = getDeadlineInfo(item.deadline);
+                    return (
+                        <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.railItem}>
+                            <span className={styles.railItemTitle}>{item.title}</span>
+                            <span className={styles.railItemMeta}>
+                                <span>{item.organization}</span>
+                                <span>{formatDate(item.deadline ?? item.postedAt)}</span>
+                                {deadlineInfo ? <span>{deadlineInfo.label}</span> : null}
+                            </span>
+                        </Link>
+                    );
+                })}
             </div>
         </section>
     );
 }
 
 export function HomePage() {
-    const navigate = useRouter();
-    const [searchQuery, setSearchQuery] = useState('');
+    const router = useRouter();
+    const { user } = useAuth();
+    const { language } = useLanguage();
 
-    const homepageQuery = useQuery({
-        queryKey: ['homepage-feed'],
-        queryFn: () => getHomepageFeed(),
+    const [query, setQuery] = useState('');
+    const [feed, setFeed] = useState<HomepageFeedData>(getFallbackHomepageFeed());
+    const [loading, setLoading] = useState(true);
+    const [bookmarkIds, setBookmarkIds] = useState<string[]>([]);
+    const [recentViews, setRecentViews] = useState(getRecentViews());
+    const [savedSearches, setSavedSearches] = useState<SavedSearchDraft[]>(getSavedSearchDrafts());
+    const [interests, setInterestState] = useState<ContentType[]>(() => {
+        const stored = getInterests();
+        return stored.length > 0 ? stored : ['job', 'result', 'admit-card'];
     });
 
-    const homepageData = homepageQuery.data?.data;
-    const sections = useMemo(
-        () => normalizeSections(homepageData?.sections),
-        [homepageData?.sections],
-    );
+    useEffect(() => {
+        let cancelled = false;
 
-    const latest = useMemo(
-        () => normalizeLatest(homepageData?.latest, sections),
-        [homepageData?.latest, sections],
-    );
+        (async () => {
+            try {
+                const response = await getHomepageFeed();
+                if (!cancelled) {
+                    setFeed(response.data);
+                }
+            } catch {
+                if (!cancelled) {
+                    setFeed(getFallbackHomepageFeed());
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        })();
 
-    const admitSection = sections['admit-card'];
-    const answerKeySection = sections['answer-key'];
-    const results = useMemo(() => mapCards(sections.result, 8), [sections.result]);
-    const jobs = useMemo(() => mapCards(sections.job, 10), [sections.job]);
-    const admitCards = useMemo(() => mapCards(admitSection, 8), [admitSection]);
-    const answerKeys = useMemo(() => mapCards(answerKeySection, 6), [answerKeySection]);
-    const syllabus = useMemo(() => mapCards(sections.syllabus, 6), [sections.syllabus]);
-    const importantLinks = useMemo(() => mapCards(latest, 8), [latest]);
-    const tickerItems = useMemo(() => latest.slice(0, 6).map((item) => item.title), [latest]);
-    const featuredJob = sections.job[0];
-    const featuredJobHref = featuredJob ? buildHref(featuredJob) : CATEGORY_PATHS.job;
-    const calendarRows = useMemo(() => {
-        const rows = [...sections.job.slice(0, 4), ...sections.result.slice(0, 2)];
-        return rows.map((item) => ({
-            id: item.id,
-            title: item.title,
-            date: formatPortalDate(item.deadline ?? item.postedAt),
-            posts: item.totalPosts ? item.totalPosts.toLocaleString('en-IN') : 'Open',
-            status: item.deadline ? 'Application Open' : 'Updated',
-            href: buildHref(item),
-        }));
-    }, [sections.job, sections.result]);
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
-    const todayText = useMemo(() => formatHeaderDate(new Date()), []);
+    useEffect(() => {
+        setRecentViews(getRecentViews());
+        setSavedSearches(getSavedSearchDrafts());
+    }, []);
+
+    useEffect(() => {
+        if (!user) {
+            setBookmarkIds([]);
+            return;
+        }
+
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const response = await getBookmarkIds();
+                if (!cancelled) {
+                    setBookmarkIds(response.data ?? []);
+                }
+            } catch {
+                if (!cancelled) {
+                    setBookmarkIds([]);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [user]);
+
+    const latest = feed.latest;
+    const sections = feed.sections;
+    const todayCount = latest.filter((item) => isFresh(item.postedAt, 1)).length;
+    const deadlineToday = [...sections.job, ...sections.admission].filter((item) => getDaysUntil(item.deadline) === 0).slice(0, 4);
+    const freshJobs = sections.job.filter((item) => isFresh(item.postedAt, 3)).slice(0, 4);
+    const newResults = sections.result.filter((item) => isFresh(item.postedAt, 3)).slice(0, 4);
+    const admitCards = sections['admit-card'].slice(0, 4);
+    const answerKeys = sections['answer-key'].slice(0, 4);
+    const admissions = sections.admission.slice(0, 4);
+    const calendarItems = [...sections.job, ...sections.admission]
+        .filter((item) => item.deadline)
+        .sort((left, right) => new Date(left.deadline ?? left.postedAt).getTime() - new Date(right.deadline ?? right.postedAt).getTime())
+        .slice(0, 6);
+    const personalizedFeed = latest.filter((item) => interests.includes(item.type)).slice(0, 4);
+
+    const heroStats = [
+        { label: copyFor(language, 'Updates today', 'आज के अपडेट'), value: todayCount.toString() },
+        { label: copyFor(language, 'Bookmarks', 'बुकमार्क्स'), value: bookmarkIds.length.toString() },
+        { label: copyFor(language, 'Saved searches', 'सेव्ड सर्च'), value: savedSearches.length.toString() },
+        { label: copyFor(language, 'Recent views', 'रिसेंट व्यू'), value: recentViews.length.toString() },
+    ];
 
     const handleSearch = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const query = searchQuery.trim();
-        if (!query) return;
-        navigate.push(`${CATEGORY_PATHS.job}?q=${encodeURIComponent(query)}&source=home`);
+        const next = query.trim();
+        if (!next) return;
+        trackEvent('home_search_submit', { query: next });
+        router.push(`/jobs?q=${encodeURIComponent(next)}&source=home_hero`);
+    };
+
+    const toggleInterest = (type: ContentType) => {
+        const next = interests.includes(type)
+            ? interests.filter((item) => item !== type)
+            : [...interests, type];
+        const normalized = next.length > 0 ? next : [type];
+        setInterestState(normalized);
+        setInterests(normalized);
+        trackEvent('interest_toggle', { type, enabled: !interests.includes(type) });
     };
 
     return (
-        <div className="exact-home">
-            <header className="exact-home-top-header">
-                <div className="exact-home-shell exact-home-top-header-inner">
-                    <div className="exact-home-brand">
-                        <div className="exact-home-brand-mark">SE</div>
-                        <div className="exact-home-brand-copy">
-                            <div className="exact-home-brand-name">SarkariExams.me</div>
-                            <div className="exact-home-brand-subtitle">India&apos;s Trusted Government Job Portal</div>
-                        </div>
-                    </div>
+        <div className={styles.page}>
+            <section className={styles.hero} data-testid="homepage-hero">
+                <div className={styles.heroGrid}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>
+                            <Icon name="ShieldCheck" size={16} />
+                            {copyFor(language, '2026 Sarkari command center', '2026 सरकारी कमांड सेंटर')}
+                        </span>
 
-                    <form className="exact-home-search" onSubmit={handleSearch} role="search">
-                        <input
-                            type="text"
-                            placeholder="Search Jobs, Results, Admit Cards..."
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            aria-label="Search Jobs, Results, Admit Cards"
-                        />
-                        <button type="submit">Search</button>
-                    </form>
+                        <h1 className={styles.heroTitle}>
+                            {copyFor(language, 'Find the right', 'सही')}
+                            {' '}
+                            <span className={styles.heroAccent}>
+                                {copyFor(language, 'government update faster.', 'सरकारी अपडेट जल्दी पाएँ।')}
+                            </span>
+                        </h1>
 
-                    <div className="exact-home-date-status">
-                        <div>{todayText}</div>
-                        <div className="exact-home-date-live">Updated Today</div>
-                    </div>
-                </div>
-            </header>
+                        <p className={styles.heroSub}>
+                            {copyFor(
+                                language,
+                                'Built for serious exam and job seekers: dense official updates, deadline urgency, mobile-first scanning, and cleaner decision-making across jobs, results, admit cards, answer keys, syllabus, and admissions.',
+                                'यह अनुभव गंभीर परीक्षा और नौकरी उम्मीदवारों के लिए बनाया गया है: डेंस ऑफिशियल अपडेट, डेडलाइन अर्जेंसी, मोबाइल-फर्स्ट स्कैनिंग और जॉब्स, रिजल्ट, एडमिट कार्ड, आंसर की, सिलेबस और एडमिशन के लिए साफ़ निर्णय सतह।',
+                            )}
+                        </p>
 
-            <nav className="exact-home-nav">
-                <div className="exact-home-shell exact-home-nav-inner">
-                    {HOME_NAV_LINKS.map((link) => (
-                        <Link key={link.label} href={link.to} className="exact-home-nav-link">
-                            {link.label}
-                        </Link>
-                    ))}
-                </div>
-            </nav>
-
-            <div className="exact-home-shell exact-home-main">
-                <Ticker items={tickerItems} />
-
-                <section className="exact-home-stats">
-                    {STATS.map((item) => (
-                        <div key={item.label} className="exact-home-stat">
-                            <span className="exact-home-stat-value">{item.value}</span>
-                            <span className="exact-home-stat-label">{item.label}</span>
-                        </div>
-                    ))}
-                </section>
-
-                <section className="exact-home-quick-grid">
-                    {QUICK_CATEGORIES.map((item) => (
-                        <Link key={item.label} href={item.to} className={`exact-home-quick-card ${item.color}`}>
-                            <span className="exact-home-quick-icon">{item.icon}</span>
-                            <span>{item.label}</span>
-                        </Link>
-                    ))}
-                </section>
-
-                <section className="exact-home-board">
-                    <div className="exact-home-column">
-                        <SectionBox
-                            title="Latest Results"
-                            headerClassName="green"
-                            items={results}
-                            viewAllTo={CATEGORY_PATHS.result}
-                            viewAllLabel="All Results"
-                        />
-                        <SectionBox
-                            title="Answer Keys"
-                            headerClassName="red"
-                            items={answerKeys}
-                            viewAllTo={CATEGORY_PATHS['answer-key']}
-                            viewAllLabel="All Keys"
-                        />
-                    </div>
-
-                    <div className="exact-home-column">
-                        <section className="exact-home-featured">
-                            <div className="exact-home-featured-kicker">Featured Recruitment</div>
-                            <h2>{featuredJob?.title ?? 'UPSC Civil Services 2026 Online Form - 1206 Posts'}</h2>
-                            <div className="exact-home-featured-meta">
-                                <span>{featuredJob?.organization ?? 'UPSC'}</span>
-                                <span>
-                                    {featuredJob?.deadline
-                                        ? `Last Date: ${formatPortalDate(featuredJob.deadline)}`
-                                        : `Updated: ${formatPortalDate(featuredJob?.postedAt)}`}
-                                </span>
+                        <form className={styles.searchForm} role="search" onSubmit={handleSearch}>
+                            <div className={styles.searchField}>
+                                <Icon name="Search" size={18} />
+                                <input
+                                    type="search"
+                                    className={styles.searchInput}
+                                    placeholder={copyFor(language, 'Search exam, department, state, or qualification', 'एग्जाम, विभाग, राज्य या क्वालिफिकेशन सर्च करें')}
+                                    value={query}
+                                    onChange={(event) => setQuery(event.target.value)}
+                                />
                             </div>
-                            <Link href={featuredJobHref} className="exact-home-featured-cta">
-                                Explore Notification
-                            </Link>
-                        </section>
+                            <button type="submit" className={styles.primaryButton}>
+                                <Icon name="ArrowRight" size={18} />
+                                {copyFor(language, 'Search all jobs', 'सभी जॉब्स सर्च करें')}
+                            </button>
+                        </form>
 
-                        <SectionBox
-                            title="Latest Jobs"
-                            headerClassName="orange"
-                            items={jobs}
-                            viewAllTo={CATEGORY_PATHS.job}
-                            viewAllLabel="All Jobs"
-                        />
+                        <div className={styles.heroMetaRow}>
+                            {EXAM_FAMILY_SHORTCUTS.slice(0, 6).map((item) => (
+                                <Link key={item.label} href={item.href} className={styles.softChip}>
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="exact-home-column">
-                        <SectionBox
-                            title="Admit Cards"
-                            headerClassName="blue"
-                            items={admitCards}
-                            viewAllTo={CATEGORY_PATHS['admit-card']}
-                            viewAllLabel="All Admit Cards"
-                        />
-                        <SectionBox
-                            title="Syllabus"
-                            headerClassName="purple"
-                            items={syllabus}
-                            viewAllTo={CATEGORY_PATHS.syllabus}
-                            viewAllLabel="All Syllabus"
-                        />
-                        <ImportantLinksBox items={importantLinks} />
-                    </div>
-                </section>
-
-                <section className="exact-home-panel">
-                    <div className="exact-home-panel-header black">
-                        <span>State-Wise Government Jobs</span>
-                        <Link href={CATEGORY_PATHS.job}>Browse All States</Link>
-                    </div>
-                    <div className="exact-home-state-grid">
-                        {STATE_LINKS.map((state) => (
-                            <Link
-                                key={state}
-                                href={`${CATEGORY_PATHS.job}?q=${encodeURIComponent(state)}`}
-                                className="exact-home-state-link"
-                            >
-                                ▸ {state}
-                            </Link>
+                    <div className={styles.heroStats}>
+                        {heroStats.map((item) => (
+                            <div key={item.label} className={styles.statCard}>
+                                <span className={styles.statLabel}>{item.label}</span>
+                                <strong className={styles.statValue}>{item.value}</strong>
+                            </div>
                         ))}
                     </div>
-                </section>
+                </div>
+            </section>
 
-                <section className="exact-home-panel">
-                    <div className="exact-home-panel-header teal">
-                        <span>Upcoming Exam Schedule</span>
-                        <Link href={CATEGORY_PATHS.job}>View Full Calendar</Link>
+            <PublicCategoryRail />
+
+            <section className={styles.section} data-testid="homepage-urgency">
+                <div className={styles.sectionHeader}>
+                    <div className={styles.sectionHeaderBlock}>
+                        <p className={styles.sectionEyebrow}>{copyFor(language, 'What changed now', 'अभी क्या बदला')}</p>
+                        <h2 className={styles.sectionTitle}>{copyFor(language, 'Urgency rails', 'अर्जेंसी रेल्स')}</h2>
+                        <p className={styles.sectionCopy}>
+                            {copyFor(language, 'The fastest scan for deadline pressure and newly released updates.', 'डेडलाइन प्रेशर और नई रिलीज़ हुई अपडेट्स के लिए सबसे तेज़ स्कैन।')}
+                        </p>
                     </div>
-                    <div className="exact-home-table-wrap">
-                        <table className="exact-home-table">
-                            <thead>
-                                <tr>
-                                    <th>Exam Name</th>
-                                    <th>Exam Date</th>
-                                    <th>Posts</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {calendarRows.map((row) => (
-                                    <tr key={row.id}>
-                                        <td>
-                                            <Link href={row.href}>{row.title}</Link>
-                                        </td>
-                                        <td>{row.date}</td>
-                                        <td>{row.posts}</td>
-                                        <td>{row.status}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                </div>
+
+                <div className={styles.railGrid}>
+                    <RailSection title="Last Date Today" eyebrow="Act now" items={deadlineToday.length > 0 ? deadlineToday : sections.job.slice(0, 4)} viewAllHref="/jobs?sort=deadline" />
+                    <RailSection title="Fresh Jobs" eyebrow="Recruitment" items={freshJobs.length > 0 ? freshJobs : sections.job.slice(0, 4)} viewAllHref={CATEGORY_META.job.href} />
+                    <RailSection title="New Results" eyebrow="Results" items={newResults.length > 0 ? newResults : sections.result.slice(0, 4)} viewAllHref={CATEGORY_META.result.href} />
+                </div>
+
+                <div className={styles.railGrid}>
+                    <RailSection title="Admit Cards Released" eyebrow="Exam access" items={admitCards} viewAllHref={CATEGORY_META['admit-card'].href} />
+                    <RailSection title="Answer Keys" eyebrow="Challenge windows" items={answerKeys} viewAllHref={CATEGORY_META['answer-key'].href} />
+                    <RailSection title="Admissions" eyebrow="Application forms" items={admissions} viewAllHref={CATEGORY_META.admission.href} />
+                </div>
+            </section>
+
+            <div className={styles.contentGrid}>
+                <div className={styles.mainStack}>
+                    <section className={styles.panel} data-testid="homepage-command-board">
+                        <div className={styles.panelHeader}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Command board</p>
+                                <h2 className={styles.panelTitle}>High-signal updates</h2>
+                                <p className={styles.panelCopy}>
+                                    {loading
+                                        ? 'Refreshing live homepage feed.'
+                                        : 'Focused cards for the most important current job, result, and exam updates.'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className={styles.cardGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                            {latest.slice(0, 6).map((item) => (
+                                <AnnouncementCard key={item.id} card={item} sourceTag="home_command_board" />
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeader}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>Live calendar</p>
+                                <h2 className={styles.panelTitle}>Upcoming deadlines and exam windows</h2>
+                            </div>
+                            <Link href="/jobs?sort=deadline" className={styles.linkButton}>View full feed</Link>
+                        </div>
+                        <div className={styles.scheduleList}>
+                            {calendarItems.map((item) => (
+                                <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.scheduleItem}>
+                                    <span className={styles.railItemTitle}>{item.title}</span>
+                                    <span className={styles.scheduleMeta}>
+                                        <span>{item.organization}</span>
+                                        <span>{formatDate(item.deadline ?? item.postedAt)}</span>
+                                        {item.deadline ? <span>{getDeadlineInfo(item.deadline)?.label}</span> : null}
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+
+                <aside className={styles.sideStack}>
+                    <section className={styles.panel} data-testid="homepage-personalized">
+                        <div className={styles.panelHeader}>
+                            <div className={styles.panelHeaderBlock}>
+                                <p className={styles.sectionEyebrow}>My desk</p>
+                                <h2 className={styles.panelTitle}>{user ? `Welcome back, ${user.username}` : 'Personalized shortcuts'}</h2>
+                            </div>
+                        </div>
+
+                        <div className={styles.chipRow}>
+                            {(Object.keys(CATEGORY_META) as ContentType[]).map((type) => (
+                                <button
+                                    key={type}
+                                    type="button"
+                                    className={`${styles.preferenceChip}${interests.includes(type) ? ` ${styles.preferenceChipActive}` : ''}`}
+                                    onClick={() => toggleInterest(type)}
+                                >
+                                    {CATEGORY_META[type].shortEn}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className={styles.moduleList}>
+                            {personalizedFeed.map((item) => (
+                                <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.moduleLink}>
+                                    <span className={styles.railItemTitle}>{item.title}</span>
+                                    <span className={styles.listMeta}>
+                                        <span>{item.organization}</span>
+                                        <span>{CATEGORY_META[item.type].shortEn}</span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+
+                        {savedSearches.length > 0 ? (
+                            <>
+                                <div className={styles.panelHeaderBlock}>
+                                    <p className={styles.sectionEyebrow}>Saved searches</p>
+                                </div>
+                                <div className={styles.chipRow}>
+                                    {savedSearches.slice(0, 4).map((item) => (
+                                        <Link key={item.id} href={`/jobs?q=${encodeURIComponent(item.query)}`} className={styles.softChip}>
+                                            {item.name}
+                                        </Link>
+                                    ))}
+                                </div>
+                            </>
+                        ) : null}
+
+                        {recentViews.length > 0 ? (
+                            <>
+                                <div className={styles.panelHeaderBlock}>
+                                    <p className={styles.sectionEyebrow}>Recent views</p>
+                                </div>
+                                <div className={styles.moduleList}>
+                                    {recentViews.slice(0, 4).map((item) => (
+                                        <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.moduleLink}>
+                                            <span className={styles.railItemTitle}>{item.title}</span>
+                                            <span className={styles.listMeta}>
+                                                <span>{item.organization}</span>
+                                                <span>{CATEGORY_META[item.type].shortEn}</span>
+                                            </span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </>
+                        ) : null}
+                    </section>
+
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Browse faster</p>
+                            <h2 className={styles.panelTitle}>State shortcuts</h2>
+                        </div>
+                        <div className={styles.shortcutGrid}>
+                            {STATE_SHORTCUTS.map((state) => (
+                                <Link key={state} href={`/jobs?q=${encodeURIComponent(state)}`} className={styles.shortcutLink}>
+                                    {state}
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Why this feels clearer</p>
+                            <h2 className={styles.panelTitle}>Trust cues</h2>
+                        </div>
+                        <ul className={styles.trustList}>
+                            {TRUST_PILLARS.map((item) => (
+                                <li key={item.titleEn} className={styles.trustItem}>
+                                    <Icon name="ShieldCheck" size={17} />
+                                    <div>
+                                        <strong>{copyFor(language, item.titleEn, item.titleHi)}</strong>
+                                        <div className={styles.hint}>{copyFor(language, item.copyEn, item.copyHi)}</div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                </aside>
             </div>
-
-            <footer className="exact-home-footer">
-                <div className="exact-home-shell exact-home-footer-inner">
-                    <div className="exact-home-footer-brand">
-                        <div className="exact-home-footer-logo">SE</div>
-                        <div>
-                            <div className="exact-home-footer-title">SarkariExams.me</div>
-                            <p>India&apos;s trusted portal for government jobs, results, admit cards and exam notifications.</p>
-                        </div>
-                    </div>
-
-                    <div className="exact-home-footer-columns">
-                        {FOOTER_COLUMNS.map((column) => (
-                            <div key={column.title} className="exact-home-footer-column">
-                                <div className="exact-home-footer-column-title">{column.title}</div>
-                                {column.links.map((link) => (
-                                    <Link key={link.label} href={link.to}>
-                                        » {link.label}
-                                    </Link>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <div className="exact-home-footer-bottom">© 2026 SarkariExams.me — All Rights Reserved | Designed for Job Seekers across India</div>
-            </footer>
         </div>
     );
 }

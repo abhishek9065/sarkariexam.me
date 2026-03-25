@@ -1130,18 +1130,160 @@ router.get('/segments', async (req, res) => {
   try {
     const { getUserSegments, getSegmentUserCount } = await import('../services/notifications.js');
     const segments = await getUserSegments();
-    
-    // Get counts for each segment
     const segmentCounts = await Promise.all([
       { type: 'all', value: 'all', count: segments.totalUsers },
       ...segments.states.map(s => getSegmentUserCount('state', s).then(count => ({ type: 'state', value: s, count }))),
       ...segments.categories.map(c => getSegmentUserCount('category', c).then(count => ({ type: 'category', value: c, count }))),
     ]);
-    
     return res.json({ data: { segments, counts: segmentCounts } });
   } catch (error) {
     console.error('[Admin] Segments error:', error);
     return res.status(500).json({ error: 'Failed to fetch segments' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// EDITORIAL WORKFLOW
+// ═══════════════════════════════════════════
+
+router.post('/assign', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { assignAnnouncement } = await import('../services/workflow.js');
+    const result = await assignAnnouncement(req.body, userId);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ message: 'Assigned' });
+  } catch (error) {
+    console.error('[Admin] Assign error:', error);
+    return res.status(500).json({ error: 'Failed to assign' });
+  }
+});
+
+router.post('/approve/:id', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { approveAnnouncement } = await import('../services/workflow.js');
+    const result = await approveAnnouncement(req.params.id, userId, req.body.note);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ message: 'Approved' });
+  } catch (error) {
+    console.error('[Admin] Approve error:', error);
+    return res.status(500).json({ error: 'Failed to approve' });
+  }
+});
+
+router.post('/reject/:id', async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { rejectAnnouncement } = await import('../services/workflow.js');
+    const result = await rejectAnnouncement(req.params.id, userId, req.body.reason);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ message: 'Rejected' });
+  } catch (error) {
+    console.error('[Admin] Reject error:', error);
+    return res.status(500).json({ error: 'Failed to reject' });
+  }
+});
+
+router.get('/pending-approvals', async (req, res) => {
+  try {
+    const { getPendingApprovals } = await import('../services/workflow.js');
+    const pending = await getPendingApprovals(req.query.assignee as string);
+    return res.json({ data: pending });
+  } catch (error) {
+    console.error('[Admin] Pending approvals error:', error);
+    return res.status(500).json({ error: 'Failed to fetch' });
+  }
+});
+
+router.get('/workflow-logs/:id', async (req, res) => {
+  try {
+    const { getWorkflowLogs } = await import('../services/workflow.js');
+    const logs = await getWorkflowLogs(req.params.id);
+    return res.json({ data: logs });
+  } catch (error) {
+    console.error('[Admin] Workflow logs error:', error);
+    return res.status(500).json({ error: 'Failed to fetch logs' });
+  }
+});
+
+router.get('/sla-violations', async (req, res) => {
+  try {
+    const { checkSLAViolations } = await import('../services/workflow.js');
+    const violations = await checkSLAViolations();
+    return res.json({ data: violations });
+  } catch (error) {
+    console.error('[Admin] SLA violations error:', error);
+    return res.status(500).json({ error: 'Failed to fetch' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// USER ENGAGEMENT
+// ═══════════════════════════════════════════
+
+router.get('/feedback', async (req, res) => {
+  try {
+    const { getUserFeedback } = await import('../services/engagement.js');
+    const feedback = await getUserFeedback(parseInt(req.query.limit as string) || 50);
+    return res.json({ data: feedback });
+  } catch (error) {
+    console.error('[Admin] Feedback error:', error);
+    return res.status(500).json({ error: 'Failed to fetch' });
+  }
+});
+
+router.get('/comments-pending', async (req, res) => {
+  try {
+    const { getCommentsPendingReview } = await import('../services/engagement.js');
+    const comments = await getCommentsPendingReview(parseInt(req.query.limit as string) || 50);
+    return res.json({ data: comments });
+  } catch (error) {
+    console.error('[Admin] Comments error:', error);
+    return res.status(500).json({ error: 'Failed to fetch' });
+  }
+});
+
+router.post('/moderate-comment/:id', async (req, res) => {
+  try {
+    const { moderateComment } = await import('../services/engagement.js');
+    const { action } = req.body;
+    const result = await moderateComment(req.params.id, action);
+    if (!result) return res.status(400).json({ error: 'Failed to moderate' });
+    return res.json({ message: 'Moderated' });
+  } catch (error) {
+    console.error('[Admin] Moderate error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
+router.get('/engagement-metrics', async (req, res) => {
+  try {
+    const { getEngagementMetrics } = await import('../services/engagement.js');
+    const metrics = await getEngagementMetrics(parseInt(req.query.days as string) || 30);
+    return res.json({ data: metrics });
+  } catch (error) {
+    console.error('[Admin] Engagement metrics error:', error);
+    return res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// SEO MONITORING
+// ═══════════════════════════════════════════
+
+router.get('/seo-metrics', async (req, res) => {
+  try {
+    const { getSEOMetrics, getTopSearchQueries, getIndexCoverage } = await import('../services/seo.js');
+    const [metrics, queries, coverage] = await Promise.all([
+      getSEOMetrics(),
+      getTopSearchQueries(),
+      getIndexCoverage(),
+    ]);
+    return res.json({ data: { metrics, queries, coverage } });
+  } catch (error) {
+    console.error('[Admin] SEO metrics error:', error);
+    return res.status(500).json({ error: 'Failed' });
   }
 });
 

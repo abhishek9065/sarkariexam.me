@@ -1,139 +1,98 @@
 'use client';
 
 import Link from 'next/link';
-import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
+import type { CSSProperties } from 'react';
+import { Icon } from '@/app/components/Icon';
 import { trackEvent } from '@/app/lib/analytics';
+import type { AnnouncementCard as CardType } from '@/app/lib/types';
 import { buildAnnouncementDetailPath } from '@/app/lib/urls';
-type SourceTag = string;
-const TYPE_LABELS: Record<ContentType, string> = {
-    job: 'Job', result: 'Result', 'admit-card': 'Admit Card',
-    'answer-key': 'Answer Key', admission: 'Admission', syllabus: 'Syllabus',
-};
+import { CATEGORY_META, formatCompactNumber, formatDate, getDeadlineInfo, isFresh } from '@/app/lib/ui';
+import styles from './AnnouncementCard.module.css';
 
-const TYPE_ICONS: Record<ContentType, string> = {
-    job: '💼', result: '📊', 'admit-card': '🎫',
-    'answer-key': '🔑', admission: '🎓', syllabus: '📚',
-};
-
-function formatDate(dateStr?: string | null): string {
-    if (!dateStr) return '';
-    try {
-        return new Date(dateStr).toLocaleDateString('en-IN', {
-            day: 'numeric', month: 'short', year: 'numeric',
-        });
-    } catch { return ''; }
-}
-
-function getDeadlineInfo(deadline?: string | null): {
-    label: string; className: string; isExpired: boolean; daysLeft: number | null;
-} | null {
-    if (!deadline) return null;
-    const now = new Date();
-    const dl = new Date(deadline);
-    const diffDays = Math.ceil((dl.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return { label: 'Expired', className: 'deadline-expired', isExpired: true, daysLeft: diffDays };
-    if (diffDays === 0) return { label: '🔥 Last Day!', className: 'deadline-urgent', isExpired: false, daysLeft: 0 };
-    if (diffDays <= 3) return { label: `🔥 ${diffDays}d left`, className: 'deadline-urgent', isExpired: false, daysLeft: diffDays };
-    if (diffDays <= 7) return { label: `⏰ ${diffDays}d left`, className: 'deadline-soon', isExpired: false, daysLeft: diffDays };
-    return { label: `${diffDays}d left`, className: 'deadline-normal', isExpired: false, daysLeft: diffDays };
-}
-
-interface Props {
+type Props = {
     card: CardType;
     showType?: boolean;
-    sourceTag?: SourceTag;
-}
+    sourceTag?: string;
+};
 
-export function AnnouncementCard({ card, showType = true, sourceTag }: Props) {
+export function AnnouncementCard({ card, showType = true, sourceTag = 'card' }: Props) {
+    const meta = CATEGORY_META[card.type];
     const deadlineInfo = getDeadlineInfo(card.deadline);
-    const detailPath = buildAnnouncementDetailPath(card.type, card.slug, sourceTag);
-
-    const handleClick = () => {
-        trackEvent('card_click', { type: card.type, slug: card.slug, source: sourceTag || 'unknown' });
-    };
+    const fresh = isFresh(card.postedAt, 3);
 
     return (
-        <Link href={detailPath} className={`announcement-card card card-clickable${deadlineInfo?.isExpired ? ' card-expired' : ''}`} data-source={sourceTag} onClick={handleClick}>
-            <div className="announcement-card-header">
-                {showType && (
-                    <span className={`badge badge-${card.type}`}>
-                        {TYPE_ICONS[card.type]} {TYPE_LABELS[card.type]}
+        <Link
+            href={buildAnnouncementDetailPath(card.type, card.slug, sourceTag)}
+            className={styles.card}
+            style={{ '--accent': meta.accent } as CSSProperties}
+            onClick={() => trackEvent('card_click', { slug: card.slug, type: card.type, source: sourceTag })}
+        >
+            <div className={styles.topRow}>
+                {showType ? (
+                    <span className={styles.typePill}>
+                        <Icon name={meta.icon as Parameters<typeof Icon>[0]['name']} size={16} />
+                        {meta.shortEn}
                     </span>
-                )}
-                <div className="announcement-card-badges">
-                    <span className="announcement-verified" title="From official source">✓ Official</span>
-                    {deadlineInfo && (
-                        <span className={`announcement-deadline ${deadlineInfo.className}`}>
-                            {deadlineInfo.label}
-                        </span>
-                    )}
+                ) : <span className={styles.typeSpacer} />}
+
+                <div className={styles.badges}>
+                    <span className={styles.officialPill}>Official linked</span>
+                    {fresh ? <span className={styles.freshPill}>NEW</span> : null}
                 </div>
             </div>
 
-            <h3 className="announcement-card-title">{card.title}</h3>
+            <h3 className={styles.title}>{card.title}</h3>
 
-            <div className="announcement-card-meta">
-                {card.organization && (
-                    <span className="announcement-card-org">🏛️ {card.organization}</span>
-                )}
-                {card.location && (
-                    <span className="announcement-card-location">📍 {card.location}</span>
-                )}
+            <div className={styles.metaLine}>
+                <span className={styles.metaItem}>
+                    <Icon name="Building2" size={15} />
+                    <span>{card.organization}</span>
+                </span>
+                {card.location ? (
+                    <span className={styles.metaItem}>
+                        <Icon name="MapPinned" size={15} />
+                        <span>{card.location}</span>
+                    </span>
+                ) : null}
             </div>
 
-            {/* ── Rich Info Row (Posts + Deadline countdown) ── */}
-            <div className="announcement-card-info">
-                {card.totalPosts != null && card.totalPosts > 0 && (
-                    <span className="card-info-chip card-info-posts">
-                        👥 {card.totalPosts.toLocaleString()} Posts
+            <div className={styles.statsRow}>
+                {card.totalPosts ? <span className={styles.statChip}>{card.totalPosts.toLocaleString('en-IN')} Posts</span> : null}
+                {deadlineInfo ? (
+                    <span className={`${styles.statChip} ${styles[`tone${deadlineInfo.tone[0].toUpperCase()}${deadlineInfo.tone.slice(1)}`]}`}>
+                        {deadlineInfo.label}
                     </span>
-                )}
-                {card.deadline && !deadlineInfo?.isExpired && (
-                    <span className="card-info-chip card-info-deadline">
-                        📅 {formatDate(card.deadline)}
-                    </span>
-                )}
-                {deadlineInfo?.isExpired && (
-                    <span className="card-info-chip card-info-expired">
-                        ❌ Closed
-                    </span>
-                )}
+                ) : null}
             </div>
 
-            <div className="announcement-card-footer">
-                <div className="announcement-card-stats">
-                    {card.viewCount != null && card.viewCount > 0 && (
-                        <span className="announcement-card-views">
-                            👁 {card.viewCount.toLocaleString()}
-                        </span>
-                    )}
-                </div>
-                <span className="announcement-card-date" title="Last updated">
-                    {formatDate(card.postedAt)}
+            <div className={styles.footer}>
+                <span className={styles.footerItem}>
+                    <Icon name="CalendarClock" size={15} />
+                    <span>{formatDate(card.deadline ?? card.postedAt)}</span>
+                </span>
+                <span className={styles.footerItem}>
+                    <Icon name="Sparkles" size={15} />
+                    <span>{formatCompactNumber(card.viewCount)} views</span>
                 </span>
             </div>
         </Link>
     );
 }
 
-/** Skeleton version */
 export function AnnouncementCardSkeleton() {
     return (
-        <div className="announcement-card card">
-            <div className="announcement-card-header">
-                <div className="skeleton" style={{ width: 100, height: 24, borderRadius: 12 }} />
-                <div className="skeleton" style={{ width: 60, height: 20, borderRadius: 10 }} />
+        <div className={styles.skeletonCard} aria-hidden="true">
+            <div className={styles.skeletonTop}>
+                <span className={styles.skeletonBadge} />
+                <span className={styles.skeletonBadgeSmall} />
             </div>
-            <div className="skeleton" style={{ width: '90%', height: 22, marginTop: 16, borderRadius: 6 }} />
-            <div className="skeleton" style={{ width: '70%', height: 18, marginTop: 12, borderRadius: 6 }} />
-            <div className="announcement-card-footer" style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', gap: 12 }}>
-                    <div className="skeleton" style={{ width: 60, height: 14, borderRadius: 4 }} />
-                    <div className="skeleton" style={{ width: 50, height: 14, borderRadius: 4 }} />
-                </div>
-                <div className="skeleton" style={{ width: 80, height: 14, borderRadius: 4 }} />
+            <span className={styles.skeletonTitle} />
+            <span className={styles.skeletonMeta} />
+            <div className={styles.skeletonStats}>
+                <span className={styles.skeletonChip} />
+                <span className={styles.skeletonChip} />
             </div>
+            <span className={styles.skeletonFooter} />
         </div>
     );
 }

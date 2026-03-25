@@ -1,245 +1,227 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnnouncementCard, AnnouncementCardSkeleton } from '@/app/components/AnnouncementCard';
+import { Icon } from '@/app/components/Icon';
+import styles from '@/app/components/PortalSurface.module.css';
 import { PublicCategoryRail } from '@/app/components/PublicCategoryRail';
 import { getBookmarks, removeBookmark } from '@/app/lib/api';
+import { getRecentViews } from '@/app/lib/personalization';
 import type { AnnouncementCard as CardType } from '@/app/lib/types';
-import '@/app/components/PublicSurface.css';
+import { formatDate } from '@/app/lib/ui';
+import { useAuth } from '@/app/lib/useAuth';
 
 type SortMode = 'newest' | 'deadline' | 'type';
-type ViewMode = 'grid' | 'compact';
+type ViewMode = 'cards' | 'list';
 
-function buildAnnouncementDetailPath(type: string, slug: string) {
-    return `/${type}/${slug}`;
+function sortBookmarks(cards: CardType[], sort: SortMode) {
+    const next = [...cards];
+    if (sort === 'deadline') {
+        return next.sort((left, right) => new Date(left.deadline ?? left.postedAt).getTime() - new Date(right.deadline ?? right.postedAt).getTime());
+    }
+    if (sort === 'type') {
+        return next.sort((left, right) => left.type.localeCompare(right.type));
+    }
+    return next.sort((left, right) => new Date(right.postedAt).getTime() - new Date(left.postedAt).getTime());
 }
-
-function toTimestamp(value?: string | null): number {
-    if (!value) return Number.POSITIVE_INFINITY;
-    const date = new Date(value);
-    const time = date.getTime();
-    return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
-}
-
-const SORT_LABELS: Record<SortMode, string> = {
-    newest: 'Newest',
-    deadline: 'Deadline',
-    type: 'Type',
-};
-
-const VIEW_LABELS: Record<ViewMode, string> = {
-    grid: 'Grid',
-    compact: 'Compact',
-};
 
 export function BookmarksPage() {
+    const { user, loading: authLoading } = useAuth();
     const [bookmarks, setBookmarks] = useState<CardType[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-    const [removing, setRemoving] = useState<Set<string>>(new Set());
     const [sort, setSort] = useState<SortMode>('newest');
-    const [viewMode, setViewMode] = useState<ViewMode>('grid');
+    const [view, setView] = useState<ViewMode>('cards');
+    const [recentViews, setRecentViews] = useState(getRecentViews());
 
-    const fetchBookmarks = useCallback(async () => {
-        setLoading(true);
-        setError(false);
-        try {
-            const res = await getBookmarks();
-            const cards: CardType[] = res.data.map((item) => ({
-                id: item.id,
-                title: item.title,
-                slug: item.slug,
-                type: item.type,
-                category: item.category || '',
-                organization: item.organization,
-                location: item.location,
-                deadline: item.deadline,
-                totalPosts: item.totalPosts,
-                postedAt: item.postedAt,
-                viewCount: item.viewCount,
-            }));
-            setBookmarks(cards);
-        } catch (err) {
-            console.error('Failed to load bookmarks:', err);
-            setError(true);
-        } finally {
-            setLoading(false);
-        }
+    useEffect(() => {
+        setRecentViews(getRecentViews());
     }, []);
 
     useEffect(() => {
-        void fetchBookmarks();
-    }, [fetchBookmarks]);
+        if (!user) {
+            setLoading(false);
+            setBookmarks([]);
+            return;
+        }
 
-    const sortedBookmarks = useMemo(() => {
-        const items = [...bookmarks];
-        if (sort === 'deadline') {
-            return items.sort((a, b) => toTimestamp(a.deadline) - toTimestamp(b.deadline));
-        }
-        if (sort === 'type') {
-            return items.sort((a, b) => a.type.localeCompare(b.type));
-        }
-        return items.sort((a, b) => toTimestamp(b.postedAt) - toTimestamp(a.postedAt));
-    }, [bookmarks, sort]);
+        let cancelled = false;
 
-    const handleRemove = useCallback(async (id: string) => {
-        setRemoving((value) => new Set(value).add(id));
-        try {
-            await removeBookmark(id);
-            setBookmarks((prev) => prev.filter((item) => item.id !== id));
-        } catch (err) {
-            console.error('Failed to remove bookmark:', err);
-        } finally {
-            setRemoving((value) => {
-                const next = new Set(value);
-                next.delete(id);
-                return next;
-            });
-        }
-    }, []);
+        (async () => {
+            try {
+                const response = await getBookmarks();
+                if (!cancelled) {
+                    setBookmarks((response.data ?? []).map((item) => ({
+                        id: item.id,
+                        title: item.title,
+                        slug: item.slug,
+                        type: item.type,
+                        category: item.category,
+                        organization: item.organization,
+                        location: item.location,
+                        deadline: item.deadline,
+                        totalPosts: item.totalPosts,
+                        postedAt: item.postedAt,
+                        viewCount: item.viewCount,
+                    })));
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [user]);
+
+    const sorted = sortBookmarks(bookmarks, sort);
+
+    if (authLoading) {
+        return (
+            <div className={styles.page}>
+                <section className={styles.hero}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>Loading account</span>
+                        <h1 className={styles.heroTitle}>Opening bookmarks</h1>
+                    </div>
+                </section>
+            </div>
+        );
+    }
+
+    if (!user) {
+        return (
+            <div className={styles.page}>
+                <section className={styles.hero}>
+                    <div className={styles.heroGrid}>
+                        <div className={styles.heroCopy}>
+                            <span className={styles.heroKicker}>Bookmarks</span>
+                            <h1 className={styles.heroTitle}>Save the updates you do not want to lose.</h1>
+                            <p className={styles.heroSub}>Bookmarks work as a personal shortlist for jobs, results, admit cards, and deadline-sensitive forms.</p>
+                            <div className={styles.toolbarGroup}>
+                                <Link href="/?login=1" className={styles.primaryButton}>Sign in to continue</Link>
+                                <Link href="/jobs" className={styles.secondaryButton}>Browse jobs</Link>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        );
+    }
 
     return (
-        <div className="hp public-shell">
-            <section className="public-hero">
-                <span className="public-kicker">Saved Updates</span>
-                <div className="public-hero-grid">
-                    <div className="public-hero-main">
-                        <h1 className="public-title">
-                            My <span className="public-title-accent">Bookmarks</span>
-                        </h1>
-                        <p className="public-sub">
-                            Keep a personal shortlist of important jobs, results, admit cards, and notifications. This page now follows the same
-                            public browsing system as the homepage and category feeds.
-                        </p>
+        <div className={styles.page}>
+            <section className={styles.hero}>
+                <div className={styles.heroGrid}>
+                    <div className={styles.heroCopy}>
+                        <span className={styles.heroKicker}>Member surface</span>
+                        <h1 className={styles.heroTitle}>Your bookmark desk</h1>
+                        <p className={styles.heroSub}>Keep the shortlist tight, sort it by urgency or type, and jump back into recently viewed announcements without starting over.</p>
                     </div>
-                    <div className="public-hero-stats">
-                        <div className="public-stat-card">
-                            <span className="public-stat-value">{bookmarks.length}</span>
-                            <span className="public-stat-label">Saved items</span>
-                        </div>
-                        <div className="public-stat-card">
-                            <span className="public-stat-value">{SORT_LABELS[sort]}</span>
-                            <span className="public-stat-label">Current sort</span>
-                        </div>
-                        <div className="public-stat-card">
-                            <span className="public-stat-value">{VIEW_LABELS[viewMode]}</span>
-                            <span className="public-stat-label">Current view</span>
-                        </div>
+                    <div className={styles.heroStats}>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Saved items</span><strong className={styles.statValue}>{bookmarks.length}</strong></div>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Recent views</span><strong className={styles.statValue}>{recentViews.length}</strong></div>
+                        <div className={styles.statCard}><span className={styles.statLabel}>Sort mode</span><strong className={styles.statValue}>{sort}</strong></div>
+                        <div className={styles.statCard}><span className={styles.statLabel}>View mode</span><strong className={styles.statValue}>{view}</strong></div>
                     </div>
                 </div>
             </section>
 
             <PublicCategoryRail />
 
-            <section className="public-panel">
-                <div className="public-panel-header">
-                    <div>
-                        <h2 className="public-panel-title">Saved list</h2>
-                        <p className="public-panel-copy">Switch between card and compact views, or remove items you no longer need to track.</p>
-                    </div>
-                </div>
-
-                <div className="public-toolbar">
-                    <label className="public-toolbar-group">
-                        <span className="public-toolbar-label">Sort by</span>
-                        <select
-                            className="public-toolbar-select"
-                            value={sort}
-                            onChange={(event) => setSort(event.target.value as SortMode)}
-                        >
-                            <option value="newest">Newest</option>
-                            <option value="deadline">Deadline</option>
-                            <option value="type">Type</option>
-                        </select>
-                    </label>
-
-                    <div className="public-toolbar-group">
-                        <span className="public-toolbar-label">View mode</span>
-                        <div className="public-pill-toggle" role="group" aria-label="Bookmark view mode">
-                            <button
-                                type="button"
-                                className={`public-toolbar-pill${viewMode === 'grid' ? ' active' : ''}`}
-                                onClick={() => setViewMode('grid')}
-                            >
-                                Grid
-                            </button>
-                            <button
-                                type="button"
-                                className={`public-toolbar-pill${viewMode === 'compact' ? ' active' : ''}`}
-                                onClick={() => setViewMode('compact')}
-                            >
-                                Compact
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div style={{ marginTop: 'var(--space-4)' }}>
-                    {loading ? (
-                        <div className="public-bookmark-grid">
-                            {Array.from({ length: 6 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
-                        </div>
-                    ) : error ? (
-                        <div className="public-empty-state">
-                            <span className="public-empty-icon">⚠️</span>
-                            <h3>Could not load bookmarks</h3>
-                            <p>The saved list did not load successfully. Try again and we will refetch your bookmarked announcements.</p>
-                            <div className="public-actions-row">
-                                <button type="button" className="public-primary-btn" onClick={() => void fetchBookmarks()}>Retry</button>
+            <div className={styles.contentGrid}>
+                <div className={styles.mainStack}>
+                    <section className={styles.panel}>
+                        <div className={styles.toolbar}>
+                            <div className={styles.toolbarGroup}>
+                                <label className={styles.field}>
+                                    <span className={styles.fieldLabel}>Sort</span>
+                                    <select className={styles.fieldSelect} value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
+                                        <option value="newest">Newest</option>
+                                        <option value="deadline">Deadline</option>
+                                        <option value="type">Type</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div className={styles.toggleGroup}>
+                                <button type="button" className={`${styles.toggleButton}${view === 'cards' ? ` ${styles.toggleActive}` : ''}`} onClick={() => setView('cards')}>Cards</button>
+                                <button type="button" className={`${styles.toggleButton}${view === 'list' ? ` ${styles.toggleActive}` : ''}`} onClick={() => setView('list')}>List</button>
                             </div>
                         </div>
-                    ) : sortedBookmarks.length === 0 ? (
-                        <div className="public-empty-state">
-                            <span className="public-empty-icon">🔖</span>
-                            <h3>No bookmarks yet</h3>
-                            <p>Save announcements from category feeds or detail pages to build your own shortlist here.</p>
-                            <div className="public-actions-row">
-                                <Link href="/jobs" className="public-secondary-link">Browse Jobs</Link>
-                                <Link href="/results" className="public-secondary-link">Browse Results</Link>
+
+                        {loading ? (
+                            <div className={styles.cardGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                                {Array.from({ length: 4 }).map((_, index) => <AnnouncementCardSkeleton key={index} />)}
                             </div>
-                        </div>
-                    ) : viewMode === 'grid' ? (
-                        <div className="public-bookmark-grid">
-                            {sortedBookmarks.map((card) => (
-                                <div key={card.id} className="public-bookmark-card">
-                                    <AnnouncementCard card={card} sourceTag="bookmarks_grid" />
-                                    <button
-                                        type="button"
-                                        className="public-icon-btn public-bookmark-remove"
-                                        onClick={() => handleRemove(card.id)}
-                                        disabled={removing.has(card.id)}
-                                        title="Remove bookmark"
-                                    >
-                                        {removing.has(card.id) ? '...' : '×'}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="public-bookmark-list">
-                            {sortedBookmarks.map((card) => (
-                                <div key={card.id} className="public-panel public-bookmark-row">
-                                    <Link href={buildAnnouncementDetailPath(card.type, card.slug)} className="public-bookmark-row-link">
-                                        <div className="public-bookmark-row-main">
-                                            <strong>{card.title}</strong>
-                                            <span>{card.organization || 'Government update'}{card.location ? ` • ${card.location}` : ''}</span>
-                                        </div>
-                                    </Link>
-                                    <button
-                                        type="button"
-                                        className="public-compact-remove"
-                                        onClick={() => handleRemove(card.id)}
-                                        disabled={removing.has(card.id)}
-                                    >
-                                        {removing.has(card.id) ? 'Removing...' : 'Remove'}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                        ) : sorted.length === 0 ? (
+                            <div className={styles.emptyState}>
+                                <Icon name="Bookmark" size={24} />
+                                <h2 className={styles.emptyTitle}>No bookmarks yet</h2>
+                                <p className={styles.sectionCopy}>Save announcements from category feeds or detail pages and they will appear here.</p>
+                            </div>
+                        ) : view === 'cards' ? (
+                            <div className={styles.cardGrid} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                                {sorted.map((card) => (
+                                    <div key={card.id} className={styles.mainStack}>
+                                        <AnnouncementCard card={card} sourceTag="bookmarks_cards" />
+                                        <button
+                                            type="button"
+                                            className={styles.ghostButton}
+                                            onClick={() => removeBookmark(card.id).then(() => setBookmarks((current) => current.filter((item) => item.id !== card.id))).catch(() => undefined)}
+                                        >
+                                            Remove bookmark
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={styles.moduleList}>
+                                {sorted.map((card) => (
+                                    <div key={card.id} className={styles.listCard}>
+                                        <Link href={`/${card.type}/${card.slug}`} className={styles.railItemTitle}>{card.title}</Link>
+                                        <span className={styles.listMeta}>
+                                            <span>{card.organization}</span>
+                                            <span>{formatDate(card.deadline ?? card.postedAt)}</span>
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className={styles.linkButton}
+                                            onClick={() => removeBookmark(card.id).then(() => setBookmarks((current) => current.filter((item) => item.id !== card.id))).catch(() => undefined)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
                 </div>
-            </section>
+
+                <aside className={styles.sideStack}>
+                    <section className={styles.panel}>
+                        <div className={styles.panelHeaderBlock}>
+                            <p className={styles.sectionEyebrow}>Recent views</p>
+                            <h2 className={styles.panelTitle}>Resume where you stopped</h2>
+                        </div>
+                        <div className={styles.moduleList}>
+                            {recentViews.length === 0 ? (
+                                <div className={styles.emptyState}><p className={styles.sectionCopy}>Open a few detail pages and they will appear here.</p></div>
+                            ) : recentViews.slice(0, 5).map((item) => (
+                                <Link key={item.id} href={`/${item.type}/${item.slug}`} className={styles.moduleLink}>
+                                    <span className={styles.railItemTitle}>{item.title}</span>
+                                    <span className={styles.listMeta}>
+                                        <span>{item.organization}</span>
+                                        <span>{item.type}</span>
+                                    </span>
+                                </Link>
+                            ))}
+                        </div>
+                    </section>
+                </aside>
+            </div>
         </div>
     );
 }

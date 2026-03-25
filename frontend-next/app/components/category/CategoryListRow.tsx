@@ -1,50 +1,62 @@
 import Link from 'next/link';
+import { Icon } from '@/app/components/Icon';
 import type { AnnouncementCard } from '@/app/lib/types';
-type SourceTag = string;
-function buildAnnouncementDetailPath(type: string, slug: string, source?: string) { void source; return `/${type}/${slug}`; }
-interface Props {
+import { buildAnnouncementDetailPath } from '@/app/lib/urls';
+import { formatDate, getDeadlineInfo } from '@/app/lib/ui';
+import styles from './CategoryListRow.module.css';
+
+type Props = {
     card: AnnouncementCard;
-    sourceTag: SourceTag;
+    sourceTag: string;
     index?: number;
-}
-
-function formatDate(value?: string | null): string {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function getDeadlineClass(deadline?: string | null): string {
-    if (!deadline) return '';
-    const diffDays = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return 'cat-row-expired';
-    if (diffDays <= 3) return 'cat-row-urgent';
-    if (diffDays <= 7) return 'cat-row-soon';
-    return '';
-}
+};
 
 export function CategoryListRow({ card, sourceTag, index }: Props) {
-    const dlClass = getDeadlineClass(card.deadline);
+    const deadlineInfo = getDeadlineInfo(card.deadline);
 
     return (
         <Link
             href={buildAnnouncementDetailPath(card.type, card.slug, sourceTag)}
-            className={`cat-list-row ${dlClass}`}
+            className={styles.row}
         >
-            {index != null && <span className="cat-row-num">{index}</span>}
-            <div className="cat-row-main">
-                <h3 className="cat-row-title">{card.title}</h3>
-                <div className="cat-row-subtitle">
-                    <span className="cat-row-org">{card.organization || 'Government Recruitment'}</span>
-                    {card.location && <span className="cat-row-loc">📍 {card.location}</span>}
+            {index != null ? <span className={styles.index}>{index}</span> : null}
+
+            <div className={styles.content}>
+                <div className={styles.header}>
+                    <h3 className={styles.title}>{card.title}</h3>
+                    {deadlineInfo ? (
+                        <span className={`${styles.deadlinePill} ${styles[`tone${deadlineInfo.tone[0].toUpperCase()}${deadlineInfo.tone.slice(1)}`]}`}>
+                            {deadlineInfo.label}
+                        </span>
+                    ) : null}
+                </div>
+
+                <div className={styles.meta}>
+                    <span className={styles.metaItem}>
+                        <Icon name="Building2" size={15} />
+                        <span>{card.organization}</span>
+                    </span>
+                    {card.location ? (
+                        <span className={styles.metaItem}>
+                            <Icon name="MapPinned" size={15} />
+                            <span>{card.location}</span>
+                        </span>
+                    ) : null}
+                    {card.totalPosts ? (
+                        <span className={styles.metaItem}>
+                            <Icon name="User" size={15} />
+                            <span>{card.totalPosts.toLocaleString('en-IN')} posts</span>
+                        </span>
+                    ) : null}
                 </div>
             </div>
-            <div className="cat-row-meta">
-                {card.deadline && <span className={`cat-row-deadline ${dlClass}`}>⏰ {formatDate(card.deadline)}</span>}
-                <span className="cat-row-date">{formatDate(card.postedAt)}</span>
+
+            <div className={styles.side}>
+                <span>{formatDate(card.postedAt)}</span>
+                <span className={styles.arrow}>
+                    <Icon name="ArrowRight" size={18} />
+                </span>
             </div>
-            <span className="cat-row-arrow">→</span>
         </Link>
     );
 }
