@@ -8,6 +8,7 @@ import { CategoryListRow } from '@/app/components/category/CategoryListRow';
 import { getAnnouncementCards, getOrganizations } from '@/app/lib/api';
 import type { AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
 import { trackEvent } from '@/app/lib/analytics';
+import { buildAnnouncementDetailPath, buildCategoryPath } from '@/app/lib/urls';
 import '@/app/components/HomePage.css';
 import '@/app/components/CategoryPage.css';
 
@@ -100,12 +101,12 @@ const SECTION_META: Record<ContentType, SectionMeta> = {
 };
 
 const CATEGORY_LINKS: Array<{ type: ContentType; label: string; icon: string; href: string }> = [
-    { type: 'job', label: 'Latest Jobs', icon: '💼', href: '/jobs' },
-    { type: 'result', label: 'Results', icon: '📊', href: '/results' },
-    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: '/admit-card' },
-    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: '/answer-key' },
-    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: '/syllabus' },
-    { type: 'admission', label: 'Admissions', icon: '🎓', href: '/admission' },
+    { type: 'job', label: 'Latest Jobs', icon: '💼', href: buildCategoryPath('job') },
+    { type: 'result', label: 'Results', icon: '📊', href: buildCategoryPath('result') },
+    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: buildCategoryPath('admit-card') },
+    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: buildCategoryPath('answer-key') },
+    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: buildCategoryPath('syllabus') },
+    { type: 'admission', label: 'Admissions', icon: '🎓', href: buildCategoryPath('admission') },
 ];
 
 const SORT_OPTIONS = [
@@ -515,7 +516,7 @@ export function CategoryPage({ type }: { type: ContentType }) {
                                     {urgentItems.map((card) => {
                                         const remaining = daysUntil(card.deadline);
                                         return (
-                                            <Link key={card.id} href={`/${card.type}/${card.slug}`} className="cat-home-urgent-link">
+                                            <Link key={card.id} href={buildAnnouncementDetailPath(card.type, card.slug)} className="cat-home-urgent-link">
                                                 <span>{card.title.length > 44 ? `${card.title.slice(0, 44)}...` : card.title}</span>
                                                 {remaining !== null && remaining >= 0 && (
                                                     <span className="cat-home-urgent-days">{remaining === 0 ? 'Today' : `${remaining}d`}</span>

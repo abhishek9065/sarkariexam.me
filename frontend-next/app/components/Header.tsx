@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/app/lib/useTheme';
 import { useAuth } from '@/app/lib/useAuth';
 import { useLanguage } from '@/app/lib/useLanguage';
+import { buildCategoryPath } from '@/app/lib/urls';
 import { SearchOverlay } from './SearchOverlay';
 import { AuthModal } from './AuthModal';
 
@@ -16,15 +17,15 @@ interface NavLinkItem {
 
 const PRIMARY_LINKS: NavLinkItem[] = [
     { to: '/', labelKey: 'nav.home' },
-    { to: '/jobs', labelKey: 'nav.jobs' },
-    { to: '/results', labelKey: 'nav.results' },
-    { to: '/admit-card', labelKey: 'nav.admitCard' },
-    { to: '/answer-key', labelKey: 'nav.answerKey' },
+    { to: buildCategoryPath('job'), labelKey: 'nav.jobs' },
+    { to: buildCategoryPath('result'), labelKey: 'nav.results' },
+    { to: buildCategoryPath('admit-card'), labelKey: 'nav.admitCard' },
+    { to: buildCategoryPath('answer-key'), labelKey: 'nav.answerKey' },
 ];
 
 const MORE_LINKS: Array<{ to: string; label: string }> = [
-    { to: '/admission', label: '🎓 Admissions' },
-    { to: '/syllabus', label: '📚 Syllabus' },
+    { to: buildCategoryPath('admission'), label: '🎓 Admissions' },
+    { to: buildCategoryPath('syllabus'), label: '📚 Syllabus' },
     { to: '/about', label: 'About' },
     { to: '/contact', label: 'Contact' },
     { to: '/privacy', label: 'Privacy' },

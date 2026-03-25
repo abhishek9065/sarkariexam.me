@@ -4,6 +4,15 @@
 
 import type { ContentType } from './types';
 
+export const CATEGORY_PATHS: Record<ContentType, string> = {
+    job: '/jobs',
+    result: '/results',
+    'admit-card': '/admit-cards',
+    'answer-key': '/answer-keys',
+    syllabus: '/syllabus',
+    admission: '/admissions',
+};
+
 /**
  * Build the detail page URL for an announcement.
  * @param type - The content type (job, result, admit-card, etc.)
@@ -14,6 +23,10 @@ export function buildAnnouncementDetailPath(type: ContentType | string, slug: st
     // In the future, source can be added as a query param for analytics
     void source;
     return `/${type}/${slug}`;
+}
+
+export function buildCategoryPath(type: ContentType): string {
+    return CATEGORY_PATHS[type];
 }
 
 /**

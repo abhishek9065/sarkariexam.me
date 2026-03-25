@@ -8,6 +8,7 @@ import { AnnouncementCard } from '@/app/components/AnnouncementCard';
 import { getAnnouncementBySlug, getAnnouncementCards, addBookmark, removeBookmark, getBookmarks } from '@/app/lib/api';
 import { trackEvent } from '@/app/lib/analytics';
 import type { Announcement, AnnouncementCard as CardType, ContentType } from '@/app/lib/types';
+import { buildCategoryPath } from '@/app/lib/urls';
 import '@/app/components/HomePage.css';
 import '@/app/components/DetailPage.css';
 
@@ -48,8 +49,12 @@ const TYPE_ICONS: Record<ContentType, string> = {
     'answer-key': '🔑', admission: '🎓', syllabus: '📚',
 };
 const TYPE_ROUTES: Record<ContentType, string> = {
-    job: '/jobs', result: '/results', 'admit-card': '/admit-card',
-    'answer-key': '/answer-key', admission: '/admission', syllabus: '/syllabus',
+    job: buildCategoryPath('job'),
+    result: buildCategoryPath('result'),
+    'admit-card': buildCategoryPath('admit-card'),
+    'answer-key': buildCategoryPath('answer-key'),
+    admission: buildCategoryPath('admission'),
+    syllabus: buildCategoryPath('syllabus'),
 };
 const TYPE_CTA: Record<ContentType, string> = {
     job: 'Apply Online', result: 'Check Result', 'admit-card': 'Download Admit Card',
@@ -64,12 +69,12 @@ const TYPE_SUMMARIES: Record<ContentType, string> = {
     syllabus: 'Syllabus, exam pattern, and useful supporting details are arranged into one quick reading surface.',
 };
 const CATEGORY_LINKS: Array<{ type: ContentType; label: string; icon: string; href: string }> = [
-    { type: 'job', label: 'Latest Jobs', icon: '💼', href: '/jobs' },
-    { type: 'result', label: 'Results', icon: '📊', href: '/results' },
-    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: '/admit-card' },
-    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: '/answer-key' },
-    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: '/syllabus' },
-    { type: 'admission', label: 'Admissions', icon: '🎓', href: '/admission' },
+    { type: 'job', label: 'Latest Jobs', icon: '💼', href: buildCategoryPath('job') },
+    { type: 'result', label: 'Results', icon: '📊', href: buildCategoryPath('result') },
+    { type: 'admit-card', label: 'Admit Cards', icon: '🎫', href: buildCategoryPath('admit-card') },
+    { type: 'answer-key', label: 'Answer Keys', icon: '🔑', href: buildCategoryPath('answer-key') },
+    { type: 'syllabus', label: 'Syllabus', icon: '📚', href: buildCategoryPath('syllabus') },
+    { type: 'admission', label: 'Admissions', icon: '🎓', href: buildCategoryPath('admission') },
 ];
 
 /* ── Helpers ── */
