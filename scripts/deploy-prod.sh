@@ -67,8 +67,14 @@ fi
 echo "Validating compose config..."
 docker compose --env-file .env config >/dev/null
 
-echo "Building and starting services..."
-docker compose --env-file .env up -d --build --remove-orphans nginx backend frontend
+echo "Building backend and nginx..."
+docker compose --env-file .env build backend nginx
+
+echo "Rebuilding frontend without cache to avoid stale Next.js artifacts..."
+docker compose --env-file .env build --no-cache frontend
+
+echo "Starting services..."
+docker compose --env-file .env up -d --force-recreate --remove-orphans nginx backend frontend
 
 echo "Container status:"
 docker compose ps
@@ -126,6 +132,40 @@ wait_for_backend_endpoint() {
 wait_for_backend_health
 wait_for_backend_endpoint
 
+wait_for_frontend_shell() {
+  local attempts="${1:-60}"
+  local sleep_seconds="${2:-2}"
+  local i
+  local route
+
+  echo "Waiting for frontend route shell verification..."
+  for ((i=1; i<=attempts; i++)); do
+    local ok=1
+    for route in "/" "/jobs/" "/job/test-slug/"; do
+      if ! docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | grep -q 'exact-home'; then
+        ok=0
+        break
+      fi
+    done
+
+    if [[ "$ok" -eq 1 ]]; then
+      echo "Frontend public shell routes are rendering correctly."
+      return 0
+    fi
+
+    echo "  [$i/$attempts] frontend shell not ready ..."
+    sleep "$sleep_seconds"
+  done
+
+  echo "Timed out waiting for frontend public shell routes."
+  for route in "/" "/jobs/" "/job/test-slug/"; do
+    echo "--- ${route} ---"
+    docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
+    echo
+  done
+  return 1
+}
+
 echo "Backend health (container internal):"
 docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
   echo
@@ -133,6 +173,8 @@ docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
   docker compose logs --tail=120 backend || true
   exit 1
 }
+
+wait_for_frontend_shell
 echo
 
 echo "Backend health (public edge):"

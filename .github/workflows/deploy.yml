@@ -96,6 +96,21 @@ jobs:
             fi
           done
 
+          echo "Checking public shell rendering..."
+          if curl -k -sS https://sarkariexams.me/jobs/ | grep -q 'exact-home'; then
+            echo "OK https://sarkariexams.me/jobs/ exact-home shell"
+          else
+            echo "FAIL https://sarkariexams.me/jobs/ exact-home shell missing"
+            failures=1
+          fi
+
+          if curl -k -sS https://sarkariexams.me/job/test-slug/ | grep -q 'exact-home'; then
+            echo "OK https://sarkariexams.me/job/test-slug/ exact-home shell"
+          else
+            echo "FAIL https://sarkariexams.me/job/test-slug/ exact-home shell missing"
+            failures=1
+          fi
+
           if [ "$failures" -ne 0 ]; then
             echo "Production health verification failed."
             exit 1
