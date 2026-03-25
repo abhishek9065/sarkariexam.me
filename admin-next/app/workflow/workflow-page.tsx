@@ -74,7 +74,7 @@ export function WorkflowPage() {
         <CardContent>
           {isLoading ? (
             <Loader2 className="h-8 w-8 animate-spin" />
-          ) : pending?.length === 0 ? (
+          ) : !pending || pending.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">No pending approvals</p>
           ) : (
             <div className="space-y-3">

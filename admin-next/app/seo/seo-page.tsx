@@ -152,7 +152,7 @@ export function SEODashboardPage() {
             <CardDescription>Most searched terms (last 30 days)</CardDescription>
           </CardHeader>
           <CardContent>
-            {queries.length === 0 ? (
+            {!queries || queries.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No search data available</p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">

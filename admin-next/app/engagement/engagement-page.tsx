@@ -110,7 +110,7 @@ export function EngagementPage() {
             <CardContent>
               {loadingComments ? (
                 <Loader2 className="h-8 w-8 animate-spin" />
-              ) : comments?.length === 0 ? (
+              ) : !comments || comments.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No pending comments</p>
               ) : (
                 <div className="space-y-4">
@@ -194,7 +194,7 @@ export function EngagementPage() {
             <CardContent>
               {loadingFeedback ? (
                 <Loader2 className="h-8 w-8 animate-spin" />
-              ) : feedback?.length === 0 ? (
+              ) : !feedback || feedback.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No feedback yet</p>
               ) : (
                 <div className="space-y-3">

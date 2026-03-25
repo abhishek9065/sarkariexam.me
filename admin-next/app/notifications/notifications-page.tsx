@@ -289,7 +289,7 @@ export function NotificationsPage() {
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              ) : campaigns?.length === 0 ? (
+              ) : !campaigns || campaigns.length === 0 ? (
                 <p className="text-center text-muted-foreground py-12">No campaigns yet</p>
               ) : (
                 <div className="space-y-3">
