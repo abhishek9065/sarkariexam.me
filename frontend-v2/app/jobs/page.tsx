@@ -145,6 +145,9 @@ const qualifications = [
   'All', '10th', '12th', 'Diploma', 'ITI', 'Graduate', 'Post Graduate'
 ];
 
+const NOW_TIMESTAMP = Date.now();
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
 export default function JobsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('All');
@@ -153,7 +156,7 @@ export default function JobsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const getDaysLeft = (lastDate: string) => {
-    const days = Math.ceil((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((new Date(lastDate).getTime() - NOW_TIMESTAMP) / MS_PER_DAY);
     return days > 0 ? `${days} days left` : 'Closing soon';
   };
 

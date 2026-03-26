@@ -4,7 +4,7 @@ export async function getUserFeedback(limit = 50) {
   try {
     const col = getCollection('user_feedback');
     return await col.find({}).sort({ createdAt: -1 }).limit(limit).toArray();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -13,7 +13,7 @@ export async function getCommentsPendingReview(limit = 50) {
   try {
     const col = getCollection('community_comments');
     return await col.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(limit).toArray();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -27,7 +27,7 @@ export async function moderateComment(id: string, action: 'approve' | 'reject') 
       { $set: { status: action === 'approve' ? 'approved' : 'rejected', moderatedAt: new Date() } }
     );
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -46,7 +46,7 @@ export async function getEngagementMetrics(days = 30) {
     ]);
 
     return { feedbackCount, commentsCount, bookmarksCount };
-  } catch (error) {
+  } catch {
     return { feedbackCount: 0, commentsCount: 0, bookmarksCount: 0 };
   }
 }

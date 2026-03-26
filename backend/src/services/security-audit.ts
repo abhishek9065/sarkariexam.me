@@ -1,5 +1,3 @@
-import { getCollection } from './cosmosdb.js';
-
 interface SecurityEvent {
   type: string;
   userId?: string;
@@ -33,8 +31,9 @@ export async function getSecurityEvents(
     if (filters?.severity) query.severity = filters.severity;
     if (filters?.userId) query.userId = filters.userId;
     
-    return await col.find(query).sort({ timestamp: -1 }).limit(limit).toArray() as SecurityEvent[];
-  } catch (error) {
+    const results = await col.find(query).sort({ timestamp: -1 }).limit(limit).toArray();
+    return results as unknown as SecurityEvent[];
+  } catch {
     return [];
   }
 }
@@ -54,7 +53,7 @@ export async function getFailedLoginAttempts(minutes = 30): Promise<{ ip: string
     
     const results = await col.aggregate(pipeline).toArray();
     return results.map((r: any) => ({ ip: r._id, count: r.count }));
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -78,7 +77,7 @@ export async function getSecurityStats(): Promise<{
     ]);
     
     return { totalEvents24h, criticalCount, failedLogins, suspiciousIPs };
-  } catch (error) {
+  } catch {
     return { totalEvents24h: 0, criticalCount: 0, failedLogins: 0, suspiciousIPs: 0 };
   }
 }

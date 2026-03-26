@@ -1,5 +1,5 @@
-import { getCollection } from './cosmosdb.js';
 import { recordAnalyticsEvent } from './analytics.js';
+import { getCollection } from './cosmosdb.js';
 
 interface LiveMetrics {
   activeUsers: number;
@@ -213,7 +213,7 @@ export function setupLiveAnalyticsWebSocket(wss: any) {
 export async function recordUserLocation(userId: string | null, state: string, city?: string) {
   try {
     await recordAnalyticsEvent({
-      type: 'page_view',
+      type: 'announcement_view', // Valid AnalyticsEventType
       userId: userId || undefined,
       metadata: { state, city, location_recorded: true },
     });

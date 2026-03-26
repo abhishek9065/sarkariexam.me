@@ -21,7 +21,7 @@ export async function getSystemHealth(): Promise<HealthStatus> {
     const col = getCollection('health_check');
     await col.findOne({});
     dbLatency = Date.now() - startTime;
-  } catch (error) {
+  } catch {
     dbStatus = 'unhealthy';
   }
   
@@ -80,7 +80,7 @@ export async function getRecentErrors(limit = 10): Promise<Array<{
       .sort({ timestamp: -1 })
       .limit(limit)
       .toArray() as any[];
-  } catch (error) {
+  } catch {
     return [];
   }
 }

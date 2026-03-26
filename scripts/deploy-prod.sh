@@ -70,7 +70,7 @@ docker compose --env-file .env config >/dev/null
 echo "Building backend and nginx..."
 docker compose --env-file .env build backend nginx
 
-echo "Rebuilding frontend without cache to avoid stale Next.js artifacts..."
+echo "Rebuilding frontend-v2 without cache to avoid stale Next.js artifacts..."
 docker compose --env-file .env build --no-cache frontend
 
 echo "Starting services..."

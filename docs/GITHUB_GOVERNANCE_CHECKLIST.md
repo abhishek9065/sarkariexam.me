@@ -18,7 +18,7 @@ Use this checklist to complete the required repository governance steps in GitHu
 - [ ] `Backend Build + Tests`
 - [ ] `Public Frontend Lint + Build`
 - [ ] `npm audit (backend)`
-- [ ] `npm audit (frontend-next)`
+- [ ] `npm audit (frontend-v2)`
 - [ ] `CodeQL`
 
 ## Security Settings

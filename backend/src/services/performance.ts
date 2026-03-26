@@ -1,5 +1,3 @@
-import { getCollection } from './cosmosdb.js';
-
 interface PerformanceMetrics {
   avgResponseTime: number;
   p95ResponseTime: number;
@@ -22,7 +20,7 @@ export async function recordApiMetrics(route: string, method: string, duration: 
       isError: statusCode >= 400,
       timestamp: new Date(),
     } as any);
-  } catch (error) {
+  } catch {
     // Silently fail to avoid affecting performance
   }
 }
@@ -58,7 +56,7 @@ export async function getPerformanceSummary(minutes = 60): Promise<PerformanceMe
       errorRate: data.totalRequests ? (data.errorCount / data.totalRequests) * 100 : 0,
       timestamp: new Date(),
     };
-  } catch (error) {
+  } catch {
     return {
       avgResponseTime: 0,
       p95ResponseTime: 0,
@@ -95,7 +93,7 @@ export async function getSlowEndpoints(limit = 10): Promise<{ route: string; avg
       avgDuration: Math.round(r.avgDuration),
       count: r.count,
     }));
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -120,7 +118,7 @@ export async function getErrorSummary(hours = 24): Promise<{ code: number; count
       count: r.count,
       percentage: total ? Math.round((r.count / total) * 100) : 0,
     }));
-  } catch (error) {
+  } catch {
     return [];
   }
 }
