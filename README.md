@@ -4,7 +4,7 @@ Public government jobs and exam updates platform.
 
 ## Apps
 - `backend/`: Express 5 + TypeScript API
-- `frontend-next/`: Next.js public frontend
+- `frontend-v2/`: Next.js public frontend
 - `nginx/`: edge routing and production proxy config
 
 ## Core Features
@@ -24,7 +24,7 @@ npm run dev
 
 ### Public Frontend
 ```bash
-cd frontend-next
+cd frontend-v2
 npm install
 npm run dev
 ```
@@ -62,7 +62,7 @@ npm run test:ci
 
 ### Public Frontend
 ```bash
-cd frontend-next
+cd frontend-v2
 npm run build
 npm run lint
 ```
@@ -81,7 +81,7 @@ The script validates required production env vars, rebuilds the public services,
 ## Repository Layout
 ```text
 backend/        Express API
-frontend-next/  Next.js public frontend
+frontend-v2/  Next.js public frontend
 docs/           deployment and ops docs
 scripts/        deployment and maintenance scripts
 nginx/          edge routing

@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-This is a public government jobs and exam updates platform built with TypeScript. The live product surface is the Next.js app in `frontend-next/`, backed by the Express API in `backend/`.
+This is a public government jobs and exam updates platform built with TypeScript. The live product surface is the Next.js app in `frontend-v2/`, backed by the Express API in `backend/`.
 
 ## Architecture
 
-- **Public frontend**: Next.js 16 + React 19 (in `frontend-next/`)
+- **Public frontend**: Next.js 16 + React 19 (in `frontend-v2/`)
 - **Backend**: Node.js 22 + Express + TypeScript (in `backend/`)
 - **Database**: MongoDB locally; Azure Cosmos DB (MongoDB API) in production
 - **Reverse Proxy**: Nginx (in `nginx/`)
@@ -22,7 +22,7 @@ This is a public government jobs and exam updates platform built with TypeScript
 - `npm test` — Run Vitest
 - `npm run test:ci` — Run Vitest plus OpenAPI parity checks
 
-### Public Frontend (`cd frontend-next`)
+### Public Frontend (`cd frontend-v2`)
 - `npm run dev` — Start the Next.js dev server
 - `npm run build` — Production build
 - `npm start` — Run the production server
@@ -32,7 +32,7 @@ This is a public government jobs and exam updates platform built with TypeScript
 
 ```text
 backend/src/
-frontend-next/app/
+frontend-v2/app/
 nginx/
 scripts/
 ```
@@ -43,4 +43,4 @@ scripts/
 - Use Zod for backend request validation.
 - Keep backend routes under `/api/`.
 - Prefer relative same-origin API calls from the frontend unless there is a clear deployment reason not to.
-- Keep repo docs and workflows aligned with the active `backend + frontend-next + nginx` stack.
+- Keep repo docs and workflows aligned with the active `backend + frontend-v2 + nginx` stack.

@@ -33,7 +33,6 @@ import {
   ChevronDown,
   Bookmark,
   User,
-  Bell,
 } from 'lucide-react';
 
 const categories = [

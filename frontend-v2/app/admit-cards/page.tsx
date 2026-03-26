@@ -16,11 +16,8 @@ import {
 import { 
   Search, 
   CreditCard,
-  Calendar,
-  Building2,
   Download,
   Clock,
-  MapPin,
   AlertCircle,
   X,
   Filter,
@@ -119,6 +116,9 @@ const admitCardsData = [
 const departments = ['All', 'Banking', 'SSC', 'Railway', 'UPSC', 'Defence'];
 const statuses = ['All', 'Available', 'Expected', 'Closed'];
 
+const NOW_TIMESTAMP = Date.now();
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
 export default function AdmitCardsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('All');
@@ -148,7 +148,7 @@ export default function AdmitCardsPage() {
   const hasActiveFilters = searchQuery || selectedDepartment !== 'All' || selectedStatus !== 'All';
 
   const getDaysLeft = (lastDate: string) => {
-    const days = Math.ceil((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((new Date(lastDate).getTime() - NOW_TIMESTAMP) / MS_PER_DAY);
     return days;
   };
 

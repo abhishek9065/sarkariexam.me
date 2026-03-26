@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getCollection } from './cosmosdb.js';
+
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
 const assignmentSchema = z.object({
@@ -27,7 +27,7 @@ export async function assignAnnouncement(data: unknown, assignedBy: string) {
     });
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to assign' };
   }
 }
@@ -42,7 +42,7 @@ export async function approveAnnouncement(announcementId: string, approvedBy: st
 
     await addWorkflowLog(announcementId, 'approved', approvedBy, { note });
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to approve' };
   }
 }
@@ -55,7 +55,7 @@ export async function rejectAnnouncement(announcementId: string, rejectedBy: str
 
     await addWorkflowLog(announcementId, 'rejected', rejectedBy, { reason });
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to reject' };
   }
 }
@@ -84,7 +84,7 @@ export async function getPendingApprovals(assigneeEmail?: string) {
       return all.filter(a => (a as any).assigneeEmail === assigneeEmail);
     }
     return all;
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -97,7 +97,7 @@ export async function getWorkflowLogs(announcementId: string) {
       .find({ announcementId })
       .sort({ createdAt: -1 })
       .toArray();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -120,7 +120,7 @@ export async function checkSLAViolations(): Promise<Array<{
         assignee: (a as any).assigneeEmail,
         hoursOverdue: Math.floor((now - new Date((a as any).reviewDueAt).getTime()) / (1000 * 60 * 60)),
       }));
-  } catch (error) {
+  } catch {
     return [];
   }
 }

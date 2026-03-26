@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 interface AIResponse {
   content: string;
   tokens?: number;
@@ -55,7 +53,7 @@ Return ONLY the meta description, no quotes or explanation.`;
 
     if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const description = data.choices?.[0]?.message?.content?.trim() || '';
 
     return {
@@ -103,7 +101,7 @@ Return ONLY the title, optimized for search engines.`;
 
     if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const metaTitle = data.choices?.[0]?.message?.content?.trim() || title;
 
     return {
@@ -168,7 +166,7 @@ Return ONLY a comma-separated list of tags from the provided list.`;
 
     if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const tagText = data.choices?.[0]?.message?.content?.trim() || '';
     const suggested = tagText.split(',').map(t => t.trim()).filter(Boolean);
 
@@ -224,7 +222,7 @@ Make it engaging with emojis. Include #SarkariNaukri #GovernmentJobs hashtags.`;
 
     if (!response.ok) throw new Error(`OpenAI API error: ${response.status}`);
 
-    const data = await response.json();
+    const data = await response.json() as any;
     const summary = data.choices?.[0]?.message?.content?.trim() || '';
 
     return {
