@@ -213,7 +213,7 @@ export function setupLiveAnalyticsWebSocket(wss: any) {
 export async function recordUserLocation(userId: string | null, state: string, city?: string) {
   try {
     await recordAnalyticsEvent({
-      type: 'content_view', // Change to valid AnalyticsEventType
+      type: 'announcement_view', // Valid AnalyticsEventType
       userId: userId || undefined,
       metadata: { state, city, location_recorded: true },
     });

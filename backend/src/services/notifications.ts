@@ -60,7 +60,10 @@ export async function createCampaign(
       title: parse.data.title,
       body: parse.data.body,
       url: parse.data.url,
-      segment: parse.data.segment,
+      segment: {
+        type: parse.data.segment.type,
+        value: parse.data.segment.value
+      },
       status: parse.data.scheduledAt ? 'scheduled' : 'draft',
       sentCount: 0,
       failedCount: 0,
@@ -69,7 +72,11 @@ export async function createCampaign(
       scheduledAt: parse.data.scheduledAt ? new Date(parse.data.scheduledAt) : undefined,
       createdBy: userId,
       createdAt: new Date(),
-      abTest: parse.data.abTest,
+      abTest: parse.data.abTest ? {
+        enabled: parse.data.abTest.enabled,
+        variantA: parse.data.abTest.variantA,
+        variantB: parse.data.abTest.variantB,
+      } : undefined,
     };
 
     await col.insertOne(campaign as any);
