@@ -74,8 +74,8 @@ export async function createCampaign(
       createdAt: new Date(),
       abTest: parse.data.abTest ? {
         enabled: parse.data.abTest.enabled,
-        variantA: parse.data.abTest.variantA,
-        variantB: parse.data.abTest.variantB,
+        variantA: parse.data.abTest.variantA as any,
+        variantB: parse.data.abTest.variantB as any,
       } : undefined,
     };
 
