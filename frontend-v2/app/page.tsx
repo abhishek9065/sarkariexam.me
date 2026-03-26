@@ -48,11 +48,15 @@ export default function HomePage() {
       <div className="container mx-auto px-2 sm:px-4 max-w-[1200px]">
         
         {/* Marquee / Important Notice */}
-        <div className="bg-[#B91C1C] text-white font-bold py-2 px-4 rounded mb-6 shadow border border-[#991B1B] flex items-center">
-          <span className="whitespace-nowrap mr-4 bg-yellow-400 text-black px-2 py-0.5 rounded text-sm animate-pulse">LATEST</span>
-          <marquee className="text-sm sm:text-base font-semibold" behavior="scroll" direction="left" scrollamount="6">
-            SSC CGL 2025 Online Form Last Date is 30 April 2025. || Railway NTPC 2025 Official Notification Released. Apply Now! || UP Police Constable Result Declared! || Check UP Board 10th & 12th Results Soon!
-          </marquee>
+        <div className="bg-[#B91C1C] text-white font-bold py-2 px-4 rounded mb-6 shadow border border-[#991B1B] flex items-center overflow-hidden relative">
+          <span className="whitespace-nowrap mr-4 bg-yellow-400 text-black px-2 py-0.5 rounded text-xs sm:text-sm animate-pulse z-10 shadow-sm">LATEST</span>
+          <div className="flex-1 overflow-hidden">
+            <div className="whitespace-nowrap inline-block animate-marquee hover:[animation-play-state:paused] font-semibold text-sm sm:text-base py-1">
+              SSC CGL 2025 Online Form Last Date is 30 April 2025. || Railway NTPC 2025 Official Notification Released. Apply Now! || UP Police Constable Result Declared! || Check UP Board 10th & 12th Results Soon!
+              <span className="mx-8">||</span>
+              SSC CGL 2025 Online Form Last Date is 30 April 2025. || Railway NTPC 2025 Official Notification Released. Apply Now! || UP Police Constable Result Declared! || Check UP Board 10th & 12th Results Soon!
+            </div>
+          </div>
         </div>
 
         {/* 3 Columns Layout (Result | Admit Card | Latest Jobs) */}
