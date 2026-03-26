@@ -1,5 +1,3 @@
-import { getCollection } from './cosmosdb.js';
-
 // In-memory rate limit store (use Redis in production)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
@@ -25,7 +23,7 @@ export async function recordRateLimitHit(key: string, endpoint: string) {
     const { getCollection } = await import('./cosmosdb.js');
     const col = getCollection('rate_limit_hits');
     await col.insertOne({ key, endpoint, timestamp: new Date() } as any);
-  } catch (error) {
+  } catch {
     // Silent fail
   }
 }
@@ -56,7 +54,7 @@ export async function getRateLimitStats(): Promise<{
       uniqueIPs: uniqueIPsAgg.length,
       mostLimited: mostLimitedAgg.map((m: any) => ({ key: m._id, count: m.count })),
     };
-  } catch (error) {
+  } catch {
     return { totalHits24h: 0, uniqueIPs: 0, mostLimited: [] };
   }
 }
@@ -76,7 +74,7 @@ export async function getRateLimitByEndpoint(): Promise<{ endpoint: string; hits
     
     const results = await col.aggregate(pipeline).toArray();
     return results.map((r: any) => ({ endpoint: r._id, hits: r.hits, blocked: 0 }));
-  } catch (error) {
+  } catch {
     return [];
   }
 }

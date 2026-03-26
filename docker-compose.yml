@@ -71,7 +71,7 @@ services:
   # Frontend (Next.js runtime)
   frontend:
     build:
-      context: ./frontend-next
+      context: ./frontend-v2
       dockerfile: Dockerfile
     container_name: sarkari-frontend
     expose:

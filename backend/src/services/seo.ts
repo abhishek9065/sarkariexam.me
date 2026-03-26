@@ -10,7 +10,7 @@ export async function getSEOMetrics() {
       col.countDocuments({ schema: { $exists: true } }),
     ]);
     return { total, withMeta, indexed, withSchema, healthScore: Math.round((withMeta / total) * 100) };
-  } catch (error) {
+  } catch {
     return { total: 0, withMeta: 0, indexed: 0, withSchema: 0, healthScore: 0 };
   }
 }
@@ -25,7 +25,7 @@ export async function getTopSearchQueries(limit = 20) {
       { $limit: limit },
     ];
     return await col.aggregate(pipeline).toArray();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -39,7 +39,7 @@ export async function getIndexCoverage() {
       col.countDocuments({ 'seo.indexPolicy': { $exists: false } }),
     ]);
     return { indexed, noindex, missing };
-  } catch (error) {
+  } catch {
     return { indexed: 0, noindex: 0, missing: 0 };
   }
 }

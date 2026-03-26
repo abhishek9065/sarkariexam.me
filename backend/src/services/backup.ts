@@ -18,7 +18,7 @@ export async function createBackupMetadata(collections: string[], initiatedBy: s
     
     await col.insertOne(backup as any);
     return backup;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -28,7 +28,7 @@ export async function getBackups(limit = 20) {
     const { getCollection } = await import('./cosmosdb.js');
     const col = getCollection('backups');
     return await col.find({}).sort({ createdAt: -1 }).limit(limit).toArray();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -38,7 +38,7 @@ export async function exportCollectionToJSON(collectionName: string) {
     const col = getCollection(collectionName);
     const docs = await col.find({}).limit(10000).toArray();
     return JSON.stringify(docs, null, 2);
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -62,7 +62,7 @@ export async function exportAnnouncementsToCSV(): Promise<string> {
     ]);
     
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  } catch (error) {
+  } catch {
     return '';
   }
 }
