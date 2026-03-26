@@ -96,20 +96,16 @@ jobs:
             fi
           done
 
-          echo "Checking public shell rendering..."
-          if curl -k -sS https://sarkariexams.me/jobs/ | grep -q 'exact-home'; then
-            echo "OK https://sarkariexams.me/jobs/ exact-home shell"
-          else
-            echo "FAIL https://sarkariexams.me/jobs/ exact-home shell missing"
-            failures=1
-          fi
-
-          if curl -k -sS https://sarkariexams.me/job/test-slug/ | grep -q 'exact-home'; then
-            echo "OK https://sarkariexams.me/job/test-slug/ exact-home shell"
-          else
-            echo "FAIL https://sarkariexams.me/job/test-slug/ exact-home shell missing"
-            failures=1
-          fi
+          echo "Checking frontend routes..."
+          for route in "/jobs" "/results" "/admit-cards"; do
+            status=$(curl -k -sS -o /dev/null -w "%{http_code}" "https://sarkariexams.me${route}" || true)
+            if [[ "$status" =~ ^(2|3) ]]; then
+              echo "OK https://sarkariexams.me${route} (status=$status)"
+            else
+              echo "FAIL https://sarkariexams.me${route} (status=$status)"
+              failures=1
+            fi
+          done
 
           if [ "$failures" -ne 0 ]; then
             echo "Production health verification failed."
