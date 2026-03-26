@@ -1,5 +1,5 @@
-import { getCollection } from './cosmosdb.js';
 import { recordAnalyticsEvent } from './analytics.js';
+import { getCollection } from './cosmosdb.js';
 
 interface LiveMetrics {
   activeUsers: number;

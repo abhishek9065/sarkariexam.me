@@ -4,10 +4,6 @@ import Link from 'next/link';
 import { 
   Briefcase, 
   FileText, 
-  CreditCard, 
-  Key, 
-  BookOpen,
-  GraduationCap,
   Home,
   Bookmark,
   User

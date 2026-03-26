@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { getCollection } from './cosmosdb.js';
 
 const notificationCampaignSchema = z.object({
   title: z.string().min(5).max(200),

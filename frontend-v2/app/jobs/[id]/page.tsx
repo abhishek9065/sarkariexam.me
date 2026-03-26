@@ -18,8 +18,6 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
-  GraduationCap,
-  Users,
   ArrowLeft,
   ExternalLink,
   ChevronRight,
@@ -161,11 +159,14 @@ const relatedJobs = [
   },
 ];
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
+const NOW_TIMESTAMP = Date.now();
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+export default function JobDetailPage() {
   const [isBookmarked, setIsBookmarked] = useState(false);
 
   const getDaysLeft = (date: string) => {
-    const days = Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((new Date(date).getTime() - NOW_TIMESTAMP) / MS_PER_DAY);
     return days;
   };
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getCollection } from '../services/cosmosdb.js';
+
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
 const bulkImportSchema = z.array(z.object({

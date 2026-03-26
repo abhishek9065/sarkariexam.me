@@ -113,14 +113,12 @@ router.get('/dashboard', async (_req, res) => {
       qaCounts,
       slaSummary,
       recentAnnouncements,
-      users,
     ] = await Promise.all([
       AnnouncementModel.getAdminCounts({ includeInactive: true }),
       AnnouncementModel.getManagePostsWorkspaceSummary({ includeInactive: true }),
       AnnouncementModel.getAdminQaCounts({ includeInactive: true }),
       AnnouncementModel.getPendingSlaSummary({ includeInactive: true, staleLimit: 5 }),
       AnnouncementModel.findAllAdmin({ sort: 'newest', limit: 10, includeInactive: true }),
-      UserModelMongo.findAll({ limit: 1 }), // Just to get a count signal
     ]);
 
     // Get total user count

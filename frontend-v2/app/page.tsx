@@ -113,6 +113,9 @@ const latestUpdates = [
   { type: 'answer', title: 'RRB Group D Answer Key 2026', date: '2 days ago', href: '/answer-keys/rrb-group-d-2026' },
 ];
 
+const NOW_TIMESTAMP = Date.now();
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -124,7 +127,7 @@ export default function HomePage() {
   };
 
   const getDaysLeft = (lastDate: string) => {
-    const days = Math.ceil((new Date(lastDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((new Date(lastDate).getTime() - NOW_TIMESTAMP) / MS_PER_DAY);
     return days > 0 ? `${days} days left` : 'Closing soon';
   };
 
@@ -443,4 +446,3 @@ export default function HomePage() {
     </div>
   );
 }
-
