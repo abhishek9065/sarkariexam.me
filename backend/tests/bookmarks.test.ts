@@ -33,7 +33,7 @@ describeOrSkip('bookmarks', () => {
             type: 'job',
             category: 'Test Category',
             organization: 'Test Org',
-        }, 'admin-user');
+        }, 'sample-user');
 
         await agent
             .post('/api/bookmarks')

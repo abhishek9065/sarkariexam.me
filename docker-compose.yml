@@ -10,8 +10,8 @@ services:
       - "443:443"
     depends_on:
       - frontend
-      - admin-frontend
       - backend
+      - admin
     restart: unless-stopped
     networks:
       - sarkari-network
@@ -33,20 +33,13 @@ services:
       - COSMOS_CONNECTION_STRING=${COSMOS_CONNECTION_STRING}
       - COSMOS_DATABASE_NAME=${COSMOS_DATABASE_NAME:-sarkari_db}
       - JWT_SECRET=${JWT_SECRET}
-      - ADMIN_BACKUP_CODE_SALT=${ADMIN_BACKUP_CODE_SALT}
       - SENDGRID_API_KEY=${SENDGRID_API_KEY}
       - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
       - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
       - SENTRY_DSN=${SENTRY_DSN}
       - FRONTEND_URL=${FRONTEND_URL:-https://sarkariexams.me}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://sarkariexams.me,https://www.sarkariexams.me}
-      - ADMIN_SETUP_KEY=${ADMIN_SETUP_KEY}
-      - TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}
       - METRICS_TOKEN=${METRICS_TOKEN}
-      - ADMIN_EMAIL_ALLOWLIST=${ADMIN_EMAIL_ALLOWLIST}
-      - ADMIN_DOMAIN_ALLOWLIST=${ADMIN_DOMAIN_ALLOWLIST}
-      - ADMIN_REQUIRE_2FA=${ADMIN_REQUIRE_2FA:-true}
-      - ADMIN_ENFORCE_HTTPS=${ADMIN_ENFORCE_HTTPS:-true}
     expose:
       - "4000"
     restart: unless-stopped
@@ -58,38 +51,36 @@ services:
       timeout: 10s
       retries: 3
 
-  # Frontend (Next.js static export)
-  frontend:
+  # Admin Console (Next.js)
+  admin:
     build:
-      context: ./frontend-next
+      context: ./admin-next
       dockerfile: Dockerfile
-    container_name: sarkari-frontend
+    container_name: sarkari-admin
     expose:
-      - "80"
+      - "3001"
     restart: unless-stopped
     networks:
       - sarkari-network
     healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:80" ]
+      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001" ]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Admin Frontend (vNext)
-  admin-frontend:
+  # Frontend (Next.js runtime)
+  frontend:
     build:
-      context: ./admin-frontend
+      context: ./frontend-v2
       dockerfile: Dockerfile
-      args:
-        VITE_ADMIN_BASENAME: ${VITE_ADMIN_BASENAME:-/admin-vnext}
-    container_name: sarkari-admin-frontend
+    container_name: sarkari-frontend
     expose:
-      - "80"
+      - "3000"
     restart: unless-stopped
     networks:
       - sarkari-network
     healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:80" ]
+      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000" ]
       interval: 30s
       timeout: 10s
       retries: 3

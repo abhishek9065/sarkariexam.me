@@ -16,10 +16,9 @@ Use this checklist to complete the required repository governance steps in GitHu
 ## Required Status Checks
 
 - [ ] `Backend Build + Tests`
-- [ ] `Frontend Build`
-- [ ] `Playwright Smoke`
+- [ ] `Public Frontend Lint + Build`
 - [ ] `npm audit (backend)`
-- [ ] `npm audit (frontend)`
+- [ ] `npm audit (frontend-v2)`
 - [ ] `CodeQL`
 
 ## Security Settings

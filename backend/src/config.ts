@@ -31,22 +31,6 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
 };
 
 /**
- * Parse JSON object with fallback.
- */
-const parseJsonObject = (value: string | undefined): Record<string, any> => {
-  if (!value) return {};
-  try {
-    const parsed = JSON.parse(value);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, any>;
-    }
-  } catch (error) {
-    console.warn('[CONFIG] Warning: Failed to parse JSON object env var', error);
-  }
-  return {};
-};
-
-/**
  * Get required environment variable (no fallback allowed in production).
  */
 const getRequiredEnv = (key: string, devFallback?: string): string => {
@@ -101,16 +85,10 @@ const getDbConnectionString = (): string => {
 
 const databaseUrl = getDbConnectionString();
 const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefined);
-const adminBackupCodeSalt = getRequiredEnv(
-  'ADMIN_BACKUP_CODE_SALT',
-  isTest ? 'test-admin-backup-code-salt' : 'dev-admin-backup-code-salt'
-);
 
 const defaultCorsOrigins = [
-  'http://localhost:4173',
-  'http://localhost:4174',
-  'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:3001',
   'https://sarkariexams.me',
   'https://www.sarkariexams.me'
 ];
@@ -119,35 +97,12 @@ const corsOrigins = parseCsv(process.env.CORS_ORIGINS);
 const rateLimitWindowMs = parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60000);
 const rateLimitMax = parseNumber(process.env.RATE_LIMIT_MAX, 200);
 const authRateLimitMax = parseNumber(process.env.AUTH_RATE_LIMIT_MAX, 20);
-const adminRateLimitMax = parseNumber(process.env.ADMIN_RATE_LIMIT_MAX, 200);
-const adminIpAllowlist = parseCsv(process.env.ADMIN_IP_ALLOWLIST);
-const adminEmailAllowlist = parseCsv(process.env.ADMIN_EMAIL_ALLOWLIST);
-const adminDomainAllowlist = parseCsv(process.env.ADMIN_DOMAIN_ALLOWLIST);
-const adminEnforceHttps = parseBoolean(process.env.ADMIN_ENFORCE_HTTPS, isProduction);
-const adminSetupKey = getRequiredEnv('ADMIN_SETUP_KEY', isTest ? 'test-admin-setup-key' : undefined);
-const adminRequire2FA = parseBoolean(process.env.ADMIN_REQUIRE_2FA, isProduction);
-const adminAuthCookieName = process.env.ADMIN_AUTH_COOKIE_NAME ?? 'admin_auth_token';
-const adminSetupTokenExpiry = process.env.ADMIN_SETUP_TOKEN_EXPIRY ?? '15m';
-const totpIssuer = process.env.TOTP_ISSUER ?? 'SarkariExams Admin';
-const totpEncryptionKey = getRequiredEnv('TOTP_ENCRYPTION_KEY', isTest ? 'test-totp-encryption-key' : undefined);
 const jwtIssuer = process.env.JWT_ISSUER ?? '';
 const jwtAudience = process.env.JWT_AUDIENCE ?? '';
 const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
-const adminJwtExpiry = process.env.ADMIN_JWT_EXPIRY ?? '6h';
 const passwordHistoryLimit = Math.max(1, parseNumber(process.env.PASSWORD_HISTORY_LIMIT, 5));
 const passwordBreachCheckEnabled = parseBoolean(process.env.PASSWORD_BREACH_CHECK_ENABLED, true);
 const passwordBreachCheckTimeoutMs = Math.max(500, parseNumber(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS, 2500));
-const adminSessionIdleTimeoutMinutes = Math.max(5, parseNumber(process.env.ADMIN_SESSION_IDLE_TIMEOUT_MINUTES, 30));
-const adminSessionAbsoluteTimeoutHours = Math.max(1, parseNumber(process.env.ADMIN_SESSION_ABSOLUTE_TIMEOUT_HOURS, 12));
-const adminStepUpTtlSeconds = Math.max(60, parseNumber(process.env.ADMIN_STEP_UP_TTL_SECONDS, 10 * 60));
-const adminDualApprovalRequired = parseBoolean(process.env.ADMIN_DUAL_APPROVAL_REQUIRED, true);
-const adminApprovalExpiryMinutes = Math.max(5, parseNumber(process.env.ADMIN_APPROVAL_EXPIRY_MINUTES, 30));
-const adminApprovalRetentionDays = Math.max(1, parseNumber(process.env.ADMIN_APPROVAL_RETENTION_DAYS, 30));
-const adminApprovalCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.ADMIN_APPROVAL_CLEANUP_INTERVAL_MINUTES, 60));
-const adminApprovalPolicyMatrix = parseJsonObject(process.env.ADMIN_APPROVAL_POLICY_MATRIX);
-const adminBreakGlassEnabled = parseBoolean(process.env.ADMIN_BREAK_GLASS_ENABLED, false);
-const adminBreakGlassMinReasonLength = Math.max(8, parseNumber(process.env.ADMIN_BREAK_GLASS_MIN_REASON_LENGTH, 12));
-const adminSecurityAlertEmail = process.env.ADMIN_SECURITY_ALERT_EMAIL ?? '';
 const metricsToken = process.env.METRICS_TOKEN ?? '';
 const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24));
 const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
@@ -158,30 +113,10 @@ const featureFlags = {
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),
   tracker_api_v2: parseBoolean(process.env.FEATURE_TRACKER_API_V2, true),
   dashboard_widgets_v2: parseBoolean(process.env.FEATURE_DASHBOARD_WIDGETS_V2, true),
-  admin_nav_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_NAV_UX_V2, true),
-  admin_analytics_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_ANALYTICS_UX_V2, true),
-  admin_lists_ux_v2: parseBoolean(process.env.FEATURE_ADMIN_LISTS_UX_V2, true),
-  admin_lists_v3: parseBoolean(process.env.FEATURE_ADMIN_LISTS_V3, false),
-  admin_review_v3: parseBoolean(process.env.FEATURE_ADMIN_REVIEW_V3, false),
-  admin_analytics_v3: parseBoolean(process.env.FEATURE_ADMIN_ANALYTICS_V3, false),
-  admin_command_palette_v1: parseBoolean(process.env.FEATURE_ADMIN_COMMAND_PALETTE_V1, false),
 };
 
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'test-secret', 'change-me', 'secret', 'jwt-secret']);
-validateSecret('ADMIN_SETUP_KEY', adminSetupKey, ['setup-admin-123', 'test-admin-setup-key', 'change-me', 'admin-setup']);
-validateSecret('TOTP_ENCRYPTION_KEY', totpEncryptionKey, ['dev-totp-key', 'change-me', 'secret', 'test-totp-encryption-key']);
-validateSecret('ADMIN_BACKUP_CODE_SALT', adminBackupCodeSalt, [
-  'change-me',
-  'admin-backup-salt',
-  'backup-salt',
-  'dev-admin-backup-code-salt',
-  'test-admin-backup-code-salt',
-]);
-
-if (isProduction && adminEmailAllowlist.length === 0 && adminDomainAllowlist.length === 0) {
-  throw new Error('SECURITY ERROR: ADMIN_EMAIL_ALLOWLIST or ADMIN_DOMAIN_ALLOWLIST is required in production.');
-}
 
 export const config = {
   port: Number(process.env.PORT ?? 5000),
@@ -191,38 +126,14 @@ export const config = {
   rateLimitWindowMs,
   rateLimitMax,
   authRateLimitMax,
-  adminRateLimitMax,
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProduction,
-  adminIpAllowlist,
-  adminEmailAllowlist,
-  adminDomainAllowlist,
-  adminEnforceHttps,
-  adminSetupKey,
-  adminRequire2FA,
-  adminAuthCookieName,
-  adminSetupTokenExpiry,
-  totpIssuer,
-  totpEncryptionKey,
-  adminBackupCodeSalt,
   jwtIssuer,
   jwtAudience,
   jwtExpiry,
-  adminJwtExpiry,
   passwordHistoryLimit,
   passwordBreachCheckEnabled,
   passwordBreachCheckTimeoutMs,
-  adminSessionIdleTimeoutMinutes,
-  adminSessionAbsoluteTimeoutHours,
-  adminStepUpTtlSeconds,
-  adminDualApprovalRequired,
-  adminApprovalExpiryMinutes,
-  adminApprovalRetentionDays,
-  adminApprovalCleanupIntervalMinutes,
-  adminApprovalPolicyMatrix,
-  adminBreakGlassEnabled,
-  adminBreakGlassMinReasonLength,
-  adminSecurityAlertEmail,
   metricsToken,
   securityLogRetentionHours,
   securityLogPersistenceEnabled,

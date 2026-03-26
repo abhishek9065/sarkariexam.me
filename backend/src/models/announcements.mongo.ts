@@ -495,7 +495,7 @@ export class AnnouncementModelMongo {
     }
 
     /**
-     * Find all announcements for admin views (includes drafts and scheduled items)
+     * Find all announcements including non-public states such as drafts and scheduled items.
      */
     static async findAllAdmin(filters?: {
         type?: ContentType;
@@ -636,6 +636,125 @@ export class AnnouncementModelMongo {
                     'answer-key': 0,
                     admission: 0,
                 },
+            };
+        }
+    }
+
+    static async getManagePostsWorkspaceSummary(options?: {
+        includeInactive?: boolean;
+        assigneeUserId?: string;
+        assigneeEmail?: string;
+    }): Promise<{
+        total: number;
+        byStatus: Record<AnnouncementStatus, number>;
+        assignedToMe: number;
+        unassignedPending: number;
+        overdueReview: number;
+    }> {
+        try {
+            const query = buildAdminQuery({ includeInactive: options?.includeInactive });
+            const assigneeClauses: Filter<AnnouncementDoc>[] = [];
+            if (options?.assigneeUserId) {
+                assigneeClauses.push({ assigneeUserId: options.assigneeUserId });
+            }
+            if (options?.assigneeEmail) {
+                assigneeClauses.push({ assigneeEmail: options.assigneeEmail });
+            }
+
+            const results = await this.collection.aggregate([
+                { $match: query },
+                {
+                    $addFields: {
+                        normalizedStatus: { $ifNull: ['$status', DEFAULT_STATUS] },
+                    },
+                },
+                {
+                    $facet: {
+                        total: [{ $count: 'value' }],
+                        byStatus: [{ $group: { _id: '$normalizedStatus', count: { $sum: 1 } } }],
+                        assignedToMe: assigneeClauses.length > 0
+                            ? [
+                                { $match: { $or: assigneeClauses } },
+                                { $count: 'value' },
+                            ]
+                            : [
+                                { $match: { _id: { $exists: false } } },
+                                { $count: 'value' },
+                            ],
+                        unassignedPending: [
+                            {
+                                $match: {
+                                    normalizedStatus: 'pending',
+                                    $and: [
+                                        {
+                                            $or: [
+                                                { assigneeUserId: { $exists: false } },
+                                                { assigneeUserId: null },
+                                                { assigneeUserId: '' },
+                                            ],
+                                        },
+                                        {
+                                            $or: [
+                                                { assigneeEmail: { $exists: false } },
+                                                { assigneeEmail: null },
+                                                { assigneeEmail: '' },
+                                            ],
+                                        },
+                                    ],
+                                },
+                            },
+                            { $count: 'value' },
+                        ],
+                        overdueReview: [
+                            {
+                                $match: {
+                                    normalizedStatus: 'pending',
+                                    reviewDueAt: { $type: 'date', $lt: new Date() },
+                                },
+                            },
+                            { $count: 'value' },
+                        ],
+                    },
+                },
+            ]).toArray();
+
+            const summary = results[0] ?? {};
+            const byStatus: Record<AnnouncementStatus, number> = {
+                draft: 0,
+                pending: 0,
+                scheduled: 0,
+                published: 0,
+                archived: 0,
+            };
+
+            for (const entry of summary.byStatus ?? []) {
+                const status = entry._id as AnnouncementStatus;
+                if (status && status in byStatus) {
+                    byStatus[status] = entry.count;
+                }
+            }
+
+            return {
+                total: summary.total?.[0]?.value ?? 0,
+                byStatus,
+                assignedToMe: summary.assignedToMe?.[0]?.value ?? 0,
+                unassignedPending: summary.unassignedPending?.[0]?.value ?? 0,
+                overdueReview: summary.overdueReview?.[0]?.value ?? 0,
+            };
+        } catch (error) {
+            console.error('[MongoDB] getManagePostsWorkspaceSummary error:', error);
+            return {
+                total: 0,
+                byStatus: {
+                    draft: 0,
+                    pending: 0,
+                    scheduled: 0,
+                    published: 0,
+                    archived: 0,
+                },
+                assignedToMe: 0,
+                unassignedPending: 0,
+                overdueReview: 0,
             };
         }
     }
@@ -1113,7 +1232,7 @@ export class AnnouncementModelMongo {
      * Create new announcement
      */
     static async create(data: CreateAnnouncementDto, userId: string): Promise<Announcement> {
-        const slug = this.generateSlug(data.title);
+        const slug = this.generateSlug(data.title, true); // Include timestamp for unique slug
         const now = new Date();
         const status = normalizeStatus(data.status);
         const publishAt = data.publishAt ? new Date(data.publishAt) : undefined;
@@ -1407,7 +1526,7 @@ export class AnnouncementModelMongo {
             try {
                 docs.push({
                     title: item.title,
-                    slug: this.generateSlug(item.title),
+                    slug: this.generateSlug(item.title, true), // Include timestamp for unique slug
                     type: item.type,
                     category: item.category,
                     organization: item.organization,
@@ -1575,13 +1694,16 @@ export class AnnouncementModelMongo {
 
     /**
      * Generate URL-safe slug
+     * @param text - The text to slugify
+     * @param includeTimestamp - Whether to include a timestamp for uniqueness (used for new slugs)
      */
-    private static generateSlug(text: string): string {
-        return text
+    private static generateSlug(text: string, includeTimestamp = false): string {
+        const slug = text
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '')
-            .substring(0, 200) + '-' + Date.now();
+            .substring(0, 200);
+        return includeTimestamp ? `${slug}-${Date.now()}` : slug;
     }
 
     /**

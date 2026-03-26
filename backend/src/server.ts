@@ -9,38 +9,28 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config.js';
-import { authenticateToken, requirePermission } from './middleware/auth.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
-import { responseTimeLogger, getPerformanceStats } from './middleware/responseTime.js';
+import { responseTimeLogger } from './middleware/responseTime.js';
 import {
   securityHeaders,
   blockSuspiciousAgents,
   validateContentType,
-  enforceAdminHttps,
-  enforceAdminIpAllowlist
 } from './middleware/security.js';
-import adminAuthRouter from './routes/admin-auth.js';
-import adminSetupRouter from './routes/admin-setup.js';
 import adminRouter from './routes/admin.js';
-import analyticsRouter from './routes/analytics.js';
 import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
 import bookmarksRouter from './routes/bookmarks.js';
-import bulkRouter from './routes/bulk.js';
 import communityRouter from './routes/community.js';
-import graphqlRouter from './routes/graphql.js';
 import jobsRouter from './routes/jobs.js';
 import profileRouter from './routes/profile.js';
 import pushRouter from './routes/push.js';
 import subscriptionsRouter from './routes/subscriptions.js';
 import supportRouter from './routes/support.js';
-import { scheduleAdminApprovalsCleanup } from './services/adminApprovals.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
-import { startAnalyticsWebSocket } from './services/analyticsStream.js';
 import { scheduleAutomationJobs } from './services/automationJobs.js';
 import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
 import { scheduleDigestSender } from './services/digestScheduler.js';
@@ -99,8 +89,6 @@ app.use(cors({
     'Content-Type',
     'Authorization',
     'X-Requested-With',
-    'X-Admin-Step-Up-Token',
-    'X-Admin-Approval-Id',
     'X-CSRF-Token',
     'Idempotency-Key',
   ]
@@ -129,12 +117,6 @@ try {
 // Rate limiting
 app.use('/api', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));
 app.use('/api/auth', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.authRateLimitMax }));
-app.use(
-  ['/api/admin', '/api/analytics', '/api/graphql', '/api/bulk', '/api/performance'],
-  enforceAdminHttps,
-  enforceAdminIpAllowlist,
-  rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.adminRateLimitMax, keyPrefix: 'admin' })
-);
 
 // Response time logging
 app.use(responseTimeLogger);
@@ -227,16 +209,10 @@ app.get('/metrics', (req, res) => {
   res.type('text/plain; version=0.0.4').send(`${lines.join('\n')}\n`);
 });
 
-// Performance stats (admin only)
-app.get('/api/performance', authenticateToken, requirePermission('admin:read'), (_req, res) => {
-  res.json({ data: getPerformanceStats() });
-});
-
 // Core Routes (MongoDB-based)
 app.use(
   '/api/auth',
   csrfProtection({
-    cookieNames: [config.adminAuthCookieName],
     exempt: [
       { method: 'POST', path: '/login' },
       { method: 'POST', path: '/register' },
@@ -244,25 +220,13 @@ app.use(
   }),
   authRouter
 );
-app.use(
-  '/api/admin-auth',
-  csrfProtection({
-    cookieNames: [config.adminAuthCookieName],
-    exempt: [{ method: 'POST', path: '/login' }],
-  }),
-  adminAuthRouter
-);
-app.use('/api/auth/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminSetupRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/announcements', announcementsRouter);
-app.use('/api/admin', csrfProtection({ cookieNames: [config.adminAuthCookieName] }), adminRouter);
-app.use('/api/analytics', analyticsRouter);
-app.use('/api/graphql', graphqlRouter);
 app.use('/api/bookmarks', bookmarksRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/jobs', jobsRouter);
-app.use('/api/bulk', bulkRouter);
 app.use('/api/community', communityRouter);
 app.use('/api/support', supportRouter);
 
@@ -290,7 +254,6 @@ export async function startServer() {
       await scheduleAnalyticsRollups().catch(error => {
         logger.error({ err: error }, '[Analytics] Rollup init failed');
       });
-      scheduleAdminApprovalsCleanup();
       scheduleDigestSender();
       scheduleTrackerReminders();
       scheduleSavedSearchAlerts();
@@ -304,7 +267,6 @@ export async function startServer() {
   }
 
   const server = http.createServer(app);
-  startAnalyticsWebSocket(server);
 
   server.listen(config.port, () => {
     logger.info(`API running on http://localhost:${config.port}`);

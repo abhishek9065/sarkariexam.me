@@ -34,7 +34,7 @@ jobs:
 
           if [ "$missing" -eq 1 ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Deployment is skipped because required DigitalOcean secrets are not configured."
+            echo "Deployment is blocked because required DigitalOcean secrets are not configured."
             exit 0
           fi
 
@@ -92,6 +92,17 @@ jobs:
               echo "OK $url (status=$status)"
             else
               echo "FAIL $url (status=$status)"
+              failures=1
+            fi
+          done
+
+          echo "Checking frontend routes..."
+          for route in "/jobs" "/results" "/admit-cards"; do
+            status=$(curl -k -sS -o /dev/null -w "%{http_code}" "https://sarkariexams.me${route}" || true)
+            if [[ "$status" =~ ^(2|3) ]]; then
+              echo "OK https://sarkariexams.me${route} (status=$status)"
+            else
+              echo "FAIL https://sarkariexams.me${route} (status=$status)"
               failures=1
             fi
           done

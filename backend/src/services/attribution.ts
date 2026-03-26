@@ -36,7 +36,6 @@ const IN_APP_SOURCES = new Set([
   'search_overlay',
   'bookmarks',
   'profile',
-  'admin',
   'section_table',
   'related',
   'recommendations',

@@ -1,6 +1,6 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
-export type UserRole = 'user' | 'viewer' | 'reviewer' | 'contributor' | 'editor' | 'admin';
+export type UserRole = string;
 export type TrackerStatus = 'saved' | 'applied' | 'admit-card' | 'exam' | 'result';
 
 export interface User {
@@ -182,9 +182,6 @@ export interface JwtPayload {
   userId: string;
   email: string;
   role: UserRole;
-  twoFactorVerified?: boolean;
-  twoFactorSetup?: boolean;
-  sessionId?: string;
 }
 
 export interface Bookmark {

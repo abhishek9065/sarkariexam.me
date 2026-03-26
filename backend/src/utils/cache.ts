@@ -1,12 +1,13 @@
 // Simple in-memory cache for API responses
 interface CacheEntry {
-    data: any;
+    data: unknown;
     expiry: number;
 }
 
 const cache = new Map<string, CacheEntry>();
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
-export function getCache(key: string): any | null {
+export function getCache(key: string): unknown | null {
     const entry = cache.get(key);
     if (!entry) return null;
 
@@ -20,7 +21,7 @@ export function getCache(key: string): any | null {
 
 const MAX_CACHE_SIZE = 1000; // Prevent memory exhaustion
 
-export function setCache(key: string, data: any, ttlSeconds: number = 300): void {
+export function setCache(key: string, data: unknown, ttlSeconds = 300): void {
     // If cache is full, delete the oldest/first entry (simple approximation of LRU)
     if (cache.size >= MAX_CACHE_SIZE) {
         const firstKey = cache.keys().next().value;
@@ -51,13 +52,27 @@ export function invalidateCache(pattern?: string): void {
 }
 
 // Cleanup expired entries periodically
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of cache.entries()) {
-        if (now > entry.expiry) {
-            cache.delete(key);
+function startCleanupInterval(): void {
+    if (cleanupInterval) return;
+    cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        for (const [key, entry] of cache.entries()) {
+            if (now > entry.expiry) {
+                cache.delete(key);
+            }
         }
-    }
-}, 60000);
+    }, 60000);
+}
 
-export default { getCache, setCache, deleteCache, invalidateCache };
+/** Stop the cleanup interval - call on server shutdown */
+export function stopCacheCleanup(): void {
+    if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = null;
+    }
+}
+
+// Start cleanup on module load
+startCleanupInterval();
+
+export default { getCache, setCache, deleteCache, invalidateCache, stopCacheCleanup };

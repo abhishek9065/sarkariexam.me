@@ -9,16 +9,10 @@ const serverPath = path.join(backendRoot, 'src', 'server.ts');
 const openApiPath = path.join(repoRoot, 'openapi.json');
 
 const ROUTER_FILE_BY_VAR: Record<string, string> = {
-    adminAuthRouter: 'src/routes/admin-auth.ts',
-    adminSetupRouter: 'src/routes/admin-setup.ts',
-    adminRouter: 'src/routes/admin.ts',
-    analyticsRouter: 'src/routes/analytics.ts',
     announcementsRouter: 'src/routes/announcements.ts',
     authRouter: 'src/routes/auth.ts',
     bookmarksRouter: 'src/routes/bookmarks.ts',
-    bulkRouter: 'src/routes/bulk.ts',
     communityRouter: 'src/routes/community.ts',
-    graphqlRouter: 'src/routes/graphql.ts',
     jobsRouter: 'src/routes/jobs.ts',
     profileRouter: 'src/routes/profile.ts',
     pushRouter: 'src/routes/push.ts',

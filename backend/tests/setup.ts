@@ -8,9 +8,6 @@ let skipMongoTests = false;
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
-process.env.ADMIN_SETUP_KEY = process.env.ADMIN_SETUP_KEY || 'test-admin-setup-key';
-process.env.TOTP_ENCRYPTION_KEY = process.env.TOTP_ENCRYPTION_KEY || 'test-totp-encryption-key';
-process.env.ADMIN_BACKUP_CODE_SALT = process.env.ADMIN_BACKUP_CODE_SALT || 'test-admin-backup-salt';
 process.env.DISABLE_DB_RECONNECT = process.env.DISABLE_DB_RECONNECT || 'false';
 // Ensure tests do not accidentally use COSMOS_CONNECTION_STRING from .env.
 process.env.COSMOS_CONNECTION_STRING = '';
@@ -18,7 +15,6 @@ process.env.COSMOS_CONNECTION_STRING = '';
 // Relax rate limits during tests so integration test suites don't hit 429s
 process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || '10000';
 process.env.AUTH_RATE_LIMIT_MAX = process.env.AUTH_RATE_LIMIT_MAX || '10000';
-process.env.ADMIN_RATE_LIMIT_MAX = process.env.ADMIN_RATE_LIMIT_MAX || '10000';
 
 if (!process.env.MONGODB_URI) {
     try {

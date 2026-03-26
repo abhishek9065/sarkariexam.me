@@ -13,27 +13,7 @@ export interface SecurityEvent {
     ip_address: string;
     event_type: 'rate_limit'
       | 'auth_failure'
-      | 'suspicious_activity'
-      | 'admin_setup_failure'
-      | 'admin_setup_success'
-      | 'admin_setup_error'
-      | 'admin_login_failure'
-      | 'admin_login_success'
-      | 'admin_backup_code_generated'
-      | 'admin_backup_code_used'
-      | 'admin_session_terminated'
-      | 'admin_step_up_success'
-      | 'admin_step_up_failed'
-      | 'admin_approval_requested'
-      | 'admin_break_glass_used'
-      | 'admin_approval_approved'
-      | 'admin_approval_rejected'
-      | 'admin_approval_executed'
-      | 'admin_security_alert'
-      | 'admin_login_new_device'
-      | 'admin_password_reset_requested'
-      | 'admin_password_reset_failed'
-      | 'admin_password_reset_completed';
+      | 'suspicious_activity';
     endpoint: string;
     metadata?: any;
     incidentStatus?: 'new' | 'investigating' | 'resolved';

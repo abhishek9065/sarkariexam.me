@@ -21,18 +21,6 @@ services:
     depends_on:
       - mongo
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-
-  admin-frontend:
-    build:
-      context: ./admin-frontend
-      dockerfile: Dockerfile
-    environment:
-      - VITE_API_BASE=
-
   nginx:
     volumes:
       - ./nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
