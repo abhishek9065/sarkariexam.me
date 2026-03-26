@@ -33,7 +33,8 @@ export async function getSecurityEvents(
     if (filters?.severity) query.severity = filters.severity;
     if (filters?.userId) query.userId = filters.userId;
     
-    return await col.find(query).sort({ timestamp: -1 }).limit(limit).toArray() as SecurityEvent[];
+    const results = await col.find(query).sort({ timestamp: -1 }).limit(limit).toArray();
+    return results as unknown as SecurityEvent[];
   } catch (error) {
     return [];
   }

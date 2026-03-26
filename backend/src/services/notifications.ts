@@ -88,11 +88,13 @@ export async function getCampaigns(limit = 50): Promise<NotificationCampaign[]> 
     const { getCollection } = await import('./cosmosdb.js');
     const col = getCollection('notification_campaigns');
     
-    return await col
+    const results = await col
       .find({})
       .sort({ createdAt: -1 })
       .limit(limit)
-      .toArray() as NotificationCampaign[];
+      .toArray();
+      
+    return results as unknown as NotificationCampaign[];
   } catch (error) {
     console.error('[NotificationService] Error fetching campaigns:', error);
     return [];
@@ -191,10 +193,11 @@ export async function sendCampaign(campaignId: string): Promise<{ success: boole
     const { getCollection } = await import('./cosmosdb.js');
     const campaignsCol = getCollection('notification_campaigns');
     
-    const campaign = await campaignsCol.findOne({ id: campaignId }) as NotificationCampaign | null;
-    if (!campaign) {
+    const doc = await campaignsCol.findOne({ id: campaignId });
+    if (!doc) {
       return { success: false, error: 'Campaign not found' };
     }
+    const campaign = doc as unknown as NotificationCampaign;
 
     if (campaign.status === 'sending' || campaign.status === 'sent') {
       return { success: false, error: 'Campaign already sent' };
@@ -304,12 +307,14 @@ export async function processScheduledCampaigns(): Promise<number> {
     const col = getCollection('notification_campaigns');
     const now = new Date();
 
-    const scheduled = await col
+    const results = await col
       .find({
         status: 'scheduled',
         scheduledAt: { $lte: now },
       })
-      .toArray() as NotificationCampaign[];
+      .toArray();
+      
+    const scheduled = results as unknown as NotificationCampaign[];
 
     for (const campaign of scheduled) {
       await sendCampaign(campaign.id);
