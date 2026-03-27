@@ -1,6 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import QuickLinks from './components/QuickLinks';
+import SocialJoinBanners from './components/SocialJoinBanners';
+import HomepageSearch from './components/HomepageSearch';
+import AppDownloadBanner from './components/AppDownloadBanner';
 
 // Dummy data for the 3 main columns mimicking the Sarkari Result layout
 const results = [
@@ -58,6 +62,10 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        <HomepageSearch />
+        <QuickLinks />
+        <SocialJoinBanners />
 
         {/* 3 Columns Layout (Result | Admit Card | Latest Jobs) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-4">
@@ -127,35 +135,50 @@ export default function HomePage() {
 
         </div>
         
-        {/* Additional Grid (Answer Key, Syllabus, Admission) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 lg:gap-4 mt-6">
+        {/* Additional Grid (Answer Key, Syllabus, Admission, etc.) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4 mt-6">
           <div className="bg-white dark:bg-[#1E293B] rounded shadow border border-gray-300 dark:border-gray-700 overflow-hidden">
             <div className="bg-[#D97706] text-white text-center py-2 font-bold text-lg uppercase tracking-wider border-b-4 border-[#92400E]">Answer Key</div>
-            <div className="p-4 text-center">
+            <div className="p-4 text-center flex flex-col items-center justify-center">
               <Link href="/answer-keys" className="text-[15px] font-bold text-[#0000EE] dark:text-blue-400 hover:text-red-600 hover:underline">SSC CGL Tier 1 Answer Key</Link>
-              <br/>
-              <Link href="/answer-keys" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-2 inline-block">View All Answer Keys</Link>
+              <Link href="/answer-keys" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-4 inline-block">View All Answer Keys</Link>
             </div>
           </div>
 
           <div className="bg-white dark:bg-[#1E293B] rounded shadow border border-gray-300 dark:border-gray-700 overflow-hidden">
             <div className="bg-[#7C3AED] text-white text-center py-2 font-bold text-lg uppercase tracking-wider border-b-4 border-[#5B21B6]">Syllabus</div>
-            <div className="p-4 text-center">
+            <div className="p-4 text-center flex flex-col items-center justify-center">
               <Link href="/syllabus" className="text-[15px] font-bold text-[#0000EE] dark:text-blue-400 hover:text-red-600 hover:underline">UP Police Constable Syllabus</Link>
-              <br/>
-              <Link href="/syllabus" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-2 inline-block">View All Syllabus</Link>
+              <Link href="/syllabus" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-4 inline-block">View All Syllabus</Link>
             </div>
           </div>
 
           <div className="bg-white dark:bg-[#1E293B] rounded shadow border border-gray-300 dark:border-gray-700 overflow-hidden">
             <div className="bg-[#0891B2] text-white text-center py-2 font-bold text-lg uppercase tracking-wider border-b-4 border-[#164E63]">Admission</div>
-            <div className="p-4 text-center">
+            <div className="p-4 text-center flex flex-col items-center justify-center">
               <Link href="/admissions" className="text-[15px] font-bold text-[#0000EE] dark:text-blue-400 hover:text-red-600 hover:underline">NTA CUET UG 2025 Online Form</Link>
-              <br/>
-              <Link href="/admissions" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-2 inline-block">View All Admissions</Link>
+              <Link href="/admissions" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-4 inline-block">View All Admissions</Link>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#1E293B] rounded shadow border border-gray-300 dark:border-gray-700 overflow-hidden">
+            <div className="bg-[#BE185D] text-white text-center py-2 font-bold text-lg uppercase tracking-wider border-b-4 border-[#831843]">Certificate Form</div>
+            <div className="p-4 text-center flex flex-col items-center justify-center">
+              <Link href="/certificates" className="text-[15px] font-bold text-[#0000EE] dark:text-blue-400 hover:text-red-600 hover:underline">PAN Card / Aadhar / Voter ID</Link>
+              <Link href="/certificates" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-4 inline-block">View All Forms</Link>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#1E293B] rounded shadow border border-gray-300 dark:border-gray-700 overflow-hidden">
+            <div className="bg-[#4F46E5] text-white text-center py-2 font-bold text-lg uppercase tracking-wider border-b-4 border-[#312E81]">Important</div>
+            <div className="p-4 text-center flex flex-col items-center justify-center">
+              <Link href="/important" className="text-[15px] font-bold text-[#0000EE] dark:text-blue-400 hover:text-red-600 hover:underline">UP Scholarship 2025 Online</Link>
+              <Link href="/important" className="text-[13px] font-bold text-gray-600 dark:text-gray-400 hover:underline mt-4 inline-block">View All Important Info</Link>
             </div>
           </div>
         </div>
+
+        <AppDownloadBanner />
 
       </div>
     </div>
