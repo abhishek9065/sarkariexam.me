@@ -5,6 +5,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari}"
+export COMPOSE_PROJECT_NAME
+
+dc() {
+  docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file .env "$@"
+}
+
 if [[ ! -f .env ]]; then
   echo "ERROR: .env not found at $ROOT_DIR/.env"
   exit 1
@@ -65,19 +72,42 @@ if [[ "${#MISSING_KEYS[@]}" -gt 0 ]]; then
 fi
 
 echo "Validating compose config..."
-docker compose --env-file .env config >/dev/null
+dc config >/dev/null
 
-echo "Building backend and nginx..."
-docker compose --env-file .env build backend nginx
+echo "Building backend, admin, and nginx..."
+dc build backend admin nginx
 
 echo "Rebuilding frontend without cache to avoid stale Next.js artifacts..."
-docker compose --env-file .env build --no-cache frontend
+dc build --no-cache frontend
+
+remove_conflicting_container() {
+  local name="$1"
+  local existing_id
+  existing_id="$(docker ps -aq --filter "name=^/${name}$" | head -n1 || true)"
+  if [[ -n "$existing_id" ]]; then
+    echo "Removing pre-existing container ${name} (${existing_id}) to avoid name conflicts..."
+    docker rm -f "$existing_id" >/dev/null
+  fi
+}
+
+cleanup_named_containers() {
+  remove_conflicting_container "sarkari-nginx"
+  remove_conflicting_container "sarkari-backend"
+  remove_conflicting_container "sarkari-admin"
+  remove_conflicting_container "sarkari-frontend"
+}
 
 echo "Starting services..."
-docker compose --env-file .env up -d --force-recreate --remove-orphans nginx backend frontend
+cleanup_named_containers
+dc up -d --force-recreate --remove-orphans nginx backend admin frontend
 
 echo "Container status:"
-docker compose ps
+dc ps
+
+service_container_id() {
+  local service="$1"
+  dc ps -q "$service" | head -n1
+}
 
 wait_for_backend_health() {
   local attempts="${1:-60}"
@@ -87,7 +117,9 @@ wait_for_backend_health() {
   echo "Waiting for backend container health..."
   for ((i=1; i<=attempts; i++)); do
     local health
-    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' sarkari-backend 2>/dev/null || true)"
+    local container_id
+    container_id="$(service_container_id backend)"
+    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
 
     if [[ "$health" == "healthy" ]]; then
       echo "Backend container reports healthy."
@@ -96,7 +128,7 @@ wait_for_backend_health() {
 
     if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
       echo "Backend container status is '$health'."
-      docker compose logs --tail=120 backend || true
+      dc logs --tail=120 backend || true
       return 1
     fi
 
@@ -105,7 +137,7 @@ wait_for_backend_health() {
   done
 
   echo "Timed out waiting for backend container health."
-  docker compose logs --tail=120 backend || true
+  dc logs --tail=120 backend || true
   return 1
 }
 
@@ -116,7 +148,7 @@ wait_for_backend_endpoint() {
 
   echo "Waiting for backend /api/health endpoint..."
   for ((i=1; i<=attempts; i++)); do
-    if docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health >/dev/null 2>&1; then
+    if dc exec -T backend wget -qO- http://127.0.0.1:4000/api/health >/dev/null 2>&1; then
       echo "Backend health endpoint is reachable."
       return 0
     fi
@@ -125,7 +157,7 @@ wait_for_backend_endpoint() {
   done
 
   echo "Timed out waiting for backend /api/health endpoint."
-  docker compose logs --tail=120 backend || true
+  dc logs --tail=120 backend || true
   return 1
 }
 
@@ -138,7 +170,7 @@ check_frontend_route_marker() {
   local label="$3"
   local html
 
-  html="$(docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${path}" || true)"
+  html="$(dc exec -T frontend wget -qO- "http://127.0.0.1:3000${path}" || true)"
   if [[ -z "$html" ]]; then
     echo "ERROR: ${label} returned no HTML for ${path}"
     return 1
@@ -177,17 +209,17 @@ wait_for_frontend_shell() {
   echo "Timed out waiting for frontend public routes."
   for route in "/" "/jobs" "/results/1"; do
     echo "--- ${route} ---"
-    docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
+    dc exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
     echo
   done
   return 1
 }
 
 echo "Backend health (container internal):"
-docker compose exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
+dc exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
   echo
   echo "ERROR: backend health endpoint failed after readiness checks."
-  docker compose logs --tail=120 backend || true
+  dc logs --tail=120 backend || true
   exit 1
 }
 

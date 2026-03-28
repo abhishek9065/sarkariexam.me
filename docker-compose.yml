@@ -1,3 +1,5 @@
+name: sarkari
+
 services:
   # Nginx Reverse Proxy with SSL
   nginx:
