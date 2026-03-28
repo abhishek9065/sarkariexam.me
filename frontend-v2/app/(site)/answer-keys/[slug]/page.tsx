@@ -9,16 +9,16 @@ import {
 } from '@/app/lib/public-content';
 
 export function generateStaticParams() {
-  return announcementItemsBySection.results.map((item) => ({ id: item.slug }));
+  return announcementItemsBySection['answer-keys'].map((item) => ({ slug: item.slug }));
 }
 
-export default async function ResultDetailPage({
+export default async function AnswerKeyDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { id } = await params;
-  const resolved = getAnnouncementByParam('results', id);
+  const { slug } = await params;
+  const resolved = getAnnouncementByParam('answer-keys', slug);
 
   if (!resolved) {
     notFound();
@@ -26,9 +26,9 @@ export default async function ResultDetailPage({
 
   return (
     <PublicAnnouncementDetailPage
-      meta={announcementCategoryMeta.results}
+      meta={announcementCategoryMeta['answer-keys']}
       item={resolved.item}
-      relatedEntries={getAnnouncementEntries('results').filter((entry) => entry.href !== buildAnnouncementPath(resolved.item)).slice(0, 6)}
+      relatedEntries={getAnnouncementEntries('answer-keys').filter((entry) => entry.href !== buildAnnouncementPath(resolved.item)).slice(0, 6)}
     />
   );
 }

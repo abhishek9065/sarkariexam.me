@@ -1,11 +1,11 @@
 import { PublicCategoryHubPage } from '@/app/components/public-site/PublicCategoryHubPage';
 import { announcementCategoryMeta, getAnnouncementEntries } from '@/app/lib/public-content';
 
-export default function ResultsPage() {
+export default function AdmissionsPage() {
   return (
     <PublicCategoryHubPage
-      meta={announcementCategoryMeta.results}
-      entries={getAnnouncementEntries('results')}
+      meta={announcementCategoryMeta.admissions}
+      entries={getAnnouncementEntries('admissions')}
     />
   );
 }

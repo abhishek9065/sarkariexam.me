@@ -9,16 +9,16 @@ import {
 } from '@/app/lib/public-content';
 
 export function generateStaticParams() {
-  return announcementItemsBySection.results.map((item) => ({ id: item.slug }));
+  return announcementItemsBySection.admissions.map((item) => ({ slug: item.slug }));
 }
 
-export default async function ResultDetailPage({
+export default async function AdmissionDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { id } = await params;
-  const resolved = getAnnouncementByParam('results', id);
+  const { slug } = await params;
+  const resolved = getAnnouncementByParam('admissions', slug);
 
   if (!resolved) {
     notFound();
@@ -26,9 +26,9 @@ export default async function ResultDetailPage({
 
   return (
     <PublicAnnouncementDetailPage
-      meta={announcementCategoryMeta.results}
+      meta={announcementCategoryMeta.admissions}
       item={resolved.item}
-      relatedEntries={getAnnouncementEntries('results').filter((entry) => entry.href !== buildAnnouncementPath(resolved.item)).slice(0, 6)}
+      relatedEntries={getAnnouncementEntries('admissions').filter((entry) => entry.href !== buildAnnouncementPath(resolved.item)).slice(0, 6)}
     />
   );
 }
