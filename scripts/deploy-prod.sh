@@ -163,7 +163,7 @@ wait_for_frontend_shell() {
 
     check_frontend_route_marker "/" 'Latest Jobs / Online Form' "homepage" || ok=0
     check_frontend_route_marker "/jobs" 'Government Jobs' "jobs listing" || ok=0
-    check_frontend_route_marker "/results/1" 'Result Detail' "result detail" || ok=0
+    check_frontend_route_marker "/results/1" 'UPSC Civil Services 2025 - Final Result' "result detail" || ok=0
 
     if [[ "$ok" -eq 1 ]]; then
       echo "Frontend public routes are rendering correctly."
@@ -327,9 +327,13 @@ purge_cloudflare_cache || true
 echo "Public route checks:"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
-check_public_route_marker "/jobs/1" "public job detail" 'Back to Jobs'
-check_public_route_marker "/results/1" "public result detail" 'Result Detail'
-check_public_route_marker "/admit-cards/ibps-po-mains" "public admit card detail" 'Admit Card Detail'
+check_public_route_marker "/jobs/1" "public job detail" 'SSC CGL 2026 - Combined Graduate Level Exam'
+check_public_route_marker "/results/1" "public result detail" 'UPSC Civil Services 2025 - Final Result'
+check_public_route_marker "/admit-cards/upsc" "public admit card detail" 'UPSC IAS IFS 2025 Admit Card'
 check_public_route_marker "/states/uttar-pradesh" "public state jobs page" 'State Jobs'
+check_public_route_marker "/search?q=ssc" "public search page" 'Search Results'
+check_public_route_marker "/jobs?department=Railway" "public jobs filter" 'Railway RRB Group D - Level 1 Posts'
+check_public_route_marker "/important" "public important links page" 'Important Links'
+check_public_route_marker "/app" "public app page" 'App Download'
 
 echo "Deploy completed successfully."

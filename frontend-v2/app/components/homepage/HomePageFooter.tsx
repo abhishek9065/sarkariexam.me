@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { buildCommunityPath } from '@/app/lib/public-content';
 import { homePageLinks } from './links';
 
 const footerColumns = {
@@ -53,10 +54,10 @@ const footerColumns = {
 } as const;
 
 const socials = [
-  { icon: MessageCircle, label: 'Twitter', href: '#', color: 'hover:bg-sky-500 hover:border-sky-400' },
-  { icon: PlayCircle, label: 'YouTube', href: '#', color: 'hover:bg-red-600 hover:border-red-500' },
-  { icon: AtSign, label: 'Instagram', href: '#', color: 'hover:bg-pink-600 hover:border-pink-500' },
-  { icon: Send, label: 'Telegram', href: '#', color: 'hover:bg-blue-500 hover:border-blue-400' },
+  { icon: MessageCircle, label: 'Twitter', href: buildCommunityPath('twitter'), color: 'hover:bg-sky-500 hover:border-sky-400' },
+  { icon: PlayCircle, label: 'YouTube', href: buildCommunityPath('youtube'), color: 'hover:bg-red-600 hover:border-red-500' },
+  { icon: AtSign, label: 'Instagram', href: buildCommunityPath('instagram'), color: 'hover:bg-pink-600 hover:border-pink-500' },
+  { icon: Send, label: 'Telegram', href: buildCommunityPath('telegram'), color: 'hover:bg-blue-500 hover:border-blue-400' },
 ] as const;
 
 const trustStats = [

@@ -3,7 +3,7 @@
 import { ArrowRight, Award, FileText, Search, TrendingUp, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { homePageLinks } from './links';
+import { buildJobsPath } from '@/app/lib/public-content';
 
 const stats = [
   { icon: FileText, label: 'Active Jobs', value: '9,200+', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -21,7 +21,7 @@ export function HomePageHero() {
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = query.trim();
-    router.push(trimmedQuery ? `${homePageLinks.jobs}?search=${encodeURIComponent(trimmedQuery)}` : homePageLinks.jobs);
+    router.push(buildJobsPath({ search: trimmedQuery || undefined }));
   }
 
   return (

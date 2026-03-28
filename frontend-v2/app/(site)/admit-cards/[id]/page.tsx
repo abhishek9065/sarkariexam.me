@@ -1,11 +1,11 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { PublicAnnouncementDetailPage } from '@/app/components/public-site/PublicAnnouncementDetailPage';
 import {
   announcementCategoryMeta,
   announcementItemsBySection,
   buildAnnouncementPath,
-  getAnnouncementByParam,
   getAnnouncementEntries,
+  resolveAnnouncementParam,
 } from '@/app/lib/public-content';
 
 export function generateStaticParams() {
@@ -18,10 +18,14 @@ export default async function AdmitCardDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const resolved = getAnnouncementByParam('admit-cards', id);
+  const resolved = resolveAnnouncementParam('admit-cards', id);
 
   if (!resolved) {
     notFound();
+  }
+
+  if (resolved.matchType !== 'canonical') {
+    redirect(resolved.canonicalPath);
   }
 
   return (

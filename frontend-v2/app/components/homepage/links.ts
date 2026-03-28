@@ -8,8 +8,12 @@ export const homePageLinks = {
   admissions: '/admissions',
   boardResults: '/board-results',
   scholarship: '/scholarship',
+  search: '/search',
+  app: '/app',
+  certificates: '/certificates',
+  importantPage: '/important',
   quickLinks: '/#quick-links',
-  importantLinks: '/#important-links',
+  importantLinks: '/important',
   latestJobs: '/#latest-jobs',
   latestAdmission: '/#latest-admission',
   stateJobs: '/#state-jobs',
@@ -21,6 +25,8 @@ export const homePageLinks = {
   privacy: '/privacy',
   disclaimer: '/disclaimer',
   advertise: '/advertise',
+  joinTelegram: '/join/telegram',
+  joinWhatsapp: '/join/whatsapp',
 } as const;
 
 export function toOfficialUrl(host: string) {

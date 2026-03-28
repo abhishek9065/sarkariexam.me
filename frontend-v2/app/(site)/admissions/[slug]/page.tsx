@@ -1,11 +1,11 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { PublicAnnouncementDetailPage } from '@/app/components/public-site/PublicAnnouncementDetailPage';
 import {
   announcementCategoryMeta,
   announcementItemsBySection,
   buildAnnouncementPath,
-  getAnnouncementByParam,
   getAnnouncementEntries,
+  resolveAnnouncementParam,
 } from '@/app/lib/public-content';
 
 export function generateStaticParams() {
@@ -18,10 +18,14 @@ export default async function AdmissionDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const resolved = getAnnouncementByParam('admissions', slug);
+  const resolved = resolveAnnouncementParam('admissions', slug);
 
   if (!resolved) {
     notFound();
+  }
+
+  if (resolved.matchType !== 'canonical') {
+    redirect(resolved.canonicalPath);
   }
 
   return (

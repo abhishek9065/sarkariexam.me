@@ -1,3 +1,5 @@
+import { siteConfig } from '../../lib/seo';
+
 export type LinkItemTag = 'new' | 'hot' | 'update' | 'last-date';
 
 export type AnnouncementSection =
@@ -16,6 +18,14 @@ export type InfoPageSlug =
   | 'privacy'
   | 'disclaimer'
   | 'advertise';
+export type AuxiliaryPageSlug = 'certificates' | 'important' | 'app';
+export type CommunityChannel =
+  | 'telegram'
+  | 'whatsapp'
+  | 'twitter'
+  | 'youtube'
+  | 'instagram'
+  | 'facebook';
 
 export interface PublicStat {
   label: string;
@@ -44,10 +54,14 @@ export interface ResourceCard {
 }
 
 export interface AnnouncementItem {
+  departments: string[];
   date: string;
   headline: string;
   keyPoints: string[];
   legacyId?: string;
+  legacySlugs: string[];
+  listed: boolean;
+  keywords: string[];
   org: string;
   postCount?: string;
   qualification?: string;
@@ -95,6 +109,39 @@ export interface InfoPageMeta {
   title: string;
 }
 
+export interface AuxiliaryActionCard {
+  description: string;
+  href: string;
+  label: string;
+}
+
+export interface AuxiliaryPageMeta {
+  canonicalPath: string;
+  cards: AuxiliaryActionCard[];
+  description: string;
+  eyebrow: string;
+  headerColor: string;
+  quickLinks: QuickLink[];
+  sections: InfoPageSection[];
+  slug: AuxiliaryPageSlug;
+  stats: PublicStat[];
+  title: string;
+}
+
+export interface CommunityPageMeta {
+  canonicalPath: string;
+  channel: CommunityChannel;
+  ctaLabel: string;
+  description: string;
+  externalUrl?: string;
+  eyebrow: string;
+  headerColor: string;
+  quickLinks: QuickLink[];
+  sections: InfoPageSection[];
+  stats: PublicStat[];
+  title: string;
+}
+
 export interface StatePageMeta {
   canonicalPath: string;
   description: string;
@@ -104,8 +151,12 @@ export interface StatePageMeta {
 }
 
 type AnnouncementSeed = {
+  departments?: string[];
   date: string;
   legacyId?: string;
+  legacySlugs?: string[];
+  keywords?: string[];
+  listed?: boolean;
   org: string;
   postCount?: string;
   qualification?: string;
@@ -135,11 +186,53 @@ const sectionLabelMap: Record<AnnouncementSection, string> = {
   admissions: 'Latest Admission',
 };
 
+const defaultCommunityUrls: Partial<Record<CommunityChannel, string>> = {
+  twitter: siteConfig.links.twitter,
+  facebook: siteConfig.links.facebook,
+  telegram: process.env.NEXT_PUBLIC_TELEGRAM_URL,
+  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_URL,
+  youtube: process.env.NEXT_PUBLIC_YOUTUBE_URL,
+  instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL,
+};
+
 function slugify(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+function uniqueValues(values: Array<string | undefined>) {
+  return [...new Set(values.filter((value): value is string => Boolean(value && value.trim())).map((value) => value.trim()))];
+}
+
+function inferDepartments(title: string, org: string, seededDepartments: string[] = []) {
+  const haystack = `${title} ${org}`.toLowerCase();
+  const inferred = [...seededDepartments];
+
+  if (/(railway|rrb|rpf)/.test(haystack)) inferred.push('Railway');
+  if (/(ibps|sbi|rbi|bank|lic)/.test(haystack)) inferred.push('Banking');
+  if (/(ssc|dsssb)/.test(haystack)) inferred.push('SSC');
+  if (/(upsc|nda|cds|capf|epfo)/.test(haystack)) inferred.push('UPSC');
+  if (/(navy|army|airforce|agniveer|defence|crpf)/.test(haystack)) inferred.push('Defence');
+  if (/(teacher|teaching|ctet|ugc net|b\.ed|school)/.test(haystack)) inferred.push('Teaching');
+  if (/(medical|neet|nursing|pharma)/.test(haystack)) inferred.push('Medical');
+  if (/(engineering|iit|tech|nift)/.test(haystack)) inferred.push('Engineering');
+  if (/(uppsc|upsssc|bpsc|bpsc|psc|state|police|board|csbc|mpesb|upessb|upp? police)/.test(haystack)) {
+    inferred.push('State Govt');
+  }
+
+  return uniqueValues(inferred);
+}
+
+function inferKeywords(seed: AnnouncementSeed, slug: string) {
+  return uniqueValues([
+    ...(seed.keywords ?? []),
+    ...(seed.legacySlugs ?? []),
+    slug.replace(/-/g, ' '),
+    seed.title,
+    seed.org,
+  ]);
 }
 
 function createAnnouncement(section: AnnouncementSection, seed: AnnouncementSeed): AnnouncementItem {
@@ -150,6 +243,10 @@ function createAnnouncement(section: AnnouncementSection, seed: AnnouncementSeed
   ];
 
   return {
+    listed: seed.listed ?? true,
+    legacySlugs: seed.legacySlugs ?? [],
+    keywords: inferKeywords(seed, slug),
+    departments: inferDepartments(seed.title, seed.org, seed.departments),
     section,
     slug,
     title: seed.title,
@@ -306,7 +403,7 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       { label: 'Scholarships', href: '/scholarship' },
       { label: 'Latest Results', href: '/results' },
       { label: 'Homepage', href: '/' },
-      { label: 'Important Links', href: '/#important-links' },
+      { label: 'Important Links', href: '/important' },
     ],
     highlights: [
       'Admission notices now keep the homepage visual hierarchy after click-through.',
@@ -728,6 +825,375 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
   },
 };
 
+export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
+  certificates: {
+    slug: 'certificates',
+    canonicalPath: '/certificates',
+    title: 'Certificates & Verification',
+    eyebrow: 'Document Support Desk',
+    description:
+      'Find certificate-linked services, verification help, and document support links without dropping out of the public homepage shell.',
+    headerColor: 'bg-[#455a64]',
+    stats: [
+      { label: 'Support Type', value: 'Documents' },
+      { label: 'Use Case', value: 'Verification' },
+      { label: 'Layout', value: 'Unified' },
+      { label: 'Next Step', value: 'One Click' },
+    ],
+    quickLinks: [
+      { label: 'Important Links', href: '/important' },
+      { label: 'Board Results', href: '/board-results' },
+      { label: 'Admissions', href: '/admissions' },
+      { label: 'Homepage', href: '/' },
+    ],
+    cards: [
+      {
+        label: 'Board Result Access',
+        href: '/board-results',
+        description: 'Result desks, mark sheet checkpoints, and official board result references.',
+      },
+      {
+        label: 'Admissions Support',
+        href: '/admissions',
+        description: 'University forms, counseling notices, and document-readiness reminders.',
+      },
+      {
+        label: 'Contact Editorial Desk',
+        href: '/contact',
+        description: 'Report a broken certificate flow or request a page-level correction.',
+      },
+      {
+        label: 'Important Links',
+        href: '/important',
+        description: 'Official portals and frequently used public-service destinations.',
+      },
+    ],
+    sections: [
+      {
+        title: 'How To Use This Page',
+        body: [
+          'This page exists so certificate-related calls to action do not land on a fake 200 page or a generic placeholder shell.',
+          'Readers should be able to move from certificate support into board results, admissions, or official portals without losing the Sarkari-style browsing context.',
+        ],
+      },
+      {
+        title: 'Verification Reminder',
+        body: [
+          'Always verify marksheets, certificates, and correction windows through the relevant official portal before relying on public summaries.',
+          'Use the support and contact links here if the public route needs correction or a missing document link.',
+        ],
+      },
+    ],
+  },
+  important: {
+    slug: 'important',
+    canonicalPath: '/important',
+    title: 'Important Links',
+    eyebrow: 'Official Portals',
+    description:
+      'A dedicated important-links desk for official websites, high-intent public routes, and commonly used follow-up actions.',
+    headerColor: 'bg-[#37474f]',
+    stats: [
+      { label: 'Portal Type', value: 'Official + Public' },
+      { label: 'Coverage', value: 'National + State' },
+      { label: 'Quick Access', value: 'Enabled' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Latest Results', href: '/results' },
+      { label: 'Certificates', href: '/certificates' },
+      { label: 'Homepage', href: '/' },
+    ],
+    cards: [
+      {
+        label: 'UPSC Official Website',
+        href: 'https://upsc.gov.in',
+        description: 'Civil services, NDA, CDS, CAPF, EPFO, and official notices.',
+      },
+      {
+        label: 'SSC Official Portal',
+        href: 'https://ssc.nic.in',
+        description: 'CGL, CHSL, MTS, GD, and other SSC recruitment notices.',
+      },
+      {
+        label: 'IBPS Official Portal',
+        href: 'https://www.ibps.in',
+        description: 'IBPS PO, Clerk, RRB, and banking exam updates.',
+      },
+      {
+        label: 'NTA Portal',
+        href: 'https://nta.ac.in',
+        description: 'CUET, UGC NET, NEET, and other NTA entrance exam services.',
+      },
+    ],
+    sections: [
+      {
+        title: 'Why This Page Exists',
+        body: [
+          'The old important-links destination should resolve to a real public page, not a fake success response or a dead anchor target.',
+          'This desk keeps official-site pivots, public support pages, and category routes inside one consistent UX.',
+        ],
+      },
+      {
+        title: 'Usage Guidance',
+        body: [
+          'Open official portals in a new tab when you need final verification, downloads, or form submission.',
+          'Use category and support links here when you want to stay within SarkariExams.me for browsing and context.',
+        ],
+      },
+    ],
+  },
+  app: {
+    slug: 'app',
+    canonicalPath: '/app',
+    title: 'App Download',
+    eyebrow: 'Mobile Access',
+    description:
+      'Provide a real app/download destination with the same public shell, even when a direct store link is not configured yet.',
+    headerColor: 'bg-[#283593]',
+    stats: [
+      { label: 'Primary Surface', value: 'Web First' },
+      { label: 'Alerts', value: 'Jobs + Results' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Join Telegram', href: defaultCommunityUrls.telegram ?? '/join/telegram' },
+      { label: 'Join WhatsApp', href: defaultCommunityUrls.whatsapp ?? '/join/whatsapp' },
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Homepage', href: '/' },
+    ],
+    cards: [
+      {
+        label: 'Open Jobs Feed',
+        href: '/jobs',
+        description: 'Use the jobs feed immediately while app delivery links are being finalized.',
+      },
+      {
+        label: 'Join Telegram',
+        href: defaultCommunityUrls.telegram ?? '/join/telegram',
+        description: 'Follow channel-based delivery if the native app is not yet available.',
+      },
+      {
+        label: 'Join WhatsApp',
+        href: defaultCommunityUrls.whatsapp ?? '/join/whatsapp',
+        description: 'Use WhatsApp community delivery as a fallback alert channel.',
+      },
+      {
+        label: 'Profile & Bookmarks',
+        href: '/profile',
+        description: 'Keep saved routes and preferences available from the public web experience.',
+      },
+    ],
+    sections: [
+      {
+        title: 'Current Delivery Model',
+        body: [
+          'The app route should always resolve to a real public page, even before a mobile-store destination is configured.',
+          'Until an external store link is verified, this page should guide users to the web experience and community channels instead of returning a broken route.',
+        ],
+      },
+      {
+        title: 'Fastest Alternatives',
+        body: [
+          'Use Telegram, WhatsApp, bookmarks, and the jobs/results hubs for the fastest current update flow.',
+          'When an official app URL becomes available, this page should remain the stable public entry point and link outward from here.',
+        ],
+      },
+    ],
+  },
+};
+
+export const communityPageMeta: Record<CommunityChannel, CommunityPageMeta> = {
+  telegram: {
+    channel: 'telegram',
+    canonicalPath: '/join/telegram',
+    title: 'Telegram Channel',
+    eyebrow: 'Community Alerts',
+    description: 'Open the Telegram channel when configured, or use this fallback page for the next best public routes.',
+    headerColor: 'bg-[#0277bd]',
+    ctaLabel: 'Open Telegram',
+    externalUrl: defaultCommunityUrls.telegram,
+    stats: [
+      { label: 'Channel', value: 'Telegram' },
+      { label: 'Purpose', value: 'Fast Alerts' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Latest Results', href: '/results' },
+      { label: 'App Download', href: '/app' },
+      { label: 'Homepage', href: '/' },
+    ],
+    sections: [
+      {
+        title: 'Channel Access',
+        body: [
+          'This route should never 404. If a Telegram URL is configured, it should redirect there immediately.',
+          'If not configured, users should still get a real page with alternative routes for alerts and updates.',
+        ],
+      },
+    ],
+  },
+  whatsapp: {
+    channel: 'whatsapp',
+    canonicalPath: '/join/whatsapp',
+    title: 'WhatsApp Channel',
+    eyebrow: 'Community Alerts',
+    description: 'Open the WhatsApp channel when configured, or use this fallback page for the next best update paths.',
+    headerColor: 'bg-[#2e7d32]',
+    ctaLabel: 'Open WhatsApp',
+    externalUrl: defaultCommunityUrls.whatsapp,
+    stats: [
+      { label: 'Channel', value: 'WhatsApp' },
+      { label: 'Purpose', value: 'Fast Alerts' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Latest Results', href: '/results' },
+      { label: 'App Download', href: '/app' },
+      { label: 'Homepage', href: '/' },
+    ],
+    sections: [
+      {
+        title: 'Channel Access',
+        body: [
+          'This route should never 404. If a WhatsApp URL is configured, it should redirect there immediately.',
+          'If not configured, users should still get a real page with alternative routes for alerts and updates.',
+        ],
+      },
+    ],
+  },
+  twitter: {
+    channel: 'twitter',
+    canonicalPath: '/join/twitter',
+    title: 'Twitter / X',
+    eyebrow: 'Social Updates',
+    description: 'Use the configured Twitter/X profile when available, with a public fallback page if needed.',
+    headerColor: 'bg-[#1565c0]',
+    ctaLabel: 'Open Twitter / X',
+    externalUrl: defaultCommunityUrls.twitter,
+    stats: [
+      { label: 'Channel', value: 'Twitter / X' },
+      { label: 'Purpose', value: 'Announcements' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Homepage', href: '/' },
+      { label: 'Contact Us', href: '/contact' },
+      { label: 'Important Links', href: '/important' },
+    ],
+    sections: [
+      {
+        title: 'Social Access',
+        body: [
+          'Footer social links should never point to placeholder anchors.',
+          'When no external profile is configured, this page acts as the safe public fallback instead of sending users to nowhere.',
+        ],
+      },
+    ],
+  },
+  youtube: {
+    channel: 'youtube',
+    canonicalPath: '/join/youtube',
+    title: 'YouTube Channel',
+    eyebrow: 'Video Updates',
+    description: 'Use the configured YouTube channel when available, with a public fallback page if needed.',
+    headerColor: 'bg-[#c62828]',
+    ctaLabel: 'Open YouTube',
+    externalUrl: defaultCommunityUrls.youtube,
+    stats: [
+      { label: 'Channel', value: 'YouTube' },
+      { label: 'Purpose', value: 'Video Updates' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Homepage', href: '/' },
+      { label: 'App Download', href: '/app' },
+      { label: 'Contact Us', href: '/contact' },
+    ],
+    sections: [
+      {
+        title: 'Video Access',
+        body: [
+          'When a YouTube destination is configured, this route should redirect outward.',
+          'Until then, users still need a real public landing page rather than a placeholder footer link.',
+        ],
+      },
+    ],
+  },
+  instagram: {
+    channel: 'instagram',
+    canonicalPath: '/join/instagram',
+    title: 'Instagram',
+    eyebrow: 'Social Updates',
+    description: 'Use the configured Instagram profile when available, with a public fallback page if needed.',
+    headerColor: 'bg-[#ad1457]',
+    ctaLabel: 'Open Instagram',
+    externalUrl: defaultCommunityUrls.instagram,
+    stats: [
+      { label: 'Channel', value: 'Instagram' },
+      { label: 'Purpose', value: 'Social Updates' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Results', href: '/results' },
+      { label: 'Homepage', href: '/' },
+      { label: 'App Download', href: '/app' },
+      { label: 'Contact Us', href: '/contact' },
+    ],
+    sections: [
+      {
+        title: 'Social Access',
+        body: [
+          'Instagram links should either open a real external profile or a real internal fallback page.',
+          'Placeholder anchors are not acceptable for the public footer or shared layout surfaces.',
+        ],
+      },
+    ],
+  },
+  facebook: {
+    channel: 'facebook',
+    canonicalPath: '/join/facebook',
+    title: 'Facebook',
+    eyebrow: 'Social Updates',
+    description: 'Use the configured Facebook profile when available, with a public fallback page if needed.',
+    headerColor: 'bg-[#0d47a1]',
+    ctaLabel: 'Open Facebook',
+    externalUrl: defaultCommunityUrls.facebook,
+    stats: [
+      { label: 'Channel', value: 'Facebook' },
+      { label: 'Purpose', value: 'Social Updates' },
+      { label: 'Fallback', value: 'Public Page' },
+      { label: 'Shell', value: 'Unified' },
+    ],
+    quickLinks: [
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Homepage', href: '/' },
+      { label: 'Important Links', href: '/important' },
+      { label: 'Contact Us', href: '/contact' },
+    ],
+    sections: [
+      {
+        title: 'Social Access',
+        body: [
+          'Known brand profiles should open directly when configured.',
+          'If the profile is not configured, this route still provides a valid public landing page instead of a broken footer destination.',
+        ],
+      },
+    ],
+  },
+};
+
 export const statePageMeta: StatePageMeta[] = [
   {
     slug: 'uttar-pradesh',
@@ -1010,6 +1476,80 @@ const jobAnnouncements: AnnouncementItem[] = [
     postCount: '322',
     qualification: 'Graduate',
   }),
+  createAnnouncement('jobs', {
+    title: 'SSC CGL 2025 - Apply Online',
+    org: 'Staff Selection Commission',
+    date: '18 Dec 2025',
+    listed: false,
+    legacySlugs: ['ssc-cgl'],
+    postCount: '17,727',
+    qualification: 'Graduate',
+  }),
+  createAnnouncement('jobs', {
+    title: 'Railway NTPC 2025 - Online Form',
+    org: 'Railway Recruitment Board',
+    date: '12 Dec 2025',
+    listed: false,
+    legacySlugs: ['rrb-ntpc'],
+    postCount: '11,558',
+    qualification: 'Graduate',
+  }),
+  createAnnouncement('jobs', {
+    title: 'Indian Navy Agniveer SSR 2025 - Recruitment',
+    org: 'Indian Navy',
+    date: '07 Dec 2025',
+    listed: false,
+    legacySlugs: ['navy'],
+    postCount: '2,800',
+    qualification: '12th Pass',
+  }),
+  createAnnouncement('jobs', {
+    title: 'Army TES 52 Entry 2025 - Online Form',
+    org: 'Indian Army',
+    date: '05 Dec 2025',
+    listed: false,
+    legacySlugs: ['army-tes'],
+    postCount: '90',
+    qualification: '12th Pass',
+  }),
+  createAnnouncement('jobs', {
+    title: 'UPSSSC RO ARO 2025 - Apply Online',
+    org: 'UPSSSC',
+    date: '30 Nov 2025',
+    listed: false,
+    legacySlugs: ['upsssc'],
+    postCount: '411',
+    qualification: 'Graduate',
+    stateSlugs: ['uttar-pradesh', ALL_INDIA],
+  }),
+  createAnnouncement('jobs', {
+    title: 'Bihar Police Constable 2025 - Online Form',
+    org: 'CSBC Bihar',
+    date: '28 Nov 2025',
+    listed: false,
+    legacySlugs: ['bihar-police'],
+    postCount: '19,838',
+    qualification: '12th Pass',
+    stateSlugs: ['bihar', ALL_INDIA],
+  }),
+  createAnnouncement('jobs', {
+    title: 'India Post GDS 2025 - Recruitment',
+    org: 'India Post',
+    date: '24 Nov 2025',
+    listed: false,
+    legacySlugs: ['post-office'],
+    postCount: '44,228',
+    qualification: '10th Pass',
+  }),
+  createAnnouncement('jobs', {
+    title: 'LIC Assistant 2025 - Apply Online',
+    org: 'Life Insurance Corporation of India',
+    date: '21 Nov 2025',
+    listed: false,
+    legacySlugs: ['lic'],
+    postCount: '5,312',
+    qualification: 'Graduate',
+  }),
 ];
 
 const resultAnnouncements: AnnouncementItem[] = [
@@ -1099,6 +1639,86 @@ const resultAnnouncements: AnnouncementItem[] = [
     tag: 'new',
     postCount: '143',
   }),
+  createAnnouncement('results', {
+    title: 'UP Police Constable Result 2025',
+    org: 'UP Police Recruitment Board',
+    date: '14 Dec 2025',
+    listed: false,
+    legacySlugs: ['up-police'],
+    postCount: '60,244',
+    stateSlugs: ['uttar-pradesh', ALL_INDIA],
+  }),
+  createAnnouncement('results', {
+    title: 'SSC GD Constable Final Result 2025',
+    org: 'SSC',
+    date: '10 Dec 2025',
+    listed: false,
+    legacySlugs: ['ssc-gd'],
+    postCount: '39,481',
+  }),
+  createAnnouncement('results', {
+    title: 'BPSC RO ARO Pre Result 2025',
+    org: 'BPSC',
+    date: '06 Dec 2025',
+    listed: false,
+    legacySlugs: ['bpsc'],
+    postCount: '379',
+    stateSlugs: ['bihar', ALL_INDIA],
+  }),
+  createAnnouncement('results', {
+    title: 'IBPS PO Mains Result 2025',
+    org: 'IBPS',
+    date: '03 Dec 2025',
+    listed: false,
+    legacySlugs: ['ibps'],
+    postCount: '4,455',
+  }),
+  createAnnouncement('results', {
+    title: 'NTA UGC NET Result 2025',
+    org: 'NTA',
+    date: '30 Nov 2025',
+    listed: false,
+    legacySlugs: ['net'],
+  }),
+  createAnnouncement('results', {
+    title: 'Railway RRB ALP Result 2025',
+    org: 'Railway Recruitment Board',
+    date: '28 Nov 2025',
+    listed: false,
+    legacySlugs: ['rrb-alp'],
+    postCount: '18,799',
+  }),
+  createAnnouncement('results', {
+    title: 'SBI Clerk Final Result 2025',
+    org: 'State Bank of India',
+    date: '24 Nov 2025',
+    listed: false,
+    legacySlugs: ['sbi-clerk'],
+    postCount: '8,283',
+  }),
+  createAnnouncement('results', {
+    title: 'Navy Agniveer SSR Result 2025',
+    org: 'Indian Navy',
+    date: '21 Nov 2025',
+    listed: false,
+    legacySlugs: ['navy'],
+    postCount: '2,500',
+  }),
+  createAnnouncement('results', {
+    title: 'Airforce Intake 01 2026 Result',
+    org: 'Indian Air Force',
+    date: '17 Nov 2025',
+    listed: false,
+    legacySlugs: ['airforce'],
+    postCount: '3,500',
+  }),
+  createAnnouncement('results', {
+    title: 'CTET 2025 Result',
+    org: 'CBSE',
+    date: '15 Nov 2025',
+    listed: false,
+    legacySlugs: ['ctet'],
+  }),
 ];
 
 const admitCardAnnouncements: AnnouncementItem[] = [
@@ -1183,6 +1803,65 @@ const admitCardAnnouncements: AnnouncementItem[] = [
     postCount: '835',
     slug: 'delhi-police-head-constable',
     stateSlugs: ['delhi', ALL_INDIA],
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'UPSC IAS IFS 2025 Admit Card',
+    org: 'UPSC',
+    date: '12 Dec 2025',
+    listed: false,
+    legacySlugs: ['upsc'],
+    postCount: '1,205',
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'Bihar BPSC Teacher 2025 - Exam Date',
+    org: 'BPSC Bihar',
+    date: '07 Dec 2025',
+    listed: false,
+    legacySlugs: ['bpsc'],
+    postCount: '1,706',
+    stateSlugs: ['bihar', ALL_INDIA],
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'Railway RPF Constable Admit Card 2025',
+    org: 'Railway Protection Force',
+    date: '05 Dec 2025',
+    listed: false,
+    legacySlugs: ['rpf'],
+    postCount: '4,208',
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'SSC CHSL Tier 1 Admit Card 2025',
+    org: 'SSC',
+    date: '03 Dec 2025',
+    listed: false,
+    legacySlugs: ['ssc-chsl'],
+    postCount: '6,500',
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'CRPF Sub Inspector Admit Card 2025',
+    org: 'CRPF',
+    date: '30 Nov 2025',
+    listed: false,
+    legacySlugs: ['crpf'],
+    postCount: '212',
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'DSSSB Various Post Admit Card 2025',
+    org: 'DSSSB Delhi',
+    date: '28 Nov 2025',
+    listed: false,
+    legacySlugs: ['dsssb'],
+    postCount: '1,982',
+    stateSlugs: ['delhi', ALL_INDIA],
+  }),
+  createAnnouncement('admit-cards', {
+    title: 'UPPSC Prelims Admit Card 2025',
+    org: 'UPPSC',
+    date: '24 Nov 2025',
+    listed: false,
+    legacySlugs: ['uppsc'],
+    postCount: '268',
+    stateSlugs: ['uttar-pradesh', ALL_INDIA],
   }),
 ];
 
@@ -1325,8 +2004,87 @@ export const announcementItemsBySection: Record<AnnouncementSection, Announcemen
   admissions: admissionAnnouncements,
 };
 
+export type AnnouncementRouteMatchType = 'canonical' | 'legacy-alias' | 'numeric-legacy';
+
+export interface AnnouncementFilters {
+  department?: string;
+  includeHidden?: boolean;
+  search?: string;
+}
+
+function buildPathWithQuery(
+  basePath: string,
+  params: Record<string, string | undefined>,
+) {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value && value.trim()) {
+      searchParams.set(key, value.trim());
+    }
+  }
+
+  const queryString = searchParams.toString();
+  return queryString ? `${basePath}?${queryString}` : basePath;
+}
+
+function normalizeFilterValue(value?: string | null) {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+function matchesSearch(item: AnnouncementItem, searchValue: string) {
+  if (!searchValue) {
+    return true;
+  }
+
+  const haystack = [
+    item.title,
+    item.org,
+    item.slug,
+    item.headline,
+    ...item.legacySlugs,
+    ...item.keywords,
+    ...item.departments,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return haystack.includes(searchValue);
+}
+
+function matchesDepartment(item: AnnouncementItem, departmentValue: string) {
+  if (!departmentValue) {
+    return true;
+  }
+
+  return item.departments.some((department) => department.toLowerCase() === departmentValue);
+}
+
 export function buildAnnouncementPath(item: AnnouncementItem) {
   return `${sectionPathMap[item.section]}/${item.slug}`;
+}
+
+export function buildSearchPath(query?: string) {
+  return buildPathWithQuery('/search', { q: query });
+}
+
+export function buildAnnouncementCategoryPath(
+  section: AnnouncementSection,
+  filters: Pick<AnnouncementFilters, 'department' | 'search'> = {},
+) {
+  return buildPathWithQuery(sectionPathMap[section], {
+    search: filters.search,
+    department: section === 'jobs' ? filters.department : undefined,
+  });
+}
+
+export function buildJobsPath(filters: Pick<AnnouncementFilters, 'department' | 'search'> = {}) {
+  return buildAnnouncementCategoryPath('jobs', filters);
+}
+
+export function buildCommunityPath(channel: CommunityChannel) {
+  const meta = communityPageMeta[channel];
+  return meta.externalUrl ?? meta.canonicalPath;
 }
 
 export function toPortalEntry(item: AnnouncementItem): PortalListEntry {
@@ -1341,20 +2099,45 @@ export function toPortalEntry(item: AnnouncementItem): PortalListEntry {
   };
 }
 
-export function getAnnouncementEntries(section: AnnouncementSection) {
-  return announcementItemsBySection[section].map(toPortalEntry);
+export function getAnnouncementEntries(section: AnnouncementSection, filters: AnnouncementFilters = {}) {
+  const searchValue = normalizeFilterValue(filters.search);
+  const departmentValue = normalizeFilterValue(filters.department);
+  const includeHidden = filters.includeHidden ?? Boolean(searchValue || departmentValue);
+
+  return announcementItemsBySection[section]
+    .filter((item) => (includeHidden || item.listed) && matchesSearch(item, searchValue) && matchesDepartment(item, departmentValue))
+    .map(toPortalEntry);
 }
 
-export function getAnnouncementByParam(section: AnnouncementSection, param: string) {
+export function resolveAnnouncementParam(section: AnnouncementSection, param: string) {
   const items = announcementItemsBySection[section];
   const directMatch = items.find((item) => item.slug === param);
 
   if (directMatch) {
-    return { item: directMatch, legacyMatch: false };
+    return {
+      canonicalPath: buildAnnouncementPath(directMatch),
+      item: directMatch,
+      matchType: 'canonical' as AnnouncementRouteMatchType,
+    };
   }
 
-  const legacyMatch = items.find((item) => item.legacyId === param);
-  return legacyMatch ? { item: legacyMatch, legacyMatch: true } : null;
+  const aliasMatch = items.find((item) => item.legacySlugs.includes(param));
+  if (aliasMatch) {
+    return {
+      canonicalPath: buildAnnouncementPath(aliasMatch),
+      item: aliasMatch,
+      matchType: 'legacy-alias' as AnnouncementRouteMatchType,
+    };
+  }
+
+  const numericLegacyMatch = items.find((item) => item.legacyId === param);
+  return numericLegacyMatch
+    ? {
+        canonicalPath: buildAnnouncementPath(numericLegacyMatch),
+        item: numericLegacyMatch,
+        matchType: 'numeric-legacy' as AnnouncementRouteMatchType,
+      }
+    : null;
 }
 
 export function getCategoryMetaBySlug(slug: string) {
@@ -1403,6 +2186,14 @@ export function getInfoPageBySlug(slug: string) {
   return slug in infoPageMeta ? infoPageMeta[slug as InfoPageSlug] : null;
 }
 
+export function getAuxiliaryPageBySlug(slug: string) {
+  return slug in auxiliaryPageMeta ? auxiliaryPageMeta[slug as AuxiliaryPageSlug] : null;
+}
+
+export function getCommunityPageBySlug(slug: string) {
+  return slug in communityPageMeta ? communityPageMeta[slug as CommunityChannel] : null;
+}
+
 export function getResourceCardsBySlug(slug: ResourceCategorySlug) {
   return resourceCategoryMeta[slug].resourceCards;
 }
@@ -1418,6 +2209,10 @@ export function getStateAnnouncements(slug: string, section?: AnnouncementSectio
 
   for (const sectionKey of sections) {
     for (const item of announcementItemsBySection[sectionKey]) {
+      if (!item.listed) {
+        continue;
+      }
+
       if (item.stateSlugs.includes(slug)) {
         exact.push(item);
       } else if (item.stateSlugs.includes(ALL_INDIA)) {
@@ -1427,6 +2222,20 @@ export function getStateAnnouncements(slug: string, section?: AnnouncementSectio
   }
 
   return [...exact, ...allIndia];
+}
+
+export function getSearchResults(query?: string) {
+  const normalizedQuery = query?.trim() ?? '';
+  return homePageSectionOrder
+    .map((section) => ({
+      entries: getAnnouncementEntries(section, {
+        includeHidden: true,
+        search: normalizedQuery,
+      }),
+      meta: announcementCategoryMeta[section],
+      section,
+    }))
+    .filter((group) => group.entries.length > 0);
 }
 
 export function getStateDirectoryEntries() {

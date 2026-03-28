@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { buildCommunityPath } from '@/app/lib/public-content';
 
 export default function SocialJoinBanners() {
   return (
@@ -12,7 +13,7 @@ export default function SocialJoinBanners() {
       className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10"
     >
       <Link 
-        href="/join/telegram" 
+        href={buildCommunityPath('telegram')} 
         className="group relative bg-gradient-to-r from-[#0088cc] to-[#005f8f] text-white flex items-center justify-center py-4 px-6 rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-blue-500/20 border border-blue-400/30 transition-all duration-300 overflow-hidden transform hover:-translate-y-1 hover:scale-[1.01]"
       >
         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 ease-out skew-x-12" />
@@ -23,7 +24,7 @@ export default function SocialJoinBanners() {
       </Link>
       
       <Link 
-        href="/join/whatsapp" 
+        href={buildCommunityPath('whatsapp')} 
         className="group relative bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white flex items-center justify-center py-4 px-6 rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-emerald-500/20 border border-emerald-400/30 transition-all duration-300 overflow-hidden transform hover:-translate-y-1 hover:scale-[1.01]"
       >
         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 ease-out -skew-x-12" />

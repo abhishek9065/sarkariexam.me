@@ -21,6 +21,7 @@ import {
 import Link from 'next/link';
 import { HomePageSectionBox } from './HomePageSectionBox';
 import { homePageLinks, toOfficialUrl } from './links';
+import { buildJobsPath } from '@/app/lib/public-content';
 
 const quickCategories = [
   { icon: FileText, label: 'Online Form', count: '342', color: 'text-blue-600', bg: 'bg-blue-50', href: homePageLinks.jobs },
@@ -32,16 +33,16 @@ const quickCategories = [
 ] as const;
 
 const departmentJobs = [
-  { icon: Briefcase, label: 'Central Govt Jobs', count: '2,340' },
-  { icon: Landmark, label: 'State Govt Jobs', count: '1,890' },
-  { icon: Shield, label: 'Defence Jobs', count: '890' },
-  { icon: Train, label: 'Railway Jobs', count: '1,200' },
-  { icon: Building2, label: 'Bank Jobs', count: '760' },
-  { icon: Stethoscope, label: 'Medical Jobs', count: '430' },
-  { icon: GraduationCap, label: 'Teaching Jobs', count: '980' },
-  { icon: Scale, label: 'Judiciary Jobs', count: '320' },
-  { icon: Cpu, label: 'IT / Tech Jobs', count: '540' },
-  { icon: Users, label: 'PSC Jobs', count: '1,100' },
+  { icon: Briefcase, label: 'Central Govt Jobs', count: '2,340', department: 'SSC' },
+  { icon: Landmark, label: 'State Govt Jobs', count: '1,890', department: 'State Govt' },
+  { icon: Shield, label: 'Defence Jobs', count: '890', department: 'Defence' },
+  { icon: Train, label: 'Railway Jobs', count: '1,200', department: 'Railway' },
+  { icon: Building2, label: 'Bank Jobs', count: '760', department: 'Banking' },
+  { icon: Stethoscope, label: 'Medical Jobs', count: '430', department: 'Medical' },
+  { icon: GraduationCap, label: 'Teaching Jobs', count: '980', department: 'Teaching' },
+  { icon: Scale, label: 'Judiciary Jobs', count: '320', department: 'State Govt' },
+  { icon: Cpu, label: 'IT / Tech Jobs', count: '540', department: 'Engineering' },
+  { icon: Users, label: 'PSC Jobs', count: '1,100', department: 'UPSC' },
 ] as const;
 
 const importantWebsites = [
@@ -140,7 +141,7 @@ export function HomePageQuickLinks() {
                 {departmentJobs.map((department) => (
                   <Link
                     key={department.label}
-                    href={homePageLinks.jobs}
+                    href={buildJobsPath({ department: department.department })}
                     className="group flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-3 transition-all hover:border-orange-200 hover:bg-orange-50/50 hover:shadow-sm"
                   >
                     <department.icon size={18} className="shrink-0 text-gray-500 transition-colors group-hover:text-[#e65100]" />

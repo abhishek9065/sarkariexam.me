@@ -34,6 +34,7 @@ import {
   Bookmark,
   User,
 } from 'lucide-react';
+import { buildJobsPath, buildSearchPath } from '@/app/lib/public-content';
 
 const categories = [
   { name: 'Jobs', href: '/jobs', icon: Briefcase, description: 'Latest government job openings' },
@@ -56,7 +57,7 @@ export function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`;
+      window.location.href = buildSearchPath(searchQuery);
     }
   };
 
@@ -109,7 +110,7 @@ export function Header() {
               <DropdownMenuContent align="start" className="w-48">
                 {departments.map((dept) => (
                   <DropdownMenuItem key={dept}>
-                    <Link href={`/jobs?department=${encodeURIComponent(dept)}`} className="w-full">
+                    <Link href={buildJobsPath({ department: dept })} className="w-full">
                       {dept}
                     </Link>
                   </DropdownMenuItem>

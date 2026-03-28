@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 const links = [
-  { title: 'SSC CGL 2025 Apply Online', href: '/jobs/ssc-cgl', gradient: 'from-[#EF4444] to-[#B91C1C]' },
-  { title: 'UP Police Constable Result Declared', href: '/results/up-police', gradient: 'from-[#3B82F6] to-[#1D4ED8]' },
-  { title: 'Railway NTPC Form 2025', href: '/jobs/rrb-ntpc', gradient: 'from-[#10B981] to-[#047857]' },
-  { title: 'UPSC IAS / IFS Admit Card 2025', href: '/admit-cards/upsc', gradient: 'from-[#F59E0B] to-[#D97706]' },
-  { title: 'Bihar BPSC Teacher Exam Date', href: '/admit-cards/bpsc', gradient: 'from-[#EF4444] to-[#B91C1C]' },
-  { title: 'CTET 2025 Answer Key / Result', href: '/results/ctet', gradient: 'from-[#3B82F6] to-[#1D4ED8]' },
-  { title: 'Navy Agniveer SSR Recruitment 2025', href: '/jobs/navy', gradient: 'from-[#10B981] to-[#047857]' },
-  { title: 'Army TES 52 Entry Online Form', href: '/jobs/army-tes', gradient: 'from-[#8B5CF6] to-[#6D28D9]' },
+  { title: 'SSC CGL 2025 Apply Online', href: '/jobs/ssc-cgl-2025-apply-online', gradient: 'from-[#EF4444] to-[#B91C1C]' },
+  { title: 'UP Police Constable Result Declared', href: '/results/up-police-constable-2025-result', gradient: 'from-[#3B82F6] to-[#1D4ED8]' },
+  { title: 'Railway NTPC Form 2025', href: '/jobs/railway-ntpc-2025-online-form', gradient: 'from-[#10B981] to-[#047857]' },
+  { title: 'UPSC IAS / IFS Admit Card 2025', href: '/admit-cards/upsc-ias-ifs-2025-admit-card', gradient: 'from-[#F59E0B] to-[#D97706]' },
+  { title: 'Bihar BPSC Teacher Exam Date', href: '/admit-cards/bihar-bpsc-teacher-2025-exam-date', gradient: 'from-[#EF4444] to-[#B91C1C]' },
+  { title: 'CTET 2025 Answer Key / Result', href: '/results/ctet-2025-result', gradient: 'from-[#3B82F6] to-[#1D4ED8]' },
+  { title: 'Navy Agniveer SSR Recruitment 2025', href: '/jobs/indian-navy-agniveer-ssr-2025-recruitment', gradient: 'from-[#10B981] to-[#047857]' },
+  { title: 'Army TES 52 Entry Online Form', href: '/jobs/army-tes-52-entry-2025-online-form', gradient: 'from-[#8B5CF6] to-[#6D28D9]' },
 ];
 
 const containerVariants = {

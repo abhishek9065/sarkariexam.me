@@ -5,14 +5,18 @@ import { PublicPageHeader } from './PublicPageHeader';
 import { PublicPanel } from './PublicPanel';
 
 interface PublicCategoryHubPageProps {
+  clearHref?: string;
   entries: PortalListEntry[];
   meta: CategoryPageMeta;
+  querySummary?: string;
   resourceCards?: ResourceCard[];
 }
 
 export function PublicCategoryHubPage({
+  clearHref,
   entries,
   meta,
+  querySummary,
   resourceCards = [],
 }: PublicCategoryHubPageProps) {
   return (
@@ -27,6 +31,22 @@ export function PublicCategoryHubPage({
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.65fr_0.95fr]">
         <div className="space-y-4">
+          {querySummary ? (
+            <PublicPanel title="Active Filters" headerColor="bg-[#e65100]">
+              <div className="flex flex-col gap-3 p-4 text-sm text-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                <p>{querySummary}</p>
+                {clearHref ? (
+                  <Link
+                    href={clearHref}
+                    className="inline-flex items-center justify-center rounded-lg border border-orange-200 px-3 py-2 text-sm font-semibold text-[#e65100] transition-colors hover:bg-orange-50"
+                  >
+                    Clear Filters
+                  </Link>
+                ) : null}
+              </div>
+            </PublicPanel>
+          ) : null}
+
           {entries.length > 0 ? (
             <HomePageSectionBox title={meta.listingTitle} headerColor={meta.headerColor} viewAllLink={meta.canonicalPath}>
               {entries.map((entry) => (
@@ -42,6 +62,13 @@ export function PublicCategoryHubPage({
                 />
               ))}
             </HomePageSectionBox>
+          ) : querySummary ? (
+            <PublicPanel title="No Matching Updates" headerColor="bg-[#37474f]">
+              <div className="space-y-3 p-4 text-sm leading-7 text-gray-700">
+                <p>No announcements matched the current search or department filter.</p>
+                <p>Clear the filters to return to the main browsing list, or try a broader keyword.</p>
+              </div>
+            </PublicPanel>
           ) : null}
 
           {resourceCards.length > 0 ? (

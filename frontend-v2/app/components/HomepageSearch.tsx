@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { buildSearchPath } from '@/app/lib/public-content';
 
 export default function HomepageSearch() {
   const [query, setQuery] = useState('');
@@ -11,7 +12,7 @@ export default function HomepageSearch() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(query)}`;
+      window.location.href = buildSearchPath(query);
     }
   };
 

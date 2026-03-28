@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Smartphone, Download } from 'lucide-react';
+import { homePageLinks } from './homepage/links';
 
 export default function AppDownloadBanner() {
   return (
@@ -19,7 +20,7 @@ export default function AppDownloadBanner() {
       </div>
       
       <Link 
-        href="/app" 
+        href={homePageLinks.app} 
         className="relative z-10 bg-white text-indigo-700 hover:bg-blue-50 flex items-center py-4 px-8 rounded-full font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300 hover:scale-105 active:scale-95 hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] w-full sm:w-auto justify-center"
       >
         <Download className="w-6 h-6 mr-2 animate-bounce" />

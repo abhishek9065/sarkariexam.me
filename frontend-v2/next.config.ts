@@ -1,7 +1,30 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
+import { announcementCategoryMeta, announcementItemsBySection, buildAnnouncementPath } from './app/lib/public-content';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async redirects() {
+    return (Object.keys(announcementItemsBySection) as Array<keyof typeof announcementItemsBySection>).flatMap((section) =>
+      announcementItemsBySection[section].flatMap((item) => {
+        const destination = buildAnnouncementPath(item);
+        const basePath = announcementCategoryMeta[section].canonicalPath;
+        const redirects = item.legacySlugs.map((legacySlug) => ({
+          source: `${basePath}/${legacySlug}`,
+          destination,
+          permanent: true,
+        }));
+
+        if (item.legacyId) {
+          redirects.push({
+            source: `${basePath}/${item.legacyId}`,
+            destination,
+            permanent: true,
+          });
+        }
+
+        return redirects;
+      }),
+    );
+  },
 };
 
 export default nextConfig;

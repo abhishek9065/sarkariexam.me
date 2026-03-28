@@ -19,6 +19,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { buildJobsPath } from '@/app/lib/public-content';
 import { HomePageLoginModal } from './HomePageLoginModal';
 import { homePageLinks } from './links';
 
@@ -50,7 +51,7 @@ export function HomePageNavbar() {
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = searchQuery.trim();
-    router.push(trimmedQuery ? `${homePageLinks.jobs}?search=${encodeURIComponent(trimmedQuery)}` : homePageLinks.jobs);
+    router.push(buildJobsPath({ search: trimmedQuery || undefined }));
     setIsMenuOpen(false);
   }
 

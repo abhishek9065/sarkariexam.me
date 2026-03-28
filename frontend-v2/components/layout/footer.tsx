@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { buildCommunityPath, buildJobsPath } from '@/app/lib/public-content';
 import { 
   Briefcase, 
   FileText, 
@@ -20,12 +21,12 @@ const footerLinks = {
     { name: 'Admissions', href: '/admissions', icon: GraduationCap },
   ],
   topDepartments: [
-    { name: 'Railway Jobs', href: '/jobs?department=Railway' },
-    { name: 'Banking Jobs', href: '/jobs?department=Banking' },
-    { name: 'SSC Recruitment', href: '/jobs?department=SSC' },
-    { name: 'UPSC Exams', href: '/jobs?department=UPSC' },
-    { name: 'Defence Jobs', href: '/jobs?department=Defence' },
-    { name: 'Teaching Jobs', href: '/jobs?department=Teaching' },
+    { name: 'Railway Jobs', href: buildJobsPath({ department: 'Railway' }) },
+    { name: 'Banking Jobs', href: buildJobsPath({ department: 'Banking' }) },
+    { name: 'SSC Recruitment', href: buildJobsPath({ department: 'SSC' }) },
+    { name: 'UPSC Exams', href: buildJobsPath({ department: 'UPSC' }) },
+    { name: 'Defence Jobs', href: buildJobsPath({ department: 'Defence' }) },
+    { name: 'Teaching Jobs', href: buildJobsPath({ department: 'Teaching' }) },
   ],
   states: [
     { name: 'UP Govt Jobs', href: '/states/uttar-pradesh' },
@@ -70,10 +71,10 @@ const YoutubeIcon = () => (
 );
 
 const socialLinks = [
-  { name: 'Facebook', icon: FacebookIcon, href: '#' },
-  { name: 'Twitter', icon: TwitterIcon, href: '#' },
-  { name: 'Instagram', icon: InstagramIcon, href: '#' },
-  { name: 'YouTube', icon: YoutubeIcon, href: '#' },
+  { name: 'Facebook', icon: FacebookIcon, href: buildCommunityPath('facebook') },
+  { name: 'Twitter', icon: TwitterIcon, href: buildCommunityPath('twitter') },
+  { name: 'Instagram', icon: InstagramIcon, href: buildCommunityPath('instagram') },
+  { name: 'YouTube', icon: YoutubeIcon, href: buildCommunityPath('youtube') },
 ];
 
 export function Footer() {
