@@ -4,7 +4,7 @@ Government jobs and exam updates platform.
 
 ## Apps
 - `backend/`: Express 5 + TypeScript API
-- `frontend-v2/`: Next.js 16 public frontend
+- `frontend/`: Next.js 16 public frontend
 - `admin-next/`: Next.js admin console
 - `nginx/`: reverse proxy and edge config
 
@@ -33,7 +33,7 @@ Runs on `http://localhost:5000`.
 
 ### Public Frontend
 ```bash
-cd frontend-v2
+cd frontend
 npm install
 npm run dev
 ```
@@ -93,7 +93,7 @@ npm run test:ci
 
 ### Public Frontend
 ```bash
-cd frontend-v2
+cd frontend
 npm run lint
 npm run build
 ```
@@ -131,19 +131,19 @@ For non-Docker VM deployments, use the committed PM2 config:
 
 ```bash
 cd ~/your-repo
-npm --prefix frontend-v2 run build
-pm2 delete frontend-v2 || true
-pm2 start ecosystem.config.cjs --only frontend-v2
+npm --prefix frontend run build
+pm2 delete frontend || true
+pm2 start ecosystem.config.cjs --only frontend
 pm2 save
 ```
 
-This ensures PM2 starts the app from the correct `frontend-v2` working directory.
+This ensures PM2 starts the app from the correct `frontend` working directory.
 
 ## Repository Layout
 
 ```text
 backend/         Express API
-frontend-v2/     Next.js public frontend
+frontend/        Next.js public frontend
 admin-next/      Next.js admin console
 nginx/           reverse proxy config
 scripts/         deployment and maintenance scripts

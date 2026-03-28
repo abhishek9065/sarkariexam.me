@@ -17,7 +17,7 @@ This codebase has been enhanced with **85% of planned features** including:
 
 ### Frontend
 ```bash
-cd frontend-v2
+cd frontend
 npm install
 ```
 
@@ -32,7 +32,7 @@ npm install
 ## ⚙️ Configuration
 
 ### Frontend Environment Variables
-Create `frontend-v2/.env.local`:
+Create `frontend/.env.local`:
 
 ```env
 # Analytics (Optional - leave blank to disable)
@@ -56,7 +56,7 @@ Use existing `.env` file or copy from `.env.example`
 
 **Frontend:**
 ```bash
-cd frontend-v2
+cd frontend
 npm run dev
 # Runs on http://localhost:3000
 ```
@@ -72,7 +72,7 @@ npm run dev
 
 **Frontend:**
 ```bash
-cd frontend-v2
+cd frontend
 npm run build
 npm start
 ```
@@ -92,13 +92,13 @@ npm start
 
 **Unit Tests:**
 ```bash
-cd frontend-v2
+cd frontend
 npm test
 ```
 
 **E2E Tests:**
 ```bash
-cd frontend-v2
+cd frontend
 npx playwright test
 ```
 
@@ -208,29 +208,29 @@ Comment out the alerts and analytics imports in `backend/src/server.ts` to build
 ## 📁 New Files Reference
 
 ### Analytics System
-- `frontend-v2/app/lib/analytics/` - Complete analytics system
-- `frontend-v2/app/components/AnalyticsInitializer.tsx` - Auto-init
+- `frontend/app/lib/analytics/` - Complete analytics system
+- `frontend/app/components/AnalyticsInitializer.tsx` - Auto-init
 - `backend/src/routes/analytics.ts` - Backend endpoint
 
 ### Testing
-- `frontend-v2/jest.config.js` - Jest configuration
-- `frontend-v2/playwright.config.ts` - E2E configuration
-- `frontend-v2/app/components/__tests__/` - Unit tests
-- `frontend-v2/e2e/` - E2E tests
+- `frontend/jest.config.js` - Jest configuration
+- `frontend/playwright.config.ts` - E2E configuration
+- `frontend/app/components/__tests__/` - Unit tests
+- `frontend/e2e/` - E2E tests
 
 ### SEO
-- `frontend-v2/app/lib/structuredData.ts` - Schema generators
-- `frontend-v2/app/sitemap.ts` - Dynamic sitemap
-- `frontend-v2/app/robots.ts` - Robots configuration
-- `frontend-v2/public/manifest.json` - PWA manifest
+- `frontend/app/lib/structuredData.ts` - Schema generators
+- `frontend/app/sitemap.ts` - Dynamic sitemap
+- `frontend/app/robots.ts` - Robots configuration
+- `frontend/public/manifest.json` - PWA manifest
 
 ### Dark Mode
-- `frontend-v2/app/lib/theme.ts` - Theme management
-- `frontend-v2/app/components/ThemeToggle.tsx` - Toggle UI
+- `frontend/app/lib/theme.ts` - Theme management
+- `frontend/app/components/ThemeToggle.tsx` - Toggle UI
 
 ### Error Handling
-- `frontend-v2/app/components/ErrorBoundary.tsx` - Error boundary
-- `frontend-v2/app/error.tsx` - Error page
+- `frontend/app/components/ErrorBoundary.tsx` - Error boundary
+- `frontend/app/error.tsx` - Error page
 
 ### User Engagement
 - `backend/src/routes/alerts.ts` - Job alerts API (needs fixes)
@@ -239,7 +239,7 @@ Comment out the alerts and analytics imports in `backend/src/server.ts` to build
 
 ## 📚 Documentation
 
-- **Analytics Guide:** `frontend-v2/README-ANALYTICS.md`
+- **Analytics Guide:** `frontend/README-ANALYTICS.md`
 - **Implementation Summary:** `IMPLEMENTATION-SUMMARY.md`
 - **Final Status:** `FINAL-STATUS.md`
 - **This Guide:** `QUICK-START.md`

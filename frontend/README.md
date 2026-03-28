@@ -33,7 +33,7 @@ A premium, modern frontend for SarkariExams.me built with Next.js 15, Tailwind C
 ## Project Structure
 
 ```
-frontend-v2/
+frontend/
 ├── app/
 │   ├── (home)/
 │   │   └── page.tsx           # Homepage
@@ -71,7 +71,7 @@ frontend-v2/
 
 1. Navigate to the project:
 ```bash
-cd frontend-v2
+cd frontend
 ```
 
 2. Install dependencies:
@@ -99,13 +99,13 @@ Use the committed PM2 config from the repository root so the process always star
 
 ```bash
 cd ~/sarkari-result
-npm --prefix frontend-v2 run build
-pm2 delete frontend-v2 || true
-pm2 start ecosystem.config.cjs --only frontend-v2
+npm --prefix frontend run build
+pm2 delete frontend || true
+pm2 start ecosystem.config.cjs --only frontend
 pm2 save
 ```
 
-If PM2 starts `next` from the repo root instead of `frontend-v2`, Next.js will fail with:
+If PM2 starts `next` from the repo root instead of `frontend`, Next.js will fail with:
 
 ```text
 Could not find a production build in the '.next' directory

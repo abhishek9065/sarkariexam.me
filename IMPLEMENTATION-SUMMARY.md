@@ -15,21 +15,21 @@ This document summarizes the comprehensive implementation of all 5 development p
   - Mixpanel
 
 ### Files Created
-- `frontend-v2/app/lib/analytics/types.ts` - Type definitions
-- `frontend-v2/app/lib/analytics/providers/ga4.ts` - GA4 implementation
-- `frontend-v2/app/lib/analytics/providers/plausible.ts` - Plausible implementation
-- `frontend-v2/app/lib/analytics/providers/mixpanel.ts` - Mixpanel implementation
-- `frontend-v2/app/lib/analytics/index.ts` - Main analytics orchestrator
-- `frontend-v2/app/components/AnalyticsInitializer.tsx` - Auto-initialization component
-- `frontend-v2/README-ANALYTICS.md` - Complete analytics documentation
+- `frontend/app/lib/analytics/types.ts` - Type definitions
+- `frontend/app/lib/analytics/providers/ga4.ts` - GA4 implementation
+- `frontend/app/lib/analytics/providers/plausible.ts` - Plausible implementation
+- `frontend/app/lib/analytics/providers/mixpanel.ts` - Mixpanel implementation
+- `frontend/app/lib/analytics/index.ts` - Main analytics orchestrator
+- `frontend/app/components/AnalyticsInitializer.tsx` - Auto-initialization component
+- `frontend/README-ANALYTICS.md` - Complete analytics documentation
 - `backend/src/routes/analytics.ts` - Backend analytics endpoint
 
 ### Files Modified
-- `frontend-v2/app/layout.tsx` - Added AnalyticsInitializer
-- `frontend-v2/app/components/DetailPageClient.tsx` - Replaced placeholder trackEvent
-- `frontend-v2/app/components/CategoryPageClient.tsx` - Replaced placeholder trackEvent
-- `frontend-v2/app/components/SearchOverlay.tsx` - Replaced placeholder trackEvent
-- `frontend-v2/app/components/AnnouncementCard.tsx` - Replaced placeholder trackEvent
+- `frontend/app/layout.tsx` - Added AnalyticsInitializer
+- `frontend/app/components/DetailPageClient.tsx` - Replaced placeholder trackEvent
+- `frontend/app/components/CategoryPageClient.tsx` - Replaced placeholder trackEvent
+- `frontend/app/components/SearchOverlay.tsx` - Replaced placeholder trackEvent
+- `frontend/app/components/AnnouncementCard.tsx` - Replaced placeholder trackEvent
 - `backend/src/server.ts` - Registered analytics routes
 
 ### Configuration Required
@@ -71,9 +71,9 @@ NEXT_PUBLIC_MIXPANEL_TOKEN=xxxxxxxxxxxxx
 - Run with: `ANALYZE=true npm run build`
 
 ### Files Modified
-- `frontend-v2/next.config.ts` - Enhanced configuration
-- `frontend-v2/app/providers.tsx` - Optimized React Query
-- `frontend-v2/next.config.analyze.ts` - Bundle analyzer config
+- `frontend/next.config.ts` - Enhanced configuration
+- `frontend/app/providers.tsx` - Optimized React Query
+- `frontend/next.config.analyze.ts` - Bundle analyzer config
 
 ### Performance Improvements
 - ✅ Reduced initial bundle size
@@ -122,13 +122,13 @@ NEXT_PUBLIC_MIXPANEL_TOKEN=xxxxxxxxxxxxx
   - Automatic error reporting to backend
 
 ### Files Created
-- `frontend-v2/jest.config.js` - Jest configuration
-- `frontend-v2/jest.setup.js` - Test setup and mocks
-- `frontend-v2/playwright.config.ts` - E2E test configuration
-- `frontend-v2/app/components/__tests__/AnnouncementCard.test.tsx` - Unit test
-- `frontend-v2/e2e/homepage.spec.ts` - E2E test suite
-- `frontend-v2/app/components/ErrorBoundary.tsx` - Error boundary
-- `frontend-v2/app/error.tsx` - Error page
+- `frontend/jest.config.js` - Jest configuration
+- `frontend/jest.setup.js` - Test setup and mocks
+- `frontend/playwright.config.ts` - E2E test configuration
+- `frontend/app/components/__tests__/AnnouncementCard.test.tsx` - Unit test
+- `frontend/e2e/homepage.spec.ts` - E2E test suite
+- `frontend/app/components/ErrorBoundary.tsx` - Error boundary
+- `frontend/app/error.tsx` - Error page
 
 ### Test Commands
 ```bash
@@ -176,10 +176,10 @@ npm test -- --coverage
 - References sitemap
 
 ### Files Created
-- `frontend-v2/app/lib/structuredData.ts` - Schema generators
-- `frontend-v2/app/sitemap.ts` - Dynamic sitemap
-- `frontend-v2/app/robots.ts` - Robots configuration
-- `frontend-v2/public/manifest.json` - PWA manifest
+- `frontend/app/lib/structuredData.ts` - Schema generators
+- `frontend/app/sitemap.ts` - Dynamic sitemap
+- `frontend/app/robots.ts` - Robots configuration
+- `frontend/public/manifest.json` - PWA manifest
 
 ### SEO Benefits
 - ✅ Rich snippets in search results
@@ -319,7 +319,7 @@ Ensure all required environment variables are set:
 
 ## Documentation
 
-- Analytics: `frontend-v2/README-ANALYTICS.md`
+- Analytics: `frontend/README-ANALYTICS.md`
 - Testing: See test files for examples
 - API: Check `openapi.json` for full API spec
 - This Summary: `IMPLEMENTATION-SUMMARY.md`

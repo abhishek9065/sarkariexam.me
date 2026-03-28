@@ -3,8 +3,8 @@ const path = require('path');
 module.exports = {
   apps: [
     {
-      name: 'frontend-v2',
-      cwd: path.join(__dirname, 'frontend-v2'),
+      name: 'frontend',
+      cwd: path.join(__dirname, 'frontend'),
       script: 'npm',
       args: 'start',
       interpreter: 'none',
