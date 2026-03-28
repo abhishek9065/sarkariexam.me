@@ -32,7 +32,12 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import supportRouter from './routes/support.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { scheduleAutomationJobs } from './services/automationJobs.js';
-import { connectToDatabase, healthCheck } from './services/cosmosdb.js';
+import {
+  connectToDatabase,
+  ensureDatabaseReady,
+  healthCheck,
+  isDatabaseConfigured,
+} from './services/cosmosdb.js';
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
@@ -41,6 +46,18 @@ import logger from './utils/logger.js';
 
 const app = express();
 const startedAt = Date.now();
+const dbBackedApiPrefixes = [
+  '/api/auth',
+  '/api/admin',
+  '/api/announcements',
+  '/api/bookmarks',
+  '/api/subscriptions',
+  '/api/profile',
+  '/api/push',
+  '/api/jobs',
+  '/api/community',
+  '/api/support',
+];
 
 export { app };
 
@@ -130,28 +147,16 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    meta: {
-      featureFlags: config.featureFlags,
-    },
-  });
+app.get('/api/health', async (_req, res) => {
+  return buildHealthResponse(res);
 });
 
-app.get('/api/healthz', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    meta: {
-      featureFlags: config.featureFlags,
-    },
-  });
+app.get('/api/healthz', async (_req, res) => {
+  return buildHealthResponse(res);
 });
 
 app.get('/api/health/deep', async (_req, res) => {
-  const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+  const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
   const status = dbConfigured && !dbOk ? 'error' : 'ok';
 
@@ -164,6 +169,28 @@ app.get('/api/health/deep', async (_req, res) => {
       db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' }
     });
 });
+
+function isDatabaseBackedApi(pathname: string): boolean {
+  return dbBackedApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+async function buildHealthResponse(res: express.Response) {
+  const dbConfigured = isDatabaseConfigured();
+  const dbOk = dbConfigured ? await healthCheck() : null;
+  const status = dbConfigured && !dbOk ? 'error' : 'ok';
+
+  return res
+    .status(status === 'error' ? 503 : 200)
+    .set('Cache-Control', 'no-store')
+    .json({
+      status,
+      timestamp: new Date().toISOString(),
+      meta: {
+        featureFlags: config.featureFlags,
+      },
+      db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' },
+    });
+}
 
 app.get('/metrics', (req, res) => {
   const token = config.metricsToken;
@@ -209,6 +236,26 @@ app.get('/metrics', (req, res) => {
   res.type('text/plain; version=0.0.4').send(`${lines.join('\n')}\n`);
 });
 
+app.use(async (req, res, next) => {
+  if (!isDatabaseBackedApi(req.path) || !isDatabaseConfigured()) {
+    next();
+    return;
+  }
+
+  try {
+    await ensureDatabaseReady();
+    next();
+  } catch (error) {
+    logger.error({ err: error, path: req.path }, '[Server] Database unavailable for API request');
+    res.status(503).json({
+      error: 'Service unavailable',
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Database is temporarily unavailable. Please retry shortly.',
+      requestId: req.requestId,
+    });
+  }
+});
+
 // Core Routes (MongoDB-based)
 app.use(
   '/api/auth',
@@ -245,10 +292,10 @@ app.use(errorHandler);
 
 // Initialize database and start server
 export async function startServer() {
-  try {
-    ErrorTracking.init();
+  ErrorTracking.init();
 
-    if (process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI) {
+  try {
+    if (isDatabaseConfigured()) {
       await connectToDatabase();
       logger.info('[Server] MongoDB connected successfully');
       await scheduleAnalyticsRollups().catch(error => {
@@ -263,16 +310,26 @@ export async function startServer() {
     }
   } catch (error) {
     logger.error({ err: error }, '[Server] Database connection failed');
+    if (config.isProduction) {
+      throw error;
+    }
     logger.info('[Server] Starting without database - using fallback data');
   }
 
   const server = http.createServer(app);
 
-  server.listen(config.port, () => {
-    logger.info(`API running on http://localhost:${config.port}`);
+  return new Promise<http.Server>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(config.port, () => {
+      logger.info(`API running on http://localhost:${config.port}`);
+      resolve(server);
+    });
   });
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  startServer();
+  startServer().catch((error) => {
+    logger.fatal({ err: error }, '[Server] Startup failed');
+    process.exit(1);
+  });
 }

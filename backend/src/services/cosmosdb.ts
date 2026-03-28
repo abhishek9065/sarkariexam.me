@@ -9,11 +9,25 @@ let client: MongoClient | null = null;
 let db: Db | null = null;
 let isConnecting = false;
 let isClosing = false;
+let lastHealthCheckAt = 0;
+let lastHealthCheckOk = false;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
+const HEALTH_CHECK_CACHE_MS = 5000;
 
-const getConnectionString = (): string | undefined =>
-    process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
+const getConnectionString = (): string | undefined => {
+    const configured = process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
+    if (configured) {
+        return configured;
+    }
+
+    // Keep the runtime DB behavior aligned with config.ts development fallback.
+    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
+        return 'mongodb://localhost:27017/sarkari_db';
+    }
+
+    return undefined;
+};
 
 const getDatabaseName = (): string =>
     process.env.COSMOS_DATABASE_NAME || 'sarkari_db';
@@ -26,6 +40,12 @@ const formatErrorForTestLog = (error: unknown): string => {
         return `${error.name}: ${error.message}`;
     }
     return String(error);
+};
+
+const markHealth = (ok: boolean): boolean => {
+    lastHealthCheckAt = Date.now();
+    lastHealthCheckOk = ok;
+    return ok;
 };
 
 /**
@@ -98,6 +118,7 @@ export async function connectToDatabase(): Promise<Db> {
             }
             isConnecting = false;
             isClosing = false;
+            markHealth(true);
 
             // Create indexes
             try {
@@ -112,6 +133,7 @@ export async function connectToDatabase(): Promise<Db> {
                 if (!isClosing && !isTestEnv()) {
                     console.warn('[CosmosDB] Connection closed');
                 }
+                markHealth(false);
                 db = null;
                 client = null;
                 isConnecting = false;
@@ -123,6 +145,7 @@ export async function connectToDatabase(): Promise<Db> {
                 } else {
                     console.error('[CosmosDB] Connection error:', error);
                 }
+                markHealth(false);
                 db = null;
                 client = null;
                 isConnecting = false;
@@ -146,6 +169,7 @@ export async function connectToDatabase(): Promise<Db> {
                 client = null;
             }
             db = null;
+            markHealth(false);
 
             if (attempt === MAX_RETRIES) {
                 isConnecting = false;
@@ -351,6 +375,7 @@ export async function closeConnection(): Promise<void> {
     }
 
     if (!client) {
+        markHealth(false);
         db = null;
         return;
     }
@@ -369,6 +394,7 @@ export async function closeConnection(): Promise<void> {
         }
     } finally {
         isClosing = false;
+        markHealth(false);
     }
 
     if (!isTestEnv()) {
@@ -380,13 +406,45 @@ export async function closeConnection(): Promise<void> {
  * Health check for database
  */
 export async function healthCheck(): Promise<boolean> {
-    try {
-        if (!db) return false;
-        await db.command({ ping: 1 });
-        return true;
-    } catch {
-        return false;
+    if (Date.now() - lastHealthCheckAt < HEALTH_CHECK_CACHE_MS) {
+        return lastHealthCheckOk;
     }
+
+    try {
+        if (!db) return markHealth(false);
+        await db.command({ ping: 1 });
+        return markHealth(true);
+    } catch {
+        return markHealth(false);
+    }
+}
+
+export function isDatabaseConfigured(): boolean {
+    return Boolean(getConnectionString());
+}
+
+export function isDatabaseConnected(): boolean {
+    return Boolean(db);
+}
+
+export async function ensureDatabaseReady(): Promise<boolean> {
+    if (!isDatabaseConfigured()) {
+        return true;
+    }
+
+    if (!db) {
+        await connectToDatabase();
+        return true;
+    }
+
+    const healthy = await healthCheck();
+    if (healthy) {
+        return true;
+    }
+
+    await closeConnection();
+    await connectToDatabase();
+    return true;
 }
 
 /**
@@ -409,6 +467,9 @@ export default {
     getCollection,
     closeConnection,
     healthCheck,
+    ensureDatabaseReady,
+    isDatabaseConfigured,
+    isDatabaseConnected,
     toObjectId,
     isValidObjectId,
 };
