@@ -132,24 +132,41 @@ wait_for_backend_endpoint() {
 wait_for_backend_health
 wait_for_backend_endpoint
 
+check_frontend_route_marker() {
+  local path="$1"
+  local marker="$2"
+  local label="$3"
+  local html
+
+  html="$(docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${path}" || true)"
+  if [[ -z "$html" ]]; then
+    echo "ERROR: ${label} returned no HTML for ${path}"
+    return 1
+  fi
+
+  if ! printf '%s' "$html" | grep -q "$marker"; then
+    echo "ERROR: ${label} did not render expected marker (${marker}) for ${path}"
+    return 1
+  fi
+
+  return 0
+}
+
 wait_for_frontend_shell() {
   local attempts="${1:-60}"
   local sleep_seconds="${2:-2}"
   local i
-  local route
 
   echo "Waiting for frontend route shell verification..."
   for ((i=1; i<=attempts; i++)); do
     local ok=1
-    for route in "/" "/jobs/" "/job/test-slug/"; do
-      if ! docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | grep -q 'exact-home'; then
-        ok=0
-        break
-      fi
-    done
+
+    check_frontend_route_marker "/" 'Latest Jobs / Online Form' "homepage" || ok=0
+    check_frontend_route_marker "/jobs" 'Government Jobs' "jobs listing" || ok=0
+    check_frontend_route_marker "/results/1" 'Result Detail' "result detail" || ok=0
 
     if [[ "$ok" -eq 1 ]]; then
-      echo "Frontend public shell routes are rendering correctly."
+      echo "Frontend public routes are rendering correctly."
       return 0
     fi
 
@@ -157,8 +174,8 @@ wait_for_frontend_shell() {
     sleep "$sleep_seconds"
   done
 
-  echo "Timed out waiting for frontend public shell routes."
-  for route in "/" "/jobs/" "/job/test-slug/"; do
+  echo "Timed out waiting for frontend public routes."
+  for route in "/" "/jobs" "/results/1"; do
     echo "--- ${route} ---"
     docker compose exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
     echo
@@ -270,60 +287,39 @@ check_public_route_assets() {
   echo "ok (${label} assets -> ${url}, assets=${asset_count})"
 }
 
-get_public_detail_slug() {
-  local type="$1"
-  local payload
-  local slug
-  payload="$(curl -k -fsS "${PUBLIC_BASE_URL}/api/announcements/v3/cards?type=${type}&limit=1" || true)"
-  slug="$(printf '%s' "$payload" | grep -o '"slug":"[^"]*"' | head -n1 | sed 's/"slug":"//; s/"$//')"
-
-  if [[ -z "$slug" ]]; then
-    echo "ERROR: unable to fetch a public ${type} slug for detail route verification."
-    return 1
-  fi
-
-  printf '%s' "$slug"
-}
-
-check_public_detail_route() {
-  local type="$1"
-  local marker="$2"
-  local slug
+check_public_route_marker() {
+  local path="$1"
+  local label="$2"
+  local marker="$3"
   local url
   local html
   local status
 
-  slug="$(get_public_detail_slug "$type")" || return 1
-  url="${PUBLIC_BASE_URL}/${type}/${slug}"
+  url="${PUBLIC_BASE_URL}${path}"
   status="$(curl -k -sS -L -o /dev/null -w "%{http_code}" "$url" || true)"
   if [[ ! "$status" =~ ^2 ]]; then
-    echo "ERROR: ${type} detail route check failed for ${url} (status=${status:-none})"
+    echo "ERROR: ${label} route check failed for ${url} (status=${status:-none})"
     return 1
   fi
 
   html="$(curl -k -sS -L "$url" || true)"
   if [[ -z "$html" ]]; then
-    echo "ERROR: ${type} detail route returned no HTML for ${url}"
-    return 1
-  fi
-
-  if printf '%s' "$html" | grep -q 'data-testid="home-mvp"'; then
-    echo "ERROR: ${type} detail route fell back to homepage for ${url}"
+    echo "ERROR: ${label} route returned no HTML for ${url}"
     return 1
   fi
 
   if printf '%s' "$html" | grep -q 'Application error:'; then
-    echo "ERROR: ${type} detail route rendered an application error for ${url}"
+    echo "ERROR: ${label} route rendered an application error for ${url}"
     return 1
   fi
 
   if ! printf '%s' "$html" | grep -q "$marker"; then
-    echo "ERROR: ${type} detail route did not render the expected marker (${marker}) for ${url}"
+    echo "ERROR: ${label} route did not render the expected marker (${marker}) for ${url}"
     return 1
   fi
 
-  check_public_route_assets "/${type}/${slug}" "${type} detail page"
-  echo "ok (${type} detail route -> ${url}, status=${status})"
+  check_public_route_assets "${path}" "${label}"
+  echo "ok (${label} -> ${url}, status=${status})"
 }
 
 purge_cloudflare_cache || true
@@ -331,6 +327,9 @@ purge_cloudflare_cache || true
 echo "Public route checks:"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
-check_public_detail_route "job" 'data-testid="detail-page"'
+check_public_route_marker "/jobs/1" "public job detail" 'Back to Jobs'
+check_public_route_marker "/results/1" "public result detail" 'Result Detail'
+check_public_route_marker "/admit-cards/ibps-po-mains" "public admit card detail" 'Admit Card Detail'
+check_public_route_marker "/states/uttar-pradesh" "public state jobs page" 'State Jobs'
 
 echo "Deploy completed successfully."
