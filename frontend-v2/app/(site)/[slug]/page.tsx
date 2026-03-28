@@ -76,6 +76,10 @@ const categoryPages = {
   },
 } as const;
 
+export function generateStaticParams() {
+  return Object.keys(categoryPages).map((slug) => ({ slug }));
+}
+
 function toLabel(slug: string) {
   return slug
     .split('-')

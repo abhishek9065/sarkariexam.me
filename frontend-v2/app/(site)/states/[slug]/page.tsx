@@ -7,6 +7,29 @@ function toLabel(slug: string) {
     .join(' ');
 }
 
+const stateSlugs = [
+  'uttar-pradesh',
+  'bihar',
+  'rajasthan',
+  'madhya-pradesh',
+  'maharashtra',
+  'delhi',
+  'gujarat',
+  'tamil-nadu',
+  'karnataka',
+  'west-bengal',
+  'punjab',
+  'haryana',
+  'jharkhand',
+  'chhattisgarh',
+  'odisha',
+  'uttarakhand',
+];
+
+export function generateStaticParams() {
+  return stateSlugs.map((slug) => ({ slug }));
+}
+
 export default async function StateJobsPage({
   params,
 }: {

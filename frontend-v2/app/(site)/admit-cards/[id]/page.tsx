@@ -7,6 +7,17 @@ function toTitle(value: string) {
     .join(' ');
 }
 
+export function generateStaticParams() {
+  return [
+    'ibps-po-mains',
+    'ssc-cgl-tier-1',
+    'rrb-ntpc-stage-2',
+    'upsc-cse-mains',
+    'sbi-clerk-mains',
+    'ssc-chsl-tier-1',
+  ].map((id) => ({ id }));
+}
+
 export default async function AdmitCardDetailPage({
   params,
 }: {
