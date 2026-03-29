@@ -25,6 +25,11 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM base AS builder
 WORKDIR /app
 
+# Accept build arguments for Next.js environment variables
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_ADMIN_URL
+ARG BUILDKIT_INLINE_CACHE
+
 # Copy node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=dev-deps /app/node_modules ./node_modules
@@ -43,6 +48,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_CACHE_DIR=.next/cache
 ENV GENERATE_SOURCEMAP=false
 ENV DISABLE_ESLINT_PLUGIN=true
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_ADMIN_URL=$NEXT_PUBLIC_ADMIN_URL
 
 # Build with optimizations
 RUN --mount=type=cache,target=/app/.next/cache \

@@ -75,7 +75,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://sarkariexams.me/api
+        - NEXT_PUBLIC_ADMIN_URL=https://sarkariexams.me/admin
     container_name: sarkari-frontend
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://sarkariexams.me/api
+      - NEXT_PUBLIC_ADMIN_URL=https://sarkariexams.me/admin
     expose:
       - "3000"
     restart: unless-stopped
