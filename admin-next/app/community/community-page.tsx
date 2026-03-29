@@ -1,355 +1,468 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
 import {
-  getCommunityForums, deleteCommunityForum,
-  getCommunityQA, deleteCommunityQA, answerCommunityQA,
-  getCommunityGroups, deleteCommunityGroup,
-  getCommunityFlags, updateCommunityFlag,
-} from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
-import {
-  MessageSquare, HelpCircle, Users, Flag, Trash2, Loader2,
-  ChevronLeft, ChevronRight, CheckCircle, Eye, Send,
+  AlertTriangle,
+  BadgeCheck,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  CornerDownRight,
+  MessageCircle,
+  Search,
+  Shield,
+  ThumbsUp,
+  Trash2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
-const PAGE_SIZE = 20;
+type QAAnswer = {
+  id: number;
+  author: string;
+  initials: string;
+  avatarColor: string;
+  text: string;
+  time: string;
+  likes: number;
+  isBest: boolean;
+  approved: boolean;
+};
 
-function Pagination({ page, totalPages, total, pageSize, onPrev, onNext }: {
-  page: number; totalPages: number; total: number; pageSize: number; onPrev: () => void; onNext: () => void;
-}) {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="flex items-center justify-between mt-4">
-      <p className="text-sm text-muted-foreground">{page * pageSize + 1}-{Math.min((page + 1) * pageSize, total)} of {total}</p>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" disabled={page === 0} onClick={onPrev}><ChevronLeft className="h-4 w-4" /></Button>
-        <span className="text-sm text-muted-foreground">{page + 1}/{totalPages}</span>
-        <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={onNext}><ChevronRight className="h-4 w-4" /></Button>
-      </div>
-    </div>
-  );
-}
+type QAQuestion = {
+  id: number;
+  author: string;
+  initials: string;
+  avatarColor: string;
+  text: string;
+  time: string;
+  likes: number;
+  approved: boolean;
+  postTitle: string;
+  answers: QAAnswer[];
+};
+
+const INITIAL_QA: QAQuestion[] = [
+  {
+    id: 1,
+    author: 'Rahul Sharma',
+    initials: 'RS',
+    avatarColor: '#1565c0',
+    text: "Can final year students apply for SSC CGL 2026? I'm currently in my last semester and haven't received my degree yet.",
+    time: '2 days ago',
+    likes: 24,
+    approved: true,
+    postTitle: 'SSC CGL 2026',
+    answers: [
+      {
+        id: 1,
+        author: 'SarkariExams Team',
+        initials: 'SE',
+        avatarColor: '#e65100',
+        text: 'Yes. Final year students can apply provisionally. You must submit the degree certificate during document verification.',
+        time: '2 days ago',
+        likes: 18,
+        isBest: true,
+        approved: true,
+      },
+      {
+        id: 2,
+        author: 'Neha Gupta',
+        initials: 'NG',
+        avatarColor: '#00695c',
+        text: 'I applied in the last cycle as a final year student. Keep a provisional certificate ready.',
+        time: '1 day ago',
+        likes: 9,
+        isBest: false,
+        approved: true,
+      },
+    ],
+  },
+  {
+    id: 2,
+    author: 'Priya Verma',
+    initials: 'PV',
+    avatarColor: '#2e7d32',
+    text: 'Is there any application fee waiver for female candidates in General category for SSC CGL?',
+    time: '1 day ago',
+    likes: 15,
+    approved: true,
+    postTitle: 'SSC CGL 2026',
+    answers: [
+      {
+        id: 1,
+        author: 'Amit Kumar',
+        initials: 'AK',
+        avatarColor: '#6a1b9a',
+        text: 'Yes. Female candidates are exempted from the application fee regardless of category.',
+        time: '1 day ago',
+        likes: 12,
+        isBest: true,
+        approved: true,
+      },
+    ],
+  },
+  {
+    id: 3,
+    author: 'Anjali Mishra',
+    initials: 'AM',
+    avatarColor: '#37474f',
+    text: 'What documents are required for UP Police Constable document verification?',
+    time: '5 hours ago',
+    likes: 3,
+    approved: false,
+    postTitle: 'UP Police Constable 2026',
+    answers: [],
+  },
+  {
+    id: 4,
+    author: 'Suresh Kumar',
+    initials: 'SK',
+    avatarColor: '#00695c',
+    text: 'Can I apply for IBPS PO 2026 if I have a gap year after graduation?',
+    time: '3 hours ago',
+    likes: 1,
+    approved: false,
+    postTitle: 'IBPS PO 2026',
+    answers: [
+      {
+        id: 1,
+        author: 'Anonymous',
+        initials: 'AN',
+        avatarColor: '#9e9e9e',
+        text: "Yes. A gap year doesn't affect eligibility if you meet the qualification and age criteria.",
+        time: '2 hours ago',
+        likes: 0,
+        isBest: false,
+        approved: false,
+      },
+    ],
+  },
+];
 
 export function CommunityPage() {
-  const qc = useQueryClient();
+  const [questions, setQuestions] = useState<QAQuestion[]>(INITIAL_QA);
+  const [expanded, setExpanded] = useState<number[]>([1, 2]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'question' | 'answer'; qId: number; aId?: number } | null>(null);
 
-  // Forums
-  const [forumPage, setForumPage] = useState(0);
-  const [deleteForumId, setDeleteForumId] = useState<string | null>(null);
-  const { data: forumData, isLoading: forumLoading } = useQuery({
-    queryKey: ['admin-community-forums', forumPage],
-    queryFn: () => getCommunityForums({ limit: PAGE_SIZE, offset: forumPage * PAGE_SIZE }),
-  });
-  const deleteForumMut = useMutation({
-    mutationFn: deleteCommunityForum,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-community-forums'] }); toast.success('Forum post deleted'); setDeleteForumId(null); },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const filtered = useMemo(() => questions.filter(question => {
+    const matchSearch =
+      question.text.toLowerCase().includes(search.toLowerCase()) ||
+      question.postTitle.toLowerCase().includes(search.toLowerCase()) ||
+      question.author.toLowerCase().includes(search.toLowerCase());
+    const matchFilter =
+      filter === 'all' ||
+      (filter === 'pending' && !question.approved) ||
+      (filter === 'approved' && question.approved);
+    return matchSearch && matchFilter;
+  }), [filter, questions, search]);
 
-  // QA
-  const [qaPage, setQaPage] = useState(0);
-  const [deleteQaId, setDeleteQaId] = useState<string | null>(null);
-  const [answerQaId, setAnswerQaId] = useState<string | null>(null);
-  const [answerText, setAnswerText] = useState('');
-  const { data: qaData, isLoading: qaLoading } = useQuery({
-    queryKey: ['admin-community-qa', qaPage],
-    queryFn: () => getCommunityQA({ limit: PAGE_SIZE, offset: qaPage * PAGE_SIZE }),
-  });
-  const deleteQaMut = useMutation({
-    mutationFn: deleteCommunityQA,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-community-qa'] }); toast.success('Question deleted'); setDeleteQaId(null); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const answerMut = useMutation({
-    mutationFn: ({ id, answer }: { id: string; answer: string }) => answerCommunityQA(id, answer),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-community-qa'] }); toast.success('Answer saved'); setAnswerQaId(null); setAnswerText(''); },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const pendingCount =
+    questions.filter(question => !question.approved).length +
+    questions.flatMap(question => question.answers).filter(answer => !answer.approved).length;
 
-  // Groups
-  const [groupPage, setGroupPage] = useState(0);
-  const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
-  const { data: groupData, isLoading: groupLoading } = useQuery({
-    queryKey: ['admin-community-groups', groupPage],
-    queryFn: () => getCommunityGroups({ limit: PAGE_SIZE, offset: groupPage * PAGE_SIZE }),
-  });
-  const deleteGroupMut = useMutation({
-    mutationFn: deleteCommunityGroup,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-community-groups'] }); toast.success('Group deleted'); setDeleteGroupId(null); },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  function toggleExpand(id: number) {
+    setExpanded(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  }
 
-  // Flags
-  const [flagPage, setFlagPage] = useState(0);
-  const [flagStatus, setFlagStatus] = useState<string>('all');
-  const { data: flagData, isLoading: flagLoading } = useQuery({
-    queryKey: ['admin-community-flags', flagPage, flagStatus],
-    queryFn: () => getCommunityFlags({ status: flagStatus !== 'all' ? flagStatus : undefined, limit: PAGE_SIZE, offset: flagPage * PAGE_SIZE }),
-  });
-  const flagMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: 'reviewed' | 'resolved' }) => updateCommunityFlag(id, status),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-community-flags'] }); toast.success('Flag updated'); },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  function approveQuestion(id: number) {
+    setQuestions(current => current.map(question => question.id === id ? { ...question, approved: true } : question));
+    toast.success('Question approved and published.');
+  }
 
-  const forums = forumData?.data || [];
-  const forumTotal = forumData?.total || 0;
-  const qa = qaData?.data || [];
-  const qaTotal = qaData?.total || 0;
-  const groups = groupData?.data || [];
-  const groupTotal = groupData?.total || 0;
-  const flags = flagData?.data || [];
-  const flagTotal = flagData?.total || 0;
+  function approveAnswer(qId: number, aId: number) {
+    setQuestions(current => current.map(question => (
+      question.id === qId
+        ? { ...question, answers: question.answers.map(answer => answer.id === aId ? { ...answer, approved: true } : answer) }
+        : question
+    )));
+    toast.success('Answer approved.');
+  }
+
+  function markBestAnswer(qId: number, aId: number) {
+    setQuestions(current => current.map(question => (
+      question.id === qId
+        ? { ...question, answers: question.answers.map(answer => ({ ...answer, isBest: answer.id === aId })) }
+        : question
+    )));
+    toast.success('Marked as best answer.');
+  }
+
+  function handleDelete() {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === 'question') {
+      setQuestions(current => current.filter(question => question.id !== deleteTarget.qId));
+      toast.success('Question deleted.');
+    } else {
+      setQuestions(current => current.map(question => (
+        question.id === deleteTarget.qId
+          ? { ...question, answers: question.answers.filter(answer => answer.id !== deleteTarget.aId) }
+          : question
+      )));
+      toast.success('Answer deleted.');
+    }
+    setDeleteTarget(null);
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Community</h1>
-        <p className="text-muted-foreground mt-1">Moderate forums, Q&A, study groups, and flagged content</p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c2d9ff] bg-[#eff4ff]">
+            <MessageCircle className="h-4.5 w-4.5 text-blue-700" />
+          </div>
+          <div>
+            <h2 className="text-[18px] font-extrabold text-gray-800">Q&A Moderation</h2>
+            <p className="text-[11px] text-gray-400">{pendingCount} items pending review</p>
+          </div>
+        </div>
+
+        {pendingCount > 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+            <span className="text-[12px] font-bold text-amber-700">{pendingCount} pending moderation</span>
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Card><CardContent className="pt-6 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-500/10"><MessageSquare className="h-5 w-5 text-blue-600" /></div>
-          <div><p className="text-2xl font-bold">{forumTotal}</p><p className="text-xs text-muted-foreground">Forum Posts</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/10"><HelpCircle className="h-5 w-5 text-purple-600" /></div>
-          <div><p className="text-2xl font-bold">{qaTotal}</p><p className="text-xs text-muted-foreground">Questions</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-green-500/10"><Users className="h-5 w-5 text-green-600" /></div>
-          <div><p className="text-2xl font-bold">{groupTotal}</p><p className="text-xs text-muted-foreground">Study Groups</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-red-500/10"><Flag className="h-5 w-5 text-red-600" /></div>
-          <div><p className="text-2xl font-bold">{flagTotal}</p><p className="text-xs text-muted-foreground">Flags</p></div>
-        </CardContent></Card>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: 'Total Questions', value: '156', color: '#1565c0' },
+          { label: 'Approved', value: '139', color: '#2e7d32' },
+          { label: 'Pending Review', value: '17', color: '#f57f17' },
+          { label: 'Best Answers', value: '98', color: '#e65100' },
+        ].map(item => (
+          <div key={item.label} className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+            <div className="text-[20px] font-extrabold" style={{ color: item.color }}>{item.value}</div>
+            <div className="mt-0.5 text-[11px] text-gray-500">{item.label}</div>
+          </div>
+        ))}
       </div>
 
-      <Tabs defaultValue="forums">
-        <TabsList>
-          <TabsTrigger value="forums"><MessageSquare className="h-4 w-4 mr-1.5" />Forums</TabsTrigger>
-          <TabsTrigger value="qa"><HelpCircle className="h-4 w-4 mr-1.5" />Q&A</TabsTrigger>
-          <TabsTrigger value="groups"><Users className="h-4 w-4 mr-1.5" />Groups</TabsTrigger>
-          <TabsTrigger value="flags"><Flag className="h-4 w-4 mr-1.5" />Flags</TabsTrigger>
-        </TabsList>
+      <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex min-w-48 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+            <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Search questions, posts, authors..."
+              className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400"
+            />
+          </div>
+          <div className="flex rounded-xl bg-gray-100 p-1">
+            {(['all', 'pending', 'approved'] as const).map(item => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setFilter(item)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition-all',
+                  filter === item ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-        {/* Forums */}
-        <TabsContent value="forums" className="mt-4 space-y-4">
-          {forumLoading ? <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : forums.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No forum posts yet.</CardContent></Card>
-          ) : (
-            <Card><CardContent className="p-0"><div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium">Title</th>
-                  <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Category</th>
-                  <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Author</th>
-                  <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Date</th>
-                  <th className="text-right px-4 py-3 font-medium">Actions</th>
-                </tr></thead>
-                <tbody>
-                  {forums.map((f: any) => (
-                    <tr key={f.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3"><p className="font-medium line-clamp-1">{f.title}</p><p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{f.content?.slice(0, 80)}</p></td>
-                      <td className="px-4 py-3 hidden sm:table-cell"><Badge variant="outline">{f.category}</Badge></td>
-                      <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{f.author}</td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">{f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteForumId(f.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div></CardContent></Card>
-          )}
-          <Pagination page={forumPage} totalPages={Math.ceil(forumTotal / PAGE_SIZE)} total={forumTotal} pageSize={PAGE_SIZE} onPrev={() => setForumPage(p => p - 1)} onNext={() => setForumPage(p => p + 1)} />
-        </TabsContent>
+      <div className="space-y-3">
+        {filtered.length === 0 ? (
+          <div className="rounded-[22px] border border-gray-100 bg-white py-12 text-center text-[13px] text-gray-400 shadow-sm">
+            No questions found matching your filters.
+          </div>
+        ) : (
+          filtered.map(question => {
+            const isExpanded = expanded.includes(question.id);
 
-        {/* Q&A */}
-        <TabsContent value="qa" className="mt-4 space-y-4">
-          {qaLoading ? <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : qa.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No questions yet.</CardContent></Card>
-          ) : (
-            <Card><CardContent className="p-0"><div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium">Question</th>
-                  <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Author</th>
-                  <th className="text-left px-4 py-3 font-medium">Answered</th>
-                  <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Date</th>
-                  <th className="text-right px-4 py-3 font-medium">Actions</th>
-                </tr></thead>
-                <tbody>
-                  {qa.map((q: any) => (
-                    <tr key={q.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3"><p className="font-medium line-clamp-2">{q.question}</p></td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{q.author}</td>
-                      <td className="px-4 py-3">
-                        {q.answer ? <Badge variant="default" className="bg-green-600">Yes</Badge> : <Badge variant="secondary">No</Badge>}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">{q.createdAt ? new Date(q.createdAt).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" title="Answer" onClick={() => { setAnswerQaId(q.id); setAnswerText(q.answer || ''); }}>
-                            <Send className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setDeleteQaId(q.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div></CardContent></Card>
-          )}
-          <Pagination page={qaPage} totalPages={Math.ceil(qaTotal / PAGE_SIZE)} total={qaTotal} pageSize={PAGE_SIZE} onPrev={() => setQaPage(p => p - 1)} onNext={() => setQaPage(p => p + 1)} />
-        </TabsContent>
-
-        {/* Groups */}
-        <TabsContent value="groups" className="mt-4 space-y-4">
-          {groupLoading ? <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : groups.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No study groups yet.</CardContent></Card>
-          ) : (
-            <Card><CardContent className="p-0"><div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium">Name</th>
-                  <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Topic</th>
-                  <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Language</th>
-                  <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Link</th>
-                  <th className="text-right px-4 py-3 font-medium">Actions</th>
-                </tr></thead>
-                <tbody>
-                  {groups.map((g: any) => (
-                    <tr key={g.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium">{g.name}</td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{g.topic}</td>
-                      <td className="px-4 py-3 hidden md:table-cell"><Badge variant="outline">{g.language}</Badge></td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {g.link ? <a href={g.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs truncate block max-w-[200px]">{g.link}</a> : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteGroupId(g.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div></CardContent></Card>
-          )}
-          <Pagination page={groupPage} totalPages={Math.ceil(groupTotal / PAGE_SIZE)} total={groupTotal} pageSize={PAGE_SIZE} onPrev={() => setGroupPage(p => p - 1)} onNext={() => setGroupPage(p => p + 1)} />
-        </TabsContent>
-
-        {/* Flags */}
-        <TabsContent value="flags" className="mt-4 space-y-4">
-          <Select value={flagStatus} onValueChange={v => { setFlagStatus(v); setFlagPage(0); }}>
-            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Flags</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="reviewed">Reviewed</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {flagLoading ? <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> : flags.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No flags found.</CardContent></Card>
-          ) : (
-            <Card><CardContent className="p-0"><div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-3 font-medium">Type</th>
-                  <th className="text-left px-4 py-3 font-medium">Reason</th>
-                  <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Reporter</th>
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Date</th>
-                  <th className="text-right px-4 py-3 font-medium">Actions</th>
-                </tr></thead>
-                <tbody>
-                  {flags.map((f: any) => (
-                    <tr key={f.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3"><Badge variant="outline">{f.entityType}</Badge></td>
-                      <td className="px-4 py-3 max-w-[250px] truncate">{f.reason}</td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{f.reporter || '—'}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={f.status === 'resolved' ? 'default' : f.status === 'reviewed' ? 'secondary' : 'destructive'} className={f.status === 'resolved' ? 'bg-green-600' : ''}>
-                          {f.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">{f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {f.status === 'open' && (
-                            <Button variant="ghost" size="icon" title="Mark Reviewed" onClick={() => flagMut.mutate({ id: f.id, status: 'reviewed' })}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
+            return (
+              <div key={question.id} className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
+                <div className={cn('border-l-4 p-4', question.approved ? 'border-green-400' : 'border-amber-400')}>
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white"
+                      style={{ background: `linear-gradient(135deg, ${question.avatarColor}cc, ${question.avatarColor})` }}
+                    >
+                      {question.initials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] font-bold text-gray-800">{question.author}</span>
+                        <span className="text-[10px] text-gray-400">· {question.time}</span>
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700">📌 {question.postTitle}</span>
+                        <span
+                          className={cn(
+                            'flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold',
+                            question.approved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                           )}
-                          {f.status !== 'resolved' && (
-                            <Button variant="ghost" size="icon" title="Resolve" onClick={() => flagMut.mutate({ id: f.id, status: 'resolved' })}>
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
+                        >
+                          {question.approved ? <CheckCircle className="h-2 w-2" /> : <Clock className="h-2 w-2" />}
+                          {question.approved ? 'Approved' : 'Pending'}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-gray-700">{question.text}</p>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                          <ThumbsUp className="h-2.5 w-2.5" />
+                          {question.likes}
+                        </span>
+                        <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                          <MessageCircle className="h-2.5 w-2.5" />
+                          {question.answers.length} answers
+                        </span>
+                        {!question.approved && (
+                          <button
+                            type="button"
+                            onClick={() => approveQuestion(question.id)}
+                            className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-[10px] font-bold text-green-700 transition-colors hover:bg-green-100"
+                          >
+                            <CheckCircle className="h-2.5 w-2.5" />
+                            Approve
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget({ type: 'question', qId: question.id })}
+                          className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-600 transition-colors hover:bg-red-100"
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                          Delete
+                        </button>
+                        {question.answers.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(question.id)}
+                            className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-blue-600 transition-colors hover:text-blue-800"
+                          >
+                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            {isExpanded ? 'Hide Answers' : 'View Answers'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="divide-y divide-gray-50 border-t border-gray-100">
+                    {question.answers.map(answer => (
+                      <div key={answer.id} className={cn('flex items-start gap-3 pl-10 pr-4 py-3.5', !answer.approved ? 'bg-amber-50/40' : 'bg-gray-50/30')}>
+                        <CornerDownRight className="mt-2 h-3 w-3 shrink-0 text-gray-300" />
+                        <div
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white"
+                          style={{ background: `linear-gradient(135deg, ${answer.avatarColor}cc, ${answer.avatarColor})` }}
+                        >
+                          {answer.initials}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div></CardContent></Card>
-          )}
-          <Pagination page={flagPage} totalPages={Math.ceil(flagTotal / PAGE_SIZE)} total={flagTotal} pageSize={PAGE_SIZE} onPrev={() => setFlagPage(p => p - 1)} onNext={() => setFlagPage(p => p + 1)} />
-        </TabsContent>
-      </Tabs>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex flex-wrap items-center gap-2">
+                            <span className="text-[12px] font-bold text-gray-800">{answer.author}</span>
+                            {answer.isBest && (
+                              <span className="flex items-center gap-1 rounded-full bg-gradient-to-r from-green-700 to-green-500 px-2 py-0.5 text-[9px] font-extrabold text-white">
+                                <BadgeCheck className="h-2.5 w-2.5" />
+                                Best Answer
+                              </span>
+                            )}
+                            {!answer.approved && (
+                              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700">
+                                <Clock className="h-2 w-2" />
+                                Pending
+                              </span>
+                            )}
+                            <span className="text-[10px] text-gray-400">· {answer.time}</span>
+                          </div>
+                          <p className="text-[12.5px] text-gray-700">{answer.text}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                              <ThumbsUp className="h-2.5 w-2.5" />
+                              {answer.likes}
+                            </span>
+                            {!answer.approved && (
+                              <button
+                                type="button"
+                                onClick={() => approveAnswer(question.id, answer.id)}
+                                className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-[10px] font-bold text-green-700 transition-colors hover:bg-green-100"
+                              >
+                                <CheckCircle className="h-2.5 w-2.5" />
+                                Approve
+                              </button>
+                            )}
+                            {!answer.isBest && answer.approved && (
+                              <button
+                                type="button"
+                                onClick={() => markBestAnswer(question.id, answer.id)}
+                                className="flex items-center gap-1 rounded-lg border border-yellow-200 bg-yellow-50 px-2 py-1 text-[10px] font-bold text-yellow-700 transition-colors hover:bg-yellow-100"
+                              >
+                                <BadgeCheck className="h-2.5 w-2.5" />
+                                Mark Best
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget({ type: 'answer', qId: question.id, aId: answer.id })}
+                              className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 transition-colors hover:bg-red-100"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
 
-      {/* Answer Dialog */}
-      <Dialog open={!!answerQaId} onOpenChange={open => { if (!open) { setAnswerQaId(null); setAnswerText(''); } }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Answer Question</DialogTitle></DialogHeader>
-          <Textarea value={answerText} onChange={e => setAnswerText(e.target.value)} placeholder="Write your answer..." rows={4} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setAnswerQaId(null); setAnswerText(''); }}>Cancel</Button>
-            <Button onClick={() => answerQaId && answerMut.mutate({ id: answerQaId, answer: answerText })} disabled={!answerText.trim() || answerMut.isPending}>
-              {answerMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}Save Answer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <div className="flex items-start gap-2.5 rounded-[22px] border border-blue-100 bg-blue-50 p-4">
+        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+        <div>
+          <div className="text-[12px] font-bold text-blue-800">Moderation Guidelines</div>
+          <p className="mt-1 text-[11px] leading-6 text-blue-700">
+            Approve questions and answers that are relevant, helpful, and follow community guidelines. Delete spam,
+            offensive content, or irrelevant posts. Mark the most accurate response as the best answer.
+          </p>
+        </div>
+      </div>
 
-      {/* Delete Dialogs */}
-      <AlertDialog open={!!deleteForumId} onOpenChange={o => { if (!o) setDeleteForumId(null); }}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Forum Post</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteForumId && deleteForumMut.mutate(deleteForumId)}>Delete</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={!!deleteQaId} onOpenChange={o => { if (!o) setDeleteQaId(null); }}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Question</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteQaId && deleteQaMut.mutate(deleteQaId)}>Delete</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={!!deleteGroupId} onOpenChange={o => { if (!o) setDeleteGroupId(null); }}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Study Group</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteGroupId && deleteGroupMut.mutate(deleteGroupId)}>Delete</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
+          <div className="w-full max-w-sm rounded-[22px] bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-red-100">
+              <Trash2 className="h-6 w-6 text-red-500" />
+            </div>
+            <h3 className="mb-2 text-[16px] font-extrabold text-gray-800">
+              Delete {deleteTarget.type === 'question' ? 'Question' : 'Answer'}?
+            </h3>
+            <p className="mb-5 text-[13px] text-gray-500">This will permanently remove the selected item.</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex-1 rounded-xl py-2.5 text-[13px] font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #c62828, #b71c1c)' }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

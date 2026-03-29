@@ -1,350 +1,434 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { getCampaigns, createCampaign, sendCampaign, getSegments } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Send, Users, Clock, Target, Loader2, Megaphone, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  Edit2,
+  ExternalLink,
+  GripVertical,
+  Link2,
+  Plus,
+  Radio,
+  Save,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  X,
+} from 'lucide-react';
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-500',
-  scheduled: 'bg-blue-500',
-  sending: 'bg-yellow-500',
-  sent: 'bg-green-500',
-  failed: 'bg-red-500',
+type TickerItem = {
+  id: string;
+  text: string;
+  emoji: string;
+  active: boolean;
+  url: string;
 };
 
+type QuickLink = {
+  id: string;
+  label: string;
+  url: string;
+  category: string;
+  active: boolean;
+};
+
+const INITIAL_TICKER: TickerItem[] = [
+  { id: '1', text: 'SSC CGL 2026 Notification Out — Apply Before 30 April!', emoji: '🔥', active: true, url: '/detail/ssc-cgl-2026' },
+  { id: '2', text: 'UPSC CSE Prelims 2026 Result Declared!', emoji: '📢', active: true, url: '#' },
+  { id: '3', text: 'Railway Group D Admit Card Released', emoji: '📋', active: true, url: '#' },
+  { id: '4', text: 'IBPS PO 2026 Online Form Started', emoji: '🏦', active: true, url: '#' },
+  { id: '5', text: 'CTET 2026 Registration Begins', emoji: '🏫', active: true, url: '#' },
+];
+
+const INITIAL_LINKS: QuickLink[] = [
+  { id: '1', label: 'UPSC', url: 'https://upsc.gov.in', category: 'PSC', active: true },
+  { id: '2', label: 'SSC', url: 'https://ssc.nic.in', category: 'Central', active: true },
+  { id: '3', label: 'IBPS', url: 'https://ibps.in', category: 'Banking', active: true },
+  { id: '4', label: 'RRB', url: 'https://indianrailways.gov.in', category: 'Railway', active: true },
+  { id: '5', label: 'NTA', url: 'https://nta.ac.in', category: 'Education', active: true },
+  { id: '6', label: 'UPPSC', url: 'https://uppsc.up.nic.in', category: 'State PSC', active: true },
+];
+
+const EMOJIS = ['🔥', '📢', '📋', '🏦', '⚔️', '👮', '📝', '🎯', '🏫', '🔔', '⭐', '🆕', '🏆', '✅', '⚡', '📌'];
+
 export function NotificationsPage() {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [url, setUrl] = useState('');
-  const [segmentType, setSegmentType] = useState('all');
-  const [segmentValue, setSegmentValue] = useState('all');
+  const [tab, setTab] = useState<'ticker' | 'links'>('ticker');
+  const [ticker, setTicker] = useState<TickerItem[]>(INITIAL_TICKER);
+  const [links, setLinks] = useState<QuickLink[]>(INITIAL_LINKS);
+  const [modal, setModal] = useState<'add-ticker' | 'edit-ticker' | 'add-link' | 'edit-link' | 'delete-ticker' | 'delete-link' | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tickerForm, setTickerForm] = useState({ text: '', emoji: '🔥', url: '', active: true });
+  const [linkForm, setLinkForm] = useState({ label: '', url: '', category: '', active: true });
 
-  const { data: campaigns, isLoading: loadingCampaigns, refetch } = useQuery({
-    queryKey: ['admin-campaigns'],
-    queryFn: async () => {
-      const res = await getCampaigns();
-      return res.data;
-    },
-  });
+  function openAddTicker() {
+    setTickerForm({ text: '', emoji: '🔥', url: '', active: true });
+    setModal('add-ticker');
+  }
 
-  const { data: segmentsData, isLoading: loadingSegments } = useQuery({
-    queryKey: ['admin-segments'],
-    queryFn: async () => {
-      const res = await getSegments();
-      return res.data;
-    },
-  });
+  function openEditTicker(item: TickerItem) {
+    setEditingId(item.id);
+    setTickerForm({ text: item.text, emoji: item.emoji, url: item.url, active: item.active });
+    setModal('edit-ticker');
+  }
 
-  const createMutation = useMutation({
-    mutationFn: createCampaign,
-    onSuccess: () => {
-      toast.success('Campaign created successfully');
-      setTitle('');
-      setBody('');
-      setUrl('');
-      refetch();
-    },
-    onError: (err: Error) => toast.error(err.message || 'Failed to create campaign'),
-  });
-
-  const sendMutation = useMutation({
-    mutationFn: sendCampaign,
-    onSuccess: () => {
-      toast.success('Campaign sent successfully');
-      refetch();
-    },
-    onError: (err: Error) => toast.error(err.message || 'Failed to send campaign'),
-  });
-
-  const segments = segmentsData?.segments;
-  const segmentCounts = segmentsData?.counts || [];
-
-  const getTargetCount = () => {
-    if (segmentType === 'all') return segments?.totalUsers || 0;
-    const match = segmentCounts.find(c => c.type === segmentType && c.value === segmentValue);
-    return match?.count || 0;
-  };
-
-  const handleCreate = (sendImmediately = false) => {
-    if (!title || !body) {
-      toast.error('Title and body are required');
+  function saveTicker() {
+    if (!tickerForm.text.trim()) {
+      toast.error('Ticker text is required.');
       return;
     }
 
-    createMutation.mutate({
-      title,
-      body,
-      url: url || undefined,
-      segment: { type: segmentType, value: segmentValue },
-    }, {
-      onSuccess: (res) => {
-        if (sendImmediately && res.data.id) {
-          sendMutation.mutate(res.data.id);
-        }
-      },
-    });
-  };
+    if (modal === 'add-ticker') {
+      setTicker(current => [...current, { id: Date.now().toString(), ...tickerForm }]);
+      toast.success('Ticker item added.');
+    } else {
+      setTicker(current => current.map(item => item.id === editingId ? { ...item, ...tickerForm } : item));
+      toast.success('Ticker item updated.');
+    }
+
+    setModal(null);
+  }
+
+  function deleteTicker() {
+    setTicker(current => current.filter(item => item.id !== editingId));
+    setModal(null);
+    toast.success('Ticker item deleted.');
+  }
+
+  function openAddLink() {
+    setLinkForm({ label: '', url: '', category: '', active: true });
+    setModal('add-link');
+  }
+
+  function openEditLink(item: QuickLink) {
+    setEditingId(item.id);
+    setLinkForm({ label: item.label, url: item.url, category: item.category, active: item.active });
+    setModal('edit-link');
+  }
+
+  function saveLink() {
+    if (!linkForm.label.trim() || !linkForm.url.trim()) {
+      toast.error('Label and URL are required.');
+      return;
+    }
+
+    if (modal === 'add-link') {
+      setLinks(current => [...current, { id: Date.now().toString(), ...linkForm }]);
+      toast.success('Quick link added.');
+    } else {
+      setLinks(current => current.map(item => item.id === editingId ? { ...item, ...linkForm } : item));
+      toast.success('Quick link updated.');
+    }
+
+    setModal(null);
+  }
+
+  function deleteLink() {
+    setLinks(current => current.filter(item => item.id !== editingId));
+    setModal(null);
+    toast.success('Quick link deleted.');
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Notification Campaigns</h1>
-        <p className="text-muted-foreground mt-1">Send targeted notifications to user segments</p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-[18px] font-extrabold text-gray-800">Ticker & Quick Links</h2>
+          <p className="text-[11px] text-gray-400">Manage the scrolling ticker bar and important website links</p>
+        </div>
+        <button
+          type="button"
+          onClick={tab === 'ticker' ? openAddTicker : openAddLink}
+          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-bold text-white shadow-md transition-all hover:opacity-90"
+          style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.3)' }}
+        >
+          <Plus className="h-4 w-4" />
+          Add New
+        </button>
       </div>
 
-      <Tabs defaultValue="compose" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="compose" className="flex items-center gap-1.5">
-            <Megaphone className="h-4 w-4" />
-            Compose
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1.5">
-            <Clock className="h-4 w-4" />
-            History
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1">
+        <button
+          type="button"
+          onClick={() => setTab('ticker')}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${tab === 'ticker' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          <Radio className="h-3.5 w-3.5" />
+          Ticker Items ({ticker.filter(item => item.active).length} active)
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('links')}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${tab === 'links' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          <Link2 className="h-3.5 w-3.5" />
+          Quick Links ({links.filter(item => item.active).length} active)
+        </button>
+      </div>
 
-        {/* Compose Tab */}
-        <TabsContent value="compose" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Composer */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-base">Create Campaign</CardTitle>
-                <CardDescription>Craft your notification message</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Notification Title</label>
-                  <Input
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    placeholder="e.g. New Railway Jobs Alert"
-                    maxLength={100}
-                  />
-                  <p className="text-xs text-muted-foreground">{title.length}/100 characters</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Message Body</label>
-                  <Textarea
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                    placeholder="Write your notification message..."
-                    rows={4}
-                    maxLength={500}
-                  />
-                  <p className="text-xs text-muted-foreground">{body.length}/500 characters</p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Link URL (optional)</label>
-                  <Input
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="https://sarkariexams.me/..."
-                    type="url"
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Target Segment</label>
-                    <Select value={segmentType} onValueChange={setSegmentType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Users</SelectItem>
-                        <SelectItem value="state">By State</SelectItem>
-                        <SelectItem value="category">By Category</SelectItem>
-                        <SelectItem value="language">By Language</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Segment Value</label>
-                    {segmentType === 'all' ? (
-                      <Input disabled value="All Users" />
-                    ) : segmentType === 'state' ? (
-                      <Select value={segmentValue} onValueChange={setSegmentValue}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {loadingSegments ? (
-                            <SelectItem value="loading">Loading...</SelectItem>
-                          ) : (
-                            segments?.states.map(state => (
-                              <SelectItem key={state} value={state}>{state}</SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    ) : segmentType === 'category' ? (
-                      <Select value={segmentValue} onValueChange={setSegmentValue}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {loadingSegments ? (
-                            <SelectItem value="loading">Loading...</SelectItem>
-                          ) : (
-                            segments?.categories.map(cat => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={segmentValue} onValueChange={setSegmentValue}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {segments?.languages.map(lang => (
-                            <SelectItem key={lang} value={lang}>{lang}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 pt-4 border-t">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Target className="h-4 w-4" />
-                    Target: <strong>{getTargetCount().toLocaleString()}</strong> users
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => handleCreate(false)}
-                    disabled={createMutation.isPending || !title || !body}
-                    variant="outline"
-                  >
-                    {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Save as Draft
-                  </Button>
-                  <Button
-                    onClick={() => handleCreate(true)}
-                    disabled={createMutation.isPending || sendMutation.isPending || !title || !body}
-                  >
-                    {createMutation.isPending || sendMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Send className="h-4 w-4 mr-2" />
-                    )}
-                    Send Now
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Preview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted rounded-lg p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
-                      SE
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">SarkariExams.me</p>
-                      <p className="text-xs text-muted-foreground">Just now</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-semibold">{title || 'Notification Title'}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {body || 'Your notification message will appear here...'}
-                    </p>
-                  </div>
-                  {url && (
-                    <div className="text-xs text-blue-600 truncate">{url}</div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+      {tab === 'ticker' ? (
+        <div className="space-y-2">
+          <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-center gap-2 border-b border-gray-100 bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-2.5">
+              <Radio className="h-3 w-3 text-blue-500" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-600">Live Preview</span>
+            </div>
+            <div className="overflow-hidden bg-gradient-to-r from-[#fff8f5] to-[#fffcfa] px-4 py-2.5">
+              <p className="truncate text-[12px] text-gray-500">
+                {ticker.filter(item => item.active).map(item => `${item.emoji} ${item.text}`).join('   ·   ') || 'No active ticker items'}
+              </p>
+            </div>
           </div>
-        </TabsContent>
 
-        {/* History Tab */}
-        <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Past Campaigns</CardTitle>
-              <CardDescription>History of sent notification campaigns</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingCampaigns ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
+            <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-gray-100 bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">#</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Ticker Text</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Status</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Actions</span>
+            </div>
+
+            {ticker.map((item, index) => (
+              <div
+                key={item.id}
+                className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-orange-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
+              >
+                <div className="flex items-center gap-2">
+                  <GripVertical className="h-3.5 w-3.5 text-gray-300" />
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-[14px]">{item.emoji}</span>
                 </div>
-              ) : !campaigns || campaigns.length === 0 ? (
-                <p className="text-center text-muted-foreground py-12">No campaigns yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {campaigns.map(campaign => (
-                    <div
-                      key={campaign.id}
-                      className="flex items-center justify-between p-4 rounded-lg border bg-muted/30"
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium text-gray-700">{item.text}</p>
+                  {item.url && <p className="truncate text-[10px] text-gray-400">{item.url}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTicker(current => current.map(entry => entry.id === item.id ? { ...entry, active: !entry.active } : entry))}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${item.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  {item.active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
+                  {item.active ? 'Active' : 'Inactive'}
+                </button>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => openEditTicker(item)} className="rounded-lg bg-blue-50 p-2 text-blue-600 transition-colors hover:bg-blue-100">
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" onClick={() => { setEditingId(item.id); setModal('delete-ticker'); }} className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
+          <div className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-gray-100 bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Label / Name</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">URL</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Status</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Actions</span>
+          </div>
+
+          {links.map((item, index) => (
+            <div
+              key={item.id}
+              className={`grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
+            >
+              <div>
+                <p className="text-[13px] font-bold text-gray-800">{item.label}</p>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-600">{item.category}</span>
+              </div>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <ExternalLink className="h-3 w-3 shrink-0 text-gray-400" />
+                <a href={item.url} target="_blank" rel="noopener noreferrer" className="truncate text-[11px] text-blue-600 hover:underline">{item.url}</a>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinks(current => current.map(entry => entry.id === item.id ? { ...entry, active: !entry.active } : entry))}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${item.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+              >
+                {item.active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
+                {item.active ? 'Active' : 'Inactive'}
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => openEditLink(item)} className="rounded-lg bg-blue-50 p-2 text-blue-600 transition-colors hover:bg-blue-100">
+                  <Edit2 className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" onClick={() => { setEditingId(item.id); setModal('delete-link'); }} className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(modal === 'add-ticker' || modal === 'edit-ticker') && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
+          <div className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4" style={{ background: 'linear-gradient(90deg, #060d2e, #1a237e)' }}>
+              <div className="flex items-center gap-2.5">
+                <Radio className="h-4 w-4 text-white" />
+                <span className="text-[14px] font-extrabold text-white">{modal === 'add-ticker' ? 'Add Ticker Item' : 'Edit Ticker Item'}</span>
+              </div>
+              <button type="button" onClick={() => setModal(null)} className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Emoji Icon</label>
+                <div className="flex flex-wrap gap-2">
+                  {EMOJIS.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setTickerForm(current => ({ ...current, emoji }))}
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg text-xl transition-all ${tickerForm.emoji === emoji ? 'scale-110 bg-orange-50 ring-2 ring-orange-400' : 'bg-gray-100 hover:bg-gray-200'}`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium truncate">{campaign.title}</p>
-                          <Badge className={`${STATUS_COLORS[campaign.status]} text-white`}>
-                            {campaign.status}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-1">{campaign.body}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {campaign.sentCount.toLocaleString()} recipients
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Target className="h-3 w-3" />
-                            {campaign.segment.type}: {campaign.segment.value}
-                          </span>
-                          <span>{new Date(campaign.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                      {campaign.status === 'draft' && (
-                        <Button
-                          size="sm"
-                          onClick={() => sendMutation.mutate(campaign.id)}
-                          disabled={sendMutation.isPending}
-                        >
-                          {sendMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Send className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
-                      {campaign.status === 'sent' && (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      )}
-                      {campaign.status === 'failed' && (
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                      )}
-                    </div>
+                      {emoji}
+                    </button>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Ticker Text</label>
+                <textarea
+                  value={tickerForm.text}
+                  onChange={event => setTickerForm(current => ({ ...current, text: event.target.value }))}
+                  rows={2}
+                  className="w-full resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-orange-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Link URL</label>
+                <input
+                  value={tickerForm.url}
+                  onChange={event => setTickerForm(current => ({ ...current, url: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-orange-400"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-[13px] font-semibold text-gray-700">Active / Visible</label>
+                <button
+                  type="button"
+                  onClick={() => setTickerForm(current => ({ ...current, active: !current.active }))}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${tickerForm.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  {tickerForm.active ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                  {tickerForm.active ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4">
+              <button type="button" onClick={() => setModal(null)} className="rounded-xl border border-gray-200 px-5 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-100">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveTicker}
+                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)' }}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(modal === 'add-link' || modal === 'edit-link') && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
+          <div className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4" style={{ background: 'linear-gradient(90deg, #060d2e, #1a237e)' }}>
+              <div className="flex items-center gap-2.5">
+                <Link2 className="h-4 w-4 text-white" />
+                <span className="text-[14px] font-extrabold text-white">{modal === 'add-link' ? 'Add Quick Link' : 'Edit Quick Link'}</span>
+              </div>
+              <button type="button" onClick={() => setModal(null)} className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Display Label</label>
+                <input
+                  value={linkForm.label}
+                  onChange={event => setLinkForm(current => ({ ...current, label: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Website URL</label>
+                <input
+                  value={linkForm.url}
+                  onChange={event => setLinkForm(current => ({ ...current, url: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Category</label>
+                <input
+                  value={linkForm.category}
+                  onChange={event => setLinkForm(current => ({ ...current, category: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-400"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-[13px] font-semibold text-gray-700">Active</label>
+                <button
+                  type="button"
+                  onClick={() => setLinkForm(current => ({ ...current, active: !current.active }))}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${linkForm.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                >
+                  {linkForm.active ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                  {linkForm.active ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4">
+              <button type="button" onClick={() => setModal(null)} className="rounded-xl border border-gray-200 px-5 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-100">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveLink}
+                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #1565c0, #1a237e)' }}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(modal === 'delete-ticker' || modal === 'delete-link') && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
+          <div className="w-full max-w-sm rounded-[22px] bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-red-100">
+              <Trash2 className="h-6 w-6 text-red-500" />
+            </div>
+            <h3 className="mb-2 text-[16px] font-extrabold text-gray-800">Delete Item?</h3>
+            <p className="mb-5 text-[13px] text-gray-500">This will permanently remove the selected item.</p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={modal === 'delete-ticker' ? deleteTicker : deleteLink}
+                className="flex-1 rounded-xl py-2.5 text-[13px] font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #c62828, #b71c1c)' }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

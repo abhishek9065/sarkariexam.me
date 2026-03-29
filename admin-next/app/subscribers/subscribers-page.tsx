@@ -1,341 +1,261 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSubscribers, getSubscriberStats, deleteSubscriber, getPushSubscribers, sendPushNotification } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Mail, Bell, Search, Trash2, Loader2, ChevronLeft, ChevronRight,
-  Send, Users, CheckCircle, XCircle,
+  Bell,
+  CheckCircle,
+  Download,
+  Mail,
+  Search,
+  Trash2,
+  TrendingUp,
+  Users,
+  XCircle,
 } from 'lucide-react';
 
-const PAGE_SIZE = 20;
+type Subscriber = {
+  id: string;
+  name: string;
+  email: string;
+  joinedDate: string;
+  preferences: string[];
+  status: 'active' | 'unsubscribed';
+  alertsReceived: number;
+};
+
+const INITIAL_SUBSCRIBERS: Subscriber[] = [
+  { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@gmail.com', joinedDate: '28 Mar 2026', preferences: ['Latest Jobs', 'Results'], status: 'active', alertsReceived: 142 },
+  { id: '2', name: 'Priya Sharma', email: 'priya.s@outlook.com', joinedDate: '27 Mar 2026', preferences: ['Admit Card', 'Answer Key'], status: 'active', alertsReceived: 87 },
+  { id: '3', name: 'Arjun Singh', email: 'arjun.singh92@yahoo.com', joinedDate: '26 Mar 2026', preferences: ['Latest Jobs'], status: 'active', alertsReceived: 215 },
+  { id: '4', name: 'Neha Gupta', email: 'neha.gupta@gmail.com', joinedDate: '25 Mar 2026', preferences: ['Results', 'Syllabus'], status: 'active', alertsReceived: 63 },
+  { id: '5', name: 'Vijay Patel', email: 'vpatel2000@gmail.com', joinedDate: '24 Mar 2026', preferences: ['Latest Jobs', 'Results', 'Admit Card'], status: 'unsubscribed', alertsReceived: 312 },
+  { id: '6', name: 'Sunita Yadav', email: 'sunita.yadav@hotmail.com', joinedDate: '22 Mar 2026', preferences: ['Latest Jobs'], status: 'active', alertsReceived: 178 },
+  { id: '7', name: 'Mohit Verma', email: 'mohitverma@gmail.com', joinedDate: '20 Mar 2026', preferences: ['Results', 'Answer Key'], status: 'active', alertsReceived: 94 },
+  { id: '8', name: 'Kavita Mishra', email: 'kavita.mishra@gmail.com', joinedDate: '18 Mar 2026', preferences: ['Admit Card'], status: 'active', alertsReceived: 47 },
+];
+
+const PREFERENCE_COLORS: Record<string, { bg: string; text: string }> = {
+  'Latest Jobs': { bg: '#fff4ef', text: '#e65100' },
+  Results: { bg: '#f0fff4', text: '#2e7d32' },
+  'Admit Card': { bg: '#eff4ff', text: '#1565c0' },
+  'Answer Key': { bg: '#f9f0ff', text: '#6a1b9a' },
+  Syllabus: { bg: '#fffbef', text: '#f57f17' },
+};
 
 export function SubscribersPage() {
-  const queryClient = useQueryClient();
+  const [subscribers, setSubscribers] = useState(INITIAL_SUBSCRIBERS);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'unsubscribed'>('all');
+  const [page, setPage] = useState(1);
+  const pageSize = 8;
 
-  // Email subscribers state
-  const [emailSearch, setEmailSearch] = useState('');
-  const [emailPage, setEmailPage] = useState(0);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const filtered = useMemo(() => subscribers.filter(item => {
+    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.email.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || item.status === statusFilter;
+    return matchSearch && matchStatus;
+  }), [search, statusFilter, subscribers]);
 
-  // Push state
-  const [pushPage, setPushPage] = useState(0);
-  const [pushForm, setPushForm] = useState({ title: '', body: '', url: '' });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const activeCount = subscribers.filter(item => item.status === 'active').length;
+  const unsubscribedCount = subscribers.filter(item => item.status === 'unsubscribed').length;
 
-  // Email queries
-  const { data: emailData, isLoading: emailLoading } = useQuery({
-    queryKey: ['admin-subscribers', emailSearch, emailPage],
-    queryFn: () => getSubscribers({ search: emailSearch || undefined, limit: PAGE_SIZE, offset: emailPage * PAGE_SIZE }),
-  });
+  function removeSubscriber(id: string) {
+    setSubscribers(current => current.filter(item => item.id !== id));
+    toast.success('Subscriber removed.');
+  }
 
-  const { data: statsData } = useQuery({
-    queryKey: ['admin-subscriber-stats'],
-    queryFn: getSubscriberStats,
-  });
-
-  // Push queries
-  const { data: pushData, isLoading: pushLoading } = useQuery({
-    queryKey: ['admin-push-subscribers', pushPage],
-    queryFn: () => getPushSubscribers({ limit: PAGE_SIZE, offset: pushPage * PAGE_SIZE }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteSubscriber,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-subscribers'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-subscriber-stats'] });
-      toast.success('Subscriber removed');
-      setDeleteTarget(null);
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const sendMutation = useMutation({
-    mutationFn: sendPushNotification,
-    onSuccess: (result) => {
-      const d = result.data;
-      if (d.message) {
-        toast.warning(d.message);
-      } else {
-        toast.success(`Sent to ${d.sent} subscribers (${d.failed} failed)`);
-      }
-      setPushForm({ title: '', body: '', url: '' });
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const stats = statsData?.data;
-  const emails = emailData?.data || [];
-  const emailTotal = emailData?.total || 0;
-  const emailPages = Math.ceil(emailTotal / PAGE_SIZE);
-
-  const pushSubs = pushData?.data || [];
-  const pushTotal = pushData?.total || 0;
-  const pushPages = Math.ceil(pushTotal / PAGE_SIZE);
+  function exportCsv() {
+    toast.success(`Exporting ${filtered.length} subscribers as CSV...`);
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Subscribers</h1>
-        <p className="text-muted-foreground mt-1">Manage email and push notification subscribers</p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ffd0d0] bg-[#fff0f0]">
+            <Users className="h-4.5 w-4.5 text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-[18px] font-extrabold text-gray-800">Subscribers</h2>
+            <p className="text-[11px] text-gray-400">{subscribers.length.toLocaleString()} total subscribers</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={exportCsv}
+          className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export CSV
+        </button>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10"><Mail className="h-5 w-5 text-primary" /></div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-xs text-muted-foreground">Email Subscribers</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-500/10"><CheckCircle className="h-5 w-5 text-green-600" /></div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.verified}</p>
-                  <p className="text-xs text-muted-foreground">Verified</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10"><XCircle className="h-5 w-5 text-orange-600" /></div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.unverified}</p>
-                  <p className="text-xs text-muted-foreground">Unverified</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10"><Bell className="h-5 w-5 text-blue-600" /></div>
-                <div>
-                  <p className="text-2xl font-bold">{pushTotal}</p>
-                  <p className="text-xs text-muted-foreground">Push Subscribers</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="text-[22px] font-extrabold text-gray-800">28,450</div>
+          <div className="mt-1 flex items-center gap-1.5">
+            <Users className="h-3 w-3 text-blue-500" />
+            <span className="text-[11px] text-gray-500">Total Subscribers</span>
+          </div>
         </div>
-      )}
+        <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="text-[22px] font-extrabold text-green-700">{activeCount.toLocaleString()}</div>
+          <div className="mt-1 flex items-center gap-1.5">
+            <CheckCircle className="h-3 w-3 text-green-500" />
+            <span className="text-[11px] text-gray-500">Active</span>
+          </div>
+        </div>
+        <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="text-[22px] font-extrabold text-red-600">{unsubscribedCount.toLocaleString()}</div>
+          <div className="mt-1 flex items-center gap-1.5">
+            <XCircle className="h-3 w-3 text-red-500" />
+            <span className="text-[11px] text-gray-500">Unsubscribed</span>
+          </div>
+        </div>
+        <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="text-[22px] font-extrabold text-blue-700">+142</div>
+          <div className="mt-1 flex items-center gap-1.5">
+            <TrendingUp className="h-3 w-3 text-blue-500" />
+            <span className="text-[11px] text-gray-500">Joined Today</span>
+          </div>
+        </div>
+      </div>
 
-      <Tabs defaultValue="email">
-        <TabsList>
-          <TabsTrigger value="email"><Mail className="h-4 w-4 mr-1.5" />Email</TabsTrigger>
-          <TabsTrigger value="push"><Bell className="h-4 w-4 mr-1.5" />Push</TabsTrigger>
-          <TabsTrigger value="send"><Send className="h-4 w-4 mr-1.5" />Send Push</TabsTrigger>
-        </TabsList>
+      <div className="rounded-[22px] border border-gray-100 bg-white p-5 shadow-sm">
+        <h3 className="mb-3 text-[13px] font-bold text-gray-800">Alert Preferences Breakdown</h3>
+        <div className="space-y-2.5">
+          {[
+            { label: 'Latest Jobs', pct: 78, count: '22,191' },
+            { label: 'Results', pct: 54, count: '15,363' },
+            { label: 'Admit Card', pct: 41, count: '11,664' },
+            { label: 'Answer Key', pct: 28, count: '7,966' },
+            { label: 'Syllabus', pct: 19, count: '5,405' },
+          ].map(item => {
+            const tone = PREFERENCE_COLORS[item.label];
+            return (
+              <div key={item.label} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-[11px] font-semibold text-gray-600">{item.label}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: tone.text }} />
+                </div>
+                <span className="w-16 shrink-0 text-right text-[11px] font-semibold text-gray-500">{item.count}</span>
+                <span className="w-8 shrink-0 text-right text-[11px] font-bold" style={{ color: tone.text }}>{item.pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-        {/* Email Subscribers Tab */}
-        <TabsContent value="email" className="space-y-4 mt-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by email..."
-              value={emailSearch}
-              onChange={e => { setEmailSearch(e.target.value); setEmailPage(0); }}
-              className="pl-9"
+      <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex min-w-48 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+            <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <input
+              value={search}
+              onChange={event => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by name or email..."
+              className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400"
             />
           </div>
-
-          {emailLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          ) : emails.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No subscribers found.</CardContent></Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left px-4 py-3 font-medium">Email</th>
-                        <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Frequency</th>
-                        <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Categories</th>
-                        <th className="text-left px-4 py-3 font-medium">Status</th>
-                        <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Joined</th>
-                        <th className="text-right px-4 py-3 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {emails.map((sub: any) => (
-                        <tr key={sub.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-4 py-3 font-medium">{sub.email}</td>
-                          <td className="px-4 py-3 hidden sm:table-cell">
-                            <Badge variant="outline">{sub.frequency || 'daily'}</Badge>
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell text-muted-foreground text-xs">
-                            {sub.categories?.join(', ') || '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {sub.verified ? (
-                              <Badge variant="default" className="bg-green-600">Verified</Badge>
-                            ) : (
-                              <Badge variant="secondary">Unverified</Badge>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">
-                            {sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(sub.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {emailPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {emailPage * PAGE_SIZE + 1}-{Math.min((emailPage + 1) * PAGE_SIZE, emailTotal)} of {emailTotal}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={emailPage === 0} onClick={() => setEmailPage(p => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">{emailPage + 1}/{emailPages}</span>
-                <Button variant="outline" size="sm" disabled={emailPage >= emailPages - 1} onClick={() => setEmailPage(p => p + 1)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Push Subscribers Tab */}
-        <TabsContent value="push" className="space-y-4 mt-4">
-          {pushLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          ) : pushSubs.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">No push subscribers found.</CardContent></Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left px-4 py-3 font-medium">Endpoint</th>
-                        <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">User</th>
-                        <th className="text-left px-4 py-3 font-medium">Subscribed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pushSubs.map((sub: any) => (
-                        <tr key={sub.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-4 py-3 font-mono text-xs truncate max-w-[400px]">{sub.endpoint}</td>
-                          <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{sub.userId || '—'}</td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs">
-                            {sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {pushPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">{pushPage * PAGE_SIZE + 1}-{Math.min((pushPage + 1) * PAGE_SIZE, pushTotal)} of {pushTotal}</p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={pushPage === 0} onClick={() => setPushPage(p => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">{pushPage + 1}/{pushPages}</span>
-                <Button variant="outline" size="sm" disabled={pushPage >= pushPages - 1} onClick={() => setPushPage(p => p + 1)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Send Push Notification Tab */}
-        <TabsContent value="send" className="mt-4">
-          <Card className="max-w-xl">
-            <CardHeader>
-              <CardTitle className="text-base">Send Push Notification</CardTitle>
-              <CardDescription>Send a notification to all {pushTotal} push subscribers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="space-y-4"
-                onSubmit={e => {
-                  e.preventDefault();
-                  if (!pushForm.title || !pushForm.body) { toast.error('Title and body are required'); return; }
-                  sendMutation.mutate({ title: pushForm.title, body: pushForm.body, url: pushForm.url || undefined });
+          <div className="flex rounded-xl bg-gray-100 p-1">
+            {(['all', 'active', 'unsubscribed'] as const).map(item => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(item);
+                  setPage(1);
                 }}
+                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition-all ${statusFilter === item ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Title *</label>
-                  <Input value={pushForm.title} onChange={e => setPushForm(p => ({ ...p, title: e.target.value }))} placeholder="Notification title" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Body *</label>
-                  <Textarea value={pushForm.body} onChange={e => setPushForm(p => ({ ...p, body: e.target.value }))} placeholder="Notification body text" rows={3} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">URL (optional)</label>
-                  <Input value={pushForm.url} onChange={e => setPushForm(p => ({ ...p, url: e.target.value }))} placeholder="https://sarkariexams.me/..." type="url" />
-                </div>
-                <Button type="submit" disabled={sendMutation.isPending}>
-                  {sendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                  Send to {pushTotal} subscribers
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Subscriber</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently remove this subscriber. This cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}>
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
+        <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b border-[#e8ecf8] bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Subscriber</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Preferences</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Joined</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Alerts</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Status</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Action</span>
+        </div>
+
+        {paginated.map((subscriber, index) => (
+          <div
+            key={subscriber.id}
+            className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1565c0] to-[#1a237e] text-[11px] font-extrabold text-white">
+                {subscriber.name.split(' ').map(part => part[0]).join('').slice(0, 2)}
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold text-gray-800">{subscriber.name}</p>
+                <p className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <Mail className="h-2.5 w-2.5" />
+                  {subscriber.email}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {subscriber.preferences.map(preference => {
+                const tone = PREFERENCE_COLORS[preference] ?? { bg: '#f3f4f6', text: '#6b7280' };
+                return (
+                  <span key={preference} className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: tone.bg, color: tone.text }}>
+                    {preference}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="text-[12px] text-gray-500">{subscriber.joinedDate}</div>
+            <div className="flex items-center justify-center gap-1">
+              <Bell className="h-2.5 w-2.5 text-orange-400" />
+              <span className="text-[12px] font-bold text-gray-700">{subscriber.alertsReceived}</span>
+            </div>
+            <div className="text-center">
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${subscriber.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                {subscriber.status === 'active' ? 'Active' : 'Unsub'}
+              </span>
+            </div>
+            <div className="text-right">
+              <button type="button" onClick={() => removeSubscriber(subscriber.id)} className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+            <span className="text-[11px] text-gray-400">
+              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map(number => (
+                <button
+                  key={number}
+                  type="button"
+                  onClick={() => setPage(number)}
+                  className={`h-7 w-7 rounded-lg text-[12px] font-bold ${page === number ? 'text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                  style={page === number ? { background: 'linear-gradient(135deg, #e65100, #bf360c)' } : undefined}
+                >
+                  {number}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
