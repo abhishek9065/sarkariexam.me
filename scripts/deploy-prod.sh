@@ -5,12 +5,28 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari}"
+detect_compose_project_name() {
+  local existing
+
+  for container in sarkari-frontend sarkari-nginx sarkari-backend sarkari-admin; do
+    existing="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$container" 2>/dev/null || true)"
+    if [[ -n "$existing" ]]; then
+      printf '%s' "$existing"
+      return 0
+    fi
+  done
+
+  printf '%s' "sarkari-result"
+}
+
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(detect_compose_project_name)}"
 export COMPOSE_PROJECT_NAME
 
 dc() {
   docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file .env "$@"
 }
+
+echo "Using compose project: $COMPOSE_PROJECT_NAME"
 
 if [[ ! -f .env ]]; then
   echo "ERROR: .env not found at $ROOT_DIR/.env"

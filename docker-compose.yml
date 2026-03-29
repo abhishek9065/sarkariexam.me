@@ -1,4 +1,4 @@
-name: sarkari
+name: sarkari-result
 
 services:
   # Nginx Reverse Proxy with SSL
