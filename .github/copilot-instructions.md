@@ -1,84 +1,69 @@
-# SarkariExams.me - Copilot Instructions
-
-## Project Overview
-
-This is a public government jobs and exam updates platform built with TypeScript. The live product surface is the Next.js app in `frontend/`, backed by the Express API in `backend/`. The repository also contains an admin console in `admin-next/`.
+# Project Guidelines
 
 ## Architecture
 
-- **Public frontend**: Next.js 16 + React 19 (in `frontend/`)
-- **Admin frontend**: Next.js 15 + React 19 (in `admin-next/`)
-- **Backend**: Node.js 22 + Express + TypeScript (in `backend/`)
-- **Database**: MongoDB locally; Azure Cosmos DB (MongoDB API) in production
-- **Reverse proxy**: Nginx (in `nginx/`)
-- **Deployment**: Docker Compose on DigitalOcean
+SarkariExams.me is a TypeScript monorepo with three app surfaces and an edge proxy:
 
-## Development Commands
+- Public web app: Next.js 16 + React 19 in `frontend/`
+- Admin console: Next.js 15 + React 19 in `admin-next/`
+- API: Node.js + Express + TypeScript in `backend/`
+- Edge/proxy: Nginx in `nginx/`
 
-### Backend (`cd backend`)
-- `npm run dev` — Start the API with hot reload
-- `npm run build` — Compile TypeScript to `dist/`
-- `npm start` — Run the production build
-- `npm run lint` — Run ESLint
-- `npm test` — Run Vitest
-- `npm run test:ci` — Run Vitest plus OpenAPI parity checks
+Data is stored in MongoDB locally and Azure Cosmos DB (MongoDB API) in production.
 
-### Public Frontend (`cd frontend`)
-- `npm run dev` — Start the Next.js dev server
-- `npm run build` — Production build
-- `npm start` — Run the production server
-- `npm run lint` — Run ESLint
+## Build and Test
 
-### Admin Frontend (`cd admin-next`)
-- `npm run dev` — Start the Next.js dev server on port 3001
-- `npm run build` — Production build
-- `npm start` — Run the production server on port 3001
-- `npm run lint` — Run ESLint
+Run commands from each package directory.
 
-## Key Directories
+### Backend (`backend/`)
 
-```text
-backend/src/
-├── routes/        # Express route handlers (auth, jobs, admin, etc.)
-├── models/        # MongoDB/Cosmos data access
-├── middleware/    # Auth, security, rate limiting, caching, CSRF
-├── services/      # Business logic (analytics, notifications, workflow, AI)
-└── tests/         # Vitest test suite
+- `npm run dev` - API dev server (typically port 5000 locally)
+- `npm run build` - compile TypeScript to `dist/`
+- `npm start` - run production build
+- `npm run lint` - ESLint
+- `npm test` - Vitest
+- `npm run test:ci` - Vitest + OpenAPI parity checks
 
-backend/tests/      # Additional test setup and integration coverage
+### Public frontend (`frontend/`)
 
-frontend/app/    # Public Next.js App Router pages
-frontend/components/
-frontend/lib/
+- `npm run dev` - Next.js dev server (port 3000)
+- `npm run build`
+- `npm start`
+- `npm run lint`
 
-admin-next/app/     # Admin Next.js App Router pages
-admin-next/components/
-admin-next/lib/
+### Admin frontend (`admin-next/`)
 
-nginx/              # Proxy and edge config
-scripts/            # Deploy and maintenance scripts
-```
+- `npm run dev` - Next.js dev server (port 3001)
+- `npm run build`
+- `npm start`
+- `npm run lint`
+
+For deployment/runtime details, prefer links over duplicating docs:
+
+- Root setup: `README.md`
+- Public frontend details: `frontend/README.md`
+- Proxy config: `nginx/nginx.conf`
+- Deployment scripts: `scripts/deploy-live.sh`, `scripts/deploy-prod.sh`, `scripts/deploy-prod-remote.sh`
 
 ## Conventions
 
-- Use TypeScript for all source files.
-- Use Zod for backend request validation.
-- Keep backend routes under `/api/`.
-- Prefer same-origin API calls from frontend apps unless deployment requires otherwise.
-- Keep repo docs and workflows aligned with the active `backend + frontend + admin-next + nginx` stack.
-- Do not document removed legacy apps unless they still exist in the repository.
+- Use TypeScript across backend and frontend code.
+- Keep backend endpoints under `/api/`.
+- Use Zod schemas to validate backend request input.
+- Apply auth middleware for protected/admin routes (`authenticateToken`, `requireAdmin`).
+- Keep CSRF protections enabled for state-changing routes.
+- Keep docs aligned with the active stack (`backend`, `frontend`, `admin-next`, `nginx`) and avoid documenting removed legacy apps.
 
-## Testing
+## Project-Specific Gotchas
 
-- **Backend**: Vitest for unit and integration tests
-- **Public frontend**: ESLint and Next production build
-- **Admin frontend**: ESLint and Next production build
-- CI runs backend lint/build/tests plus frontend lint/build on PRs and `main`
+- Frontend and admin call the same API base (`/api`), but run on different local ports (3000 and 3001).
+- Backend port differs by environment (commonly 5000 in local dev vs 4000 in Docker/Nginx upstream).
+- Next.js versions differ between apps (public app 16, admin app 15). Verify package-specific behavior before cross-app refactors.
+- Keep shared domain enums/types in sync across backend and frontend/admin clients.
 
-## Security Considerations
+## Reference Docs
 
-- Admin routes require JWT-based authentication and admin authorization
-- Rate limiting is applied to auth and API endpoints
-- CSRF protection is enabled for state-changing requests
-- Security headers are applied in backend middleware
-- Production deploys are expected to use environment variables from `.env` or GitHub secrets
+- `docs/CLOUDFLARE_SETUP.md` for DNS/SSL/edge setup
+- `docs/GITHUB_GOVERNANCE_CHECKLIST.md` for repository governance
+- `docs/changelogs/WEBSITE_FIXES_SUMMARY.md` and `docs/changelogs/BACKEND_FIXES.md` for historical fix context
+- `frontend/AGENTS.md` for frontend-specific agent notes
