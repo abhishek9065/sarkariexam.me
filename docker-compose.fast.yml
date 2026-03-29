@@ -1,0 +1,41 @@
+# Docker Compose override for faster builds
+# Use: docker compose -f docker-compose.yml -f docker-compose.fast.yml build
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.optimized
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+      cache_from:
+        - sarkari-result-frontend:latest
+      cache_to:
+        - type=inline
+    environment:
+      # Optimize for faster builds
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - GENERATE_SOURCEMAP=false
+      - DISABLE_ESLINT_PLUGIN=true
+  
+  backend:
+    build:
+      cache_from:
+        - sarkari-result-backend:latest
+      cache_to:
+        - type=inline
+  
+  admin:
+    build:
+      cache_from:
+        - sarkari-result-admin:latest
+      cache_to:
+        - type=inline
+  
+  nginx:
+    build:
+      cache_from:
+        - sarkari-result-nginx:latest
+      cache_to:
+        - type=inline

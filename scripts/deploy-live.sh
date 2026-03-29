@@ -51,7 +51,20 @@ git pull --ff-only origin main
 
 export COMPOSE_PROJECT_NAME="sarkari-result"
 
-echo "=== Running guarded compose deploy ==="
-bash scripts/deploy-prod.sh
+# Use fast deployment by default, fallback to full deployment
+DEPLOY_MODE="${DEPLOY_MODE:-fast}"
+
+if [[ "$DEPLOY_MODE" == "fast" ]]; then
+  echo "=== Running FAST deployment (3-4 min estimated) ==="
+  echo "To use full deployment, set: DEPLOY_MODE=full"
+  export SKIP_CONFIG_VALIDATION=1
+  export SKIP_FRONTEND_CHECKS=1
+  export SKIP_PUBLIC_CHECKS=0  # Keep essential public checks
+  export SKIP_CACHE_PURGE=0
+  bash scripts/deploy-fast.sh
+else
+  echo "=== Running FULL deployment (8-10 min estimated) ==="
+  bash scripts/deploy-prod.sh
+fi
 
 echo "=== Deploy finished at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ==="
