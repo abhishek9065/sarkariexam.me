@@ -50,7 +50,7 @@ jobs:
           port: ${{ secrets.DO_PORT || 22 }}
           script: |
             set -euo pipefail
-            if [ -x ~/sarkari-result/scripts/deploy-live.sh ]; then
+            if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then
               bash ~/sarkari-result/scripts/deploy-live.sh
             else
               echo "No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh"
