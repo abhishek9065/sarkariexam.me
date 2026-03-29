@@ -3,7 +3,6 @@
 set -euo pipefail
 
 CANONICAL_REPO_DIR="$HOME/sarkari-result"
-LEGACY_REPO_DIR="$HOME/sarkariexam.me"
 LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
 
@@ -13,13 +12,7 @@ resolve_repo_dir() {
     return 0
   fi
 
-  if [[ -d "$LEGACY_REPO_DIR" ]]; then
-    echo "WARNING: using legacy deploy checkout at $LEGACY_REPO_DIR; migrate production to $CANONICAL_REPO_DIR." >&2
-    printf '%s' "$LEGACY_REPO_DIR"
-    return 0
-  fi
-
-  echo "ERROR: deployment checkout not found at $CANONICAL_REPO_DIR or $LEGACY_REPO_DIR" >&2
+  echo "ERROR: deployment checkout not found at $CANONICAL_REPO_DIR" >&2
   exit 1
 }
 
