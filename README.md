@@ -117,20 +117,45 @@ Workflow files live in [`.github/workflows`](./.github/workflows).
 
 ## Deployment
 
-### Guarded Docker deploy
-```bash
-cd ~/your-repo
-bash scripts/deploy-prod.sh
+### Canonical production deploy
+
+PowerShell:
+
+```powershell
+.\scripts\deploy-prod-remote.ps1
 ```
 
-The deploy script validates required production env vars, rebuilds services, checks backend health, and verifies public routes after startup.
+Bash:
+
+```bash
+bash scripts/deploy-prod-remote.sh
+```
+
+Both wrappers SSH into the droplet and invoke the same remote entrypoint: `bash ~/sarkari-result/scripts/deploy-live.sh`.
+
+### Server-side deploy entrypoint
+
+```bash
+bash ~/sarkari-result/scripts/deploy-live.sh
+```
+
+`deploy-live.sh` is the canonical server-side deploy command. It syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, and then calls `scripts/deploy-prod.sh`.
+
+### Guarded Docker deploy engine
+
+```bash
+cd ~/sarkari-result
+COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-prod.sh
+```
+
+`deploy-prod.sh` is the guarded compose deploy engine for the current checkout only. It validates required production env vars, rebuilds services, checks backend health, and verifies public routes after startup.
 
 ### PM2 frontend runtime
 
 For non-Docker VM deployments, use the committed PM2 config:
 
 ```bash
-cd ~/your-repo
+cd ~/sarkari-result
 npm --prefix frontend run build
 pm2 delete frontend || true
 pm2 start ecosystem.config.cjs --only frontend

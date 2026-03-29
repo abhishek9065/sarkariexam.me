@@ -5,21 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-detect_compose_project_name() {
-  local existing
-
-  for container in sarkari-frontend sarkari-nginx sarkari-backend sarkari-admin; do
-    existing="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "$container" 2>/dev/null || true)"
-    if [[ -n "$existing" ]]; then
-      printf '%s' "$existing"
-      return 0
-    fi
-  done
-
-  printf '%s' "sarkari-result"
-}
-
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(detect_compose_project_name)}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
 export COMPOSE_PROJECT_NAME
 
 dc() {
@@ -384,7 +370,8 @@ echo "Public route checks:"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
 check_public_route_marker "/jobs/1" "public job detail" 'SSC CGL 2026 - Combined Graduate Level Exam'
-check_public_route_marker "/results/1" "public result detail" 'UPSC Civil Services 2025 - Final Result'
+check_public_route_marker "/results/upsc-civil-services-2025-final-result" "public result detail" 'UPSC Civil Services 2025 - Final Result'
+check_public_route_marker "/detail/upsc-civil-services-2025-final-result" "public detail alias" 'UPSC Civil Services 2025 - Final Result'
 check_public_route_marker "/admit-cards/upsc" "public admit card detail" 'UPSC IAS IFS 2025 Admit Card'
 check_public_route_marker "/states/uttar-pradesh" "public state jobs page" 'State Jobs'
 check_public_route_marker "/search?q=ssc" "public search page" 'Search Results'

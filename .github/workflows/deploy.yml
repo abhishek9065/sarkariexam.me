@@ -50,20 +50,15 @@ jobs:
           port: ${{ secrets.DO_PORT || 22 }}
           script: |
             set -euo pipefail
-            if [ -d ~/sarkariexam.me ]; then
-              cd ~/sarkariexam.me
-            elif [ -d ~/sarkari-result ]; then
-              cd ~/sarkari-result
+            if [ -x ~/sarkari-result/scripts/deploy-live.sh ]; then
+              bash ~/sarkari-result/scripts/deploy-live.sh
+            elif [ -x ~/sarkariexam.me/scripts/deploy-live.sh ]; then
+              echo "WARNING: using legacy deployment checkout at ~/sarkariexam.me" >&2
+              bash ~/sarkariexam.me/scripts/deploy-live.sh
             else
-              echo "No deployment checkout found at ~/sarkariexam.me or ~/sarkari-result"
+              echo "No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh or ~/sarkariexam.me/scripts/deploy-live.sh"
               exit 1
             fi
-
-            echo "=== Pulling latest code ==="
-            git pull --ff-only origin main
-
-            echo "=== Running guarded production deploy ==="
-            bash scripts/deploy-prod.sh
 
       - name: Purge Cloudflare Cache
         if: steps.deploy-config.outputs.enabled == 'true' && success()
