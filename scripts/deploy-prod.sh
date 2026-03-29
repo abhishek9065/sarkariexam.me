@@ -79,8 +79,14 @@ dc config >/dev/null
 echo "Building backend, admin, and nginx..."
 dc build backend admin nginx
 
-echo "Rebuilding frontend without cache to avoid stale Next.js artifacts..."
-dc build --no-cache frontend
+FRONTEND_BUILD_ARGS=()
+if [[ "${FRONTEND_NO_CACHE:-0}" == "1" ]]; then
+  echo "Rebuilding frontend without cache because FRONTEND_NO_CACHE=1..."
+  FRONTEND_BUILD_ARGS+=(--no-cache)
+else
+  echo "Building frontend with Docker layer cache..."
+fi
+dc build "${FRONTEND_BUILD_ARGS[@]}" frontend
 
 remove_conflicting_container() {
   local name="$1"
