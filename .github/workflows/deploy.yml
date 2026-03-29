@@ -52,8 +52,10 @@ jobs:
             set -euo pipefail
             if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then
               bash ~/sarkari-result/scripts/deploy-live.sh
+            elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then
+              bash ~/sarkariexam.me/scripts/deploy-live.sh
             else
-              echo "No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh"
+              echo "No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh or ~/sarkariexam.me/scripts/deploy-live.sh"
               exit 1
             fi
 

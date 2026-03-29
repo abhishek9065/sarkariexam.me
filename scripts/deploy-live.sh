@@ -2,17 +2,23 @@
 
 set -euo pipefail
 
-CANONICAL_REPO_DIR="$HOME/sarkari-result"
+PRIMARY_REPO_DIR="$HOME/sarkari-result"
+FALLBACK_REPO_DIR="$HOME/sarkariexam.me"
 LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
 
 resolve_repo_dir() {
-  if [[ -d "$CANONICAL_REPO_DIR" ]]; then
-    printf '%s' "$CANONICAL_REPO_DIR"
+  if [[ -d "$PRIMARY_REPO_DIR" ]]; then
+    printf '%s' "$PRIMARY_REPO_DIR"
     return 0
   fi
 
-  echo "ERROR: deployment checkout not found at $CANONICAL_REPO_DIR" >&2
+  if [[ -d "$FALLBACK_REPO_DIR" ]]; then
+    printf '%s' "$FALLBACK_REPO_DIR"
+    return 0
+  fi
+
+  echo "ERROR: deployment checkout not found at $PRIMARY_REPO_DIR or $FALLBACK_REPO_DIR" >&2
   exit 1
 }
 

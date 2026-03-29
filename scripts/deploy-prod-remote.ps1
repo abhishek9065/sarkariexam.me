@@ -5,7 +5,7 @@ param(
   [string]$KeyPath = $(if ($env:SSH_KEY_PATH) { $env:SSH_KEY_PATH } else { (Join-Path $HOME '.ssh\id_ed25519') })
 )
 
-$remoteCommand = "bash ~/sarkari-result/scripts/deploy-live.sh"
+$remoteCommand = 'if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then bash ~/sarkari-result/scripts/deploy-live.sh; elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then bash ~/sarkariexam.me/scripts/deploy-live.sh; else echo "No deployment entrypoint found"; exit 1; fi'
 
 if (-not (Test-Path -LiteralPath $KeyPath)) {
   throw "SSH key not found at $KeyPath"

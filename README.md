@@ -131,7 +131,7 @@ Bash:
 bash scripts/deploy-prod-remote.sh
 ```
 
-Both wrappers SSH into the droplet and invoke the same remote entrypoint: `bash ~/sarkari-result/scripts/deploy-live.sh`.
+Both wrappers SSH into the droplet and invoke the same remote entrypoint, preferring `~/sarkari-result/scripts/deploy-live.sh` and falling back to `~/sarkariexam.me/scripts/deploy-live.sh`.
 
 ### Server-side deploy entrypoint
 
@@ -139,7 +139,7 @@ Both wrappers SSH into the droplet and invoke the same remote entrypoint: `bash 
 bash ~/sarkari-result/scripts/deploy-live.sh
 ```
 
-`deploy-live.sh` is the canonical server-side deploy command. It syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, and then calls `scripts/deploy-prod.sh`.
+`deploy-live.sh` is the canonical server-side deploy command. It resolves the active server checkout (`~/sarkari-result` first, then `~/sarkariexam.me`), syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, and then calls `scripts/deploy-prod.sh`.
 
 ### Guarded Docker deploy engine
 
