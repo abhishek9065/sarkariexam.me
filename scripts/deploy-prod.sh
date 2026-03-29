@@ -367,10 +367,10 @@ purge_cloudflare_cache || true
 echo "Public route checks:"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
-check_public_route_marker "/jobs/1" "public job detail" 'Vacancy / Post Details'
-check_public_route_marker "/results/upsc-civil-services-2025-final-result" "public result detail" 'Result Publication Process'
-check_public_route_marker "/detail/upsc-civil-services-2025-final-result" "public detail alias" 'Result Publication Process'
-check_public_route_marker "/admit-cards/upsc" "public admit card detail" 'Eligibility Details'
+check_public_route_marker "/jobs/1" "public job detail" 'Short Information'
+check_public_route_marker "/results/upsc-civil-services-2025-final-result" "public result detail" 'Short Information'
+check_public_route_marker "/detail/upsc-civil-services-2025-final-result" "public detail alias" 'Short Information'
+check_public_route_marker "/admit-cards/upsc" "public admit card detail" 'Short Information'
 check_public_route_marker "/states/uttar-pradesh" "public state jobs page" 'State Jobs'
 check_public_route_marker "/search?q=ssc" "public search page" 'Search Results'
 check_public_route_marker "/jobs?department=Railway" "public jobs filter" 'Railway RRB Group D - Level 1 Posts'
