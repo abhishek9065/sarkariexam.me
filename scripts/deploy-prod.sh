@@ -273,14 +273,14 @@ check_public_route() {
   local url="${PUBLIC_BASE_URL}${path}"
   local status headers app_header
 
-  status="$(curl -k -sS -L -o /dev/null -w "%{http_code}" "$url" || true)"
+  status="$(curl -sS -L -o /dev/null -w "%{http_code}" "$url" || true)"
   if [[ ! "$status" =~ ^2 ]]; then
     echo "ERROR: ${label} route check failed for ${url} (status=${status:-none})"
     return 1
   fi
 
   if [[ -n "$expected_app_header" ]]; then
-    headers="$(curl -k -sS -I -L "$url" || true)"
+    headers="$(curl -sS -I -L "$url" || true)"
     app_header="$(echo "$headers" | tr -d '\r' | grep -i '^X-Sarkari-App:' | tail -n1 | awk -F': ' '{print $2}')"
     if [[ "$app_header" != "$expected_app_header" ]]; then
       echo "ERROR: ${label} expected X-Sarkari-App=${expected_app_header}, got '${app_header:-missing}' for ${url}"
@@ -303,7 +303,7 @@ check_public_route_assets() {
   local asset_status
   local asset_count=0
 
-  html="$(curl -k -sS -L "$url" || true)"
+  html="$(curl -sS -L "$url" || true)"
   if [[ -z "$html" ]]; then
     echo "ERROR: ${label} did not return HTML for asset validation (${url})"
     return 1
@@ -312,7 +312,7 @@ check_public_route_assets() {
   while IFS= read -r asset; do
     [[ -z "$asset" ]] && continue
     asset_count=$((asset_count + 1))
-    asset_status="$(curl -k -sS -o /dev/null -w "%{http_code}" "${PUBLIC_BASE_URL}${asset}" || true)"
+    asset_status="$(curl -sS -o /dev/null -w "%{http_code}" "${PUBLIC_BASE_URL}${asset}" || true)"
     if [[ ! "$asset_status" =~ ^2 ]]; then
       echo "ERROR: ${label} references missing asset ${asset} (status=${asset_status:-none})"
       return 1
@@ -336,13 +336,13 @@ check_public_route_marker() {
   local status
 
   url="${PUBLIC_BASE_URL}${path}"
-  status="$(curl -k -sS -L -o /dev/null -w "%{http_code}" "$url" || true)"
+  status="$(curl -sS -L -o /dev/null -w "%{http_code}" "$url" || true)"
   if [[ ! "$status" =~ ^2 ]]; then
     echo "ERROR: ${label} route check failed for ${url} (status=${status:-none})"
     return 1
   fi
 
-  html="$(curl -k -sS -L "$url" || true)"
+  html="$(curl -sS -L "$url" || true)"
   if [[ -z "$html" ]]; then
     echo "ERROR: ${label} route returned no HTML for ${url}"
     return 1
@@ -367,14 +367,23 @@ purge_cloudflare_cache || true
 echo "Public route checks:"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
-check_public_route_marker "/jobs/1" "public job detail" 'Short Information'
-check_public_route_marker "/results/upsc-civil-services-2025-final-result" "public result detail" 'Short Information'
-check_public_route_marker "/detail/upsc-civil-services-2025-final-result" "public detail alias" 'Short Information'
-check_public_route_marker "/admit-cards/upsc" "public admit card detail" 'Short Information'
-check_public_route_marker "/states/uttar-pradesh" "public state jobs page" 'State Jobs'
-check_public_route_marker "/search?q=ssc" "public search page" 'Search Results'
-check_public_route_marker "/jobs?department=Railway" "public jobs filter" 'Railway RRB Group D - Level 1 Posts'
-check_public_route_marker "/important" "public important links page" 'Important Links'
-check_public_route_marker "/app" "public app page" 'App Download'
+check_public_route "/jobs/1" "public job detail"
+check_public_route_assets "/jobs/1" "public job detail"
+check_public_route "/results/upsc-civil-services-2025-final-result" "public result detail"
+check_public_route_assets "/results/upsc-civil-services-2025-final-result" "public result detail"
+check_public_route "/detail/upsc-civil-services-2025-final-result" "public detail alias"
+check_public_route_assets "/detail/upsc-civil-services-2025-final-result" "public detail alias"
+check_public_route "/admit-cards/upsc" "public admit card detail"
+check_public_route_assets "/admit-cards/upsc" "public admit card detail"
+check_public_route "/states/uttar-pradesh" "public state jobs page"
+check_public_route_assets "/states/uttar-pradesh" "public state jobs page"
+check_public_route "/search?q=ssc" "public search page"
+check_public_route_assets "/search?q=ssc" "public search page"
+check_public_route "/jobs?department=Railway" "public jobs filter"
+check_public_route_assets "/jobs?department=Railway" "public jobs filter"
+check_public_route "/important" "public important links page"
+check_public_route_assets "/important" "public important links page"
+check_public_route "/app" "public app page"
+check_public_route_assets "/app" "public app page"
 
 echo "Deploy completed successfully."

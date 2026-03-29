@@ -88,7 +88,7 @@ jobs:
             "https://sarkariexams.me/api/health" \
             "https://sarkariexams.me/" \
             "https://sarkariexams.me/admin"; do
-            status=$(curl -k -sS -o /dev/null -w "%{http_code}" "$url" || true)
+            status=$(curl -sS -o /dev/null -w "%{http_code}" "$url" || true)
             if [[ "$status" =~ ^(2|3) ]]; then
               echo "OK $url (status=$status)"
             else
@@ -99,7 +99,7 @@ jobs:
 
           echo "Checking frontend routes..."
           for route in "/jobs" "/results" "/admit-cards"; do
-            status=$(curl -k -sS -o /dev/null -w "%{http_code}" "https://sarkariexams.me${route}" || true)
+            status=$(curl -sS -o /dev/null -w "%{http_code}" "https://sarkariexams.me${route}" || true)
             if [[ "$status" =~ ^(2|3) ]]; then
               echo "OK https://sarkariexams.me${route} (status=$status)"
             else
