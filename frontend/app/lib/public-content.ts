@@ -53,9 +53,93 @@ export interface ResourceCard {
   label: string;
 }
 
+export type DetailStatus = 'done' | 'active' | 'upcoming';
+export type DetailNoticeTone = 'info' | 'success' | 'warning';
+export type DetailLinkEmphasis = 'primary' | 'secondary' | 'muted';
+
+export interface DetailNotice {
+  body: string[];
+  tone: DetailNoticeTone;
+  title: string;
+}
+
+export interface DetailDateRow {
+  date: string;
+  label: string;
+  status?: DetailStatus;
+}
+
+export interface DetailFeeRow {
+  label: string;
+  value: string;
+}
+
+export interface DetailAgeLimit {
+  points: string[];
+  summary: string;
+}
+
+export interface DetailEligibilityBlock {
+  description: string;
+  title: string;
+}
+
+export interface DetailVacancyRow {
+  department: string;
+  payLevel?: string;
+  post: string;
+  salary?: string;
+  vacancies: string;
+}
+
+export interface DetailVacancyTable {
+  columns: string[];
+  rows: DetailVacancyRow[];
+}
+
+export interface DetailImportantLink {
+  emphasis?: DetailLinkEmphasis;
+  href: string;
+  label: string;
+  note?: string;
+}
+
+export interface AnnouncementDetailContent {
+  ageLimit?: DetailAgeLimit;
+  applicationFee?: {
+    note?: string;
+    rows: DetailFeeRow[];
+    title?: string;
+  };
+  cta?: {
+    primaryHref: string;
+    primaryLabel: string;
+    secondaryHref?: string;
+    secondaryLabel?: string;
+  };
+  eligibility: DetailEligibilityBlock[];
+  eyebrow: string;
+  heroStats: PublicStat[];
+  howToApply?: string[];
+  importantDates: DetailDateRow[];
+  importantLinks: DetailImportantLink[];
+  notice?: DetailNotice;
+  overviewTitle?: string;
+  relatedLinkOverrides?: QuickLink[];
+  selectionProcess?: string[];
+  sourceNote?: string;
+  subscribePrompt?: {
+    buttonLabel: string;
+    description: string;
+    title: string;
+  };
+  vacancyTable?: DetailVacancyTable;
+}
+
 export interface AnnouncementItem {
   departments: string[];
   date: string;
+  detail: AnnouncementDetailContent;
   headline: string;
   keyPoints: string[];
   legacyId?: string;
@@ -153,6 +237,7 @@ export interface StatePageMeta {
 type AnnouncementSeed = {
   departments?: string[];
   date: string;
+  detail?: Partial<AnnouncementDetailContent>;
   legacyId?: string;
   legacySlugs?: string[];
   keywords?: string[];
@@ -235,12 +320,312 @@ function inferKeywords(seed: AnnouncementSeed, slug: string) {
   ]);
 }
 
+function getSectionActionLabel(section: AnnouncementSection) {
+  switch (section) {
+    case 'jobs':
+      return 'Apply Online';
+    case 'results':
+      return 'View Result';
+    case 'admit-cards':
+      return 'Download Admit Card';
+    case 'answer-keys':
+      return 'View Answer Key';
+    case 'admissions':
+      return 'Open Admission Form';
+    default:
+      return 'Open Details';
+  }
+}
+
+function getSectionOverviewTitle(section: AnnouncementSection) {
+  switch (section) {
+    case 'jobs':
+      return 'Recruitment Overview';
+    case 'results':
+      return 'Result Overview';
+    case 'admit-cards':
+      return 'Admit Card Overview';
+    case 'answer-keys':
+      return 'Answer Key Overview';
+    case 'admissions':
+      return 'Admission Overview';
+    default:
+      return 'Overview';
+  }
+}
+
+function getSectionNoticeTone(section: AnnouncementSection): DetailNoticeTone {
+  switch (section) {
+    case 'results':
+      return 'success';
+    case 'admit-cards':
+      return 'warning';
+    default:
+      return 'info';
+  }
+}
+
+function buildDefaultDetail(
+  section: AnnouncementSection,
+  seed: AnnouncementSeed,
+  slug: string,
+  fallbackLinks: QuickLink[],
+): AnnouncementDetailContent {
+  const primaryLabel = getSectionActionLabel(section);
+  const secondaryLabel =
+    section === 'results'
+      ? 'View Latest Results'
+      : section === 'admit-cards'
+        ? 'All Admit Cards'
+        : section === 'answer-keys'
+          ? 'All Answer Keys'
+          : section === 'admissions'
+            ? 'All Admissions'
+            : 'Latest Jobs';
+
+  const baseDates: DetailDateRow[] = [
+    {
+      label: 'Homepage Update',
+      date: seed.date,
+      status: 'active',
+    },
+  ];
+
+  if (section === 'jobs') {
+    baseDates.push({ label: 'Application Status', date: 'Check official notice', status: 'upcoming' });
+  }
+  if (section === 'results') {
+    baseDates.unshift({ label: 'Result Declared', date: seed.date, status: 'done' });
+  }
+  if (section === 'admit-cards') {
+    baseDates.unshift({ label: 'Document Released', date: seed.date, status: 'done' });
+  }
+  if (section === 'answer-keys') {
+    baseDates.unshift({ label: 'Answer Key Released', date: seed.date, status: 'done' });
+  }
+  if (section === 'admissions') {
+    baseDates.push({ label: 'Registration Window', date: 'Refer official brochure', status: 'upcoming' });
+  }
+
+  const importantLinks: DetailImportantLink[] = [
+    {
+      label: primaryLabel,
+      href: `${sectionPathMap[section]}/${slug}`,
+      emphasis: 'primary',
+      note: 'Canonical detail page',
+    },
+    {
+      label: `Back to ${announcementCategoryMeta[section].title}`,
+      href: sectionPathMap[section],
+      emphasis: 'secondary',
+    },
+    {
+      label: 'Homepage',
+      href: '/',
+      emphasis: 'muted',
+    },
+    ...fallbackLinks.slice(0, 2).map((link) => ({
+      label: link.label,
+      href: link.href,
+      emphasis: 'secondary' as DetailLinkEmphasis,
+    })),
+  ];
+
+  const heroStats = [
+    { label: 'Category', value: announcementCategoryMeta[section].title },
+    { label: 'Organization', value: seed.org },
+    { label: 'Updated', value: seed.date },
+    {
+      label: seed.postCount ? 'Posts / Seats' : 'Status',
+      value: seed.postCount ?? (seed.tag ? seed.tag.toUpperCase() : 'ACTIVE'),
+    },
+  ];
+
+  if (seed.qualification) {
+    heroStats.push({ label: 'Qualification', value: seed.qualification });
+  }
+
+  return {
+    eyebrow: sectionLabelMap[section],
+    heroStats,
+    notice: {
+      title:
+        section === 'results'
+          ? 'Result Notice'
+          : section === 'admit-cards'
+            ? 'Exam-Day Notice'
+            : section === 'answer-keys'
+              ? 'Objection Window Notice'
+              : section === 'admissions'
+                ? 'Admission Notice'
+                : 'Application Notice',
+      tone: getSectionNoticeTone(section),
+      body: [
+        `${seed.title} is now available on a dedicated Sarkari-style detail page for ${seed.org}.`,
+        'Candidates should verify all dates, eligibility rules, and document requirements from the official notification before taking action.',
+      ],
+    },
+    overviewTitle: getSectionOverviewTitle(section),
+    importantDates: baseDates,
+    applicationFee: {
+      title: 'Application Fee',
+      rows: [
+        { label: 'General / OBC / EWS', value: 'Refer official notice' },
+        { label: 'SC / ST / Female / PwD', value: 'Refer official notice' },
+      ],
+      note: 'Exact fee mode, exemptions, and payment deadlines should be verified on the official source.',
+    },
+    ageLimit: {
+      summary: 'Refer the official notice for exact age calculation and relaxation rules.',
+      points: [
+        'Age relaxation generally applies as per recruitment or admission rules.',
+        'Category certificates and date-of-birth proof must match the submitted application.',
+      ],
+    },
+    eligibility: [
+      {
+        title: 'Educational Qualification',
+        description:
+          seed.qualification
+            ? `${seed.qualification} level eligibility is reflected on the homepage listing. Check the official notice for stream-wise or post-wise variation.`
+            : 'Refer to the official notice for detailed educational eligibility, specialization rules, and final-year candidate conditions.',
+      },
+      {
+        title: 'Organization / Exam Scope',
+        description: `${seed.org} is the primary authority for this ${sectionLabelMap[section].toLowerCase()} update.`,
+      },
+      {
+        title: 'Document Readiness',
+        description:
+          'Keep category, identity, qualification, and exam-specific supporting documents ready before applying, downloading, or verifying the result.',
+      },
+    ],
+    selectionProcess:
+      section === 'results'
+        ? ['Result publication', 'Score / merit verification', 'Next-stage instructions from the authority']
+        : section === 'admit-cards'
+          ? ['Download admit card', 'Check reporting instructions', 'Carry valid photo ID and required documents']
+          : section === 'answer-keys'
+            ? ['Download response sheet / key', 'Review official answers', 'Submit objections within the allowed window if available']
+            : section === 'admissions'
+              ? ['Complete registration', 'Upload required documents', 'Participate in counseling / verification as notified']
+              : ['Complete application', 'Appear in exam / test', 'Attend document verification or next-stage process if shortlisted'],
+    vacancyTable: seed.postCount
+      ? {
+          columns: ['Post / Stage', 'Department', 'Vacancies', 'Pay Level', 'Remarks'],
+          rows: [
+            {
+              post: seed.title,
+              department: seed.org,
+              vacancies: seed.postCount,
+              payLevel: section === 'results' ? 'Declared' : 'Refer notice',
+              salary: seed.qualification ?? 'Refer notice',
+            },
+          ],
+        }
+      : undefined,
+    howToApply:
+      section === 'results'
+        ? [
+            'Open the official result link or notice PDF from the authority website.',
+            'Use roll number, registration details, or merit list search as instructed.',
+            'Download and save the result / score card for the next stage.',
+          ]
+        : section === 'admit-cards'
+          ? [
+              'Visit the official portal and open the admit-card download section.',
+              'Enter the required login details exactly as submitted in the application.',
+              'Verify exam city, reporting time, and instructions before printing the hall ticket.',
+            ]
+          : section === 'answer-keys'
+            ? [
+                'Open the official answer-key or response-sheet link for the exam.',
+                'Match responses carefully and note the objection window, fee, and deadline if published.',
+                'Save a copy of the key / response sheet for future reference.',
+              ]
+          : section === 'admissions'
+            ? [
+                'Read the information bulletin and eligibility rules before registration.',
+                'Complete the form with accurate academic, category, and personal details.',
+                'Upload the required documents and preserve the submitted form copy.',
+              ]
+            : [
+                'Read the official notification before filling the application form.',
+                'Check eligibility, age rules, fees, and document requirements carefully.',
+                'Submit the form before the deadline and keep a printed copy for later stages.',
+              ],
+    importantLinks,
+    sourceNote: `${seed.org} remains the authoritative source for this update. Candidates should rely on the official notice for final confirmation of dates, eligibility, fee, and next-stage instructions.`,
+    relatedLinkOverrides: fallbackLinks,
+    cta: {
+      primaryLabel,
+      primaryHref: `${sectionPathMap[section]}/${slug}`,
+      secondaryLabel,
+      secondaryHref: sectionPathMap[section],
+    },
+    subscribePrompt: {
+      title: 'Get update alerts',
+      description: `Track fresh ${announcementCategoryMeta[section].title.toLowerCase()} updates without leaving the Sarkari Result-style public shell.`,
+      buttonLabel: 'Set alert',
+    },
+  };
+}
+
+function mergeAnnouncementDetail(
+  baseDetail: AnnouncementDetailContent,
+  override?: Partial<AnnouncementDetailContent>,
+): AnnouncementDetailContent {
+  if (!override) {
+    return baseDetail;
+  }
+
+  return {
+    ...baseDetail,
+    ...override,
+    notice: override.notice ? { ...baseDetail.notice, ...override.notice } as DetailNotice : baseDetail.notice,
+    applicationFee: override.applicationFee
+      ? {
+          ...baseDetail.applicationFee,
+          ...override.applicationFee,
+          rows: override.applicationFee.rows ?? baseDetail.applicationFee?.rows ?? [],
+        }
+      : baseDetail.applicationFee,
+    ageLimit: override.ageLimit
+      ? {
+          ...baseDetail.ageLimit,
+          ...override.ageLimit,
+          points: override.ageLimit.points ?? baseDetail.ageLimit?.points ?? [],
+        }
+      : baseDetail.ageLimit,
+    cta: override.cta ? { ...baseDetail.cta, ...override.cta } : baseDetail.cta,
+    subscribePrompt: override.subscribePrompt
+      ? { ...baseDetail.subscribePrompt, ...override.subscribePrompt }
+      : baseDetail.subscribePrompt,
+    vacancyTable: override.vacancyTable
+      ? {
+          ...baseDetail.vacancyTable,
+          ...override.vacancyTable,
+          columns: override.vacancyTable.columns ?? baseDetail.vacancyTable?.columns ?? [],
+          rows: override.vacancyTable.rows ?? baseDetail.vacancyTable?.rows ?? [],
+        }
+      : baseDetail.vacancyTable,
+    heroStats: override.heroStats ?? baseDetail.heroStats,
+    eligibility: override.eligibility ?? baseDetail.eligibility,
+    importantDates: override.importantDates ?? baseDetail.importantDates,
+    selectionProcess: override.selectionProcess ?? baseDetail.selectionProcess,
+    howToApply: override.howToApply ?? baseDetail.howToApply,
+    importantLinks: override.importantLinks ?? baseDetail.importantLinks,
+    relatedLinkOverrides: override.relatedLinkOverrides ?? baseDetail.relatedLinkOverrides,
+  };
+}
+
 function createAnnouncement(section: AnnouncementSection, seed: AnnouncementSeed): AnnouncementItem {
   const slug = seed.slug ?? slugify(seed.title);
   const fallbackLinks = [
     { label: `Back to ${announcementCategoryMeta[section].title}`, href: sectionPathMap[section] },
     { label: 'Homepage', href: '/' },
   ];
+  const defaultDetail = buildDefaultDetail(section, seed, slug, fallbackLinks);
 
   return {
     listed: seed.listed ?? true,
@@ -272,6 +657,7 @@ function createAnnouncement(section: AnnouncementSection, seed: AnnouncementSeed
         ]
       : [`Primary organization: ${seed.org}`, `Homepage update date: ${seed.date}`, `Route family: ${sectionPathMap[section]}`],
     usefulLinks: fallbackLinks,
+    detail: mergeAnnouncementDetail(defaultDetail, seed.detail),
   };
 }
 
@@ -1382,6 +1768,85 @@ const jobAnnouncements: AnnouncementItem[] = [
     postCount: '14,582',
     qualification: 'Graduate',
     legacyId: '1',
+    shortInfo:
+      'Staff Selection Commission has released the Combined Graduate Level Examination 2026 update for graduate-level central government posts. Candidates should review post-wise eligibility, age rules, and tier-wise selection details before applying.',
+    summary:
+      'SSC CGL 2026 is a multi-post central recruitment drive covering inspector, assistant section officer, tax assistant, auditor, and related graduate-level posts. The recruitment follows the usual multi-tier pattern with computer-based stages and document verification.',
+    detail: {
+      heroStats: [
+        { label: 'Category', value: 'Government Jobs' },
+        { label: 'Organization', value: 'SSC' },
+        { label: 'Updated', value: '28 Mar 2026' },
+        { label: 'Posts', value: '14,582' },
+        { label: 'Qualification', value: 'Graduate' },
+      ],
+      notice: {
+        title: 'SSC CGL 2026 Recruitment Notice',
+        tone: 'info',
+        body: [
+          'This recruitment covers graduate-level central government posts under multiple ministries and departments.',
+          'Candidates should verify post-wise age criteria, physical standards for eligible posts, and tier-wise selection rules from the official SSC notification.',
+        ],
+      },
+      importantDates: [
+        { label: 'Notification Released', date: '28 Mar 2026', status: 'done' },
+        { label: 'Application Start', date: '01 Apr 2026', status: 'active' },
+        { label: 'Last Date to Apply', date: '30 Apr 2026', status: 'upcoming' },
+        { label: 'Tier I Exam Window', date: 'Jul - Aug 2026', status: 'upcoming' },
+      ],
+      applicationFee: {
+        title: 'Application Fee',
+        rows: [
+          { label: 'General / OBC / EWS', value: 'Rs. 100/-' },
+          { label: 'SC / ST / Female / PwD', value: 'Nil' },
+        ],
+        note: 'Fee payment is usually accepted through online mode or approved challan channels as notified by SSC.',
+      },
+      ageLimit: {
+        summary: 'Most posts follow an 18 to 32 year range, with post-wise variation.',
+        points: [
+          'Age is calculated as per the date specified in the official SSC notification.',
+          'Reserved-category relaxation is provided according to central government recruitment rules.',
+        ],
+      },
+      eligibility: [
+        {
+          title: 'Educational Qualification',
+          description: 'Bachelor degree in any discipline from a recognized university. Some posts may require preferred subjects or additional physical standards.',
+        },
+        {
+          title: 'Category Documents',
+          description: 'Candidates claiming reservation, EWS, PwD, or ex-serviceman benefits should keep valid supporting certificates ready.',
+        },
+        {
+          title: 'Posting Scope',
+          description: 'The recruitment covers all-India postings across ministries, departments, and attached offices.',
+        },
+      ],
+      selectionProcess: ['Tier I CBT', 'Tier II CBT', 'Post-specific skill / qualifying stages where applicable', 'Document Verification'],
+      vacancyTable: {
+        columns: ['Post', 'Department', 'Vacancies', 'Pay Level', 'Remarks'],
+        rows: [
+          { post: 'Assistant Section Officer', department: 'Central Secretariat / Ministries', vacancies: '2,341', payLevel: 'Level 7', salary: 'Graduate' },
+          { post: 'Inspector', department: 'CBDT / CBIC / Enforcement units', vacancies: '3,112', payLevel: 'Level 7', salary: 'Physical standard may apply' },
+          { post: 'Tax Assistant / Auditor', department: 'CBDT / CAG / CGDA', vacancies: '4,956', payLevel: 'Level 4 to 5', salary: 'Department-wise allocation' },
+          { post: 'Other Graduate Posts', department: 'Various central departments', vacancies: '4,173', payLevel: 'Refer notice', salary: 'Post-wise breakup in notification' },
+        ],
+      },
+      howToApply: [
+        'Open the official SSC portal and complete one-time registration if not already created.',
+        'Fill the CGL 2026 application form carefully with post preference, category, and communication details.',
+        'Upload the required photograph / signature and preserve the submitted application printout.',
+      ],
+      importantLinks: [
+        { label: 'Apply Online', href: '/jobs/ssc-cgl-2026-combined-graduate-level-exam', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'Latest Jobs', href: '/jobs', emphasis: 'secondary' },
+        { label: 'Results Section', href: '/results', emphasis: 'muted' },
+        { label: 'Homepage', href: '/', emphasis: 'muted' },
+      ],
+      sourceNote:
+        'SSC is the official authority for notification text, fee mode, post-wise breakup, age calculation, and exam schedule. Candidates should confirm every final rule from the official SSC notice.',
+    },
   }),
   createAnnouncement('jobs', {
     title: 'IBPS PO 2026 - Probationary Officer',
@@ -1391,6 +1856,39 @@ const jobAnnouncements: AnnouncementItem[] = [
     postCount: '4,500',
     qualification: 'Graduate',
     legacyId: '2',
+    detail: {
+      notice: {
+        title: 'IBPS PO Recruitment Update',
+        tone: 'info',
+        body: [
+          'IBPS Probationary Officer recruitment is a major banking-sector opportunity for graduate candidates.',
+          'Candidates should verify participating banks, prelims and mains schedule, and interview rules from the official IBPS notice.',
+        ],
+      },
+      importantDates: [
+        { label: 'Recruitment Update', date: '26 Mar 2026', status: 'done' },
+        { label: 'Online Form Window', date: 'Expected Apr 2026', status: 'active' },
+        { label: 'Prelims Exam', date: 'Expected Aug 2026', status: 'upcoming' },
+      ],
+      applicationFee: {
+        rows: [
+          { label: 'General / OBC / EWS', value: 'Refer IBPS notice' },
+          { label: 'SC / ST / PwD', value: 'Refer IBPS notice' },
+        ],
+        note: 'Banking recruitment fee slabs are confirmed only in the official IBPS advertisement.',
+      },
+      selectionProcess: ['Prelims', 'Mains', 'Interview', 'Final allotment'],
+      howToApply: [
+        'Register on the official IBPS portal with valid mobile number and email.',
+        'Fill the PO application carefully, upload the required documents, and save the submitted form.',
+        'Track prelims, mains, and interview notices through the official website.',
+      ],
+      importantLinks: [
+        { label: 'PO 2026 Details', href: '/jobs/ibps-po-2026-probationary-officer', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Jobs', href: '/jobs', emphasis: 'secondary' },
+        { label: 'Latest Results', href: '/results', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('jobs', {
     title: 'Railway RRB Group D - Level 1 Posts',
@@ -1400,6 +1898,45 @@ const jobAnnouncements: AnnouncementItem[] = [
     postCount: '32,000',
     qualification: '10th Pass',
     legacyId: '3',
+    detail: {
+      notice: {
+        title: 'Railway Level 1 Recruitment Notice',
+        tone: 'info',
+        body: [
+          'RRB Group D remains one of the largest railway recruitment drives, covering multiple technical and non-technical level 1 posts.',
+          'Candidates should confirm zone-wise vacancies, medical standards, and PET requirements from the official notice.',
+        ],
+      },
+      importantDates: [
+        { label: 'Recruitment Update', date: '25 Mar 2026', status: 'done' },
+        { label: 'Application Window', date: 'Refer RRB notification', status: 'active' },
+        { label: 'CBT Stage', date: 'Expected later in 2026', status: 'upcoming' },
+      ],
+      applicationFee: {
+        rows: [
+          { label: 'General / OBC / EWS', value: 'Refer RRB notice' },
+          { label: 'SC / ST / Female / EBC / PwD', value: 'Refer RRB notice' },
+        ],
+        note: 'Refund or bank-charge rules, if any, should be checked in the railway notification.',
+      },
+      selectionProcess: ['Computer Based Test', 'Physical Efficiency Test', 'Document Verification', 'Medical Examination'],
+      vacancyTable: {
+        columns: ['Post / Unit', 'Department', 'Vacancies', 'Pay Level', 'Remarks'],
+        rows: [
+          { post: 'Track Maintainer / Helper', department: 'Railway Zones', vacancies: '32,000', payLevel: 'Level 1', salary: 'Zone-wise breakup in notice' },
+        ],
+      },
+      howToApply: [
+        'Choose the correct railway zone or board as permitted in the official notice.',
+        'Fill the online form carefully and verify category, qualification, and identity details.',
+        'Keep scanned documents and payment proof ready for future verification stages.',
+      ],
+      importantLinks: [
+        { label: 'Group D Details', href: '/jobs/railway-rrb-group-d-level-1-posts', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Jobs', href: '/jobs', emphasis: 'secondary' },
+        { label: 'Admit Cards', href: '/admit-cards', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('jobs', {
     title: 'UPSC NDA NA 2026 - National Defence Academy',
@@ -1560,6 +2097,84 @@ const resultAnnouncements: AnnouncementItem[] = [
     tag: 'hot',
     postCount: '933',
     legacyId: '1',
+    shortInfo:
+      'Union Public Service Commission has declared the Civil Services Examination 2025 final result. The recommendation list covers IAS, IPS, IFS, and other central services vacancies.',
+    summary:
+      'The UPSC Civil Services 2025 final result closes the prelims, mains, and personality test cycle for one of the most competitive examinations in India. Candidates should check the official PDF, verify roll numbers, and follow further service-allocation or marks-related notices from UPSC.',
+    detail: {
+      heroStats: [
+        { label: 'Category', value: 'Latest Results' },
+        { label: 'Organization', value: 'UPSC' },
+        { label: 'Updated', value: '27 Mar 2026' },
+        { label: 'Recommended', value: '933' },
+        { label: 'Exam Type', value: 'Civil Services' },
+      ],
+      notice: {
+        title: 'Final Result Declared',
+        tone: 'success',
+        body: [
+          'UPSC has published the final merit list for Civil Services Examination 2025 after completion of the interview round.',
+          'Candidates should download the official result PDF and monitor UPSC for marks, cut-off, reserve-list, and service-allocation updates.',
+        ],
+      },
+      importantDates: [
+        { label: 'Prelims Exam', date: '26 May 2025', status: 'done' },
+        { label: 'Mains Exam', date: '20 Sep 2025', status: 'done' },
+        { label: 'Interview Window', date: 'Jan - Mar 2026', status: 'done' },
+        { label: 'Final Result', date: '27 Mar 2026', status: 'active' },
+      ],
+      applicationFee: {
+        title: 'Application Fee (Original Exam Cycle)',
+        rows: [
+          { label: 'General / OBC / EWS', value: 'Rs. 100/-' },
+          { label: 'SC / ST / Female / PwD', value: 'Nil' },
+        ],
+        note: 'This fee table is included for reference from the original UPSC CSE application cycle.',
+      },
+      ageLimit: {
+        summary: 'The original examination cycle followed UPSC Civil Services age rules.',
+        points: [
+          'General category candidates usually fall within 21 to 32 years as per the official notification.',
+          'Category-wise upper-age relaxation applies according to UPSC rules.',
+        ],
+      },
+      eligibility: [
+        {
+          title: 'Qualification',
+          description: 'Bachelor degree from a recognized university was required in the original application cycle.',
+        },
+        {
+          title: 'Result Verification',
+          description: 'Candidates should verify their roll number, name, and category details exactly as published in the final result PDF.',
+        },
+        {
+          title: 'Next-Stage Readiness',
+          description: 'Keep identity proof, educational documents, category certificates, and service-preference records ready for any further verification or allocation steps.',
+        },
+      ],
+      selectionProcess: ['Preliminary Examination', 'Main Examination', 'Personality Test / Interview', 'Final Merit Recommendation'],
+      vacancyTable: {
+        columns: ['Service / Group', 'Department', 'Vacancies', 'Pay Level', 'Remarks'],
+        rows: [
+          { post: 'IAS', department: 'DoPT', vacancies: '180', payLevel: 'Level 10', salary: 'Service allocation by merit and category' },
+          { post: 'IPS', department: 'MHA', vacancies: '200', payLevel: 'Level 10', salary: 'Cadre allocation as per rules' },
+          { post: 'IFS', department: 'MEA', vacancies: '37', payLevel: 'Level 10', salary: 'Foreign service allocation rules apply' },
+          { post: 'Other Central Services', department: 'Various', vacancies: '516', payLevel: 'Refer service rules', salary: 'Combined final recommendation total' },
+        ],
+      },
+      howToApply: [
+        'Open the official UPSC result PDF and search for your roll number or name in the final list.',
+        'Download and preserve the result notice, then wait for marks, reserve list, or service-allocation notices if applicable.',
+        'Follow only the UPSC website for final confirmation of cut-off marks, marksheets, and post-result instructions.',
+      ],
+      importantLinks: [
+        { label: 'View Final Result', href: '/results/upsc-civil-services-2025-final-result', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'Latest Results', href: '/results', emphasis: 'secondary' },
+        { label: 'Homepage', href: '/', emphasis: 'muted' },
+      ],
+      sourceNote:
+        'UPSC remains the only authoritative source for the final result PDF, marks, cut-off, reserve-list publication, and any further service-allocation or verification instructions.',
+    },
   }),
   createAnnouncement('results', {
     title: 'SSC CHSL 2025 - Tier 2 Result',
@@ -1568,6 +2183,32 @@ const resultAnnouncements: AnnouncementItem[] = [
     tag: 'new',
     postCount: '6,500',
     legacyId: '2',
+    detail: {
+      notice: {
+        title: 'Tier II Result Notice',
+        tone: 'success',
+        body: [
+          'SSC has released the CHSL Tier II result for candidates shortlisted toward document verification and post allocation stages.',
+          'Candidates should verify result status, cut-off, and further schedule from the official SSC notice.',
+        ],
+      },
+      importantDates: [
+        { label: 'Tier I Result', date: 'Earlier declared', status: 'done' },
+        { label: 'Tier II Result', date: '26 Mar 2026', status: 'active' },
+        { label: 'Document Verification', date: 'Refer SSC schedule', status: 'upcoming' },
+      ],
+      selectionProcess: ['Tier I', 'Tier II', 'Skill / Typing test where applicable', 'Document Verification'],
+      howToApply: [
+        'Open the official result PDF and verify your roll number or name.',
+        'Check the post-wise cut-off and shortlist instructions published with the result notice.',
+        'Preserve the result copy and prepare for document verification or the next announced stage.',
+      ],
+      importantLinks: [
+        { label: 'View Result', href: '/results/ssc-chsl-2025-tier-2-result', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'Latest Results', href: '/results', emphasis: 'secondary' },
+        { label: 'Latest Jobs', href: '/jobs', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('results', {
     title: 'IBPS Clerk Mains 2025 - Result Declared',
@@ -1576,6 +2217,32 @@ const resultAnnouncements: AnnouncementItem[] = [
     tag: 'new',
     postCount: '5,000',
     legacyId: '3',
+    detail: {
+      notice: {
+        title: 'Banking Result Update',
+        tone: 'success',
+        body: [
+          'IBPS Clerk mains result has been declared for the current recruitment cycle.',
+          'Candidates should check allotment updates, score card release, and bank-wise notices from IBPS.',
+        ],
+      },
+      importantDates: [
+        { label: 'Prelims Result', date: 'Earlier declared', status: 'done' },
+        { label: 'Mains Result', date: '25 Mar 2026', status: 'active' },
+        { label: 'Final Allotment / Joining Updates', date: 'Refer IBPS notice', status: 'upcoming' },
+      ],
+      selectionProcess: ['Prelims', 'Mains', 'Provisional allotment'],
+      howToApply: [
+        'Log in through the official IBPS result portal to download your score card if enabled.',
+        'Check state or bank allotment instructions and preserve the score / result copy.',
+        'Keep educational and identity documents ready for later joining formalities.',
+      ],
+      importantLinks: [
+        { label: 'View Result', href: '/results/ibps-clerk-mains-2025-result-declared', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'Latest Results', href: '/results', emphasis: 'secondary' },
+        { label: 'Banking Jobs', href: '/jobs?department=Banking', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('results', {
     title: 'RRB NTPC CBT 2 Result 2025',
@@ -1730,6 +2397,51 @@ const admitCardAnnouncements: AnnouncementItem[] = [
     postCount: '46,617',
     slug: 'ssc-gd-constable-pet-pst',
     legacyId: '1',
+    detail: {
+      notice: {
+        title: 'PET / PST Admit Card Notice',
+        tone: 'warning',
+        body: [
+          'Candidates shortlisted for the physical stages should verify reporting venue, time, and document checklist before downloading the admit card.',
+          'Photo identity proof and the printed admit card should be carried exactly as instructed by the authority.',
+        ],
+      },
+      importantDates: [
+        { label: 'Written Result', date: 'Earlier declared', status: 'done' },
+        { label: 'PET / PST Admit Card', date: '28 Mar 2026', status: 'active' },
+        { label: 'Physical Test Window', date: 'Apr 2026', status: 'upcoming' },
+      ],
+      applicationFee: {
+        title: 'Original Application Fee',
+        rows: [
+          { label: 'General / OBC / EWS', value: 'Rs. 100/-' },
+          { label: 'SC / ST / Female / ExSM', value: 'Nil' },
+        ],
+        note: 'This fee block refers to the original exam cycle and is shown here for reference.',
+      },
+      ageLimit: {
+        summary: 'SSC GD age criteria follow the recruitment notification for the original application cycle.',
+        points: [
+          'Reserved-category relaxation applies according to SSC and central rules.',
+          'Candidates should verify age proof and category certificates before physical verification.',
+        ],
+      },
+      eligibility: [
+        { title: 'Document Readiness', description: 'Carry admit card printout, valid photo ID, and any physical-test supporting documents required by the authority.' },
+        { title: 'Physical Stage', description: 'PET / PST standards are post-specific and should be cross-checked from the SSC notification and region notice.' },
+      ],
+      selectionProcess: ['Written examination result', 'PET / PST stage', 'Document verification', 'Final merit / medical procedures where applicable'],
+      howToApply: [
+        'Open the SSC regional admit-card link and log in with your exam credentials.',
+        'Check exam city, reporting slot, and physical-stage instructions before printing the admit card.',
+        'Reach the venue with all original documents listed in the PET / PST instructions.',
+      ],
+      importantLinks: [
+        { label: 'Download Admit Card', href: '/admit-cards/ssc-gd-constable-pet-pst', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Admit Cards', href: '/admit-cards', emphasis: 'secondary' },
+        { label: 'Latest Jobs', href: '/jobs', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('admit-cards', {
     title: 'UPSC EPFO 2026 Admit Card',
@@ -1739,6 +2451,31 @@ const admitCardAnnouncements: AnnouncementItem[] = [
     postCount: '577',
     slug: 'upsc-epfo-2026',
     legacyId: '2',
+    detail: {
+      notice: {
+        title: 'UPSC EPFO Admit Card Notice',
+        tone: 'warning',
+        body: [
+          'Candidates should verify exam date, centre, and reporting instructions after downloading the EPFO admit card.',
+          'UPSC candidates must follow the exact instructions printed on the admit card and e-admission certificate notice.',
+        ],
+      },
+      importantDates: [
+        { label: 'Admit Card Released', date: '27 Mar 2026', status: 'active' },
+        { label: 'Written Exam / RT', date: 'Refer UPSC schedule', status: 'upcoming' },
+      ],
+      selectionProcess: ['Recruitment test / exam', 'Interview or further stage if notified', 'Document verification'],
+      howToApply: [
+        'Download the e-admit card from the official UPSC portal using your registration details.',
+        'Read all exam-day instructions, prohibited items, and identity-proof requirements carefully.',
+        'Keep extra printed copies and reach the venue according to the reporting schedule.',
+      ],
+      importantLinks: [
+        { label: 'Download Admit Card', href: '/admit-cards/upsc-epfo-2026', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Admit Cards', href: '/admit-cards', emphasis: 'secondary' },
+        { label: 'UPSC Updates', href: '/jobs?department=UPSC', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('admit-cards', {
     title: 'NTA CUET UG 2026 - City Slip Released',
@@ -1872,6 +2609,36 @@ const answerKeyAnnouncements: AnnouncementItem[] = [
     date: '27 Mar 2026',
     tag: 'hot',
     postCount: '14,000',
+    detail: {
+      notice: {
+        title: 'Tier I Answer Key Released',
+        tone: 'info',
+        body: [
+          'Candidates can review the provisional answer key and response sheet for SSC CGL Tier I.',
+          'Objection fee, challenge window, and final answer-key publication should be checked from the official notice.',
+        ],
+      },
+      importantDates: [
+        { label: 'Tier I Exam Window', date: 'Completed', status: 'done' },
+        { label: 'Provisional Answer Key', date: '27 Mar 2026', status: 'active' },
+        { label: 'Objection Last Date', date: 'Refer SSC notice', status: 'upcoming' },
+      ],
+      eligibility: [
+        { title: 'Answer-Key Access', description: 'Use the official login window to open both the response sheet and answer key, if the authority provides candidate login access.' },
+        { title: 'Challenge Process', description: 'Read the objection rules carefully before raising a challenge. Keep question ID, evidence, and payment proof ready if required.' },
+      ],
+      selectionProcess: ['Download answer key', 'Verify responses', 'Submit challenge if needed', 'Wait for final answer key / result notice'],
+      howToApply: [
+        'Open the official SSC answer-key link and log in with your application credentials.',
+        'Match each marked response with the published key and note disputed questions separately.',
+        'Submit objections within the official window only if the authority permits a challenge process.',
+      ],
+      importantLinks: [
+        { label: 'View Answer Key', href: '/answer-keys/ssc-cgl-2025-tier-1-answer-key-released', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Answer Keys', href: '/answer-keys', emphasis: 'secondary' },
+        { label: 'Latest Results', href: '/results', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('answer-keys', {
     title: 'UPSC CAPF 2025 - Answer Key',
@@ -1879,6 +2646,32 @@ const answerKeyAnnouncements: AnnouncementItem[] = [
     date: '25 Mar 2026',
     tag: 'new',
     postCount: '322',
+    detail: {
+      notice: {
+        title: 'CAPF Answer Key Notice',
+        tone: 'info',
+        body: [
+          'UPSC CAPF candidates should verify the published key and follow any official objection or representation process only if announced by the authority.',
+          'The final answer key and result timeline should always be checked on the UPSC website.',
+        ],
+      },
+      importantDates: [
+        { label: 'Exam Conducted', date: 'Completed', status: 'done' },
+        { label: 'Answer Key Update', date: '25 Mar 2026', status: 'active' },
+        { label: 'Final Result', date: 'Refer UPSC schedule', status: 'upcoming' },
+      ],
+      selectionProcess: ['Review answer key', 'Check result notice', 'Physical / interview stages as per CAPF recruitment rules'],
+      howToApply: [
+        'Download or open the official answer-key notice from the UPSC portal.',
+        'Compare responses carefully and preserve a copy of the answer key for reference.',
+        'Track further notices for results, physical standards, and interview stages.',
+      ],
+      importantLinks: [
+        { label: 'View Answer Key', href: '/answer-keys/upsc-capf-2025-answer-key', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Answer Keys', href: '/answer-keys', emphasis: 'secondary' },
+        { label: 'UPSC Jobs', href: '/jobs?department=UPSC', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('answer-keys', {
     title: 'NTA UGC NET Dec 2025 - Answer Key',
@@ -1939,12 +2732,95 @@ const admissionAnnouncements: AnnouncementItem[] = [
     date: '28 Mar 2026',
     tag: 'new',
     stateSlugs: ['delhi', ALL_INDIA],
+    detail: {
+      notice: {
+        title: 'University Admission Notice',
+        tone: 'info',
+        body: [
+          'Delhi University undergraduate admissions for the 2026 session are expected to follow the CUET-based process.',
+          'Candidates should track the central admission portal for registration, preference filling, and seat-allocation rounds.',
+        ],
+      },
+      importantDates: [
+        { label: 'Admission Update Published', date: '28 Mar 2026', status: 'done' },
+        { label: 'Registration Window', date: 'Expected after CUET process', status: 'active' },
+        { label: 'Preference / Allocation Rounds', date: 'Refer DU schedule', status: 'upcoming' },
+      ],
+      applicationFee: {
+        title: 'Registration / Counseling Fee',
+        rows: [
+          { label: 'General Category', value: 'Refer DU admission bulletin' },
+          { label: 'Reserved Categories', value: 'Refer DU admission bulletin' },
+        ],
+        note: 'Portal fee, counseling fee, and category concessions may differ by programme or round.',
+      },
+      ageLimit: {
+        summary: 'Most DU undergraduate programmes focus on academic eligibility rather than a strict upper age limit.',
+        points: [
+          'Programme-specific exceptions should be verified from the official information bulletin.',
+          'Category and subject-combination rules are determined by the admission authority.',
+        ],
+      },
+      eligibility: [
+        { title: 'Academic Requirement', description: 'Candidates should satisfy programme-wise class 12 marks, subject mapping, and CUET participation rules published by the university.' },
+        { title: 'Document Readiness', description: 'Keep class 10 and 12 mark sheets, identity proof, category certificate, domicile or EWS documents, and CUET application details ready.' },
+        { title: 'Programme Choice', description: 'Admission is usually guided by programme preference, merit, reservation, and seat availability across colleges.' },
+      ],
+      selectionProcess: ['CUET participation', 'Portal registration', 'Programme preference filling', 'Seat allocation and document verification'],
+      howToApply: [
+        'Read the DU admission bulletin and CUET-linked eligibility notes before registering.',
+        'Complete the admission portal registration with accurate academic, category, and communication details.',
+        'Fill programme / college preferences carefully and preserve all portal acknowledgements for later allocation rounds.',
+      ],
+      importantLinks: [
+        { label: 'Admission Details', href: '/admissions/du-undergraduate-admission-2026-cuet-based', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Admissions', href: '/admissions', emphasis: 'secondary' },
+        { label: 'Scholarships', href: '/scholarship', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('admissions', {
     title: 'JEE Advanced 2026 - Registration Open',
     org: 'IIT Kanpur',
     date: '27 Mar 2026',
     tag: 'hot',
+    detail: {
+      notice: {
+        title: 'JEE Advanced Registration Notice',
+        tone: 'info',
+        body: [
+          'JEE Advanced registration should be completed carefully after checking JEE Main qualification status and category-specific rules.',
+          'Candidates must follow the official information brochure for exam cities, eligibility attempts, and fee categories.',
+        ],
+      },
+      importantDates: [
+        { label: 'Registration Open', date: '27 Mar 2026', status: 'active' },
+        { label: 'Last Date to Apply', date: 'Refer official schedule', status: 'upcoming' },
+        { label: 'Exam Date', date: 'Refer official schedule', status: 'upcoming' },
+      ],
+      applicationFee: {
+        rows: [
+          { label: 'Indian Candidates', value: 'Refer JEE Advanced notice' },
+          { label: 'Foreign / OCI / PIO', value: 'Refer JEE Advanced notice' },
+        ],
+        note: 'Fee varies by category and candidate type; use only the official brochure for final payment rules.',
+      },
+      eligibility: [
+        { title: 'Qualification Path', description: 'Only eligible JEE Main qualified candidates can register, subject to the official attempt and rank rules.' },
+        { title: 'Academic Rule', description: 'Class 12 performance and subject eligibility should be verified from the official JEE Advanced brochure.' },
+      ],
+      selectionProcess: ['JEE Main qualification', 'JEE Advanced registration', 'JEE Advanced examination', 'JoSAA counseling / seat allocation'],
+      howToApply: [
+        'Confirm JEE Main qualification and read the full JEE Advanced brochure before registering.',
+        'Complete registration, pay the applicable fee, and download the confirmation page.',
+        'Track admit card, exam, answer key, and counseling notices through the official portals only.',
+      ],
+      importantLinks: [
+        { label: 'Admission Details', href: '/admissions/jee-advanced-2026-registration-open', emphasis: 'primary', note: 'Canonical detail page' },
+        { label: 'All Admissions', href: '/admissions', emphasis: 'secondary' },
+        { label: 'Scholarships', href: '/scholarship', emphasis: 'muted' },
+      ],
+    },
   }),
   createAnnouncement('admissions', {
     title: 'NEET UG 2026 - Application Form Out',
@@ -2138,6 +3014,17 @@ export function resolveAnnouncementParam(section: AnnouncementSection, param: st
         matchType: 'numeric-legacy' as AnnouncementRouteMatchType,
       }
     : null;
+}
+
+export function resolveAnnouncementAcrossSections(param: string) {
+  for (const section of homePageSectionOrder) {
+    const resolved = resolveAnnouncementParam(section, param);
+    if (resolved) {
+      return { ...resolved, section };
+    }
+  }
+
+  return null;
 }
 
 export function getCategoryMetaBySlug(slug: string) {

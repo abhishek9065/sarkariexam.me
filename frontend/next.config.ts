@@ -13,13 +13,33 @@ const nextConfig: NextConfig = {
           permanent: true,
         }));
 
+        redirects.push({
+          source: `/detail/${item.slug}`,
+          destination,
+          permanent: true,
+        });
+
         if (item.legacyId) {
           redirects.push({
             source: `${basePath}/${item.legacyId}`,
             destination,
             permanent: true,
           });
+
+          redirects.push({
+            source: `/detail/${item.legacyId}`,
+            destination,
+            permanent: true,
+          });
         }
+
+        redirects.push(
+          ...item.legacySlugs.map((legacySlug) => ({
+            source: `/detail/${legacySlug}`,
+            destination,
+            permanent: true,
+          })),
+        );
 
         return redirects;
       }),
