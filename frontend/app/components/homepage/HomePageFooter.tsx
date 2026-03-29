@@ -1,16 +1,13 @@
 'use client';
 
 import {
-  AtSign,
   ArrowRight,
   ChevronRight,
   Clock,
   GraduationCap,
   Heart,
   Mail,
-  MessageCircle,
   MapPin,
-  PlayCircle,
   Phone,
   Send,
   Shield,
@@ -53,10 +50,37 @@ const footerColumns = {
   ],
 } as const;
 
+function TwitterGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M22 5.8c-.7.3-1.5.6-2.3.7.8-.5 1.4-1.2 1.7-2.1-.8.5-1.7.8-2.6 1-1.5-1.6-4-1.7-5.6-.2-1 1-1.5 2.4-1.2 3.8-3-.2-5.8-1.7-7.6-4-.9 1.5-.5 3.5 1 4.6-.6 0-1.2-.2-1.7-.5 0 1.9 1.3 3.5 3.1 3.9-.6.2-1.2.2-1.8.1.5 1.6 2 2.7 3.8 2.8-1.4 1.1-3.1 1.7-4.9 1.7H3c1.8 1.2 4 1.9 6.2 1.9 7.4 0 11.4-6.1 11.4-11.4v-.5c.8-.6 1.5-1.3 2-2.1Z" />
+    </svg>
+  );
+}
+
+function YouTubeGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <rect x="3" y="6" width="18" height="12" rx="4" fill="currentColor" />
+      <path d="M10 9.5 15.5 12 10 14.5Z" fill="white" />
+    </svg>
+  );
+}
+
+function InstagramGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <rect x="4" y="4" width="16" height="16" rx="5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="17" cy="7" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
 const socials = [
-  { icon: MessageCircle, label: 'Twitter', href: buildCommunityPath('twitter'), color: 'hover:bg-sky-500 hover:border-sky-400' },
-  { icon: PlayCircle, label: 'YouTube', href: buildCommunityPath('youtube'), color: 'hover:bg-red-600 hover:border-red-500' },
-  { icon: AtSign, label: 'Instagram', href: buildCommunityPath('instagram'), color: 'hover:bg-pink-600 hover:border-pink-500' },
+  { icon: TwitterGlyph, label: 'Twitter', href: buildCommunityPath('twitter'), color: 'hover:bg-sky-500 hover:border-sky-400' },
+  { icon: YouTubeGlyph, label: 'YouTube', href: buildCommunityPath('youtube'), color: 'hover:bg-red-600 hover:border-red-500' },
+  { icon: InstagramGlyph, label: 'Instagram', href: buildCommunityPath('instagram'), color: 'hover:bg-pink-600 hover:border-pink-500' },
   { icon: Send, label: 'Telegram', href: buildCommunityPath('telegram'), color: 'hover:bg-blue-500 hover:border-blue-400' },
 ] as const;
 
@@ -142,7 +166,7 @@ export function HomePageFooter() {
           <div className="lg:col-span-2">
             <p className="mb-6 text-[13px] leading-[1.8] text-blue-200">
               India&apos;s most trusted platform for Sarkari Naukri alerts, Results, Admit Cards and Answer Keys —
-              covering <span className="text-white">500+ exams</span> across all departments &amp; states.
+              covering <span className="text-white">500+ exams</span>{' '}across all departments &amp; states.
             </p>
 
             <div className="mb-6 space-y-2.5">
