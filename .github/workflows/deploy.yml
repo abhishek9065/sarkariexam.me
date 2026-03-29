@@ -50,7 +50,14 @@ jobs:
           port: ${{ secrets.DO_PORT || 22 }}
           script: |
             set -euo pipefail
-            cd ~/sarkari-result
+            if [ -d ~/sarkariexam.me ]; then
+              cd ~/sarkariexam.me
+            elif [ -d ~/sarkari-result ]; then
+              cd ~/sarkari-result
+            else
+              echo "No deployment checkout found at ~/sarkariexam.me or ~/sarkari-result"
+              exit 1
+            fi
 
             echo "=== Pulling latest code ==="
             git pull --ff-only origin main

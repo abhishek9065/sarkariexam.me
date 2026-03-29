@@ -111,11 +111,19 @@ cleanup_named_containers() {
   remove_conflicting_container "sarkari-backend"
   remove_conflicting_container "sarkari-admin"
   remove_conflicting_container "sarkari-frontend"
+  remove_conflicting_container "sarkari-datadog"
 }
+
+DATADOG_SERVICES=()
+if [[ -n "$(read_env_var "DD_API_KEY")" ]]; then
+  DATADOG_SERVICES+=(datadog-agent)
+else
+  echo "NOTICE: DD_API_KEY not set — skipping Datadog agent startup."
+fi
 
 echo "Starting services..."
 cleanup_named_containers
-dc up -d --force-recreate --remove-orphans nginx backend admin frontend
+dc up -d --force-recreate --remove-orphans nginx backend admin frontend "${DATADOG_SERVICES[@]}"
 
 echo "Container status:"
 dc ps

@@ -98,7 +98,7 @@ npm start
 Use the committed PM2 config from the repository root so the process always starts with the correct working directory:
 
 ```bash
-cd ~/sarkari-result
+cd ~/sarkariexam.me
 npm --prefix frontend run build
 pm2 delete frontend || true
 pm2 start ecosystem.config.cjs --only frontend

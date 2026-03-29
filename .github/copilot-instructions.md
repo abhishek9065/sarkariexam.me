@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-This is a public government jobs and exam updates platform built with TypeScript. The live product surface is the Next.js app in `frontend-v2/`, backed by the Express API in `backend/`. The repository also contains an admin console in `admin-next/`.
+This is a public government jobs and exam updates platform built with TypeScript. The live product surface is the Next.js app in `frontend/`, backed by the Express API in `backend/`. The repository also contains an admin console in `admin-next/`.
 
 ## Architecture
 
-- **Public frontend**: Next.js 16 + React 19 (in `frontend-v2/`)
+- **Public frontend**: Next.js 16 + React 19 (in `frontend/`)
 - **Admin frontend**: Next.js 15 + React 19 (in `admin-next/`)
 - **Backend**: Node.js 22 + Express + TypeScript (in `backend/`)
 - **Database**: MongoDB locally; Azure Cosmos DB (MongoDB API) in production
@@ -23,7 +23,7 @@ This is a public government jobs and exam updates platform built with TypeScript
 - `npm test` — Run Vitest
 - `npm run test:ci` — Run Vitest plus OpenAPI parity checks
 
-### Public Frontend (`cd frontend-v2`)
+### Public Frontend (`cd frontend`)
 - `npm run dev` — Start the Next.js dev server
 - `npm run build` — Production build
 - `npm start` — Run the production server
@@ -47,9 +47,9 @@ backend/src/
 
 backend/tests/      # Additional test setup and integration coverage
 
-frontend-v2/app/    # Public Next.js App Router pages
-frontend-v2/components/
-frontend-v2/lib/
+frontend/app/    # Public Next.js App Router pages
+frontend/components/
+frontend/lib/
 
 admin-next/app/     # Admin Next.js App Router pages
 admin-next/components/
@@ -65,7 +65,7 @@ scripts/            # Deploy and maintenance scripts
 - Use Zod for backend request validation.
 - Keep backend routes under `/api/`.
 - Prefer same-origin API calls from frontend apps unless deployment requires otherwise.
-- Keep repo docs and workflows aligned with the active `backend + frontend-v2 + admin-next + nginx` stack.
+- Keep repo docs and workflows aligned with the active `backend + frontend + admin-next + nginx` stack.
 - Do not document removed legacy apps unless they still exist in the repository.
 
 ## Testing

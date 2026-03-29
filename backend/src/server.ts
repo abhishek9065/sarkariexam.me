@@ -119,8 +119,12 @@ app.use(validateContentType);
 
 // Swagger UI
 try {
-  const openApiPath = path.join(process.cwd(), '../openapi.json');
-  if (fs.existsSync(openApiPath)) {
+  const openApiCandidates = [
+    path.join(process.cwd(), 'openapi.json'),
+    path.join(process.cwd(), '../openapi.json'),
+  ];
+  const openApiPath = openApiCandidates.find((candidate) => fs.existsSync(candidate));
+  if (openApiPath) {
     const openApiParams = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
     app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiParams));
     logger.info('[Server] Swagger UI available at /api/docs');

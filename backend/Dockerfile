@@ -32,6 +32,7 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/openapi.json ./openapi.json
 
 # Copy scripts for seeding (optional)
 COPY --from=builder /app/scripts ./scripts
