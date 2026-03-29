@@ -217,9 +217,9 @@ wait_for_frontend_shell() {
   for ((i=1; i<=attempts; i++)); do
     local ok=1
 
-    check_frontend_route_marker "/" 'Latest Jobs / Online Form' "homepage" || ok=0
-    check_frontend_route_marker "/jobs" 'Government Jobs' "jobs listing" || ok=0
-    check_frontend_route_marker "/results/1" 'UPSC Civil Services 2025 - Final Result' "result detail" || ok=0
+    check_frontend_route_marker "/" 'SarkariExams.me' "homepage" || ok=0
+    check_frontend_route_marker "/jobs" 'Latest Jobs / Online Form' "jobs listing" || ok=0
+    check_frontend_route_marker "/results/upsc-civil-services-2025-final-result" 'UPSC Civil Services 2025 - Final Result' "result detail" || ok=0
 
     if [[ "$ok" -eq 1 ]]; then
       echo "Frontend public routes are rendering correctly."
@@ -231,7 +231,7 @@ wait_for_frontend_shell() {
   done
 
   echo "Timed out waiting for frontend public routes."
-  for route in "/" "/jobs" "/results/1"; do
+  for route in "/" "/jobs" "/results/upsc-civil-services-2025-final-result"; do
     echo "--- ${route} ---"
     dc exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
     echo
