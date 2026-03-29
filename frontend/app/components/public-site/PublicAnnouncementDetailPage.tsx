@@ -65,6 +65,18 @@ export function PublicAnnouncementDetailPage({
 }: PublicAnnouncementDetailPageProps) {
   const theme = detailThemeBySection[item.section];
   const detail = item.detail;
+  const extraSections = detail.extraSections ?? [];
+  const usefulLinks = item.usefulLinks.slice(0, 4);
+  const metaRows = [
+    { label: 'Post / Update Name', value: item.title },
+    { label: 'Organization', value: item.org },
+    { label: 'Category', value: meta.title },
+    { label: 'Published Update', value: item.date },
+    ...(item.postCount ? [{ label: 'Posts / Seats', value: item.postCount }] : []),
+    ...(item.qualification ? [{ label: 'Qualification', value: item.qualification }] : []),
+    { label: 'Short Information', value: item.shortInfo },
+  ];
+
   const navItems = [
     { href: '#short-information', label: 'Short Info' },
     { href: '#overview', label: 'Overview' },
@@ -75,14 +87,15 @@ export function PublicAnnouncementDetailPage({
     detail.vacancyTable?.rows.length ? { href: '#vacancy-details', label: 'Vacancy' } : null,
     detail.selectionProcess?.length ? { href: '#selection-process', label: 'Selection' } : null,
     detail.howToApply?.length ? { href: '#how-to-apply', label: 'How To Apply' } : null,
+    ...extraSections.map((section) => ({ href: `#${section.id}`, label: section.title })),
     detail.importantLinks.length ? { href: '#important-links', label: 'Links' } : null,
     detail.sourceNote ? { href: '#source-note', label: 'Disclaimer' } : null,
   ].filter((itemLink): itemLink is { href: string; label: string } => Boolean(itemLink));
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4">
+    <div className="mx-auto max-w-[1180px] bg-[#faf7f2] px-3 py-4 md:px-4">
       <section
-        className="overflow-hidden rounded-[28px] text-white shadow-2xl"
+        className="overflow-hidden rounded-[22px] border border-[#243372] text-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]"
         style={{ background: theme.gradient }}
       >
         <div className="border-b border-white/10 px-5 py-3 text-[11px] font-semibold tracking-[0.14em] text-white/75">
@@ -100,7 +113,7 @@ export function PublicAnnouncementDetailPage({
         </div>
 
         <div className="px-5 py-6 md:px-6 md:py-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="grid gap-5 lg:grid-cols-[1.5fr_0.78fr]">
             <div className="max-w-4xl">
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">
                 {detail.eyebrow}
@@ -126,23 +139,79 @@ export function PublicAnnouncementDetailPage({
                 </span>
               </div>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-white/85">{item.summary}</p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {detail.heroStats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm"
+                  >
+                    <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/70">
+                      {stat.label}
+                    </div>
+                    <div className="mt-1 text-lg font-extrabold text-white">{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {usefulLinks.length ? (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {usefulLinks.map((link) => (
+                    <Link
+                      key={`${link.href}-${link.label}`}
+                      href={link.href}
+                      className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-white/15"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
-            <DetailClientActions title={item.title} />
-          </div>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {detail.heroStats.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm"
-              >
-                <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/70">
-                  {stat.label}
-                </div>
-                <div className="mt-1 text-lg font-extrabold text-white">{stat.value}</div>
+            <div className="rounded-[20px] border border-white/15 bg-white/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/75">
+                Update Snapshot
               </div>
-            ))}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                {metaRows.slice(0, 5).map((row) => (
+                  <div
+                    key={`${row.label}-${row.value}`}
+                    className="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5"
+                  >
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/65">
+                      {row.label}
+                    </div>
+                    <div className="mt-1 text-sm font-semibold leading-6 text-white">
+                      {row.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <DetailClientActions title={item.title} />
+                <p className="mt-3 text-xs leading-6 text-white/75">
+                  Verify every instruction, PDF notice, and date from the official authority before taking action.
+                </p>
+                {detail.cta ? (
+                  <Link
+                    href={detail.cta.primaryHref}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#ff8a3d,#bf360c)] px-4 py-3 text-sm font-bold text-white"
+                  >
+                    {detail.cta.primaryLabel}
+                    <ExternalLink size={15} />
+                  </Link>
+                ) : null}
+                {detail.cta?.secondaryHref && detail.cta.secondaryLabel ? (
+                  <Link
+                    href={detail.cta.secondaryHref}
+                    className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/15"
+                  >
+                    {detail.cta.secondaryLabel}
+                  </Link>
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -150,31 +219,32 @@ export function PublicAnnouncementDetailPage({
       <div className="mt-4 space-y-4">
         <DetailStickyNav items={navItems} />
 
-        <div className="grid gap-4 lg:grid-cols-[1.7fr_0.92fr]">
+        <div className="grid gap-4 lg:grid-cols-[1.72fr_0.9fr]">
           <div className="space-y-4">
             {detail.notice ? <DetailNoticeBox notice={detail.notice} /> : null}
 
             <div id="short-information" className="scroll-mt-[140px]">
-              <DetailSectionCard title="Short Information" eyebrow={meta.eyebrow} icon={<ClipboardList size={16} />}>
-                <DetailKeyValueGrid
-                  rows={[
-                    { label: 'Headline', value: item.headline },
-                    { label: 'Update Note', value: item.shortInfo },
-                    { label: 'Summary', value: item.summary },
-                  ]}
-                />
+              <DetailSectionCard
+                title="Short Information"
+                eyebrow={meta.eyebrow}
+                icon={<ClipboardList size={16} />}
+              >
+                <DetailKeyValueGrid rows={metaRows} />
               </DetailSectionCard>
             </div>
 
             <div id="overview" className="scroll-mt-[140px]">
-              <DetailSectionCard title={detail.overviewTitle ?? 'Overview'} icon={<FileText size={16} />}>
-                <div className="space-y-4 px-5 py-4 text-sm leading-7 text-gray-700">
+              <DetailSectionCard
+                title={detail.overviewTitle ?? 'Overview'}
+                icon={<FileText size={16} />}
+              >
+                <div className="space-y-4 px-4 py-4 text-sm leading-7 text-gray-700 sm:px-5">
                   <p>{item.summary}</p>
                   <div className="grid gap-3 md:grid-cols-2">
                     {item.keyPoints.map((point) => (
                       <div
                         key={point}
-                        className="flex items-start gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3"
+                        className="flex items-start gap-2 rounded-xl border border-[#e7e7e7] bg-[#fffdfb] px-3 py-3"
                       >
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
                         <p>{point}</p>
@@ -188,14 +258,29 @@ export function PublicAnnouncementDetailPage({
             {detail.importantDates.length ? (
               <div id="important-dates" className="scroll-mt-[140px]">
                 <DetailSectionCard title="Important Dates" icon={<Calendar size={16} />}>
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-[#ece5df]">
                     {detail.importantDates.map((row) => (
                       <div
                         key={`${row.label}-${row.date}`}
-                        className="grid gap-2 px-5 py-3 sm:grid-cols-[1.3fr_1fr]"
+                        className="grid gap-3 px-4 py-3 sm:px-5 sm:grid-cols-[1.3fr_1fr_auto]"
                       >
                         <div className="text-sm font-semibold text-gray-800">{row.label}</div>
                         <div className="text-sm font-bold text-[#bf360c] sm:text-right">{row.date}</div>
+                        {row.status ? (
+                          <div className="sm:text-right">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                                row.status === 'done'
+                                  ? 'bg-green-50 text-green-700'
+                                  : row.status === 'active'
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {row.status}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -211,7 +296,7 @@ export function PublicAnnouncementDetailPage({
                 >
                   <DetailKeyValueGrid rows={detail.applicationFee.rows} />
                   {detail.applicationFee.note ? (
-                    <div className="border-t border-gray-100 px-5 py-3 text-[12px] leading-6 text-gray-500">
+                    <div className="border-t border-[#ece5df] px-4 py-3 text-[12px] leading-6 text-gray-500 sm:px-5">
                       {detail.applicationFee.note}
                     </div>
                   ) : null}
@@ -222,7 +307,7 @@ export function PublicAnnouncementDetailPage({
             {detail.ageLimit ? (
               <div id="age-limit" className="scroll-mt-[140px]">
                 <DetailSectionCard title="Age Limit" icon={<Shield size={16} />}>
-                  <div className="space-y-3 px-5 py-4 text-sm leading-7 text-gray-700">
+                  <div className="space-y-3 px-4 py-4 text-sm leading-7 text-gray-700 sm:px-5">
                     <p className="font-semibold text-gray-800">{detail.ageLimit.summary}</p>
                     {detail.ageLimit.points.map((point) => (
                       <div key={point} className="flex items-start gap-2">
@@ -238,11 +323,11 @@ export function PublicAnnouncementDetailPage({
             {detail.eligibility.length ? (
               <div id="eligibility" className="scroll-mt-[140px]">
                 <DetailSectionCard title="Eligibility Details" icon={<GraduationCap size={16} />}>
-                  <div className="grid gap-3 px-5 py-4 md:grid-cols-2">
+                  <div className="grid gap-3 px-4 py-4 md:grid-cols-2 sm:px-5">
                     {detail.eligibility.map((block) => (
                       <div
                         key={block.title}
-                        className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+                        className="rounded-xl border border-[#e7e7e7] bg-[#fffdfb] px-4 py-3"
                       >
                         <h3 className="text-[13px] font-extrabold text-gray-800">{block.title}</h3>
                         <p className="mt-2 text-sm leading-7 text-gray-700">{block.description}</p>
@@ -264,11 +349,11 @@ export function PublicAnnouncementDetailPage({
             {detail.selectionProcess?.length ? (
               <div id="selection-process" className="scroll-mt-[140px]">
                 <DetailSectionCard title="Selection Process" icon={<UserCheck size={16} />}>
-                  <div className="space-y-3 px-5 py-4">
+                  <div className="space-y-3 px-4 py-4 sm:px-5">
                     {detail.selectionProcess.map((step, index) => (
                       <div
                         key={step}
-                        className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3"
+                        className="flex items-start gap-3 rounded-xl border border-[#e7e7e7] bg-[#fffdfb] px-4 py-3"
                       >
                         <span
                           className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold ${theme.accentSoft}`}
@@ -286,12 +371,10 @@ export function PublicAnnouncementDetailPage({
             {detail.howToApply?.length ? (
               <div id="how-to-apply" className="scroll-mt-[140px]">
                 <DetailSectionCard title="How To Apply / Use This Update" icon={<Newspaper size={16} />}>
-                  <div className="space-y-3 px-5 py-4">
+                  <div className="space-y-3 px-4 py-4 sm:px-5">
                     {detail.howToApply.map((step, index) => (
                       <div key={step} className="flex items-start gap-3">
-                        <span
-                          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1a237e] text-[11px] font-bold text-white"
-                        >
+                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1a237e] text-[11px] font-bold text-white">
                           {index + 1}
                         </span>
                         <p className="text-sm leading-7 text-gray-700">{step}</p>
@@ -301,6 +384,33 @@ export function PublicAnnouncementDetailPage({
                 </DetailSectionCard>
               </div>
             ) : null}
+
+            {extraSections.map((section) => (
+              <div key={section.id} id={section.id} className="scroll-mt-[140px]">
+                <DetailSectionCard
+                  title={section.title}
+                  eyebrow={section.eyebrow}
+                  icon={<FileText size={16} />}
+                >
+                  <div className="space-y-4 px-4 py-4 text-sm leading-7 text-gray-700 sm:px-5">
+                    {section.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                    {section.points?.length ? (
+                      <div className="space-y-3">
+                        {section.points.map((point) => (
+                          <div
+                            key={point}
+                            className="flex items-start gap-2 rounded-xl border border-[#e7e7e7] bg-[#fffdfb] px-3 py-3"
+                          >
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
+                            <p>{point}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </DetailSectionCard>
+              </div>
+            ))}
 
             {detail.importantLinks.length ? (
               <div id="important-links" className="scroll-mt-[140px]">
@@ -313,7 +423,9 @@ export function PublicAnnouncementDetailPage({
             {detail.sourceNote ? (
               <div id="source-note" className="scroll-mt-[140px]">
                 <DetailSectionCard title="Important Disclaimer / Source Note" icon={<Shield size={16} />}>
-                  <div className="px-5 py-4 text-sm leading-7 text-gray-700">{detail.sourceNote}</div>
+                  <div className="px-4 py-4 text-sm leading-7 text-gray-700 sm:px-5">
+                    {detail.sourceNote}
+                  </div>
                 </DetailSectionCard>
               </div>
             ) : null}
@@ -322,7 +434,7 @@ export function PublicAnnouncementDetailPage({
           <div className="space-y-4 lg:sticky lg:top-[140px] lg:self-start">
             {detail.cta ? (
               <div
-                className="overflow-hidden rounded-2xl text-white shadow-lg"
+                className="overflow-hidden rounded-[18px] border border-[#243372] text-white shadow-lg"
                 style={{ background: theme.gradient }}
               >
                 <div className="p-5">
@@ -354,7 +466,7 @@ export function PublicAnnouncementDetailPage({
 
             {detail.importantDates.length ? (
               <DetailSidebarCard title="Important Dates">
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-[#ece5df]">
                   {detail.importantDates.slice(0, 5).map((row) => (
                     <div key={`${row.label}-${row.date}`} className="grid gap-1 px-4 py-3">
                       <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-gray-500">
@@ -362,6 +474,23 @@ export function PublicAnnouncementDetailPage({
                       </div>
                       <div className="text-sm font-bold text-[#bf360c]">{row.date}</div>
                     </div>
+                  ))}
+                </div>
+              </DetailSidebarCard>
+            ) : null}
+
+            {usefulLinks.length ? (
+              <DetailSidebarCard title="Useful Resources">
+                <div className="space-y-2 p-4">
+                  {usefulLinks.map((link) => (
+                    <Link
+                      key={`${link.href}-${link.label}`}
+                      href={link.href}
+                      className="flex items-center justify-between rounded-xl border border-[#e7e7e7] bg-[#fffdfb] px-3 py-3 text-sm font-semibold text-[#374151] transition-colors hover:border-[#f1ccb6] hover:bg-[#fff7f1] hover:text-[#bf360c]"
+                    >
+                      <span>{link.label}</span>
+                      <ExternalLink size={14} />
+                    </Link>
                   ))}
                 </div>
               </DetailSidebarCard>

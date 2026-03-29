@@ -16,7 +16,7 @@ export function DetailImportantLinksGrid({
   links: DetailImportantLink[];
 }) {
   return (
-    <div className="grid gap-3 p-5 md:grid-cols-2">
+    <div className="grid gap-3 p-4 sm:p-5 md:grid-cols-2">
       {links.map((link) => {
         const emphasis = link.emphasis ?? 'muted';
 
@@ -24,7 +24,7 @@ export function DetailImportantLinksGrid({
           <Link
             key={`${link.label}-${link.href}`}
             href={link.href}
-            className={`rounded-xl border px-4 py-3 transition-colors ${emphasisClasses[emphasis]}`}
+            className={`rounded-[16px] border px-4 py-3 transition-colors ${emphasisClasses[emphasis]}`}
           >
             <div className="text-sm font-bold">{link.label}</div>
             {link.note ? <div className="mt-1 text-[11px] opacity-80">{link.note}</div> : null}

@@ -1,8 +1,6 @@
-'use client';
-
-import { Send } from 'lucide-react';
-import { useState } from 'react';
-import type { AnnouncementDetailContent } from '@/app/lib/public-content';
+import { BellRing, MessageCircleMore } from 'lucide-react';
+import Link from 'next/link';
+import { buildCommunityPath, type AnnouncementDetailContent } from '@/app/lib/public-content';
 import { DetailSidebarCard } from './DetailSidebarCard';
 
 export function DetailSubscribeCard({
@@ -10,49 +8,30 @@ export function DetailSubscribeCard({
 }: {
   prompt: AnnouncementDetailContent['subscribePrompt'];
 }) {
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
   if (!prompt) {
     return null;
-  }
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!email.trim()) {
-      return;
-    }
-
-    setSubmitted(true);
-    setEmail('');
   }
 
   return (
     <DetailSidebarCard title={prompt.title}>
       <div className="space-y-3 p-4">
         <p className="text-sm leading-7 text-gray-600">{prompt.description}</p>
-        {submitted ? (
-          <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
-            Alert preference captured for this browser session.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-2">
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="your@email.com"
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none transition-colors focus:border-orange-300"
-            />
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-xl bg-[linear-gradient(135deg,#e65100,#bf360c)] px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-95"
-            >
-              <Send size={14} />
-              {prompt.buttonLabel}
-            </button>
-          </form>
-        )}
+        <div className="grid gap-2">
+          <Link
+            href={buildCommunityPath('telegram')}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#e65100,#bf360c)] px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-95"
+          >
+            <BellRing size={14} />
+            {prompt.buttonLabel}
+          </Link>
+          <Link
+            href={buildCommunityPath('whatsapp')}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-[#f8fafc] px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-[#f1ccb6] hover:bg-[#fff7f1] hover:text-[#bf360c]"
+          >
+            <MessageCircleMore size={14} />
+            WhatsApp Channel
+          </Link>
+        </div>
       </div>
     </DetailSidebarCard>
   );

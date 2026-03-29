@@ -8,9 +8,11 @@ const toneClasses = {
 
 export function DetailNoticeBox({ notice }: { notice: DetailNotice }) {
   return (
-    <div className={`rounded-2xl border px-5 py-4 ${toneClasses[notice.tone]}`}>
-      <h3 className="text-[13px] font-extrabold uppercase tracking-[0.12em]">{notice.title}</h3>
-      <div className="mt-2 space-y-2 text-sm leading-7">
+    <div className={`overflow-hidden rounded-[18px] border shadow-sm ${toneClasses[notice.tone]}`}>
+      <div className="border-b border-current/10 px-4 py-3">
+        <h3 className="text-[12px] font-extrabold uppercase tracking-[0.14em]">{notice.title}</h3>
+      </div>
+      <div className="space-y-2 px-4 py-4 text-sm leading-7 sm:px-5">
         {notice.body.map((line) => (
           <p key={line}>{line}</p>
         ))}

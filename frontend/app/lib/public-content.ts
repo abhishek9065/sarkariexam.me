@@ -104,6 +104,14 @@ export interface DetailImportantLink {
   note?: string;
 }
 
+export interface DetailExtraSection {
+  eyebrow?: string;
+  id: string;
+  paragraphs?: string[];
+  points?: string[];
+  title: string;
+}
+
 export interface AnnouncementDetailContent {
   ageLimit?: DetailAgeLimit;
   applicationFee?: {
@@ -117,6 +125,7 @@ export interface AnnouncementDetailContent {
     secondaryHref?: string;
     secondaryLabel?: string;
   };
+  extraSections?: DetailExtraSection[];
   eligibility: DetailEligibilityBlock[];
   eyebrow: string;
   heroStats: PublicStat[];
@@ -616,6 +625,7 @@ function mergeAnnouncementDetail(
     howToApply: override.howToApply ?? baseDetail.howToApply,
     importantLinks: override.importantLinks ?? baseDetail.importantLinks,
     relatedLinkOverrides: override.relatedLinkOverrides ?? baseDetail.relatedLinkOverrides,
+    extraSections: override.extraSections ?? baseDetail.extraSections,
   };
 }
 
@@ -2171,6 +2181,32 @@ const resultAnnouncements: AnnouncementItem[] = [
         { label: 'View Final Result', href: '/results/upsc-civil-services-2025-final-result', emphasis: 'primary', note: 'Canonical detail page' },
         { label: 'Latest Results', href: '/results', emphasis: 'secondary' },
         { label: 'Homepage', href: '/', emphasis: 'muted' },
+      ],
+      extraSections: [
+        {
+          id: 'result-publication-process',
+          eyebrow: 'Result Workflow',
+          title: 'Result Publication Process',
+          paragraphs: [
+            'The UPSC Civil Services final result follows completion of the prelims, mains, and personality test stages. Final recommendation is prepared after interview assessment and service-wise vacancy reconciliation.',
+            'Candidates should treat the official PDF and later marks or cut-off publications as the final source for merit position and service-allocation updates.',
+          ],
+          points: [
+            'Verify roll number and name carefully in the published final list.',
+            'Track marks, reserve list, and service allocation notices separately on the UPSC portal.',
+            'Keep all original certificates and interview-stage records ready for any subsequent document scrutiny.',
+          ],
+        },
+        {
+          id: 'documents-required',
+          eyebrow: 'Candidate Readiness',
+          title: 'Documents / Records To Keep Ready',
+          points: [
+            'Result PDF copy and roll-number records used during the examination cycle.',
+            'Educational qualification documents, identity proof, and category certificates matching the application data.',
+            'Domicile, service preference, and other supporting papers if sought during allocation or verification.',
+          ],
+        },
       ],
       sourceNote:
         'UPSC remains the only authoritative source for the final result PDF, marks, cut-off, reserve-list publication, and any further service-allocation or verification instructions.',

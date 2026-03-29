@@ -14,21 +14,21 @@ export function DetailSectionCard({
   title,
 }: DetailSectionCardProps) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-orange-100 bg-[linear-gradient(90deg,#fff8f5_0%,#ffffff_100%)] px-5 py-3.5">
-        <div className="flex items-center gap-3">
+    <section className="overflow-hidden rounded-[18px] border border-[#d7d7d7] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+      <div className="border-b border-[#f1ccb6] bg-[linear-gradient(90deg,#fff3eb_0%,#fffaf6_52%,#ffffff_100%)] px-4 py-3.5 sm:px-5">
+        <div className="flex items-start gap-3">
           {icon ? (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-[#e65100]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#efc1a4] bg-[#fff3eb] text-[#bf360c] shadow-sm">
               {icon}
             </div>
           ) : null}
           <div>
             {eyebrow ? (
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#bf360c]/75">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#bf360c]/80">
                 {eyebrow}
               </p>
             ) : null}
-            <h2 className="text-[15px] font-extrabold text-gray-800">{title}</h2>
+            <h2 className="text-[15px] font-black text-[#1f2937] sm:text-base">{title}</h2>
           </div>
         </div>
       </div>
