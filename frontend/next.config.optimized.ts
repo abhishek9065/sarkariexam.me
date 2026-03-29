@@ -10,9 +10,7 @@ const singularAliasPathMap = {
 const nextConfig: NextConfig = {
   // Build optimizations for faster deployments
   experimental: {
-    // Use SWC minifier for faster builds
-    swcMinify: true,
-    // Enable optimized package imports
+    // Enable optimized package imports for faster builds
     optimizePackageImports: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
   },
   
