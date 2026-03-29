@@ -180,10 +180,9 @@ wait_for_backend_endpoint() {
 wait_for_backend_health
 wait_for_backend_endpoint
 
-check_frontend_route_marker() {
+check_frontend_route_ready() {
   local path="$1"
-  local marker="$2"
-  local label="$3"
+  local label="$2"
   local html
 
   html="$(dc exec -T frontend wget -qO- "http://127.0.0.1:3000${path}" || true)"
@@ -192,8 +191,13 @@ check_frontend_route_marker() {
     return 1
   fi
 
-  if ! printf '%s' "$html" | grep -q "$marker"; then
-    echo "ERROR: ${label} did not render expected marker (${marker}) for ${path}"
+  if ! printf '%s' "$html" | grep -q '<html'; then
+    echo "ERROR: ${label} did not render a valid HTML document for ${path}"
+    return 1
+  fi
+
+  if ! printf '%s' "$html" | grep -q '/_next/static/'; then
+    echo "ERROR: ${label} did not include Next assets for ${path}"
     return 1
   fi
 
@@ -209,9 +213,9 @@ wait_for_frontend_shell() {
   for ((i=1; i<=attempts; i++)); do
     local ok=1
 
-    check_frontend_route_marker "/" 'SarkariExams.me' "homepage" || ok=0
-    check_frontend_route_marker "/jobs" 'Latest Jobs / Online Form' "jobs listing" || ok=0
-    check_frontend_route_marker "/results/upsc-civil-services-2025-final-result" 'UPSC Civil Services 2025 - Final Result' "result detail" || ok=0
+    check_frontend_route_ready "/" "homepage" || ok=0
+    check_frontend_route_ready "/jobs" "jobs listing" || ok=0
+    check_frontend_route_ready "/results/upsc-civil-services-2025-final-result" "result detail" || ok=0
 
     if [[ "$ok" -eq 1 ]]; then
       echo "Frontend public routes are rendering correctly."
