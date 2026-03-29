@@ -100,8 +100,9 @@ const nextConfig: NextConfig = {
   // Redirects (cached for faster computation)
   async redirects() {
     // Cache the redirects computation result
-    if (nextConfig._cachedRedirects) {
-      return nextConfig._cachedRedirects;
+    const cachedRedirects = (nextConfig as any)._cachedRedirects;
+    if (cachedRedirects) {
+      return cachedRedirects;
     }
     
     const redirects = (Object.keys(announcementItemsBySection) as Array<keyof typeof announcementItemsBySection>).flatMap((section) =>
