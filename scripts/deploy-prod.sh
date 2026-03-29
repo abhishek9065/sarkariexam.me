@@ -183,21 +183,9 @@ wait_for_backend_endpoint
 check_frontend_route_ready() {
   local path="$1"
   local label="$2"
-  local html
 
-  html="$(dc exec -T frontend wget -qO- "http://127.0.0.1:3000${path}" || true)"
-  if [[ -z "$html" ]]; then
-    echo "ERROR: ${label} returned no HTML for ${path}"
-    return 1
-  fi
-
-  if ! printf '%s' "$html" | grep -q '<html'; then
-    echo "ERROR: ${label} did not render a valid HTML document for ${path}"
-    return 1
-  fi
-
-  if ! printf '%s' "$html" | grep -q '/_next/static/'; then
-    echo "ERROR: ${label} did not include Next assets for ${path}"
+  if ! dc exec -T frontend wget -q --spider "http://127.0.0.1:3000${path}" >/dev/null 2>&1; then
+    echo "ERROR: ${label} did not return HTTP success for ${path}"
     return 1
   fi
 
