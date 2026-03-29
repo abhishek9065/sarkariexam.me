@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   description: 'Get latest Sarkari Result, Government Jobs, Admit Card, Answer Key, Syllabus and Admission updates for 2025.',
   keywords: 'sarkari result, sarkari naukri, government jobs, admit card, answer key, syllabus',
   manifest: '/manifest.json',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

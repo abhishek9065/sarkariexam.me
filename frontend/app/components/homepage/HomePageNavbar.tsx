@@ -193,6 +193,7 @@ export function HomePageNavbar() {
               </div>
             </Link>
 
+            {/* Desktop Search and Buttons */}
             <div className="hidden flex-1 items-center justify-end gap-2.5 md:flex">
               <form
                 onSubmit={handleSearchSubmit}
@@ -317,6 +318,21 @@ export function HomePageNavbar() {
             </div>
 
             <div className="flex items-center gap-2 md:hidden" data-mobile-menu>
+              {/* Mobile Notification Bell */}
+              <button
+                type="button"
+                onClick={() => setIsNotificationOpen((current) => !current)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14"
+                aria-label="Toggle notifications"
+                title="Notifications"
+              >
+                <Bell size={14} />
+                <span
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-[#0d1b6e] animate-pulse"
+                  style={{ background: 'linear-gradient(135deg,#ff5252,#c62828)' }}
+                />
+              </button>
+
               {isLoggedIn ? (
                 <button
                   type="button"
@@ -569,6 +585,83 @@ export function HomePageNavbar() {
             </div>
           </div>
         )}
+
+        {/* Mobile Notification Dropdown - positioned outside hamburger menu */}
+        {isNotificationOpen && (
+          <div className="absolute right-4 top-20 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5 md:hidden">
+            <div className="flex items-center justify-between bg-gradient-to-r from-[#0d1b6e] to-[#1565c0] px-3.5 py-2.5">
+              <span className="text-[12px] font-bold text-white">Notifications</span>
+              <span className="rounded-full bg-[#e53935] px-1.5 py-0.5 text-[9px] font-extrabold text-white">
+                3 NEW
+              </span>
+            </div>
+            {notifications.map((notification, index) => (
+              <div
+                key={notification}
+                className="flex cursor-pointer items-start gap-2.5 border-b border-gray-50 px-3.5 py-2.5 transition-colors hover:bg-blue-50"
+                onClick={() => {
+                  console.log('Mobile notification clicked:', notification);
+                  setIsNotificationOpen(false);
+                }}
+              >
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
+                <span className="text-[12px] text-gray-700">{notification}</span>
+              </div>
+            ))}
+            <div className="bg-gray-50 px-3.5 py-2.5 text-center">
+              <Link 
+                href={homePageLinks.results} 
+                className="text-[11px] font-semibold text-[#1a237e] hover:underline"
+                onClick={() => setIsNotificationOpen(false)}
+              >
+                View all notifications →
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile User Dropdown - positioned outside hamburger menu */}
+        {isUserMenuOpen && isLoggedIn && (
+          <div className="absolute right-4 top-20 z-[9999] w-[200px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 md:hidden">
+            <div className="border-b border-gray-100 px-4 py-3">
+              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+              <p className="text-xs text-gray-500">{user?.email}</p>
+              {isAdmin && (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                  <Shield size={12} />
+                  Admin
+                </span>
+              )}
+            </div>
+            
+            {isAdmin && (
+              <>
+                <a
+                  href={ADMIN_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-100"
+                  onClick={() => setIsUserMenuOpen(false)}
+                >
+                  <Settings size={16} />
+                  Admin Dashboard
+                </a>
+              </>
+            )}
+            
+            <button
+              onClick={() => {
+                logout();
+                setIsUserMenuOpen(false);
+              }}
+              className="flex w-full items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-red-50"
+            >
+              <LogOut size={16} />
+              Sign Out
+            </button>
+          </div>
+        )}
+
       </header>
     </>
   );
