@@ -97,11 +97,31 @@ export interface DetailVacancyTable {
   rows: DetailVacancyRow[];
 }
 
+export type DetailImportantLinkType =
+  | 'apply'
+  | 'download'
+  | 'website'
+  | 'disabled'
+  | 'result'
+  | 'category'
+  | 'resource';
+
+export type DetailImportantLinkIcon =
+  | 'apply'
+  | 'pdf'
+  | 'doc'
+  | 'web'
+  | 'card'
+  | 'result'
+  | 'link';
+
 export interface DetailImportantLink {
   emphasis?: DetailLinkEmphasis;
   href: string;
+  icon?: DetailImportantLinkIcon;
   label: string;
   note?: string;
+  type?: DetailImportantLinkType;
 }
 
 export interface DetailExtraSection {
@@ -109,6 +129,64 @@ export interface DetailExtraSection {
   id: string;
   paragraphs?: string[];
   points?: string[];
+  title: string;
+}
+
+export interface DetailThemeTokens {
+  accent: string;
+  gradientFrom: string;
+  gradientTo: string;
+  sidebarFrom?: string;
+  sidebarTo?: string;
+}
+
+export interface DetailEngagement {
+  comments: number;
+  likes: string;
+  views: string;
+}
+
+export interface DetailSummaryMeta {
+  ageLimit?: string;
+  applicationStartDate: string;
+  examDate: string;
+  lastDate: string;
+  location: string;
+  orgShort: string;
+  publishedDate: string;
+  salary: string;
+}
+
+export interface DetailQaAnswer {
+  author: string;
+  avatarColor: string;
+  id: number;
+  initials: string;
+  isBest?: boolean;
+  liked?: boolean;
+  likes: number;
+  text: string;
+  time: string;
+}
+
+export interface DetailQaQuestion {
+  answers: DetailQaAnswer[];
+  author: string;
+  avatarColor: string;
+  id: number;
+  initials: string;
+  liked?: boolean;
+  likes: number;
+  text: string;
+  time: string;
+}
+
+export interface DetailRelatedPost {
+  category: string;
+  date: string;
+  href: string;
+  posts?: string;
+  tag?: LinkItemTag;
   title: string;
 }
 
@@ -125,6 +203,7 @@ export interface AnnouncementDetailContent {
     secondaryHref?: string;
     secondaryLabel?: string;
   };
+  engagement: DetailEngagement;
   extraSections?: DetailExtraSection[];
   eligibility: DetailEligibilityBlock[];
   eyebrow: string;
@@ -134,6 +213,8 @@ export interface AnnouncementDetailContent {
   importantLinks: DetailImportantLink[];
   notice?: DetailNotice;
   overviewTitle?: string;
+  qa: DetailQaQuestion[];
+  relatedPosts: DetailRelatedPost[];
   relatedLinkOverrides?: QuickLink[];
   selectionProcess?: string[];
   sourceNote?: string;
@@ -142,6 +223,8 @@ export interface AnnouncementDetailContent {
     description: string;
     title: string;
   };
+  summaryMeta: DetailSummaryMeta;
+  theme?: DetailThemeTokens;
   vacancyTable?: DetailVacancyTable;
 }
 
@@ -374,6 +457,298 @@ function getSectionNoticeTone(section: AnnouncementSection): DetailNoticeTone {
   }
 }
 
+const defaultDetailThemeBySection: Record<AnnouncementSection, DetailThemeTokens> = {
+  jobs: {
+    accent: '#e65100',
+    gradientFrom: '#1a237e',
+    gradientTo: '#283593',
+    sidebarFrom: '#1a237e',
+    sidebarTo: '#bf360c',
+  },
+  results: {
+    accent: '#c62828',
+    gradientFrom: '#b71c1c',
+    gradientTo: '#c62828',
+    sidebarFrom: '#b71c1c',
+    sidebarTo: '#1a237e',
+  },
+  'admit-cards': {
+    accent: '#6a1b9a',
+    gradientFrom: '#311b92',
+    gradientTo: '#6a1b9a',
+    sidebarFrom: '#311b92',
+    sidebarTo: '#283593',
+  },
+  'answer-keys': {
+    accent: '#00695c',
+    gradientFrom: '#004d40',
+    gradientTo: '#00695c',
+    sidebarFrom: '#004d40',
+    sidebarTo: '#1565c0',
+  },
+  admissions: {
+    accent: '#ad1457',
+    gradientFrom: '#880e4f',
+    gradientTo: '#ad1457',
+    sidebarFrom: '#880e4f',
+    sidebarTo: '#6a1b9a',
+  },
+};
+
+const qaAvatarPalette = ['#1565c0', '#2e7d32', '#6a1b9a', '#e65100', '#880e4f', '#00695c'] as const;
+
+function hashString(value: string) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+
+  return Math.abs(hash);
+}
+
+function getSeededNumber(seed: string, min: number, max: number) {
+  const spread = max - min + 1;
+  return min + (hashString(seed) % spread);
+}
+
+function formatIndianNumber(value: number) {
+  return new Intl.NumberFormat('en-IN').format(value);
+}
+
+function getInitials(name: string) {
+  const parts = name
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+}
+
+function inferOrgShort(org: string) {
+  const trimmed = org.trim();
+
+  if (!trimmed) {
+    return 'ORG';
+  }
+
+  if (/^[A-Z0-9&.\- ]{2,10}$/.test(trimmed)) {
+    return trimmed.replace(/\s+/g, '');
+  }
+
+  return trimmed
+    .split(/\s+/)
+    .map((part) => part.replace(/[^A-Za-z0-9]/g, ''))
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+}
+
+function formatSlugLabel(value: string) {
+  return value
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function inferLocation(stateSlugs: string[] = []) {
+  if (!stateSlugs.length || stateSlugs.includes(ALL_INDIA)) {
+    return 'All India';
+  }
+
+  return stateSlugs.map(formatSlugLabel).join(', ');
+}
+
+function findDateValue(rows: DetailDateRow[], pattern: RegExp) {
+  return rows.find((row) => pattern.test(row.label))?.date;
+}
+
+function getPrimaryLinkMeta(section: AnnouncementSection): Pick<DetailImportantLink, 'type' | 'icon'> {
+  switch (section) {
+    case 'results':
+      return { type: 'result', icon: 'result' };
+    case 'admit-cards':
+      return { type: 'download', icon: 'card' };
+    case 'answer-keys':
+      return { type: 'download', icon: 'doc' };
+    case 'admissions':
+      return { type: 'apply', icon: 'apply' };
+    default:
+      return { type: 'apply', icon: 'apply' };
+  }
+}
+
+function getDefaultSalary(section: AnnouncementSection, seed: AnnouncementSeed) {
+  if (section === 'results') {
+    return 'Refer original notification';
+  }
+
+  if (section === 'admit-cards') {
+    return 'Not applicable';
+  }
+
+  if (section === 'answer-keys') {
+    return 'Objection fee as per notice';
+  }
+
+  return seed.qualification ? `${seed.qualification} level posts` : 'Refer official notice';
+}
+
+function getDefaultSummaryMeta(
+  section: AnnouncementSection,
+  seed: AnnouncementSeed,
+  baseDates: DetailDateRow[],
+): DetailSummaryMeta {
+  const publishedDate = seed.date;
+  const lastDate =
+    findDateValue(baseDates, /last date|closing date|deadline|status|registration/i) ??
+    (section === 'results' || section === 'admit-cards' || section === 'answer-keys' ? publishedDate : 'Refer official notice');
+  const applicationStartDate =
+    findDateValue(baseDates, /application begin|application start|registration start|homepage update/i) ?? publishedDate;
+  const examDate =
+    findDateValue(baseDates, /exam|interview|verification|window|result declared|document released|answer key released/i) ??
+    (section === 'results' ? 'Completed' : 'Refer official notice');
+
+  return {
+    orgShort: inferOrgShort(seed.org),
+    location: inferLocation(seed.stateSlugs),
+    salary: getDefaultSalary(section, seed),
+    lastDate,
+    applicationStartDate,
+    examDate,
+    publishedDate,
+    ageLimit:
+      section === 'results' || section === 'admit-cards' || section === 'answer-keys'
+        ? 'Refer original notice'
+        : 'Refer official notice',
+  };
+}
+
+function getDefaultEngagement(section: AnnouncementSection, seed: AnnouncementSeed): DetailEngagement {
+  const views = getSeededNumber(`${section}:${seed.title}:views`, 180000, 980000);
+  const likes = Math.max(2400, Math.round(views * (section === 'results' ? 0.05 : 0.035)));
+  const comments = Math.max(96, Math.round(likes * 0.04));
+
+  return {
+    views: formatIndianNumber(views),
+    likes: formatIndianNumber(likes),
+    comments,
+  };
+}
+
+function buildDefaultQa(section: AnnouncementSection, seed: AnnouncementSeed, summaryMeta: DetailSummaryMeta): DetailQaQuestion[] {
+  const primaryAuthor = section === 'results' ? 'Rahul Sharma' : 'Priya Verma';
+  const secondaryAuthor = section === 'jobs' ? 'Amit Kumar' : 'Neha Gupta';
+  const tertiaryAuthor = section === 'admissions' ? 'Vikram Singh' : 'Meena Yadav';
+  const sectionSpecific = {
+    jobs: [
+      {
+        question: `Can candidates with ${seed.qualification ?? 'the required qualification'} apply for ${seed.title}?`,
+        answer: `${seed.org} candidates should follow the official notice for post-wise eligibility. If the homepage tag shows ${seed.qualification ?? 'a required qualification'}, treat that as a high-level marker and verify stream or final-year rules from the notification before submitting the form.`,
+      },
+      {
+        question: 'What should I keep ready before applying?',
+        answer: 'Keep identity proof, educational documents, category certificates, recent photograph/signature files, and payment details ready before starting the application.',
+      },
+      {
+        question: 'How should I track deadlines for this recruitment?',
+        answer: `Use the important-dates block on this page, but confirm the final deadline from ${seed.org}. The current tracked last-date field is ${summaryMeta.lastDate}.`,
+      },
+    ],
+    results: [
+      {
+        question: `Where should I check the final outcome for ${seed.title}?`,
+        answer: `Use the official ${seed.org} result PDF or portal first. This page keeps the same public reading flow, but the authority publication is the final source for result status, marks, and any next-stage notice.`,
+      },
+      {
+        question: 'Will score cards, cut-off, or next-stage updates be released separately?',
+        answer: `Possibly. ${seed.org} often publishes score cards, cut-off marks, reserve list, or verification notices separately after the main result. Keep watching the official portal after ${summaryMeta.publishedDate}.`,
+      },
+      {
+        question: 'What should I preserve after checking my result?',
+        answer: 'Save the PDF / score card, roll number details, and any document-verification or service-allocation instructions published with the result.',
+      },
+    ],
+    'admit-cards': [
+      {
+        question: 'What if the admit card download link is not opening?',
+        answer: `Wait for the official ${seed.org} server to stabilize, recheck your credentials, and confirm whether the admit-card window has actually opened for your exam stage.`,
+      },
+      {
+        question: 'Which documents should I carry on exam day?',
+        answer: 'Carry the admit card printout, valid photo ID, passport-size photographs if required, and any category or exam-specific instructions mentioned on the hall ticket.',
+      },
+      {
+        question: 'How do I verify reporting time and exam city?',
+        answer: `Use the admit-card PDF itself as the final source. This page summarizes the update, but exam-city, gate-closing time, and reporting instructions should come from the official ticket.`,
+      },
+    ],
+    'answer-keys': [
+      {
+        question: 'How do I challenge an answer if I disagree with the key?',
+        answer: `Follow the objection rules published by ${seed.org}. Check the objection window, fee, accepted evidence format, and the last date before submitting a challenge.`,
+      },
+      {
+        question: 'Should I save my response sheet and answer key copy?',
+        answer: 'Yes. Preserve the official answer key, response sheet, question IDs, and payment proof if you submit any objections.',
+      },
+      {
+        question: 'Will the final answer key change after objections?',
+        answer: 'It can. Authorities may revise provisional keys after reviewing objections, so keep checking the official portal for the final answer key and result publication.',
+      },
+    ],
+    admissions: [
+      {
+        question: `Can I complete registration now and handle counselling later?`,
+        answer: `Yes, if the current ${seed.org} notice allows it. Complete registration first, then watch the authority schedule for counselling, preference filling, and seat-allocation rounds.`,
+      },
+      {
+        question: 'What records should I keep after submitting the admission form?',
+        answer: 'Preserve the registration number, submitted application copy, payment receipt, academic records, and all counselling or verification acknowledgements.',
+      },
+      {
+        question: 'How do I track the next seat-allocation or document-verification step?',
+        answer: `Use the important-dates and important-links sections on this page as a summary, then verify each counselling or allotment notice directly from ${seed.org}.`,
+      },
+    ],
+  }[section];
+
+  const authorNames = [primaryAuthor, secondaryAuthor, tertiaryAuthor];
+
+  return sectionSpecific.map((item, index) => {
+    const author = authorNames[index];
+
+    return {
+      id: index + 1,
+      author,
+      initials: getInitials(author),
+      avatarColor: qaAvatarPalette[index % qaAvatarPalette.length],
+      text: item.question,
+      time: `${index + 1} day${index === 0 ? '' : 's'} ago`,
+      likes: 12 + index * 7,
+      liked: false,
+      answers: [
+        {
+          id: 1,
+          author: `${seed.org} Updates Desk`,
+          initials: inferOrgShort(seed.org).slice(0, 2),
+          avatarColor: qaAvatarPalette[(index + 3) % qaAvatarPalette.length],
+          text: item.answer,
+          time: `${index + 1} day${index === 0 ? '' : 's'} ago`,
+          likes: 8 + index * 5,
+          liked: false,
+          isBest: true,
+        },
+      ],
+    };
+  });
+}
+
 function buildDefaultDetail(
   section: AnnouncementSection,
   seed: AnnouncementSeed,
@@ -381,6 +756,7 @@ function buildDefaultDetail(
   fallbackLinks: QuickLink[],
 ): AnnouncementDetailContent {
   const primaryLabel = getSectionActionLabel(section);
+  const primaryLinkMeta = getPrimaryLinkMeta(section);
   const secondaryLabel =
     section === 'results'
       ? 'View Latest Results'
@@ -421,22 +797,29 @@ function buildDefaultDetail(
       label: primaryLabel,
       href: `${sectionPathMap[section]}/${slug}`,
       emphasis: 'primary',
+      ...primaryLinkMeta,
       note: 'Canonical detail page',
     },
     {
       label: `Back to ${announcementCategoryMeta[section].title}`,
       href: sectionPathMap[section],
       emphasis: 'secondary',
+      type: 'category',
+      icon: 'link',
     },
     {
       label: 'Homepage',
       href: '/',
       emphasis: 'muted',
+      type: 'website',
+      icon: 'web',
     },
     ...fallbackLinks.slice(0, 2).map((link) => ({
       label: link.label,
       href: link.href,
       emphasis: 'secondary' as DetailLinkEmphasis,
+      type: 'resource' as DetailImportantLinkType,
+      icon: 'link' as DetailImportantLinkIcon,
     })),
   ];
 
@@ -454,9 +837,14 @@ function buildDefaultDetail(
     heroStats.push({ label: 'Qualification', value: seed.qualification });
   }
 
+  const summaryMeta = getDefaultSummaryMeta(section, seed, baseDates);
+
   return {
+    theme: defaultDetailThemeBySection[section],
+    engagement: getDefaultEngagement(section, seed),
     eyebrow: sectionLabelMap[section],
     heroStats,
+    summaryMeta,
     notice: {
       title:
         section === 'results'
@@ -564,6 +952,8 @@ function buildDefaultDetail(
                 'Submit the form before the deadline and keep a printed copy for later stages.',
               ],
     importantLinks,
+    qa: buildDefaultQa(section, seed, summaryMeta),
+    relatedPosts: [],
     sourceNote: `${seed.org} remains the authoritative source for this update. Candidates should rely on the official notice for final confirmation of dates, eligibility, fee, and next-stage instructions.`,
     relatedLinkOverrides: fallbackLinks,
     cta: {
@@ -592,6 +982,9 @@ function mergeAnnouncementDetail(
     ...baseDetail,
     ...override,
     notice: override.notice ? { ...baseDetail.notice, ...override.notice } as DetailNotice : baseDetail.notice,
+    theme: override.theme ? { ...baseDetail.theme, ...override.theme } : baseDetail.theme,
+    engagement: override.engagement ? { ...baseDetail.engagement, ...override.engagement } : baseDetail.engagement,
+    summaryMeta: override.summaryMeta ? { ...baseDetail.summaryMeta, ...override.summaryMeta } : baseDetail.summaryMeta,
     applicationFee: override.applicationFee
       ? {
           ...baseDetail.applicationFee,
@@ -624,6 +1017,8 @@ function mergeAnnouncementDetail(
     selectionProcess: override.selectionProcess ?? baseDetail.selectionProcess,
     howToApply: override.howToApply ?? baseDetail.howToApply,
     importantLinks: override.importantLinks ?? baseDetail.importantLinks,
+    qa: override.qa ?? baseDetail.qa,
+    relatedPosts: override.relatedPosts ?? baseDetail.relatedPosts,
     relatedLinkOverrides: override.relatedLinkOverrides ?? baseDetail.relatedLinkOverrides,
     extraSections: override.extraSections ?? baseDetail.extraSections,
   };
@@ -2112,6 +2507,28 @@ const resultAnnouncements: AnnouncementItem[] = [
     summary:
       'The UPSC Civil Services 2025 final result closes the prelims, mains, and personality test cycle for one of the most competitive examinations in India. Candidates should check the official PDF, verify roll numbers, and follow further service-allocation or marks-related notices from UPSC.',
     detail: {
+      theme: {
+        accent: '#c62828',
+        gradientFrom: '#b71c1c',
+        gradientTo: '#c62828',
+        sidebarFrom: '#b71c1c',
+        sidebarTo: '#1a237e',
+      },
+      engagement: {
+        views: '8,92,341',
+        likes: '45,210',
+        comments: 1892,
+      },
+      summaryMeta: {
+        orgShort: 'UPSC',
+        location: 'All India',
+        salary: '₹56,100 — ₹2,50,000 (IAS Level)',
+        lastDate: 'N/A',
+        applicationStartDate: 'Feb 2025',
+        examDate: 'Completed',
+        publishedDate: '27 Mar 2026',
+        ageLimit: '21 — 32 years (General)',
+      },
       heroStats: [
         { label: 'Category', value: 'Latest Results' },
         { label: 'Organization', value: 'UPSC' },
@@ -2178,9 +2595,129 @@ const resultAnnouncements: AnnouncementItem[] = [
         'Follow only the UPSC website for final confirmation of cut-off marks, marksheets, and post-result instructions.',
       ],
       importantLinks: [
-        { label: 'View Final Result', href: '/results/upsc-civil-services-2025-final-result', emphasis: 'primary', note: 'Canonical detail page' },
-        { label: 'Latest Results', href: '/results', emphasis: 'secondary' },
-        { label: 'Homepage', href: '/', emphasis: 'muted' },
+        {
+          label: 'View Final Result',
+          href: '/results/upsc-civil-services-2025-final-result',
+          emphasis: 'primary',
+          note: 'Canonical detail page',
+          type: 'result',
+          icon: 'result',
+        },
+        { label: 'Latest Results', href: '/results', emphasis: 'secondary', type: 'category', icon: 'link' },
+        { label: 'Homepage', href: '/', emphasis: 'muted', type: 'website', icon: 'web' },
+      ],
+      qa: [
+        {
+          id: 1,
+          author: 'Rahul Sharma',
+          initials: 'RS',
+          avatarColor: '#1565c0',
+          text: "Can final year students apply for this exam? I am currently in my last semester and haven't received my degree yet.",
+          time: '2 days ago',
+          likes: 24,
+          liked: false,
+          answers: [
+            {
+              id: 1,
+              author: 'SarkariExams Team',
+              initials: 'SE',
+              avatarColor: '#e65100',
+              text: 'Yes! Final year students can apply provisionally. However, you must submit your original degree certificate at the time of document verification. If you fail to produce the certificate, your candidature will be cancelled.',
+              time: '2 days ago',
+              likes: 18,
+              liked: false,
+              isBest: true,
+            },
+            {
+              id: 2,
+              author: 'Neha Gupta',
+              initials: 'NG',
+              avatarColor: '#00695c',
+              text: 'I applied in the previous cycle as a final year student. Just make sure your college issues a provisional certificate. That is also accepted during verification.',
+              time: '1 day ago',
+              likes: 9,
+              liked: false,
+            },
+          ],
+        },
+        {
+          id: 2,
+          author: 'Priya Verma',
+          initials: 'PV',
+          avatarColor: '#2e7d32',
+          text: 'Is there any application fee waiver for female candidates in General category?',
+          time: '1 day ago',
+          likes: 15,
+          liked: false,
+          answers: [
+            {
+              id: 1,
+              author: 'Amit Kumar',
+              initials: 'AK',
+              avatarColor: '#6a1b9a',
+              text: 'Yes. Female candidates are fully exempted from paying the application fee regardless of their category. The fee is Nil for all women applicants in this cycle.',
+              time: '1 day ago',
+              likes: 12,
+              liked: false,
+              isBest: true,
+            },
+          ],
+        },
+        {
+          id: 3,
+          author: 'Vikram Singh',
+          initials: 'VS',
+          avatarColor: '#880e4f',
+          text: 'What is the age relaxation for OBC candidates and how do I claim it?',
+          time: '18 hours ago',
+          likes: 11,
+          liked: false,
+          answers: [
+            {
+              id: 1,
+              author: 'Meena Yadav',
+              initials: 'MY',
+              avatarColor: '#e65100',
+              text: 'OBC (Non-Creamy Layer) candidates get 3 years of age relaxation over the upper age limit. You need to submit a valid OBC-NCL certificate issued in the prescribed format during the verification stage.',
+              time: '17 hours ago',
+              likes: 8,
+              liked: false,
+              isBest: true,
+            },
+          ],
+        },
+      ],
+      relatedPosts: [
+        {
+          title: 'SSC CHSL 2025 - Tier 2 Result',
+          tag: 'new',
+          date: '26 Mar',
+          href: '/results/ssc-chsl-2025-tier-2-result',
+          posts: '6,500',
+          category: 'Latest Results',
+        },
+        {
+          title: 'IBPS Clerk Mains 2025 - Result Declared',
+          tag: 'new',
+          date: '25 Mar',
+          href: '/results/ibps-clerk-mains-2025-result-declared',
+          posts: '5,000',
+          category: 'Latest Results',
+        },
+        {
+          title: 'RRB NTPC CBT 2 Result 2025',
+          date: '24 Mar',
+          href: '/results/rrb-ntpc-cbt-2-result-2025',
+          posts: '35,208',
+          category: 'Latest Results',
+        },
+        {
+          title: 'NTA CUET UG 2026 - Score Card Released',
+          tag: 'new',
+          date: '23 Mar',
+          href: '/results/nta-cuet-ug-2026-score-card-released',
+          category: 'Latest Results',
+        },
       ],
       extraSections: [
         {
@@ -2915,6 +3452,54 @@ export const announcementItemsBySection: Record<AnnouncementSection, Announcemen
   'answer-keys': answerKeyAnnouncements,
   admissions: admissionAnnouncements,
 };
+
+function getFallbackLinkMeta(section: AnnouncementSection, link: DetailImportantLink) {
+  if (link.emphasis === 'primary') {
+    return getPrimaryLinkMeta(section);
+  }
+
+  if (link.href === '/') {
+    return { type: 'website' as DetailImportantLinkType, icon: 'web' as DetailImportantLinkIcon };
+  }
+
+  if (link.href === sectionPathMap[section] || link.label.toLowerCase().includes('latest')) {
+    return { type: 'category' as DetailImportantLinkType, icon: 'link' as DetailImportantLinkIcon };
+  }
+
+  return { type: 'resource' as DetailImportantLinkType, icon: 'link' as DetailImportantLinkIcon };
+}
+
+function createRelatedPostsForItem(
+  section: AnnouncementSection,
+  currentItem: AnnouncementItem,
+  items: AnnouncementItem[],
+): DetailRelatedPost[] {
+  return items
+    .filter((item) => item.slug !== currentItem.slug && item.listed)
+    .slice(0, 5)
+    .map((item) => ({
+      title: item.title,
+      tag: item.tag,
+      date: item.date.replace(/\s+\d{4}$/, ''),
+      href: `${sectionPathMap[section]}/${item.slug}`,
+      posts: item.postCount,
+      category: announcementCategoryMeta[section].title,
+    }));
+}
+
+for (const [section, items] of Object.entries(announcementItemsBySection) as [AnnouncementSection, AnnouncementItem[]][]) {
+  for (const item of items) {
+    item.detail.importantLinks = item.detail.importantLinks.map((link) => ({
+      ...link,
+      ...getFallbackLinkMeta(section, link),
+      ...link,
+    }));
+
+    if (!item.detail.relatedPosts.length) {
+      item.detail.relatedPosts = createRelatedPostsForItem(section, item, items);
+    }
+  }
+}
 
 export type AnnouncementRouteMatchType = 'canonical' | 'legacy-alias' | 'numeric-legacy';
 
