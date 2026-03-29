@@ -11,17 +11,22 @@ import {
   Home,
   LayoutGrid,
   LogIn,
+  LogOut,
   Menu,
   School,
   Search,
+  Settings,
+  Shield,
+  User,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { buildJobsPath } from '@/app/lib/public-content';
 import { HomePageLoginModal } from './HomePageLoginModal';
 import { homePageLinks } from './links';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const navLinks = [
   { label: 'Home', icon: Home, badge: null, href: homePageLinks.home },
@@ -43,10 +48,28 @@ const notifications = [
 
 export function HomePageNavbar() {
   const router = useRouter();
+  const { user, isAdmin, isLoggedIn, logout } = useCurrentUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001/admin';
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Element;
+      if (!target.closest('[data-user-menu]') && !target.closest('[data-notification-menu]')) {
+        setIsUserMenuOpen(false);
+        setIsNotificationOpen(false);
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,7 +80,15 @@ export function HomePageNavbar() {
 
   return (
     <>
-      <HomePageLoginModal open={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <HomePageLoginModal 
+        open={isLoginOpen} 
+        onClose={() => setIsLoginOpen(false)} 
+        onLoginSuccess={() => {
+          setIsLoginOpen(false);
+          // The useCurrentUser hook will automatically re-fetch user data
+          window.location.reload();
+        }}
+      />
       <header className="sticky top-0 z-50">
         <div
           className="relative overflow-hidden text-white shadow-2xl"
@@ -172,7 +203,7 @@ export function HomePageNavbar() {
                 />
               </form>
 
-              <div className="relative">
+              <div className="relative" data-notification-menu>
                 <button
                   type="button"
                   onClick={() => setIsNotificationOpen((current) => !current)}
@@ -210,25 +241,91 @@ export function HomePageNavbar() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsLoginOpen(true)}
-                className="flex items-center gap-2 rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-[7px] text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(253,216,53,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:-translate-y-px hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e] hover:shadow-[0_4px_20px_rgba(253,216,53,0.35)]"
-              >
-                <LogIn size={13} />
-                Login / Register
-              </button>
+              {/* User Authentication Section */}
+              {isLoggedIn ? (
+                <div className="relative" data-user-menu>
+                  <button
+                    type="button"
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center gap-2 rounded-[10px] border border-[rgba(100,200,100,0.45)] bg-[linear-gradient(135deg,rgba(100,200,100,0.18)_0%,rgba(150,200,100,0.1)_100%)] px-4 py-[7px] text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(100,200,100,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:-translate-y-px hover:bg-[linear-gradient(135deg,#64c864_0%,#96c864_100%)] hover:text-[#0d1b6e] hover:shadow-[0_4px_20px_rgba(100,200,100,0.35)]"
+                  >
+                    {isAdmin ? <Shield size={13} /> : <User size={13} />}
+                    {isAdmin ? 'Admin' : user?.name || 'Profile'}
+                  </button>
+
+                  {/* User Dropdown Menu */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 top-11 z-50 w-[200px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div className="border-b border-gray-100 px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                        {isAdmin && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                            <Shield size={12} />
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      
+                      {isAdmin && (
+                        <>
+                          <a
+                            href={ADMIN_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-100"
+                          >
+                            <Settings size={16} />
+                            Admin Dashboard
+                          </a>
+                        </>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-red-50"
+                      >
+                        <LogOut size={16} />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsLoginOpen(true)}
+                  className="flex items-center gap-2 rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-[7px] text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(253,216,53,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:-translate-y-px hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e] hover:shadow-[0_4px_20px_rgba(253,216,53,0.35)]"
+                >
+                  <LogIn size={13} />
+                  Login / Register
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-2 md:hidden">
-              <button
-                type="button"
-                onClick={() => setIsLoginOpen(true)}
-                className="flex items-center gap-1 rounded-xl border border-[rgba(253,216,53,0.4)] bg-[rgba(253,216,53,0.2)] px-3 py-1.5 text-[11px] font-bold text-white"
-              >
-                <LogIn size={12} />
-                Login
-              </button>
+              {isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-1 rounded-xl border border-[rgba(100,200,100,0.4)] bg-[rgba(100,200,100,0.2)] px-3 py-1.5 text-[11px] font-bold text-white"
+                >
+                  {isAdmin ? <Shield size={12} /> : <User size={12} />}
+                  {isAdmin ? 'Admin' : 'Profile'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsLoginOpen(true)}
+                  className="flex items-center gap-1 rounded-xl border border-[rgba(253,216,53,0.4)] bg-[rgba(253,216,53,0.2)] px-3 py-1.5 text-[11px] font-bold text-white"
+                >
+                  <LogIn size={12} />
+                  Login
+                </button>
+              )}
               <button
                 type="button"
                 className="rounded-lg p-2 transition-colors hover:bg-white/15"

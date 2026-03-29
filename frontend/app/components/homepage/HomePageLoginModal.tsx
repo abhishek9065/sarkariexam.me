@@ -6,9 +6,10 @@ import { useState } from 'react';
 interface HomePageLoginModalProps {
   open: boolean;
   onClose: () => void;
+  onLoginSuccess?: () => void;
 }
 
-export function HomePageLoginModal({ open, onClose }: HomePageLoginModalProps) {
+export function HomePageLoginModal({ open, onClose, onLoginSuccess }: HomePageLoginModalProps) {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,24 +17,52 @@ export function HomePageLoginModal({ open, onClose }: HomePageLoginModalProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDone, setIsDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   if (!open) {
     return null;
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsLoading(true);
+    setError(null);
 
-    window.setTimeout(() => {
+    try {
+      const endpoint = tab === 'login' ? '/auth/login' : '/auth/register';
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          password,
+          name: tab === 'register' ? name : undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setIsDone(true);
+        setTimeout(() => {
+          setIsDone(false);
+          onLoginSuccess?.();
+          onClose();
+        }, 1200);
+      } else {
+        setError(data.error || 'Authentication failed');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+      console.error('Auth error:', err);
+    } finally {
       setIsLoading(false);
-      setIsDone(true);
-
-      window.setTimeout(() => {
-        setIsDone(false);
-        onClose();
-      }, 1200);
-    }, 1400);
+    }
   }
 
   return (
@@ -68,7 +97,10 @@ export function HomePageLoginModal({ open, onClose }: HomePageLoginModalProps) {
               <button
                 key={mode}
                 type="button"
-                onClick={() => setTab(mode)}
+                onClick={() => {
+                  setTab(mode);
+                  setError(null);
+                }}
                 className={`flex-1 rounded-md py-1.5 text-[13px] font-semibold capitalize transition-all ${
                   tab === mode ? 'bg-white text-[#1a237e] shadow-sm' : 'text-white/70 hover:text-white'
                 }`}
@@ -80,6 +112,12 @@ export function HomePageLoginModal({ open, onClose }: HomePageLoginModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 px-6 py-5">
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-center">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+          
           {isDone ? (
             <div className="py-6 text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
