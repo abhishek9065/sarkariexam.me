@@ -5,7 +5,6 @@ import { getSEOMetrics } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { toast } from 'sonner';
 import { Search, FileText, CheckCircle, AlertTriangle, TrendingUp, Globe, Loader2 } from 'lucide-react';
 
 export function SEODashboardPage() {

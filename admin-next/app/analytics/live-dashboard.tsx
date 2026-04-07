@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -58,9 +58,10 @@ const INDIAN_STATES = [
 
 function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?: number }) {
   const [display, setDisplay] = useState(0);
+  const previousValueRef = useRef(0);
   
   useEffect(() => {
-    const start = display;
+    const start = previousValueRef.current;
     const diff = value - start;
     const steps = 20;
     const stepValue = diff / steps;
@@ -70,6 +71,7 @@ function AnimatedCounter({ value, duration = 1000 }: { value: number; duration?:
       current++;
       if (current >= steps) {
         setDisplay(value);
+        previousValueRef.current = value;
         clearInterval(interval);
       } else {
         setDisplay(Math.round(start + stepValue * current));

@@ -44,6 +44,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     content,
     editorProps: {
       attributes: {
+        'data-placeholder': placeholder ?? '',
         class:
           'prose prose-sm dark:prose-invert max-w-none min-h-[200px] px-4 py-3 focus:outline-none',
       },

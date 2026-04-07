@@ -7,6 +7,14 @@ const singularAliasPathMap = {
   'admit-cards': '/admit-card',
 } as const;
 
+type RedirectRule = {
+  source: string;
+  destination: string;
+  permanent: boolean;
+};
+
+let cachedRedirects: RedirectRule[] | null = null;
+
 const nextConfig: NextConfig = {
   // Build optimizations for faster deployments
   experimental: {
@@ -99,8 +107,6 @@ const nextConfig: NextConfig = {
   
   // Redirects (cached for faster computation)
   async redirects() {
-    // Cache the redirects computation result
-    const cachedRedirects = (nextConfig as any)._cachedRedirects;
     if (cachedRedirects) {
       return cachedRedirects;
     }
@@ -177,8 +183,7 @@ const nextConfig: NextConfig = {
       }),
     );
     
-    // Cache the result
-    (nextConfig as any)._cachedRedirects = redirects;
+    cachedRedirects = redirects;
     return redirects;
   },
 };

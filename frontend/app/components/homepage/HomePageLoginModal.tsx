@@ -2,6 +2,7 @@
 
 import { ArrowRight, Eye, EyeOff, GraduationCap, Loader2, Lock, Mail, X } from 'lucide-react';
 import { useState } from 'react';
+import { resolvePublicApiBase } from '@/lib/api';
 
 interface HomePageLoginModalProps {
   open: boolean;
@@ -19,7 +20,7 @@ export function HomePageLoginModal({ open, onClose, onLoginSuccess }: HomePageLo
   const [isDone, setIsDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const apiBase = resolvePublicApiBase();
 
   if (!open) {
     return null;
@@ -32,7 +33,7 @@ export function HomePageLoginModal({ open, onClose, onLoginSuccess }: HomePageLo
 
     try {
       const endpoint = tab === 'login' ? '/auth/login' : '/auth/register';
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+      const response = await fetch(`${apiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

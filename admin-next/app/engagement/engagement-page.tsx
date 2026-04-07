@@ -23,7 +23,7 @@ export function EngagementPage() {
     },
   });
 
-  const { data: feedback, isLoading: loadingFeedback, refetch: refetchFeedback } = useQuery({
+  const { data: feedback, isLoading: loadingFeedback } = useQuery({
     queryKey: ['user-feedback'],
     queryFn: async () => {
       const res = await getUserFeedback(50);

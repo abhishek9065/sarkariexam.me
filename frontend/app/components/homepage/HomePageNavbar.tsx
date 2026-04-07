@@ -55,7 +55,7 @@ export function HomePageNavbar() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001/admin';
+  const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -230,7 +230,7 @@ export function HomePageNavbar() {
                         3 NEW
                       </span>
                     </div>
-                    {notifications.map((notification, index) => (
+                    {notifications.map((notification) => (
                       <div
                         key={notification}
                         className="flex cursor-pointer items-start gap-2.5 border-b border-gray-50 px-3.5 py-2.5 transition-colors hover:bg-blue-50"
@@ -595,7 +595,7 @@ export function HomePageNavbar() {
                 3 NEW
               </span>
             </div>
-            {notifications.map((notification, index) => (
+            {notifications.map((notification) => (
               <div
                 key={notification}
                 className="flex cursor-pointer items-start gap-2.5 border-b border-gray-50 px-3.5 py-2.5 transition-colors hover:bg-blue-50"

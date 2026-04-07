@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { resolvePublicApiBase } from '@/lib/api';
 
 interface User {
   id: string;
@@ -16,13 +17,12 @@ export function useCurrentUser() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const apiBase = resolvePublicApiBase();
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE}/auth/me`, {
+      const response = await fetch(`${apiBase}/auth/me`, {
         credentials: 'include',
         headers: {
           'Accept': 'application/json',
@@ -44,15 +44,15 @@ export function useCurrentUser() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiBase]);
 
   useEffect(() => {
     checkUser();
-  }, []);
+  }, [checkUser]);
 
   const logout = async () => {
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      await fetch(`${apiBase}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });

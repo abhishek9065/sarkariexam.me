@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Inter, Poppins } from 'next/font/google';
 import './globals.css';
 import { PwaRegister } from '@/components/PwaRegister';
@@ -18,7 +18,13 @@ export const metadata: Metadata = {
   description: 'Get latest Sarkari Result, Government Jobs, Admit Card, Answer Key, Syllabus and Admission updates for 2025.',
   keywords: 'sarkari result, sarkari naukri, government jobs, admit card, answer key, syllabus',
   manifest: '/manifest.json',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

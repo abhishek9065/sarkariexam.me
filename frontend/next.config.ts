@@ -1,3 +1,4 @@
+import path from 'path';
 import type { NextConfig } from 'next';
 import { announcementCategoryMeta, announcementItemsBySection, buildAnnouncementPath } from './app/lib/public-content';
 
@@ -8,6 +9,9 @@ const singularAliasPathMap = {
 } as const;
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   async redirects() {
     return (Object.keys(announcementItemsBySection) as Array<keyof typeof announcementItemsBySection>).flatMap((section) =>
       announcementItemsBySection[section].flatMap((item) => {

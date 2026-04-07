@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, AlertCircle, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns';
 import Link from 'next/link';
 
@@ -48,7 +48,7 @@ export function CalendarPage() {
   const calendarStart = startOfWeek(monthStart);
   const calendarEnd = endOfWeek(monthEnd);
 
-  const { data: events, isLoading } = useQuery({
+  const { data: events } = useQuery({
     queryKey: ['calendar', monthStart.toISOString(), monthEnd.toISOString(), filterStatus, filterType],
     queryFn: async () => {
       const res = await getCalendarAnnouncements({
@@ -159,7 +159,7 @@ export function CalendarPage() {
             </div>
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-px bg-border border border-t-0 rounded-b-lg overflow-hidden">
-              {calendarDays.map((day, idx) => {
+              {calendarDays.map((day) => {
                 const dayEvents = getEventsForDay(day);
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 const isTodayDate = isToday(day);
@@ -178,7 +178,7 @@ export function CalendarPage() {
                       {dayEvents.slice(0, 3).map(event => (
                         <Link
                           key={event.id}
-                          href={`/announcements/${event.id}/edit`}
+                          href={`/announcements/${event.id}`}
                           className="block"
                         >
                           <div className={`text-xs truncate px-1.5 py-0.5 rounded text-white ${STATUS_COLORS[event.status] || 'bg-gray-500'}`}>
@@ -217,7 +217,7 @@ export function CalendarPage() {
                 upcomingDeadlines?.map(deadline => (
                   <Link
                     key={deadline.id}
-                    href={`/announcements/${deadline.id}/edit`}
+                    href={`/announcements/${deadline.id}`}
                     className="block p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">

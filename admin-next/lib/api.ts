@@ -212,7 +212,7 @@ export function getContentAnalytics(limit = 50, type?: string) {
   );
 }
 
-export function getAnalyticsContent(days = 30) {
+export function getAnalyticsContent() {
   return getContentAnalytics(50);
 }
 

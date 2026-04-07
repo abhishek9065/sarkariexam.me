@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getBackups, exportAnnouncementsToCSV, getSecurityStats, getSecurityEvents, getPerformanceSummary, getRateLimitStats, getSystemHealth } from '@/lib/api';
+import { getBackups, exportAnnouncementsToCSV, getSecurityStats, getPerformanceSummary, getRateLimitStats, getSystemHealth } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +67,7 @@ export function SystemAdminPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast.success('Export downloaded');
-    } catch (error) {
+    } catch {
       toast.error('Export failed');
     }
   };

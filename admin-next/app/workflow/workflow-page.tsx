@@ -81,7 +81,7 @@ export function WorkflowPage() {
               {pending?.map((item: any) => (
                 <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <Link href={`/announcements/${item.id}/edit`} className="font-medium hover:underline">
+                    <Link href={`/announcements/${item.id}`} className="font-medium hover:underline">
                       {item.title}
                     </Link>
                     <p className="text-sm text-muted-foreground">Assigned to: {item.assigneeEmail || 'Unassigned'}</p>
