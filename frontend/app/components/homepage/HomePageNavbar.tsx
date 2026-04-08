@@ -319,19 +319,21 @@ export function HomePageNavbar() {
 
             <div className="flex items-center gap-2 md:hidden" data-mobile-menu>
               {/* Mobile Notification Bell */}
-              <button
-                type="button"
-                onClick={() => setIsNotificationOpen((current) => !current)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14"
-                aria-label="Toggle notifications"
-                title="Notifications"
-              >
-                <Bell size={14} />
-                <span
-                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-[#0d1b6e] animate-pulse"
-                  style={{ background: 'linear-gradient(135deg,#ff5252,#c62828)' }}
-                />
-              </button>
+              <div data-notification-menu>
+                <button
+                  type="button"
+                  onClick={() => setIsNotificationOpen((current) => !current)}
+                  className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14"
+                  aria-label="Toggle notifications"
+                  title="Notifications"
+                >
+                  <Bell size={14} />
+                  <span
+                    className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border border-[#0d1b6e] animate-pulse"
+                    style={{ background: 'linear-gradient(135deg,#ff5252,#c62828)' }}
+                  />
+                </button>
+              </div>
 
               {isLoggedIn ? (
                 <button
@@ -588,7 +590,7 @@ export function HomePageNavbar() {
 
         {/* Mobile Notification Dropdown - positioned outside hamburger menu */}
         {isNotificationOpen && (
-          <div className="absolute right-4 top-20 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5 md:hidden">
+          <div className="absolute right-4 top-20 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5 md:hidden" data-notification-menu>
             <div className="flex items-center justify-between bg-gradient-to-r from-[#0d1b6e] to-[#1565c0] px-3.5 py-2.5">
               <span className="text-[12px] font-bold text-white">Notifications</span>
               <span className="rounded-full bg-[#e53935] px-1.5 py-0.5 text-[9px] font-extrabold text-white">
