@@ -668,7 +668,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                     </div>
 
                     <div className="bg-gray-50 px-4 py-2.5 text-center">
-                      <button type="button" className="text-[11px] font-semibold text-blue-600 transition-colors hover:underline">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotifOpen(false);
+                          router.push('/notifications');
+                        }}
+                        className="text-[11px] font-semibold text-blue-600 transition-colors hover:underline"
+                      >
                         View all notifications
                       </button>
                     </div>
@@ -686,7 +693,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               </button>
 
               <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
-                <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 px-2.5 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => router.push('/system-admin')}
+                  className="flex items-center gap-2 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 px-2.5 py-1.5 transition-colors hover:bg-orange-100/60"
+                  title="Open system admin"
+                >
                   <div
                     className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-extrabold text-white"
                     style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)' }}
@@ -695,7 +707,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                   </div>
                   <span className="hidden text-xs font-bold text-gray-700 sm:block">{userLabel}</span>
                   <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[7px] font-black tracking-[0.08em] text-white">ADMIN</span>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleLogout()}
