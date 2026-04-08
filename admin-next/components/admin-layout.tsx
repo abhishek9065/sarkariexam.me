@@ -41,6 +41,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from './theme-toggle';
 
 type NavItem = {
   href: string;
@@ -286,7 +287,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     (pathname.startsWith('/announcements/') && pathname !== '/announcements');
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f2f7]" style={{ fontFamily: "var(--font-sans), 'Inter', sans-serif" }}>
+    <div className="flex h-screen overflow-hidden bg-admin-shell" style={{ fontFamily: "var(--font-sans), 'Inter', sans-serif" }}>
       {(sidebarOpen || paletteOpen) && (
         <div
           className={cn(
@@ -302,20 +303,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
       {paletteOpen && (
         <div className="fixed inset-x-0 top-[15vh] z-50 mx-auto w-full max-w-xl px-4">
-          <div className="overflow-hidden rounded-[22px] border border-gray-200 bg-white shadow-2xl">
-            <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5">
-              <Search className="h-4 w-4 shrink-0 text-gray-400" />
+          <div className="overflow-hidden rounded-[22px] border border-border bg-card shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
               <input
                 ref={paletteRef}
                 value={paletteQuery}
                 onChange={event => setPaletteQuery(event.target.value)}
                 placeholder="Type a command or search..."
-                className="flex-1 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
               />
               <button
                 type="button"
                 onClick={() => setPaletteOpen(false)}
-                className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -560,40 +561,42 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="z-30 shrink-0 border-b border-gray-200 bg-white shadow-sm" style={{ height: 52 }}>
+        <header className="z-30 shrink-0 border-b border-border bg-card shadow-sm" style={{ height: 52 }}>
           <div className="flex h-full items-center gap-3 px-4">
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-xl p-2 text-gray-600 transition-colors hover:bg-gray-100 lg:hidden"
+              className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-accent lg:hidden"
             >
               <Menu className="h-4.5 w-4.5" />
             </button>
 
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="hidden text-[11px] text-gray-400 sm:block">Admin</span>
-              <ChevronRight className="hidden h-3 w-3 text-gray-300 sm:block" />
-              <span className="truncate text-sm font-bold text-gray-800">{pageTitle}</span>
+              <span className="hidden text-[11px] text-muted-foreground sm:block">Admin</span>
+              <ChevronRight className="hidden h-3 w-3 text-muted-foreground/50 sm:block" />
+              <span className="truncate text-sm font-bold text-foreground">{pageTitle}</span>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 onClick={() => setPaletteOpen(true)}
-                className="hidden items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-gray-50 lg:flex"
+                className="hidden items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent lg:flex"
               >
                 <Search className="h-3 w-3" />
                 Search
-                <span className="ml-1 flex items-center gap-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-400">
+                <span className="ml-1 flex items-center gap-0.5 rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">
                   <Command className="h-2 w-2" />K
                 </span>
               </button>
+
+              <ThemeToggle />
 
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setNotifOpen(open => !open)}
-                  className="relative rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100"
+                  className="relative rounded-xl p-2 text-muted-foreground transition-colors hover:bg-accent"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (

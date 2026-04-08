@@ -231,17 +231,17 @@ export function HomePageNavbar() {
                       </span>
                     </div>
                     {notifications.map((notification) => (
-                      <div
+                      <Link
                         key={notification}
+                        href={homePageLinks.results}
                         className="flex cursor-pointer items-start gap-2.5 border-b border-gray-50 px-3.5 py-2.5 transition-colors hover:bg-blue-50"
                         onClick={() => {
-                          console.log('Notification clicked:', notification);
-                          // Add actual notification click handling here
+                          setIsNotificationOpen(false);
                         }}
                       >
                         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
                         <span className="text-[12px] text-gray-700">{notification}</span>
-                      </div>
+                      </Link>
                     ))}
                     <div className="bg-gray-50 px-3.5 py-2.5 text-center">
                       <Link href={homePageLinks.results} className="text-[11px] font-semibold text-[#1a237e] hover:underline">
@@ -596,17 +596,17 @@ export function HomePageNavbar() {
               </span>
             </div>
             {notifications.map((notification) => (
-              <div
+              <Link
                 key={notification}
+                href={homePageLinks.results}
                 className="flex cursor-pointer items-start gap-2.5 border-b border-gray-50 px-3.5 py-2.5 transition-colors hover:bg-blue-50"
                 onClick={() => {
-                  console.log('Mobile notification clicked:', notification);
                   setIsNotificationOpen(false);
                 }}
               >
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400" />
                 <span className="text-[12px] text-gray-700">{notification}</span>
-              </div>
+              </Link>
             ))}
             <div className="bg-gray-50 px-3.5 py-2.5 text-center">
               <Link 

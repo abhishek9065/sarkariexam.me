@@ -42,6 +42,7 @@
   --warning-foreground: oklch(0.205 0 0);
   --background: #f0f2f7;
   --foreground: #111827;
+  --shell-bg-image: linear-gradient(180deg, #f6f7fb 0%, #eef2f8 100%);
 }
 
 .dark {
@@ -81,6 +82,7 @@
   --success-foreground: oklch(0.145 0 0);
   --warning: oklch(0.828 0.189 84.429);
   --warning-foreground: oklch(0.145 0 0);
+  --shell-bg-image: none;
 }
 
 @theme inline {
@@ -137,7 +139,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image: linear-gradient(180deg, #f6f7fb 0%, #eef2f8 100%);
+    background-image: var(--shell-bg-image);
   }
   html {
     @apply font-sans;
@@ -153,7 +155,7 @@
 
 @layer utilities {
   .bg-admin-shell {
-    background-image: linear-gradient(180deg, #f6f7fb 0%, #eef2f8 100%);
+    background-image: var(--shell-bg-image);
   }
 
   .scrollbar-none {
