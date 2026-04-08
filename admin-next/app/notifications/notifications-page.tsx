@@ -167,15 +167,34 @@ export function NotificationsPage() {
 
       {tab === 'ticker' ? (
         <div className="space-y-2">
-          <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
-            <div className="flex items-center gap-2 border-b border-gray-100 bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-2.5">
-              <Radio className="h-3 w-3 text-blue-500" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-600">Live Preview</span>
+          <div className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
+            <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
+              <Radio className="h-3 w-3 text-blue-500 animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Live Preview</span>
             </div>
-            <div className="overflow-hidden bg-gradient-to-r from-[#fff8f5] to-[#fffcfa] px-4 py-2.5">
-              <p className="truncate text-[12px] text-gray-500">
-                {ticker.filter(item => item.active).map(item => `${item.emoji} ${item.text}`).join('   ·   ') || 'No active ticker items'}
-              </p>
+            <div className="overflow-hidden bg-accent/10 py-3 pause-on-hover flex whitespace-nowrap">
+              {ticker.filter(item => item.active).length > 0 ? (
+                <>
+                  <div className="animate-marquee flex gap-8 shrink-0 pr-8">
+                    {ticker.filter(item => item.active).map(item => (
+                      <a key={`1-${item.id}`} href={item.url || '#'} className="text-[13px] font-semibold text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors flex items-center gap-1.5" onClick={e => e.preventDefault()}>
+                        <span>{item.emoji}</span>
+                        <span>{item.text}</span>
+                      </a>
+                    ))}
+                  </div>
+                  <div className="animate-marquee flex gap-8 shrink-0 pr-8" aria-hidden="true">
+                    {ticker.filter(item => item.active).map(item => (
+                      <a key={`2-${item.id}`} href={item.url || '#'} className="text-[13px] font-semibold text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors flex items-center gap-1.5" onClick={e => e.preventDefault()}>
+                        <span>{item.emoji}</span>
+                        <span>{item.text}</span>
+                      </a>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="px-4 text-[12px] text-muted-foreground">No active ticker items</p>
+              )}
             </div>
           </div>
 

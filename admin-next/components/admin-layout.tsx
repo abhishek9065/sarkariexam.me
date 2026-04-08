@@ -7,7 +7,7 @@ import {
   useSearchParams,
   type ReadonlyURLSearchParams,
 } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ComponentType } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type CSSProperties, type ComponentType, type ReactNode } from 'react';
 import {
   Activity,
   BarChart3,
@@ -41,6 +41,8 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
+import type { AdminRole } from '@/lib/types';
+import { RoleGuard } from './role-guard';
 import { ThemeToggle } from './theme-toggle';
 
 type NavItem = {
@@ -50,6 +52,7 @@ type NavItem = {
   badge?: string | number;
   sub?: boolean;
   match?: (pathname: string, searchParams: ReadonlyURLSearchParams) => boolean;
+  roles?: AdminRole[];
 };
 
 type NavSection = {
@@ -128,21 +131,21 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Insights',
     items: [
-      { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+      { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['superadmin', 'admin'] },
     ],
   },
   {
     label: 'Site',
     items: [
       { href: '/notifications', label: 'Ticker & Links', icon: Radio },
-      { href: '/subscribers', label: 'Subscribers', icon: Users, badge: '28K' },
-      { href: '/audit-log', label: 'Activity Log', icon: Activity },
+      { href: '/subscribers', label: 'Subscribers', icon: Users, badge: '28K', roles: ['superadmin', 'admin'] },
+      { href: '/audit-log', label: 'Activity Log', icon: Activity, roles: ['superadmin', 'admin'] },
     ],
   },
   {
     label: 'System',
     items: [
-      { href: '/settings', label: 'Settings', icon: Settings },
+      { href: '/settings', label: 'Settings', icon: Settings, roles: ['superadmin', 'admin'] },
     ],
   },
 ];
@@ -183,7 +186,7 @@ function getInitials(name?: string | null) {
   return parts.map(part => part[0]?.toUpperCase() ?? '').join('');
 }
 
-export function AdminLayout({ children }: { children: React.ReactNode }) {
+export function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -454,9 +457,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 const Icon = item.icon;
                 const active = matchesNavItem(item, pathname, searchParams);
 
-                return (
+                const LinkNode = (
                   <Link
-                    key={item.href}
                     href={item.href}
                     title={collapsed ? item.label : undefined}
                     className={cn(
@@ -509,6 +511,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     )}
                   </Link>
                 );
+
+                if (item.roles) {
+                  return (
+                    <RoleGuard key={item.href} allowedRoles={item.roles}>
+                      {LinkNode}
+                    </RoleGuard>
+                  );
+                }
+                return <Fragment key={item.href}>{LinkNode}</Fragment>;
               })}
             </div>
           ))}

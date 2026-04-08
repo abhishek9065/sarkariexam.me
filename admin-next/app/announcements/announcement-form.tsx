@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Briefcase, Calendar, CheckCircle, Eye, FileText,
 import { toast } from 'sonner';
 import { createAnnouncement, getAdminAnnouncement, updateAnnouncement } from '@/lib/api';
 import type { Announcement, AnnouncementStatus, ContentType, ImportantDate } from '@/lib/types';
+import { RoleGuard } from '@/components/role-guard';
 
 interface AnnouncementFormProps { id?: string }
 type EditorStatus = 'active' | 'draft' | 'scheduled' | 'expired';
@@ -235,9 +236,11 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
           <button type="button" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate('draft')} className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-[12px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
             <Save size={13} /> Save Draft
           </button>
-          <button type="button" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate('active')} className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.3)' }}>
-            <ArrowRight size={14} /> Publish
-          </button>
+          <RoleGuard allowedRoles={['superadmin', 'reviewer']}>
+            <button type="button" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate('active')} className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.3)' }}>
+              <ArrowRight size={14} /> Publish
+            </button>
+          </RoleGuard>
         </div>
       </div>
 
@@ -487,7 +490,14 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
         <div className="flex items-center gap-2 text-[11px] text-gray-400">{dirty ? <><span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />Unsaved changes</> : <><CheckCircle size={12} className="text-green-500" />All changes saved</>}</div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => { setPost(existing?.data ? fromAnnouncement(existing.data) : EMPTY_POST); setDirty(false); toast.info('Changes discarded.'); }} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-semibold text-gray-500 hover:bg-gray-100"><RotateCcw size={13} /> Discard</button>
-          <button type="button" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate(post.status)} className="flex items-center gap-2 rounded-xl px-5 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.25)' }}><Save size={14} />{post.status === 'active' ? 'Save & Publish' : 'Save Draft'}</button>
+          <RoleGuard
+            allowedRoles={['superadmin', 'reviewer']}
+            fallback={
+              <button type="button" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate('draft')} className="flex items-center gap-2 rounded-xl px-5 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.25)' }}><Save size={14} />Save Draft</button>
+            }
+          >
+            <button type="button" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate(post.status)} className="flex items-center gap-2 rounded-xl px-5 py-2 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-60" style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.25)' }}><Save size={14} />{post.status === 'active' ? 'Save & Publish' : 'Save Draft'}</button>
+          </RoleGuard>
         </div>
       </div>
 

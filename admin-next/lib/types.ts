@@ -1,11 +1,13 @@
 export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer-key' | 'admission';
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 
+export type AdminRole = 'superadmin' | 'editor' | 'reviewer' | 'admin' | 'user';
+
 export interface User {
   id: string;
   email: string;
   username: string;
-  role: string;
+  role: AdminRole;
   isActive: boolean;
   createdAt?: string;
   lastLogin?: string;

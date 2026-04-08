@@ -166,4 +166,17 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
+  .animate-marquee {
+    animation: marquee 35s linear infinite;
+  }
+
+  .pause-on-hover:hover .animate-marquee {
+    animation-play-state: paused;
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-100%); }
+  }
 }

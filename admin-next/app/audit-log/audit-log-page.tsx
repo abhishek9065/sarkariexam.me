@@ -16,21 +16,22 @@ interface LogEntry {
   detail: string;
   ip: string;
   severity: Severity;
+  changes?: Array<{ field: string; old: string; new: string }>;
 }
 
 const LOG_DATA: LogEntry[] = [
   { id: '1', time: '2026-03-29 14:32:05', user: 'Super Admin', userInitials: 'SA', action: 'publish', entity: 'SSC CGL 2026 Notification', detail: 'Post published with 14,582 vacancies', ip: '192.168.1.1', severity: 'success' },
   { id: '2', time: '2026-03-29 14:28:11', user: 'Super Admin', userInitials: 'SA', action: 'approve', entity: 'Q&A: Final year eligibility question', detail: 'Question approved and made public', ip: '192.168.1.1', severity: 'success' },
   { id: '3', time: '2026-03-29 14:15:42', user: 'Super Admin', userInitials: 'SA', action: 'create', entity: 'UPSC CSE Prelims Admit Card 2026', detail: 'New admit card post created (draft)', ip: '192.168.1.1', severity: 'info' },
-  { id: '4', time: '2026-03-29 13:55:03', user: 'Super Admin', userInitials: 'SA', action: 'setting', entity: 'Site SEO Settings', detail: 'Meta title and description updated', ip: '192.168.1.1', severity: 'info' },
+  { id: '4', time: '2026-03-29 13:55:03', user: 'Super Admin', userInitials: 'SA', action: 'setting', entity: 'Site SEO Settings', detail: 'Meta title and description updated', ip: '192.168.1.1', severity: 'info', changes: [{ field: 'metaTitle', old: 'SarkariExams - India Jobs', new: 'SarkariExams.me - Latest Govt Jobs' }, { field: 'metaDescription', old: 'Find all govt jobs.', new: 'Get the latest Sarkari Results, Admit Cards, and Jobs.' }] },
   { id: '5', time: '2026-03-29 13:30:29', user: 'Super Admin', userInitials: 'SA', action: 'login', entity: 'Admin Console', detail: 'Successful admin login from browser', ip: '192.168.1.1', severity: 'success' },
-  { id: '6', time: '2026-03-29 12:44:17', user: 'Super Admin', userInitials: 'SA', action: 'update', entity: 'Railway Group D 2026', detail: 'Last date updated to 15 May 2026', ip: '192.168.1.1', severity: 'info' },
+  { id: '6', time: '2026-03-29 12:44:17', user: 'Super Admin', userInitials: 'SA', action: 'update', entity: 'Railway Group D 2026', detail: 'Last date updated to 15 May 2026', ip: '192.168.1.1', severity: 'info', changes: [{ field: 'lastDate', old: '2026-04-30', new: '2026-05-15' }] },
   { id: '7', time: '2026-03-29 12:10:08', user: 'Super Admin', userInitials: 'SA', action: 'delete', entity: 'Q&A: Spam question #4821', detail: 'Spam question deleted from UP Police post', ip: '192.168.1.1', severity: 'danger' },
   { id: '8', time: '2026-03-29 11:55:33', user: 'Super Admin', userInitials: 'SA', action: 'create', entity: 'Ticker: Bihar Police alert', detail: 'New ticker item added - Bihar Police 21,391 posts', ip: '192.168.1.1', severity: 'info' },
   { id: '9', time: '2026-03-29 11:30:51', user: 'Super Admin', userInitials: 'SA', action: 'bulk', entity: '3 expired posts', detail: 'Bulk status change: 3 posts marked as expired', ip: '192.168.1.1', severity: 'warning' },
   { id: '10', time: '2026-03-29 10:45:22', user: 'Super Admin', userInitials: 'SA', action: 'approve', entity: 'Q&A Answer: OBC relaxation', detail: 'Answer marked as Best Answer', ip: '192.168.1.1', severity: 'success' },
   { id: '11', time: '2026-03-29 10:18:09', user: 'Super Admin', userInitials: 'SA', action: 'publish', entity: 'SSC CGL Tier-I Result 2025', detail: 'Result post published successfully', ip: '192.168.1.1', severity: 'success' },
-  { id: '12', time: '2026-03-29 09:55:44', user: 'Super Admin', userInitials: 'SA', action: 'update', entity: 'IBPS PO 2026', detail: 'Application fee details corrected', ip: '192.168.1.1', severity: 'info' },
+  { id: '12', time: '2026-03-29 09:55:44', user: 'Super Admin', userInitials: 'SA', action: 'update', entity: 'IBPS PO 2026', detail: 'Application fee details corrected', ip: '192.168.1.1', severity: 'info', changes: [{ field: 'applicationFee.general', old: '850 INR', new: '850 INR + 18% GST' }, { field: 'applicationFee.scst', old: '175 INR', new: '175 INR + 18% GST' }] },
   { id: '13', time: '2026-03-28 22:30:15', user: 'Super Admin', userInitials: 'SA', action: 'logout', entity: 'Admin Console', detail: 'Session ended - logged out', ip: '192.168.1.1', severity: 'info' },
   { id: '14', time: '2026-03-28 21:00:08', user: 'Super Admin', userInitials: 'SA', action: 'setting', entity: 'Feature Toggles', detail: 'Maintenance mode disabled', ip: '192.168.1.1', severity: 'warning' },
   { id: '15', time: '2026-03-28 19:45:33', user: 'Super Admin', userInitials: 'SA', action: 'create', entity: 'UPSC NDA 2026 Notification', detail: 'New post created with 400 vacancies', ip: '192.168.1.1', severity: 'info' },
@@ -64,6 +65,7 @@ export function AuditLogPage() {
   const [actionFilter, setActionFilter] = useState<ActionType | 'all'>('all');
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [page, setPage] = useState(1);
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
   const pageSize = 10;
 
@@ -229,7 +231,18 @@ export function AuditLogPage() {
                       </p>
                     </td>
                     <td className="px-3 py-3">
-                      <p className="text-[12px] text-gray-500">{log.detail}</p>
+                      <div className="flex flex-col gap-1.5 items-start">
+                        <p className="text-[12px] text-gray-500">{log.detail}</p>
+                        {log.changes && log.changes.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLog(log)}
+                            className="rounded-lg bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20"
+                          >
+                            Inspect Changes
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <span
@@ -284,15 +297,77 @@ export function AuditLogPage() {
         )}
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-        <AlertCircle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/50 dark:bg-amber-500/10">
+        <AlertCircle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-500" />
         <div>
-          <p className="text-[12px] font-bold text-amber-800">Audit Trail Notice</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
+          <p className="text-[12px] font-bold text-amber-800 dark:text-amber-500">Audit Trail Notice</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-600/90">
             All admin actions are logged with timestamps and IP addresses. This log is retained for 90 days and cannot be modified. Export regularly for compliance.
           </p>
         </div>
       </div>
+
+      {selectedLog && selectedLog.changes && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
+          <div className="w-full max-w-3xl overflow-hidden rounded-[22px] bg-white dark:bg-card shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-border bg-muted/50 px-6 py-4">
+              <div className="flex flex-col">
+                <span className="text-[15px] font-extrabold text-foreground flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-primary" /> Visual Diff Inspector
+                </span>
+                <span className="text-[12px] text-muted-foreground mt-0.5">
+                  Action performed by {selectedLog.user} on {selectedLog.time}
+                </span>
+              </div>
+              <button type="button" onClick={() => setSelectedLog(null)} className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto p-6 space-y-6">
+              <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 border-l-4 border-l-blue-500">
+                <p className="text-[12px] font-bold uppercase text-muted-foreground tracking-wider mb-1">Target Entity</p>
+                <p className="text-[14px] font-semibold text-foreground">{selectedLog.entity}</p>
+                <p className="text-[13px] text-muted-foreground mt-1">{selectedLog.detail}</p>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-[14px] font-extrabold text-foreground border-b border-border pb-2">Fields Changed</h3>
+                
+                <div className="grid grid-cols-[minmax(120px,1fr)_2fr_2fr] gap-4">
+                  <div className="text-[11px] font-bold uppercase text-muted-foreground px-2">Field / Key</div>
+                  <div className="text-[11px] font-bold uppercase text-red-500 bg-red-500/10 rounded-md px-3 py-1 w-fit">Removed / Old</div>
+                  <div className="text-[11px] font-bold uppercase text-green-500 bg-green-500/10 rounded-md px-3 py-1 w-fit">Added / New</div>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedLog.changes.map((change, idx) => (
+                    <div key={idx} className="grid grid-cols-[minmax(120px,1fr)_2fr_2fr] gap-4 items-start border-t border-border/50 pt-2">
+                      <div className="px-2 pt-1 font-mono text-[12px] font-bold text-foreground overflow-hidden text-ellipsis whitespace-nowrap" title={change.field}>
+                        {change.field}
+                      </div>
+                      <div className="rounded-lg bg-[#ffebe9] dark:bg-[#ffebe9]/10 p-3 relative group">
+                        <span className="text-[13px] font-mono whitespace-pre-wrap break-all text-[#cf222e] dark:text-[#ff7b72]">{change.old}</span>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#cf222e]/10 dark:bg-[#ff7b72]/20 rounded px-1.5 py-0.5 text-[10px] text-[#cf222e] dark:text-[#ff7b72] font-bold">- Old</div>
+                      </div>
+                      <div className="rounded-lg bg-[#e6ffec] dark:bg-[#e6ffec]/10 p-3 relative group">
+                        <span className="text-[13px] font-mono whitespace-pre-wrap break-all text-[#1a7f37] dark:text-[#3fb950]">{change.new}</span>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1a7f37]/10 dark:bg-[#3fb950]/20 rounded px-1.5 py-0.5 text-[10px] text-[#1a7f37] dark:text-[#3fb950] font-bold">+ New</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 border-t border-border bg-muted/30 px-6 py-4 mt-auto">
+              <button type="button" onClick={() => setSelectedLog(null)} className="rounded-xl bg-primary px-5 py-2.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90">
+                Close Inspector
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
