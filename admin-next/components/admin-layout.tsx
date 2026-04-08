@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import type { AdminRole } from '@/lib/types';
 import { RoleGuard } from './role-guard';
 import { ThemeToggle } from './theme-toggle';
+import { useTheme } from 'next-themes';
 
 type NavItem = {
   href: string;
@@ -191,6 +192,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, logout } = useAuth();
+  const { theme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -369,8 +371,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
         style={{
-          background: 'linear-gradient(165deg, #060d2e 0%, #0d1b6e 50%, #0a1428 100%)',
-          boxShadow: '4px 0 28px rgba(0,0,0,0.45)',
+          background: theme === 'evening'
+            ? 'linear-gradient(165deg, #5c3310 0%, #78350f 50%, #4a2408 100%)'
+            : theme === 'dark'
+              ? 'linear-gradient(165deg, #0f0f14 0%, #18181b 50%, #0f0f14 100%)'
+              : 'linear-gradient(165deg, #060d2e 0%, #0d1b6e 50%, #0a1428 100%)',
+          boxShadow: theme === 'evening'
+            ? '4px 0 28px rgba(92,51,16,0.45)'
+            : '4px 0 28px rgba(0,0,0,0.45)',
         }}
       >
         <button
@@ -668,16 +676,13 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                     </div>
 
                     <div className="bg-gray-50 px-4 py-2.5 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNotifOpen(false);
-                          router.push('/notifications');
-                        }}
+                      <Link
+                        href="/notifications"
+                        onClick={() => setNotifOpen(false)}
                         className="text-[11px] font-semibold text-blue-600 transition-colors hover:underline"
                       >
                         View all notifications
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -693,9 +698,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               </button>
 
               <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
-                <button
-                  type="button"
-                  onClick={() => router.push('/system-admin')}
+                <Link
+                  href="/system-admin"
                   className="flex items-center gap-2 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 px-2.5 py-1.5 transition-colors hover:bg-orange-100/60"
                   title="Open system admin"
                 >
@@ -707,7 +711,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                   </div>
                   <span className="hidden text-xs font-bold text-gray-700 sm:block">{userLabel}</span>
                   <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[7px] font-black tracking-[0.08em] text-white">ADMIN</span>
-                </button>
+                </Link>
                 <button
                   type="button"
                   onClick={() => void handleLogout()}
