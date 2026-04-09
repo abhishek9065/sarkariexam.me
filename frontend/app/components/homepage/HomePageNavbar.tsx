@@ -95,7 +95,7 @@ export function HomePageNavbar() {
       />
       <header className="sticky top-0 z-50">
         <div
-          className="relative overflow-hidden text-white shadow-2xl"
+          className="relative overflow-x-hidden text-white shadow-2xl"
           style={{ background: 'linear-gradient(120deg, #060d2e 0%, #0d1b6e 30%, #1a237e 60%, #0a3880 100%)' }}
         >
           <div
