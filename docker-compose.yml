@@ -41,7 +41,7 @@ services:
       - SENTRY_DSN=${SENTRY_DSN}
       - FRONTEND_URL=${FRONTEND_URL:-https://sarkariexams.me}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://sarkariexams.me,https://www.sarkariexams.me}
-      - METRICS_TOKEN=${METRICS_TOKEN}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
     expose:
       - "4000"
     restart: unless-stopped
@@ -65,7 +65,7 @@ services:
     networks:
       - sarkari-network
     healthcheck:
-      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001" ]
+      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/admin" ]
       interval: 30s
       timeout: 10s
       retries: 3

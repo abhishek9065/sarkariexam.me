@@ -111,7 +111,7 @@ remove_conflicting_container() {
   existing_id="$(docker ps -aq --filter "name=^/${name}$" | head -n1 || true)"
   if [[ -n "$existing_id" ]]; then
     echo "Removing pre-existing container ${name}..."
-    docker rm -f "$existing_id" >/dev/null 2>&1 &
+    docker rm -f "$existing_id" >/dev/null 2>&1 || true
   fi
 }
 
