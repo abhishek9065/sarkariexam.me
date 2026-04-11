@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { optionalAuth } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { getCollectionAsync } from '../services/cosmosdb.js';
 
 const router = Router();
@@ -113,7 +114,7 @@ router.get('/forums', async (req, res) => {
     }
 });
 
-router.post('/forums', async (req, res) => {
+router.post('/forums', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'community-forums' }), async (req, res) => {
     const parseResult = forumCreateSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });
@@ -166,7 +167,7 @@ router.get('/qa', async (req, res) => {
     }
 });
 
-router.post('/qa', async (req, res) => {
+router.post('/qa', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'community-qa' }), async (req, res) => {
     const parseResult = qaCreateSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });
@@ -218,7 +219,7 @@ router.get('/groups', async (req, res) => {
     }
 });
 
-router.post('/groups', async (req, res) => {
+router.post('/groups', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'community-groups' }), async (req, res) => {
     const parseResult = groupCreateSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });
@@ -244,7 +245,7 @@ router.post('/groups', async (req, res) => {
     }
 });
 
-router.post('/flags', optionalAuth, async (req, res) => {
+router.post('/flags', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 30, keyPrefix: 'community-flags' }), optionalAuth, async (req, res) => {
     const parseResult = flagCreateSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });

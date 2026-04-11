@@ -2,6 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';
@@ -907,25 +908,8 @@ router.put('/settings', async (req, res) => {
 // AI CONTENT ASSISTANT
 // ═══════════════════════════════════════════
 
-const aiRateLimit = new Map<string, number[]>();
-
-function checkRateLimit(key: string, maxRequests = 50, windowMs = 3600000): boolean {
-  const now = Date.now();
-  const requests = aiRateLimit.get(key) || [];
-  const valid = requests.filter(t => now - t < windowMs);
-  if (valid.length >= maxRequests) return false;
-  valid.push(now);
-  aiRateLimit.set(key, valid);
-  return true;
-}
-
-router.post('/ai/generate-meta', async (req, res) => {
+router.post('/ai/generate-meta', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 50, keyPrefix: 'admin-ai' }), async (req, res) => {
   try {
-    const userKey = (req as any).user?.id || req.ip;
-    if (!checkRateLimit(userKey)) {
-      return res.status(429).json({ error: 'Rate limit exceeded. Max 50 AI requests/hour.' });
-    }
-
     const schema = z.object({
       title: z.string().min(5).max(200),
       content: z.string().min(10),
@@ -953,13 +937,8 @@ router.post('/ai/generate-meta', async (req, res) => {
   }
 });
 
-router.post('/ai/suggest-tags', async (req, res) => {
+router.post('/ai/suggest-tags', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 50, keyPrefix: 'admin-ai' }), async (req, res) => {
   try {
-    const userKey = (req as any).user?.id || req.ip;
-    if (!checkRateLimit(userKey)) {
-      return res.status(429).json({ error: 'Rate limit exceeded' });
-    }
-
     const schema = z.object({
       title: z.string().min(5),
       content: z.string().min(10),
@@ -985,13 +964,8 @@ router.post('/ai/suggest-tags', async (req, res) => {
   }
 });
 
-router.post('/ai/social-summary', async (req, res) => {
+router.post('/ai/social-summary', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 50, keyPrefix: 'admin-ai' }), async (req, res) => {
   try {
-    const userKey = (req as any).user?.id || req.ip;
-    if (!checkRateLimit(userKey)) {
-      return res.status(429).json({ error: 'Rate limit exceeded' });
-    }
-
     const schema = z.object({
       title: z.string().min(5),
       content: z.string().min(10),

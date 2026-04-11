@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 
+import { rateLimit } from '../middleware/rateLimit.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getCollection } from '../services/cosmosdb.js';
 import { isEmailConfigured, sendVerificationEmail } from '../services/email.js';
@@ -34,7 +35,7 @@ function normalizeCategories(categories?: string[]): string[] {
 }
 
 // Create or update subscription
-router.post('/', async (req, res) => {
+router.post('/', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'subscriptions' }), async (req, res) => {
     const parseResult = subscriptionSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });

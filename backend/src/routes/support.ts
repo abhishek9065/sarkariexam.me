@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { optionalAuth } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { getCollection } from '../services/cosmosdb.js';
 import ErrorTracking from '../services/errorTracking.js';
 
@@ -45,7 +46,7 @@ const reportSchema = z.object({
 
 const reportsCollection = () => getCollection<ErrorReportDoc>('error_reports');
 
-router.post('/error-report', optionalAuth, async (req, res) => {
+router.post('/error-report', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'support-error-report' }), optionalAuth, async (req, res) => {
     const parseResult = reportSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });

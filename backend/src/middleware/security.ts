@@ -9,8 +9,8 @@ import RedisCache from '../services/redis.js';
  * Uses Redis for brute-force protection (distributed safe)
  */
 
-const MAX_FAILED_ATTEMPTS = 5;
-const BLOCK_DURATION_SEC = 15 * 60; // 15 minutes
+const MAX_FAILED_ATTEMPTS = 3;
+const BLOCK_DURATION_SEC = 30 * 60; // 30 minutes
 
 const normalizeEmail = (email?: string): string | null => {
     if (!email) return null;
@@ -129,9 +129,9 @@ export async function recordFailedLoginWithEmail(ip: string, email?: string): Pr
                 
                 if (newCount >= MAX_FAILED_ATTEMPTS) {
                     if (key.startsWith('bf:ip:')) {
-                        console.log(`[SECURITY] IP ${ip} blocked for 15 minutes due to failed login attempts`);
+                        console.log(`[SECURITY] IP ${ip} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`);
                     } else if (normalizedEmail) {
-                        console.log(`[SECURITY] Account ${normalizedEmail} blocked for 15 minutes due to failed login attempts`);
+                        console.log(`[SECURITY] Account ${normalizedEmail} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`);
                     }
                 }
             }

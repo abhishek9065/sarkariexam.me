@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
 
 const router = Router();
@@ -26,7 +27,7 @@ function normalize(value?: string): string {
     return (value || '').toLowerCase();
 }
 
-router.get('/match', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.jobMatch }), async (req, res) => {
+router.get('/match', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'jobs-match' }), cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.jobMatch }), async (req, res) => {
     const parseResult = matchQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
         return res.status(400).json({ 

@@ -41,6 +41,7 @@ import {
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
+import { getSecurityMetricSnapshot } from './services/securityMetrics.js';
 import { scheduleTrackerReminders } from './services/trackerReminders.js';
 import logger from './utils/logger.js';
 
@@ -119,17 +120,21 @@ app.use(validateContentType);
 
 // Swagger UI
 try {
-  const openApiCandidates = [
-    path.join(process.cwd(), 'openapi.json'),
-    path.join(process.cwd(), '../openapi.json'),
-  ];
-  const openApiPath = openApiCandidates.find((candidate) => fs.existsSync(candidate));
-  if (openApiPath) {
-    const openApiParams = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiParams));
-    logger.info('[Server] Swagger UI available at /api/docs');
+  if (!config.isProduction) {
+    const openApiCandidates = [
+      path.join(process.cwd(), 'openapi.json'),
+      path.join(process.cwd(), '../openapi.json'),
+    ];
+    const openApiPath = openApiCandidates.find((candidate) => fs.existsSync(candidate));
+    if (openApiPath) {
+      const openApiParams = JSON.parse(fs.readFileSync(openApiPath, 'utf8'));
+      app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiParams));
+      logger.info('[Server] Swagger UI available at /api/docs');
+    } else {
+      logger.warn('[Server] openapi.json not found, skipping Swagger UI');
+    }
   } else {
-    logger.warn('[Server] openapi.json not found, skipping Swagger UI');
+    logger.info('[Server] Swagger UI disabled in production');
   }
 } catch (err) {
   logger.error({ err }, '[Server] Failed to load Swagger UI');
@@ -144,22 +149,22 @@ app.use(responseTimeLogger);
 
 // Health check
 app.get('/', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.json({
     service: 'SarkariExams API',
     status: 'running',
-    version: '2.0.0'
   });
 });
 
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
   return buildHealthResponse(res);
 });
 
-app.get('/api/healthz', async (_req, res) => {
+app.get('/api/healthz', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
   return buildHealthResponse(res);
 });
 
-app.get('/api/health/deep', async (_req, res) => {
+app.get('/api/health/deep', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
   const status = dbConfigured && !dbOk ? 'error' : 'ok';
@@ -189,9 +194,6 @@ async function buildHealthResponse(res: express.Response) {
     .json({
       status,
       timestamp: new Date().toISOString(),
-      meta: {
-        featureFlags: config.featureFlags,
-      },
       db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' },
     });
 }
@@ -211,6 +213,7 @@ app.get('/metrics', (req, res) => {
   const uptimeSeconds = (Date.now() - startedAt) / 1000;
   const memory = process.memoryUsage();
   const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+  const securityMetrics = getSecurityMetricSnapshot();
 
   const lines = [
     '# HELP app_uptime_seconds App uptime in seconds',
@@ -233,7 +236,16 @@ app.get('/metrics', (req, res) => {
     `app_db_configured ${dbConfigured ? 1 : 0}`,
     '# HELP app_build_info Build information',
     '# TYPE app_build_info gauge',
-    `app_build_info{node_version="${process.version}"} 1`
+    `app_build_info{node_version="${process.version}"} 1`,
+    '# HELP app_security_rate_limit_triggers_total Total requests blocked by rate-limiting middleware',
+    '# TYPE app_security_rate_limit_triggers_total counter',
+    `app_security_rate_limit_triggers_total ${securityMetrics.rateLimitTriggers}`,
+    '# HELP app_security_auth_login_failures_total Total failed login attempts',
+    '# TYPE app_security_auth_login_failures_total counter',
+    `app_security_auth_login_failures_total ${securityMetrics.authLoginFailures}`,
+    '# HELP app_security_bruteforce_blocked_responses_total Total login responses blocked due to brute-force state',
+    '# TYPE app_security_bruteforce_blocked_responses_total counter',
+    `app_security_bruteforce_blocked_responses_total ${securityMetrics.bruteForceBlockedResponses}`
   ];
 
   res.set('Cache-Control', 'no-store');

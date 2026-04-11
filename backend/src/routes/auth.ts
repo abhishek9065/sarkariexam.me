@@ -5,14 +5,17 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { AUTH_COOKIE_NAME, blacklistToken, isTokenBlacklisted } from '../middleware/auth.js';
 import { clearCsrfCookie, ensureCsrfCookie, setCsrfCookie } from '../middleware/csrf.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import {
   bruteForceProtection,
   clearFailedLoginsWithEmail,
   getClientIP,
+  recordFailedLoginWithEmail,
 } from '../middleware/security.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { checkPasswordSecurity } from '../services/passwordSecurity.js';
+import { incrementAuthLoginFailure, incrementBruteForceBlockedResponse } from '../services/securityMetrics.js';
 import type { JwtPayload } from '../types.js';
 
 const router = express.Router();
@@ -90,13 +93,13 @@ const verifyJwtToken = (token: string): JwtPayload => {
   return jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
 };
 
-router.get('/csrf', (req, res) => {
+router.get('/csrf', rateLimit({ windowMs: 60000, maxRequests: 30, keyPrefix: 'auth-csrf' }), (req, res) => {
   const csrfToken = ensureCsrfCookie(req, res);
   res.set('Cache-Control', 'no-store');
   return res.json({ data: { csrfToken } });
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 10, keyPrefix: 'auth-register' }), async (req, res) => {
   try {
     const validated = registerSchema.parse(req.body);
     const passwordSecurity = await checkPasswordSecurity(validated.password);
@@ -159,6 +162,16 @@ router.post('/login', bruteForceProtection, async (req, res) => {
     const user = await UserModelMongo.verifyPassword(validated.email, validated.password);
 
     if (!user) {
+      incrementAuthLoginFailure();
+      await recordFailedLoginWithEmail(clientIP, validated.email);
+      if ((req as any).bruteForceBlocked) {
+        const waitMinutes = Number((req as any).bruteForceWaitMinutes || 30);
+        incrementBruteForceBlockedResponse();
+        return res.status(429).json({
+          error: 'Too many failed attempts',
+          retryAfterMinutes: waitMinutes,
+        });
+      }
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 

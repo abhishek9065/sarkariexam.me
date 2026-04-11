@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 import { cacheControl } from '../middleware/cacheControl.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
 import { getTopSearches, recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
 import { normalizeAttribution } from '../services/attribution.js';
@@ -36,7 +37,7 @@ const querySchema = z.object({
   salaryMin: z.coerce.number().min(0).optional(),
   salaryMax: z.coerce.number().min(0).optional(),
   sort: z.enum(['newest', 'oldest', 'deadline', 'views']).default('newest'),
-  limit: z.coerce.number().int().min(1).max(200).default(100),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
@@ -46,7 +47,7 @@ const searchQuerySchema = z.object({
   type: z
     .enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]])
     .optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
 const suggestQuerySchema = z.object({
@@ -517,6 +518,7 @@ router.get(
 // Search suggestions for global overlay
 router.get(
   '/search/suggest',
+  rateLimit({ windowMs: 60 * 1000, maxRequests: 120, keyPrefix: 'announcements-suggest' }),
   cacheMiddleware({
     ttl: 180,
     keyGenerator: (req) => `search-suggest:q:${req.query.q || ''}:type:${req.query.type || 'all'}:limit:${req.query.limit || 8}`,
@@ -624,6 +626,7 @@ router.get(
 // Top search terms (query-frequency driven trending chips)
 router.get(
   '/search/trending',
+  rateLimit({ windowMs: 60 * 1000, maxRequests: 60, keyPrefix: 'announcements-trending' }),
   cacheMiddleware({
     ttl: 180,
     keyGenerator: (req) => `search-trending:days:${req.query.days || 30}:limit:${req.query.limit || 8}`,
@@ -652,6 +655,7 @@ router.get(
 // Search announcements (cached)
 router.get(
   '/search',
+  rateLimit({ windowMs: 60 * 1000, maxRequests: 60, keyPrefix: 'announcements-search' }),
   cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.search }),
   cacheControl(120),
   async (req, res) => {

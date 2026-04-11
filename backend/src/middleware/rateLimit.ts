@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 import RedisCache from '../services/redis.js';
+import { incrementRateLimitTrigger } from '../services/securityMetrics.js';
 import { SecurityLogger } from '../services/securityLogger.js';
 
 import { getRealIp } from './cloudflare.js';
@@ -57,6 +58,7 @@ export function rateLimit(options: RateLimitOptions = {}) {
 
         if (!result.allowed) {
             const retryAfter = Math.max(1, Math.ceil((result.resetTime - Date.now()) / 1000));
+            incrementRateLimitTrigger();
             SecurityLogger.log({
                 ip_address: clientIp,
                 event_type: 'rate_limit',
