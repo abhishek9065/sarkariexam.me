@@ -5,7 +5,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.optimized
+      dockerfile: Dockerfile
       args:
         - BUILDKIT_INLINE_CACHE=1
         - NEXT_PUBLIC_API_URL=https://sarkariexams.me/api

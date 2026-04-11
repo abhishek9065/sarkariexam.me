@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Production Dockerfile for frontend (Next.js 16.2.1)
 FROM node:22-alpine AS base
 
@@ -8,7 +9,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -27,7 +28,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_ADMIN_URL=$NEXT_PUBLIC_ADMIN_URL
 
 # Build Next.js application
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -41,9 +42,8 @@ RUN adduser --system --uid 1001 nextjs
 
 # Copy built application
 COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
@@ -52,4 +52,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

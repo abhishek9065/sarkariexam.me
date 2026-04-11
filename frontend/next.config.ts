@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  output: 'standalone',
   async redirects() {
     return (Object.keys(announcementItemsBySection) as Array<keyof typeof announcementItemsBySection>).flatMap((section) =>
       announcementItemsBySection[section].flatMap((item) => {

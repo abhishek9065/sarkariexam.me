@@ -1,13 +1,19 @@
-# Build stage
-FROM node:22-alpine AS builder
+# syntax=docker/dockerfile:1.7
+FROM node:22-alpine AS base
+
+FROM base AS deps
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev)
-RUN npm ci
+# Install all dependencies once and reuse them across stages
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+FROM deps AS builder
+
+WORKDIR /app
 
 # Copy source code
 COPY . .
@@ -15,8 +21,14 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
+FROM deps AS prod-deps
+
+WORKDIR /app
+
+RUN npm prune --omit=dev && npm cache clean --force
+
 # Production stage
-FROM node:22-alpine AS production
+FROM base AS production
 
 WORKDIR /app
 
@@ -24,24 +36,12 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/package*.json ./
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/openapi.json ./openapi.json
-
-# Copy scripts for seeding (optional)
-COPY --from=builder /app/scripts ./scripts
-
-# Copy source files for tsx-based runtime scripts that import from src/*
-COPY --from=builder /app/src ./src
-
-# Install tsx for running TypeScript scripts
-RUN npm install -g tsx
 
 # Set ownership
 RUN chown -R nodejs:nodejs /app

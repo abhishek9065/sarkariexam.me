@@ -10,9 +10,14 @@ cd "$ROOT_DIR"
 
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
 export COMPOSE_PROJECT_NAME
+COMPOSE_FILES=(-f docker-compose.yml)
+
+if [[ -f docker-compose.fast.yml ]]; then
+  COMPOSE_FILES+=(-f docker-compose.fast.yml)
+fi
 
 dc() {
-  docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file .env "$@"
+  docker compose "${COMPOSE_FILES[@]}" --project-name "$COMPOSE_PROJECT_NAME" --env-file .env "$@"
 }
 
 echo "Using compose project: $COMPOSE_PROJECT_NAME"
@@ -88,8 +93,16 @@ echo "Building all services in parallel with optimized caching..."
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
-# Build everything in parallel rather than sequentially
-dc build --parallel --pull
+# Build everything in parallel rather than sequentially. Pull base images only when requested.
+BUILD_ARGS=(--parallel)
+if [[ "${PULL_BASE_IMAGES:-0}" == "1" ]]; then
+  BUILD_ARGS+=(--pull)
+  echo "Base image refresh enabled (PULL_BASE_IMAGES=1)"
+else
+  echo "Using local/cached base images. Set PULL_BASE_IMAGES=1 to force a refresh."
+fi
+
+dc build "${BUILD_ARGS[@]}"
 
 # OPTIMIZATION 3: Smart container replacement
 remove_conflicting_container() {
@@ -223,20 +236,7 @@ dc exec -T backend wget -qO- --timeout=5 http://127.0.0.1:4000/api/health || {
   exit 1
 }
 
-# OPTIMIZATION 9: Optional public endpoint verification
-if [[ "${SKIP_PUBLIC_CHECKS:-0}" == "1" ]]; then
-  echo "Skipping public endpoint checks (SKIP_PUBLIC_CHECKS=1)"
-else
-  echo "Backend health (public edge):"
-  PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://sarkariexams.me/api/health}"
-  if curl -fsS --max-time 10 "$PUBLIC_HEALTH_URL" >/dev/null 2>&1; then
-    echo "ok ($PUBLIC_HEALTH_URL)"
-  else
-    echo "WARNING: Public health check failed (may be due to cache/DNS delay)"
-  fi
-fi
-
-# OPTIMIZATION 10: Conditional cache purge
+# OPTIMIZATION 9: Conditional cache purge
 purge_cloudflare_cache() {
   CF_ZONE_ID="$(read_env_var "CF_ZONE_ID")"
   CF_API_TOKEN="$(read_env_var "CF_API_TOKEN")"
@@ -257,6 +257,45 @@ if [[ "${SKIP_CACHE_PURGE:-0}" == "1" ]]; then
   echo "Skipping cache purge (SKIP_CACHE_PURGE=1)"
 else
   purge_cloudflare_cache || true
+fi
+
+verify_public_endpoint() {
+  local path="$1"
+  local label="$2"
+  local url="${PUBLIC_BASE_URL}${path}"
+  local status
+
+  status="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 10 "$url" || true)"
+  if [[ "$status" =~ ^(2|3) ]]; then
+    echo "ok (${label} -> ${url}, status=${status})"
+    return 0
+  fi
+
+  echo "ERROR: ${label} failed for ${url} (status=${status:-none})"
+  return 1
+}
+
+verify_public_endpoints() {
+  PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
+  local failures=0
+
+  echo "Public edge verification:"
+  verify_public_endpoint "/api/health" "public api health" || failures=1
+  verify_public_endpoint "/" "homepage" || failures=1
+  verify_public_endpoint "/jobs" "jobs listing" || failures=1
+  verify_public_endpoint "/results/upsc-civil-services-2025-final-result" "result detail" || failures=1
+  verify_public_endpoint "/admin" "admin console" || failures=1
+
+  if [[ "$failures" -ne 0 ]]; then
+    return 1
+  fi
+}
+
+# OPTIMIZATION 10: Single public verification layer
+if [[ "${SKIP_PUBLIC_CHECKS:-0}" == "1" ]]; then
+  echo "Skipping public endpoint checks (SKIP_PUBLIC_CHECKS=1)"
+else
+  verify_public_endpoints
 fi
 
 echo "=== FAST DEPLOY COMPLETED ==="
