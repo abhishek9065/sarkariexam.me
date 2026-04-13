@@ -13,7 +13,7 @@ Government jobs and exam updates platform.
 - Admin workflows for announcements, analytics, subscribers, notifications, SEO, and moderation
 - MongoDB locally and Azure Cosmos DB (MongoDB API) in production
 - JWT auth, CSRF, rate limiting, caching, and OpenAPI docs
-- Docker-based production deployment and PM2 support for direct VM deploys
+- Docker-based production deployment through prebuilt registry images
 
 ## Requirements
 - Node.js `22.x`
@@ -55,6 +55,8 @@ Runs on `http://localhost:3001`.
 ```env
 COSMOS_CONNECTION_STRING=...
 JWT_SECRET=...
+DOCR_REGISTRY_NAME=...
+DOCR_ACCESS_TOKEN=...
 METRICS_TOKEN=
 ```
 
@@ -107,20 +109,33 @@ npm run build
 
 ## CI
 
-GitHub Actions currently run:
+GitHub Actions currently cover:
 - backend lint, build, and tests
 - public frontend lint and build
 - npm audit for backend and frontend
 - CodeQL analysis
+- production image build and publish to DigitalOcean Container Registry
+- production deploy over SSH after image publication succeeds
 
 Workflow files live in [`.github/workflows`](./.github/workflows).
 
 ## Deployment
 
-### Canonical production deploy
+### Normal release path
+
+```bash
+git push origin main
+```
+
+`main` pushes trigger the production release pipeline:
+- `Build and Publish Production Images`
+- `Deploy to Production`
+
+The build workflow runs CI and security checks, publishes immutable Docker images tagged with the commit SHA plus a stable `main` tag, and the deploy workflow SSHes into the droplet and restarts Docker with those prebuilt images.
+
+### Manual fallback deploy
 
 PowerShell:
-
 ```powershell
 .\scripts\deploy-prod-remote.ps1
 ```
@@ -131,7 +146,7 @@ Bash:
 bash scripts/deploy-prod-remote.sh
 ```
 
-Both wrappers SSH into the droplet and invoke the same remote entrypoint, preferring `~/sarkari-result/scripts/deploy-live.sh` and falling back to `~/sarkariexam.me/scripts/deploy-live.sh`.
+Both wrappers SSH into the droplet and invoke the same remote entrypoint, preferring `~/sarkari-result/scripts/deploy-live.sh` and falling back to `~/sarkariexam.me/scripts/deploy-live.sh`. Manual deploys default to `DEPLOY_MODE=fast` and use the current `main` checkout SHA, with `main` as the fallback image tag.
 
 ### Server-side deploy entrypoint
 
@@ -139,30 +154,49 @@ Both wrappers SSH into the droplet and invoke the same remote entrypoint, prefer
 bash ~/sarkari-result/scripts/deploy-live.sh
 ```
 
-`deploy-live.sh` is the canonical server-side deploy command. It resolves the active server checkout (`~/sarkari-result` first, then `~/sarkariexam.me`), syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, and then calls `scripts/deploy-prod.sh`.
+`deploy-live.sh` is the canonical server-side deploy command. It resolves the active server checkout (`~/sarkari-result` first, then `~/sarkariexam.me`), syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, resolves the target image tag from the checked-out commit SHA, and then calls `scripts/deploy-fast.sh` by default or `scripts/deploy-prod.sh` when `DEPLOY_MODE=full`.
 
-### Guarded Docker deploy engine
+### Pull-only Docker deploy engines
+
+```bash
+cd ~/sarkari-result
+COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-fast.sh
+```
+
+Fast mode pulls production images from DigitalOcean Container Registry and performs compact health and public-edge checks:
+
+```bash
+cd ~/sarkari-result
+COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-fast.sh
+```
+
+Full mode uses the same pull-only image path, then performs the extended route and asset verification suite:
 
 ```bash
 cd ~/sarkari-result
 COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-prod.sh
 ```
 
-`deploy-prod.sh` is the guarded compose deploy engine for the current checkout only. It validates required production env vars, rebuilds services, checks backend health, and verifies public routes after startup.
+Both scripts use [`docker-compose.production.yml`](./docker-compose.production.yml) and `docker compose up --no-build`, so the droplet no longer rebuilds application images during release.
 
-### PM2 frontend runtime
+### Required secrets and server env
 
-For non-Docker VM deployments, use the committed PM2 config:
+GitHub Actions secrets:
+- `DOCR_REGISTRY_NAME`
+- `DOCR_TOKEN`
+- `DO_HOST`
+- `DO_USER`
+- `DO_SSH_KEY`
+- optional `DO_PORT`
 
-```bash
-cd ~/sarkari-result
-npm --prefix frontend run build
-pm2 delete frontend || true
-pm2 start ecosystem.config.cjs --only frontend
-pm2 save
-```
+Server root `.env`:
+- `DOCR_REGISTRY_NAME`
+- `DOCR_ACCESS_TOKEN`
+- existing production app secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
 
-This ensures PM2 starts the app from the correct `frontend` working directory.
+### Runtime model
+
+Production runtime is Docker + Nginx only. Use the deploy scripts above for releases and avoid PM2-specific frontend startup paths.
 
 ## Repository Layout
 

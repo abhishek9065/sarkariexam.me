@@ -1,178 +1,109 @@
-# 🚀 Fast Deployment System
+# Fast Deploy
 
-This optimization system reduces deployment time from **~9.5 minutes to ~3-4 minutes** (60%+ faster).
+Production deploys now use a pull-only release flow:
+- GitHub Actions build and publish Docker images to DigitalOcean Container Registry
+- the droplet `git pull`s the repo for scripts and compose changes
+- the deploy scripts run `docker compose pull` and `docker compose up --no-build`
 
-## Quick Usage
+That removes the slowest part of the old flow: rebuilding Next.js and backend images on a `1 vCPU / 1 GB` droplet.
 
-### Fast Deployment (Recommended)
-```bash
-# From your local machine
-./scripts/deploy-prod-remote.ps1
+## Default Commands
 
-# Fast mode is now the default!
-# Estimated time: 3-4 minutes
-```
-
-### Full Deployment (When needed)
-```bash
-# Set environment variable for full checks
-$env:DEPLOY_MODE="full"
-./scripts/deploy-prod-remote.ps1
-
-# Estimated time: 8-10 minutes  
-```
-
-## Optimizations Applied
-
-### 1. **Parallel Docker Builds** 
-- All services build simultaneously instead of sequentially
-- Uses BuildKit for improved caching and parallelism
-- **Time saved: ~2-3 minutes**
-
-### 2. **Optimized Frontend Build**
-- Enhanced Docker layer caching
-- Standalone Next.js output (smaller runtime)  
-- Disabled source maps in production
-- Better webpack chunk splitting
-- **Time saved: ~1-2 minutes**
-
-### 3. **Reduced Health Checks**
-- Faster polling intervals (1s vs 2s)
-- Fewer attempts (30 vs 60)  
-- Minimal frontend route testing
-- **Time saved: ~1-2 minutes**
-
-### 4. **Smart Skipping**
-- Skip config validation in fast mode
-- Optional extensive public route testing
-- Conditional cache purging
-- **Time saved: ~1 minute**
-
-### 5. **Container Optimizations**
-- Parallel container removal
-- Faster startup sequencing
-- Optimized health check timeouts
-- **Time saved: ~30-60 seconds**
-
-## Configuration Options
-
-Set these environment variables to control deployment behavior:
+Normal release:
 
 ```bash
-# Deployment mode
-DEPLOY_MODE=fast           # Use fast deployment (default)
-DEPLOY_MODE=full          # Use full deployment with all checks
-
-# Fast mode options  
-SKIP_CONFIG_VALIDATION=1  # Skip docker compose config validation
-SKIP_FRONTEND_CHECKS=1    # Skip extensive frontend route testing  
-SKIP_PUBLIC_CHECKS=1      # Skip public endpoint verification
-SKIP_CACHE_PURGE=1        # Skip Cloudflare cache purge
+git push origin main
 ```
 
-## Files Added/Modified
+Manual fallback from a developer machine:
 
-### New Files
-- `scripts/deploy-fast.sh` - Fast deployment script with optimizations
-- `frontend/Dockerfile.optimized` - Optimized frontend Dockerfile  
-- `frontend/next.config.optimized.ts` - Performance-tuned Next.js config
-- `docker-compose.fast.yml` - Fast build override configuration
-- `scripts/verify-deployment.sh` - Post-deployment verification
-- `scripts/FAST_DEPLOY_README.md` - This documentation
-
-### Modified Files
-- `scripts/deploy-live.sh` - Added fast/full mode selection
-
-## Usage Examples
-
-### Normal Fast Deploy (3-4 minutes)
 ```powershell
-./scripts/deploy-prod-remote.ps1
+.\scripts\deploy-prod-remote.ps1
 ```
 
-### Full Deploy with All Checks (8-10 minutes)
+```bash
+bash scripts/deploy-prod-remote.sh
+```
+
+Remote emergency fallback:
+
+```bash
+bash ~/sarkari-result/scripts/deploy-live.sh
+```
+
+## Modes
+
+Fast mode is the default:
+- pulls the target image tag from DigitalOcean Container Registry
+- restarts Docker services with `--no-build`
+- runs compact backend and public-edge checks
+- optionally purges Cloudflare cache
+
+Full mode uses the same pull-only image path, then runs the extended public route and asset verification suite.
+
+PowerShell:
+
 ```powershell
 $env:DEPLOY_MODE="full"
-./scripts/deploy-prod-remote.ps1
+.\scripts\deploy-prod-remote.ps1
 ```
 
-### Custom Fast Deploy 
-```powershell
-$env:DEPLOY_MODE="fast"
-$env:SKIP_PUBLIC_CHECKS="1"    # Skip public endpoint tests
-$env:SKIP_CACHE_PURGE="1"      # Skip Cloudflare cache purge
-./scripts/deploy-prod-remote.ps1
-```
+Bash:
 
-### Post-Deployment Verification
 ```bash
-# Run comprehensive verification after fast deploy
-bash scripts/verify-deployment.sh
+DEPLOY_MODE=full bash scripts/deploy-prod-remote.sh
 ```
 
-## When to Use Each Mode
+## Image Tags
 
-### Use Fast Mode When:
-- ✅ Regular code updates and bug fixes
-- ✅ Adding new features  
-- ✅ Admin button updates and UI changes
-- ✅ Content and data updates
-- ✅ Daily/frequent deployments
+The default image tag is the checked-out `main` commit SHA on the server. If that exact tag is unavailable, deploy scripts fall back to the stable `main` tag.
 
-### Use Full Mode When:
-- 🔍 Major infrastructure changes
-- 🔍 Docker configuration updates
-- 🔍 First deployment to new server
-- 🔍 Debugging deployment issues
-- 🔍 Critical production releases
+You can override the tag manually.
 
-## Performance Comparison
+PowerShell:
 
-| Deployment Stage | Original Time | Fast Mode Time | Time Saved |
-|------------------|---------------|----------------|------------|
-| Docker Builds    | ~4-5 minutes  | ~2-3 minutes   | ~40-50%    |
-| Health Checks    | ~2 minutes    | ~45 seconds    | ~60%       |
-| Route Testing    | ~1.5 minutes  | ~15 seconds    | ~85%       |
-| Container Setup  | ~1 minute     | ~30 seconds    | ~50%       |
-| **TOTAL**        | **~9.5 min**  | **~3-4 min**   | **~60%**   |
+```powershell
+.\scripts\deploy-prod-remote.ps1 -ImageTag 0123456789abcdef0123456789abcdef01234567
+```
+
+Bash:
+
+```bash
+DEPLOY_IMAGE_TAG=0123456789abcdef0123456789abcdef01234567 bash scripts/deploy-prod-remote.sh
+```
+
+## Required Configuration
+
+GitHub Actions secrets:
+- `DOCR_REGISTRY_NAME`
+- `DOCR_TOKEN`
+- `DO_HOST`
+- `DO_USER`
+- `DO_SSH_KEY`
+- optional `DO_PORT`
+
+Server root `.env`:
+- `DOCR_REGISTRY_NAME`
+- `DOCR_ACCESS_TOKEN`
+- `COSMOS_CONNECTION_STRING`
+- `JWT_SECRET`
+- optional `CF_ZONE_ID`
+- optional `CF_API_TOKEN`
+- optional `DD_API_KEY`
+
+## Files
+
+- `docker-compose.production.yml`: pull-only production runtime definition
+- `scripts/deploy-common.sh`: shared production deploy helpers
+- `scripts/deploy-fast.sh`: fast production deploy
+- `scripts/deploy-prod.sh`: full production deploy
+- `scripts/deploy-live.sh`: remote deploy entrypoint
+- `docker-compose.fast.yml`: local build override, not used by production deploys
 
 ## Troubleshooting
 
-### If Fast Deploy Fails
-1. Try full deployment mode:
-   ```powershell
-   $env:DEPLOY_MODE="full"
-   ./scripts/deploy-prod-remote.ps1
-   ```
-
-2. Run verification script:
-   ```bash
-   bash scripts/verify-deployment.sh  
-   ```
-
-3. Check container logs:
-   ```bash
-   docker compose logs backend
-   docker compose logs frontend
-   ```
-
-### If Build Caching Issues
-```bash
-# Clear Docker build cache
-docker builder prune -f
-
-# Rebuild without cache
-$env:FRONTEND_NO_CACHE="1"
-./scripts/deploy-prod-remote.ps1
-```
-
-## Benefits Summary
-
-- ⚡ **60%+ faster deployments** (9.5min → 3-4min)
-- 🔄 **Maintains reliability** with optional full verification
-- 🛠️ **Easy to use** - fast mode is default
-- 📊 **Configurable** via environment variables
-- 🔍 **Post-deploy verification** available when needed
-- 🏗️ **Better Docker caching** for future builds
-
-Your admin button feature deployments will now be much faster while maintaining the same reliability and functionality!
+If a deploy fails:
+1. Re-run in full mode.
+2. Check the server deploy log at `/tmp/sarkari-result-deploy.log`.
+3. Check container logs with `docker compose -f docker-compose.production.yml logs`.
+4. Verify the required registry secrets and server `.env` values exist.

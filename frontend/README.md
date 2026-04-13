@@ -93,25 +93,9 @@ npm run build
 npm start
 ```
 
-### Run With PM2
+### Production Runtime
 
-Use the committed PM2 config from the repository root so the process always starts with the correct working directory:
-
-```bash
-cd ~/sarkari-result
-npm --prefix frontend run build
-pm2 delete frontend || true
-pm2 start ecosystem.config.cjs --only frontend
-pm2 save
-```
-
-If PM2 starts `next` from the repo root instead of `frontend`, Next.js will fail with:
-
-```text
-Could not find a production build in the '.next' directory
-```
-
-That error means the build exists, but the process manager is looking in the wrong directory.
+The project uses Docker + Nginx for production runtime. Use the repository deployment scripts in `scripts/` from the project root for release workflows.
 
 ## Design System
 
