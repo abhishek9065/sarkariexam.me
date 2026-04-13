@@ -1,6 +1,11 @@
 import path from 'path';
 import type { NextConfig } from 'next';
-import { announcementCategoryMeta, announcementItemsBySection, buildAnnouncementPath } from './app/lib/public-content';
+import {
+  announcementCategoryMeta,
+  announcementItemsBySection,
+  buildAnnouncementPath,
+  resolveAnnouncementAcrossSections,
+} from './app/lib/public-content';
 
 const singularAliasPathMap = {
   jobs: '/job',
@@ -28,11 +33,13 @@ const nextConfig: NextConfig = {
           permanent: true,
         }));
 
-        redirects.push({
-          source: `/detail/${item.slug}`,
-          destination,
-          permanent: true,
-        });
+        if (resolveAnnouncementAcrossSections(item.slug)) {
+          redirects.push({
+            source: `/detail/${item.slug}`,
+            destination,
+            permanent: true,
+          });
+        }
 
         if (singularAliasPath) {
           redirects.push({
@@ -49,11 +56,13 @@ const nextConfig: NextConfig = {
             permanent: true,
           });
 
-          redirects.push({
-            source: `/detail/${item.legacyId}`,
-            destination,
-            permanent: true,
-          });
+          if (resolveAnnouncementAcrossSections(item.legacyId)) {
+            redirects.push({
+              source: `/detail/${item.legacyId}`,
+              destination,
+              permanent: true,
+            });
+          }
 
           if (singularAliasPath) {
             redirects.push({
@@ -65,11 +74,13 @@ const nextConfig: NextConfig = {
         }
 
         redirects.push(
-          ...item.legacySlugs.map((legacySlug) => ({
-            source: `/detail/${legacySlug}`,
-            destination,
-            permanent: true,
-          })),
+          ...item.legacySlugs
+            .filter((legacySlug) => Boolean(resolveAnnouncementAcrossSections(legacySlug)))
+            .map((legacySlug) => ({
+              source: `/detail/${legacySlug}`,
+              destination,
+              permanent: true,
+            })),
         );
 
         if (singularAliasPath) {

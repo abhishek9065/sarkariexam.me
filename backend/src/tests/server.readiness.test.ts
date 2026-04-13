@@ -56,6 +56,23 @@ describe('server readiness', () => {
     });
   });
 
+  it('keeps /api/health healthy when no database is configured', async () => {
+    isDatabaseConfigured.mockReturnValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'ok',
+      db: {
+        configured: false,
+        status: 'not_configured',
+      },
+    });
+    expect(healthCheck).not.toHaveBeenCalled();
+  });
+
   it('returns 503 for db-backed API routes when the database cannot be readied', async () => {
     isDatabaseConfigured.mockReturnValue(true);
     healthCheck.mockResolvedValue(true);

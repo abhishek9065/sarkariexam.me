@@ -16,17 +16,7 @@ const RETRY_DELAY = 5000;
 const HEALTH_CHECK_CACHE_MS = 5000;
 
 const getConnectionString = (): string | undefined => {
-    const configured = process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
-    if (configured) {
-        return configured;
-    }
-
-    // Keep the runtime DB behavior aligned with config.ts development fallback.
-    if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
-        return 'mongodb://localhost:27017/sarkari_db';
-    }
-
-    return undefined;
+    return process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI;
 };
 
 const getDatabaseName = (): string =>

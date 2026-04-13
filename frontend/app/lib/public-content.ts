@@ -3655,14 +3655,20 @@ export function resolveAnnouncementParam(section: AnnouncementSection, param: st
 }
 
 export function resolveAnnouncementAcrossSections(param: string) {
+  let match: (ReturnType<typeof resolveAnnouncementParam> & { section: AnnouncementSection }) | null = null;
+
   for (const section of homePageSectionOrder) {
     const resolved = resolveAnnouncementParam(section, param);
     if (resolved) {
-      return { ...resolved, section };
+      if (match) {
+        return null;
+      }
+
+      match = { ...resolved, section };
     }
   }
 
-  return null;
+  return match;
 }
 
 export function getCategoryMetaBySlug(slug: string) {

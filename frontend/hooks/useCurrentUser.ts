@@ -13,6 +13,18 @@ interface User {
   lastLogin?: string;
 }
 
+function readCookieValue(name: string) {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const cookie = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${name}=`));
+
+  return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : null;
+}
+
 export function useCurrentUser() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,13 +64,37 @@ export function useCurrentUser() {
 
   const logout = async () => {
     try {
-      await fetch(`${apiBase}/auth/logout`, {
+      let csrfToken = readCookieValue('csrf_token');
+
+      if (!csrfToken) {
+        const csrfResponse = await fetch(`${apiBase}/auth/csrf`, {
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+
+        if (csrfResponse.ok) {
+          const payload = await csrfResponse.json().catch(() => null);
+          csrfToken = payload?.data?.csrfToken ?? readCookieValue('csrf_token');
+        }
+      }
+
+      const response = await fetch(`${apiBase}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
+        headers: csrfToken ? { 'x-csrf-token': csrfToken } : undefined,
       });
+
+      if (!response.ok) {
+        throw new Error(`Logout failed with status ${response.status}`);
+      }
+
       setUser(null);
+      setError(null);
     } catch (err) {
       console.error('Failed to logout:', err);
+      setError(err instanceof Error ? err.message : 'Failed to logout');
     }
   };
 
