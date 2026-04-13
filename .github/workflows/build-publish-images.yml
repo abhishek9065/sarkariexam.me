@@ -90,7 +90,7 @@ jobs:
 
       - name: Build and push frontend image
         if: matrix.service == 'frontend'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -110,7 +110,7 @@ jobs:
 
       - name: Build and push image
         if: matrix.service != 'frontend'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
