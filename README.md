@@ -134,6 +134,8 @@ git push origin main
 
 The build workflow runs CI and security checks, publishes immutable Docker images tagged with the commit SHA plus a stable `main` tag, and the deploy workflow SSHes into the droplet and restarts Docker with those prebuilt images.
 
+Production image publishing and deployment workflows are restricted to `main` for manual dispatches.
+
 ### Manual fallback deploy
 
 PowerShell:
