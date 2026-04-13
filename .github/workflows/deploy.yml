@@ -36,8 +36,37 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
       github.ref == 'refs/heads/main')
     steps:
+      - name: Check publish results
+        id: publish-status
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_JOBS_URL: ${{ github.event.workflow_run.jobs_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$EVENT_NAME" != "workflow_run" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          jobs_json="$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$WORKFLOW_RUN_JOBS_URL")"
+
+          publish_success_count="$(printf '%s' "$jobs_json" | jq '[.jobs[] | select(.name | test("^Publish .+ Image$")) | select(.conclusion == "success")] | length')"
+
+          if [ "${publish_success_count:-0}" -gt 0 ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "published=false" >> "$GITHUB_OUTPUT"
+
+      - name: Report skipped deploy
+        if: steps.publish-status.outputs.published != 'true'
+        run: |
+          echo "Skipping production deploy because the triggering workflow did not publish production images."
+
       - name: Resolve deployment inputs
         id: deploy-inputs
+        if: steps.publish-status.outputs.published == 'true'
         env:
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -57,6 +86,7 @@ jobs:
           echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Check deploy configuration
+        if: steps.publish-status.outputs.published == 'true'
         env:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
@@ -76,6 +106,7 @@ jobs:
           fi
 
       - name: Deploy via SSH
+        if: steps.publish-status.outputs.published == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DO_HOST }}
