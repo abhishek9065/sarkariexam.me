@@ -5,7 +5,15 @@ set -euo pipefail
 DO_HOST="${DO_HOST:-64.227.191.101}"
 DO_USER="${DO_USER:-root}"
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/id_ed25519}"
-REMOTE_COMMAND='if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then bash ~/sarkari-result/scripts/deploy-live.sh; elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then bash ~/sarkariexam.me/scripts/deploy-live.sh; else echo "No deployment entrypoint found"; exit 1; fi'
+DEPLOY_MODE="${DEPLOY_MODE:-fast}"
+DEPLOY_IMAGE_FALLBACK_TAG="${DEPLOY_IMAGE_FALLBACK_TAG:-main}"
+REMOTE_COMMAND="export DEPLOY_MODE=${DEPLOY_MODE}; export DEPLOY_IMAGE_FALLBACK_TAG=${DEPLOY_IMAGE_FALLBACK_TAG}; "
+
+if [[ -n "${DEPLOY_IMAGE_TAG:-}" ]]; then
+  REMOTE_COMMAND+="export DEPLOY_IMAGE_TAG=${DEPLOY_IMAGE_TAG}; "
+fi
+
+REMOTE_COMMAND+='if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then bash ~/sarkari-result/scripts/deploy-live.sh; elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then bash ~/sarkariexam.me/scripts/deploy-live.sh; else echo "No deployment entrypoint found"; exit 1; fi'
 
 if [[ ! -f "$SSH_KEY_PATH" ]]; then
   echo "ERROR: SSH key not found at $SSH_KEY_PATH" >&2

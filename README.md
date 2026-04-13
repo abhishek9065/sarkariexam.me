@@ -57,6 +57,7 @@ COSMOS_CONNECTION_STRING=...
 JWT_SECRET=...
 DOCR_REGISTRY_NAME=...
 DOCR_ACCESS_TOKEN=...
+DOCR_USERNAME=
 METRICS_TOKEN=
 ```
 
@@ -192,6 +193,7 @@ GitHub Actions secrets:
 Server root `.env`:
 - `DOCR_REGISTRY_NAME`
 - `DOCR_ACCESS_TOKEN`
+- optional `DOCR_USERNAME`
 - existing production app secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
 
 ### Runtime model

@@ -85,6 +85,7 @@ GitHub Actions secrets:
 Server root `.env`:
 - `DOCR_REGISTRY_NAME`
 - `DOCR_ACCESS_TOKEN`
+- optional `DOCR_USERNAME`
 - `COSMOS_CONNECTION_STRING`
 - `JWT_SECRET`
 - optional `CF_ZONE_ID`

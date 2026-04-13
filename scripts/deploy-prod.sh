@@ -2,128 +2,35 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./deploy-common.sh
+source "${SCRIPT_DIR}/deploy-common.sh"
+
 cd "$ROOT_DIR"
 
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
-export COMPOSE_PROJECT_NAME
-
-dc() {
-  docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file .env "$@"
-}
-
 echo "Using compose project: $COMPOSE_PROJECT_NAME"
+echo "=== FULL DEPLOY MODE - Pull Prebuilt Images + Full Verification ==="
 
-if [[ ! -f .env ]]; then
-  echo "ERROR: .env not found at $ROOT_DIR/.env"
-  exit 1
-fi
+require_env_file
+validate_production_env
+configure_production_images
+resolve_datadog_services
 
-# Read key from current environment first, then from .env file.
-# This avoids `source .env` parsing issues with special characters in secrets.
-read_env_var() {
-  local key="$1"
-  local from_env="${!key:-}"
-  if [[ -n "$from_env" ]]; then
-    printf '%s' "$from_env"
-    return 0
-  fi
+echo "Using production image registry: ${IMAGE_REGISTRY}"
+echo "Requested production image tag: ${IMAGE_TAG} (fallback: ${IMAGE_FALLBACK_TAG})"
 
-  local line
-  line="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" .env | tail -n 1 || true)"
-  if [[ -z "$line" ]]; then
-    return 0
-  fi
-
-  local value="${line#*=}"
-  value="${value%$'\r'}"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-
-  # Strip matching surrounding quotes only.
-  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
-    value="${value:1:${#value}-2}"
-  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
-    value="${value:1:${#value}-2}"
-  fi
-
-  printf '%s' "$value"
-}
-
-require_var() {
-  local key="$1"
-  local value
-  value="$(read_env_var "$key")"
-  if [[ -z "$value" ]]; then
-    MISSING_KEYS+=("$key")
-  fi
-}
-
-MISSING_KEYS=()
-require_var "COSMOS_CONNECTION_STRING"
-require_var "JWT_SECRET"
-
-if [[ "${#MISSING_KEYS[@]}" -gt 0 ]]; then
-  echo "ERROR: missing required production env var(s) in .env:"
-  for key in "${MISSING_KEYS[@]}"; do
-    echo "  - $key"
-  done
-  echo
-  echo "Set them in $ROOT_DIR/.env and rerun deploy."
-  exit 1
-fi
-
-echo "Validating compose config..."
+echo "Validating production compose config..."
 dc config >/dev/null
 
-echo "Building backend, admin, and nginx..."
-dc build backend admin nginx
-
-FRONTEND_BUILD_ARGS=()
-if [[ "${FRONTEND_NO_CACHE:-0}" == "1" ]]; then
-  echo "Rebuilding frontend without cache because FRONTEND_NO_CACHE=1..."
-  FRONTEND_BUILD_ARGS+=(--no-cache)
-else
-  echo "Building frontend with Docker layer cache..."
-fi
-dc build "${FRONTEND_BUILD_ARGS[@]}" frontend
-
-remove_conflicting_container() {
-  local name="$1"
-  local existing_id
-  existing_id="$(docker ps -aq --filter "name=^/${name}$" | head -n1 || true)"
-  if [[ -n "$existing_id" ]]; then
-    echo "Removing pre-existing container ${name} (${existing_id}) to avoid name conflicts..."
-    docker rm -f "$existing_id" >/dev/null
-  fi
-}
-
-cleanup_named_containers() {
-  remove_conflicting_container "sarkari-nginx"
-  remove_conflicting_container "sarkari-backend"
-  remove_conflicting_container "sarkari-admin"
-  remove_conflicting_container "sarkari-frontend"
-  remove_conflicting_container "sarkari-datadog"
-}
-
-DATADOG_SERVICES=()
-if [[ -n "$(read_env_var "DD_API_KEY")" ]]; then
-  DATADOG_SERVICES+=(datadog-agent)
-else
-  echo "NOTICE: DD_API_KEY not set — skipping Datadog agent startup."
-fi
+login_container_registry
+pull_production_images
 
 echo "Starting services..."
 cleanup_named_containers
-dc up -d --force-recreate --remove-orphans nginx backend admin frontend "${DATADOG_SERVICES[@]}"
+dc up -d --force-recreate --remove-orphans --no-build nginx backend admin frontend "${DATADOG_SERVICES[@]}"
 
 echo "Container status:"
 dc ps
-
-service_container_id() {
-  local service="$1"
-  dc ps -q "$service" | head -n1
-}
 
 wait_for_backend_health() {
   local attempts="${1:-60}"
@@ -177,9 +84,6 @@ wait_for_backend_endpoint() {
   return 1
 }
 
-wait_for_backend_health
-wait_for_backend_endpoint
-
 check_frontend_route_ready() {
   local path="$1"
   local label="$2"
@@ -223,6 +127,9 @@ wait_for_frontend_shell() {
   return 1
 }
 
+wait_for_backend_health
+wait_for_backend_endpoint
+
 echo "Backend health (container internal):"
 dc exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
   echo
@@ -234,20 +141,18 @@ dc exec -T backend wget -qO- http://127.0.0.1:4000/api/health || {
 wait_for_frontend_shell
 echo
 
-echo "Backend health (public edge):"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://sarkariexams.me/api/health}"
-curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null && echo "ok ($PUBLIC_HEALTH_URL)"
-
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
 
 purge_cloudflare_cache() {
-  CF_ZONE_ID="$(read_env_var "CF_ZONE_ID")"
-  CF_API_TOKEN="$(read_env_var "CF_API_TOKEN")"
+  local cf_zone_id cf_api_token cf_resp
 
-  if [[ -n "$CF_ZONE_ID" && -n "$CF_API_TOKEN" ]]; then
+  cf_zone_id="$(read_env_var "CF_ZONE_ID")"
+  cf_api_token="$(read_env_var "CF_API_TOKEN")"
+
+  if [[ -n "$cf_zone_id" && -n "$cf_api_token" ]]; then
     echo "Purging Cloudflare edge cache..."
-    cf_resp="$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
-      -H "Authorization: Bearer ${CF_API_TOKEN}" \
+    cf_resp="$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/purge_cache" \
+      -H "Authorization: Bearer ${cf_api_token}" \
       -H "Content-Type: application/json" \
       --data '{"purge_everything":true}')"
 
@@ -364,6 +269,10 @@ check_public_route_marker() {
 
 purge_cloudflare_cache || true
 
+echo "Backend health (public edge):"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-${PUBLIC_BASE_URL}/api/health}"
+curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null && echo "ok ($PUBLIC_HEALTH_URL)"
+
 echo "Public route checks:"
 check_public_route "/jobs" "public jobs listing"
 check_public_route_assets "/jobs" "public jobs listing"
@@ -387,3 +296,4 @@ check_public_route "/app" "public app page"
 check_public_route_assets "/app" "public app page"
 
 echo "Deploy completed successfully."
+echo "Active production image tag: ${IMAGE_TAG}"

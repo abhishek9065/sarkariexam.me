@@ -1,5 +1,6 @@
-# Docker Compose override for faster builds
-# Use: docker compose -f docker-compose.yml -f docker-compose.fast.yml build
+# Docker Compose override for faster local image builds.
+# Production deploys use prebuilt registry images via docker-compose.production.yml.
+# Use locally with: docker compose -f docker-compose.yml -f docker-compose.fast.yml build
 
 services:
   frontend:

@@ -1,10 +1,24 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - Build and Publish Production Images
+    types:
+      - completed
   workflow_dispatch:
+    inputs:
+      deploy_mode:
+        description: Deployment mode
+        type: choice
+        options:
+          - fast
+          - full
+        default: fast
+      image_tag:
+        description: Image tag to deploy. Leave blank to deploy the stable main tag.
+        required: false
+        type: string
 
 concurrency:
   group: production-deploy
@@ -14,11 +28,34 @@ jobs:
   deploy:
     name: Deploy to DigitalOcean
     runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     environment: production
+    if: >-
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
     steps:
+      - name: Resolve deployment inputs
+        id: deploy-inputs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          DISPATCH_DEPLOY_MODE: ${{ inputs.deploy_mode }}
+          DISPATCH_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            echo "deploy_mode=fast" >> "$GITHUB_OUTPUT"
+            echo "image_tag=$WORKFLOW_RUN_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          deploy_mode="${DISPATCH_DEPLOY_MODE:-fast}"
+          image_tag="${DISPATCH_IMAGE_TAG:-main}"
+
+          echo "deploy_mode=$deploy_mode" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+
       - name: Check deploy configuration
-        id: deploy-config
         env:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
@@ -33,15 +70,11 @@ jobs:
           done
 
           if [ "$missing" -eq 1 ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Deployment is blocked because required DigitalOcean secrets are not configured."
-            exit 0
+            echo "Production deploy secrets are required. Configure them before running this workflow."
+            exit 1
           fi
 
-          echo "enabled=true" >> "$GITHUB_OUTPUT"
-
       - name: Deploy via SSH
-        if: steps.deploy-config.outputs.enabled == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DO_HOST }}
@@ -50,6 +83,9 @@ jobs:
           port: ${{ secrets.DO_PORT || 22 }}
           script: |
             set -euo pipefail
+            export DEPLOY_MODE='${{ steps.deploy-inputs.outputs.deploy_mode }}'
+            export DEPLOY_IMAGE_TAG='${{ steps.deploy-inputs.outputs.image_tag }}'
+            export DEPLOY_IMAGE_FALLBACK_TAG='main'
             if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then
               bash ~/sarkari-result/scripts/deploy-live.sh
             elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then
