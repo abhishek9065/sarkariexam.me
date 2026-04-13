@@ -147,34 +147,29 @@ Bash:
 bash scripts/deploy-prod-remote.sh
 ```
 
-Both wrappers SSH into the droplet and invoke the same remote entrypoint, preferring `~/sarkari-result/scripts/deploy-live.sh` and falling back to `~/sarkariexam.me/scripts/deploy-live.sh`. Manual deploys default to `DEPLOY_MODE=fast` and use the current `main` checkout SHA, with `main` as the fallback image tag.
+Both wrappers SSH into the droplet and invoke the same remote entrypoint (for example, `~/your-repo/scripts/deploy-live.sh`). Manual deploys default to `DEPLOY_MODE=fast` and use the current `main` checkout SHA, with `main` as the fallback image tag.
 
 ### Server-side deploy entrypoint
 
 ```bash
-bash ~/sarkari-result/scripts/deploy-live.sh
+bash ~/your-repo/scripts/deploy-live.sh
 ```
 
-`deploy-live.sh` is the canonical server-side deploy command. It resolves the active server checkout (`~/sarkari-result` first, then `~/sarkariexam.me`), syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, resolves the target image tag from the checked-out commit SHA, and then calls `scripts/deploy-fast.sh` by default or `scripts/deploy-prod.sh` when `DEPLOY_MODE=full`.
+`deploy-live.sh` is the canonical server-side deploy command. It resolves the active server checkout, syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, resolves the target image tag from the checked-out commit SHA, and then calls `scripts/deploy-fast.sh` by default or `scripts/deploy-prod.sh` when `DEPLOY_MODE=full`.
 
 ### Pull-only Docker deploy engines
 
+Fast mode (default) pulls production images from DigitalOcean Container Registry and performs compact checks for backend health, key public pages, and admin availability:
+
 ```bash
-cd ~/sarkari-result
+cd ~/your-repo
 COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-fast.sh
 ```
 
-Fast mode pulls production images from DigitalOcean Container Registry and performs compact health and public-edge checks:
+Full mode uses the same pull-only image path, then performs expanded public route and asset verification:
 
 ```bash
-cd ~/sarkari-result
-COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-fast.sh
-```
-
-Full mode uses the same pull-only image path, then performs the extended route and asset verification suite:
-
-```bash
-cd ~/sarkari-result
+cd ~/your-repo
 COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-prod.sh
 ```
 
@@ -195,6 +190,12 @@ Server root `.env`:
 - `DOCR_ACCESS_TOKEN`
 - optional `DOCR_USERNAME`
 - existing production app secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
+
+### Security note
+
+- Never commit real secret values to git.
+- Keep production secrets only in secure stores and server-side `.env` files.
+- If a token or key is ever exposed, rotate it immediately.
 
 ### Runtime model
 
