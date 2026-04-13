@@ -36,10 +36,10 @@ bash ~/sarkari-result/scripts/deploy-live.sh
 Fast mode is the default:
 - pulls the target image tag from DigitalOcean Container Registry
 - restarts Docker services with `--no-build`
-- runs compact backend and public-edge checks
+- runs compact backend and homepage checks
 - optionally purges Cloudflare cache
 
-Full mode uses the same pull-only image path, then runs the extended public route and asset verification suite.
+Full mode uses the same pull-only image path, then runs the deeper homepage verification suite.
 
 PowerShell:
 

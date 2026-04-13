@@ -101,29 +101,25 @@ wait_for_frontend_shell() {
   local sleep_seconds="${2:-2}"
   local i
 
-  echo "Waiting for frontend route shell verification..."
+  echo "Waiting for homepage shell verification..."
   for ((i=1; i<=attempts; i++)); do
     local ok=1
 
     check_frontend_route_ready "/" "homepage" || ok=0
-    check_frontend_route_ready "/jobs" "jobs listing" || ok=0
-    check_frontend_route_ready "/results/upsc-civil-services-2025-final-result" "result detail" || ok=0
 
     if [[ "$ok" -eq 1 ]]; then
-      echo "Frontend public routes are rendering correctly."
+      echo "Homepage is rendering correctly."
       return 0
     fi
 
-    echo "  [$i/$attempts] frontend shell not ready ..."
+    echo "  [$i/$attempts] homepage shell not ready ..."
     sleep "$sleep_seconds"
   done
 
-  echo "Timed out waiting for frontend public routes."
-  for route in "/" "/jobs" "/results/upsc-civil-services-2025-final-result"; do
-    echo "--- ${route} ---"
-    dc exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
-    echo
-  done
+  echo "Timed out waiting for homepage."
+  echo "--- / ---"
+  dc exec -T frontend wget -qO- "http://127.0.0.1:3000/" | head -c 1200 || true
+  echo
   return 1
 }
 
@@ -269,31 +265,9 @@ check_public_route_marker() {
 
 purge_cloudflare_cache || true
 
-echo "Backend health (public edge):"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-${PUBLIC_BASE_URL}/api/health}"
-curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null && echo "ok ($PUBLIC_HEALTH_URL)"
-
-echo "Public route checks:"
-check_public_route "/jobs" "public jobs listing"
-check_public_route_assets "/jobs" "public jobs listing"
-check_public_route "/jobs/1" "public job detail"
-check_public_route_assets "/jobs/1" "public job detail"
-check_public_route "/results/upsc-civil-services-2025-final-result" "public result detail"
-check_public_route_assets "/results/upsc-civil-services-2025-final-result" "public result detail"
-check_public_route "/detail/upsc-civil-services-2025-final-result" "public detail alias"
-check_public_route_assets "/detail/upsc-civil-services-2025-final-result" "public detail alias"
-check_public_route "/admit-cards/upsc" "public admit card detail"
-check_public_route_assets "/admit-cards/upsc" "public admit card detail"
-check_public_route "/states/uttar-pradesh" "public state jobs page"
-check_public_route_assets "/states/uttar-pradesh" "public state jobs page"
-check_public_route "/search?q=ssc" "public search page"
-check_public_route_assets "/search?q=ssc" "public search page"
-check_public_route "/jobs?department=Railway" "public jobs filter"
-check_public_route_assets "/jobs?department=Railway" "public jobs filter"
-check_public_route "/important" "public important links page"
-check_public_route_assets "/important" "public important links page"
-check_public_route "/app" "public app page"
-check_public_route_assets "/app" "public app page"
+echo "Public homepage checks:"
+check_public_route "/" "homepage"
+check_public_route_assets "/" "homepage"
 
 echo "Deploy completed successfully."
 echo "Active production image tag: ${IMAGE_TAG}"

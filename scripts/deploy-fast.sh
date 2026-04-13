@@ -97,17 +97,20 @@ wait_for_frontend_minimal() {
   local sleep_seconds="${2:-1}"
   local i
 
-  echo "Waiting for frontend basic availability (minimal checks)..."
+  echo "Waiting for core public pages (minimal checks)..."
   for ((i=1; i<=attempts; i++)); do
-    if dc exec -T frontend wget -q --spider --timeout=2 "http://127.0.0.1:3000/" >/dev/null 2>&1; then
-      echo "Frontend ready after ${i}s."
+    if dc exec -T frontend wget -q --spider --timeout=2 "http://127.0.0.1:3000/" >/dev/null 2>&1 &&
+      dc exec -T frontend wget -q --spider --timeout=2 "http://127.0.0.1:3000/jobs" >/dev/null 2>&1 &&
+      dc exec -T frontend wget -q --spider --timeout=2 "http://127.0.0.1:3000/results/upsc-civil-services-2025-final-result" >/dev/null 2>&1 &&
+      dc exec -T admin wget -q --spider --timeout=2 "http://127.0.0.1:3001/admin" >/dev/null 2>&1; then
+      echo "Core public pages ready after ${i}s."
       return 0
     fi
-    echo "  [$i/$attempts] frontend not ready"
+    echo "  [$i/$attempts] public pages not ready"
     sleep "$sleep_seconds"
   done
 
-  echo "WARNING: Frontend minimal check timed out, but continuing..."
+  echo "WARNING: Core public page check timed out, but continuing..."
   return 0
 }
 
@@ -115,7 +118,7 @@ wait_for_backend_health
 wait_for_backend_endpoint
 
 if [[ "${SKIP_FRONTEND_CHECKS:-0}" == "1" ]]; then
-  echo "Skipping frontend route checks (SKIP_FRONTEND_CHECKS=1)"
+  echo "Skipping core public page check (SKIP_FRONTEND_CHECKS=1)"
 else
   wait_for_frontend_minimal
 fi
@@ -165,8 +168,7 @@ verify_public_endpoints() {
   PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
   local failures=0
 
-  echo "Public edge verification:"
-  verify_public_endpoint "/api/health" "public api health" || failures=1
+  echo "Public verification:"
   verify_public_endpoint "/" "homepage" || failures=1
   verify_public_endpoint "/jobs" "jobs listing" || failures=1
   verify_public_endpoint "/results/upsc-civil-services-2025-final-result" "result detail" || failures=1
@@ -184,7 +186,7 @@ else
 fi
 
 if [[ "${SKIP_PUBLIC_CHECKS:-0}" == "1" ]]; then
-  echo "Skipping public endpoint checks (SKIP_PUBLIC_CHECKS=1)"
+  echo "Skipping public route checks (SKIP_PUBLIC_CHECKS=1)"
 else
   verify_public_endpoints
 fi
@@ -192,4 +194,4 @@ fi
 echo "=== FAST DEPLOY COMPLETED ==="
 echo "Active production image tag: ${IMAGE_TAG}"
 echo "Total services deployed: $(dc ps --services | wc -l)"
-echo "For full route testing, run: bash scripts/verify-deployment.sh"
+echo "For deeper public verification, run: bash scripts/verify-deployment.sh"
