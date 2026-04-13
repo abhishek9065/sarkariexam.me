@@ -1,28 +1,31 @@
 # SarkariExams.me
 
-Government jobs and exam updates platform.
+SarkariExams.me is a government jobs and exam updates platform with a public site, admin console, backend API, and Docker-based production deployment.
 
-## Apps
-- `backend/`: Express 5 + TypeScript API
-- `frontend/`: Next.js 16 public frontend
+## Stack
+
+- `frontend/`: Next.js 16 public website
 - `admin-next/`: Next.js admin console
+- `backend/`: Express 5 + TypeScript API
 - `nginx/`: reverse proxy and edge config
 
-## Core Features
+Core platform areas:
+
 - Jobs, results, admit cards, answer keys, syllabus, and admissions
-- Admin workflows for announcements, analytics, subscribers, notifications, SEO, and moderation
-- MongoDB locally and Azure Cosmos DB (MongoDB API) in production
-- JWT auth, CSRF, rate limiting, caching, and OpenAPI docs
-- Docker-based production deployment through prebuilt registry images
+- Admin tools for content, SEO, analytics, subscribers, notifications, and moderation
+- MongoDB in local development and Azure Cosmos DB (MongoDB API) in production
+- JWT auth, CSRF, rate limiting, caching, and OpenAPI documentation
 
 ## Requirements
+
 - Node.js `22.x`
 - npm `10+`
-- MongoDB for local backend data
+- MongoDB for local backend development
 
 ## Local Development
 
 ### Backend
+
 ```bash
 cd backend
 npm install
@@ -32,6 +35,7 @@ npm run dev
 Runs on `http://localhost:5000`.
 
 ### Public Frontend
+
 ```bash
 cd frontend
 npm install
@@ -41,6 +45,7 @@ npm run dev
 Runs on `http://localhost:3000`.
 
 ### Admin Console
+
 ```bash
 cd admin-next
 npm install
@@ -51,42 +56,32 @@ Runs on `http://localhost:3001`.
 
 ## Environment
 
-### Root `.env` for production deploys
-```env
-COSMOS_CONNECTION_STRING=...
-JWT_SECRET=...
-DOCR_REGISTRY_NAME=...
-DOCR_ACCESS_TOKEN=...
-DOCR_USERNAME=
-METRICS_TOKEN=
+Start from the root example file:
+
+```bash
+cp .env.example .env
 ```
 
-### Backend
-```env
-COSMOS_CONNECTION_STRING=mongodb://localhost:27017/sarkari_db
-COSMOS_DATABASE_NAME=sarkari_db
-JWT_SECRET=change-me
-PORT=5000
-FRONTEND_URL=http://localhost:3000
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=200
-AUTH_RATE_LIMIT_MAX=20
-```
+Important variables you will typically need:
 
-### Public Frontend
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
-```
+- `COSMOS_CONNECTION_STRING`
+- `COSMOS_DATABASE_NAME`
+- `JWT_SECRET`
+- `CORS_ORIGINS`
+- `FRONTEND_URL`
+- `SENDGRID_API_KEY`
+- `SENTRY_DSN`
 
-### Admin Console
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
-```
+App-specific local variables:
+
+- `backend`: backend API and database settings
+- `frontend`: `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api`
+- `admin-next`: `NEXT_PUBLIC_API_URL=http://localhost:5000/api`
 
 ## Verification
 
 ### Backend
+
 ```bash
 cd backend
 npm run lint
@@ -95,6 +90,7 @@ npm run test:ci
 ```
 
 ### Public Frontend
+
 ```bash
 cd frontend
 npm run lint
@@ -102,43 +98,38 @@ npm run build
 ```
 
 ### Admin Console
+
 ```bash
 cd admin-next
 npm run lint
 npm run build
 ```
 
-## CI
+## CI and Release Flow
 
-GitHub Actions currently cover:
-- backend lint, build, and tests
-- public frontend lint and build
-- npm audit for backend and frontend
-- CodeQL analysis
-- production image build and publish to DigitalOcean Container Registry
-- production deploy over SSH after image publication succeeds
+Main branch pushes trigger:
 
-Workflow files live in [`.github/workflows`](./.github/workflows).
+- `CI`
+- `Security`
+- `Build and Publish Production Images`
+- `Deploy to Production`
+
+Production uses prebuilt Docker images from DigitalOcean Container Registry. The server pulls images and restarts containers; it does not rebuild the app on the droplet during release.
 
 ## Deployment
 
-### Normal release path
+### Normal release
 
 ```bash
 git push origin main
 ```
 
-`main` pushes trigger the production release pipeline:
-- `Build and Publish Production Images`
-- `Deploy to Production`
+This is the default release path.
 
-The build workflow runs CI and security checks, publishes immutable Docker images tagged with the commit SHA plus a stable `main` tag, and the deploy workflow SSHes into the droplet and restarts Docker with those prebuilt images.
-
-Production image publishing and deployment workflows are restricted to `main` for manual dispatches.
-
-### Manual fallback deploy
+### Manual fallback from your machine
 
 PowerShell:
+
 ```powershell
 .\scripts\deploy-prod-remote.ps1
 ```
@@ -149,37 +140,24 @@ Bash:
 bash scripts/deploy-prod-remote.sh
 ```
 
-Both wrappers SSH into the droplet and invoke the same remote entrypoint (for example, `~/your-repo/scripts/deploy-live.sh`). Manual deploys default to `DEPLOY_MODE=fast` and use the current `main` checkout SHA, with `main` as the fallback image tag.
-
-### Server-side deploy entrypoint
+### Server-side entrypoint
 
 ```bash
-bash ~/your-repo/scripts/deploy-live.sh
+bash ~/sarkari-result/scripts/deploy-live.sh
 ```
 
-`deploy-live.sh` is the canonical server-side deploy command. It resolves the active server checkout, syncs `main`, acquires a deploy lock, exports `COMPOSE_PROJECT_NAME=sarkari-result`, resolves the target image tag from the checked-out commit SHA, and then calls `scripts/deploy-fast.sh` by default or `scripts/deploy-prod.sh` when `DEPLOY_MODE=full`.
-
-### Pull-only Docker deploy engines
-
-Fast mode (default) pulls production images from DigitalOcean Container Registry and performs compact checks for backend health, key public pages, and admin availability:
+If that path does not exist on the droplet, the fallback repo path used by the workflows is:
 
 ```bash
-cd ~/your-repo
-COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-fast.sh
+bash ~/sarkariexam.me/scripts/deploy-live.sh
 ```
 
-Full mode uses the same pull-only image path, then performs expanded public route and asset verification:
+Detailed deploy notes live in [scripts/FAST_DEPLOY_README.md](./scripts/FAST_DEPLOY_README.md).
 
-```bash
-cd ~/your-repo
-COMPOSE_PROJECT_NAME=sarkari-result bash scripts/deploy-prod.sh
-```
-
-Both scripts use [`docker-compose.production.yml`](./docker-compose.production.yml) and `docker compose up --no-build`, so the droplet no longer rebuilds application images during release.
-
-### Required secrets and server env
+## Production Secrets
 
 GitHub Actions secrets:
+
 - `DOCR_REGISTRY_NAME`
 - `DOCR_TOKEN`
 - `DO_HOST`
@@ -187,21 +165,12 @@ GitHub Actions secrets:
 - `DO_SSH_KEY`
 - optional `DO_PORT`
 
-Server root `.env`:
+Server `.env` values for production typically include:
+
 - `DOCR_REGISTRY_NAME`
 - `DOCR_ACCESS_TOKEN`
 - optional `DOCR_USERNAME`
-- existing production app secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
-
-### Security note
-
-- Never commit real secret values to git.
-- Keep production secrets only in secure stores and server-side `.env` files.
-- If a token or key is ever exposed, rotate it immediately.
-
-### Runtime model
-
-Production runtime is Docker + Nginx only. Use the deploy scripts above for releases and avoid PM2-specific frontend startup paths.
+- application secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
 
 ## Repository Layout
 
@@ -211,9 +180,16 @@ frontend/        Next.js public frontend
 admin-next/      Next.js admin console
 nginx/           reverse proxy config
 scripts/         deployment and maintenance scripts
-docs/            ops and project documentation
+docs/            project and ops documentation
 .github/         CI, security, and deploy workflows
 ```
 
+## Security
+
+- Never commit real secrets.
+- Keep production credentials only in GitHub secrets and server-side `.env` files.
+- Rotate any exposed token or key immediately.
+
 ## License
+
 MIT
