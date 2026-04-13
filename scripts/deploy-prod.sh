@@ -101,25 +101,33 @@ wait_for_frontend_shell() {
   local sleep_seconds="${2:-2}"
   local i
 
-  echo "Waiting for homepage shell verification..."
+  echo "Waiting for core page shell verification..."
   for ((i=1; i<=attempts; i++)); do
     local ok=1
 
     check_frontend_route_ready "/" "homepage" || ok=0
+    check_frontend_route_ready "/jobs" "jobs listing" || ok=0
+    check_frontend_route_ready "/results/upsc-civil-services-2025-final-result" "result detail" || ok=0
+    if ! dc exec -T admin wget -q --spider "http://127.0.0.1:3001/admin" >/dev/null 2>&1; then
+      echo "ERROR: admin console did not return HTTP success for /admin"
+      ok=0
+    fi
 
     if [[ "$ok" -eq 1 ]]; then
-      echo "Homepage is rendering correctly."
+      echo "Homepage, key public pages, and admin console are rendering correctly."
       return 0
     fi
 
-    echo "  [$i/$attempts] homepage shell not ready ..."
+    echo "  [$i/$attempts] core pages not ready ..."
     sleep "$sleep_seconds"
   done
 
-  echo "Timed out waiting for homepage."
-  echo "--- / ---"
-  dc exec -T frontend wget -qO- "http://127.0.0.1:3000/" | head -c 1200 || true
-  echo
+  echo "Timed out waiting for core pages."
+  for route in "/" "/jobs" "/results/upsc-civil-services-2025-final-result"; do
+    echo "--- ${route} ---"
+    dc exec -T frontend wget -qO- "http://127.0.0.1:3000${route}" | head -c 1200 || true
+    echo
+  done
   return 1
 }
 
@@ -265,9 +273,14 @@ check_public_route_marker() {
 
 purge_cloudflare_cache || true
 
-echo "Public homepage checks:"
+echo "Public route checks:"
 check_public_route "/" "homepage"
 check_public_route_assets "/" "homepage"
+check_public_route "/jobs" "public jobs listing"
+check_public_route_assets "/jobs" "public jobs listing"
+check_public_route "/results/upsc-civil-services-2025-final-result" "public result detail"
+check_public_route_assets "/results/upsc-civil-services-2025-final-result" "public result detail"
+check_public_route "/admin" "admin console"
 
 echo "Deploy completed successfully."
 echo "Active production image tag: ${IMAGE_TAG}"

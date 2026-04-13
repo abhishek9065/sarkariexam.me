@@ -3,73 +3,83 @@
 set -euo pipefail
 
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
-HOMEPAGE_URL="${PUBLIC_BASE_URL}/"
 
-echo "=== Homepage Verification ==="
-echo "Testing: $HOMEPAGE_URL"
+echo "=== Deployment Verification ==="
+echo "Testing: $PUBLIC_BASE_URL"
 
-check_homepage_status() {
+check_public_route() {
+  local path="$1"
+  local label="$2"
+  local url="${PUBLIC_BASE_URL}${path}"
   local status
 
-  status="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 15 "$HOMEPAGE_URL" || true)"
+  status="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 15 "$url" || true)"
   if [[ ! "$status" =~ ^2 ]]; then
-    echo "FAIL: homepage returned status ${status:-timeout}"
+    echo "FAIL: ${label} (${url}) returned ${status:-timeout}"
     return 1
   fi
 
-  echo "PASS: homepage returned status ${status}"
+  echo "PASS: ${label} (${url}) returned ${status}"
 }
 
-check_homepage_html() {
+check_public_route_html() {
+  local path="$1"
+  local label="$2"
+  local url="${PUBLIC_BASE_URL}${path}"
   local html
 
-  html="$(curl -sS -L --max-time 15 "$HOMEPAGE_URL" || true)"
+  html="$(curl -sS -L --max-time 15 "$url" || true)"
   if [[ -z "$html" ]]; then
-    echo "FAIL: homepage returned no HTML"
+    echo "FAIL: ${label} returned no HTML"
     return 1
   fi
 
   if printf '%s' "$html" | grep -q 'Application error:'; then
-    echo "FAIL: homepage rendered an application error"
+    echo "FAIL: ${label} rendered an application error"
     return 1
   fi
 
-  echo "PASS: homepage returned HTML without application error"
+  echo "PASS: ${label} returned HTML without application error"
 }
 
-check_homepage_assets() {
-  local html asset_count asset asset_status
+check_public_route_assets() {
+  local path="$1"
+  local label="$2"
+  local url="${PUBLIC_BASE_URL}${path}"
+  local html
+  local asset_count=0
+  local asset
+  local asset_status
 
-  html="$(curl -sS -L --max-time 15 "$HOMEPAGE_URL" || true)"
+  html="$(curl -sS -L --max-time 15 "$url" || true)"
   if [[ -z "$html" ]]; then
-    echo "FAIL: homepage returned no HTML for asset validation"
+    echo "FAIL: ${label} returned no HTML for asset validation"
     return 1
   fi
 
-  asset_count=0
   while IFS= read -r asset; do
     [[ -z "$asset" ]] && continue
     asset_count=$((asset_count + 1))
     asset_status="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "${PUBLIC_BASE_URL}${asset}" || true)"
     if [[ ! "$asset_status" =~ ^2 ]]; then
-      echo "FAIL: homepage asset ${asset} returned ${asset_status:-timeout}"
+      echo "FAIL: ${label} asset ${asset} returned ${asset_status:-timeout}"
       return 1
     fi
   done < <(printf '%s' "$html" | grep -oE "/_next/static/[^\"'[:space:]]+\.(js|css)" | sort -u | head -20)
 
   if [[ "$asset_count" -eq 0 ]]; then
-    echo "FAIL: homepage did not include any Next assets"
+    echo "FAIL: ${label} did not include any Next assets"
     return 1
   fi
 
-  echo "PASS: homepage assets loaded (${asset_count} checked)"
+  echo "PASS: ${label} assets loaded (${asset_count} checked)"
 }
 
-check_homepage_performance() {
+check_performance() {
   local start_time end_time load_time
 
   start_time=$(date +%s%3N)
-  curl -sS -o /dev/null --max-time 15 "$HOMEPAGE_URL" || true
+  curl -sS -o /dev/null --max-time 15 "${PUBLIC_BASE_URL}/" || true
   end_time=$(date +%s%3N)
   load_time=$((end_time - start_time))
 
@@ -82,22 +92,17 @@ check_homepage_performance() {
   fi
 }
 
-check_https() {
-  local status
+check_public_route "/" "Homepage"
+check_public_route_html "/" "Homepage"
+check_public_route_assets "/" "Homepage"
+check_public_route "/jobs" "Jobs listing"
+check_public_route_html "/jobs" "Jobs listing"
+check_public_route_assets "/jobs" "Jobs listing"
+check_public_route "/results/upsc-civil-services-2025-final-result" "Result detail"
+check_public_route_html "/results/upsc-civil-services-2025-final-result" "Result detail"
+check_public_route_assets "/results/upsc-civil-services-2025-final-result" "Result detail"
+check_public_route "/admin" "Admin console"
 
-  status="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "$HOMEPAGE_URL" || true)"
-  if [[ ! "$status" =~ ^2 ]]; then
-    echo "FAIL: HTTPS homepage returned status ${status:-timeout}"
-    return 1
-  fi
+check_performance
 
-  echo "PASS: HTTPS homepage is reachable"
-}
-
-check_homepage_status
-check_homepage_html
-check_homepage_assets
-check_homepage_performance
-check_https
-
-echo "=== Homepage Verification Complete ==="
+echo "=== Deployment Verification Complete ==="
