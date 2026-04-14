@@ -97,6 +97,11 @@ npm run lint
 - `.github/workflows/build-publish-images.yml` now acts as production release validation and gates deploy after CI and security pass.
 - `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, or via explicit GitHub Actions manual dispatch on `main`.
 
+Release gating detail:
+- On `main` release validation, the reusable `Security` workflow contributes npm audit checks.
+- CodeQL remains active for pull requests, manual security runs, and the scheduled weekly security scan.
+- This prevents transient GitHub-hosted CodeQL bootstrap failures from blocking a production deploy when application CI and package-audit checks are already green.
+
 ## Health And Readiness
 - Backend health:
   `/api/health`

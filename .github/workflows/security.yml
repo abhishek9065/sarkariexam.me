@@ -2,6 +2,12 @@ name: Security
 
 on:
   workflow_call:
+    inputs:
+      run_codeql:
+        description: Run the CodeQL job when invoked as a reusable workflow.
+        required: false
+        default: false
+        type: boolean
   pull_request:
   workflow_dispatch:
   schedule:
@@ -61,6 +67,7 @@ jobs:
 
   codeql:
     name: CodeQL
+    if: ${{ github.event_name != 'workflow_call' || inputs.run_codeql }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
