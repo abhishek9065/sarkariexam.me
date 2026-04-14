@@ -9,16 +9,14 @@ source "${SCRIPT_DIR}/deploy-common.sh"
 cd "$ROOT_DIR"
 
 echo "Using compose project: $COMPOSE_PROJECT_NAME"
-echo "=== FAST DEPLOY MODE - Pull Prebuilt Images ==="
+echo "=== FAST DEPLOY MODE - Rebuild On Droplet ==="
 
 require_env_file
 validate_production_env
 warn_if_missing_production_runtime_vars
-configure_production_images
 resolve_datadog_services
 
-echo "Using production image registry: ${IMAGE_REGISTRY}"
-echo "Requested production image tag: ${IMAGE_TAG} (fallback: ${IMAGE_FALLBACK_TAG})"
+echo "Building services from the checked-out repository on the droplet."
 
 if [[ "${SKIP_CONFIG_VALIDATION:-0}" != "1" ]]; then
   echo "Validating production compose config..."
@@ -27,16 +25,18 @@ else
   echo "Skipping config validation (SKIP_CONFIG_VALIDATION=1)"
 fi
 
-login_container_registry
-pull_production_images
+echo "Building backend image..."
+dc build --pull backend
 
 echo "Starting services with fast startup mode..."
 cleanup_named_containers
 
-dc up -d --force-recreate --no-build backend
+dc up -d --force-recreate backend
 echo "Backend starting..."
 
-dc up -d --force-recreate --remove-orphans --no-build nginx admin frontend "${DATADOG_SERVICES[@]}"
+echo "Building frontend, admin, and nginx images..."
+dc build --pull frontend admin nginx
+dc up -d --force-recreate --remove-orphans nginx admin frontend "${DATADOG_SERVICES[@]}"
 
 echo "Container status:"
 dc ps
@@ -166,28 +166,17 @@ verify_public_endpoint() {
 }
 
 verify_public_revalidation_smoke() {
-  local revalidate_token
-  local url="${PUBLIC_BASE_URL}/api/revalidate"
-  local status
-
-  revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
-  if [[ -z "$revalidate_token" ]]; then
+  if [[ -z "$(read_env_var "FRONTEND_REVALIDATE_TOKEN")" ]]; then
     echo "NOTICE: FRONTEND_REVALIDATE_TOKEN not set — skipping revalidation smoke check."
     return 0
   fi
 
-  status="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
-    -X POST "$url" \
-    -H "Authorization: Bearer ${revalidate_token}" \
-    -H "Content-Type: application/json" \
-    --data '{"paths":["/jobs"],"tags":["content:posts","content:listings"]}' || true)"
-
-  if [[ "$status" =~ ^2 ]]; then
-    echo "ok (frontend revalidation smoke -> ${url}, status=${status})"
+  if dc exec -T frontend node -e "const token=process.env.REVALIDATE_TOKEN; if (!token) process.exit(2); fetch('http://127.0.0.1:3000/api/revalidate', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ paths: ['/jobs'], tags: ['content:posts', 'content:listings'] }) }).then(async (res) => { if (!res.ok) { console.error('revalidate-status=' + res.status); console.error(await res.text()); process.exit(1); } }).catch((error) => { console.error(error); process.exit(1); });"; then
+    echo "ok (frontend revalidation smoke -> internal frontend container route)"
     return 0
   fi
 
-  echo "ERROR: frontend revalidation smoke check failed for ${url} (status=${status:-none})"
+  echo "ERROR: frontend revalidation smoke check failed for internal frontend container route"
   return 1
 }
 
@@ -222,6 +211,5 @@ else
 fi
 
 echo "=== FAST DEPLOY COMPLETED ==="
-echo "Active production image tag: ${IMAGE_TAG}"
 echo "Total services deployed: $(dc ps --services | wc -l)"
 echo "For deeper public verification, run: bash scripts/verify-deployment.sh"

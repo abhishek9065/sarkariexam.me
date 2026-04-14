@@ -30,8 +30,6 @@ Do not rely on `backend/.env` or `frontend/.env.local` for Docker production dep
 ### Production Root `.env`
 
 Required for deploy:
-- `DOCR_REGISTRY_NAME`
-- `DOCR_ACCESS_TOKEN`
 - `COSMOS_CONNECTION_STRING`
 - `JWT_SECRET`
 
@@ -49,7 +47,7 @@ Strongly recommended for runtime:
 - The frontend now includes a protected `/api/revalidate` endpoint plus shared content-tag conventions.
 - Editorial publish, unpublish, archive, restore, and live-content edits call the frontend revalidation endpoint when backend revalidation env vars are configured.
 - Default production Docker wiring points the backend to `http://frontend:3000/api/revalidate`.
-- `docker-compose.production.yml` maps the same root `.env` secret into both:
+- `docker-compose.yml` maps the same root `.env` secret into both:
   - backend `FRONTEND_REVALIDATE_TOKEN`
   - frontend `REVALIDATE_TOKEN`
 - Public pages remain request-time rendered today because the current Docker and CI build topology does not guarantee a live backend during frontend compilation.
@@ -96,7 +94,8 @@ npm run lint
 ## CI
 - `.github/workflows/ci.yml` runs backend lint/build/tests, frontend lint/build, and admin lint/build.
 - `.github/workflows/security.yml` runs npm audit and CodeQL.
-- `.github/workflows/deploy.yml` deploys only after production image publication succeeds or via explicit manual dispatch on `main`.
+- `.github/workflows/build-publish-images.yml` now acts as production release validation and gates deploy after CI and security pass.
+- `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, or via explicit GitHub Actions manual dispatch on `main`.
 
 ## Health And Readiness
 - Backend health:
@@ -113,10 +112,10 @@ Deployment scripts now verify:
 - `/jobs`
 - `/results/upsc-civil-services-2025-final-result`
 - `/admin`
-- optional authenticated `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
+- optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 
 ## Rollback Guidance
-- Application rollback: redeploy the previous image tag.
+- Application rollback: revert the offending commit on `main` and let GitHub Actions redeploy, or restore the previous server checkout and rerun the deploy workflow.
 - Content rollback: use post history plus version notes, update or unpublish the affected post, then republish after verification.
 - Cache rollback: frontend revalidation can be called again after restoring a previous content state.
 

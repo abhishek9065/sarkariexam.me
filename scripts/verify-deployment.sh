@@ -56,28 +56,22 @@ check_public_route() {
 }
 
 check_revalidation_smoke() {
-  local token
-  local url="${PUBLIC_BASE_URL}/api/revalidate"
-  local status
-
-  token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
-  if [[ -z "$token" ]]; then
+  if [[ -z "$(read_env_var "FRONTEND_REVALIDATE_TOKEN")" ]]; then
     echo "SKIP: Revalidation smoke check (FRONTEND_REVALIDATE_TOKEN not configured in root .env or shell)"
     return 0
   fi
 
-  status="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 \
-    -X POST "$url" \
-    -H "Authorization: Bearer ${token}" \
-    -H "Content-Type: application/json" \
-    --data '{"paths":["/jobs"],"tags":["content:posts","content:listings"]}' || true)"
+  if ! command -v docker >/dev/null 2>&1 || [[ ! -f "$ROOT_DIR/.env" ]]; then
+    echo "SKIP: Revalidation smoke check (docker or root .env unavailable on this machine)"
+    return 0
+  fi
 
-  if [[ ! "$status" =~ ^2 ]]; then
-    echo "FAIL: Revalidation smoke (${url}) returned ${status:-timeout}"
+  if ! docker compose -f "$ROOT_DIR/docker-compose.yml" --project-name "${COMPOSE_PROJECT_NAME:-sarkari-result}" --env-file "$ROOT_DIR/.env" exec -T frontend node -e "const token=process.env.REVALIDATE_TOKEN; if (!token) process.exit(2); fetch('http://127.0.0.1:3000/api/revalidate', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ paths: ['/jobs'], tags: ['content:posts', 'content:listings'] }) }).then(async (res) => { if (!res.ok) { console.error('revalidate-status=' + res.status); console.error(await res.text()); process.exit(1); } }).catch((error) => { console.error(error); process.exit(1); });"; then
+    echo "FAIL: Revalidation smoke (internal frontend container route) failed"
     return 1
   fi
 
-  echo "PASS: Revalidation smoke (${url}) returned ${status}"
+  echo "PASS: Revalidation smoke (internal frontend container route) succeeded"
 }
 
 check_public_route_html() {

@@ -53,23 +53,17 @@ export COMPOSE_PROJECT_NAME="sarkari-result"
 
 # Use fast deployment by default, fallback to full deployment
 DEPLOY_MODE="${DEPLOY_MODE:-fast}"
-DEPLOY_IMAGE_TAG="${DEPLOY_IMAGE_TAG:-$(git rev-parse HEAD)}"
-DEPLOY_IMAGE_FALLBACK_TAG="${DEPLOY_IMAGE_FALLBACK_TAG:-main}"
-export DEPLOY_IMAGE_TAG
-export DEPLOY_IMAGE_FALLBACK_TAG
 
 if [[ "$DEPLOY_MODE" == "fast" ]]; then
-  echo "=== Running FAST deployment (pull-only production restart) ==="
+  echo "=== Running FAST deployment (GitHub Actions triggered rebuild on droplet) ==="
   echo "To use full deployment, set: DEPLOY_MODE=full"
-  echo "Requested production image tag: $DEPLOY_IMAGE_TAG (fallback: $DEPLOY_IMAGE_FALLBACK_TAG)"
   export SKIP_CONFIG_VALIDATION=1
   export SKIP_FRONTEND_CHECKS=1
   export SKIP_PUBLIC_CHECKS=0  # Keep essential public checks
   export SKIP_CACHE_PURGE=0
   bash scripts/deploy-fast.sh
 else
-  echo "=== Running FULL deployment (pull-only production restart + full verification) ==="
-  echo "Requested production image tag: $DEPLOY_IMAGE_TAG (fallback: $DEPLOY_IMAGE_FALLBACK_TAG)"
+  echo "=== Running FULL deployment (GitHub Actions triggered rebuild + full verification) ==="
   bash scripts/deploy-prod.sh
 fi
 

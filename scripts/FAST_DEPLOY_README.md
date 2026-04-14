@@ -1,11 +1,12 @@
 # Fast Deploy
 
-Production deploys now use a pull-only release flow:
-- GitHub Actions build and publish Docker images to DigitalOcean Container Registry
+Production deploys now use a GitHub Actions driven rebuild flow:
+- GitHub Actions runs CI and security checks
+- the deploy workflow SSHes into the droplet after those checks pass
 - the droplet `git pull`s the repo for scripts and compose changes
-- the deploy scripts run `docker compose pull` and `docker compose up --no-build`
+- the deploy scripts rebuild Docker services locally on the droplet and restart them
 
-That removes the slowest part of the old flow: rebuilding Next.js and backend images on a `1 vCPU / 1 GB` droplet.
+That removes the external registry dependency from the production release path while keeping GitHub Actions as the only supported deploy trigger.
 
 GitHub Actions is the only supported production release entrypoint.
 
@@ -20,8 +21,9 @@ The server-side scripts in `scripts/` are still required because the GitHub depl
 ## Modes
 
 Fast mode is the default:
-- pulls the target image tag from DigitalOcean Container Registry
-- restarts Docker services with `--no-build`
+- rebuilds backend first so API readiness is established early
+- rebuilds frontend, admin, and nginx from the checked-out repo
+- restarts Docker services after the rebuild
 - runs compact backend checks plus representative public route checks
 - optionally purges Cloudflare cache
 
@@ -32,31 +34,20 @@ Fast public verification includes:
 - `/jobs`
 - `/results/upsc-civil-services-2025-final-result`
 - `/admin`
-- optional authenticated `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
+- optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 
-Full mode uses the same pull-only image path, then runs deeper verification for the homepage, representative public pages, and the admin console.
+Full mode uses the same GitHub-triggered rebuild path, then runs deeper verification for the homepage, representative public pages, the admin console, and internal frontend revalidation.
 Use the `Deploy to Production` GitHub Actions manual dispatch if you need to choose `fast` or `full`.
-
-## Image Tags
-
-The default image tag is the checked-out `main` commit SHA on the server. If that exact tag is unavailable, deploy scripts fall back to the stable `main` tag.
-
-If you need to override the tag, use the `image_tag` input on the `Deploy to Production` GitHub Actions workflow dispatch.
 
 ## Required Configuration
 
 GitHub Actions secrets:
-- `DOCR_REGISTRY_NAME`
-- `DOCR_TOKEN`
 - `DO_HOST`
 - `DO_USER`
 - `DO_SSH_KEY`
 - optional `DO_PORT`
 
 Server root `.env`:
-- `DOCR_REGISTRY_NAME`
-- `DOCR_ACCESS_TOKEN`
-- optional `DOCR_USERNAME`
 - `COSMOS_CONNECTION_STRING`
 - `JWT_SECRET`
 - recommended `COSMOS_DATABASE_NAME`
@@ -69,12 +60,12 @@ Server root `.env`:
 - optional `CF_API_TOKEN`
 - optional `DD_API_KEY`
 
-The server root `.env` is the production source of truth for deploy scripts and `docker-compose.production.yml`.
+The server root `.env` is the production source of truth for deploy scripts and `docker-compose.yml`.
 Do not treat `backend/.env` or `frontend/.env.local` as production Docker config.
 
 ## Files
 
-- `docker-compose.production.yml`: pull-only production runtime definition
+- `docker-compose.yml`: production runtime and build definition used by GitHub Actions deploys
 - `scripts/deploy-common.sh`: shared production deploy helpers
 - `scripts/deploy-fast.sh`: fast production deploy
 - `scripts/deploy-prod.sh`: full production deploy
@@ -86,5 +77,5 @@ Do not treat `backend/.env` or `frontend/.env.local` as production Docker config
 If a deploy fails:
 1. Re-run in full mode.
 2. Check the server deploy log at `/tmp/sarkari-result-deploy.log`.
-3. Check container logs with `docker compose -f docker-compose.production.yml logs`.
-4. Verify the required registry secrets and server `.env` values exist.
+3. Check container logs with `docker compose -f docker-compose.yml logs`.
+4. Verify the required deploy secrets and server `.env` values exist.

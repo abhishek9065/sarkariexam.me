@@ -9,26 +9,24 @@ source "${SCRIPT_DIR}/deploy-common.sh"
 cd "$ROOT_DIR"
 
 echo "Using compose project: $COMPOSE_PROJECT_NAME"
-echo "=== FULL DEPLOY MODE - Pull Prebuilt Images + Full Verification ==="
+echo "=== FULL DEPLOY MODE - Rebuild On Droplet + Full Verification ==="
 
 require_env_file
 validate_production_env
 warn_if_missing_production_runtime_vars
-configure_production_images
 resolve_datadog_services
 
-echo "Using production image registry: ${IMAGE_REGISTRY}"
-echo "Requested production image tag: ${IMAGE_TAG} (fallback: ${IMAGE_FALLBACK_TAG})"
+echo "Building services from the checked-out repository on the droplet."
 
 echo "Validating production compose config..."
 dc config >/dev/null
 
-login_container_registry
-pull_production_images
+echo "Building application images..."
+dc build --pull nginx backend admin frontend
 
 echo "Starting services..."
 cleanup_named_containers
-dc up -d --force-recreate --remove-orphans --no-build nginx backend admin frontend "${DATADOG_SERVICES[@]}"
+dc up -d --force-recreate --remove-orphans nginx backend admin frontend "${DATADOG_SERVICES[@]}"
 
 echo "Container status:"
 dc ps
@@ -206,28 +204,17 @@ check_public_route() {
 }
 
 check_public_revalidation_smoke() {
-  local url="${PUBLIC_BASE_URL}/api/revalidate"
-  local revalidate_token
-  local status
-
-  revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
-  if [[ -z "$revalidate_token" ]]; then
+  if [[ -z "$(read_env_var "FRONTEND_REVALIDATE_TOKEN")" ]]; then
     echo "NOTICE: FRONTEND_REVALIDATE_TOKEN not set — skipping revalidation smoke check."
     return 0
   fi
 
-  status="$(curl -sS -o /dev/null -w "%{http_code}" \
-    -X POST "$url" \
-    -H "Authorization: Bearer ${revalidate_token}" \
-    -H "Content-Type: application/json" \
-    --data '{"paths":["/jobs"],"tags":["content:posts","content:listings"]}' || true)"
-
-  if [[ ! "$status" =~ ^2 ]]; then
-    echo "ERROR: frontend revalidation smoke check failed for ${url} (status=${status:-none})"
+  if ! dc exec -T frontend node -e "const token=process.env.REVALIDATE_TOKEN; if (!token) process.exit(2); fetch('http://127.0.0.1:3000/api/revalidate', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ paths: ['/jobs'], tags: ['content:posts', 'content:listings'] }) }).then(async (res) => { if (!res.ok) { console.error('revalidate-status=' + res.status); console.error(await res.text()); process.exit(1); } }).catch((error) => { console.error(error); process.exit(1); });"; then
+    echo "ERROR: frontend revalidation smoke check failed for internal frontend container route"
     return 1
   fi
 
-  echo "ok (frontend revalidation smoke -> ${url}, status=${status})"
+  echo "ok (frontend revalidation smoke -> internal frontend container route)"
 }
 
 check_public_route_assets() {
@@ -312,4 +299,3 @@ check_public_route "/admin" "admin console"
 check_public_revalidation_smoke
 
 echo "Deploy completed successfully."
-echo "Active production image tag: ${IMAGE_TAG}"

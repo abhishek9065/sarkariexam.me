@@ -79,13 +79,10 @@ Root `.env` is the production source of truth for:
 - `scripts/deploy-common.sh`
 - `scripts/deploy-fast.sh`
 - `scripts/deploy-prod.sh`
-- `docker-compose.production.yml`
+- `docker-compose.yml`
 
 Important production variables:
 
-- `DOCR_REGISTRY_NAME`
-- `DOCR_ACCESS_TOKEN`
-- optional `DOCR_USERNAME`
 - `COSMOS_CONNECTION_STRING`
 - `COSMOS_DATABASE_NAME`
 - `JWT_SECRET`
@@ -144,15 +141,15 @@ Main branch pushes trigger:
 
 - `CI`
 - `Security`
-- `Build and Publish Production Images`
+- `Production Release Validation`
 - `Deploy to Production`
 
-Production uses prebuilt Docker images from DigitalOcean Container Registry. The server pulls images and restarts containers; it does not rebuild the app on the droplet during release.
+Production deploys are GitHub Actions driven. After CI and security pass, the deploy workflow SSHes into the droplet, pulls `main`, rebuilds the Docker services from the checked-out repo, and restarts the stack.
 
 ## Deployment
 
 GitHub Actions is the only supported production deploy path.
-Push to `main` to trigger CI, image publish, and production deploy:
+Push to `main` to trigger CI, release validation, and production deploy:
 
 ```bash
 git push origin main
@@ -166,8 +163,6 @@ Detailed deploy notes live in [scripts/FAST_DEPLOY_README.md](./scripts/FAST_DEP
 
 GitHub Actions secrets:
 
-- `DOCR_REGISTRY_NAME`
-- `DOCR_TOKEN`
 - `DO_HOST`
 - `DO_USER`
 - `DO_SSH_KEY`
@@ -175,9 +170,6 @@ GitHub Actions secrets:
 
 Server `.env` values for production typically include:
 
-- `DOCR_REGISTRY_NAME`
-- `DOCR_ACCESS_TOKEN`
-- optional `DOCR_USERNAME`
 - application secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
 - revalidation settings such as `FRONTEND_REVALIDATE_URL` and `FRONTEND_REVALIDATE_TOKEN`
 

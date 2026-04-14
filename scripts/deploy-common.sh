@@ -4,7 +4,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
 export COMPOSE_PROJECT_NAME
 
-PRODUCTION_COMPOSE_FILES=(-f docker-compose.production.yml)
+PRODUCTION_COMPOSE_FILES=(-f docker-compose.yml)
 
 dc() {
   docker compose "${PRODUCTION_COMPOSE_FILES[@]}" --project-name "$COMPOSE_PROJECT_NAME" --env-file .env "$@"
@@ -58,8 +58,6 @@ validate_production_env() {
   MISSING_KEYS=()
   require_var "COSMOS_CONNECTION_STRING"
   require_var "JWT_SECRET"
-  require_var "DOCR_REGISTRY_NAME"
-  require_var "DOCR_ACCESS_TOKEN"
 
   if [[ "${#MISSING_KEYS[@]}" -gt 0 ]]; then
     echo "ERROR: missing required production env var(s) in .env:"
@@ -115,31 +113,6 @@ warn_if_missing_production_runtime_vars() {
   fi
 }
 
-configure_production_images() {
-  local registry_name registry_token
-
-  registry_name="$(read_env_var "DOCR_REGISTRY_NAME")"
-  registry_token="$(read_env_var "DOCR_ACCESS_TOKEN")"
-
-  export DOCR_REGISTRY_NAME="$registry_name"
-  export DOCR_ACCESS_TOKEN="$registry_token"
-  export IMAGE_REGISTRY="registry.digitalocean.com/${DOCR_REGISTRY_NAME}"
-  export IMAGE_TAG="${DEPLOY_IMAGE_TAG:-${IMAGE_TAG:-main}}"
-  export IMAGE_FALLBACK_TAG="${DEPLOY_IMAGE_FALLBACK_TAG:-main}"
-}
-
-login_container_registry() {
-  local registry_username
-
-  registry_username="$(read_env_var "DOCR_USERNAME")"
-  if [[ -z "$registry_username" ]]; then
-    registry_username="$DOCR_ACCESS_TOKEN"
-  fi
-
-  echo "Authenticating Docker with DigitalOcean Container Registry..."
-  printf '%s' "$DOCR_ACCESS_TOKEN" | docker login registry.digitalocean.com -u "$registry_username" --password-stdin >/dev/null
-}
-
 resolve_datadog_services() {
   DATADOG_SERVICES=()
   if [[ -n "$(read_env_var "DD_API_KEY")" ]]; then
@@ -170,26 +143,4 @@ cleanup_named_containers() {
 service_container_id() {
   local service="$1"
   dc ps -q "$service" | head -n1
-}
-
-pull_production_images() {
-  local services=(nginx backend admin frontend)
-  local primary_tag="$IMAGE_TAG"
-
-  echo "Pulling production images for tag ${primary_tag}..."
-  if dc pull "${services[@]}"; then
-    echo "Production images ready for tag ${primary_tag}."
-    return 0
-  fi
-
-  if [[ -n "$IMAGE_FALLBACK_TAG" && "$IMAGE_FALLBACK_TAG" != "$primary_tag" ]]; then
-    export IMAGE_TAG="$IMAGE_FALLBACK_TAG"
-    echo "Primary image tag ${primary_tag} unavailable. Falling back to ${IMAGE_TAG}."
-    dc pull "${services[@]}"
-    echo "Production images ready for fallback tag ${IMAGE_TAG}."
-    return 0
-  fi
-
-  echo "ERROR: failed to pull production images for tag ${primary_tag}."
-  return 1
 }

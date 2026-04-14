@@ -35,7 +35,7 @@
   - `docs/stale-expired-content-handling.md`
   - `docs/deployment-notes.md`
   - `docs/migration-runbook.md`
-- Hardened production deploy wiring so server root `.env` is the explicit Docker production source of truth, `docker-compose.production.yml` passes frontend revalidation env vars through correctly, and deploy verification now covers `/api/health`, `/api/health/deep`, representative public pages, admin, and optional authenticated `/api/revalidate` smoke checks.
+- Hardened production deploy wiring so server root `.env` is the explicit Docker production source of truth, GitHub Actions now drives a droplet-side rebuild from `docker-compose.yml` without requiring container-registry secrets, and deploy verification now covers `/api/health`, `/api/health/deep`, representative public pages, admin, and optional authenticated internal frontend `/api/revalidate` smoke checks.
 - Completed a local migration rehearsal using the new in-memory dev Mongo helper and wrote sample reports:
   - `docs/backfill-dry-run-report.json`
   - `docs/backfill-live-report.json`
