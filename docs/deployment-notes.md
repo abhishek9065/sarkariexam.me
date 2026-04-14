@@ -96,7 +96,7 @@ npm run lint
 - `.github/workflows/security.yml` runs reusable npm audit checks.
 - `.github/workflows/codeql.yml` runs standalone CodeQL scanning for pull requests, manual security runs, and the scheduled weekly scan.
 - `.github/workflows/build-publish-images.yml` now acts as production release validation and gates deploy after CI and security pass.
-- `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, or via explicit GitHub Actions manual dispatch on `main`.
+- `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, or via explicit GitHub Actions manual dispatch on `main`, using native OpenSSH from the runner instead of a third-party SSH action wrapper.
 
 Release gating detail:
 - On `main` release validation, the reusable `Security` workflow contributes npm audit checks.

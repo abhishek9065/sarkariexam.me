@@ -66,21 +66,33 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare SSH
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_PORT: ${{ secrets.DO_PORT || 22 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DO_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          ssh-keyscan -p "$DO_PORT" -H "$DO_HOST" >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          port: ${{ secrets.DO_PORT || 22 }}
-          script: |
-            set -euo pipefail
-            export DEPLOY_MODE='${{ steps.deploy-inputs.outputs.deploy_mode }}'
-            if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then
-              bash ~/sarkari-result/scripts/deploy-live.sh
-            elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then
-              bash ~/sarkariexam.me/scripts/deploy-live.sh
-            else
-              echo "No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh or ~/sarkariexam.me/scripts/deploy-live.sh"
-              exit 1
-            fi
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USER: ${{ secrets.DO_USER }}
+          DO_PORT: ${{ secrets.DO_PORT || 22 }}
+          DEPLOY_MODE: ${{ steps.deploy-inputs.outputs.deploy_mode }}
+        run: |
+          set -euo pipefail
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -p "$DO_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DO_USER@$DO_HOST" \
+            "set -euo pipefail; export DEPLOY_MODE='$DEPLOY_MODE'; if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then bash ~/sarkari-result/scripts/deploy-live.sh; elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then bash ~/sarkariexam.me/scripts/deploy-live.sh; else echo 'No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh or ~/sarkariexam.me/scripts/deploy-live.sh'; exit 1; fi"
