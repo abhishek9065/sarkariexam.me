@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 concurrency:
   group: production-release-${{ github.ref }}
@@ -16,32 +15,13 @@ permissions:
   security-events: write
 
 jobs:
-  validate-production-ref:
-    name: Validate Production Ref
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ensure workflow runs only for main
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "Production image publishing via manual dispatch is allowed only from the main branch."
-            echo "Current ref: $GITHUB_REF"
-            exit 1
-          fi
-
   ci:
     name: CI
-    needs:
-      - validate-production-ref
     uses: ./.github/workflows/ci.yml
     secrets: inherit
 
   security:
     name: Security
-    needs:
-      - validate-production-ref
     uses: ./.github/workflows/security.yml
     secrets: inherit
 

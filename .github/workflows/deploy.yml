@@ -6,15 +6,6 @@ on:
       - Production Release Validation
     types:
       - completed
-  workflow_dispatch:
-    inputs:
-      deploy_mode:
-        description: Deployment mode
-        type: choice
-        options:
-          - fast
-          - full
-        default: fast
 
 concurrency:
   group: production-deploy
@@ -26,26 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     if: >-
-      (github.event_name == 'workflow_run' &&
+      github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' &&
-      github.ref == 'refs/heads/main')
+      github.event.workflow_run.head_branch == 'main'
     steps:
-      - name: Resolve deployment inputs
-        id: deploy-inputs
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DISPATCH_DEPLOY_MODE: ${{ inputs.deploy_mode }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_run" ]; then
-            echo "deploy_mode=fast" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          deploy_mode="${DISPATCH_DEPLOY_MODE:-fast}"
-
-          echo "deploy_mode=$deploy_mode" >> "$GITHUB_OUTPUT"
 
       - name: Check deploy configuration
         env:
@@ -106,7 +81,7 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_PORT: ${{ secrets.DO_PORT || 22 }}
-          DEPLOY_MODE: ${{ steps.deploy-inputs.outputs.deploy_mode }}
+          DEPLOY_MODE: fast
         run: |
           set -euo pipefail
           ssh \

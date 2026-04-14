@@ -145,7 +145,7 @@ Main branch pushes trigger:
 - `Deploy to Production`
 
 Production deploys are GitHub Actions driven. After CI and security pass, the deploy workflow SSHes into the droplet, pulls `main`, rebuilds the Docker services from the checked-out repo, and restarts the stack.
-On release pushes, deploy gating depends on CI plus npm audit security checks. CodeQL now runs in its own workflow for pull requests, manual security runs, and the scheduled weekly security scan, so transient GitHub-hosted CodeQL setup failures no longer block production deploys.
+On release pushes, deploy gating depends on CI plus npm audit security checks. CodeQL now runs in its own workflow for pull requests and the scheduled weekly security scan, so transient GitHub-hosted CodeQL setup failures no longer block production deploys.
 
 ## Deployment
 
@@ -156,7 +156,7 @@ Push to `main` to trigger CI, release validation, and production deploy:
 git push origin main
 ```
 
-The server-side deploy scripts remain in the repo because GitHub Actions calls them over SSH on the droplet. They are internal deployment plumbing, not the supported developer release path.
+The server-side deploy scripts remain in the repo because GitHub Actions calls them over SSH on the droplet. They are internal deployment plumbing, not alternate developer deployment methods.
 
 Detailed deploy notes live in [scripts/FAST_DEPLOY_README.md](./scripts/FAST_DEPLOY_README.md).
 

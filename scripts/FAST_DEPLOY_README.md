@@ -18,9 +18,9 @@ git push origin main
 
 The server-side scripts in `scripts/` are still required because the GitHub deploy workflow invokes `scripts/deploy-live.sh` on the droplet over SSH.
 
-## Modes
+## Runtime Behavior
 
-Fast mode is the default:
+Production deploys always use the fast path:
 - rebuilds backend first so API readiness is established early
 - rebuilds frontend, admin, and nginx from the checked-out repo
 - restarts Docker services after the rebuild
@@ -36,8 +36,7 @@ Fast public verification includes:
 - `/admin`
 - optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 
-Full mode uses the same GitHub-triggered rebuild path, then runs deeper verification for the homepage, representative public pages, the admin console, and internal frontend revalidation.
-Use the `Deploy to Production` GitHub Actions manual dispatch if you need to choose `fast` or `full`.
+The deeper full-deploy script remains in the repo as server-side maintenance plumbing, but it is not a supported release trigger or operator-facing deployment mode.
 
 ## Required Configuration
 
@@ -75,7 +74,6 @@ Do not treat `backend/.env` or `frontend/.env.local` as production Docker config
 ## Troubleshooting
 
 If a deploy fails:
-1. Re-run in full mode.
-2. Check the server deploy log at `/tmp/sarkari-result-deploy.log`.
-3. Check container logs with `docker compose -f docker-compose.yml logs`.
-4. Verify the required deploy secrets and server `.env` values exist.
+1. Check the server deploy log at `/tmp/sarkari-result-deploy.log`.
+2. Check container logs with `docker compose -f docker-compose.yml logs`.
+3. Verify the required deploy secrets and server `.env` values exist.
