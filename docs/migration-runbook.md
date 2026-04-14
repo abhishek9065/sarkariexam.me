@@ -12,6 +12,7 @@ This runbook covers the remaining operational rollout for the new `posts` platfo
   - `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
   - `COSMOS_DATABASE_NAME`
 - Backend dependencies installed.
+- The application deploy has already been completed with the production root `.env` in place on the target server.
 
 The repo now supports direct CLI overrides, so you do not need to rewrite `backend/.env` for staged runs.
 
@@ -57,6 +58,7 @@ What this does:
 - writes a JSON report with coverage and quality-signal counts
 
 Review `docs/backfill-dry-run-report.json` before any live import.
+For rollout, do this on staging first and only proceed to production after the staging report and editorial QA are accepted.
 
 ## Live Backfill
 After the dry run is reviewed:

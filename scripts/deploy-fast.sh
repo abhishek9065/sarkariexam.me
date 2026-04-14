@@ -13,6 +13,7 @@ echo "=== FAST DEPLOY MODE - Pull Prebuilt Images ==="
 
 require_env_file
 validate_production_env
+warn_if_missing_production_runtime_vars
 configure_production_images
 resolve_datadog_services
 
@@ -164,15 +165,44 @@ verify_public_endpoint() {
   return 1
 }
 
+verify_public_revalidation_smoke() {
+  local revalidate_token
+  local url="${PUBLIC_BASE_URL}/api/revalidate"
+  local status
+
+  revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+  if [[ -z "$revalidate_token" ]]; then
+    echo "NOTICE: FRONTEND_REVALIDATE_TOKEN not set — skipping revalidation smoke check."
+    return 0
+  fi
+
+  status="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
+    -X POST "$url" \
+    -H "Authorization: Bearer ${revalidate_token}" \
+    -H "Content-Type: application/json" \
+    --data '{"paths":["/jobs"],"tags":["content:posts","content:listings"]}' || true)"
+
+  if [[ "$status" =~ ^2 ]]; then
+    echo "ok (frontend revalidation smoke -> ${url}, status=${status})"
+    return 0
+  fi
+
+  echo "ERROR: frontend revalidation smoke check failed for ${url} (status=${status:-none})"
+  return 1
+}
+
 verify_public_endpoints() {
   PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
   local failures=0
 
   echo "Public verification:"
+  verify_public_endpoint "/api/health" "backend health" || failures=1
+  verify_public_endpoint "/api/health/deep" "backend deep health" || failures=1
   verify_public_endpoint "/" "homepage" || failures=1
   verify_public_endpoint "/jobs" "jobs listing" || failures=1
   verify_public_endpoint "/results/upsc-civil-services-2025-final-result" "result detail" || failures=1
   verify_public_endpoint "/admin" "admin console" || failures=1
+  verify_public_revalidation_smoke || failures=1
 
   if [[ "$failures" -ne 0 ]]; then
     return 1

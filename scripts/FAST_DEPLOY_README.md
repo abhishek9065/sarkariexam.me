@@ -39,6 +39,15 @@ Fast mode is the default:
 - runs compact backend checks plus representative public route checks
 - optionally purges Cloudflare cache
 
+Fast public verification includes:
+- `/api/health`
+- `/api/health/deep`
+- `/`
+- `/jobs`
+- `/results/upsc-civil-services-2025-final-result`
+- `/admin`
+- optional authenticated `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
+
 Full mode uses the same pull-only image path, then runs deeper verification for the homepage, representative public pages, and the admin console.
 
 PowerShell:
@@ -88,9 +97,18 @@ Server root `.env`:
 - optional `DOCR_USERNAME`
 - `COSMOS_CONNECTION_STRING`
 - `JWT_SECRET`
+- recommended `COSMOS_DATABASE_NAME`
+- recommended `FRONTEND_URL`
+- recommended `CORS_ORIGINS`
+- recommended `FRONTEND_REVALIDATE_URL`
+- recommended `FRONTEND_REVALIDATE_TOKEN`
+- recommended `METRICS_TOKEN`
 - optional `CF_ZONE_ID`
 - optional `CF_API_TOKEN`
 - optional `DD_API_KEY`
+
+The server root `.env` is the production source of truth for deploy scripts and `docker-compose.production.yml`.
+Do not treat `backend/.env` or `frontend/.env.local` as production Docker config.
 
 ## Files
 

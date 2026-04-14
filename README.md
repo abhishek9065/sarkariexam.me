@@ -68,27 +68,48 @@ Runs on `http://localhost:3001`.
 
 ## Environment
 
-Start from the root example file:
+Production Docker deploys use the repository root `.env` on the server.
+Start from the root example file when preparing production:
 
 ```bash
 cp .env.example .env
 ```
 
-Important variables you will typically need:
+Root `.env` is the production source of truth for:
+- `scripts/deploy-common.sh`
+- `scripts/deploy-fast.sh`
+- `scripts/deploy-prod.sh`
+- `docker-compose.production.yml`
 
+Important production variables:
+
+- `DOCR_REGISTRY_NAME`
+- `DOCR_ACCESS_TOKEN`
+- optional `DOCR_USERNAME`
 - `COSMOS_CONNECTION_STRING`
 - `COSMOS_DATABASE_NAME`
 - `JWT_SECRET`
-- `CORS_ORIGINS`
 - `FRONTEND_URL`
+- `CORS_ORIGINS`
+- `FRONTEND_REVALIDATE_URL`
+- `FRONTEND_REVALIDATE_TOKEN`
+- `METRICS_TOKEN`
+
+Recommended production variables:
+
 - `SENDGRID_API_KEY`
 - `SENTRY_DSN`
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_ADMIN_URL`
+- `CONTENT_CACHE_REVALIDATE_SECONDS`
 
-App-specific local variables:
+Local app development uses app-specific env files instead of the server root `.env`:
 
-- `backend`: backend API and database settings
-- `frontend`: `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api`
-- `admin-next`: `NEXT_PUBLIC_API_URL=http://localhost:5000/api`
+- `backend`: `backend/.env`
+- `frontend`: `frontend/.env.local`
+- `frontend` local API base: `NEXT_PUBLIC_API_URL=http://localhost:5000`
+- `admin-next`: `admin-next/.env.local` when needed
+- `admin-next` local API base: `NEXT_PUBLIC_API_URL=http://localhost:5000/api`
 
 ## Verification
 
@@ -183,6 +204,7 @@ Server `.env` values for production typically include:
 - `DOCR_ACCESS_TOKEN`
 - optional `DOCR_USERNAME`
 - application secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
+- revalidation settings such as `FRONTEND_REVALIDATE_URL` and `FRONTEND_REVALIDATE_TOKEN`
 
 ## Repository Layout
 

@@ -13,6 +13,7 @@ echo "=== FULL DEPLOY MODE - Pull Prebuilt Images + Full Verification ==="
 
 require_env_file
 validate_production_env
+warn_if_missing_production_runtime_vars
 configure_production_images
 resolve_datadog_services
 
@@ -204,6 +205,31 @@ check_public_route() {
   fi
 }
 
+check_public_revalidation_smoke() {
+  local url="${PUBLIC_BASE_URL}/api/revalidate"
+  local revalidate_token
+  local status
+
+  revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+  if [[ -z "$revalidate_token" ]]; then
+    echo "NOTICE: FRONTEND_REVALIDATE_TOKEN not set — skipping revalidation smoke check."
+    return 0
+  fi
+
+  status="$(curl -sS -o /dev/null -w "%{http_code}" \
+    -X POST "$url" \
+    -H "Authorization: Bearer ${revalidate_token}" \
+    -H "Content-Type: application/json" \
+    --data '{"paths":["/jobs"],"tags":["content:posts","content:listings"]}' || true)"
+
+  if [[ ! "$status" =~ ^2 ]]; then
+    echo "ERROR: frontend revalidation smoke check failed for ${url} (status=${status:-none})"
+    return 1
+  fi
+
+  echo "ok (frontend revalidation smoke -> ${url}, status=${status})"
+}
+
 check_public_route_assets() {
   local path="$1"
   local label="$2"
@@ -274,6 +300,8 @@ check_public_route_marker() {
 purge_cloudflare_cache || true
 
 echo "Public route checks:"
+check_public_route "/api/health" "backend health"
+check_public_route "/api/health/deep" "backend deep health"
 check_public_route "/" "homepage"
 check_public_route_assets "/" "homepage"
 check_public_route "/jobs" "public jobs listing"
@@ -281,6 +309,7 @@ check_public_route_assets "/jobs" "public jobs listing"
 check_public_route "/results/upsc-civil-services-2025-final-result" "public result detail"
 check_public_route_assets "/results/upsc-civil-services-2025-final-result" "public result detail"
 check_public_route "/admin" "admin console"
+check_public_revalidation_smoke
 
 echo "Deploy completed successfully."
 echo "Active production image tag: ${IMAGE_TAG}"

@@ -35,6 +35,7 @@
   - `docs/stale-expired-content-handling.md`
   - `docs/deployment-notes.md`
   - `docs/migration-runbook.md`
+- Hardened production deploy wiring so server root `.env` is the explicit Docker production source of truth, `docker-compose.production.yml` passes frontend revalidation env vars through correctly, and deploy verification now covers `/api/health`, `/api/health/deep`, representative public pages, admin, and optional authenticated `/api/revalidate` smoke checks.
 - Completed a local migration rehearsal using the new in-memory dev Mongo helper and wrote sample reports:
   - `docs/backfill-dry-run-report.json`
   - `docs/backfill-live-report.json`
@@ -55,6 +56,7 @@
 
 ## What Still Remains
 - Repo-side refactor work is complete for this phase. The remaining items are rollout tasks rather than missing core architecture.
+- Production deploys still need to be executed from a real server environment that has `bash`, Docker, the server root `.env`, and the configured GitHub or droplet secrets.
 - Production data migration still needs to be executed and reviewed in staging, then in production, using the backfill and audit scripts.
 - Migrated editorial data still needs human QA for taxonomy normalization, slug quality, official source hygiene, and SEO copy.
 - The public frontend is still request-time rendered in production-safe mode. Selective ISR is scaffolded but should only be enabled after build and runtime networking are separated cleanly.

@@ -8,6 +8,9 @@
 
 ## Important Environment Variables
 
+The production runtime source of truth is the repository root `.env` on the server checkout.
+Do not rely on `backend/.env` or `frontend/.env.local` for Docker production deploys. Those files are for local development only.
+
 ### Backend
 - `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
 - `COSMOS_DATABASE_NAME`
@@ -24,10 +27,31 @@
 - `REVALIDATE_TOKEN`
 - `CONTENT_CACHE_REVALIDATE_SECONDS`
 
+### Production Root `.env`
+
+Required for deploy:
+- `DOCR_REGISTRY_NAME`
+- `DOCR_ACCESS_TOKEN`
+- `COSMOS_CONNECTION_STRING`
+- `JWT_SECRET`
+
+Strongly recommended for runtime:
+- `COSMOS_DATABASE_NAME`
+- `FRONTEND_URL`
+- `CORS_ORIGINS`
+- `FRONTEND_REVALIDATE_URL`
+- `FRONTEND_REVALIDATE_TOKEN`
+- `METRICS_TOKEN`
+- `SENDGRID_API_KEY`
+- `SENTRY_DSN`
+
 ## Revalidation Flow
 - The frontend now includes a protected `/api/revalidate` endpoint plus shared content-tag conventions.
 - Editorial publish, unpublish, archive, restore, and live-content edits call the frontend revalidation endpoint when backend revalidation env vars are configured.
-- Default docker wiring points the backend to `http://frontend:3000/api/revalidate`.
+- Default production Docker wiring points the backend to `http://frontend:3000/api/revalidate`.
+- `docker-compose.production.yml` maps the same root `.env` secret into both:
+  - backend `FRONTEND_REVALIDATE_TOKEN`
+  - frontend `REVALIDATE_TOKEN`
 - Public pages remain request-time rendered today because the current Docker and CI build topology does not guarantee a live backend during frontend compilation.
 - The tag-based revalidation hook is therefore scaffolded and ready for a later selective ISR rollout after build and runtime networking are separated cleanly.
 
@@ -82,7 +106,14 @@ npm run lint
 - Edge or proxy health:
   `/healthz`
 
-Deployment scripts already wait for backend health and perform basic public-page readiness checks.
+Deployment scripts now verify:
+- `/api/health`
+- `/api/health/deep`
+- `/`
+- `/jobs`
+- `/results/upsc-civil-services-2025-final-result`
+- `/admin`
+- optional authenticated `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 
 ## Rollback Guidance
 - Application rollback: redeploy the previous image tag.

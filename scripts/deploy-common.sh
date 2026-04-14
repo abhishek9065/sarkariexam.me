@@ -70,6 +70,49 @@ validate_production_env() {
     echo "Set them in $ROOT_DIR/.env and rerun deploy."
     exit 1
   fi
+
+  local frontend_revalidate_url frontend_revalidate_token
+  frontend_revalidate_url="$(read_env_var "FRONTEND_REVALIDATE_URL")"
+  frontend_revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+
+  if [[ -n "$frontend_revalidate_url" && -z "$frontend_revalidate_token" ]]; then
+    echo "ERROR: FRONTEND_REVALIDATE_URL is set but FRONTEND_REVALIDATE_TOKEN is missing."
+    echo "Set FRONTEND_REVALIDATE_TOKEN in $ROOT_DIR/.env or unset FRONTEND_REVALIDATE_URL."
+    exit 1
+  fi
+
+  if [[ -z "$frontend_revalidate_url" && -n "$frontend_revalidate_token" ]]; then
+    echo "NOTICE: FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL is missing."
+    echo "  Content publishes will skip frontend revalidation until FRONTEND_REVALIDATE_URL is configured."
+  fi
+}
+
+warn_if_missing_production_runtime_vars() {
+  local recommended_keys=(
+    "COSMOS_DATABASE_NAME"
+    "FRONTEND_URL"
+    "CORS_ORIGINS"
+    "FRONTEND_REVALIDATE_URL"
+    "FRONTEND_REVALIDATE_TOKEN"
+    "METRICS_TOKEN"
+    "SENDGRID_API_KEY"
+    "SENTRY_DSN"
+  )
+  local missing=()
+  local key
+
+  for key in "${recommended_keys[@]}"; do
+    if [[ -z "$(read_env_var "$key")" ]]; then
+      missing+=("$key")
+    fi
+  done
+
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    echo "NOTICE: recommended production env var(s) missing from $ROOT_DIR/.env:"
+    for key in "${missing[@]}"; do
+      echo "  - $key"
+    done
+  fi
 }
 
 configure_production_images() {
