@@ -75,9 +75,29 @@ jobs:
           set -euo pipefail
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
-          printf '%s\n' "$DO_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/deploy_key"
-          chmod 600 "$HOME/.ssh/deploy_key"
-          ssh-keygen -y -f "$HOME/.ssh/deploy_key" > /dev/null
+
+          validate_key() {
+            ssh-keygen -y -f "$1" > /dev/null 2>&1
+          }
+
+          key_file="$HOME/.ssh/deploy_key"
+
+          # Support raw multiline secrets, escaped newline secrets, and base64-encoded secrets.
+          printf '%s\n' "$DO_SSH_KEY" | tr -d '\r' > "$key_file"
+          if ! validate_key "$key_file"; then
+            printf '%b\n' "$DO_SSH_KEY" | tr -d '\r' > "$key_file"
+          fi
+
+          if ! validate_key "$key_file"; then
+            printf '%s' "$DO_SSH_KEY" | tr -d '\r\n ' | base64 -d > "$key_file" 2>/dev/null || true
+          fi
+
+          if ! validate_key "$key_file"; then
+            echo "DO_SSH_KEY is not a valid private key. Save it as a raw multiline OpenSSH private key, escaped newline string, or base64-encoded private key." >&2
+            exit 1
+          fi
+
+          chmod 600 "$key_file"
           ssh-keyscan -p "$DO_PORT" -H "$DO_HOST" >> "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
