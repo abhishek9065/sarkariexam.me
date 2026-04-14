@@ -43,7 +43,8 @@ For deployment/runtime details, prefer links over duplicating docs:
 - Root setup: `README.md`
 - Public frontend details: `frontend/README.md`
 - Proxy config: `nginx/default.conf` (prod), `nginx/nginx-dev.conf` (dev)
-- Deployment scripts: `scripts/deploy-live.sh`, `scripts/deploy-prod.sh`, `scripts/deploy-fast.sh`, `scripts/deploy-prod-remote.sh`
+- Deployment flow: `.github/workflows/build-publish-images.yml`, `.github/workflows/deploy.yml`
+- Server-side deploy scripts used by GitHub Actions: `scripts/deploy-live.sh`, `scripts/deploy-prod.sh`, `scripts/deploy-fast.sh`
 
 ## Conventions
 

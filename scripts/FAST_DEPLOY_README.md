@@ -7,29 +7,15 @@ Production deploys now use a pull-only release flow:
 
 That removes the slowest part of the old flow: rebuilding Next.js and backend images on a `1 vCPU / 1 GB` droplet.
 
-## Default Commands
+GitHub Actions is the only supported production release entrypoint.
 
-Normal release:
+## Default Release
 
 ```bash
 git push origin main
 ```
 
-Manual fallback from a developer machine:
-
-```powershell
-.\scripts\deploy-prod-remote.ps1
-```
-
-```bash
-bash scripts/deploy-prod-remote.sh
-```
-
-Remote emergency fallback:
-
-```bash
-bash ~/sarkari-result/scripts/deploy-live.sh
-```
+The server-side scripts in `scripts/` are still required because the GitHub deploy workflow invokes `scripts/deploy-live.sh` on the droplet over SSH.
 
 ## Modes
 
@@ -49,37 +35,13 @@ Fast public verification includes:
 - optional authenticated `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 
 Full mode uses the same pull-only image path, then runs deeper verification for the homepage, representative public pages, and the admin console.
-
-PowerShell:
-
-```powershell
-$env:DEPLOY_MODE="full"
-.\scripts\deploy-prod-remote.ps1
-```
-
-Bash:
-
-```bash
-DEPLOY_MODE=full bash scripts/deploy-prod-remote.sh
-```
+Use the `Deploy to Production` GitHub Actions manual dispatch if you need to choose `fast` or `full`.
 
 ## Image Tags
 
 The default image tag is the checked-out `main` commit SHA on the server. If that exact tag is unavailable, deploy scripts fall back to the stable `main` tag.
 
-You can override the tag manually.
-
-PowerShell:
-
-```powershell
-.\scripts\deploy-prod-remote.ps1 -ImageTag 0123456789abcdef0123456789abcdef01234567
-```
-
-Bash:
-
-```bash
-DEPLOY_IMAGE_TAG=0123456789abcdef0123456789abcdef01234567 bash scripts/deploy-prod-remote.sh
-```
+If you need to override the tag, use the `image_tag` input on the `Deploy to Production` GitHub Actions workflow dispatch.
 
 ## Required Configuration
 
@@ -116,7 +78,7 @@ Do not treat `backend/.env` or `frontend/.env.local` as production Docker config
 - `scripts/deploy-common.sh`: shared production deploy helpers
 - `scripts/deploy-fast.sh`: fast production deploy
 - `scripts/deploy-prod.sh`: full production deploy
-- `scripts/deploy-live.sh`: remote deploy entrypoint
+- `scripts/deploy-live.sh`: server-side entrypoint used by GitHub Actions deploy over SSH
 - `docker-compose.fast.yml`: local build override, not used by production deploys
 
 ## Troubleshooting

@@ -151,39 +151,14 @@ Production uses prebuilt Docker images from DigitalOcean Container Registry. The
 
 ## Deployment
 
-### Normal release
+GitHub Actions is the only supported production deploy path.
+Push to `main` to trigger CI, image publish, and production deploy:
 
 ```bash
 git push origin main
 ```
 
-This is the default release path.
-
-### Manual fallback from your machine
-
-PowerShell:
-
-```powershell
-.\scripts\deploy-prod-remote.ps1
-```
-
-Bash:
-
-```bash
-bash scripts/deploy-prod-remote.sh
-```
-
-### Server-side entrypoint
-
-```bash
-bash ~/sarkari-result/scripts/deploy-live.sh
-```
-
-If that path does not exist on the droplet, the fallback repo path used by the workflows is:
-
-```bash
-bash ~/sarkariexam.me/scripts/deploy-live.sh
-```
+The server-side deploy scripts remain in the repo because GitHub Actions calls them over SSH on the droplet. They are internal deployment plumbing, not the supported developer release path.
 
 Detailed deploy notes live in [scripts/FAST_DEPLOY_README.md](./scripts/FAST_DEPLOY_README.md).
 
