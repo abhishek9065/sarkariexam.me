@@ -93,13 +93,14 @@ npm run lint
 
 ## CI
 - `.github/workflows/ci.yml` runs backend lint/build/tests, frontend lint/build, and admin lint/build.
-- `.github/workflows/security.yml` runs npm audit and CodeQL.
+- `.github/workflows/security.yml` runs reusable npm audit checks.
+- `.github/workflows/codeql.yml` runs standalone CodeQL scanning for pull requests, manual security runs, and the scheduled weekly scan.
 - `.github/workflows/build-publish-images.yml` now acts as production release validation and gates deploy after CI and security pass.
 - `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, or via explicit GitHub Actions manual dispatch on `main`.
 
 Release gating detail:
 - On `main` release validation, the reusable `Security` workflow contributes npm audit checks.
-- CodeQL remains active for pull requests, manual security runs, and the scheduled weekly security scan.
+- CodeQL remains active in its own workflow for pull requests, manual security runs, and the scheduled weekly security scan.
 - This prevents transient GitHub-hosted CodeQL bootstrap failures from blocking a production deploy when application CI and package-audit checks are already green.
 
 ## Health And Readiness

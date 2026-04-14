@@ -2,21 +2,11 @@ name: Security
 
 on:
   workflow_call:
-    inputs:
-      run_codeql:
-        description: Run the CodeQL job when invoked as a reusable workflow.
-        required: false
-        default: false
-        type: boolean
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 1'
 
 permissions:
-  actions: read
   contents: read
-  security-events: write
 
 jobs:
   npm-audit-backend:
@@ -64,28 +54,3 @@ jobs:
 
       - name: Audit prod dependencies
         run: npm audit --omit=dev --audit-level=high
-
-  codeql:
-    name: CodeQL
-    if: ${{ github.event_name != 'workflow_call' || inputs.run_codeql }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        language:
-          - javascript-typescript
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          config-file: ./.github/codeql/codeql-config.yml
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
-
-      - name: Analyze
-        uses: github/codeql-action/analyze@v4
