@@ -155,6 +155,8 @@ export const config = {
 
   // Frontend URL for links in emails
   frontendUrl: process.env.FRONTEND_URL ?? 'https://sarkariexams.me',
+  frontendRevalidateUrl: process.env.FRONTEND_REVALIDATE_URL ?? '',
+  frontendRevalidateToken: process.env.FRONTEND_REVALIDATE_TOKEN ?? '',
 
   // VAPID keys for web push notifications (optional)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',

@@ -6,6 +6,14 @@ import { sendAnnouncementEmail } from './email.js';
 interface SubscriptionDoc {
     email: string;
     categories?: string[];
+    categorySlugs?: string[];
+    states?: string[];
+    stateSlugs?: string[];
+    organizations?: string[];
+    organizationSlugs?: string[];
+    qualifications?: string[];
+    qualificationSlugs?: string[];
+    postTypes?: string[];
     frequency?: 'instant' | 'daily' | 'weekly';
     verified: boolean;
     isActive: boolean;
@@ -24,29 +32,30 @@ const normalizeToken = (value?: string | null): string => {
     return value.trim().toLowerCase().replace(/\s+/g, '-');
 };
 
-const buildAnnouncementTokens = (announcement: Announcement): Set<string> => {
-    const tokens = new Set<string>();
-    const category = normalizeToken(announcement.category);
-    const type = normalizeToken(announcement.type);
-    if (category) tokens.add(category);
-    if (type) tokens.add(type);
-    return tokens;
-};
+const buildAnnouncementMatchState = (announcement: Announcement) => ({
+    category: normalizeToken(announcement.category),
+    type: normalizeToken(announcement.type),
+    organization: normalizeToken(announcement.organization),
+    state: normalizeToken(announcement.location),
+    qualification: normalizeToken(announcement.minQualification),
+});
 
 const shouldDispatchToSubscriber = (
-    announcementTokens: Set<string>,
-    categories?: string[]
+    announcement: ReturnType<typeof buildAnnouncementMatchState>,
+    subscriber: SubscriptionDoc
 ): boolean => {
-    if (!categories || categories.length === 0) {
-        return true;
-    }
-    const normalizedCategories = categories
-        .map((category) => normalizeToken(category))
-        .filter(Boolean);
-    if (normalizedCategories.length === 0) {
-        return true;
-    }
-    return normalizedCategories.some((category) => announcementTokens.has(category));
+    const matchesArray = (values?: string[], target?: string) => {
+        const normalized = (values || []).map((value) => normalizeToken(value)).filter(Boolean);
+        if (normalized.length === 0) return true;
+        if (!target) return false;
+        return normalized.includes(target);
+    };
+
+    return matchesArray(subscriber.categorySlugs || subscriber.categories, announcement.category)
+        && matchesArray(subscriber.postTypes, announcement.type)
+        && matchesArray(subscriber.organizationSlugs || subscriber.organizations, announcement.organization)
+        && matchesArray(subscriber.stateSlugs || subscriber.states, announcement.state)
+        && matchesArray(subscriber.qualificationSlugs || subscriber.qualifications, announcement.qualification);
 };
 
 export async function dispatchAnnouncementToSubscribers(
@@ -63,7 +72,7 @@ export async function dispatchAnnouncementToSubscribers(
 
     let subscribers: SubscriptionDoc[] = [];
     try {
-        const collection = getCollection<SubscriptionDoc>('subscriptions');
+        const collection = getCollection<SubscriptionDoc>('alert_subscriptions');
         subscribers = await collection
             .find({
                 isActive: true,
@@ -72,7 +81,11 @@ export async function dispatchAnnouncementToSubscribers(
             })
             .project({
                 email: 1,
-                categories: 1,
+                categorySlugs: 1,
+                stateSlugs: 1,
+                organizationSlugs: 1,
+                qualificationSlugs: 1,
+                postTypes: 1,
                 unsubscribeToken: 1,
                 frequency: 1,
             })
@@ -82,12 +95,12 @@ export async function dispatchAnnouncementToSubscribers(
         return { matched: 0, sent: 0, skipped: 0, frequency };
     }
 
-    const announcementTokens = buildAnnouncementTokens(announcement);
+    const matchState = buildAnnouncementMatchState(announcement);
     const emailToToken = new Map<string, string>();
 
     for (const subscriber of subscribers) {
         if (!subscriber?.email || !subscriber?.unsubscribeToken) continue;
-        if (!shouldDispatchToSubscriber(announcementTokens, subscriber.categories)) continue;
+        if (!shouldDispatchToSubscriber(matchState, subscriber)) continue;
         emailToToken.set(subscriber.email.toLowerCase(), subscriber.unsubscribeToken);
     }
 

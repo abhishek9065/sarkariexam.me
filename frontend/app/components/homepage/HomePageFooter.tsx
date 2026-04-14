@@ -16,6 +16,7 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 import { buildCommunityPath } from '@/app/lib/public-content';
+import { subscribeToAlerts } from '@/lib/alert-subscriptions';
 import { homePageLinks } from './links';
 
 const footerColumns = {
@@ -101,15 +102,31 @@ const legalLinks = [
 export function HomePageFooter() {
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState('');
 
-  function handleSubscribe(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubscribe(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!email.trim()) {
       return;
     }
 
-    setIsSubscribed(true);
-    setEmail('');
+    try {
+      setIsSubmitting(true);
+      const response = await subscribeToAlerts({
+        email,
+        frequency: 'daily',
+        source: 'homepage-footer',
+      });
+      setIsSubscribed(true);
+      setSubscriptionMessage(response.message || 'Subscription saved.');
+      setEmail('');
+    } catch (error) {
+      setIsSubscribed(false);
+      setSubscriptionMessage(error instanceof Error ? error.message : 'Failed to subscribe.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -261,7 +278,7 @@ export function HomePageFooter() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <span className="text-[13px] font-semibold text-green-300">You&apos;re subscribed!</span>
+                  <span className="text-[13px] font-semibold text-green-300">{subscriptionMessage || 'You’re subscribed!'}</span>
                 </div>
               ) : (
                 <>
@@ -278,14 +295,16 @@ export function HomePageFooter() {
                   </div>
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg"
                   >
-                    Subscribe
+                    {isSubmitting ? 'Saving...' : 'Subscribe'}
                     <ArrowRight size={13} />
                   </button>
                 </>
               )}
             </form>
+            {!isSubscribed && subscriptionMessage ? <p className="text-[11px] text-amber-300">{subscriptionMessage}</p> : null}
           </div>
         </div>
       </div>

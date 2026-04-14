@@ -11,6 +11,11 @@
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
     "test:ci": "vitest run --maxWorkers=2 --retry=1 && npm run verify:openapi-parity",
+    "backfill:posts": "tsx scripts/backfill-posts.ts",
+    "audit:migration": "tsx scripts/audit-content-migration.ts",
+    "dev:db:start": "tsx scripts/local-dev-db.ts start",
+    "dev:db:stop": "tsx scripts/local-dev-db.ts stop",
+    "dev:db:status": "tsx scripts/local-dev-db.ts status",
     "verify:openapi-parity": "tsx scripts/verify-openapi-parity.ts"
   },
   "engines": {

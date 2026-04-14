@@ -1,10 +1,16 @@
 import type {
+  AlertSubscriber,
+  AlertSubscriberStats,
   Announcement,
   AnalyticsOverview,
+  CmsDashboardData,
+  CmsPost,
+  CmsTaxonomy,
   DashboardData,
   PaginatedResponse,
   SiteSettings,
   User,
+  WorkflowViolation,
 } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -217,12 +223,12 @@ export function getAnalyticsContent() {
 }
 
 // ─── Subscribers ───
-export function getSubscribers(filters: { search?: string; limit?: number; offset?: number } = {}) {
-  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/subscribers${qs(filters as Record<string, string | number | undefined>)}`);
+export function getSubscribers(filters: { search?: string; status?: 'all' | 'active' | 'inactive'; frequency?: 'all' | 'instant' | 'daily' | 'weekly'; limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: AlertSubscriber[]; total: number; count: number }>(`/admin/subscribers${qs(filters as Record<string, string | number | undefined>)}`);
 }
 
 export function getSubscriberStats() {
-  return apiFetch<{ data: { total: number; verified: number; unverified: number; byFrequency: Array<{ _id: string; count: number }> } }>('/admin/subscribers/stats');
+  return apiFetch<{ data: AlertSubscriberStats }>('/admin/subscribers/stats');
 }
 
 export function deleteSubscriber(id: string) {
@@ -539,4 +545,124 @@ export function getSystemHealth() {
     services: { services: Array<{ name: string; status: string; lastChecked: string }> };
     errors: Array<{ message: string; count: number; timestamp: string }>;
   } }>('/admin/health');
+}
+
+// ─── Editorial CMS ───
+export interface CmsPostFilters {
+  type?: string;
+  status?: string;
+  search?: string;
+  category?: string;
+  state?: string;
+  organization?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function getEditorialDashboard() {
+  return apiFetch<{ data: CmsDashboardData }>('/editorial/dashboard');
+}
+
+export function getCmsPosts(filters: CmsPostFilters = {}) {
+  return apiFetch<PaginatedResponse<CmsPost>>(`/editorial/posts${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function getCmsPost(id: string) {
+  return apiFetch<{ data: CmsPost }>(`/editorial/posts/${id}`);
+}
+
+export function createCmsPost(data: Record<string, unknown>) {
+  return apiFetchWithCsrf<{ data: CmsPost }>('/editorial/posts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateCmsPost(id: string, data: Record<string, unknown>) {
+  return apiFetchWithCsrf<{ data: CmsPost }>(`/editorial/posts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+function editorialWorkflowAction(path: string, note?: string) {
+  return apiFetchWithCsrf<{ data: CmsPost }>(path, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function submitCmsPost(id: string, note?: string) {
+  return editorialWorkflowAction(`/editorial/posts/${id}/submit`, note);
+}
+
+export function approveCmsPost(id: string, note?: string) {
+  return editorialWorkflowAction(`/editorial/posts/${id}/approve`, note);
+}
+
+export function publishCmsPost(id: string, note?: string) {
+  return editorialWorkflowAction(`/editorial/posts/${id}/publish`, note);
+}
+
+export function unpublishCmsPost(id: string, note?: string) {
+  return editorialWorkflowAction(`/editorial/posts/${id}/unpublish`, note);
+}
+
+export function archiveCmsPost(id: string, note?: string) {
+  return editorialWorkflowAction(`/editorial/posts/${id}/archive`, note);
+}
+
+export function restoreCmsPost(id: string, note?: string) {
+  return editorialWorkflowAction(`/editorial/posts/${id}/restore`, note);
+}
+
+export function getCmsPostHistory(id: string) {
+  return apiFetch<{ data: { versions: any[]; audit: any[] } }>(`/editorial/posts/${id}/history`);
+}
+
+export function getEditorialTaxonomies(type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications') {
+  return apiFetch<{ data: CmsTaxonomy[] }>(`/editorial/taxonomies/${type}`);
+}
+
+export function createEditorialTaxonomy(
+  type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications',
+  data: Partial<CmsTaxonomy>,
+) {
+  return apiFetchWithCsrf<{ data: CmsTaxonomy }>(`/editorial/taxonomies/${type}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateEditorialTaxonomy(
+  type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications',
+  id: string,
+  data: Partial<CmsTaxonomy>,
+) {
+  return apiFetchWithCsrf<{ data: CmsTaxonomy }>(`/editorial/taxonomies/${type}/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteEditorialTaxonomy(
+  type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications',
+  id: string,
+) {
+  return apiFetchWithCsrf<{ message: string }>(`/editorial/taxonomies/${type}/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export function getEditorialAuditLog(filters: { limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: any[]; total: number; count: number }>(`/editorial/audit-log${qs(filters as Record<string, string | number | undefined>)}`);
+}
+
+export function getEditorialWorkflowQueue() {
+  return apiFetch<{ data: CmsPost[] }>('/editorial/workflow/pending');
+}
+
+export function getEditorialWorkflowSla() {
+  return apiFetch<{ data: WorkflowViolation[] }>('/editorial/workflow/sla');
 }

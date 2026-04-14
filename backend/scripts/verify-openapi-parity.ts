@@ -13,6 +13,8 @@ const ROUTER_FILE_BY_VAR: Record<string, string> = {
     authRouter: 'src/routes/auth.ts',
     bookmarksRouter: 'src/routes/bookmarks.ts',
     communityRouter: 'src/routes/community.ts',
+    contentRouter: 'src/routes/content.ts',
+    editorialRouter: 'src/routes/editorial.ts',
     jobsRouter: 'src/routes/jobs.ts',
     profileRouter: 'src/routes/profile.ts',
     pushRouter: 'src/routes/push.ts',

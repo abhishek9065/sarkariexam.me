@@ -135,7 +135,7 @@ const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searc
 const profilesCollection = () => getCollection<UserProfileDoc>('user_profiles');
 const notificationsCollection = () => getCollection<NotificationDoc>('user_notifications');
 const usersCollection = () => getCollection<UserDoc>('users');
-const subscriptionsCollection = () => getCollection<SubscriptionDoc>('subscriptions');
+const subscriptionsCollection = () => getCollection<SubscriptionDoc>('alert_subscriptions');
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 

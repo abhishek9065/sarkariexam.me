@@ -5,7 +5,7 @@ const notificationCampaignSchema = z.object({
   body: z.string().min(10).max(1000),
   url: z.string().url().optional(),
   segment: z.object({
-    type: z.enum(['all', 'state', 'category', 'language']),
+    type: z.enum(['all', 'state', 'category', 'organization', 'qualification', 'type', 'language']),
     value: z.string(),
   }),
   scheduledAt: z.string().datetime().optional(),
@@ -118,21 +118,22 @@ export async function getUserSegments(): Promise<{
 }> {
   try {
     const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('subscriptions');
+    const col = getCollection('alert_subscriptions');
 
     // Aggregate states from user profiles
     const statePipeline = [
-      { $match: { state: { $exists: true, $ne: null } } },
-      { $group: { _id: '$state', count: { $sum: 1 } } },
+      { $match: { stateNames: { $exists: true, $ne: [] } } },
+      { $unwind: '$stateNames' },
+      { $group: { _id: '$stateNames', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 20 },
     ];
     
     // Aggregate preferred categories
     const categoryPipeline = [
-      { $match: { categories: { $exists: true, $ne: [] } } },
-      { $unwind: '$categories' },
-      { $group: { _id: '$categories', count: { $sum: 1 } } },
+      { $match: { categoryNames: { $exists: true, $ne: [] } } },
+      { $unwind: '$categoryNames' },
+      { $group: { _id: '$categoryNames', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 20 },
     ];
@@ -165,16 +166,25 @@ export async function getSegmentUserCount(
 ): Promise<number> {
   try {
     const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('subscriptions');
+    const col = getCollection('alert_subscriptions');
 
     const query: Record<string, unknown> = { isActive: true };
     
     switch (segmentType) {
       case 'state':
-        query.state = segmentValue;
+        query.stateSlugs = segmentValue;
         break;
       case 'category':
-        query.categories = { $in: [segmentValue] };
+        query.categorySlugs = { $in: [segmentValue] };
+        break;
+      case 'organization':
+        query.organizationSlugs = { $in: [segmentValue] };
+        break;
+      case 'qualification':
+        query.qualificationSlugs = { $in: [segmentValue] };
+        break;
+      case 'type':
+        query.postTypes = { $in: [segmentValue] };
         break;
       case 'language':
         query.language = segmentValue;
@@ -213,17 +223,26 @@ export async function sendCampaign(campaignId: string): Promise<{ success: boole
     await campaignsCol.updateOne({ id: campaignId }, { $set: { status: 'sending' } });
 
     // Get target users
-    const subscriptionsCol = getCollection('subscriptions');
+    const subscriptionsCol = getCollection('alert_subscriptions');
     const pushSubsCol = getCollection('push_subscriptions');
 
     const userQuery: Record<string, unknown> = { isActive: true, verified: true };
     
     switch (campaign.segment.type) {
       case 'state':
-        userQuery.state = campaign.segment.value;
+        userQuery.stateSlugs = campaign.segment.value;
         break;
       case 'category':
-        userQuery.categories = { $in: [campaign.segment.value] };
+        userQuery.categorySlugs = { $in: [campaign.segment.value] };
+        break;
+      case 'organization':
+        userQuery.organizationSlugs = { $in: [campaign.segment.value] };
+        break;
+      case 'qualification':
+        userQuery.qualificationSlugs = { $in: [campaign.segment.value] };
+        break;
+      case 'type':
+        userQuery.postTypes = { $in: [campaign.segment.value] };
         break;
       case 'language':
         userQuery.language = campaign.segment.value;

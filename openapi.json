@@ -1685,6 +1685,268 @@
           }
         }
       }
+    },
+    "/api/content/homepage": {
+      "get": {
+        "summary": "Get homepage content sections",
+        "responses": {
+          "200": {
+            "description": "Homepage content response"
+          }
+        }
+      }
+    },
+    "/api/content/posts": {
+      "get": {
+        "summary": "List public content posts",
+        "responses": {
+          "200": {
+            "description": "Public post list"
+          }
+        }
+      }
+    },
+    "/api/content/posts/{slug}": {
+      "get": {
+        "summary": "Get public post detail by slug",
+        "responses": {
+          "200": {
+            "description": "Public post detail"
+          }
+        }
+      }
+    },
+    "/api/content/taxonomies/{type}": {
+      "get": {
+        "summary": "List public taxonomies",
+        "responses": {
+          "200": {
+            "description": "Taxonomy list"
+          }
+        }
+      }
+    },
+    "/api/content/taxonomies/{type}/{slug}": {
+      "get": {
+        "summary": "Get public taxonomy landing page",
+        "responses": {
+          "200": {
+            "description": "Taxonomy landing page"
+          }
+        }
+      }
+    },
+    "/api/editorial/dashboard": {
+      "get": {
+        "summary": "Get editorial dashboard",
+        "responses": {
+          "200": {
+            "description": "Editorial dashboard response"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts": {
+      "get": {
+        "summary": "List editorial posts",
+        "responses": {
+          "200": {
+            "description": "Editorial post list"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create editorial post",
+        "responses": {
+          "201": {
+            "description": "Editorial post created"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}": {
+      "get": {
+        "summary": "Get editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post detail"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post updated"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/submit": {
+      "post": {
+        "summary": "Submit editorial post for review",
+        "responses": {
+          "200": {
+            "description": "Editorial post submitted"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/approve": {
+      "post": {
+        "summary": "Approve editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post approved"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/publish": {
+      "post": {
+        "summary": "Publish editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post published"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/unpublish": {
+      "post": {
+        "summary": "Unpublish editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post unpublished"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/archive": {
+      "post": {
+        "summary": "Archive editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post archived"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/restore": {
+      "post": {
+        "summary": "Restore editorial post",
+        "responses": {
+          "200": {
+            "description": "Editorial post restored"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/history": {
+      "get": {
+        "summary": "Get editorial post history",
+        "responses": {
+          "200": {
+            "description": "Editorial post history"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/pending": {
+      "get": {
+        "summary": "List editorial workflow queue",
+        "responses": {
+          "200": {
+            "description": "Pending workflow items"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/sla": {
+      "get": {
+        "summary": "Get editorial workflow SLA violations",
+        "responses": {
+          "200": {
+            "description": "Workflow SLA response"
+          }
+        }
+      }
+    },
+    "/api/editorial/taxonomies/{type}": {
+      "get": {
+        "summary": "List editorial taxonomies",
+        "responses": {
+          "200": {
+            "description": "Editorial taxonomy list"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create editorial taxonomy",
+        "responses": {
+          "201": {
+            "description": "Editorial taxonomy created"
+          }
+        }
+      }
+    },
+    "/api/editorial/taxonomies/{type}/{id}": {
+      "put": {
+        "summary": "Update editorial taxonomy",
+        "responses": {
+          "200": {
+            "description": "Editorial taxonomy updated"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete editorial taxonomy",
+        "responses": {
+          "200": {
+            "description": "Editorial taxonomy deleted"
+          }
+        }
+      }
+    },
+    "/api/editorial/alert-subscriptions": {
+      "get": {
+        "summary": "List alert subscriptions",
+        "responses": {
+          "200": {
+            "description": "Alert subscription list"
+          }
+        }
+      }
+    },
+    "/api/editorial/alert-subscriptions/stats": {
+      "get": {
+        "summary": "Get alert subscription stats",
+        "responses": {
+          "200": {
+            "description": "Alert subscription stats"
+          }
+        }
+      }
+    },
+    "/api/editorial/alert-subscriptions/{id}": {
+      "delete": {
+        "summary": "Delete alert subscription",
+        "responses": {
+          "200": {
+            "description": "Alert subscription deleted"
+          }
+        }
+      }
+    },
+    "/api/editorial/audit-log": {
+      "get": {
+        "summary": "Get editorial audit log",
+        "responses": {
+          "200": {
+            "description": "Editorial audit log response"
+          }
+        }
+      }
     }
   },
   "components": {

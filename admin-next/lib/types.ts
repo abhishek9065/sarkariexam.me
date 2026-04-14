@@ -2,6 +2,7 @@ export type ContentType = 'job' | 'result' | 'admit-card' | 'syllabus' | 'answer
 export type AnnouncementStatus = 'draft' | 'pending' | 'scheduled' | 'published' | 'archived';
 
 export type AdminRole = 'superadmin' | 'editor' | 'reviewer' | 'admin' | 'user';
+export type EditorialStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'archived';
 
 export interface User {
   id: string;
@@ -12,6 +13,130 @@ export interface User {
   createdAt?: string;
   lastLogin?: string;
   twoFactorEnabled?: boolean;
+}
+
+export interface TaxonomyRef {
+  id?: string;
+  name: string;
+  slug: string;
+}
+
+export interface CmsOfficialSource {
+  label: string;
+  url: string;
+  sourceType?: string;
+  isPrimary?: boolean;
+}
+
+export interface CmsImportantDate {
+  label: string;
+  value: string;
+  kind?: string;
+  isPrimary?: boolean;
+  note?: string;
+}
+
+export interface CmsPost {
+  id: string;
+  title: string;
+  slug: string;
+  legacySlugs: string[];
+  type: ContentType;
+  status: EditorialStatus;
+  summary: string;
+  shortInfo?: string;
+  body?: string;
+  organization?: TaxonomyRef | null;
+  categories: TaxonomyRef[];
+  states: TaxonomyRef[];
+  qualifications: TaxonomyRef[];
+  institution?: TaxonomyRef | null;
+  exam?: TaxonomyRef | null;
+  importantDates: CmsImportantDate[];
+  eligibility: Array<{ label: string; description: string }>;
+  feeRules: Array<{ category: string; amount: string; paymentNote?: string }>;
+  vacancyRows: Array<{ postName: string; department?: string; vacancies: string; payLevel?: string; salaryNote?: string }>;
+  admissionPrograms: Array<{ programName: string; level?: string; department?: string; intake?: string; eligibilityNote?: string }>;
+  officialSources: CmsOfficialSource[];
+  trust: { verificationNote?: string };
+  tag?: 'new' | 'hot' | 'update' | 'last-date';
+  flags: { urgent?: boolean; isNew?: boolean; lastDate?: boolean; featured?: boolean };
+  home: { section?: string; stickyRank?: number; highlight?: boolean; trendingScore?: number };
+  location?: string;
+  salary?: string;
+  postCount?: string;
+  applicationStartDate?: string;
+  lastDate?: string;
+  examDate?: string;
+  publishedAt?: string;
+  updatedAt: string;
+  createdAt: string;
+  currentVersion: number;
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    canonicalPath?: string;
+    indexable?: boolean;
+    ogImage?: string;
+  };
+}
+
+export interface CmsDashboardData {
+  total: number;
+  published: number;
+  inReview: number;
+  byType: Record<string, number>;
+  byStatus: Record<string, number>;
+  recentPosts: CmsPost[];
+}
+
+export interface WorkflowViolation {
+  id: string;
+  title: string;
+  hoursOverdue: number;
+}
+
+export interface CmsTaxonomy {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  officialWebsite?: string;
+  shortName?: string;
+  priority?: number;
+  type?: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AlertSubscriber {
+  id: string;
+  email: string;
+  verified: boolean;
+  isActive: boolean;
+  frequency: 'instant' | 'daily' | 'weekly';
+  categorySlugs: string[];
+  categoryNames: string[];
+  stateSlugs: string[];
+  stateNames: string[];
+  organizationSlugs: string[];
+  organizationNames: string[];
+  qualificationSlugs: string[];
+  qualificationNames: string[];
+  postTypes: ContentType[];
+  alertCount?: number;
+  lastAlertedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AlertSubscriberStats {
+  total: number;
+  verified: number;
+  unverified: number;
+  active: number;
+  inactive: number;
+  byFrequency: Array<{ _id: string; count: number }>;
 }
 
 export interface Tag {

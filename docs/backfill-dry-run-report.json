@@ -1,0 +1,21 @@
+{
+  "mode": "dry-run",
+  "totals": {
+    "announcements": 15,
+    "created": 15,
+    "skipped": 0
+  },
+  "qualitySignals": {
+    "missingOfficialSources": 0,
+    "missingVerificationNote": 0,
+    "missingStateTags": 0,
+    "missingQualificationTags": 0
+  },
+  "samples": {
+    "missingOfficialSources": [],
+    "missingVerificationNote": [],
+    "missingStateTags": [],
+    "missingQualificationTags": []
+  },
+  "generatedAt": "2026-04-14T04:52:13.510Z"
+}

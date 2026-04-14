@@ -1,74 +1,100 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bell, CheckCircle, Download, Mail, Search, Trash2, Users, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Bell,
-  CheckCircle,
-  Download,
-  Mail,
-  Search,
-  Trash2,
-  TrendingUp,
-  Users,
-  XCircle,
-} from 'lucide-react';
 
-type Subscriber = {
-  id: string;
-  name: string;
-  email: string;
-  joinedDate: string;
-  preferences: string[];
-  status: 'active' | 'unsubscribed';
-  alertsReceived: number;
-};
+import { deleteSubscriber, getSubscriberStats, getSubscribers } from '@/lib/api';
+import type { AlertSubscriber } from '@/lib/types';
 
-const INITIAL_SUBSCRIBERS: Subscriber[] = [
-  { id: '1', name: 'Rahul Kumar', email: 'rahul.kumar@gmail.com', joinedDate: '28 Mar 2026', preferences: ['Latest Jobs', 'Results'], status: 'active', alertsReceived: 142 },
-  { id: '2', name: 'Priya Sharma', email: 'priya.s@outlook.com', joinedDate: '27 Mar 2026', preferences: ['Admit Card', 'Answer Key'], status: 'active', alertsReceived: 87 },
-  { id: '3', name: 'Arjun Singh', email: 'arjun.singh92@yahoo.com', joinedDate: '26 Mar 2026', preferences: ['Latest Jobs'], status: 'active', alertsReceived: 215 },
-  { id: '4', name: 'Neha Gupta', email: 'neha.gupta@gmail.com', joinedDate: '25 Mar 2026', preferences: ['Results', 'Syllabus'], status: 'active', alertsReceived: 63 },
-  { id: '5', name: 'Vijay Patel', email: 'vpatel2000@gmail.com', joinedDate: '24 Mar 2026', preferences: ['Latest Jobs', 'Results', 'Admit Card'], status: 'unsubscribed', alertsReceived: 312 },
-  { id: '6', name: 'Sunita Yadav', email: 'sunita.yadav@hotmail.com', joinedDate: '22 Mar 2026', preferences: ['Latest Jobs'], status: 'active', alertsReceived: 178 },
-  { id: '7', name: 'Mohit Verma', email: 'mohitverma@gmail.com', joinedDate: '20 Mar 2026', preferences: ['Results', 'Answer Key'], status: 'active', alertsReceived: 94 },
-  { id: '8', name: 'Kavita Mishra', email: 'kavita.mishra@gmail.com', joinedDate: '18 Mar 2026', preferences: ['Admit Card'], status: 'active', alertsReceived: 47 },
-];
+function formatDate(value?: string) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-const PREFERENCE_COLORS: Record<string, { bg: string; text: string }> = {
-  'Latest Jobs': { bg: '#fff4ef', text: '#e65100' },
-  Results: { bg: '#f0fff4', text: '#2e7d32' },
-  'Admit Card': { bg: '#eff4ff', text: '#1565c0' },
-  'Answer Key': { bg: '#f9f0ff', text: '#6a1b9a' },
-  Syllabus: { bg: '#fffbef', text: '#f57f17' },
-};
+function preferenceTags(subscriber: AlertSubscriber) {
+  return [
+    ...subscriber.categoryNames.map((item) => `Category: ${item}`),
+    ...subscriber.stateNames.map((item) => `State: ${item}`),
+    ...subscriber.organizationNames.map((item) => `Org: ${item}`),
+    ...subscriber.qualificationNames.map((item) => `Qualification: ${item}`),
+    ...subscriber.postTypes.map((item) => `Type: ${item}`),
+  ];
+}
+
+function downloadCsv(rows: AlertSubscriber[]) {
+  const headers = ['Email', 'Status', 'Verified', 'Frequency', 'Categories', 'States', 'Organizations', 'Qualifications', 'Post Types', 'Alerts Sent', 'Created At'];
+  const lines = rows.map((row) => [
+    row.email,
+    row.isActive ? 'active' : 'inactive',
+    row.verified ? 'yes' : 'no',
+    row.frequency,
+    row.categoryNames.join('; '),
+    row.stateNames.join('; '),
+    row.organizationNames.join('; '),
+    row.qualificationNames.join('; '),
+    row.postTypes.join('; '),
+    String(row.alertCount || 0),
+    row.createdAt,
+  ]);
+
+  const content = [headers, ...lines]
+    .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'alert-subscribers.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function SubscribersPage() {
-  const [subscribers, setSubscribers] = useState(INITIAL_SUBSCRIBERS);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'unsubscribed'>('all');
-  const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [frequency, setFrequency] = useState<'all' | 'instant' | 'daily' | 'weekly'>('all');
 
-  const filtered = useMemo(() => subscribers.filter(item => {
-    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.email.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || item.status === statusFilter;
-    return matchSearch && matchStatus;
-  }), [search, statusFilter, subscribers]);
+  const statsQuery = useQuery({
+    queryKey: ['alert-subscriber-stats'],
+    queryFn: getSubscriberStats,
+  });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const activeCount = subscribers.filter(item => item.status === 'active').length;
-  const unsubscribedCount = subscribers.filter(item => item.status === 'unsubscribed').length;
+  const subscribersQuery = useQuery({
+    queryKey: ['alert-subscribers', search, status, frequency],
+    queryFn: () => getSubscribers({ search: search || undefined, status, frequency, limit: 100 }),
+  });
 
-  function removeSubscriber(id: string) {
-    setSubscribers(current => current.filter(item => item.id !== id));
-    toast.success('Subscriber removed.');
-  }
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteSubscriber(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alert-subscribers'] });
+      queryClient.invalidateQueries({ queryKey: ['alert-subscriber-stats'] });
+      toast.success('Subscriber removed.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to remove subscriber');
+    },
+  });
 
-  function exportCsv() {
-    toast.success(`Exporting ${filtered.length} subscribers as CSV...`);
-  }
+  const subscribers = subscribersQuery.data?.data || [];
+  const stats = statsQuery.data?.data;
+
+  const activeCount = stats?.active ?? subscribers.filter((item) => item.isActive).length;
+  const inactiveCount = stats?.inactive ?? subscribers.filter((item) => !item.isActive).length;
+  const frequencyBreakdown = useMemo(() => {
+    const byFrequency = new Map((stats?.byFrequency || []).map((item) => [item._id, item.count]));
+    return {
+      instant: byFrequency.get('instant') || 0,
+      daily: byFrequency.get('daily') || 0,
+      weekly: byFrequency.get('weekly') || 0,
+    };
+  }, [stats?.byFrequency]);
 
   return (
     <div className="space-y-4">
@@ -78,13 +104,13 @@ export function SubscribersPage() {
             <Users className="h-4.5 w-4.5 text-red-600" />
           </div>
           <div>
-            <h2 className="text-[18px] font-extrabold text-gray-800">Subscribers</h2>
-            <p className="text-[11px] text-gray-400">{subscribers.length.toLocaleString()} total subscribers</p>
+            <h2 className="text-[18px] font-extrabold text-gray-800">Alert Subscribers</h2>
+            <p className="text-[11px] text-gray-400">{(stats?.total ?? subscribers.length).toLocaleString()} total subscriptions</p>
           </div>
         </div>
         <button
           type="button"
-          onClick={exportCsv}
+          onClick={() => downloadCsv(subscribers)}
           className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-[13px] font-semibold text-gray-700 transition-colors hover:bg-gray-50"
         >
           <Download className="h-3.5 w-3.5" />
@@ -94,10 +120,10 @@ export function SubscribersPage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="text-[22px] font-extrabold text-gray-800">28,450</div>
+          <div className="text-[22px] font-extrabold text-gray-800">{(stats?.total ?? 0).toLocaleString()}</div>
           <div className="mt-1 flex items-center gap-1.5">
             <Users className="h-3 w-3 text-blue-500" />
-            <span className="text-[11px] text-gray-500">Total Subscribers</span>
+            <span className="text-[11px] text-gray-500">Total</span>
           </div>
         </div>
         <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
@@ -108,43 +134,34 @@ export function SubscribersPage() {
           </div>
         </div>
         <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="text-[22px] font-extrabold text-red-600">{unsubscribedCount.toLocaleString()}</div>
+          <div className="text-[22px] font-extrabold text-red-600">{inactiveCount.toLocaleString()}</div>
           <div className="mt-1 flex items-center gap-1.5">
             <XCircle className="h-3 w-3 text-red-500" />
-            <span className="text-[11px] text-gray-500">Unsubscribed</span>
+            <span className="text-[11px] text-gray-500">Inactive</span>
           </div>
         </div>
         <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="text-[22px] font-extrabold text-blue-700">+142</div>
+          <div className="text-[22px] font-extrabold text-blue-700">{(stats?.verified ?? 0).toLocaleString()}</div>
           <div className="mt-1 flex items-center gap-1.5">
-            <TrendingUp className="h-3 w-3 text-blue-500" />
-            <span className="text-[11px] text-gray-500">Joined Today</span>
+            <Mail className="h-3 w-3 text-blue-500" />
+            <span className="text-[11px] text-gray-500">Verified</span>
           </div>
         </div>
       </div>
 
       <div className="rounded-[22px] border border-gray-100 bg-white p-5 shadow-sm">
-        <h3 className="mb-3 text-[13px] font-bold text-gray-800">Alert Preferences Breakdown</h3>
-        <div className="space-y-2.5">
+        <h3 className="mb-3 text-[13px] font-bold text-gray-800">Frequency Breakdown</h3>
+        <div className="grid gap-3 sm:grid-cols-3">
           {[
-            { label: 'Latest Jobs', pct: 78, count: '22,191' },
-            { label: 'Results', pct: 54, count: '15,363' },
-            { label: 'Admit Card', pct: 41, count: '11,664' },
-            { label: 'Answer Key', pct: 28, count: '7,966' },
-            { label: 'Syllabus', pct: 19, count: '5,405' },
-          ].map(item => {
-            const tone = PREFERENCE_COLORS[item.label];
-            return (
-              <div key={item.label} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 text-[11px] font-semibold text-gray-600">{item.label}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-                  <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: tone.text }} />
-                </div>
-                <span className="w-16 shrink-0 text-right text-[11px] font-semibold text-gray-500">{item.count}</span>
-                <span className="w-8 shrink-0 text-right text-[11px] font-bold" style={{ color: tone.text }}>{item.pct}%</span>
-              </div>
-            );
-          })}
+            { label: 'Instant', count: frequencyBreakdown.instant, tone: 'text-[#e65100] bg-[#fff4ef]' },
+            { label: 'Daily', count: frequencyBreakdown.daily, tone: 'text-[#1565c0] bg-[#eff4ff]' },
+            { label: 'Weekly', count: frequencyBreakdown.weekly, tone: 'text-[#2e7d32] bg-[#f0fff4]' },
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-gray-100 p-4">
+              <div className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${item.tone}`}>{item.label}</div>
+              <div className="mt-3 text-[22px] font-extrabold text-gray-800">{item.count.toLocaleString()}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -154,24 +171,32 @@ export function SubscribersPage() {
             <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
             <input
               value={search}
-              onChange={event => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search by name or email..."
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by email..."
               className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400"
             />
           </div>
+
           <div className="flex rounded-xl bg-gray-100 p-1">
-            {(['all', 'active', 'unsubscribed'] as const).map(item => (
+            {(['all', 'active', 'inactive'] as const).map((item) => (
               <button
                 key={item}
                 type="button"
-                onClick={() => {
-                  setStatusFilter(item);
-                  setPage(1);
-                }}
-                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition-all ${statusFilter === item ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => setStatus(item)}
+                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition-all ${status === item ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex rounded-xl bg-gray-100 p-1">
+            {(['all', 'instant', 'daily', 'weekly'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setFrequency(item)}
+                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition-all ${frequency === item ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 {item}
               </button>
@@ -181,80 +206,65 @@ export function SubscribersPage() {
       </div>
 
       <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
-        <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b border-[#e8ecf8] bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
+        <div className="grid grid-cols-[1.2fr_1fr_auto_auto_auto] items-center gap-3 border-b border-[#e8ecf8] bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Subscriber</span>
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Preferences</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Joined</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Alerts</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Frequency</span>
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Status</span>
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Action</span>
         </div>
 
-        {paginated.map((subscriber, index) => (
+        {subscribers.map((subscriber, index) => (
           <div
             key={subscriber.id}
-            className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
+            className={`grid grid-cols-[1.2fr_1fr_auto_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
           >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1565c0] to-[#1a237e] text-[11px] font-extrabold text-white">
-                {subscriber.name.split(' ').map(part => part[0]).join('').slice(0, 2)}
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold text-gray-800">{subscriber.name}</p>
-                <p className="flex items-center gap-1 text-[11px] text-gray-400">
-                  <Mail className="h-2.5 w-2.5" />
-                  {subscriber.email}
-                </p>
-              </div>
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-semibold text-gray-800">{subscriber.email}</p>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Created {formatDate(subscriber.createdAt)}{subscriber.lastAlertedAt ? ` · Last alert ${formatDate(subscriber.lastAlertedAt)}` : ''}
+              </p>
             </div>
+
             <div className="flex flex-wrap gap-1">
-              {subscriber.preferences.map(preference => {
-                const tone = PREFERENCE_COLORS[preference] ?? { bg: '#f3f4f6', text: '#6b7280' };
-                return (
-                  <span key={preference} className="rounded-full px-2 py-0.5 text-[9px] font-bold" style={{ background: tone.bg, color: tone.text }}>
-                    {preference}
-                  </span>
-                );
-              })}
+              {preferenceTags(subscriber).slice(0, 6).map((preference) => (
+                <span key={preference} className="rounded-full bg-[#f8f2ff] px-2 py-0.5 text-[9px] font-bold text-[#6a1b9a]">
+                  {preference}
+                </span>
+              ))}
+              {preferenceTags(subscriber).length === 0 ? <span className="text-[11px] text-gray-400">All updates</span> : null}
             </div>
-            <div className="text-[12px] text-gray-500">{subscriber.joinedDate}</div>
-            <div className="flex items-center justify-center gap-1">
+
+            <div className="flex items-center gap-1">
               <Bell className="h-2.5 w-2.5 text-orange-400" />
-              <span className="text-[12px] font-bold text-gray-700">{subscriber.alertsReceived}</span>
+              <span className="text-[12px] font-bold capitalize text-gray-700">{subscriber.frequency}</span>
             </div>
-            <div className="text-center">
-              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${subscriber.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                {subscriber.status === 'active' ? 'Active' : 'Unsub'}
+
+            <div className="flex flex-col items-start gap-1">
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${subscriber.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                {subscriber.isActive ? 'Active' : 'Inactive'}
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${subscriber.verified ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                {subscriber.verified ? 'Verified' : 'Pending'}
               </span>
             </div>
+
             <div className="text-right">
-              <button type="button" onClick={() => removeSubscriber(subscriber.id)} className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100">
+              <button
+                type="button"
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate(subscriber.id)}
+                className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         ))}
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-            <span className="text-[11px] text-gray-400">
-              Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}
-            </span>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, index) => index + 1).map(number => (
-                <button
-                  key={number}
-                  type="button"
-                  onClick={() => setPage(number)}
-                  className={`h-7 w-7 rounded-lg text-[12px] font-bold ${page === number ? 'text-white' : 'text-gray-500 hover:bg-gray-100'}`}
-                  style={page === number ? { background: 'linear-gradient(135deg, #e65100, #bf360c)' } : undefined}
-                >
-                  {number}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {subscribers.length === 0 ? (
+          <div className="px-4 py-10 text-center text-[13px] text-gray-500">No alert subscribers found for the current filters.</div>
+        ) : null}
       </div>
     </div>
   );

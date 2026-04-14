@@ -1,38 +1,31 @@
 import { notFound, redirect } from 'next/navigation';
 import { PublicAnnouncementDetailPage } from '@/app/components/public-site/PublicAnnouncementDetailPage';
-import {
-  announcementCategoryMeta,
-  announcementItemsBySection,
-  buildAnnouncementPath,
-  getAnnouncementEntries,
-  resolveAnnouncementParam,
-} from '@/app/lib/public-content';
+import { loadDetailPage } from '@/lib/content-page';
 
-export function generateStaticParams() {
-  return announcementItemsBySection['admit-cards'].map((item) => ({ id: item.slug }));
-}
 
 export default async function AdmitCardDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const resolved = resolveAnnouncementParam('admit-cards', id);
+  let resolved;
 
-  if (!resolved) {
+  try {
+    const { id } = await params;
+    resolved = await loadDetailPage('admit-cards', id);
+
+    if (!resolved.isCanonicalSection || resolved.item.slug !== id) {
+      redirect(resolved.canonicalPath);
+    }
+  } catch {
     notFound();
-  }
-
-  if (resolved.matchType !== 'canonical') {
-    redirect(resolved.canonicalPath);
   }
 
   return (
     <PublicAnnouncementDetailPage
-      meta={announcementCategoryMeta['admit-cards']}
+      meta={resolved.meta}
       item={resolved.item}
-      relatedEntries={getAnnouncementEntries('admit-cards').filter((entry) => entry.href !== buildAnnouncementPath(resolved.item)).slice(0, 6)}
+      relatedEntries={resolved.relatedEntries}
     />
   );
 }

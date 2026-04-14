@@ -7,6 +7,7 @@ import RedisCache from '../services/redis.js';
 import type { JwtPayload } from '../types.js';
 
 export const AUTH_COOKIE_NAME = 'auth_token';
+export const EDITORIAL_ROLES = ['editor', 'reviewer', 'admin', 'superadmin'] as const;
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -118,11 +119,29 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || !['admin', 'superadmin'].includes(req.user.role)) {
     res.status(403).json({ error: 'Admin access required' });
     return;
   }
   next();
+}
+
+export function requireEditorialAccess(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user || !EDITORIAL_ROLES.includes(req.user.role as (typeof EDITORIAL_ROLES)[number])) {
+    res.status(403).json({ error: 'Editorial access required' });
+    return;
+  }
+  next();
+}
+
+export function requireRoles(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    next();
+  };
 }
 
 export function requirePermission(_permission: string) {

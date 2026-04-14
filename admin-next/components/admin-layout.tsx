@@ -121,6 +121,11 @@ const NAV_SECTIONS: NavSection[] = [
         sub: true,
         match: (pathname, searchParams) => pathname === '/announcements' && searchParams.get('type') === 'syllabus',
       },
+      {
+        href: '/taxonomies',
+        label: 'Taxonomies',
+        icon: BookOpen,
+      },
     ],
   },
   {
@@ -226,6 +231,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       { id: 'new-post', label: 'New Post', icon: Plus, description: 'Create a new job / result post', run: () => router.push('/announcements/new') },
       { id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, description: 'Overview & metrics', run: () => router.push('/') },
       { id: 'all-posts', label: 'All Posts', icon: Hash, description: 'Browse all content', run: () => router.push('/announcements') },
+      { id: 'taxonomies', label: 'Taxonomies', icon: BookOpen, description: 'Manage states, organizations, and filters', run: () => router.push('/taxonomies') },
       { id: 'analytics', label: 'Analytics', icon: BarChart3, description: 'Traffic & insights', run: () => router.push('/analytics') },
       { id: 'qa', label: 'Q&A Moderation', icon: MessageSquare, description: 'Review pending questions', run: () => router.push('/community') },
       { id: 'ticker', label: 'Ticker & Links', icon: Radio, description: 'Manage scrolling ticker', run: () => router.push('/notifications') },

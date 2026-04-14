@@ -5,7 +5,11 @@ import { sendDigestEmail } from './email.js';
 
 interface SubscriptionDoc {
     email: string;
-    categories?: string[];
+    categorySlugs?: string[];
+    stateSlugs?: string[];
+    organizationSlugs?: string[];
+    qualificationSlugs?: string[];
+    postTypes?: string[];
     frequency: 'instant' | 'daily' | 'weekly';
     verified: boolean;
     isActive: boolean;
@@ -45,23 +49,22 @@ const normalizeToken = (value?: string | null): string => {
     return value.trim().toLowerCase().replace(/\s+/g, '-');
 };
 
-const getAnnouncementTokenSet = (announcement: { category?: string; type?: string }) => {
-    const tokens = new Set<string>();
-    const category = normalizeToken(announcement.category);
-    const type = normalizeToken(announcement.type);
-    if (category) tokens.add(category);
-    if (type) tokens.add(type);
-    return tokens;
-};
+const matchesSubscription = (
+    announcement: { category?: string; type?: string; organization?: string; location?: string; minQualification?: string },
+    subscriber: SubscriptionDoc
+): boolean => {
+    const matchesArray = (values?: string[], target?: string) => {
+        const normalized = (values || []).map((value) => normalizeToken(value)).filter(Boolean);
+        if (normalized.length === 0) return true;
+        if (!target) return false;
+        return normalized.includes(target);
+    };
 
-const matchesCategories = (announcement: { category?: string; type?: string }, categories?: string[]): boolean => {
-    if (!categories || categories.length === 0) return true;
-    const announcementTokens = getAnnouncementTokenSet(announcement);
-    const normalizedCategories = categories
-        .map((category) => normalizeToken(category))
-        .filter(Boolean);
-    if (normalizedCategories.length === 0) return true;
-    return normalizedCategories.some((category) => announcementTokens.has(category));
+    return matchesArray(subscriber.categorySlugs, announcement.category)
+        && matchesArray(subscriber.postTypes, announcement.type)
+        && matchesArray(subscriber.organizationSlugs, announcement.organization)
+        && matchesArray(subscriber.stateSlugs, announcement.location)
+        && matchesArray(subscriber.qualificationSlugs, announcement.minQualification);
 };
 
 const toDateOrNull = (value: Date | string | null | undefined): Date | null => {
@@ -112,7 +115,7 @@ const getFrequencyWindowLabel = (frequency: 'daily' | 'weekly', now: Date): stri
     return `${formatter.format(start)} - ${formatter.format(now)} (UTC)`;
 };
 
-const getSubscriptionCollection = () => getCollection<SubscriptionDoc>('subscriptions');
+const getSubscriptionCollection = () => getCollection<SubscriptionDoc>('alert_subscriptions');
 
 async function listDueSubscribers(frequency: 'daily' | 'weekly', now: Date): Promise<SubscriptionDoc[]> {
     const threshold = getFrequencyThreshold(frequency, now);
@@ -132,7 +135,11 @@ async function listDueSubscribers(frequency: 'daily' | 'weekly', now: Date): Pro
         .find(query)
         .project({
             email: 1,
-            categories: 1,
+            categorySlugs: 1,
+            stateSlugs: 1,
+            organizationSlugs: 1,
+            qualificationSlugs: 1,
+            postTypes: 1,
             unsubscribeToken: 1,
             frequency: 1,
             lastDigestDailySentAt: 1,
@@ -184,7 +191,7 @@ async function processFrequency(frequency: 'daily' | 'weekly', now: Date): Promi
         }
 
         const matches = candidates
-            .filter((announcement) => matchesCategories(announcement, subscriber.categories))
+            .filter((announcement) => matchesSubscription(announcement as any, subscriber))
             .slice(0, schedulerConfig.maxItems)
             .map((announcement) => ({
                 title: announcement.title,

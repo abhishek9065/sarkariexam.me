@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 
 export const siteConfig = {
   name: "SarkariExams.me",
-  description: "India's most trusted platform for government jobs, exam results, admit cards, and syllabus. Find latest Sarkari Naukri updates.",
+  description: "India-focused government opportunities platform for latest jobs, results, admit cards, admissions, and official notices.",
   url: "https://sarkariexams.me",
-  ogImage: "https://sarkariexams.me/og.jpg",
+  ogImage: "https://sarkariexams.me/file.svg",
   links: {
     twitter: "https://twitter.com/sarkariexams",
     facebook: "https://facebook.com/sarkariexams",
@@ -72,14 +72,9 @@ export const defaultMetadata: Metadata = {
     },
   },
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon-16x16.png",
-    apple: "/apple-touch-icon.png",
+    icon: "/file.svg",
   },
-  manifest: "/site.webmanifest",
-  verification: {
-    google: "your-google-verification-code",
-  },
+  manifest: "/manifest.json",
 };
 
 export function generateJobMetadata(job: {

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter, Poppins } from 'next/font/google';
 import './globals.css';
 import { PwaRegister } from '@/components/PwaRegister';
 import { ThemeProvider } from '@/components/theme-provider';
+import { defaultMetadata } from '@/lib/seo';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -13,12 +14,7 @@ const poppins = Poppins({
   weight: ['400', '500', '600', '700', '800'],
 });
 
-export const metadata: Metadata = {
-  title: { template: '%s | SarkariExams.me', default: 'SarkariExams.me — Sarkari Result, Jobs, Admit Card 2025' },
-  description: 'Get latest Sarkari Result, Government Jobs, Admit Card, Answer Key, Syllabus and Admission updates for 2025.',
-  keywords: 'sarkari result, sarkari naukri, government jobs, admit card, answer key, syllabus',
-  manifest: '/manifest.json',
-};
+export const metadata: Metadata = defaultMetadata;
 
 export const viewport: Viewport = {
   width: 'device-width',

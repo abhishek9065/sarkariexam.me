@@ -3,10 +3,9 @@ import { HomePageLinkItem, HomePageSectionBox } from './HomePageSectionBox';
 import { homePageLinks, toOfficialUrl } from './links';
 import {
   announcementCategoryMeta,
-  announcementItemsBySection,
-  buildAnnouncementPath,
   homePageSectionOrder,
 } from '@/app/lib/public-content';
+import type { PortalListEntry } from '@/app/lib/public-content';
 
 const importantLinks = [
   { label: 'UPSC Official Website', url: 'upsc.gov.in', tag: 'Central' },
@@ -41,14 +40,18 @@ const sectionIdMap = {
   admissions: 'latest-admission',
 } as const;
 
-export function HomePageLatestUpdates() {
+interface HomePageLatestUpdatesProps {
+  sections: Partial<Record<(typeof homePageSectionOrder)[number], PortalListEntry[]>>;
+}
+
+export function HomePageLatestUpdates({ sections }: HomePageLatestUpdatesProps) {
   return (
     <section className="py-4">
       <div className="mx-auto max-w-6xl px-3">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {homePageSectionOrder.map((section) => {
             const meta = announcementCategoryMeta[section];
-            const items = announcementItemsBySection[section];
+            const items = sections[section] || [];
 
             return (
               <HomePageSectionBox
@@ -60,8 +63,8 @@ export function HomePageLatestUpdates() {
               >
                 {items.map((item) => (
                   <HomePageLinkItem
-                    key={`${section}-${item.slug}`}
-                    href={buildAnnouncementPath(item)}
+                    key={`${section}-${item.href}-${item.title}`}
+                    href={item.href}
                     title={item.title}
                     org={item.org}
                     date={item.date}

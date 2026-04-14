@@ -127,7 +127,7 @@ const dispatchLogsCollection = () => getCollection<ReminderDispatchLogDoc>('remi
 const trackedCollection = () => getCollection<TrackedApplicationDoc>('tracked_applications');
 const bookmarksCollection = () => getCollection<BookmarkDoc>('bookmarks');
 const usersCollection = () => getCollection<UserDoc>('users');
-const subscriptionsCollection = () => getCollection<SubscriptionDoc>('subscriptions');
+const subscriptionsCollection = () => getCollection<SubscriptionDoc>('alert_subscriptions');
 const notificationsCollection = () => getCollection<ReminderNotificationDoc>('user_notifications');
 
 async function reserveDispatch(item: ReminderItem, channel: 'in_app' | 'email'): Promise<boolean> {

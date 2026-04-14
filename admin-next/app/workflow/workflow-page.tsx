@@ -1,105 +1,103 @@
 'use client';
 
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { getPendingApprovals, approveAnnouncement, rejectAnnouncement, getSLAViolations } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { CheckCircle, XCircle, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, CheckCircle2, Clock3, Loader2, Send } from 'lucide-react';
+import { toast } from 'sonner';
+import { approveCmsPost, getEditorialWorkflowQueue, getEditorialWorkflowSla } from '@/lib/api';
 
 export function WorkflowPage() {
-  const { data: pending, isLoading, refetch } = useQuery({
-    queryKey: ['pending-approvals'],
-    queryFn: async () => {
-      const res = await getPendingApprovals();
-      return res.data;
-    },
+  const queryClient = useQueryClient();
+  const pendingQuery = useQuery({
+    queryKey: ['editorial-workflow-queue'],
+    queryFn: async () => (await getEditorialWorkflowQueue()).data,
   });
-
-  const { data: violations } = useQuery({
-    queryKey: ['sla-violations'],
-    queryFn: async () => {
-      const res = await getSLAViolations();
-      return res.data;
-    },
+  const slaQuery = useQuery({
+    queryKey: ['editorial-workflow-sla'],
+    queryFn: async () => (await getEditorialWorkflowSla()).data,
   });
 
   const approveMutation = useMutation({
-    mutationFn: ({ id, note }: { id: string; note?: string }) => approveAnnouncement(id, note),
-    onSuccess: () => { toast.success('Approved'); refetch(); },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectAnnouncement(id, reason),
-    onSuccess: () => { toast.success('Rejected'); refetch(); },
+    mutationFn: (id: string) => approveCmsPost(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['editorial-workflow-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['editorial-workflow-sla'] });
+      toast.success('Post approved.');
+    },
+    onError: (error: Error) => toast.error(error.message || 'Failed to approve post'),
   });
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Editorial Workflow</h1>
-        <p className="text-muted-foreground mt-1">Manage content approvals and assignments</p>
+        <h1 className="text-[24px] font-black text-gray-900">Editorial Workflow</h1>
+        <p className="text-[12px] text-gray-500">Review submitted drafts, approve them, and watch SLA pressure on the queue.</p>
       </div>
 
-      {violations && violations.length > 0 && (
-        <Card className="border-red-200 bg-red-50">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 text-red-700">
-              <AlertTriangle className="h-5 w-5" />
-              SLA Violations ({violations.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {violations.map(v => (
-                <div key={v.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                  <span className="text-sm font-medium">{v.title}</span>
-                  <Badge variant="destructive">{v.hoursOverdue}h overdue</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Pending Approvals ({pending?.length || 0})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Loader2 className="h-8 w-8 animate-spin" />
-          ) : !pending || pending.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No pending approvals</p>
-          ) : (
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Send size={15} />
+            <h2 className="text-[14px] font-bold text-gray-900">Pending Review</h2>
+          </div>
+          {pendingQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading queue…</div>
+          ) : pendingQuery.data && pendingQuery.data.length > 0 ? (
             <div className="space-y-3">
-              {pending?.map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Link href={`/announcements/${item.id}`} className="font-medium hover:underline">
-                      {item.title}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">Assigned to: {item.assigneeEmail || 'Unassigned'}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => approveMutation.mutate({ id: item.id })}>
-                      <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => rejectMutation.mutate({ id: item.id, reason: 'Rejected' })}>
-                      <XCircle className="h-4 w-4 mr-1" /> Reject
-                    </Button>
+              {pendingQuery.data.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <Link href={`/announcements/${item.id}`} className="text-[14px] font-bold text-gray-900 hover:underline">
+                        {item.title}
+                      </Link>
+                      <div className="mt-1 text-[12px] text-gray-500">{item.organization?.name || 'No organization tagged'} · {item.type}</div>
+                      <div className="mt-1 text-[11px] text-gray-400">Updated {new Date(item.updatedAt).toLocaleString('en-IN')}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => approveMutation.mutate(item.id)}
+                      disabled={approveMutation.isPending}
+                      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-3 py-2 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={14} />
+                      Approve
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="text-sm text-gray-500">No posts are waiting in review.</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Clock3 size={15} />
+            <h2 className="text-[14px] font-bold text-gray-900">SLA Watch</h2>
+          </div>
+          {slaQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading SLA…</div>
+          ) : slaQuery.data && slaQuery.data.length > 0 ? (
+            <div className="space-y-3">
+              {slaQuery.data.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={14} className="mt-0.5 text-red-600" />
+                    <div>
+                      <div className="font-semibold text-red-900">{item.title}</div>
+                      <div className="text-[12px] text-red-700">{item.hoursOverdue} hours overdue</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No SLA violations right now.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip :
 interface SubscriptionDoc {
     email: string;
     categories: string[];
+    categorySlugs?: string[];
     frequency: 'instant' | 'daily' | 'weekly';
     verified: boolean;
     verificationToken?: string;
@@ -20,7 +21,7 @@ interface SubscriptionDoc {
 
 describeOrSkip('subscriptions', () => {
     it('verifies and unsubscribes using tokens', async () => {
-        const collection = getCollection<SubscriptionDoc>('subscriptions');
+        const collection = getCollection<SubscriptionDoc>('alert_subscriptions');
         const now = new Date();
         const verificationToken = `verify-${Date.now()}`;
         const unsubscribeToken = `unsub-${Date.now()}`;
@@ -28,6 +29,7 @@ describeOrSkip('subscriptions', () => {
         await collection.insertOne({
             email: `sub-${Date.now()}@example.com`,
             categories: ['job'],
+            categorySlugs: ['job'],
             frequency: 'daily',
             verified: false,
             verificationToken,

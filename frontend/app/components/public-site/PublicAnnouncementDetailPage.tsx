@@ -50,6 +50,7 @@ import type {
   DetailRelatedPost,
   PortalListEntry,
 } from '@/app/lib/public-content';
+import { subscribeToAlerts } from '@/lib/alert-subscriptions';
 import { cn } from '@/lib/utils';
 
 interface PublicAnnouncementDetailPageProps {
@@ -317,6 +318,9 @@ function PublicAnnouncementDetailPageInner({
   const [replyAuthor, setReplyAuthor] = useState('');
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState('');
+  const subscribeInputRef = useRef<HTMLInputElement | null>(null);
   const primaryAction =
     detail.importantLinks.find((link) => link.emphasis === 'primary') ??
     (detail.cta ? { href: detail.cta.primaryHref, label: detail.cta.primaryLabel, emphasis: 'primary' as const } : null);
@@ -442,7 +446,8 @@ function PublicAnnouncementDetailPageInner({
   }
 
   function handleAlert() {
-    setIsSubscribed(true);
+    subscribeInputRef.current?.focus();
+    subscribeInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function handleLike() {
@@ -557,13 +562,37 @@ function PublicAnnouncementDetailPageInner({
     setReplyAuthor('');
   }
 
-  function handleSubscribe() {
+  async function handleSubscribe() {
     if (!email.trim()) {
       return;
     }
 
-    setIsSubscribed(true);
-    setEmail('');
+    try {
+      setIsSubscribing(true);
+      const sectionToType = {
+        jobs: 'job',
+        results: 'result',
+        'admit-cards': 'admit-card',
+        admissions: 'admission',
+        'answer-keys': 'answer-key',
+      } as const;
+
+      const response = await subscribeToAlerts({
+        email,
+        organizations: item.org ? [item.org] : [],
+        postTypes: [sectionToType[item.section]],
+        frequency: 'instant',
+        source: 'detail-page',
+      });
+      setIsSubscribed(true);
+      setSubscriptionMessage(response.message || 'Subscription saved.');
+      setEmail('');
+    } catch (error) {
+      setIsSubscribed(false);
+      setSubscriptionMessage(error instanceof Error ? error.message : 'Failed to subscribe.');
+    } finally {
+      setIsSubscribing(false);
+    }
   }
 
   return (
@@ -1521,6 +1550,7 @@ function PublicAnnouncementDetailPageInner({
               </p>
               <div className="flex gap-2">
                 <input
+                  ref={subscribeInputRef}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="your@email.com"
@@ -1534,13 +1564,17 @@ function PublicAnnouncementDetailPageInner({
                 />
                 <button
                   type="button"
+                  disabled={isSubscribing}
                   onClick={handleSubscribe}
                   className="shrink-0 rounded-xl px-3 py-2 text-white transition-opacity hover:opacity-90"
                   style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', fontSize: 12, fontWeight: 700 }}
                 >
-                  <Send size={14} />
+                  {isSubscribing ? '...' : <Send size={14} />}
                 </button>
               </div>
+              {subscriptionMessage ? (
+                <p className={`mt-2 text-[11px] ${isSubscribed ? 'text-green-600' : 'text-amber-700'}`}>{subscriptionMessage}</p>
+              ) : null}
             </div>
 
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">

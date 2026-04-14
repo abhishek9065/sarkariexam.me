@@ -53,7 +53,7 @@ vi.mock('../services/cosmosdb.js', () => ({
                 find: vi.fn(() => buildCursor(userDocs)),
             };
         }
-        if (name === 'subscriptions') {
+        if (name === 'alert_subscriptions') {
             return {
                 find: vi.fn(() => buildCursor(subscriptionDocs)),
             };

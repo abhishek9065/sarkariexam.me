@@ -1,38 +1,31 @@
 import { notFound, redirect } from 'next/navigation';
 import { PublicAnnouncementDetailPage } from '@/app/components/public-site/PublicAnnouncementDetailPage';
-import {
-  announcementCategoryMeta,
-  announcementItemsBySection,
-  buildAnnouncementPath,
-  getAnnouncementEntries,
-  resolveAnnouncementParam,
-} from '@/app/lib/public-content';
+import { loadDetailPage } from '@/lib/content-page';
 
-export function generateStaticParams() {
-  return announcementItemsBySection.admissions.map((item) => ({ slug: item.slug }));
-}
 
 export default async function AdmissionDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
-  const resolved = resolveAnnouncementParam('admissions', slug);
+  let resolved;
 
-  if (!resolved) {
+  try {
+    const { slug } = await params;
+    resolved = await loadDetailPage('admissions', slug);
+
+    if (!resolved.isCanonicalSection || resolved.item.slug !== slug) {
+      redirect(resolved.canonicalPath);
+    }
+  } catch {
     notFound();
-  }
-
-  if (resolved.matchType !== 'canonical') {
-    redirect(resolved.canonicalPath);
   }
 
   return (
     <PublicAnnouncementDetailPage
-      meta={announcementCategoryMeta.admissions}
+      meta={resolved.meta}
       item={resolved.item}
-      relatedEntries={getAnnouncementEntries('admissions').filter((entry) => entry.href !== buildAnnouncementPath(resolved.item)).slice(0, 6)}
+      relatedEntries={resolved.relatedEntries}
     />
   );
 }

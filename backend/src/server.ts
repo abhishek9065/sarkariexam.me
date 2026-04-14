@@ -25,6 +25,8 @@ import announcementsRouter from './routes/announcements.js';
 import authRouter from './routes/auth.js';
 import bookmarksRouter from './routes/bookmarks.js';
 import communityRouter from './routes/community.js';
+import contentRouter from './routes/content.js';
+import editorialRouter from './routes/editorial.js';
 import jobsRouter from './routes/jobs.js';
 import profileRouter from './routes/profile.js';
 import pushRouter from './routes/push.js';
@@ -51,6 +53,7 @@ const dbBackedApiPrefixes = [
   '/api/auth',
   '/api/admin',
   '/api/announcements',
+  '/api/content',
   '/api/bookmarks',
   '/api/subscriptions',
   '/api/profile',
@@ -58,6 +61,7 @@ const dbBackedApiPrefixes = [
   '/api/jobs',
   '/api/community',
   '/api/support',
+  '/api/editorial',
 ];
 
 export { app };
@@ -285,6 +289,8 @@ app.use(
 );
 app.use('/api/admin', adminRouter);
 app.use('/api/announcements', announcementsRouter);
+app.use('/api/content', contentRouter);
+app.use('/api/editorial', editorialRouter);
 app.use('/api/bookmarks', bookmarksRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
 app.use('/api/profile', profileRouter);

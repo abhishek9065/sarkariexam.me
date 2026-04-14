@@ -475,13 +475,18 @@ router.get('/analytics/content', async (req, res) => {
 router.get('/subscribers', async (req, res) => {
   try {
     const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('subscriptions');
+    const col = getCollection('alert_subscriptions');
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const status = typeof req.query.status === 'string' ? req.query.status.trim() : 'all';
+    const frequency = typeof req.query.frequency === 'string' ? req.query.frequency.trim() : 'all';
 
     const filter: Record<string, unknown> = {};
     if (search) filter.email = { $regex: search, $options: 'i' };
+    if (status === 'active') filter.isActive = true;
+    if (status === 'inactive') filter.isActive = false;
+    if (['instant', 'daily', 'weekly'].includes(frequency)) filter.frequency = frequency;
 
     const [items, total] = await Promise.all([
       col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
@@ -498,15 +503,16 @@ router.get('/subscribers', async (req, res) => {
 router.get('/subscribers/stats', async (_req, res) => {
   try {
     const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('subscriptions');
-    const [total, verified, byFrequency] = await Promise.all([
+    const col = getCollection('alert_subscriptions');
+    const [total, verified, active, byFrequency] = await Promise.all([
       col.countDocuments(),
       col.countDocuments({ verified: true }),
+      col.countDocuments({ isActive: true }),
       col.aggregate([
         { $group: { _id: '$frequency', count: { $sum: 1 } } },
       ]).toArray(),
     ]);
-    return res.json({ data: { total, verified, unverified: total - verified, byFrequency } });
+    return res.json({ data: { total, verified, unverified: total - verified, active, inactive: total - active, byFrequency } });
   } catch (error) {
     console.error('[Admin] Subscriber stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch subscriber stats' });
@@ -518,7 +524,7 @@ router.delete('/subscribers/:id', async (req, res) => {
     const rawId = String(req.params.id);
     const { getCollection } = await import('../services/cosmosdb.js');
     const { ObjectId } = await import('mongodb');
-    const col = getCollection('subscriptions');
+    const col = getCollection('alert_subscriptions');
     
     // Validate ObjectId format
     if (!ObjectId.isValid(rawId)) {

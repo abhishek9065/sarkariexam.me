@@ -1,21 +1,17 @@
 import { notFound, redirect } from 'next/navigation';
-import { resolveAnnouncementParam } from '@/app/lib/public-content';
+import { loadDetailPage } from '@/lib/content-page';
 
-export function generateStaticParams() {
-  return [];
-}
 
 export default async function AdmitCardAliasPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
-  const resolved = resolveAnnouncementParam('admit-cards', slug);
-
-  if (!resolved) {
+  try {
+    const { slug } = await params;
+    const resolved = await loadDetailPage('admit-cards', slug);
+    redirect(resolved.canonicalPath);
+  } catch {
     notFound();
   }
-
-  redirect(resolved.canonicalPath);
 }

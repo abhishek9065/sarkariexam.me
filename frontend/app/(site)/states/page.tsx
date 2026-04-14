@@ -1,12 +1,25 @@
 import { PublicStateDirectoryPage } from '@/app/components/public-site/PublicStateDirectoryPage';
-import { getCategoryMetaBySlug, getStateDirectoryEntries } from '@/app/lib/public-content';
+import { getCategoryMetaBySlug } from '@/app/lib/public-content';
+import { getTaxonomyList } from '@/lib/content-api';
 
-export default function StatesPage() {
+
+export default async function StatesPage() {
   const meta = getCategoryMetaBySlug('states');
+  const states = await getTaxonomyList('states');
 
   if (!meta) {
     return null;
   }
 
-  return <PublicStateDirectoryPage meta={meta} entries={getStateDirectoryEntries()} />;
+  return (
+    <PublicStateDirectoryPage
+      meta={meta}
+      entries={states.map((state) => ({
+        slug: state.slug,
+        title: state.name,
+        description: `Government jobs, results, admit cards, and admissions for ${state.name}.`,
+        count: 0,
+      }))}
+    />
+  );
 }

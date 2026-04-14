@@ -1,128 +1,64 @@
-import { randomBytes } from 'crypto';
-
 import { Router } from 'express';
-import { z } from 'zod';
 
+import { alertSubscriptionPublicSchema } from '../content/types.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import AlertSubscriptionModelMongo from '../models/alertSubscriptions.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
-import { getCollection } from '../services/cosmosdb.js';
 import { isEmailConfigured, sendVerificationEmail } from '../services/email.js';
 
-interface SubscriptionDoc {
-    email: string;
-    categories: string[];
-    frequency: 'instant' | 'daily' | 'weekly';
-    verified: boolean;
-    verificationToken?: string;
-    unsubscribeToken: string;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
 const router = Router();
-const collection = () => getCollection<SubscriptionDoc>('subscriptions');
 
-const subscriptionSchema = z.object({
-    email: z.string().email().toLowerCase().trim(),
-    categories: z.array(z.string()).optional(),
-    frequency: z.enum(['instant', 'daily', 'weekly']).optional(),
-});
-
-function normalizeCategories(categories?: string[]): string[] {
-    if (!categories || categories.length === 0) return [];
-    return Array.from(new Set(categories.map(cat => cat.trim()).filter(Boolean)));
+function buildPreferenceSummary(data: {
+    categories?: string[];
+    states?: string[];
+    organizations?: string[];
+    qualifications?: string[];
+    postTypes?: string[];
+}) {
+    return [
+        ...(data.categories || []),
+        ...(data.states || []).map((item) => `State: ${item}`),
+        ...(data.organizations || []).map((item) => `Organization: ${item}`),
+        ...(data.qualifications || []).map((item) => `Qualification: ${item}`),
+        ...(data.postTypes || []).map((item) => `Type: ${item}`),
+    ];
 }
 
 // Create or update subscription
 router.post('/', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'subscriptions' }), async (req, res) => {
-    const parseResult = subscriptionSchema.safeParse(req.body);
+    const parseResult = alertSubscriptionPublicSchema.safeParse(req.body);
     if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.flatten() });
     }
 
     const data = parseResult.data;
-    const email = data.email;
-    const categories = normalizeCategories(data.categories);
-    const frequency = data.frequency ?? 'daily';
     const emailConfigured = isEmailConfigured();
 
     try {
-        const now = new Date();
-        const existing = await collection().findOne({ email });
-
-        if (!existing) {
-            const verified = !emailConfigured;
-            const verificationToken = verified ? undefined : randomBytes(24).toString('hex');
-            const unsubscribeToken = randomBytes(24).toString('hex');
-
-            const doc: SubscriptionDoc = {
-                email,
-                categories,
-                frequency,
-                verified,
-                verificationToken,
-                unsubscribeToken,
-                isActive: true,
-                createdAt: now,
-                updatedAt: now,
-            };
-
-            await collection().insertOne(doc as any);
-
-            if (!verified && verificationToken) {
-                await sendVerificationEmail(email, verificationToken, categories);
-            }
-
-            if (verified) {
-                recordAnalyticsEvent({
-                    type: 'subscription_verify',
-                    metadata: { source: 'inline' },
-                }).catch(console.error);
-            }
-
-            return res.json({
-                data: { verified },
-                message: verified
-                    ? 'Subscription created'
-                    : 'Subscription created. Please verify your email.',
-            });
-        }
-
-        let verified = existing.verified;
-        let verificationToken = existing.verificationToken;
-
-        if (!verified && !emailConfigured) {
-            verified = true;
-            verificationToken = undefined;
-        } else if (!verified && emailConfigured && !verificationToken) {
-            verificationToken = randomBytes(24).toString('hex');
-        }
-
-        const updateSet: Partial<SubscriptionDoc> = {
-            categories,
-            frequency,
+        const verified = !emailConfigured;
+        const subscription = await AlertSubscriptionModelMongo.upsert({
+            email: data.email,
+            categories: data.categories,
+            states: data.states,
+            organizations: data.organizations,
+            qualifications: data.qualifications,
+            postTypes: data.postTypes,
+            frequency: data.frequency,
+            source: data.source || 'public-api',
             verified,
-            isActive: true,
-            updatedAt: now,
-        };
+        });
 
-        if (verificationToken) {
-            updateSet.verificationToken = verificationToken;
+        if (!subscription) {
+            return res.status(500).json({ error: 'Failed to save subscription' });
         }
 
-        const updateOps: any = { $set: updateSet };
-        if (verified && existing.verificationToken) {
-            updateOps.$unset = { verificationToken: '' };
-        }
-
-        await collection().updateOne({ email }, updateOps);
-
-        if (!verified && verificationToken) {
-            await sendVerificationEmail(email, verificationToken, categories);
-        }
-
-        if (verified && !existing.verified) {
+        if (!subscription.verified && subscription.verificationToken) {
+            await sendVerificationEmail(
+                subscription.email,
+                subscription.verificationToken,
+                buildPreferenceSummary(data),
+            );
+        } else if (subscription.verified) {
             recordAnalyticsEvent({
                 type: 'subscription_verify',
                 metadata: { source: 'inline' },
@@ -130,8 +66,8 @@ router.post('/', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefi
         }
 
         return res.json({
-            data: { verified },
-            message: verified
+            data: { verified: subscription.verified },
+            message: subscription.verified
                 ? 'Subscription updated'
                 : 'Subscription updated. Please verify your email.',
         });
@@ -149,16 +85,7 @@ router.get('/verify', async (req, res) => {
     }
 
     try {
-        const result = await collection().findOneAndUpdate(
-            { verificationToken: token, isActive: true },
-            { $set: { verified: true, updatedAt: new Date() }, $unset: { verificationToken: '' } },
-            { returnDocument: 'after' }
-        );
-
-        const doc = result && typeof result === 'object' && 'value' in result
-            ? (result as any).value
-            : result;
-
+        const doc = await AlertSubscriptionModelMongo.verifyByToken(token);
         if (!doc) {
             return res.status(404).json({ error: 'Invalid or expired token' });
         }
@@ -183,16 +110,7 @@ router.get('/unsubscribe', async (req, res) => {
     }
 
     try {
-        const result = await collection().findOneAndUpdate(
-            { unsubscribeToken: token },
-            { $set: { isActive: false, updatedAt: new Date() } },
-            { returnDocument: 'after' }
-        );
-
-        const doc = result && typeof result === 'object' && 'value' in result
-            ? (result as any).value
-            : result;
-
+        const doc = await AlertSubscriptionModelMongo.unsubscribeByToken(token);
         if (!doc) {
             return res.status(404).json({ error: 'Invalid token' });
         }

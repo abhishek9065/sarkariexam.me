@@ -1,5 +1,7 @@
 import { PublicSearchPage } from '@/app/components/public-site/PublicSearchPage';
-import { getSearchResults } from '@/app/lib/public-content';
+import { announcementCategoryMeta } from '@/app/lib/public-content';
+import { getRawListing } from '@/lib/content-api';
+
 
 export default async function SearchPage({
   searchParams,
@@ -8,6 +10,62 @@ export default async function SearchPage({
 }) {
   const { q } = await searchParams;
   const query = q?.trim() ?? '';
+  const results = query
+    ? await Promise.all([
+        getRawListing({ type: 'job', search: query, limit: 8 }).then((entries) => ({
+          entries: entries.map((entry) => ({
+            href: entry.href,
+            title: entry.title,
+            org: entry.org,
+            date: entry.date,
+            tag: entry.tag,
+            postCount: entry.postCount,
+            qualification: entry.qualification,
+          })),
+          meta: announcementCategoryMeta.jobs,
+          section: 'jobs' as const,
+        })),
+        getRawListing({ type: 'result', search: query, limit: 8 }).then((entries) => ({
+          entries: entries.map((entry) => ({
+            href: entry.href,
+            title: entry.title,
+            org: entry.org,
+            date: entry.date,
+            tag: entry.tag,
+            postCount: entry.postCount,
+            qualification: entry.qualification,
+          })),
+          meta: announcementCategoryMeta.results,
+          section: 'results' as const,
+        })),
+        getRawListing({ type: 'admit-card', search: query, limit: 8 }).then((entries) => ({
+          entries: entries.map((entry) => ({
+            href: entry.href,
+            title: entry.title,
+            org: entry.org,
+            date: entry.date,
+            tag: entry.tag,
+            postCount: entry.postCount,
+            qualification: entry.qualification,
+          })),
+          meta: announcementCategoryMeta['admit-cards'],
+          section: 'admit-cards' as const,
+        })),
+        getRawListing({ type: 'admission', search: query, limit: 8 }).then((entries) => ({
+          entries: entries.map((entry) => ({
+            href: entry.href,
+            title: entry.title,
+            org: entry.org,
+            date: entry.date,
+            tag: entry.tag,
+            postCount: entry.postCount,
+            qualification: entry.qualification,
+          })),
+          meta: announcementCategoryMeta.admissions,
+          section: 'admissions' as const,
+        })),
+      ])
+    : [];
 
-  return <PublicSearchPage query={query} results={query ? getSearchResults(query) : []} />;
+  return <PublicSearchPage query={query} results={results.filter((group) => group.entries.length > 0)} />;
 }

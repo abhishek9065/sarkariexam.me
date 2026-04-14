@@ -17,6 +17,7 @@ interface AuthContextValue extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const EDITORIAL_ROLES = new Set(['editor', 'reviewer', 'admin', 'superadmin']);
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -34,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await getMe();
         const user = res.data.user;
         if (cancelled) return;
-        if (user.role !== 'admin') {
-          setState({ user: null, loading: false, error: 'Admin access required' });
+        if (!EDITORIAL_ROLES.has(user.role)) {
+          setState({ user: null, loading: false, error: 'Editorial access required' });
           return;
         }
         setState({ user, loading: false, error: null });
@@ -53,9 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await apiLogin(email, password);
       const user = res.data.user;
-      if (user.role !== 'admin') {
+      if (!EDITORIAL_ROLES.has(user.role)) {
         clearCsrfCache();
-        setState({ user: null, loading: false, error: 'Admin access required. Your account does not have admin privileges.' });
+        setState({ user: null, loading: false, error: 'Editorial access required. Your account does not have CMS privileges.' });
         return;
       }
       setState({ user, loading: false, error: null });

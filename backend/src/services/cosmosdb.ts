@@ -236,6 +236,16 @@ async function createIndexes(): Promise<void> {
     try {
         const database = await getDatabase();
         const announcements = database.collection('announcements');
+        const posts = database.collection('posts');
+        const postVersions = database.collection('post_versions');
+        const auditLogs = database.collection('audit_logs');
+        const organizations = database.collection('organizations');
+        const states = database.collection('states');
+        const categories = database.collection('categories');
+        const institutions = database.collection('institutions');
+        const exams = database.collection('exams');
+        const qualifications = database.collection('qualifications');
+        const alertSubscriptions = database.collection('alert_subscriptions');
         const users = database.collection('users');
         const securityLogs = database.collection('security_logs');
         const bookmarks = database.collection('bookmarks');
@@ -278,6 +288,37 @@ async function createIndexes(): Promise<void> {
         await announcements.createIndex({ isActive: 1, status: 1, reviewDueAt: 1, updatedAt: -1 });
         // Note: Text indexes are not supported in Cosmos DB MongoDB API
         // Use regex search instead (already implemented in model)
+
+        // Content platform indexes
+        await posts.createIndex({ slug: 1 }, { unique: true });
+        await posts.createIndex({ legacyAnnouncementId: 1 });
+        await posts.createIndex({ legacyId: 1 });
+        await posts.createIndex({ status: 1, type: 1, publishedAt: -1 });
+        await posts.createIndex({ status: 1, updatedAt: -1 });
+        await posts.createIndex({ status: 1, expiresAt: 1 });
+        await posts.createIndex({ type: 1, stateSlugs: 1, publishedAt: -1 });
+        await posts.createIndex({ type: 1, organizationSlug: 1, publishedAt: -1 });
+        await posts.createIndex({ type: 1, categorySlugs: 1, publishedAt: -1 });
+        await posts.createIndex({ type: 1, qualificationSlugs: 1, publishedAt: -1 });
+        await posts.createIndex({ organizationSlug: 1, status: 1, publishedAt: -1 });
+        await posts.createIndex({ stateSlugs: 1, status: 1, publishedAt: -1 });
+        await posts.createIndex({ categorySlugs: 1, status: 1, publishedAt: -1 });
+        await posts.createIndex({ currentVersion: -1, updatedAt: -1 });
+
+        await postVersions.createIndex({ postId: 1, version: -1 });
+        await auditLogs.createIndex({ entityId: 1, createdAt: -1 });
+        await auditLogs.createIndex({ entityType: 1, createdAt: -1 });
+        await organizations.createIndex({ slug: 1 }, { unique: true });
+        await states.createIndex({ slug: 1 }, { unique: true });
+        await categories.createIndex({ slug: 1 }, { unique: true });
+        await institutions.createIndex({ slug: 1 }, { unique: true });
+        await exams.createIndex({ slug: 1 }, { unique: true });
+        await qualifications.createIndex({ slug: 1 }, { unique: true });
+        await alertSubscriptions.createIndex({ email: 1 }, { unique: true });
+        await alertSubscriptions.createIndex({ isActive: 1, verified: 1, frequency: 1 });
+        await alertSubscriptions.createIndex({ verificationToken: 1 });
+        await alertSubscriptions.createIndex({ unsubscribeToken: 1 });
+        await alertSubscriptions.createIndex({ categorySlugs: 1, stateSlugs: 1, organizationSlugs: 1, qualificationSlugs: 1, postTypes: 1 });
 
         // Users indexes
         await users.createIndex({ email: 1 }, { unique: true });

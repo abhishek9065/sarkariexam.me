@@ -29,10 +29,22 @@ Core platform areas:
 ```bash
 cd backend
 npm install
+npm run dev:db:start -- --seed
 npm run dev
 ```
 
 Runs on `http://localhost:5000`.
+
+If you only need the local Mongo-compatible database for migration rehearsal or backend work:
+
+```bash
+cd backend
+npm run dev:db:start -- --seed
+npm run dev:db:status
+npm run dev:db:stop
+```
+
+This uses an in-memory development Mongo server and seeds sample legacy `announcements`. It is for local development only.
 
 ### Public Frontend
 
