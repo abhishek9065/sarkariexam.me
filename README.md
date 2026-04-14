@@ -158,6 +158,17 @@ git push origin main
 
 The server-side deploy scripts remain in the repo because GitHub Actions calls them over SSH on the droplet. They are internal deployment plumbing, not alternate developer deployment methods.
 
+Production deploy entrypoint:
+
+- local code change
+- `git push origin main`
+- GitHub Actions `Production Release Validation`
+- GitHub Actions `Deploy to Production`
+- droplet-side rebuild from `docker-compose.yml`
+- live health verification
+
+There is no supported manual production deploy trigger in the repository workflows.
+
 Detailed deploy notes live in [scripts/FAST_DEPLOY_README.md](./scripts/FAST_DEPLOY_README.md).
 
 ## Production Secrets
@@ -173,6 +184,32 @@ Server `.env` values for production typically include:
 
 - application secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
 - revalidation settings such as `FRONTEND_REVALIDATE_URL` and `FRONTEND_REVALIDATE_TOKEN`
+
+## Production Prerequisites
+
+Before `push to main` can deploy successfully, production must already have:
+
+- a DigitalOcean droplet reachable at `DO_HOST`
+- the deploy user from `DO_USER` able to SSH with `DO_SSH_KEY`
+- the repository checked out on the droplet at `~/sarkari-result` or `~/sarkariexam.me`
+- Docker and Docker Compose installed on the droplet
+- a root `.env` file on the droplet checkout derived from `.env.example`
+
+## Production Verification
+
+After a successful deploy, the expected health checks are:
+
+- `/`
+- `/jobs`
+- `/admin`
+- `/api/health`
+- `/api/health/deep`
+
+If a deploy fails, start with:
+
+- the GitHub Actions run log
+- `/tmp/sarkari-result-deploy.log` on the droplet
+- `docker compose -f docker-compose.yml logs` on the droplet
 
 ## Repository Layout
 
