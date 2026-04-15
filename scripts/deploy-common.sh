@@ -45,6 +45,77 @@ read_env_var() {
   printf '%s' "$value"
 }
 
+read_env_var_from_file() {
+  local key="$1"
+  local file_path="$2"
+
+  if [[ ! -f "$file_path" ]]; then
+    return 0
+  fi
+
+  local line
+  line="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$file_path" | tail -n 1 || true)"
+  if [[ -z "$line" ]]; then
+    return 0
+  fi
+
+  local value="${line#*=}"
+  value="${value%$'\r'}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+
+  printf '%s' "$value"
+}
+
+resolve_postgres_connection_env() {
+  local postgres_prisma_url database_url
+
+  postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
+  database_url="$(read_env_var "DATABASE_URL")"
+
+  if [[ -z "$postgres_prisma_url" && -z "$database_url" ]]; then
+    local backend_env_file="$ROOT_DIR/backend/.env"
+    postgres_prisma_url="$(read_env_var_from_file "POSTGRES_PRISMA_URL" "$backend_env_file")"
+    database_url="$(read_env_var_from_file "DATABASE_URL" "$backend_env_file")"
+    if [[ -n "$postgres_prisma_url" || -n "$database_url" ]]; then
+      echo "NOTICE: using PostgreSQL URL from backend/.env as deploy fallback."
+    fi
+  fi
+
+  if [[ -z "$postgres_prisma_url" && -z "$database_url" ]] && command -v docker >/dev/null 2>&1; then
+    local backend_container_id
+    backend_container_id="$(docker ps -q --filter "name=^/sarkari-backend$" | head -n1 || true)"
+    if [[ -n "$backend_container_id" ]]; then
+      local current_env
+      current_env="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$backend_container_id" 2>/dev/null || true)"
+      postgres_prisma_url="$(printf '%s\n' "$current_env" | grep -E '^POSTGRES_PRISMA_URL=' | tail -n1 | cut -d'=' -f2- || true)"
+      database_url="$(printf '%s\n' "$current_env" | grep -E '^DATABASE_URL=' | tail -n1 | cut -d'=' -f2- || true)"
+      if [[ -n "$postgres_prisma_url" || -n "$database_url" ]]; then
+        echo "NOTICE: using PostgreSQL URL from running backend container as deploy fallback."
+      fi
+    fi
+  fi
+
+  if [[ -n "$postgres_prisma_url" ]]; then
+    export POSTGRES_PRISMA_URL="$postgres_prisma_url"
+  fi
+  if [[ -n "$database_url" ]]; then
+    export DATABASE_URL="$database_url"
+  fi
+
+  if [[ -n "$POSTGRES_PRISMA_URL" || -n "$DATABASE_URL" ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
 require_var() {
   local key="$1"
   local value
@@ -69,13 +140,10 @@ validate_production_env() {
     exit 1
   fi
 
-  local postgres_prisma_url database_url
-  postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
-  database_url="$(read_env_var "DATABASE_URL")"
-
-  if [[ -z "$postgres_prisma_url" && -z "$database_url" ]]; then
+  if ! resolve_postgres_connection_env; then
     echo "ERROR: missing PostgreSQL connection URL in $ROOT_DIR/.env"
-    echo "  Set POSTGRES_PRISMA_URL (preferred) or DATABASE_URL."
+    echo "  Set POSTGRES_PRISMA_URL (preferred) or DATABASE_URL in root .env"
+    echo "  (or backend/.env as a fallback source for deploy scripts)."
     exit 1
   fi
 
@@ -98,7 +166,6 @@ validate_production_env() {
 warn_if_missing_production_runtime_vars() {
   local recommended_keys=(
     "COSMOS_DATABASE_NAME"
-    "POSTGRES_PRISMA_URL"
     "FRONTEND_URL"
     "CORS_ORIGINS"
     "FRONTEND_REVALIDATE_URL"
@@ -115,6 +182,10 @@ warn_if_missing_production_runtime_vars() {
       missing+=("$key")
     fi
   done
+
+  if [[ -z "$(read_env_var "POSTGRES_PRISMA_URL")" && -z "$(read_env_var "DATABASE_URL")" ]]; then
+    missing+=("POSTGRES_PRISMA_URL or DATABASE_URL")
+  fi
 
   if [[ "${#missing[@]}" -gt 0 ]]; then
     echo "NOTICE: recommended production env var(s) missing from $ROOT_DIR/.env:"
