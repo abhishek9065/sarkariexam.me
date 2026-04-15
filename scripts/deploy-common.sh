@@ -69,6 +69,16 @@ validate_production_env() {
     exit 1
   fi
 
+  local postgres_prisma_url database_url
+  postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
+  database_url="$(read_env_var "DATABASE_URL")"
+
+  if [[ -z "$postgres_prisma_url" && -z "$database_url" ]]; then
+    echo "ERROR: missing PostgreSQL connection URL in $ROOT_DIR/.env"
+    echo "  Set POSTGRES_PRISMA_URL (preferred) or DATABASE_URL."
+    exit 1
+  fi
+
   local frontend_revalidate_url frontend_revalidate_token
   frontend_revalidate_url="$(read_env_var "FRONTEND_REVALIDATE_URL")"
   frontend_revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
@@ -88,6 +98,7 @@ validate_production_env() {
 warn_if_missing_production_runtime_vars() {
   local recommended_keys=(
     "COSMOS_DATABASE_NAME"
+    "POSTGRES_PRISMA_URL"
     "FRONTEND_URL"
     "CORS_ORIGINS"
     "FRONTEND_REVALIDATE_URL"

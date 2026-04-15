@@ -164,7 +164,7 @@ app.get('/api/health/deep', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, ke
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
   const contentDbMode = getContentDbMode();
-  const postgresConfigured = Boolean(process.env.POSTGRES_PRISMA_URL);
+  const postgresConfigured = Boolean(config.postgresPrismaUrl);
   const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
   const postgresRequired = shouldReadFromPostgres();
   const hasDbFailure = dbConfigured && !dbOk;
@@ -197,7 +197,7 @@ async function buildHealthResponse(res: express.Response) {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
   const contentDbMode = getContentDbMode();
-  const postgresConfigured = Boolean(process.env.POSTGRES_PRISMA_URL);
+  const postgresConfigured = Boolean(config.postgresPrismaUrl);
   const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
   const postgresRequired = shouldReadFromPostgres();
   const hasDbFailure = dbConfigured && !dbOk;
@@ -237,7 +237,7 @@ app.get('/metrics', (req, res) => {
   const uptimeSeconds = (Date.now() - startedAt) / 1000;
   const memory = process.memoryUsage();
   const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
-  const postgresConfigured = Boolean(process.env.POSTGRES_PRISMA_URL);
+  const postgresConfigured = Boolean(config.postgresPrismaUrl);
   const contentDbMode = getContentDbMode();
   const securityMetrics = getSecurityMetricSnapshot();
 

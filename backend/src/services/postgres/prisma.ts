@@ -10,9 +10,21 @@ const prismaLogLevels: Prisma.LogLevel[] = process.env.NODE_ENV === 'production'
   ? ['error']
   : ['error', 'warn'];
 
-export const prisma = globalRef.__prismaClient ?? new PrismaClient({
+const prismaDatasourceUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
+
+const prismaClientOptions: Prisma.PrismaClientOptions = {
   log: prismaLogLevels,
-});
+};
+
+if (prismaDatasourceUrl) {
+  prismaClientOptions.datasources = {
+    db: {
+      url: prismaDatasourceUrl,
+    },
+  };
+}
+
+export const prisma = globalRef.__prismaClient ?? new PrismaClient(prismaClientOptions);
 
 if (process.env.NODE_ENV !== 'production') {
   globalRef.__prismaClient = prisma;

@@ -110,7 +110,7 @@ const securityLogDbRetentionDays = Math.max(1, parseNumber(process.env.SECURITY_
 const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SECURITY_LOG_CLEANUP_INTERVAL_MINUTES, 60));
 const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
 const contentDbMode = 'postgres';
-const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? '';
+const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
 const featureFlags = {
   search_overlay_v2: parseBoolean(process.env.FEATURE_SEARCH_OVERLAY_V2, true),
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),

@@ -88,6 +88,7 @@ Important production variables:
 
 - `COSMOS_CONNECTION_STRING`
 - `COSMOS_DATABASE_NAME`
+- `POSTGRES_PRISMA_URL` (or `DATABASE_URL` fallback)
 - `JWT_SECRET`
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
