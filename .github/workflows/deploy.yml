@@ -84,11 +84,20 @@ jobs:
           DEPLOY_MODE: fast
         run: |
           set -euo pipefail
-          ssh \
-            -i "$HOME/.ssh/deploy_key" \
-            -p "$DO_PORT" \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 \
-            "$DO_USER@$DO_HOST" \
-            "DEPLOY_MODE='$DEPLOY_MODE' bash -lc 'set -euo pipefail; if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then bash ~/sarkari-result/scripts/deploy-live.sh; elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then bash ~/sarkariexam.me/scripts/deploy-live.sh; else echo \"No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh or ~/sarkariexam.me/scripts/deploy-live.sh\"; exit 1; fi'"
+          ssh_cmd=(
+            ssh
+            -i "$HOME/.ssh/deploy_key"
+            -p "$DO_PORT"
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=15
+            "$DO_USER@$DO_HOST"
+          )
+
+          remote_entrypoint="DEPLOY_MODE='$DEPLOY_MODE' bash -lc 'set -euo pipefail; if [ -f ~/sarkari-result/scripts/deploy-live.sh ]; then bash ~/sarkari-result/scripts/deploy-live.sh; elif [ -f ~/sarkariexam.me/scripts/deploy-live.sh ]; then bash ~/sarkariexam.me/scripts/deploy-live.sh; else echo \"No deployment entrypoint found at ~/sarkari-result/scripts/deploy-live.sh or ~/sarkariexam.me/scripts/deploy-live.sh\"; exit 1; fi'"
+
+          if ! "${ssh_cmd[@]}" "$remote_entrypoint"; then
+            echo "Deploy via SSH failed. Attempting to print remote deploy log tail..."
+            "${ssh_cmd[@]}" "tail -n 200 /tmp/sarkari-result-deploy.log || true" || true
+            exit 1
+          fi

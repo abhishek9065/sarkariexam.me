@@ -47,7 +47,19 @@ fi
 echo "=== Syncing repository ==="
 git fetch origin main
 git checkout main
-git pull --ff-only origin main
+
+if ! git pull --ff-only origin main; then
+  echo "WARN: fast-forward pull failed. Attempting checkout recovery."
+
+  if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+    stash_label="deploy-autostash-$(date -u +"%Y%m%dT%H%M%SZ")"
+    git stash push --include-untracked -m "$stash_label" || true
+    echo "NOTICE: saved local checkout changes to stash: $stash_label"
+  fi
+
+  git fetch origin main
+  git checkout -B main origin/main
+fi
 
 export COMPOSE_PROJECT_NAME="sarkari-result"
 
