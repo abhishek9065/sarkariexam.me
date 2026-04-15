@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import type { CommunityPageMeta } from '@/app/lib/public-content';
 import { PublicPageHeader } from './PublicPageHeader';
 import { PublicPanel } from './PublicPanel';
+import { SafeLink } from './SafeLink';
 
 export function PublicCommunityPage({ meta }: { meta: CommunityPageMeta }) {
   return (
@@ -38,13 +38,13 @@ export function PublicCommunityPage({ meta }: { meta: CommunityPageMeta }) {
           <PublicPanel title="Quick Access" headerColor="bg-[#37474f]">
             <div className="space-y-2 p-4">
               {meta.quickLinks.map((link) => (
-                <Link
+                <SafeLink
                   key={`${meta.channel}-${link.label}-${link.href}`}
                   href={link.href}
                   className="block rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-[#e65100]"
                 >
                   {link.label}
-                </Link>
+                </SafeLink>
               ))}
             </div>
           </PublicPanel>

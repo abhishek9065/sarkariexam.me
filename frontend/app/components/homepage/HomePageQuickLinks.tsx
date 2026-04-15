@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { HomePageSectionBox } from './HomePageSectionBox';
+import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { homePageLinks, toOfficialUrl } from './links';
 import { buildJobsPath } from '@/app/lib/public-content';
 
@@ -111,11 +112,10 @@ export function HomePageQuickLinks() {
               <HomePageSectionBox title="Important Websites" headerColor="bg-[#37474f]" viewAllLink={homePageLinks.importantLinks}>
                 <div className="space-y-1 p-3">
                   {importantWebsites.map((website) => (
-                    <a
+                    <SafeLink
                       key={website.label}
                       href={toOfficialUrl(website.url)}
                       target="_blank"
-                      rel="noreferrer"
                       className="group flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
                     >
                       <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export function HomePageQuickLinks() {
                         {website.url}
                         <ExternalLink size={10} />
                       </span>
-                    </a>
+                    </SafeLink>
                   ))}
                 </div>
               </HomePageSectionBox>

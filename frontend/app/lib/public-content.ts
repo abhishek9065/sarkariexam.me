@@ -32,6 +32,27 @@ export interface PublicStat {
   value: string;
 }
 
+function isInternalHref(value: string) {
+  return (value.startsWith('/') || value.startsWith('#')) && !value.startsWith('//');
+}
+function isExternalHref(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+export function normalizeHref(value?: string | null): string | null {
+  const href = value?.trim();
+  if (!href) return null;
+  if (isInternalHref(href) || isExternalHref(href)) return href;
+  return null;
+}
+export function normalizeInternalHref(value?: string | null): string | null {
+  const href = normalizeHref(value);
+  return href && isInternalHref(href) ? href : null;
+}
+export function normalizeExternalHref(value?: string | null): string | null {
+  const href = normalizeHref(value);
+  return href && isExternalHref(href) ? href : null;
+}
+
 export interface QuickLink {
   href: string;
   label: string;
@@ -3598,7 +3619,7 @@ export function buildJobsPath(filters: Pick<AnnouncementFilters, 'department' | 
 
 export function buildCommunityPath(channel: CommunityChannel) {
   const meta = communityPageMeta[channel];
-  return meta.externalUrl ?? meta.canonicalPath;
+  return normalizeHref(meta.externalUrl) ?? meta.canonicalPath;
 }
 
 export function toPortalEntry(item: AnnouncementItem): PortalListEntry {

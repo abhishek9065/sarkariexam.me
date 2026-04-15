@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { PublicCommunityPage } from '@/app/components/public-site/PublicCommunityPage';
-import { getCommunityPageBySlug } from '@/app/lib/public-content';
+import { getCommunityPageBySlug, normalizeExternalHref } from '@/app/lib/public-content';
 import { loadCommunityPageMeta } from '@/lib/content-api';
 
 export default async function JoinChannelPage({
@@ -16,8 +16,9 @@ export default async function JoinChannelPage({
     notFound();
   }
 
-  if (meta.externalUrl) {
-    redirect(meta.externalUrl);
+  const externalUrl = normalizeExternalHref(meta.externalUrl);
+  if (externalUrl) {
+    redirect(externalUrl);
   }
 
   return <PublicCommunityPage meta={meta} />;

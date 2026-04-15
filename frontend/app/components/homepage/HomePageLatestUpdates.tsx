@@ -1,5 +1,6 @@
 import { ExternalLink, Globe } from 'lucide-react';
 import { HomePageLinkItem, HomePageSectionBox } from './HomePageSectionBox';
+import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { homePageLinks, toOfficialUrl } from './links';
 import {
   announcementCategoryMeta,
@@ -79,11 +80,10 @@ export function HomePageLatestUpdates({ sections }: HomePageLatestUpdatesProps) 
 
           <HomePageSectionBox id="important-links" title="Important Links" headerColor="bg-[#37474f]" viewAllLink={homePageLinks.importantLinks}>
             {importantLinks.map((link) => (
-              <a
+              <SafeLink
                 key={link.label}
                 href={toOfficialUrl(link.url)}
                 target="_blank"
-                rel="noreferrer"
                 className="group flex cursor-pointer items-center justify-between px-4 py-2.5 transition-colors hover:bg-blue-50/60"
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -96,7 +96,7 @@ export function HomePageLatestUpdates({ sections }: HomePageLatestUpdatesProps) 
                   <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${tagColor[link.tag]}`}>{link.tag}</span>
                   <ExternalLink size={10} className="text-gray-300 transition-colors group-hover:text-blue-500" />
                 </div>
-              </a>
+              </SafeLink>
             ))}
           </HomePageSectionBox>
 

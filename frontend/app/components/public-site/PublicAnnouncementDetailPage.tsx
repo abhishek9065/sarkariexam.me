@@ -52,6 +52,7 @@ import type {
 } from '@/app/lib/public-content';
 import { subscribeToAlerts } from '@/lib/alert-subscriptions';
 import { cn } from '@/lib/utils';
+import { SafeLink } from './SafeLink';
 
 interface PublicAnnouncementDetailPageProps {
   item: AnnouncementItem;
@@ -127,10 +128,6 @@ const sectionCategoryLabel: Record<AnnouncementItem['section'], string> = {
   admissions: 'Latest Admission',
 };
 
-function isExternalHref(href: string) {
-  return href.startsWith('http://') || href.startsWith('https://');
-}
-
 function SmartLink({
   href,
   className,
@@ -142,18 +139,10 @@ function SmartLink({
   href: string;
   style?: CSSProperties;
 }) {
-  if (isExternalHref(href)) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer" className={className} style={style}>
-        {children}
-      </a>
-    );
-  }
-
   return (
-    <Link href={href} className={className} style={style}>
+    <SafeLink href={href} className={className} style={style}>
       {children}
-    </Link>
+    </SafeLink>
   );
 }
 

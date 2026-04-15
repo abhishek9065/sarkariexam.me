@@ -23,6 +23,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { buildJobsPath } from '@/app/lib/public-content';
 import { HomePageLoginModal } from './HomePageLoginModal';
 import { homePageLinks } from './links';
@@ -280,15 +281,14 @@ export function HomePageNavbar() {
                       
                       {isAdmin && (
                         <>
-                          <a
+                          <SafeLink
                             href={ADMIN_URL}
                             target="_blank"
-                            rel="noopener noreferrer"
                             className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-100"
                           >
                             <Settings size={16} />
                             Admin Dashboard
-                          </a>
+                          </SafeLink>
                         </>
                       )}
                       
@@ -337,7 +337,6 @@ export function HomePageNavbar() {
 
               {isLoggedIn ? (
                 <button
-                  type="button"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center gap-1 rounded-xl border border-[rgba(100,200,100,0.4)] bg-[rgba(100,200,100,0.2)] px-3 py-1.5 text-[11px] font-bold text-white"
                 >
@@ -638,16 +637,15 @@ export function HomePageNavbar() {
             
             {isAdmin && (
               <>
-                <a
+                <SafeLink
                   href={ADMIN_URL}
                   target="_blank"
-                  rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-100"
                   onClick={() => setIsUserMenuOpen(false)}
                 >
                   <Settings size={16} />
                   Admin Dashboard
-                </a>
+                </SafeLink>
               </>
             )}
             

@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { normalizeInternalHref } from '@/app/lib/public-content';
 import { PublicAnnouncementDetailPage } from '@/app/components/public-site/PublicAnnouncementDetailPage';
 import { loadDetailPage } from '@/lib/content-page';
 
@@ -15,7 +16,11 @@ export default async function ResultDetailPage({
     resolved = await loadDetailPage('results', id);
 
     if (!resolved.isCanonicalSection || resolved.item.slug !== id) {
-      redirect(resolved.canonicalPath);
+      const canonicalPath = normalizeInternalHref(resolved.canonicalPath);
+      if (!canonicalPath) {
+        notFound();
+      }
+      redirect(canonicalPath);
     }
   } catch {
     notFound();
