@@ -6,8 +6,14 @@ PRIMARY_REPO_DIR="$HOME/sarkari-result"
 FALLBACK_REPO_DIR="$HOME/sarkariexam.me"
 LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
+LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-900}"
 
 resolve_repo_dir() {
+  if [[ -n "${REPO_DIR_OVERRIDE:-}" && -d "${REPO_DIR_OVERRIDE}" ]]; then
+    printf '%s' "${REPO_DIR_OVERRIDE}"
+    return 0
+  fi
+
   if [[ -d "$PRIMARY_REPO_DIR" ]]; then
     printf '%s' "$PRIMARY_REPO_DIR"
     return 0
@@ -15,6 +21,19 @@ resolve_repo_dir() {
 
   if [[ -d "$FALLBACK_REPO_DIR" ]]; then
     printf '%s' "$FALLBACK_REPO_DIR"
+    return 0
+  fi
+
+  for candidate in /opt/sarkari-result /var/www/sarkari-result /srv/sarkari-result; do
+    if [[ -d "$candidate" ]]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+
+  discovered_script="$(find "$HOME" -maxdepth 4 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$discovered_script" ]]; then
+    dirname "$(dirname "$discovered_script")"
     return 0
   fi
 
@@ -26,8 +45,8 @@ REPO_DIR="$(resolve_repo_dir)"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-  echo "ERROR: another deployment is already running. Lock file: $LOCK_FILE" >&2
+if ! flock -w "$LOCK_WAIT_SECONDS" 9; then
+  echo "ERROR: another deployment is already running and lock wait timed out after ${LOCK_WAIT_SECONDS}s. Lock file: $LOCK_FILE" >&2
   exit 1
 fi
 
