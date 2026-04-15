@@ -108,6 +108,9 @@ const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_L
 const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
 const securityLogDbRetentionDays = Math.max(1, parseNumber(process.env.SECURITY_LOG_DB_RETENTION_DAYS, 30));
 const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SECURITY_LOG_CLEANUP_INTERVAL_MINUTES, 60));
+const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
+const contentDbMode = 'postgres';
+const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? '';
 const featureFlags = {
   search_overlay_v2: parseBoolean(process.env.FEATURE_SEARCH_OVERLAY_V2, true),
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),
@@ -139,6 +142,8 @@ export const config = {
   securityLogPersistenceEnabled,
   securityLogDbRetentionDays,
   securityLogCleanupIntervalMinutes,
+  contentDbMode,
+  postgresPrismaUrl,
   featureFlags,
 
   // Cosmos DB specific
@@ -167,6 +172,11 @@ export const config = {
 if (!isProduction) {
   console.log('[CONFIG] Running in development mode');
   console.log(`[CONFIG] Database: ${databaseUrl.includes('localhost') ? 'local MongoDB' : 'Cosmos DB'}`);
+  if (configuredContentDbMode !== 'postgres') {
+    console.log(`[CONFIG] CONTENT_DB_MODE=${configuredContentDbMode} ignored; forcing postgres mode`);
+  }
+  console.log(`[CONFIG] Content DB mode: ${contentDbMode}`);
+  console.log(`[CONFIG] PostgreSQL URL configured: ${postgresPrismaUrl ? 'yes' : 'no'}`);
   console.log(`[CONFIG] Push notifications: ${config.vapidPublicKey ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Email notifications: ${config.emailPass ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Telegram notifications: ${config.telegramBotToken ? 'enabled' : 'disabled'}`);

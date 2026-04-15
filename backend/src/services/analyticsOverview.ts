@@ -1,4 +1,5 @@
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
+import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
 
 import {
     getDailyRollups,
@@ -10,12 +11,7 @@ import {
     getFunnelAttributionSplit,
     getPushSubscriptionStats,
 } from './analytics.js';
-import { getCollection } from './cosmosdb.js';
-
-interface SubscriptionDoc {
-    isActive: boolean;
-    verified: boolean;
-}
+import { prisma } from './postgres/prisma.js';
 
 const OVERVIEW_CACHE_TTL_MS = 60 * 1000;
 const MAX_DAYS = 90;
@@ -74,7 +70,7 @@ export async function getAnalyticsOverview(
         totalEmailSubscribers,
         totalPushSubscribers,
     ] = await Promise.all([
-        AnnouncementModelMongo.findAll({ limit: 1000 }),
+        AnnouncementModelPostgres.findAll({ limit: 1000 }),
         getRollupSummary(clampedDays),
         getDailyRollups(Math.min(clampedDays, MAX_DAYS)),
         getCtrByType(clampedDays),
@@ -85,8 +81,12 @@ export async function getAnalyticsOverview(
         getPushSubscriptionStats(clampedDays),
         (async () => {
             try {
-                const subscriptions = getCollection<SubscriptionDoc>('subscriptions');
-                return await subscriptions.countDocuments({ isActive: true, verified: true });
+                return await prisma.subscription.count({
+                    where: {
+                        isActive: true,
+                        verified: true,
+                    },
+                });
             } catch (error) {
                 console.error('[Analytics] Failed to load subscription count:', error);
                 return 0;
@@ -94,8 +94,8 @@ export async function getAnalyticsOverview(
         })(),
         (async () => {
             try {
-                const pushSubs = getCollection('push_subscriptions');
-                return await pushSubs.countDocuments({});
+                const pushStats = await PushSubscriptionModelPostgres.list(1, 0);
+                return pushStats.total;
             } catch (error) {
                 console.error('[Analytics] Failed to load push subscription count:', error);
                 return 0;

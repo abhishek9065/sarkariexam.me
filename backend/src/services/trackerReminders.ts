@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
 import type { ContentType } from '../types.js';
 
 import { getCollection } from './cosmosdb.js';
@@ -249,11 +249,13 @@ async function getTrackedReminderItems(now: Date, horizon: Date): Promise<Remind
 }
 
 async function getBookmarkReminderItems(now: Date, horizon: Date): Promise<ReminderItem[]> {
-    const dueAnnouncements = await AnnouncementModelMongo.getByDeadlineRange({
-        startDate: now,
-        endDate: horizon,
+    const dueAnnouncements = (await AnnouncementModelPostgres.findAll({
         limit: DEFAULT_MAX_ANNOUNCEMENT_SCAN,
+    })).filter((announcement) => {
+        const deadline = toDate(announcement.deadline as any);
+        return Boolean(deadline && deadline >= now && deadline <= horizon);
     });
+
     if (!dueAnnouncements.length) return [];
 
     const byAnnouncementId = new Map(dueAnnouncements.map((announcement) => [announcement.id, announcement]));

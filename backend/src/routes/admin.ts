@@ -3,7 +3,12 @@ import { z } from 'zod';
 
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
+import AnnouncementModel from '../models/announcements.postgres.js';
+import CommunityModelPostgres from '../models/community.postgres.js';
+import ErrorReportModelPostgres from '../models/errorReports.postgres.js';
+import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
+import SiteSettingsModelPostgres from '../models/siteSettings.postgres.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';
 import type { ContentType, AnnouncementStatus, CreateAnnouncementDto } from '../types.js';
@@ -474,26 +479,23 @@ router.get('/analytics/content', async (req, res) => {
 
 router.get('/subscribers', async (req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('alert_subscriptions');
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
     const status = typeof req.query.status === 'string' ? req.query.status.trim() : 'all';
     const frequency = typeof req.query.frequency === 'string' ? req.query.frequency.trim() : 'all';
 
-    const filter: Record<string, unknown> = {};
-    if (search) filter.email = { $regex: search, $options: 'i' };
-    if (status === 'active') filter.isActive = true;
-    if (status === 'inactive') filter.isActive = false;
-    if (['instant', 'daily', 'weekly'].includes(frequency)) filter.frequency = frequency;
+    const result = await AlertSubscriptionModelPostgres.listAdmin({
+      search: search || undefined,
+      status: status === 'active' || status === 'inactive' ? status : 'all',
+      frequency: frequency === 'instant' || frequency === 'daily' || frequency === 'weekly'
+        ? frequency
+        : 'all',
+      limit,
+      offset,
+    });
 
-    const [items, total] = await Promise.all([
-      col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
-      col.countDocuments(filter),
-    ]);
-
-    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+    return res.json({ data: result.data, total: result.total, count: result.count });
   } catch (error) {
     console.error('[Admin] Subscribers error:', error);
     return res.status(500).json({ error: 'Failed to fetch subscribers' });
@@ -502,17 +504,8 @@ router.get('/subscribers', async (req, res) => {
 
 router.get('/subscribers/stats', async (_req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('alert_subscriptions');
-    const [total, verified, active, byFrequency] = await Promise.all([
-      col.countDocuments(),
-      col.countDocuments({ verified: true }),
-      col.countDocuments({ isActive: true }),
-      col.aggregate([
-        { $group: { _id: '$frequency', count: { $sum: 1 } } },
-      ]).toArray(),
-    ]);
-    return res.json({ data: { total, verified, unverified: total - verified, active, inactive: total - active, byFrequency } });
+    const stats = await AlertSubscriptionModelPostgres.getStats();
+    return res.json({ data: stats });
   } catch (error) {
     console.error('[Admin] Subscriber stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch subscriber stats' });
@@ -521,18 +514,9 @@ router.get('/subscribers/stats', async (_req, res) => {
 
 router.delete('/subscribers/:id', async (req, res) => {
   try {
-    const rawId = String(req.params.id);
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const { ObjectId } = await import('mongodb');
-    const col = getCollection('alert_subscriptions');
-    
-    // Validate ObjectId format
-    if (!ObjectId.isValid(rawId)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
-    
-    const result = await col.deleteOne({ _id: new ObjectId(rawId) });
-    if (result.deletedCount === 0) {
+    const id = String(req.params.id);
+    const deleted = await AlertSubscriptionModelPostgres.deleteById(id);
+    if (!deleted) {
       return res.status(404).json({ error: 'Subscriber not found' });
     }
     return res.json({ message: 'Subscriber removed' });
@@ -548,17 +532,20 @@ router.delete('/subscribers/:id', async (req, res) => {
 
 router.get('/push-subscribers', async (req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('push_subscriptions');
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
 
-    const [items, total] = await Promise.all([
-      col.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
-      col.countDocuments(),
-    ]);
-
-    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), endpoint: d.endpoint, userId: d.userId, createdAt: d.createdAt })), total, count: items.length });
+    const result = await PushSubscriptionModelPostgres.list(limit, offset);
+    return res.json({
+      data: result.data.map((item) => ({
+        id: item.id,
+        endpoint: item.endpoint,
+        userId: item.userId,
+        createdAt: item.createdAt,
+      })),
+      total: result.total,
+      count: result.count,
+    });
   } catch (error) {
     console.error('[Admin] Push subscribers error:', error);
     return res.status(500).json({ error: 'Failed to fetch push subscribers' });
@@ -575,9 +562,7 @@ router.post('/push/send', async (req, res) => {
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('push_subscriptions');
-    const subs = await col.find({}).toArray();
+    const subs = await PushSubscriptionModelPostgres.listAll();
 
     let sent = 0;
     let failed = 0;
@@ -612,75 +597,64 @@ router.post('/push/send', async (req, res) => {
 // COMMUNITY MODERATION
 // ═══════════════════════════════════════════
 
-const communityList = async (collectionName: string, req: express.Request, res: express.Response) => {
+router.get('/community/forums', async (req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection(collectionName);
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
-
-    const [items, total] = await Promise.all([
-      col.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
-      col.countDocuments(),
-    ]);
-
-    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+    const result = await CommunityModelPostgres.listForums(limit, offset);
+    return res.json(result);
   } catch (error) {
-    console.error(`[Admin] ${collectionName} list error:`, error);
-    return res.status(500).json({ error: `Failed to fetch ${collectionName}` });
+    console.error('[Admin] community forums list error:', error);
+    return res.status(500).json({ error: 'Failed to fetch community forums' });
   }
-};
+});
 
-const communityDelete = async (collectionName: string, req: express.Request, res: express.Response) => {
+router.delete('/community/forums/:id', async (req, res) => {
   try {
-    const rawId = String(req.params.id);
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const { ObjectId } = await import('mongodb');
-    
-    // Validate ObjectId format
-    if (!ObjectId.isValid(rawId)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
-    
-    const col = getCollection(collectionName);
-    const result = await col.deleteOne({ _id: new ObjectId(rawId) });
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'Item not found' });
-    }
+    const deleted = await CommunityModelPostgres.deleteForum(String(req.params.id));
+    if (!deleted) return res.status(404).json({ error: 'Item not found' });
     return res.json({ message: 'Deleted' });
   } catch (error) {
-    console.error(`[Admin] ${collectionName} delete error:`, error);
-    return res.status(500).json({ error: `Failed to delete from ${collectionName}` });
+    console.error('[Admin] community forums delete error:', error);
+    return res.status(500).json({ error: 'Failed to delete forum' });
   }
-};
+});
 
-router.get('/community/forums', (req, res) => communityList('community_forums', req, res));
-router.delete('/community/forums/:id', (req, res) => communityDelete('community_forums', req, res));
+router.get('/community/qa', async (req, res) => {
+  try {
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+    const result = await CommunityModelPostgres.listQa(limit, offset);
+    return res.json(result);
+  } catch (error) {
+    console.error('[Admin] community qa list error:', error);
+    return res.status(500).json({ error: 'Failed to fetch community QA' });
+  }
+});
 
-router.get('/community/qa', (req, res) => communityList('community_qa', req, res));
-router.delete('/community/qa/:id', (req, res) => communityDelete('community_qa', req, res));
+router.delete('/community/qa/:id', async (req, res) => {
+  try {
+    const deleted = await CommunityModelPostgres.deleteQa(String(req.params.id));
+    if (!deleted) return res.status(404).json({ error: 'Item not found' });
+    return res.json({ message: 'Deleted' });
+  } catch (error) {
+    console.error('[Admin] community qa delete error:', error);
+    return res.status(500).json({ error: 'Failed to delete question' });
+  }
+});
 
 router.patch('/community/qa/:id', async (req, res) => {
   try {
-    const rawId = String(req.params.id);
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const { ObjectId } = await import('mongodb');
-    
-    // Validate ObjectId format
-    if (!ObjectId.isValid(rawId)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
-    
-    const col = getCollection('community_qa');
     const schema = z.object({ answer: z.string().trim().min(1).max(2000) });
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
-    const result = await col.updateOne(
-      { _id: new ObjectId(rawId) },
-      { $set: { answer: parse.data.answer, answeredBy: (req as any).user?.email || 'admin', updatedAt: new Date() } }
+    const updated = await CommunityModelPostgres.answerQa(
+      String(req.params.id),
+      parse.data.answer,
+      (req as any).user?.email || 'admin',
     );
-    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Answer updated' });
   } catch (error) {
     console.error('[Admin] QA answer error:', error);
@@ -688,26 +662,39 @@ router.patch('/community/qa/:id', async (req, res) => {
   }
 });
 
-router.get('/community/groups', (req, res) => communityList('community_groups', req, res));
-router.delete('/community/groups/:id', (req, res) => communityDelete('community_groups', req, res));
+router.get('/community/groups', async (req, res) => {
+  try {
+    const parse = paginationSchema.safeParse(req.query);
+    const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
+    const result = await CommunityModelPostgres.listGroups(limit, offset);
+    return res.json(result);
+  } catch (error) {
+    console.error('[Admin] community groups list error:', error);
+    return res.status(500).json({ error: 'Failed to fetch community groups' });
+  }
+});
+
+router.delete('/community/groups/:id', async (req, res) => {
+  try {
+    const deleted = await CommunityModelPostgres.deleteGroup(String(req.params.id));
+    if (!deleted) return res.status(404).json({ error: 'Item not found' });
+    return res.json({ message: 'Deleted' });
+  } catch (error) {
+    console.error('[Admin] community groups delete error:', error);
+    return res.status(500).json({ error: 'Failed to delete group' });
+  }
+});
 
 router.get('/community/flags', async (req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('community_flags');
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
-    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const statusParam = typeof req.query.status === 'string' && ['open', 'reviewed', 'resolved'].includes(req.query.status)
+      ? req.query.status as 'open' | 'reviewed' | 'resolved'
+      : undefined;
 
-    const filter: Record<string, unknown> = {};
-    if (statusParam && ['open', 'reviewed', 'resolved'].includes(statusParam)) filter.status = statusParam;
-
-    const [items, total] = await Promise.all([
-      col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
-      col.countDocuments(filter),
-    ]);
-
-    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+    const result = await CommunityModelPostgres.listFlags(limit, offset, statusParam);
+    return res.json(result);
   } catch (error) {
     console.error('[Admin] Flags list error:', error);
     return res.status(500).json({ error: 'Failed to fetch flags' });
@@ -716,25 +703,12 @@ router.get('/community/flags', async (req, res) => {
 
 router.patch('/community/flags/:id', async (req, res) => {
   try {
-    const rawId = String(req.params.id);
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const { ObjectId } = await import('mongodb');
-    
-    // Validate ObjectId format
-    if (!ObjectId.isValid(rawId)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
-    
-    const col = getCollection('community_flags');
     const schema = z.object({ status: z.enum(['reviewed', 'resolved']) });
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
-    const result = await col.updateOne(
-      { _id: new ObjectId(rawId) },
-      { $set: { status: parse.data.status, updatedAt: new Date() } }
-    );
-    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    const updated = await CommunityModelPostgres.updateFlagStatus(String(req.params.id), parse.data.status);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Flag updated' });
   } catch (error) {
     console.error('[Admin] Flag update error:', error);
@@ -748,21 +722,14 @@ router.patch('/community/flags/:id', async (req, res) => {
 
 router.get('/error-reports', async (req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('error_reports');
     const parse = paginationSchema.safeParse(req.query);
     const { limit, offset } = parse.success ? parse.data : { limit: 20, offset: 0 };
-    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const statusParam = typeof req.query.status === 'string' && ['new', 'triaged', 'resolved'].includes(req.query.status)
+      ? req.query.status as 'new' | 'triaged' | 'resolved'
+      : undefined;
 
-    const filter: Record<string, unknown> = {};
-    if (statusParam && ['new', 'triaged', 'resolved'].includes(statusParam)) filter.status = statusParam;
-
-    const [items, total] = await Promise.all([
-      col.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).toArray(),
-      col.countDocuments(filter),
-    ]);
-
-    return res.json({ data: items.map((d: any) => ({ id: d._id?.toString(), ...d, _id: undefined })), total, count: items.length });
+    const result = await ErrorReportModelPostgres.list(limit, offset, statusParam);
+    return res.json(result);
   } catch (error) {
     console.error('[Admin] Error reports error:', error);
     return res.status(500).json({ error: 'Failed to fetch error reports' });
@@ -771,16 +738,6 @@ router.get('/error-reports', async (req, res) => {
 
 router.patch('/error-reports/:id', async (req, res) => {
   try {
-    const rawId = String(req.params.id);
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const { ObjectId } = await import('mongodb');
-    
-    // Validate ObjectId format
-    if (!ObjectId.isValid(rawId)) {
-      return res.status(400).json({ error: 'Invalid ID format' });
-    }
-    
-    const col = getCollection('error_reports');
     const schema = z.object({
       status: z.enum(['triaged', 'resolved']),
       reviewNote: z.string().trim().max(1000).optional(),
@@ -788,15 +745,12 @@ router.patch('/error-reports/:id', async (req, res) => {
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
-    const update: Record<string, unknown> = { status: parse.data.status, updatedAt: new Date() };
-    if (parse.data.reviewNote) update.reviewNote = parse.data.reviewNote;
-    if (parse.data.status === 'resolved') {
-      update.resolvedAt = new Date();
-      update.resolvedBy = (req as any).user?.email || 'admin';
-    }
-
-    const result = await col.updateOne({ _id: new ObjectId(rawId) }, { $set: update });
-    if (result.matchedCount === 0) return res.status(404).json({ error: 'Not found' });
+    const updated = await ErrorReportModelPostgres.update(String(req.params.id), {
+      status: parse.data.status,
+      reviewNote: parse.data.reviewNote,
+      resolvedBy: parse.data.status === 'resolved' ? ((req as any).user?.email || 'admin') : undefined,
+    });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
     return res.json({ message: 'Error report updated' });
   } catch (error) {
     console.error('[Admin] Error report update error:', error);
@@ -846,10 +800,8 @@ router.get('/audit-log', async (req, res) => {
 
 router.get('/settings', async (_req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
     const { config } = await import('../config.js');
-    const col = getCollection('site_settings');
-    const saved = await col.findOne({ _id: 'main' as any });
+    const saved = await SiteSettingsModelPostgres.getMain();
 
     const defaults = {
       siteName: 'SarkariExams.me',
@@ -867,7 +819,7 @@ router.get('/settings', async (_req, res) => {
       featureFlags: config.featureFlags || {},
     };
 
-    return res.json({ data: { ...defaults, ...(saved || {}), _id: undefined } });
+    return res.json({ data: { ...defaults, ...(saved || {}) } });
   } catch (error) {
     console.error('[Admin] Settings error:', error);
     return res.status(500).json({ error: 'Failed to fetch settings' });
@@ -876,9 +828,6 @@ router.get('/settings', async (_req, res) => {
 
 router.put('/settings', async (req, res) => {
   try {
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('site_settings');
-
     const schema = z.object({
       siteName: z.string().trim().max(100).optional(),
       siteDescription: z.string().trim().max(500).optional(),
@@ -897,13 +846,9 @@ router.put('/settings', async (req, res) => {
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
-    await col.updateOne(
-      { _id: 'main' as any },
-      { $set: { ...parse.data, updatedAt: new Date() } },
-      { upsert: true }
-    );
+    const updated = await SiteSettingsModelPostgres.updateMain(parse.data);
 
-    return res.json({ data: parse.data, message: 'Settings saved' });
+    return res.json({ data: updated, message: 'Settings saved' });
   } catch (error) {
     console.error('[Admin] Settings save error:', error);
     return res.status(500).json({ error: 'Failed to save settings' });

@@ -1,4 +1,5 @@
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import PostModelPostgres from '../models/posts.postgres.js';
+import type { ContentType } from '../types.js';
 
 import { getCollection } from './cosmosdb.js';
 import { sendDigestEmail } from './email.js';
@@ -17,6 +18,19 @@ interface SubscriptionDoc {
     updatedAt?: Date;
     lastDigestDailySentAt?: Date | null;
     lastDigestWeeklySentAt?: Date | null;
+}
+
+interface CandidateDigestAnnouncement {
+    title: string;
+    slug: string;
+    type: ContentType;
+    category: string;
+    organization: string;
+    deadline?: Date;
+    categorySlug?: string;
+    organizationSlug?: string;
+    stateSlug?: string;
+    qualificationSlug?: string;
 }
 
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1000;
@@ -50,7 +64,7 @@ const normalizeToken = (value?: string | null): string => {
 };
 
 const matchesSubscription = (
-    announcement: { category?: string; type?: string; organization?: string; location?: string; minQualification?: string },
+    announcement: CandidateDigestAnnouncement,
     subscriber: SubscriptionDoc
 ): boolean => {
     const matchesArray = (values?: string[], target?: string) => {
@@ -60,11 +74,11 @@ const matchesSubscription = (
         return normalized.includes(target);
     };
 
-    return matchesArray(subscriber.categorySlugs, announcement.category)
+    return matchesArray(subscriber.categorySlugs, announcement.categorySlug || normalizeToken(announcement.category))
         && matchesArray(subscriber.postTypes, announcement.type)
-        && matchesArray(subscriber.organizationSlugs, announcement.organization)
-        && matchesArray(subscriber.stateSlugs, announcement.location)
-        && matchesArray(subscriber.qualificationSlugs, announcement.minQualification);
+        && matchesArray(subscriber.organizationSlugs, announcement.organizationSlug || normalizeToken(announcement.organization))
+        && matchesArray(subscriber.stateSlugs, announcement.stateSlug)
+        && matchesArray(subscriber.qualificationSlugs, announcement.qualificationSlug);
 };
 
 const toDateOrNull = (value: Date | string | null | undefined): Date | null => {
@@ -148,18 +162,38 @@ async function listDueSubscribers(frequency: 'daily' | 'weekly', now: Date): Pro
         .toArray() as Promise<SubscriptionDoc[]>;
 }
 
-async function listCandidateAnnouncements(frequency: 'daily' | 'weekly', now: Date) {
+async function listCandidateAnnouncements(frequency: 'daily' | 'weekly', now: Date): Promise<CandidateDigestAnnouncement[]> {
     const lookbackStart = getFrequencyLookbackStart(frequency, now).getTime();
-    const announcements = await AnnouncementModelMongo.findAll({
+    const posts = await PostModelPostgres.findAdmin({
+        status: 'published',
         sort: 'newest',
         limit: DEFAULT_LOOKBACK_LIMIT,
     });
 
-    return announcements.filter((announcement) => {
-        const postedAt = toDateOrNull(announcement.postedAt as any);
-        if (!postedAt) return false;
-        return postedAt.getTime() >= lookbackStart;
-    });
+    return posts.data
+        .map((post) => {
+            const postedAt = toDateOrNull(post.publishedAt || post.createdAt);
+            if (!postedAt || postedAt.getTime() < lookbackStart) return null;
+
+            const category = post.categories[0];
+            const organization = post.organization;
+            const state = post.states[0];
+            const qualification = post.qualifications[0];
+
+            return {
+                title: post.title,
+                slug: post.slug,
+                type: post.type,
+                category: category?.name || 'General',
+                organization: organization?.name || 'Government of India',
+                deadline: toDateOrNull(post.lastDate || post.expiresAt || null) || undefined,
+                categorySlug: normalizeToken(category?.slug || category?.name),
+                organizationSlug: normalizeToken(organization?.slug || organization?.name),
+                stateSlug: normalizeToken(state?.slug || state?.name || post.location),
+                qualificationSlug: normalizeToken(qualification?.slug || qualification?.name),
+            };
+        })
+        .filter(Boolean) as CandidateDigestAnnouncement[];
 }
 
 async function markDigestSent(subscriptionEmail: string, frequency: 'daily' | 'weekly', sentAt: Date): Promise<void> {
@@ -191,7 +225,7 @@ async function processFrequency(frequency: 'daily' | 'weekly', now: Date): Promi
         }
 
         const matches = candidates
-            .filter((announcement) => matchesSubscription(announcement as any, subscriber))
+            .filter((announcement) => matchesSubscription(announcement, subscriber))
             .slice(0, schedulerConfig.maxItems)
             .map((announcement) => ({
                 title: announcement.title,

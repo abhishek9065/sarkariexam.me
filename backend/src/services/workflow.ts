@@ -1,6 +1,12 @@
+import { randomUUID } from 'crypto';
+
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import PostModelPostgres from '../models/posts.postgres.js';
+
+import { ensureWorkflowLogsTable } from './postgres/legacyTables.js';
+import { prisma } from './postgres/prisma.js';
 
 const assignmentSchema = z.object({
   announcementId: z.string(),
@@ -9,21 +15,101 @@ const assignmentSchema = z.object({
   reviewDueAt: z.string().datetime().optional(),
 });
 
+interface WorkflowLogRow {
+  id: string;
+  announcement_id: string;
+  action: string;
+  actor: string;
+  metadata: unknown;
+  created_at: Date;
+}
+
+interface WorkflowLog {
+  id: string;
+  announcementId: string;
+  action: string;
+  actor: string;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+interface AssignmentDetails {
+  assigneeUserId?: string;
+  assigneeEmail?: string;
+  assignedAt?: Date;
+  reviewDueAt?: Date;
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function toDateOrUndefined(value: unknown): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+async function getLatestAssignments(announcementIds: string[]): Promise<Map<string, AssignmentDetails>> {
+  await ensureWorkflowLogsTable();
+  if (announcementIds.length === 0) {
+    return new Map<string, AssignmentDetails>();
+  }
+
+  const rows = await prisma.$queryRaw<WorkflowLogRow[]>(Prisma.sql`
+    SELECT id, announcement_id, action, actor, metadata, created_at
+    FROM app_workflow_logs
+    WHERE announcement_id IN (${Prisma.join(announcementIds)})
+      AND action = ${'assigned'}
+    ORDER BY created_at DESC
+  `);
+
+  const assignments = new Map<string, AssignmentDetails>();
+  for (const row of rows) {
+    if (assignments.has(row.announcement_id)) {
+      continue;
+    }
+
+    const metadata = asObject(row.metadata);
+    assignments.set(row.announcement_id, {
+      assigneeUserId: typeof metadata?.assigneeUserId === 'string' ? metadata.assigneeUserId : undefined,
+      assigneeEmail: typeof metadata?.assignee === 'string' ? metadata.assignee : undefined,
+      assignedAt: toDateOrUndefined(metadata?.assignedAt),
+      reviewDueAt: toDateOrUndefined(metadata?.reviewDueAt),
+    });
+  }
+
+  return assignments;
+}
+
 export async function assignAnnouncement(data: unknown, assignedBy: string) {
   const parse = assignmentSchema.safeParse(data);
   if (!parse.success) return { success: false, error: parse.error.message };
 
   try {
-    await AnnouncementModelMongo.update(parse.data.announcementId, {
-      assigneeUserId: parse.data.assigneeUserId,
-      assigneeEmail: parse.data.assigneeEmail,
-      assignedAt: new Date(),
-      reviewDueAt: parse.data.reviewDueAt ? new Date(parse.data.reviewDueAt) : undefined,
-      status: 'pending',
-    } as any);
+    const assignedAt = new Date();
+    const reviewDueAt = parse.data.reviewDueAt ? new Date(parse.data.reviewDueAt) : undefined;
+
+    const updated = await PostModelPostgres.update(
+      parse.data.announcementId,
+      { status: 'in_review' },
+      assignedBy,
+      'admin',
+      'Assigned for review',
+    );
+
+    if (!updated) {
+      return { success: false, error: 'Announcement not found' };
+    }
 
     await addWorkflowLog(parse.data.announcementId, 'assigned', assignedBy, {
       assignee: parse.data.assigneeEmail,
+      assigneeUserId: parse.data.assigneeUserId,
+      assignedAt: assignedAt.toISOString(),
+      reviewDueAt: reviewDueAt?.toISOString(),
     });
 
     return { success: true };
@@ -34,11 +120,23 @@ export async function assignAnnouncement(data: unknown, assignedBy: string) {
 
 export async function approveAnnouncement(announcementId: string, approvedBy: string, note?: string) {
   try {
-    await AnnouncementModelMongo.update(announcementId, {
-      status: 'published',
-      approvedAt: new Date(),
+    const approvedAt = new Date().toISOString();
+    const updated = await PostModelPostgres.update(
+      announcementId,
+      {
+        status: 'published',
+        approvedBy,
+        publishedBy: approvedBy,
+        publishedAt: approvedAt,
+      },
       approvedBy,
-    } as any);
+      'admin',
+      note || 'Approved',
+    );
+
+    if (!updated) {
+      return { success: false, error: 'Announcement not found' };
+    }
 
     await addWorkflowLog(announcementId, 'approved', approvedBy, { note });
     return { success: true };
@@ -49,9 +147,17 @@ export async function approveAnnouncement(announcementId: string, approvedBy: st
 
 export async function rejectAnnouncement(announcementId: string, rejectedBy: string, reason: string) {
   try {
-    await AnnouncementModelMongo.update(announcementId, {
-      status: 'draft',
-    } as any);
+    const updated = await PostModelPostgres.update(
+      announcementId,
+      { status: 'draft' },
+      rejectedBy,
+      'admin',
+      reason || 'Rejected',
+    );
+
+    if (!updated) {
+      return { success: false, error: 'Announcement not found' };
+    }
 
     await addWorkflowLog(announcementId, 'rejected', rejectedBy, { reason });
     return { success: true };
@@ -61,29 +167,85 @@ export async function rejectAnnouncement(announcementId: string, rejectedBy: str
 }
 
 async function addWorkflowLog(announcementId: string, action: string, actor: string, metadata?: Record<string, unknown>) {
-  const { getCollection } = await import('./cosmosdb.js');
-  const col = getCollection('workflow_logs');
-  await col.insertOne({
-    announcementId,
-    action,
-    actor,
-    metadata,
-    createdAt: new Date(),
-  } as any);
+  await ensureWorkflowLogsTable();
+  const metadataJson = metadata ? JSON.stringify(metadata) : null;
+
+  if (metadataJson) {
+    await prisma.$executeRaw`
+      INSERT INTO app_workflow_logs (
+        id,
+        announcement_id,
+        action,
+        actor,
+        metadata,
+        created_at
+      ) VALUES (
+        ${randomUUID()},
+        ${announcementId},
+        ${action},
+        ${actor},
+        ${metadataJson}::jsonb,
+        NOW()
+      )
+    `;
+    return;
+  }
+
+  await prisma.$executeRaw`
+    INSERT INTO app_workflow_logs (
+      id,
+      announcement_id,
+      action,
+      actor,
+      metadata,
+      created_at
+    ) VALUES (
+      ${randomUUID()},
+      ${announcementId},
+      ${action},
+      ${actor},
+      ${null},
+      NOW()
+    )
+  `;
 }
 
 export async function getPendingApprovals(assigneeEmail?: string) {
   try {
-    const all = await AnnouncementModelMongo.findAllAdmin({
-      status: 'pending',
-      includeInactive: true,
+    const all = await PostModelPostgres.findAdmin({
+      status: 'in_review',
       limit: 100,
+      sort: 'updated',
+    });
+
+    const assignments = await getLatestAssignments(all.data.map((item) => item.id));
+
+    const pending = all.data.map((item) => {
+      const assignment = assignments.get(item.id);
+      return {
+        id: item.id,
+        title: item.title,
+        slug: item.slug,
+        type: item.type,
+        category: item.categories[0]?.name || 'General',
+        organization: item.organization?.name || 'Government of India',
+        status: 'pending' as const,
+        postedAt: new Date(item.publishedAt || item.createdAt),
+        updatedAt: new Date(item.updatedAt),
+        version: item.currentVersion,
+        isActive: true,
+        viewCount: item.home.trendingScore || 0,
+        assigneeUserId: assignment?.assigneeUserId,
+        assigneeEmail: assignment?.assigneeEmail,
+        assignedAt: assignment?.assignedAt,
+        reviewDueAt: assignment?.reviewDueAt,
+      };
     });
 
     if (assigneeEmail) {
-      return all.filter(a => (a as any).assigneeEmail === assigneeEmail);
+      return pending.filter((item) => item.assigneeEmail === assigneeEmail);
     }
-    return all;
+    return pending;
   } catch {
     return [];
   }
@@ -91,12 +253,22 @@ export async function getPendingApprovals(assigneeEmail?: string) {
 
 export async function getWorkflowLogs(announcementId: string) {
   try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('workflow_logs');
-    return await col
-      .find({ announcementId })
-      .sort({ createdAt: -1 })
-      .toArray();
+    await ensureWorkflowLogsTable();
+    const rows = await prisma.$queryRaw<WorkflowLogRow[]>(Prisma.sql`
+      SELECT id, announcement_id, action, actor, metadata, created_at
+      FROM app_workflow_logs
+      WHERE announcement_id = ${announcementId}
+      ORDER BY created_at DESC
+    `);
+
+    return rows.map((row): WorkflowLog => ({
+      id: row.id,
+      announcementId: row.announcement_id,
+      action: row.action,
+      actor: row.actor,
+      metadata: asObject(row.metadata),
+      createdAt: row.created_at,
+    }));
   } catch {
     return [];
   }
@@ -113,12 +285,12 @@ export async function checkSLAViolations(): Promise<Array<{
     const now = Date.now();
 
     return pending
-      .filter(a => (a as any).reviewDueAt && new Date((a as any).reviewDueAt).getTime() < now)
-      .map(a => ({
-        id: a.id,
-        title: a.title,
-        assignee: (a as any).assigneeEmail,
-        hoursOverdue: Math.floor((now - new Date((a as any).reviewDueAt).getTime()) / (1000 * 60 * 60)),
+      .filter((item) => item.reviewDueAt && new Date(item.reviewDueAt).getTime() < now)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        assignee: item.assigneeEmail,
+        hoursOverdue: Math.floor((now - new Date(item.reviewDueAt as Date).getTime()) / (1000 * 60 * 60)),
       }));
   } catch {
     return [];

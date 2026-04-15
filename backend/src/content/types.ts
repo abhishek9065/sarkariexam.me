@@ -163,6 +163,32 @@ export interface AuditLogRecord {
   createdAt: string;
 }
 
+export const contentPageTypeValues = ['auxiliary', 'info', 'community', 'category_meta', 'resource_meta', 'state_directory'] as const;
+export type ContentPageType = (typeof contentPageTypeValues)[number];
+
+export interface ContentPageRecord {
+  id: string;
+  slug: string;
+  pageType: ContentPageType;
+  title: string;
+  eyebrow?: string;
+  description?: string;
+  headerColor?: string;
+  layoutVariant?: string;
+  payload: Record<string, unknown>;
+  status: PostWorkflowStatus;
+  seoTitle?: string;
+  seoDescription?: string;
+  seoCanonicalPath?: string;
+  seoIndexable?: boolean;
+  publishedAt?: string;
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
 export interface TaxonomyDocument extends TaxonomyRef {
   description?: string;
   officialWebsite?: string;

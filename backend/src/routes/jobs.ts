@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
 
 const router = Router();
 
@@ -46,7 +46,7 @@ router.get('/match', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix
             setTimeout(() => reject(new Error('Job matching timeout')), 10000);
         });
 
-        const jobsPromise = AnnouncementModelMongo.findAll({ 
+        const jobsPromise = AnnouncementModelPostgres.findAll({ 
             type: 'job', 
             limit: 200
         });

@@ -34,6 +34,7 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import supportRouter from './routes/support.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { scheduleAutomationJobs } from './services/automationJobs.js';
+import { getContentDbMode, shouldReadFromPostgres } from './services/contentDbMode.js';
 import {
   connectToDatabase,
   ensureDatabaseReady,
@@ -42,6 +43,7 @@ import {
 } from './services/cosmosdb.js';
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
+import { postgresHealthCheck } from './services/postgres/prisma.js';
 import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
 import { getSecurityMetricSnapshot } from './services/securityMetrics.js';
 import { scheduleTrackerReminders } from './services/trackerReminders.js';
@@ -49,19 +51,9 @@ import logger from './utils/logger.js';
 
 const app = express();
 const startedAt = Date.now();
+// Only legacy APIs still backed by MongoDB/Cosmos should require Mongo readiness checks.
 const dbBackedApiPrefixes = [
-  '/api/auth',
   '/api/admin',
-  '/api/announcements',
-  '/api/content',
-  '/api/bookmarks',
-  '/api/subscriptions',
-  '/api/profile',
-  '/api/push',
-  '/api/jobs',
-  '/api/community',
-  '/api/support',
-  '/api/editorial',
 ];
 
 export { app };
@@ -171,7 +163,13 @@ app.get('/api/healthz', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPre
 app.get('/api/health/deep', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
-  const status = dbConfigured && !dbOk ? 'error' : 'ok';
+  const contentDbMode = getContentDbMode();
+  const postgresConfigured = Boolean(process.env.POSTGRES_PRISMA_URL);
+  const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
+  const postgresRequired = shouldReadFromPostgres();
+  const hasDbFailure = dbConfigured && !dbOk;
+  const hasPostgresFailure = postgresRequired && (!postgresConfigured || postgresOk === false);
+  const status = hasDbFailure || hasPostgresFailure ? 'error' : 'ok';
 
   res
     .status(status === 'error' ? 503 : 200)
@@ -179,7 +177,15 @@ app.get('/api/health/deep', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, ke
     .json({
       status,
       timestamp: new Date().toISOString(),
-      db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' }
+      db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' },
+      contentDb: {
+        mode: contentDbMode,
+        postgres: {
+          configured: postgresConfigured,
+          required: postgresRequired,
+          ok: postgresOk,
+        },
+      },
     });
 });
 
@@ -190,7 +196,13 @@ function isDatabaseBackedApi(pathname: string): boolean {
 async function buildHealthResponse(res: express.Response) {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
-  const status = dbConfigured && !dbOk ? 'error' : 'ok';
+  const contentDbMode = getContentDbMode();
+  const postgresConfigured = Boolean(process.env.POSTGRES_PRISMA_URL);
+  const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
+  const postgresRequired = shouldReadFromPostgres();
+  const hasDbFailure = dbConfigured && !dbOk;
+  const hasPostgresFailure = postgresRequired && (!postgresConfigured || postgresOk === false);
+  const status = hasDbFailure || hasPostgresFailure ? 'error' : 'ok';
 
   return res
     .status(status === 'error' ? 503 : 200)
@@ -199,6 +211,14 @@ async function buildHealthResponse(res: express.Response) {
       status,
       timestamp: new Date().toISOString(),
       db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' },
+      contentDb: {
+        mode: contentDbMode,
+        postgres: {
+          configured: postgresConfigured,
+          required: postgresRequired,
+          ok: postgresOk,
+        },
+      },
     });
 }
 
@@ -217,6 +237,8 @@ app.get('/metrics', (req, res) => {
   const uptimeSeconds = (Date.now() - startedAt) / 1000;
   const memory = process.memoryUsage();
   const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+  const postgresConfigured = Boolean(process.env.POSTGRES_PRISMA_URL);
+  const contentDbMode = getContentDbMode();
   const securityMetrics = getSecurityMetricSnapshot();
 
   const lines = [
@@ -238,6 +260,12 @@ app.get('/metrics', (req, res) => {
     '# HELP app_db_configured Database configured (1=yes, 0=no)',
     '# TYPE app_db_configured gauge',
     `app_db_configured ${dbConfigured ? 1 : 0}`,
+    '# HELP app_postgres_configured PostgreSQL configured for Prisma (1=yes, 0=no)',
+    '# TYPE app_postgres_configured gauge',
+    `app_postgres_configured ${postgresConfigured ? 1 : 0}`,
+    '# HELP app_content_db_mode Active content data source mode (postgres=1)',
+    '# TYPE app_content_db_mode gauge',
+    `app_content_db_mode ${contentDbMode === 'postgres' ? 1 : 0}`,
     '# HELP app_build_info Build information',
     '# TYPE app_build_info gauge',
     `app_build_info{node_version="${process.version}"} 1`,

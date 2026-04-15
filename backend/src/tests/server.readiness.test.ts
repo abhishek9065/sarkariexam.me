@@ -73,13 +73,13 @@ describe('server readiness', () => {
     expect(healthCheck).not.toHaveBeenCalled();
   });
 
-  it('returns 503 for db-backed API routes when the database cannot be readied', async () => {
+  it('returns 503 for legacy mongo-backed API routes when the database cannot be readied', async () => {
     isDatabaseConfigured.mockReturnValue(true);
     healthCheck.mockResolvedValue(true);
     ensureDatabaseReady.mockRejectedValue(new Error('database unavailable'));
 
     const { app } = await import('../server.js');
-    const response = await request(app).get('/api/auth/me');
+    const response = await request(app).get('/api/admin/announcements');
 
     expect(response.status).toBe(503);
     expect(response.body).toMatchObject({

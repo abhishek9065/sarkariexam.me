@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import { alertSubscriptionPublicSchema } from '../content/types.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import AlertSubscriptionModelMongo from '../models/alertSubscriptions.mongo.js';
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { isEmailConfigured, sendVerificationEmail } from '../services/email.js';
 
@@ -36,7 +36,7 @@ router.post('/', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefi
 
     try {
         const verified = !emailConfigured;
-        const subscription = await AlertSubscriptionModelMongo.upsert({
+        const subscription = await AlertSubscriptionModelPostgres.upsert({
             email: data.email,
             categories: data.categories,
             states: data.states,
@@ -85,7 +85,7 @@ router.get('/verify', async (req, res) => {
     }
 
     try {
-        const doc = await AlertSubscriptionModelMongo.verifyByToken(token);
+        const doc = await AlertSubscriptionModelPostgres.verifyByToken(token);
         if (!doc) {
             return res.status(404).json({ error: 'Invalid or expired token' });
         }
@@ -110,7 +110,7 @@ router.get('/unsubscribe', async (req, res) => {
     }
 
     try {
-        const doc = await AlertSubscriptionModelMongo.unsubscribeByToken(token);
+        const doc = await AlertSubscriptionModelPostgres.unsubscribeByToken(token);
         if (!doc) {
             return res.status(404).json({ error: 'Invalid token' });
         }

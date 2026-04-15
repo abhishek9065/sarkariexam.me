@@ -10,9 +10,8 @@ const {
     getTopSearchesMock,
     getFunnelAttributionSplitMock,
     getPushSubscriptionStatsMock,
-    getCollectionMock,
     subscriptionsCountMock,
-    pushSubscriptionsCountMock,
+    pushSubscriptionListMock,
 } = vi.hoisted(() => ({
     findAllMock: vi.fn(),
     getRollupSummaryMock: vi.fn(),
@@ -23,14 +22,19 @@ const {
     getTopSearchesMock: vi.fn(),
     getFunnelAttributionSplitMock: vi.fn(),
     getPushSubscriptionStatsMock: vi.fn(),
-    getCollectionMock: vi.fn(),
     subscriptionsCountMock: vi.fn(),
-    pushSubscriptionsCountMock: vi.fn(),
+    pushSubscriptionListMock: vi.fn(),
 }));
 
-vi.mock('../models/announcements.mongo.js', () => ({
-    AnnouncementModelMongo: {
+vi.mock('../models/announcements.postgres.js', () => ({
+    default: {
         findAll: findAllMock,
+    },
+}));
+
+vi.mock('../models/pushSubscriptions.postgres.js', () => ({
+    default: {
+        list: pushSubscriptionListMock,
     },
 }));
 
@@ -45,8 +49,12 @@ vi.mock('../services/analytics.js', () => ({
     getPushSubscriptionStats: getPushSubscriptionStatsMock,
 }));
 
-vi.mock('../services/cosmosdb.js', () => ({
-    getCollection: getCollectionMock,
+vi.mock('../services/postgres/prisma.js', () => ({
+    prisma: {
+        subscription: {
+            count: subscriptionsCountMock,
+        },
+    },
 }));
 
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';
@@ -133,15 +141,10 @@ describe('analytics overview health flags', () => {
             bySource: [],
         });
         subscriptionsCountMock.mockResolvedValue(0);
-        pushSubscriptionsCountMock.mockResolvedValue(0);
-        getCollectionMock.mockImplementation((name: string) => {
-            if (name === 'subscriptions') {
-                return { countDocuments: subscriptionsCountMock };
-            }
-            if (name === 'push_subscriptions') {
-                return { countDocuments: pushSubscriptionsCountMock };
-            }
-            return { countDocuments: vi.fn().mockResolvedValue(0) };
+        pushSubscriptionListMock.mockResolvedValue({
+            data: [],
+            total: 0,
+            count: 0,
         });
     });
 

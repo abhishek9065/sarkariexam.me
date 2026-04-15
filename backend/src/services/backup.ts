@@ -1,4 +1,12 @@
+import PostModelPostgres from '../models/posts.postgres.js';
+
 import { getCollection } from './cosmosdb.js';
+
+function toLegacyStatus(status: 'draft' | 'in_review' | 'approved' | 'published' | 'archived') {
+  if (status === 'in_review') return 'pending';
+  if (status === 'approved') return 'scheduled';
+  return status;
+}
 
 export async function createBackupMetadata(collections: string[], initiatedBy: string) {
   try {
@@ -45,20 +53,23 @@ export async function exportCollectionToJSON(collectionName: string) {
 
 export async function exportAnnouncementsToCSV(): Promise<string> {
   try {
-    const { AnnouncementModelMongo } = await import('../models/announcements.mongo.js');
-    const announcements = await AnnouncementModelMongo.findAllAdmin({ limit: 10000, includeInactive: true });
+    const posts = await PostModelPostgres.findAdmin({
+      limit: 10000,
+      status: 'all',
+      sort: 'updated',
+    });
     
     const headers = ['id', 'title', 'type', 'category', 'organization', 'status', 'deadline', 'postedAt', 'viewCount'];
-    const rows = announcements.map(a => [
-      a.id,
-      `"${a.title.replace(/"/g, '""')}"`,
-      a.type,
-      a.category,
-      `"${a.organization.replace(/"/g, '""')}"`,
-      a.status,
-      a.deadline || '',
-      a.postedAt.toISOString(),
-      a.viewCount,
+    const rows = posts.data.map((post) => [
+      post.id,
+      `"${post.title.replace(/"/g, '""')}"`,
+      post.type,
+      post.categories[0]?.name || 'General',
+      `"${(post.organization?.name || 'Government of India').replace(/"/g, '""')}"`,
+      toLegacyStatus(post.status),
+      post.lastDate || post.expiresAt || '',
+      new Date(post.publishedAt || post.createdAt).toISOString(),
+      post.home.trendingScore || 0,
     ]);
     
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');

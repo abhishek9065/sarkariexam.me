@@ -9,7 +9,7 @@ const {
     dueAnnouncementDocs,
     dispatchInsertOneMock,
     notificationUpdateOneMock,
-    getByDeadlineRangeMock,
+    announcementFindAllMock,
     sendDigestEmailMock,
 } = vi.hoisted(() => ({
     trackedDocs: [] as Array<Record<string, any>>,
@@ -19,7 +19,7 @@ const {
     dueAnnouncementDocs: [] as Array<Record<string, any>>,
     dispatchInsertOneMock: vi.fn().mockResolvedValue({ acknowledged: true }),
     notificationUpdateOneMock: vi.fn().mockResolvedValue({ acknowledged: true }),
-    getByDeadlineRangeMock: vi.fn().mockResolvedValue([]),
+    announcementFindAllMock: vi.fn().mockResolvedValue([]),
     sendDigestEmailMock: vi.fn().mockResolvedValue(true),
 }));
 
@@ -73,9 +73,9 @@ vi.mock('../services/cosmosdb.js', () => ({
     }),
 }));
 
-vi.mock('../models/announcements.mongo.js', () => ({
-    AnnouncementModelMongo: {
-        getByDeadlineRange: getByDeadlineRangeMock,
+vi.mock('../models/announcements.postgres.js', () => ({
+    default: {
+        findAll: announcementFindAllMock,
     },
 }));
 
@@ -97,7 +97,7 @@ describe('trackerReminders service', () => {
 
         dispatchInsertOneMock.mockResolvedValue({ acknowledged: true });
         notificationUpdateOneMock.mockResolvedValue({ acknowledged: true });
-        getByDeadlineRangeMock.mockResolvedValue(dueAnnouncementDocs);
+        announcementFindAllMock.mockResolvedValue(dueAnnouncementDocs);
         sendDigestEmailMock.mockResolvedValue(true);
     });
 

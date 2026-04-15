@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { cacheMiddleware, cacheKeys } from '../middleware/cache.js';
 import { cacheControl } from '../middleware/cacheControl.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { AnnouncementModelMongo as AnnouncementModel } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
 import { getTopSearches, recordAnnouncementView, recordAnalyticsEvent } from '../services/analytics.js';
 import { normalizeAttribution } from '../services/attribution.js';
 import { Announcement, ContentType } from '../types.js';
@@ -13,7 +13,7 @@ import { getPathParam } from '../utils/routeParams.js';
 const router = express.Router();
 const HOMEPAGE_SECTION_TYPES: ContentType[] = ['job', 'result', 'admit-card', 'answer-key', 'syllabus', 'admission'];
 
-type ListingCard = Awaited<ReturnType<typeof AnnouncementModel.findListingCards>>['data'][number];
+type ListingCard = Awaited<ReturnType<typeof AnnouncementModelPostgres.findListingCards>>['data'][number];
 type HomepageSections = Record<ContentType, ListingCard[]>;
 
 // Add rate limiting info to responses
@@ -78,7 +78,9 @@ const cursorQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z
     .string()
-    .regex(/^[a-fA-F0-9]{24}$/)
+    .trim()
+    .min(1)
+    .max(64)
     .optional(), // Last seen ObjectId
 });
 
@@ -186,7 +188,7 @@ const recordListingAnalytics = (req: express.Request, options: {
 
 const recordAnnouncementAnalytics = (req: express.Request, announcement: Announcement) => {
   const announcementId = String(announcement.id);
-  AnnouncementModel.incrementViewCount(announcementId).catch(console.error);
+  AnnouncementModelPostgres.incrementViewCount(announcementId).catch(console.error);
   const attribution = normalizeAttribution({
     source: pickQueryValue(req.query.source),
     utmSource: pickQueryValue(req.query.utm_source),
@@ -288,7 +290,7 @@ router.get('/', cacheMiddleware({ ttl: 300, keyGenerator: cacheKeys.announcement
     }
 
     const filters = parseResult.data;
-    const announcements = await AnnouncementModel.findAll(filters);
+    const announcements = await AnnouncementModelPostgres.findAll(filters);
 
     return res.json({ data: announcements, count: announcements.length });
   } catch (error) {
@@ -310,7 +312,7 @@ router.get(
       }
 
       const filters = parseResult.data;
-      const result = await AnnouncementModel.findAllWithCursor({
+      const result = await AnnouncementModelPostgres.findAllWithCursor({
         ...filters,
         cursor: filters.cursor?.toString(),
       });
@@ -345,7 +347,7 @@ router.get(
     try {
       const settledResults = await Promise.allSettled(
         HOMEPAGE_SECTION_TYPES.map((type) =>
-          AnnouncementModel.findListingCards({
+          AnnouncementModelPostgres.findListingCards({
             type,
             sort: 'newest',
             limit: 12,
@@ -431,7 +433,7 @@ router.get(
       }
 
       const filters = parseResult.data;
-      const result = await AnnouncementModel.findListingCards({
+      const result = await AnnouncementModelPostgres.findListingCards({
         type: filters.type,
         category: filters.category,
         search: filters.search,
@@ -477,7 +479,7 @@ router.get(
   cacheControl(1800),
   async (_req, res) => {
     try {
-      const categories = await AnnouncementModel.getCategories();
+      const categories = await AnnouncementModelPostgres.getCategories();
       return res.json({ data: categories });
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -492,7 +494,7 @@ router.get(
   cacheControl(1800),
   async (_req, res) => {
     try {
-      const organizations = await AnnouncementModel.getOrganizations();
+      const organizations = await AnnouncementModelPostgres.getOrganizations();
       return res.json({ data: organizations });
     } catch (error) {
       console.error('Error fetching organizations:', error);
@@ -507,7 +509,7 @@ router.get(
   cacheControl(600),
   async (_req, res) => {
     try {
-      const tags = await AnnouncementModel.getTags();
+      const tags = await AnnouncementModelPostgres.getTags();
       return res.json({ data: tags });
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -544,7 +546,7 @@ router.get(
         if (topQueries.length > 0) {
           const cards = await Promise.all(
             topQueries.map((row) =>
-              AnnouncementModel.findListingCards({
+              AnnouncementModelPostgres.findListingCards({
                 type,
                 search: row.query,
                 sort: 'views',
@@ -571,7 +573,7 @@ router.get(
           }
         }
 
-        const trending = await AnnouncementModel.findListingCards({
+        const trending = await AnnouncementModelPostgres.findListingCards({
           type,
           sort: 'views',
           limit: effectiveLimit,
@@ -585,7 +587,7 @@ router.get(
         return res.json({ data });
       }
 
-      const matches = await AnnouncementModel.findListingCards({
+      const matches = await AnnouncementModelPostgres.findListingCards({
         type,
         search: query,
         sort: 'views',
@@ -680,7 +682,7 @@ router.get(
       }
       const normalizedQuery = normalizeSearchTerm(sanitizedQuery);
 
-      const announcements = await AnnouncementModel.findAll({
+      const announcements = await AnnouncementModelPostgres.findAll({
         search: sanitizedQuery,
         type: filters.type,
         limit: filters.limit,
@@ -722,7 +724,7 @@ router.get(
   cacheControl(300),
   async (req, res) => {
     try {
-      const announcement = await AnnouncementModel.findBySlug(getPathParam(req.params.slug));
+      const announcement = await AnnouncementModelPostgres.findBySlug(getPathParam(req.params.slug));
 
       if (!announcement) {
         return res.status(404).json({ error: 'Announcement not found' });

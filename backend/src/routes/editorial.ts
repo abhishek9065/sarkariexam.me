@@ -3,21 +3,21 @@ import express from 'express';
 import {
   alertSubscriptionAdminQuerySchema,
   adminPostListQuerySchema,
+  type PostRecord,
   postEditorSchema,
   taxonomyEditorSchema,
   taxonomyTypeValues,
   workflowNoteSchema,
 } from '../content/types.js';
 import { authenticateToken, requireEditorialAccess, requireRoles } from '../middleware/auth.js';
-import AlertSubscriptionModelMongo from '../models/alertSubscriptions.mongo.js';
-import AuditLogModelMongo from '../models/auditLogs.mongo.js';
-import ContentTaxonomyModelMongo from '../models/contentTaxonomies.mongo.js';
-import PostModelMongo from '../models/posts.mongo.js';
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
+import { getEditorialDataProvider } from '../services/editorialDataProvider.js';
 import { triggerFrontendRevalidation } from '../services/frontendRevalidation.js';
 
 const router = express.Router();
+const { postModel, taxonomyModel, auditLogModel } = getEditorialDataProvider();
 
-async function buildEditorialResponse(post: Awaited<ReturnType<typeof PostModelMongo.findById>>, forceRevalidate = false) {
+async function buildEditorialResponse(post: PostRecord | null, forceRevalidate = false) {
   if (!post) {
     return { data: post };
   }
@@ -36,9 +36,9 @@ router.use(requireEditorialAccess);
 router.get('/dashboard', async (_req, res) => {
   try {
     const [allPosts, livePosts, reviewPosts] = await Promise.all([
-      PostModelMongo.findAdmin({ limit: 10, offset: 0, sort: 'updated', status: 'all' }),
-      PostModelMongo.findAdmin({ limit: 100, offset: 0, status: 'published' }),
-      PostModelMongo.findAdmin({ limit: 100, offset: 0, status: 'in_review' }),
+      postModel.findAdmin({ limit: 10, offset: 0, sort: 'updated', status: 'all' }),
+      postModel.findAdmin({ limit: 100, offset: 0, status: 'published' }),
+      postModel.findAdmin({ limit: 100, offset: 0, status: 'in_review' }),
     ]);
 
     const byType = allPosts.data.reduce<Record<string, number>>((acc, post) => {
@@ -77,7 +77,7 @@ router.get('/posts', async (req, res) => {
       return res.status(400).json({ error: parse.error.flatten() });
     }
 
-    const result = await PostModelMongo.findAdmin(parse.data);
+    const result = await postModel.findAdmin(parse.data);
     return res.json(result);
   } catch (error) {
     console.error('[Editorial] List posts error:', error);
@@ -87,7 +87,7 @@ router.get('/posts', async (req, res) => {
 
 router.get('/posts/:id', async (req, res) => {
   try {
-    const post = await PostModelMongo.findById(req.params.id);
+    const post = await postModel.findById(req.params.id);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -123,7 +123,7 @@ router.post('/posts', requireRoles('editor', 'reviewer', 'admin', 'superadmin'),
         officialSources: parse.data.officialSources ?? [],
       },
     } as any;
-    const post = await PostModelMongo.create(
+    const post = await postModel.create(
       { ...payload, status: 'draft' },
       userId,
       role,
@@ -147,7 +147,7 @@ router.put('/posts/:id', requireRoles('editor', 'reviewer', 'admin', 'superadmin
     const userId = req.user?.userId;
     const role = req.user?.role;
     const payload = parse.data;
-    const post = await PostModelMongo.update(
+    const post = await postModel.update(
       String(req.params.id),
       {
         ...payload,
@@ -177,7 +177,7 @@ router.post('/posts/:id/submit', requireRoles('editor', 'admin', 'superadmin'), 
       return res.status(400).json({ error: parse.error.flatten() });
     }
 
-    const post = await PostModelMongo.transition(String(req.params.id), 'submit', req.user?.userId, req.user?.role, parse.data.note);
+    const post = await postModel.transition(String(req.params.id), 'submit', req.user?.userId, req.user?.role, parse.data.note);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -194,7 +194,7 @@ router.post('/posts/:id/approve', requireRoles('reviewer', 'admin', 'superadmin'
     if (!parse.success) {
       return res.status(400).json({ error: parse.error.flatten() });
     }
-    const post = await PostModelMongo.transition(String(req.params.id), 'approve', req.user?.userId, req.user?.role, parse.data.note);
+    const post = await postModel.transition(String(req.params.id), 'approve', req.user?.userId, req.user?.role, parse.data.note);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -211,7 +211,7 @@ router.post('/posts/:id/publish', requireRoles('admin', 'superadmin'), async (re
     if (!parse.success) {
       return res.status(400).json({ error: parse.error.flatten() });
     }
-    const post = await PostModelMongo.transition(String(req.params.id), 'publish', req.user?.userId, req.user?.role, parse.data.note);
+    const post = await postModel.transition(String(req.params.id), 'publish', req.user?.userId, req.user?.role, parse.data.note);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -228,7 +228,7 @@ router.post('/posts/:id/unpublish', requireRoles('admin', 'superadmin'), async (
     if (!parse.success) {
       return res.status(400).json({ error: parse.error.flatten() });
     }
-    const post = await PostModelMongo.transition(String(req.params.id), 'unpublish', req.user?.userId, req.user?.role, parse.data.note);
+    const post = await postModel.transition(String(req.params.id), 'unpublish', req.user?.userId, req.user?.role, parse.data.note);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -245,7 +245,7 @@ router.post('/posts/:id/archive', requireRoles('admin', 'superadmin'), async (re
     if (!parse.success) {
       return res.status(400).json({ error: parse.error.flatten() });
     }
-    const post = await PostModelMongo.transition(String(req.params.id), 'archive', req.user?.userId, req.user?.role, parse.data.note);
+    const post = await postModel.transition(String(req.params.id), 'archive', req.user?.userId, req.user?.role, parse.data.note);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -262,7 +262,7 @@ router.post('/posts/:id/restore', requireRoles('admin', 'superadmin'), async (re
     if (!parse.success) {
       return res.status(400).json({ error: parse.error.flatten() });
     }
-    const post = await PostModelMongo.transition(String(req.params.id), 'restore', req.user?.userId, req.user?.role, parse.data.note);
+    const post = await postModel.transition(String(req.params.id), 'restore', req.user?.userId, req.user?.role, parse.data.note);
     if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
@@ -275,7 +275,7 @@ router.post('/posts/:id/restore', requireRoles('admin', 'superadmin'), async (re
 
 router.get('/posts/:id/history', async (req, res) => {
   try {
-    const history = await PostModelMongo.getHistory(String(req.params.id));
+    const history = await postModel.getHistory(String(req.params.id));
     return res.json({ data: history });
   } catch (error) {
     console.error('[Editorial] History error:', error);
@@ -285,7 +285,7 @@ router.get('/posts/:id/history', async (req, res) => {
 
 router.get('/workflow/pending', async (_req, res) => {
   try {
-    const result = await PostModelMongo.findAdmin({ status: 'in_review', limit: 100, sort: 'updated' });
+    const result = await postModel.findAdmin({ status: 'in_review', limit: 100, sort: 'updated' });
     return res.json({ data: result.data });
   } catch (error) {
     console.error('[Editorial] Pending workflow error:', error);
@@ -295,7 +295,7 @@ router.get('/workflow/pending', async (_req, res) => {
 
 router.get('/workflow/sla', async (_req, res) => {
   try {
-    const result = await PostModelMongo.findAdmin({ status: 'in_review', limit: 100, sort: 'updated' });
+    const result = await postModel.findAdmin({ status: 'in_review', limit: 100, sort: 'updated' });
     const violations = result.data
       .filter((item) => Date.now() - new Date(item.updatedAt).getTime() > 48 * 60 * 60 * 1000)
       .map((item) => ({
@@ -316,7 +316,7 @@ router.get('/taxonomies/:type', async (req, res) => {
     if (!(taxonomyTypeValues as readonly string[]).includes(type)) {
       return res.status(404).json({ error: 'Unknown taxonomy type' });
     }
-    const data = await ContentTaxonomyModelMongo.list(type, 200);
+    const data = await taxonomyModel.list(type, 200);
     return res.json({ data });
   } catch (error) {
     console.error('[Editorial] Taxonomy list error:', error);
@@ -336,7 +336,7 @@ router.post('/taxonomies/:type', requireRoles('admin', 'superadmin'), async (req
       return res.status(400).json({ error: parse.error.flatten() });
     }
 
-    const created = await ContentTaxonomyModelMongo.create(type, {
+    const created = await taxonomyModel.create(type, {
       name: parse.data.name,
       slug: parse.data.slug,
       description: parse.data.description,
@@ -363,7 +363,7 @@ router.put('/taxonomies/:type/:id', requireRoles('admin', 'superadmin'), async (
       return res.status(400).json({ error: parse.error.flatten() });
     }
 
-    const updated = await ContentTaxonomyModelMongo.update(type, String(req.params.id), {
+    const updated = await taxonomyModel.update(type, String(req.params.id), {
       name: parse.data.name,
       slug: parse.data.slug,
       description: parse.data.description,
@@ -389,7 +389,7 @@ router.delete('/taxonomies/:type/:id', requireRoles('admin', 'superadmin'), asyn
       return res.status(404).json({ error: 'Unknown taxonomy type' });
     }
 
-    const deleted = await ContentTaxonomyModelMongo.remove(type, String(req.params.id));
+    const deleted = await taxonomyModel.remove(type, String(req.params.id));
     if (!deleted) {
       return res.status(404).json({ error: 'Taxonomy not found' });
     }
@@ -408,7 +408,7 @@ router.get('/alert-subscriptions', requireRoles('admin', 'superadmin'), async (r
       return res.status(400).json({ error: parse.error.flatten() });
     }
 
-    const result = await AlertSubscriptionModelMongo.listAdmin(parse.data);
+    const result = await AlertSubscriptionModelPostgres.listAdmin(parse.data);
     return res.json(result);
   } catch (error) {
     console.error('[Editorial] Alert subscriptions list error:', error);
@@ -418,7 +418,7 @@ router.get('/alert-subscriptions', requireRoles('admin', 'superadmin'), async (r
 
 router.get('/alert-subscriptions/stats', requireRoles('admin', 'superadmin'), async (_req, res) => {
   try {
-    const data = await AlertSubscriptionModelMongo.getStats();
+    const data = await AlertSubscriptionModelPostgres.getStats();
     return res.json({ data });
   } catch (error) {
     console.error('[Editorial] Alert subscriptions stats error:', error);
@@ -428,7 +428,7 @@ router.get('/alert-subscriptions/stats', requireRoles('admin', 'superadmin'), as
 
 router.delete('/alert-subscriptions/:id', requireRoles('admin', 'superadmin'), async (req, res) => {
   try {
-    const deleted = await AlertSubscriptionModelMongo.deleteById(String(req.params.id));
+    const deleted = await AlertSubscriptionModelPostgres.deleteById(String(req.params.id));
     if (!deleted) {
       return res.status(404).json({ error: 'Alert subscription not found' });
     }
@@ -443,7 +443,7 @@ router.get('/audit-log', requireRoles('admin', 'superadmin'), async (req, res) =
   try {
     const limit = Math.min(Number(req.query.limit || 50), 200);
     const offset = Math.max(Number(req.query.offset || 0), 0);
-    const data = await AuditLogModelMongo.list({ limit, offset });
+    const data = await auditLogModel.list({ limit, offset });
     return res.json({ data, total: data.length, count: data.length });
   } catch (error) {
     console.error('[Editorial] Audit log error:', error);

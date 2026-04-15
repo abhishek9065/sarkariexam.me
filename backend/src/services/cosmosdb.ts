@@ -263,6 +263,7 @@ async function createIndexes(): Promise<void> {
         const communityGroups = database.collection('community_groups');
         const communityFlags = database.collection('community_flags');
         const errorReports = database.collection('error_reports');
+        const contentPages = database.collection('content_pages');
 
         // Announcements indexes
         await announcements.createIndex({ slug: 1 }, { unique: true });
@@ -298,6 +299,11 @@ async function createIndexes(): Promise<void> {
         await posts.createIndex({ status: 1, expiresAt: 1 });
         await posts.createIndex({ type: 1, stateSlugs: 1, publishedAt: -1 });
         await posts.createIndex({ type: 1, organizationSlug: 1, publishedAt: -1 });
+
+        // Content pages indexes
+        await contentPages.createIndex({ slug: 1 }, { unique: true });
+        await contentPages.createIndex({ pageType: 1, status: 1, updatedAt: -1 });
+        await contentPages.createIndex({ expiresAt: 1 });
         await posts.createIndex({ type: 1, categorySlugs: 1, publishedAt: -1 });
         await posts.createIndex({ type: 1, qualificationSlugs: 1, publishedAt: -1 });
         await posts.createIndex({ organizationSlug: 1, status: 1, publishedAt: -1 });

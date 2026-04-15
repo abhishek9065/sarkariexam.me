@@ -14,8 +14,8 @@ const {
     recordAnalyticsEventMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../models/announcements.mongo.js', () => ({
-    AnnouncementModelMongo: {
+vi.mock('../models/announcements.postgres.js', () => ({
+    default: {
         findListingCards: findListingCardsMock,
     },
 }));

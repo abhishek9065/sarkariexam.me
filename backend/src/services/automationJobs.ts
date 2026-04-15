@@ -1,7 +1,10 @@
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import { WorkflowStatus } from '@prisma/client';
+
+import PostModelPostgres from '../models/posts.postgres.js';
 
 import { invalidateAnnouncementCaches } from './cacheInvalidation.js';
 import { getCollection } from './cosmosdb.js';
+import { prisma } from './postgres/prisma.js';
 
 let automationIntervalRef: NodeJS.Timeout | null = null;
 const RUN_EVERY_MINUTES = 60; // Run every hour
@@ -68,21 +71,27 @@ export async function runAutomationJobs() {
             });
         }
 
-        const announcementsCollection = getCollection<any>('announcements');
-
         // 2. Scheduling Automation
         // Find scheduled posts where publishAt <= now
         console.log('[Automation] Executing Scheduled Posts...');
-        const scheduledPosts = await announcementsCollection.find({
-            status: 'scheduled',
-            publishAt: { $lte: now }
-        }).toArray();
+        const scheduledPosts = await prisma.post.findMany({
+            where: {
+                status: WorkflowStatus.APPROVED,
+                publishedAt: { lte: now },
+            },
+            select: { id: true },
+        });
 
         for (const post of scheduledPosts) {
-            await AnnouncementModelMongo.update(
-                post._id.toHexString(),
-                { status: 'published', note: 'Auto-published by scheduling automation' } as any,
-                'system'
+            await PostModelPostgres.update(
+                post.id,
+                {
+                    status: 'published',
+                    publishedAt: now.toISOString(),
+                },
+                'system',
+                'system',
+                'Auto-published by scheduling automation',
             );
             cachesInvalidated = true;
         }
@@ -91,16 +100,24 @@ export async function runAutomationJobs() {
         // Find published posts where deadline has passed by 30 days
         console.log('[Automation] Expiring Old Posts...');
         const expiryThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
-        const expiredPosts = await announcementsCollection.find({
-            status: 'published',
-            deadline: { $lt: expiryThreshold }
-        }).toArray();
+        const expiredPosts = await prisma.post.findMany({
+            where: {
+                status: WorkflowStatus.PUBLISHED,
+                expiresAt: { lt: expiryThreshold },
+            },
+            select: { id: true },
+        });
 
         for (const post of expiredPosts) {
-            await AnnouncementModelMongo.update(
-                post._id.toHexString(),
-                { status: 'archived', note: 'Auto-archived by expiry automation' } as any,
-                'system'
+            await PostModelPostgres.update(
+                post.id,
+                {
+                    status: 'archived',
+                    archivedAt: now.toISOString(),
+                },
+                'system',
+                'system',
+                'Auto-archived by expiry automation',
             );
             cachesInvalidated = true;
         }

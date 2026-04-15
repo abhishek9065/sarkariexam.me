@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { authenticateToken } from '../middleware/auth.js';
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
+import ProfileModelPostgres from '../models/profile.postgres.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
-import { getCollection, isValidObjectId, toObjectId } from '../services/cosmosdb.js';
 import { ContentType, TrackerStatus } from '../types.js';
 import { getPathParam } from '../utils/routeParams.js';
 
@@ -49,18 +49,6 @@ interface SavedSearchDoc {
     updatedAt: Date;
 }
 
-interface NotificationDoc {
-    userId: string;
-    announcementId: string;
-    title: string;
-    type: ContentType;
-    slug?: string;
-    organization?: string;
-    source: string;
-    createdAt: Date;
-    readAt?: Date | null;
-}
-
 interface TrackedApplicationDoc {
     userId: string;
     announcementId?: string;
@@ -94,10 +82,10 @@ interface DashboardWidgetPayload {
 }
 
 const router = Router();
-const collection = () => getCollection<UserProfileDoc>('user_profiles');
-const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searches');
-const notificationsCollection = () => getCollection<NotificationDoc>('user_notifications');
-const trackedApplicationsCollection = () => getCollection<TrackedApplicationDoc>('tracked_applications');
+
+function isValidEntityId(value: string): boolean {
+    return Boolean(value) && value.length <= 120;
+}
 
 const profileUpdateSchema = z.object({
     preferredCategories: z.array(z.string()).optional(),
@@ -230,19 +218,29 @@ const EDUCATION_LEVELS = [
 ];
 
 function formatProfile(doc: any) {
-    const { _id, ...rest } = doc;
-    return { id: _id?.toString?.() || _id, ...rest };
+    return {
+        ...doc,
+        createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : doc.createdAt,
+        updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : doc.updatedAt,
+    };
 }
 
 
 function formatSavedSearch(doc: any) {
-    const { _id, ...rest } = doc;
-    return { id: _id?.toString?.() || _id, ...rest };
+    return {
+        ...doc,
+        lastNotifiedAt: doc.lastNotifiedAt ? new Date(doc.lastNotifiedAt).toISOString() : doc.lastNotifiedAt,
+        createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : doc.createdAt,
+        updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : doc.updatedAt,
+    };
 }
 
 function formatNotification(doc: any) {
-    const { _id, ...rest } = doc;
-    return { id: _id?.toString?.() || _id, ...rest };
+    return {
+        ...doc,
+        createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : doc.createdAt,
+        readAt: doc.readAt ? new Date(doc.readAt).toISOString() : doc.readAt,
+    };
 }
 
 function parseOptionalDate(value?: string | null): Date | null | undefined {
@@ -256,14 +254,12 @@ function parseOptionalDate(value?: string | null): Date | null | undefined {
 }
 
 function formatTrackedApplication(doc: any) {
-    const { _id, ...rest } = doc;
     return {
-        id: _id?.toString?.() || _id,
-        ...rest,
-        deadline: rest.deadline ? new Date(rest.deadline).toISOString() : null,
-        reminderAt: rest.reminderAt ? new Date(rest.reminderAt).toISOString() : null,
-        trackedAt: rest.trackedAt ? new Date(rest.trackedAt).toISOString() : null,
-        updatedAt: rest.updatedAt ? new Date(rest.updatedAt).toISOString() : null,
+        ...doc,
+        deadline: doc.deadline ? new Date(doc.deadline).toISOString() : null,
+        reminderAt: doc.reminderAt ? new Date(doc.reminderAt).toISOString() : null,
+        trackedAt: doc.trackedAt ? new Date(doc.trackedAt).toISOString() : null,
+        updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : null,
     };
 }
 
@@ -342,32 +338,8 @@ const LOCATIONS = [
 ];
 
 async function getOrCreateProfile(userId: string) {
-    const existing = await collection().findOne({ userId });
-    if (existing) return existing;
-
-    const now = new Date();
-    const profile: UserProfileDoc = {
-        userId,
-        preferredCategories: [],
-        preferredQualifications: [],
-        preferredLocations: [],
-        preferredOrganizations: [],
-        ageGroup: null,
-        educationLevel: null,
-        experienceYears: 0,
-        emailNotifications: true,
-        pushNotifications: false,
-        notificationFrequency: 'daily',
-        alertWindowDays: 7,
-        alertMaxItems: 6,
-        profileComplete: false,
-        onboardingCompleted: false,
-        createdAt: now,
-        updatedAt: now,
-    };
-
-    const result = await collection().insertOne(profile as any);
-    return { ...profile, _id: result.insertedId };
+    const profile = await ProfileModelPostgres.getOrCreateProfile(userId);
+    return profile as unknown as UserProfileDoc;
 }
 
 
@@ -375,7 +347,7 @@ async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, 
     const filters = sanitizeFilters(search.filters);
     const searchLimit = Math.min(200, Math.max(limit * 4, 50));
 
-    const announcements = await AnnouncementModelMongo.findAll({
+    const announcements = await AnnouncementModelPostgres.findAll({
         type: filters?.type,
         category: filters?.category,
         organization: filters?.organization,
@@ -396,32 +368,18 @@ async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, 
 
 async function upsertNotifications(userId: string, items: any[], source: string) {
     if (!items.length) return;
-    const ops = items.map(item => ({
-        updateOne: {
-            filter: {
-                userId,
-                announcementId: String(item.id),
-                source,
-            },
-            update: {
-                $setOnInsert: {
-                    userId,
-                    announcementId: String(item.id),
-                    title: item.title,
-                    type: item.type,
-                    slug: item.slug,
-                    organization: item.organization,
-                    source,
-                    createdAt: new Date(),
-                    readAt: null,
-                },
-            },
-            upsert: true,
-        }
-    }));
-
     try {
-        await notificationsCollection().bulkWrite(ops, { ordered: false });
+        await ProfileModelPostgres.upsertNotifications(
+            userId,
+            items.map(item => ({
+                announcementId: String(item.id),
+                title: item.title,
+                type: item.type,
+                slug: item.slug,
+                organization: item.organization,
+            })),
+            source,
+        );
     } catch (error) {
         console.error('[Notifications] Upsert error:', error);
     }
@@ -441,7 +399,7 @@ async function getPreferenceAlerts(profile: UserProfileDoc, sinceMs: number, lim
         return { matches: [], totalMatches: 0 };
     }
 
-    const announcements = await AnnouncementModelMongo.findAll({ limit: 200 });
+    const announcements = await AnnouncementModelPostgres.findAll({ limit: 200 });
     const scored = announcements.map(item => ({
         item,
         ...scoreAnnouncement(profile, item),
@@ -498,14 +456,7 @@ router.put('/', authenticateToken, async (req, res) => {
     }
 
     try {
-        const now = new Date();
-        const update = { ...parseResult.data, updatedAt: now };
-
-        await collection().updateOne(
-            { userId: req.user!.userId },
-            { $set: update, $setOnInsert: { createdAt: now } },
-            { upsert: true }
-        );
+        await ProfileModelPostgres.updateProfile(req.user!.userId, parseResult.data);
 
         const profile = await getOrCreateProfile(req.user!.userId);
         return res.json({ data: formatProfile(profile as any) });
@@ -519,8 +470,8 @@ router.put('/', authenticateToken, async (req, res) => {
 router.get('/options', async (_req, res) => {
     try {
         const [categories, organizations] = await Promise.all([
-            AnnouncementModelMongo.getCategories(),
-            AnnouncementModelMongo.getOrganizations(),
+            AnnouncementModelPostgres.getCategories(),
+            AnnouncementModelPostgres.getOrganizations(),
         ]);
 
         return res.json({
@@ -544,10 +495,7 @@ router.get('/options', async (_req, res) => {
 // Saved searches
 router.get('/saved-searches', authenticateToken, async (req, res) => {
     try {
-        const searches = await savedSearchesCollection()
-            .find({ userId: req.user!.userId })
-            .sort({ updatedAt: -1 })
-            .toArray();
+        const searches = await ProfileModelPostgres.listSavedSearches(req.user!.userId);
 
         return res.json({ data: searches.map(formatSavedSearch) });
     } catch (error) {
@@ -563,23 +511,19 @@ router.post('/saved-searches', authenticateToken, async (req, res) => {
     }
 
     try {
-        const now = new Date();
         const input = parseResult.data;
         const filters = sanitizeFilters(input.filters);
 
-        const doc: SavedSearchDoc = {
-            userId: req.user!.userId,
+        const doc: Omit<SavedSearchDoc, 'userId' | 'createdAt' | 'updatedAt'> = {
             name: input.name,
             query: input.query?.trim() || '',
             filters,
             notificationsEnabled: input.notificationsEnabled ?? true,
             frequency: input.frequency ?? 'daily',
             lastNotifiedAt: null,
-            createdAt: now,
-            updatedAt: now,
         };
 
-        const result = await savedSearchesCollection().insertOne(doc as any);
+        const created = await ProfileModelPostgres.createSavedSearch(req.user!.userId, doc);
         recordAnalyticsEvent({
             type: 'saved_search_create',
             userId: req.user!.userId,
@@ -589,7 +533,7 @@ router.post('/saved-searches', authenticateToken, async (req, res) => {
                 frequency: doc.frequency,
             },
         }).catch(console.error);
-        return res.status(201).json({ data: formatSavedSearch({ ...doc, _id: result.insertedId }) });
+        return res.status(201).json({ data: formatSavedSearch(created) });
     } catch (error) {
         console.error('Saved search create error:', error);
         return res.status(500).json({ error: 'Failed to create saved search' });
@@ -598,7 +542,7 @@ router.post('/saved-searches', authenticateToken, async (req, res) => {
 
 router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
     const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
+    if (!isValidEntityId(id)) {
         return res.status(400).json({ error: 'Invalid saved search id' });
     }
 
@@ -608,8 +552,7 @@ router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
     }
 
     try {
-        const now = new Date();
-        const update: Partial<SavedSearchDoc> & { updatedAt: Date } = { updatedAt: now };
+        const update: Partial<Omit<SavedSearchDoc, 'userId' | 'createdAt' | 'updatedAt'>> = {};
 
         if (parseResult.data.name !== undefined) {
             update.name = parseResult.data.name.trim();
@@ -627,17 +570,12 @@ router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
             update.frequency = parseResult.data.frequency;
         }
 
-        const result = await savedSearchesCollection().updateOne(
-            { _id: toObjectId(id), userId: req.user!.userId },
-            { $set: update }
-        );
-
-        if (result.matchedCount === 0) {
+        const updated = await ProfileModelPostgres.updateSavedSearch(req.user!.userId, id, update);
+        if (!updated) {
             return res.status(404).json({ error: 'Saved search not found' });
         }
 
-        const updated = await savedSearchesCollection().findOne({ _id: toObjectId(id), userId: req.user!.userId });
-        return res.json({ data: updated ? formatSavedSearch(updated) : null });
+        return res.json({ data: formatSavedSearch(updated) });
     } catch (error) {
         console.error('Saved search update error:', error);
         return res.status(500).json({ error: 'Failed to update saved search' });
@@ -646,17 +584,13 @@ router.put('/saved-searches/:id', authenticateToken, async (req, res) => {
 
 router.delete('/saved-searches/:id', authenticateToken, async (req, res) => {
     const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
+    if (!isValidEntityId(id)) {
         return res.status(400).json({ error: 'Invalid saved search id' });
     }
 
     try {
-        const result = await savedSearchesCollection().deleteOne({
-            _id: toObjectId(id),
-            userId: req.user!.userId,
-        });
-
-        if (result.deletedCount === 0) {
+        const deleted = await ProfileModelPostgres.deleteSavedSearch(req.user!.userId, id);
+        if (!deleted) {
             return res.status(404).json({ error: 'Saved search not found' });
         }
 
@@ -682,10 +616,7 @@ router.get('/alerts', authenticateToken, async (req, res) => {
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
         const since = new Date(sinceMs);
 
-        const searches = await savedSearchesCollection()
-            .find({ userId: req.user!.userId })
-            .sort({ updatedAt: -1 })
-            .toArray();
+        const searches = await ProfileModelPostgres.listSavedSearches(req.user!.userId);
 
         const savedSearches = await Promise.all(
             searches.map(async (search) => ({
@@ -737,10 +668,7 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
         const since = new Date(sinceMs);
 
-        const searches = await savedSearchesCollection()
-            .find({ userId: req.user!.userId })
-            .sort({ updatedAt: -1 })
-            .toArray();
+        const searches = await ProfileModelPostgres.listSavedSearches(req.user!.userId);
 
         const savedSearches = await Promise.all(
             searches.map(async (search) => ({
@@ -809,13 +737,8 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
 router.get('/notifications', authenticateToken, async (req, res) => {
     try {
         const limit = Math.min(50, parseInt(req.query.limit as string) || 12);
-        const docs = await notificationsCollection()
-            .find({ userId: req.user!.userId })
-            .sort({ createdAt: -1 })
-            .limit(limit)
-            .toArray();
-
-        const unreadCount = await notificationsCollection().countDocuments({ userId: req.user!.userId, readAt: null });
+        const docs = await ProfileModelPostgres.listNotifications(req.user!.userId, limit);
+        const unreadCount = await ProfileModelPostgres.countUnreadNotifications(req.user!.userId);
 
         return res.json({
             data: docs.map(formatNotification),
@@ -837,22 +760,16 @@ router.post('/notifications/read', authenticateToken, async (req, res) => {
         }
 
         if (markAll) {
-            await notificationsCollection().updateMany(
-                { userId: req.user!.userId, readAt: null },
-                { $set: { readAt: new Date() } }
-            );
+            await ProfileModelPostgres.markAllNotificationsRead(req.user!.userId);
             return res.json({ message: 'All notifications marked as read' });
         }
 
-        const objectIds = ids.filter(isValidObjectId).map(toObjectId);
-        if (objectIds.length === 0) {
+        const validIds = ids.filter((value) => typeof value === 'string' && isValidEntityId(value));
+        if (validIds.length === 0) {
             return res.status(400).json({ error: 'Invalid notification ids' });
         }
 
-        await notificationsCollection().updateMany(
-            { _id: { $in: objectIds }, userId: req.user!.userId },
-            { $set: { readAt: new Date() } }
-        );
+        await ProfileModelPostgres.markNotificationsRead(req.user!.userId, validIds);
 
         return res.json({ message: 'Notifications marked as read' });
     } catch (error) {
@@ -864,10 +781,7 @@ router.post('/notifications/read', authenticateToken, async (req, res) => {
 // Tracked applications
 router.get('/tracked-applications', authenticateToken, async (req, res) => {
     try {
-        const docs = await trackedApplicationsCollection()
-            .find({ userId: req.user!.userId })
-            .sort({ updatedAt: -1 })
-            .toArray();
+        const docs = await ProfileModelPostgres.listTrackedApplications(req.user!.userId);
 
         return res.json({ data: docs.map(formatTrackedApplication) });
     } catch (error) {
@@ -894,8 +808,19 @@ router.post('/tracked-applications', authenticateToken, async (req, res) => {
 
     try {
         const now = new Date();
-        const updateDoc: Partial<TrackedApplicationDoc> & { userId: string; slug: string; type: ContentType; title: string; status: TrackerStatus; updatedAt: Date } = {
-            userId: req.user!.userId,
+        const updateDoc: {
+            announcementId?: string;
+            slug: string;
+            type: ContentType;
+            title: string;
+            organization?: string;
+            deadline?: Date | null;
+            status: TrackerStatus;
+            notes?: string;
+            reminderAt?: Date | null;
+            trackedAt?: Date;
+            updatedAt?: Date;
+        } = {
             slug: input.slug,
             type: input.type,
             title: input.title,
@@ -908,20 +833,10 @@ router.post('/tracked-applications', authenticateToken, async (req, res) => {
         if (input.deadline !== undefined) updateDoc.deadline = deadline === undefined ? null : deadline;
         if (input.reminderAt !== undefined) updateDoc.reminderAt = reminderAt === undefined ? null : reminderAt;
 
-        const result = await trackedApplicationsCollection().findOneAndUpdate(
-            { userId: req.user!.userId, slug: input.slug },
-            {
-                $set: updateDoc,
-                $setOnInsert: {
-                    trackedAt: now,
-                },
-            },
-            { upsert: true, returnDocument: 'after' }
-        );
-
-        const doc = result && typeof result === 'object' && 'value' in result
-            ? (result as any).value
-            : result;
+        const doc = await ProfileModelPostgres.upsertTrackedApplicationBySlug(req.user!.userId, {
+            ...updateDoc,
+            trackedAt: now,
+        });
 
         if (!doc) {
             return res.status(500).json({ error: 'Failed to save tracked application' });
@@ -936,7 +851,7 @@ router.post('/tracked-applications', authenticateToken, async (req, res) => {
 
 router.patch('/tracked-applications/:id', authenticateToken, async (req, res) => {
     const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
+    if (!isValidEntityId(id)) {
         return res.status(400).json({ error: 'Invalid tracked application id' });
     }
 
@@ -945,7 +860,7 @@ router.patch('/tracked-applications/:id', authenticateToken, async (req, res) =>
         return res.status(400).json({ error: parseResult.error.flatten() });
     }
 
-    const update: Partial<TrackedApplicationDoc> = {};
+    const update: Partial<{ status: TrackerStatus; notes?: string; reminderAt?: Date | null; updatedAt?: Date }> = {};
     if (parseResult.data.status !== undefined) {
         update.status = parseResult.data.status;
     }
@@ -962,15 +877,12 @@ router.patch('/tracked-applications/:id', authenticateToken, async (req, res) =>
     update.updatedAt = new Date();
 
     try {
-        const result = await trackedApplicationsCollection().findOneAndUpdate(
-            { _id: toObjectId(id), userId: req.user!.userId },
-            { $set: update },
-            { returnDocument: 'after' }
-        );
-
-        const doc = result && typeof result === 'object' && 'value' in result
-            ? (result as any).value
-            : result;
+        const doc = await ProfileModelPostgres.updateTrackedApplicationById(req.user!.userId, id, {
+            status: update.status,
+            notes: update.notes,
+            reminderAt: update.reminderAt,
+            updatedAt: update.updatedAt,
+        });
 
         if (!doc) {
             return res.status(404).json({ error: 'Tracked application not found' });
@@ -985,17 +897,13 @@ router.patch('/tracked-applications/:id', authenticateToken, async (req, res) =>
 
 router.delete('/tracked-applications/:id', authenticateToken, async (req, res) => {
     const id = getPathParam(req.params.id);
-    if (!isValidObjectId(id)) {
+    if (!isValidEntityId(id)) {
         return res.status(400).json({ error: 'Invalid tracked application id' });
     }
 
     try {
-        const deleted = await trackedApplicationsCollection().deleteOne({
-            _id: toObjectId(id),
-            userId: req.user!.userId,
-        });
-
-        if (deleted.deletedCount === 0) {
+        const deleted = await ProfileModelPostgres.deleteTrackedApplicationById(req.user!.userId, id);
+        if (!deleted) {
             return res.status(404).json({ error: 'Tracked application not found' });
         }
 
@@ -1015,7 +923,19 @@ router.post('/tracked-applications/import', authenticateToken, async (req, res) 
     const seenSlugs = new Set<string>();
     const now = new Date();
     let skipped = 0;
-    const operations = [];
+    const importItems: Array<{
+        announcementId?: string;
+        slug: string;
+        type: ContentType;
+        title: string;
+        organization?: string;
+        deadline?: Date | null;
+        status: TrackerStatus;
+        notes?: string;
+        reminderAt?: Date | null;
+        trackedAt?: Date;
+        updatedAt?: Date;
+    }> = [];
 
     for (const item of parseResult.data.items) {
         const slug = item.slug.trim();
@@ -1038,39 +958,28 @@ router.post('/tracked-applications/import', authenticateToken, async (req, res) 
         const trackedAt = parseOptionalDate(item.trackedAt) ?? now;
         const updatedAt = parseOptionalDate(item.updatedAt) ?? now;
 
-        operations.push({
-            updateOne: {
-                filter: { userId: req.user!.userId, slug },
-                update: {
-                    $set: {
-                        userId: req.user!.userId,
-                        announcementId: item.announcementId || undefined,
-                        slug,
-                        type: item.type,
-                        title: item.title,
-                        organization: item.organization?.trim() || undefined,
-                        deadline: deadline === undefined ? null : deadline,
-                        status: item.status,
-                        notes: item.notes?.trim() || undefined,
-                        reminderAt: reminderAt === undefined ? null : reminderAt,
-                        updatedAt: updatedAt || now,
-                    },
-                    $setOnInsert: {
-                        trackedAt: trackedAt || now,
-                    },
-                },
-                upsert: true,
-            },
+        importItems.push({
+            announcementId: item.announcementId || undefined,
+            slug,
+            type: item.type,
+            title: item.title,
+            organization: item.organization?.trim() || undefined,
+            deadline: deadline === undefined ? null : deadline,
+            status: item.status,
+            notes: item.notes?.trim() || undefined,
+            reminderAt: reminderAt === undefined ? null : reminderAt,
+            trackedAt: trackedAt || now,
+            updatedAt: updatedAt || now,
         });
     }
 
-    if (operations.length === 0) {
+    if (importItems.length === 0) {
         return res.json({ imported: 0, skipped });
     }
 
     try {
-        await trackedApplicationsCollection().bulkWrite(operations, { ordered: false });
-        return res.json({ imported: operations.length, skipped });
+        const imported = await ProfileModelPostgres.importTrackedApplications(req.user!.userId, importItems);
+        return res.json({ imported, skipped });
     } catch (error) {
         console.error('Tracked applications import error:', error);
         return res.status(500).json({ error: 'Failed to import tracked applications' });
@@ -1084,8 +993,8 @@ router.get('/widgets', authenticateToken, async (req, res) => {
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
 
         const [trackedItems, searches, preferenceAlerts] = await Promise.all([
-            trackedApplicationsCollection().find({ userId: req.user!.userId }).sort({ updatedAt: -1 }).toArray(),
-            savedSearchesCollection().find({ userId: req.user!.userId }).toArray(),
+            ProfileModelPostgres.listTrackedApplications(req.user!.userId),
+            ProfileModelPostgres.listSavedSearches(req.user!.userId),
             getPreferenceAlerts(profile, sinceMs, 24),
         ]);
 
@@ -1103,7 +1012,7 @@ router.get('/widgets', authenticateToken, async (req, res) => {
             .sort((a, b) => a.deadlineMs - b.deadlineMs)
             .slice(0, 8)
             .map((entry) => ({
-                id: (entry.item as any)._id?.toString?.() || '',
+                id: (entry.item as any).id || '',
                 slug: entry.item.slug,
                 title: entry.item.title,
                 type: entry.item.type,
@@ -1140,7 +1049,7 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
     try {
         const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
         const profile = await getOrCreateProfile(req.user!.userId);
-        const announcements = await AnnouncementModelMongo.findAll({ limit: 200 });
+        const announcements = await AnnouncementModelPostgres.findAll({ limit: 200 });
 
         const scored = announcements.map(item => {
             let score = 0;

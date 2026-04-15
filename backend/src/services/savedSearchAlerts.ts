@@ -1,6 +1,6 @@
 import { Filter, ObjectId } from 'mongodb';
 
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
 import type { ContentType } from '../types.js';
 
 import { getCollection } from './cosmosdb.js';
@@ -193,7 +193,7 @@ async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, 
     const filters = sanitizeFilters(search.filters);
     const searchLimit = Math.min(250, Math.max(limit * 4, 50));
 
-    const announcements = await AnnouncementModelMongo.findAll({
+    const announcements = await AnnouncementModelPostgres.findAll({
         type: filters?.type,
         category: filters?.category,
         organization: filters?.organization,

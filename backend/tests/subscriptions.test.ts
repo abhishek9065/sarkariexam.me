@@ -2,42 +2,23 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
 import { app } from '../src/server.js';
-import { getCollection } from '../src/services/cosmosdb.js';
+import { prisma } from '../src/services/postgres/prisma.js';
 
-const describeOrSkip = process.env.SKIP_MONGO_TESTS === 'true' ? describe.skip : describe;
-
-interface SubscriptionDoc {
-    email: string;
-    categories: string[];
-    categorySlugs?: string[];
-    frequency: 'instant' | 'daily' | 'weekly';
-    verified: boolean;
-    verificationToken?: string;
-    unsubscribeToken: string;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-describeOrSkip('subscriptions', () => {
+describe('subscriptions', () => {
     it('verifies and unsubscribes using tokens', async () => {
-        const collection = getCollection<SubscriptionDoc>('alert_subscriptions');
-        const now = new Date();
+                const email = `sub-${Date.now()}@example.com`;
         const verificationToken = `verify-${Date.now()}`;
         const unsubscribeToken = `unsub-${Date.now()}`;
 
-        await collection.insertOne({
-            email: `sub-${Date.now()}@example.com`,
-            categories: ['job'],
-            categorySlugs: ['job'],
-            frequency: 'daily',
+                await prisma.subscription.create({
+                    data: {
+                        email,
             verified: false,
             verificationToken,
             unsubscribeToken,
             isActive: true,
-            createdAt: now,
-            updatedAt: now,
-        } as SubscriptionDoc);
+                    },
+                });
 
         const verifyRes = await request(app)
             .get(`/api/subscriptions/verify?token=${encodeURIComponent(verificationToken)}`)
@@ -51,7 +32,7 @@ describeOrSkip('subscriptions', () => {
 
         expect(unsubscribeRes.body?.message).toBeTypeOf('string');
 
-        const updated = await collection.findOne({ unsubscribeToken });
+        const updated = await prisma.subscription.findUnique({ where: { unsubscribeToken } });
         expect(updated?.verified).toBe(true);
         expect(updated?.isActive).toBe(false);
     });

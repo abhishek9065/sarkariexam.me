@@ -1,0 +1,669 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+}
+
+enum PostType {
+  JOB          @map("job")
+  RESULT       @map("result")
+  ADMIT_CARD   @map("admit_card")
+  ANSWER_KEY   @map("answer_key")
+  ADMISSION    @map("admission")
+  SCHOLARSHIP  @map("scholarship")
+  BOARD_RESULT @map("board_result")
+  SYLLABUS     @map("syllabus")
+}
+
+enum WorkflowStatus {
+  DRAFT      @map("draft")
+  IN_REVIEW  @map("in_review")
+  APPROVED   @map("approved")
+  PUBLISHED  @map("published")
+  ARCHIVED   @map("archived")
+}
+
+enum ImportantDateKind {
+  APPLICATION_START @map("application_start")
+  LAST_DATE         @map("last_date")
+  EXAM_DATE         @map("exam_date")
+  RESULT_DATE       @map("result_date")
+  ADMIT_CARD        @map("admit_card")
+  COUNSELLING       @map("counselling")
+  OTHER             @map("other")
+}
+
+enum TrustTag {
+  NEW       @map("new")
+  HOT       @map("hot")
+  UPDATE    @map("update")
+  LAST_DATE @map("last_date")
+}
+
+enum SubscriptionFrequency {
+  INSTANT @map("instant")
+  DAILY   @map("daily")
+  WEEKLY  @map("weekly")
+}
+
+enum ContentPageType {
+  AUXILIARY       @map("auxiliary")
+  INFO            @map("info")
+  COMMUNITY       @map("community")
+  CATEGORY_META   @map("category_meta")
+  RESOURCE_META   @map("resource_meta")
+  STATE_DIRECTORY @map("state_directory")
+}
+
+model Organization {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  kind             String?
+  shortName        String?
+  officialWebsite  String?
+  description      String?
+  priority         Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  exams            Exam[]
+  posts            Post[]
+  subscriptionPrefs SubscriptionOrganization[]
+
+  @@index([name])
+  @@index([priority, name])
+  @@map("organizations")
+}
+
+model State {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  code              String?
+  region            String?
+  priority          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  postStates        PostState[]
+  subscriptionPrefs SubscriptionState[]
+
+  @@index([name])
+  @@index([priority, name])
+  @@map("states")
+}
+
+model Category {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  description       String?
+  priority          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  postCategories    PostCategory[]
+  subscriptionPrefs SubscriptionCategory[]
+
+  @@index([name])
+  @@index([priority, name])
+  @@map("categories")
+}
+
+model Qualification {
+  id                String   @id @default(cuid())
+  name              String
+  slug              String   @unique
+  description       String?
+  level             String?
+  priority          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  postQualifications PostQualification[]
+  eligibilityRules   EligibilityRule[]
+  subscriptionPrefs  SubscriptionQualification[]
+
+  @@index([name])
+  @@index([priority, name])
+  @@map("qualifications")
+}
+
+model Exam {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  level          String?
+  organizationId String?
+  description    String?
+  priority       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  posts          Post[]
+
+  @@index([name])
+  @@index([organizationId, name])
+  @@map("exams")
+}
+
+model College {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  shortName       String?
+  stateCode       String?
+  collegeType     String?
+  officialWebsite String?
+  description     String?
+  priority        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  posts           Post[]
+  programs        Program[]
+  admissionDetails AdmissionDetail[]
+
+  @@index([name])
+  @@index([priority, name])
+  @@map("colleges")
+}
+
+model Program {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  level            String?
+  department       String?
+  durationLabel    String?
+  mode             String?
+  intake           String?
+  description      String?
+  collegeId        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  college          College? @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  posts            Post[]
+  admissionDetails AdmissionDetail[]
+
+  @@index([name])
+  @@index([collegeId, name])
+  @@map("programs")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  postTags  PostTag[]
+
+  @@index([name])
+  @@map("tags")
+}
+
+model Post {
+  id                   String         @id @default(cuid())
+  legacyAnnouncementId String?
+  legacyId             String?
+  title                String
+  slug                 String         @unique
+  legacySlugs          String[]       @default([])
+  type                 PostType
+  status               WorkflowStatus @default(DRAFT)
+  summary              String
+  shortInfo            String?
+  body                 String?
+  contentJson          Json?
+
+  organizationId       String?
+  institutionId        String?
+  examId               String?
+  programId            String?
+
+  location             String?
+  salary               String?
+  postCount            String?
+  applicationStartDate String?
+  lastDate             String?
+  examDate             String?
+  resultDate           String?
+
+  expiresAt            DateTime?
+  archivedAt           DateTime?
+  publishedAt          DateTime?
+
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  createdBy            String?
+  updatedBy            String?
+  approvedBy           String?
+  publishedBy          String?
+  currentVersion       Int            @default(1)
+
+  searchText           String         @default("")
+  sourceNote           String?
+  verificationNote     String?
+  updatedLabel         String?
+  correctionNote       String?
+
+  tag                  TrustTag?
+  isUrgent             Boolean        @default(false)
+  isNew                Boolean        @default(false)
+  isLastDate           Boolean        @default(false)
+  isFeatured           Boolean        @default(false)
+
+  homeSection          String?
+  stickyRank           Int?
+  highlight            Boolean        @default(false)
+  trendingScore        Int?
+
+  seoTitle             String?
+  seoDescription       String?
+  seoCanonicalPath     String?
+  seoIndexable         Boolean        @default(true)
+  seoOgImage           String?
+
+  organization         Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  institution          College?       @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  exam                 Exam?          @relation(fields: [examId], references: [id], onDelete: SetNull)
+  program              Program?       @relation(fields: [programId], references: [id], onDelete: SetNull)
+
+  postCategories       PostCategory[]
+  postStates           PostState[]
+  postQualifications   PostQualification[]
+  postTags             PostTag[]
+
+  officialSources      OfficialSource[]
+  importantDates       ImportantDate[]
+  eligibilityRules     EligibilityRule[]
+  feeRules             FeeRule[]
+  vacancyRows          VacancyRow[]
+  admissionDetails     AdmissionDetail?
+
+  versions             PostVersion[]
+  auditLogs            AuditLog[]
+  slugAliases          SlugAlias[]
+  alertDispatchLogs    AlertDispatchLog[]
+
+  @@index([type, status, publishedAt])
+  @@index([status, updatedAt])
+  @@index([organizationId, status, publishedAt])
+  @@index([institutionId, status, publishedAt])
+  @@index([examId, status, publishedAt])
+  @@index([programId, status, publishedAt])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("posts")
+}
+
+model PostCategory {
+  id         String   @id @default(cuid())
+  postId     String
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, categoryId])
+  @@index([categoryId, postId])
+  @@map("post_categories")
+}
+
+model PostState {
+  id        String   @id @default(cuid())
+  postId    String
+  stateId   String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, stateId])
+  @@index([stateId, postId])
+  @@map("post_states")
+}
+
+model PostQualification {
+  id              String        @id @default(cuid())
+  postId          String
+  qualificationId String
+  createdAt       DateTime      @default(now())
+
+  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, qualificationId])
+  @@index([qualificationId, postId])
+  @@map("post_qualifications")
+}
+
+model PostTag {
+  id        String   @id @default(cuid())
+  postId    String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, tagId])
+  @@index([tagId, postId])
+  @@map("post_tags")
+}
+
+model OfficialSource {
+  id         String   @id @default(cuid())
+  postId     String
+  label      String
+  url        String
+  sourceType String?
+  isPrimary  Boolean  @default(false)
+  capturedAt DateTime?
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, isPrimary, position])
+  @@index([url])
+  @@map("official_sources")
+}
+
+model ImportantDate {
+  id         String            @id @default(cuid())
+  postId     String
+  kind       ImportantDateKind?
+  label      String
+  value      String
+  sortDate   DateTime?
+  isPrimary  Boolean           @default(false)
+  note       String?
+  position   Int               @default(0)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  post       Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, kind, sortDate])
+  @@index([sortDate])
+  @@map("important_dates")
+}
+
+model EligibilityRule {
+  id              String        @id @default(cuid())
+  postId          String
+  qualificationId String?
+  label           String
+  description     String
+  minAge          Int?
+  maxAge          Int?
+  relaxationNote  String?
+  position        Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  qualification   Qualification? @relation(fields: [qualificationId], references: [id], onDelete: SetNull)
+
+  @@index([postId, position])
+  @@index([qualificationId])
+  @@map("eligibility_rules")
+}
+
+model FeeRule {
+  id          String   @id @default(cuid())
+  postId      String
+  category    String
+  amount      String
+  currency    String?  @default("INR")
+  paymentNote String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, position])
+  @@map("fee_rules")
+}
+
+model VacancyRow {
+  id          String   @id @default(cuid())
+  postId      String
+  postName    String
+  department  String?
+  category    String?
+  vacancies   String
+  payLevel    String?
+  salaryNote  String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, position])
+  @@map("vacancy_rows")
+}
+
+model AdmissionDetail {
+  id                String   @id @default(cuid())
+  postId            String   @unique
+  collegeId         String?
+  programId         String?
+  intake            String?
+  counsellingRounds Json?
+  applicationWindow Json?
+  domicilePolicy    String?
+  reservationPolicy String?
+  seatMatrix        Json?
+  scholarshipNote   String?
+  hostelInfo        String?
+  correctionNote    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  post              Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  college           College? @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  program           Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+
+  @@index([collegeId])
+  @@index([programId])
+  @@map("admission_details")
+}
+
+model PostVersion {
+  id        String   @id @default(cuid())
+  postId    String
+  version   Int
+  note      String?
+  reason    String?
+  actorId   String?
+  snapshot  Json
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, version])
+  @@index([postId, createdAt])
+  @@map("post_versions")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  postId     String?
+  action     String
+  actorId    String?
+  actorRole  String?
+  summary    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  post       Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([postId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+model SlugAlias {
+  id         String   @id @default(cuid())
+  postId     String
+  slug       String   @unique
+  isLegacy   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("slug_aliases")
+}
+
+model ContentPage {
+  id               String         @id @default(cuid())
+  slug             String         @unique
+  pageType         ContentPageType
+  title            String
+  eyebrow          String?
+  description      String?
+  headerColor      String?
+  layoutVariant    String?
+  payload          Json
+  status           WorkflowStatus @default(DRAFT)
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalPath String?
+  seoIndexable     Boolean        @default(true)
+  publishedAt      DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  createdBy        String?
+  updatedBy        String?
+
+  @@index([pageType, status, updatedAt])
+  @@index([expiresAt])
+  @@map("content_pages")
+}
+
+model Subscription {
+  id                 String                @id @default(cuid())
+  email              String                @unique
+  verified           Boolean               @default(false)
+  isActive           Boolean               @default(true)
+  frequency          SubscriptionFrequency @default(DAILY)
+  verificationToken  String?
+  unsubscribeToken   String                @unique
+  source             String?
+  alertCount         Int                   @default(0)
+  lastAlertedAt      DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  categoryPrefs      SubscriptionCategory[]
+  statePrefs         SubscriptionState[]
+  organizationPrefs  SubscriptionOrganization[]
+  qualificationPrefs SubscriptionQualification[]
+  postTypePrefs      SubscriptionPostType[]
+  dispatchLogs       AlertDispatchLog[]
+
+  @@index([isActive, verified, frequency])
+  @@map("subscriptions")
+}
+
+model SubscriptionCategory {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  categoryId     String
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, categoryId])
+  @@index([categoryId, subscriptionId])
+  @@map("subscription_categories")
+}
+
+model SubscriptionState {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  stateId        String
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  state          State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, stateId])
+  @@index([stateId, subscriptionId])
+  @@map("subscription_states")
+}
+
+model SubscriptionOrganization {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  organizationId String
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, organizationId])
+  @@index([organizationId, subscriptionId])
+  @@map("subscription_organizations")
+}
+
+model SubscriptionQualification {
+  id              String        @id @default(cuid())
+  subscriptionId  String
+  qualificationId String
+
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, qualificationId])
+  @@index([qualificationId, subscriptionId])
+  @@map("subscription_qualifications")
+}
+
+model SubscriptionPostType {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  postType       PostType
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, postType])
+  @@index([postType, subscriptionId])
+  @@map("subscription_post_types")
+}
+
+model AlertDispatchLog {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  postId         String?
+  channel        String
+  status         String
+  messageId      String?
+  metadata       Json?
+  dispatchedAt   DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  post           Post?        @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([subscriptionId, dispatchedAt])
+  @@index([postId, dispatchedAt])
+  @@map("alert_dispatch_logs")
+}

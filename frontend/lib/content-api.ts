@@ -2,10 +2,22 @@ import { resolvePublicApiBase } from './api';
 import type {
   AnnouncementItem,
   AnnouncementSection,
+  AuxiliaryActionCard,
+  AuxiliaryPageMeta,
+  AuxiliaryPageSlug,
   CategoryPageMeta,
+  CommunityChannel,
+  CommunityPageMeta,
   DetailImportantLink,
   DetailThemeTokens,
+  InfoPageMeta,
+  InfoPageSection,
   PortalListEntry,
+  PublicStat,
+  QuickLink,
+  ResourceCard,
+  ResourceCategoryMeta,
+  ResourceCategorySlug,
   StatePageMeta,
 } from '@/app/lib/public-content';
 import { announcementCategoryMeta } from '@/app/lib/public-content';
@@ -97,6 +109,20 @@ interface BackendTaxonomyLanding {
   relatedCounts: Record<string, number>;
 }
 
+type BackendContentPageType = 'auxiliary' | 'info' | 'community' | 'category_meta' | 'resource_meta' | 'state_directory';
+
+interface BackendContentPageRecord {
+  id: string;
+  slug: string;
+  pageType: BackendContentPageType;
+  title: string;
+  eyebrow?: string;
+  description?: string;
+  headerColor?: string;
+  payload: Record<string, unknown>;
+  seoCanonicalPath?: string;
+}
+
 const CONTENT_BASE = `${resolvePublicApiBase()}/content`;
 const CONTENT_REVALIDATE_SECONDS = Number.parseInt(process.env.CONTENT_CACHE_REVALIDATE_SECONDS ?? '300', 10);
 
@@ -146,6 +172,18 @@ function buildContentTags(path: string) {
     if (slug) tags.add(`content:post:${slug}`);
   }
 
+  if (url.pathname === '/pages') {
+    tags.add('content:pages');
+    const type = sanitizeTagSegment(url.searchParams.get('type') ?? undefined);
+    if (type) tags.add(`content:pages:type:${type}`);
+  }
+
+  if (url.pathname.startsWith('/pages/')) {
+    const slug = sanitizeTagSegment(url.pathname.split('/').pop());
+    tags.add('content:pages');
+    if (slug) tags.add(`content:page:${slug}`);
+  }
+
   if (url.pathname.startsWith('/taxonomies/')) {
     const [, , taxonomyType, taxonomySlug] = url.pathname.split('/');
     const safeType = sanitizeTagSegment(taxonomyType);
@@ -182,6 +220,228 @@ async function fetchJson<T>(path: string): Promise<T> {
     throw new Error(`Request failed: ${res.status}`);
   }
   return res.json() as Promise<T>;
+}
+
+const DEFAULT_HEADER_COLOR = 'bg-[#37474f]';
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+}
+
+function coerceQuickLinks(value: unknown, fallback: QuickLink[] = []): QuickLink[] {
+  if (!Array.isArray(value)) return fallback;
+  const links = value
+    .map((item) => {
+      const row = asRecord(item);
+      const label = asString(row?.label);
+      const href = asString(row?.href);
+      if (!label || !href) return null;
+      return { label, href };
+    })
+    .filter((item): item is QuickLink => Boolean(item));
+  return links.length > 0 ? links : fallback;
+}
+
+function coerceStats(value: unknown, fallback: PublicStat[] = []): PublicStat[] {
+  if (!Array.isArray(value)) return fallback;
+  const stats = value
+    .map((item) => {
+      const row = asRecord(item);
+      const label = asString(row?.label);
+      const statValue = asString(row?.value);
+      if (!label || !statValue) return null;
+      return { label, value: statValue };
+    })
+    .filter((item): item is PublicStat => Boolean(item));
+  return stats.length > 0 ? stats : fallback;
+}
+
+function coerceSections(value: unknown, fallback: InfoPageSection[] = []): InfoPageSection[] {
+  if (!Array.isArray(value)) return fallback;
+  const sections = value
+    .map((item) => {
+      const row = asRecord(item);
+      const title = asString(row?.title);
+      const bodyRaw = row?.body;
+      const body = Array.isArray(bodyRaw)
+        ? bodyRaw.map((entry) => asString(entry)).filter((entry): entry is string => Boolean(entry))
+        : asString(bodyRaw)
+          ? [asString(bodyRaw)!]
+          : [];
+
+      if (!title || body.length === 0) return null;
+      return { title, body };
+    })
+    .filter((item): item is InfoPageSection => Boolean(item));
+  return sections.length > 0 ? sections : fallback;
+}
+
+function coerceAuxiliaryCards(value: unknown, fallback: AuxiliaryActionCard[] = []): AuxiliaryActionCard[] {
+  if (!Array.isArray(value)) return fallback;
+  const cards = value
+    .map((item) => {
+      const row = asRecord(item);
+      const label = asString(row?.label);
+      const href = asString(row?.href);
+      const description = asString(row?.description) || '';
+      if (!label || !href) return null;
+      return { label, href, description };
+    })
+    .filter((item): item is AuxiliaryActionCard => Boolean(item));
+  return cards.length > 0 ? cards : fallback;
+}
+
+function coerceResourceCards(value: unknown, fallback: ResourceCard[] = []): ResourceCard[] {
+  if (!Array.isArray(value)) return fallback;
+  const cards = value
+    .map((item) => {
+      const row = asRecord(item);
+      const label = asString(row?.label);
+      const href = asString(row?.href);
+      const description = asString(row?.description) || '';
+      if (!label || !href) return null;
+      return { label, href, description };
+    })
+    .filter((item): item is ResourceCard => Boolean(item));
+  return cards.length > 0 ? cards : fallback;
+}
+
+function coerceHighlights(value: unknown, fallback: string[] = []): string[] {
+  const highlights = asStringArray(value);
+  return highlights.length > 0 ? highlights : fallback;
+}
+
+function canonicalPathFromPage(page: BackendContentPageRecord, fallback?: string) {
+  return page.seoCanonicalPath || fallback || `/${page.slug}`;
+}
+
+export async function getContentPageBySlug(slug: string): Promise<BackendContentPageRecord | null> {
+  try {
+    const response = await fetchJson<{ data: BackendContentPageRecord }>(`/pages/${encodeURIComponent(slug)}`);
+    return response.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function getContentPagesByType(type: BackendContentPageType, limit = 100): Promise<BackendContentPageRecord[]> {
+  const params = new URLSearchParams({ type, limit: String(limit) });
+  try {
+    const response = await fetchJson<{ data: BackendContentPageRecord[] }>(`/pages?${params.toString()}`);
+    return response.data;
+  } catch {
+    return [];
+  }
+}
+
+export function mapContentPageToInfoMeta(page: BackendContentPageRecord, fallback?: InfoPageMeta): InfoPageMeta {
+  const payload = asRecord(page.payload) || {};
+  return {
+    canonicalPath: canonicalPathFromPage(page, fallback?.canonicalPath),
+    description: page.description || fallback?.description || '',
+    eyebrow: page.eyebrow || fallback?.eyebrow || 'Public Information',
+    headerColor: page.headerColor || fallback?.headerColor || DEFAULT_HEADER_COLOR,
+    quickLinks: coerceQuickLinks(payload.quickLinks, fallback?.quickLinks || []),
+    sections: coerceSections(payload.sections, fallback?.sections || []),
+    slug: (fallback?.slug || page.slug) as InfoPageMeta['slug'],
+    stats: coerceStats(payload.stats, fallback?.stats || []),
+    title: page.title || fallback?.title || page.slug,
+  };
+}
+
+export function mapContentPageToAuxiliaryMeta(page: BackendContentPageRecord, fallback?: AuxiliaryPageMeta): AuxiliaryPageMeta {
+  const payload = asRecord(page.payload) || {};
+  return {
+    canonicalPath: canonicalPathFromPage(page, fallback?.canonicalPath),
+    cards: coerceAuxiliaryCards(payload.cards, fallback?.cards || []),
+    description: page.description || fallback?.description || '',
+    eyebrow: page.eyebrow || fallback?.eyebrow || 'Utility Pages',
+    headerColor: page.headerColor || fallback?.headerColor || DEFAULT_HEADER_COLOR,
+    quickLinks: coerceQuickLinks(payload.quickLinks, fallback?.quickLinks || []),
+    sections: coerceSections(payload.sections, fallback?.sections || []),
+    slug: (fallback?.slug || page.slug) as AuxiliaryPageSlug,
+    stats: coerceStats(payload.stats, fallback?.stats || []),
+    title: page.title || fallback?.title || page.slug,
+  };
+}
+
+export function mapContentPageToCommunityMeta(page: BackendContentPageRecord, fallback?: CommunityPageMeta): CommunityPageMeta {
+  const payload = asRecord(page.payload) || {};
+  return {
+    canonicalPath: canonicalPathFromPage(page, fallback?.canonicalPath),
+    channel: (fallback?.channel || page.slug) as CommunityChannel,
+    ctaLabel: asString(payload.ctaLabel) || fallback?.ctaLabel || 'Join Community',
+    description: page.description || fallback?.description || '',
+    externalUrl: asString(payload.externalUrl) || fallback?.externalUrl,
+    eyebrow: page.eyebrow || fallback?.eyebrow || 'Community',
+    headerColor: page.headerColor || fallback?.headerColor || DEFAULT_HEADER_COLOR,
+    quickLinks: coerceQuickLinks(payload.quickLinks, fallback?.quickLinks || []),
+    sections: coerceSections(payload.sections, fallback?.sections || []),
+    stats: coerceStats(payload.stats, fallback?.stats || []),
+    title: page.title || fallback?.title || page.slug,
+  };
+}
+
+export function mapContentPageToResourceMeta(page: BackendContentPageRecord, fallback?: ResourceCategoryMeta): ResourceCategoryMeta {
+  const payload = asRecord(page.payload) || {};
+  return {
+    canonicalPath: canonicalPathFromPage(page, fallback?.canonicalPath),
+    description: page.description || fallback?.description || '',
+    eyebrow: page.eyebrow || fallback?.eyebrow || 'Resource Hub',
+    headerColor: page.headerColor || fallback?.headerColor || DEFAULT_HEADER_COLOR,
+    highlights: coerceHighlights(payload.highlights, fallback?.highlights || []),
+    listingTitle: asString(payload.listingTitle) || fallback?.listingTitle || 'Featured Resources',
+    quickLinks: coerceQuickLinks(payload.quickLinks, fallback?.quickLinks || []),
+    resourceCards: coerceResourceCards(payload.resourceCards || payload.cards, fallback?.resourceCards || []),
+    slug: (fallback?.slug || page.slug) as ResourceCategorySlug,
+    stats: coerceStats(payload.stats, fallback?.stats || []),
+    title: page.title || fallback?.title || page.slug,
+  };
+}
+
+export async function loadInfoPageMeta(slug: string, fallback?: InfoPageMeta): Promise<InfoPageMeta | null> {
+  const page = await getContentPageBySlug(slug);
+  if (!page || page.pageType !== 'info') {
+    return fallback || null;
+  }
+  return mapContentPageToInfoMeta(page, fallback);
+}
+
+export async function loadAuxiliaryPageMeta(slug: string, fallback?: AuxiliaryPageMeta): Promise<AuxiliaryPageMeta | null> {
+  const page = await getContentPageBySlug(slug);
+  if (!page || page.pageType !== 'auxiliary') {
+    return fallback || null;
+  }
+  return mapContentPageToAuxiliaryMeta(page, fallback);
+}
+
+export async function loadCommunityPageMeta(slug: string, fallback?: CommunityPageMeta): Promise<CommunityPageMeta | null> {
+  const page = await getContentPageBySlug(slug);
+  if (!page || page.pageType !== 'community') {
+    return fallback || null;
+  }
+  return mapContentPageToCommunityMeta(page, fallback);
+}
+
+export async function loadResourceCategoryMeta(slug: string, fallback?: ResourceCategoryMeta): Promise<ResourceCategoryMeta | null> {
+  const page = await getContentPageBySlug(slug);
+  if (!page || page.pageType !== 'resource_meta') {
+    return fallback || null;
+  }
+  return mapContentPageToResourceMeta(page, fallback);
 }
 
 function safeDateLabel(value?: string) {

@@ -1,6 +1,10 @@
+import { WorkflowStatus } from '@prisma/client';
 import { z } from 'zod';
 
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
+import PostModelPostgres from '../models/posts.postgres.js';
+
+import { prisma } from './postgres/prisma.js';
 
 const bulkImportSchema = z.array(z.object({
   title: z.string().min(5).max(200),
@@ -23,6 +27,33 @@ interface BulkImportResult {
   failed: number;
   errors: Array<{ row: number; error: string }>;
   createdIds: string[];
+}
+
+function parseDateCandidate(...values: Array<string | Date | null | undefined>): Date | undefined {
+  for (const value of values) {
+    if (!value) continue;
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function toAnnouncementStatus(status: string): string {
+  if (status === 'approved') return 'scheduled';
+  if (status === 'in_review') return 'pending';
+  return status;
+}
+
+function toPostStatusFilter(status?: string): 'draft' | 'in_review' | 'approved' | 'published' | 'archived' | undefined {
+  if (!status || status === 'all') return undefined;
+  if (status === 'pending') return 'in_review';
+  if (status === 'scheduled') return 'approved';
+  if (status === 'draft') return 'draft';
+  if (status === 'published') return 'published';
+  if (status === 'archived') return 'archived';
+  return undefined;
 }
 
 /**
@@ -59,10 +90,7 @@ export async function bulkImportAnnouncements(
         organization: row.organization,
         content: row.content,
         status: row.publishAt ? 'scheduled' : 'draft',
-        postedBy: userId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        version: 1,
+        publishAt: row.publishAt,
       };
 
       if (row.deadline) payload.deadline = row.deadline;
@@ -76,7 +104,21 @@ export async function bulkImportAnnouncements(
         payload.tags = row.tags.split(',').map(t => t.trim()).filter(Boolean);
       }
 
-      const created = await AnnouncementModelMongo.create(payload as any, userId);
+      const created = await AnnouncementModelPostgres.create(payload as any, userId);
+
+      if (row.publishAt) {
+        await PostModelPostgres.update(
+          created.id,
+          {
+            status: 'approved',
+            publishedAt: row.publishAt,
+          },
+          userId,
+          'admin',
+          'Scheduled via bulk import',
+        );
+      }
+
       result.success++;
       result.createdIds.push(created.id);
     } catch (error) {
@@ -108,47 +150,40 @@ export async function getCalendarAnnouncements(
   createdAt: Date;
 }>> {
   try {
-    const query: Record<string, unknown> = {
-      $or: [
-        { deadline: { $gte: startDate, $lte: endDate } },
-        { publishAt: { $gte: startDate, $lte: endDate } },
-        { createdAt: { $gte: startDate, $lte: endDate } },
-      ],
-    };
+    const status = toPostStatusFilter(filters?.status) || 'all';
+    const type = filters?.type && filters.type !== 'all'
+      ? (filters.type as 'job' | 'result' | 'admit-card' | 'admission' | 'answer-key' | 'syllabus')
+      : undefined;
 
-    if (filters?.status && filters.status !== 'all') {
-      query.status = filters.status;
-    }
-    if (filters?.type && filters.type !== 'all') {
-      query.type = filters.type;
-    }
-
-    const announcements = await AnnouncementModelMongo.findAllAdmin({
-      includeInactive: true,
-      limit: 500,
+    const posts = await PostModelPostgres.findAdmin({
+      status,
+      type,
+      limit: 600,
+      sort: 'updated',
     });
 
-    return announcements
-      .filter(a => {
-        const deadline = a.deadline ? new Date(a.deadline) : null;
-        const publishAt = a.publishAt ? new Date(a.publishAt) : null;
-        const createdAt = (a as any).postedAt ? new Date((a as any).postedAt) : new Date();
-        
-        return (
-          (deadline && deadline >= startDate && deadline <= endDate) ||
-          (publishAt && publishAt >= startDate && publishAt <= endDate) ||
-          (createdAt >= startDate && createdAt <= endDate)
-        );
+    return posts.data
+      .map((post) => {
+        const deadline = parseDateCandidate(post.lastDate, post.expiresAt);
+        const publishAt = parseDateCandidate(post.publishedAt);
+        const createdAt = parseDateCandidate(post.publishedAt, post.createdAt) || new Date();
+        return {
+          id: post.id,
+          title: post.title,
+          type: post.type,
+          status: toAnnouncementStatus(post.status),
+          deadline,
+          publishAt,
+          createdAt,
+        };
       })
-      .map(a => ({
-        id: a.id,
-        title: a.title,
-        type: a.type,
-        status: a.status,
-        deadline: a.deadline ? new Date(a.deadline) : undefined,
-        publishAt: a.publishAt ? new Date(a.publishAt) : undefined,
-        createdAt: (a as any).postedAt ? new Date((a as any).postedAt) : new Date(),
-      }));
+      .filter((item) => {
+        return (
+          (item.deadline && item.deadline >= startDate && item.deadline <= endDate) ||
+          (item.publishAt && item.publishAt >= startDate && item.publishAt <= endDate) ||
+          (item.createdAt >= startDate && item.createdAt <= endDate)
+        );
+      });
   } catch (error) {
     console.error('[CalendarService] Error fetching calendar data:', error);
     return [];
@@ -164,13 +199,17 @@ export async function scheduleAnnouncement(
   userId: string
 ): Promise<boolean> {
   try {
-    await AnnouncementModelMongo.update(id, {
-      status: 'scheduled',
-      publishAt: publishAt.toISOString(),
-      updatedBy: userId,
-      updatedAt: new Date(),
-    } as any);
-    return true;
+    const updated = await PostModelPostgres.update(
+      id,
+      {
+        status: 'approved',
+        publishedAt: publishAt.toISOString(),
+      },
+      userId,
+      'admin',
+      'Scheduled via calendar',
+    );
+    return Boolean(updated);
   } catch (error) {
     console.error('[CalendarService] Error scheduling announcement:', error);
     return false;
@@ -183,24 +222,54 @@ export async function scheduleAnnouncement(
 export async function autoArchiveExpired(): Promise<number> {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const { getCollection } = await import('../services/cosmosdb.js');
-    const col = getCollection('announcements');
+    const archivedAt = new Date();
 
-    const result = await col.updateMany(
-      {
-        status: { $in: ['published', 'draft'] },
-        deadline: { $lt: thirtyDaysAgo },
-      },
-      {
-        $set: {
-          status: 'archived',
-          updatedAt: new Date(),
+    const primary = await prisma.post.updateMany({
+      where: {
+        status: {
+          in: [WorkflowStatus.PUBLISHED, WorkflowStatus.DRAFT],
         },
-      }
-    );
+        expiresAt: { lt: thirtyDaysAgo },
+      },
+      data: {
+        status: WorkflowStatus.ARCHIVED,
+        archivedAt,
+        updatedAt: archivedAt,
+      },
+    });
 
-    console.log(`[CalendarService] Auto-archived ${result.modifiedCount} expired announcements`);
-    return result.modifiedCount;
+    // Fallback for legacy rows where expiresAt is null but lastDate is still parseable.
+    const candidates = await PostModelPostgres.findAdmin({
+      status: 'all',
+      limit: 600,
+      sort: 'updated',
+    });
+
+    let fallbackArchived = 0;
+    for (const post of candidates.data) {
+      if (post.status !== 'published' && post.status !== 'draft') continue;
+      if (post.expiresAt) continue;
+
+      const parsedDeadline = parseDateCandidate(post.lastDate);
+      if (!parsedDeadline || parsedDeadline >= thirtyDaysAgo) continue;
+
+      const updated = await PostModelPostgres.update(
+        post.id,
+        {
+          status: 'archived',
+          archivedAt: archivedAt.toISOString(),
+        },
+        'system',
+        'system',
+        'Auto-archived by calendar',
+      );
+
+      if (updated) fallbackArchived += 1;
+    }
+
+    const totalArchived = primary.count + fallbackArchived;
+    console.log(`[CalendarService] Auto-archived ${totalArchived} expired announcements`);
+    return totalArchived;
   } catch (error) {
     console.error('[CalendarService] Error auto-archiving:', error);
     return 0;
@@ -221,28 +290,35 @@ export async function getUpcomingDeadlines(limit = 10): Promise<Array<{
     const now = new Date();
     const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    const announcements = await AnnouncementModelMongo.findAllAdmin({
-      includeInactive: true,
-      limit: 100,
+    const posts = await PostModelPostgres.findAdmin({
+      status: 'all',
+      limit: 300,
+      sort: 'updated',
     });
 
-    return announcements
-      .filter(a => {
-        if (!a.deadline) return false;
-        const deadline = new Date(a.deadline);
-        return deadline >= now && deadline <= thirtyDaysFromNow && a.status !== 'archived';
+    return posts.data
+      .map((post) => ({
+        id: post.id,
+        title: post.title,
+        type: post.type,
+        status: toAnnouncementStatus(post.status),
+        deadline: parseDateCandidate(post.lastDate, post.expiresAt),
+      }))
+      .filter((post) => {
+        if (!post.deadline) return false;
+        return post.deadline >= now && post.deadline <= thirtyDaysFromNow && post.status !== 'archived';
       })
-      .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+      .sort((a, b) => a.deadline!.getTime() - b.deadline!.getTime())
       .slice(0, limit)
-      .map(a => {
-        const deadline = new Date(a.deadline!);
+      .map((post) => {
+        const deadline = post.deadline!;
         const daysLeft = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
         return {
-          id: a.id,
-          title: a.title,
+          id: post.id,
+          title: post.title,
           deadline,
           daysLeft,
-          type: a.type,
+          type: post.type,
         };
       });
   } catch (error) {

@@ -1,0 +1,30 @@
+{
+  "mode": "dry-run",
+  "totals": {
+    "taxonomies": {
+      "states": 1,
+      "organizations": 8,
+      "categories": 6,
+      "institutions": 1,
+      "exams": 0,
+      "qualifications": 5
+    },
+    "posts": {
+      "scanned": 15,
+      "migrated": 15
+    },
+    "versions": {
+      "scanned": 15,
+      "migrated": 15
+    },
+    "auditLogs": {
+      "scanned": 15,
+      "migrated": 15
+    },
+    "subscriptions": {
+      "scanned": 0,
+      "migrated": 0
+    }
+  },
+  "generatedAt": "2026-04-14T16:30:02.706Z"
+}

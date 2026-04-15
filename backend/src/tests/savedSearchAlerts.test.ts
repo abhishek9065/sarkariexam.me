@@ -67,8 +67,8 @@ vi.mock('../services/cosmosdb.js', () => ({
     }),
 }));
 
-vi.mock('../models/announcements.mongo.js', () => ({
-    AnnouncementModelMongo: {
+vi.mock('../models/announcements.postgres.js', () => ({
+    default: {
         findAll: announcementFindAllMock,
     },
 }));

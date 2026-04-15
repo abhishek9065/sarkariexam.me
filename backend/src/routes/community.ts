@@ -3,53 +3,9 @@ import { z } from 'zod';
 
 import { optionalAuth } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { getCollectionAsync } from '../services/cosmosdb.js';
+import CommunityModelPostgres from '../models/community.postgres.js';
 
 const router = Router();
-
-interface ForumDoc {
-    title: string;
-    content: string;
-    category: string;
-    author: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-interface QaDoc {
-    question: string;
-    answer?: string | null;
-    answeredBy?: string | null;
-    author: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-interface GroupDoc {
-    name: string;
-    topic: string;
-    language: string;
-    link?: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-type CommunityEntityType = 'forum' | 'qa' | 'group';
-
-interface FlagDoc {
-    entityType: CommunityEntityType;
-    entityId: string;
-    reason: string;
-    reporter?: string | null;
-    status: 'open' | 'reviewed' | 'resolved';
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-const forumsCollection = () => getCollectionAsync<ForumDoc>('community_forums');
-const qaCollection = () => getCollectionAsync<QaDoc>('community_qa');
-const groupsCollection = () => getCollectionAsync<GroupDoc>('community_groups');
-const flagsCollection = () => getCollectionAsync<FlagDoc>('community_flags');
 
 const listQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(50).optional(),
@@ -82,11 +38,6 @@ const flagCreateSchema = z.object({
     reporter: z.string().trim().min(2).max(60).optional(),
 });
 
-const formatDoc = (doc: any) => {
-    const { _id, ...rest } = doc;
-    return { id: _id?.toString?.() || _id, ...rest };
-};
-
 router.get('/forums', async (req, res) => {
     const parseResult = listQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
@@ -96,18 +47,8 @@ router.get('/forums', async (req, res) => {
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
-        const col = await forumsCollection();
-        const [items, total] = await Promise.all([
-            col
-                .find({})
-                .sort({ createdAt: -1 })
-                .skip(offset)
-                .limit(limit)
-                .toArray(),
-            col.countDocuments(),
-        ]);
-
-        return res.json({ data: items.map(formatDoc), count: total });
+        const result = await CommunityModelPostgres.listForums(limit, offset);
+        return res.json(result);
     } catch (error) {
         console.error('Forums fetch error:', error);
         return res.status(500).json({ error: 'Failed to load forums' });
@@ -121,19 +62,15 @@ router.post('/forums', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, ke
     }
 
     try {
-        const now = new Date();
         const input = parseResult.data;
-        const doc: ForumDoc = {
+        const created = await CommunityModelPostgres.createForum({
             title: input.title,
             content: input.content,
             category: input.category,
             author: input.author,
-            createdAt: now,
-            updatedAt: now,
-        };
-        const col = await forumsCollection();
-        const result = await col.insertOne(doc as any);
-        return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
+        });
+        if (!created) return res.status(500).json({ error: 'Failed to create forum post' });
+        return res.status(201).json({ data: created });
     } catch (error) {
         console.error('Forum create error:', error);
         return res.status(500).json({ error: 'Failed to create forum post' });
@@ -149,18 +86,8 @@ router.get('/qa', async (req, res) => {
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
-        const col = await qaCollection();
-        const [items, total] = await Promise.all([
-            col
-                .find({})
-                .sort({ createdAt: -1 })
-                .skip(offset)
-                .limit(limit)
-                .toArray(),
-            col.countDocuments(),
-        ]);
-
-        return res.json({ data: items.map(formatDoc), count: total });
+        const result = await CommunityModelPostgres.listQa(limit, offset);
+        return res.json(result);
     } catch (error) {
         console.error('QA fetch error:', error);
         return res.status(500).json({ error: 'Failed to load Q&A' });
@@ -174,18 +101,13 @@ router.post('/qa', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPre
     }
 
     try {
-        const now = new Date();
         const input = parseResult.data;
-        const doc: QaDoc = {
+        const created = await CommunityModelPostgres.createQa({
             question: input.question,
             author: input.author,
-            answer: null,
-            createdAt: now,
-            updatedAt: now,
-        };
-        const col = await qaCollection();
-        const result = await col.insertOne(doc as any);
-        return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
+        });
+        if (!created) return res.status(500).json({ error: 'Failed to create question' });
+        return res.status(201).json({ data: created });
     } catch (error) {
         console.error('QA create error:', error);
         return res.status(500).json({ error: 'Failed to create question' });
@@ -201,18 +123,8 @@ router.get('/groups', async (req, res) => {
     try {
         const limit = parseResult.data.limit ?? 20;
         const offset = parseResult.data.offset ?? 0;
-        const col = await groupsCollection();
-        const [items, total] = await Promise.all([
-            col
-                .find({})
-                .sort({ createdAt: -1 })
-                .skip(offset)
-                .limit(limit)
-                .toArray(),
-            col.countDocuments(),
-        ]);
-
-        return res.json({ data: items.map(formatDoc), count: total });
+        const result = await CommunityModelPostgres.listGroups(limit, offset);
+        return res.json(result);
     } catch (error) {
         console.error('Groups fetch error:', error);
         return res.status(500).json({ error: 'Failed to load study groups' });
@@ -226,19 +138,15 @@ router.post('/groups', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, ke
     }
 
     try {
-        const now = new Date();
         const input = parseResult.data;
-        const doc: GroupDoc = {
+        const created = await CommunityModelPostgres.createGroup({
             name: input.name,
             topic: input.topic,
             language: input.language,
             link: input.link || null,
-            createdAt: now,
-            updatedAt: now,
-        };
-        const col = await groupsCollection();
-        const result = await col.insertOne(doc as any);
-        return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
+        });
+        if (!created) return res.status(500).json({ error: 'Failed to create study group' });
+        return res.status(201).json({ data: created });
     } catch (error) {
         console.error('Group create error:', error);
         return res.status(500).json({ error: 'Failed to create study group' });
@@ -252,20 +160,15 @@ router.post('/flags', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 30, key
     }
 
     try {
-        const now = new Date();
         const input = parseResult.data;
-        const doc: FlagDoc = {
+        const created = await CommunityModelPostgres.createFlag({
             entityType: input.entityType,
             entityId: input.entityId,
             reason: input.reason,
             reporter: input.reporter ?? req.user?.email ?? 'Anonymous',
-            status: 'open',
-            createdAt: now,
-            updatedAt: now,
-        };
-        const col = await flagsCollection();
-        const result = await col.insertOne(doc as any);
-        return res.status(201).json({ data: formatDoc({ ...doc, _id: result.insertedId }) });
+        });
+        if (!created) return res.status(500).json({ error: 'Failed to submit report' });
+        return res.status(201).json({ data: created });
     } catch (error) {
         console.error('Flag create error:', error);
         return res.status(500).json({ error: 'Failed to submit report' });

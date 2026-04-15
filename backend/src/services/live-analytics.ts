@@ -1,5 +1,13 @@
-import { recordAnalyticsEvent } from './analytics.js';
-import { getCollection } from './cosmosdb.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
+
+import {
+  getGeoStateActivity,
+  getRecentEngagementCount,
+  getRollupSummary,
+  getTopAnnouncementViews,
+  getTopSearches,
+  recordAnalyticsEvent,
+} from './analytics.js';
 
 interface LiveMetrics {
   activeUsers: number;
@@ -20,14 +28,8 @@ const CACHE_TTL = 30000; // 30 seconds
  */
 async function getActiveUsers(): Promise<number> {
   try {
-    const col = getCollection('analytics_events');
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    
-    const recentEvents = await col.countDocuments({
-      timestamp: { $gte: fiveMinutesAgo },
-      type: { $in: ['page_view', 'content_view'] },
-    });
-    
+    const recentEvents = await getRecentEngagementCount(5);
+
     // Estimate unique users (rough approximation)
     return Math.ceil(recentEvents * 0.7);
   } catch (error) {
@@ -41,18 +43,7 @@ async function getActiveUsers(): Promise<number> {
  */
 async function getTrendingSearches(limit = 10): Promise<Array<{ query: string; count: number }>> {
   try {
-    const col = getCollection('analytics_events');
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    const pipeline = [
-      { $match: { type: 'search', timestamp: { $gte: oneDayAgo } } },
-      { $group: { _id: '$metadata.query', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: limit },
-    ];
-    
-    const results = await col.aggregate(pipeline).toArray();
-    return results.map((r: any) => ({ query: r._id || 'unknown', count: r.count }));
+    return getTopSearches(1, limit);
   } catch (error) {
     console.error('[LiveAnalytics] Error getting trending searches:', error);
     return [];
@@ -64,39 +55,18 @@ async function getTrendingSearches(limit = 10): Promise<Array<{ query: string; c
  */
 async function getTopContent(limit = 10): Promise<Array<{ id: string; title: string; views: number; type: string }>> {
   try {
-    const col = getCollection('analytics_events');
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    const pipeline = [
-      { $match: { type: 'content_view', timestamp: { $gte: oneDayAgo } } },
-      { $group: { _id: '$metadata.contentId', views: { $sum: 1 } } },
-      { $sort: { views: -1 } },
-      { $limit: limit },
-    ];
-    
-    const viewCounts = await col.aggregate(pipeline).toArray();
-    
-    // Fetch announcement details
-    const contentIds = viewCounts.map((v: any) => v._id).filter(Boolean);
-    if (contentIds.length === 0) return [];
-    
-    const { ObjectId } = await import('mongodb');
-    const objectIds = contentIds.map((id: string) => new ObjectId(id));
-    
-    const announcementsCol = getCollection('announcements');
-    const announcements = await announcementsCol
-      .find({ _id: { $in: objectIds } })
-      .project({ title: 1, type: 1 })
-      .toArray();
-    
-    const idMap = new Map(announcements.map((a: any) => [a._id.toString(), a]));
-    
-    return viewCounts.map((v: any) => {
-      const announcement = idMap.get(v._id);
+    const viewCounts = await getTopAnnouncementViews(24, limit);
+    if (viewCounts.length === 0) return [];
+
+    const announcements = await AnnouncementModelPostgres.findByIds(viewCounts.map((entry) => entry.announcementId));
+    const byId = new Map(announcements.map((announcement) => [announcement.id, announcement]));
+
+    return viewCounts.map((entry) => {
+      const announcement = byId.get(entry.announcementId);
       return {
-        id: v._id,
+        id: entry.announcementId,
         title: announcement?.title || 'Unknown',
-        views: v.views,
+        views: entry.views,
         type: announcement?.type || 'job',
       };
     });
@@ -111,19 +81,7 @@ async function getTopContent(limit = 10): Promise<Array<{ id: string; title: str
  */
 async function getGeoData(): Promise<Array<{ state: string; users: number }>> {
   try {
-    const col = getCollection('analytics_events');
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    const pipeline = [
-      { $match: { timestamp: { $gte: oneDayAgo } } },
-      { $group: { _id: '$metadata.state', users: { $sum: 1 } } },
-      { $sort: { users: -1 } },
-    ];
-    
-    const results = await col.aggregate(pipeline).toArray();
-    return results
-      .filter((r: any) => r._id)
-      .map((r: any) => ({ state: r._id, users: r.users }));
+    return getGeoStateActivity(24, 20);
   } catch (error) {
     console.error('[LiveAnalytics] Error getting geo data:', error);
     return [];
@@ -145,16 +103,20 @@ export async function getLiveMetrics(): Promise<LiveMetrics> {
     trendingSearches,
     topContent,
     geoData,
+    rollupSummary,
   ] = await Promise.all([
     getActiveUsers(),
     getTrendingSearches(10),
     getTopContent(10),
     getGeoData(),
+    getRollupSummary(1),
   ]);
+
+  const derivedPageViews = rollupSummary.viewCount + rollupSummary.listingViews;
   
   liveMetricsCache = {
     activeUsers,
-    pageViews: Math.floor(activeUsers * 2.5), // Approximate
+    pageViews: derivedPageViews > 0 ? derivedPageViews : Math.floor(activeUsers * 2.5),
     trendingSearches,
     topContent,
     geoData,

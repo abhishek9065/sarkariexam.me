@@ -1,15 +1,31 @@
-import { getCollection } from './cosmosdb.js';
+import { getTopSearches } from './analytics.js';
+import { prisma } from './postgres/prisma.js';
 
 export async function getSEOMetrics() {
   try {
-    const col = getCollection('announcements');
     const [total, withMeta, indexed, withSchema] = await Promise.all([
-      col.countDocuments(),
-      col.countDocuments({ 'seo.metaDescription': { $exists: true, $ne: '' } }),
-      col.countDocuments({ 'seo.indexPolicy': 'index' }),
-      col.countDocuments({ schema: { $exists: true } }),
+      prisma.post.count(),
+      prisma.post.count({
+        where: {
+          AND: [
+            { seoDescription: { not: null } },
+            { seoDescription: { not: '' } },
+          ],
+        },
+      }),
+      prisma.post.count({ where: { seoIndexable: true } }),
+      prisma.post.count({
+        where: {
+          AND: [
+            { seoCanonicalPath: { not: null } },
+            { seoCanonicalPath: { not: '' } },
+          ],
+        },
+      }),
     ]);
-    return { total, withMeta, indexed, withSchema, healthScore: Math.round((withMeta / total) * 100) };
+
+    const healthScore = total > 0 ? Math.round((withMeta / total) * 100) : 0;
+    return { total, withMeta, indexed, withSchema, healthScore };
   } catch {
     return { total: 0, withMeta: 0, indexed: 0, withSchema: 0, healthScore: 0 };
   }
@@ -17,14 +33,13 @@ export async function getSEOMetrics() {
 
 export async function getTopSearchQueries(limit = 20) {
   try {
-    const col = getCollection('analytics_events');
-    const pipeline = [
-      { $match: { type: 'search', timestamp: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
-      { $group: { _id: '$metadata.query', count: { $sum: 1 }, lastSearched: { $max: '$timestamp' } } },
-      { $sort: { count: -1 } },
-      { $limit: limit },
-    ];
-    return await col.aggregate(pipeline).toArray();
+    const nowIso = new Date().toISOString();
+    const rows = await getTopSearches(30, limit);
+    return rows.map((row) => ({
+      _id: row.query,
+      count: row.count,
+      lastSearched: nowIso,
+    }));
   } catch {
     return [];
   }
@@ -32,12 +47,13 @@ export async function getTopSearchQueries(limit = 20) {
 
 export async function getIndexCoverage() {
   try {
-    const col = getCollection('announcements');
-    const [indexed, noindex, missing] = await Promise.all([
-      col.countDocuments({ 'seo.indexPolicy': 'index' }),
-      col.countDocuments({ 'seo.indexPolicy': 'noindex' }),
-      col.countDocuments({ 'seo.indexPolicy': { $exists: false } }),
+    const [indexed, noindex, total] = await Promise.all([
+      prisma.post.count({ where: { seoIndexable: true } }),
+      prisma.post.count({ where: { seoIndexable: false } }),
+      prisma.post.count(),
     ]);
+
+    const missing = Math.max(0, total - indexed - noindex);
     return { indexed, noindex, missing };
   } catch {
     return { indexed: 0, noindex: 0, missing: 0 };

@@ -171,6 +171,74 @@ export async function getTopSearches(days: number = DEFAULT_ROLLUP_DAYS, limit =
     }
 }
 
+export async function getRecentEngagementCount(windowMinutes: number = 5): Promise<number> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) return 0;
+
+    const safeWindowMinutes = Math.max(1, Math.min(120, Math.round(windowMinutes)));
+    const start = new Date(Date.now() - safeWindowMinutes * 60 * 1000);
+
+    try {
+        return await events.countDocuments({
+            createdAt: { $gte: start },
+            type: {
+                $in: ['announcement_view', 'listing_view', 'search'] as AnalyticsEventType[],
+            },
+        });
+    } catch (error) {
+        console.error('[Analytics] Failed to load recent engagement count:', error);
+        return 0;
+    }
+}
+
+export async function getGeoStateActivity(hours: number = 24, limit: number = 20): Promise<Array<{
+    state: string;
+    users: number;
+}>> {
+    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
+    if (!events) return [];
+
+    const safeHours = Math.max(1, Math.min(168, Math.round(hours)));
+    const safeLimit = Math.max(1, Math.min(100, Math.round(limit)));
+    const start = new Date(Date.now() - safeHours * 60 * 60 * 1000);
+
+    try {
+        const rows = await events.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: start },
+                    type: {
+                        $in: ['announcement_view', 'listing_view'] as AnalyticsEventType[],
+                    },
+                    'metadata.state': {
+                        $exists: true,
+                        $type: 'string',
+                        $ne: '',
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: '$metadata.state',
+                    users: { $sum: 1 },
+                },
+            },
+            { $sort: { users: -1 } },
+            { $limit: safeLimit },
+        ]).toArray();
+
+        return rows
+            .map((row) => ({
+                state: String((row as { _id?: unknown })._id || '').trim(),
+                users: Number((row as { users?: unknown }).users || 0),
+            }))
+            .filter((row) => row.state.length > 0 && Number.isFinite(row.users) && row.users > 0);
+    } catch (error) {
+        console.error('[Analytics] Failed to load geo state activity:', error);
+        return [];
+    }
+}
+
 export async function getFunnelAttributionSplit(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
     totalCardClicks: number;
     cardClicksInApp: number;

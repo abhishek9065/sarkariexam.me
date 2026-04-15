@@ -3,20 +3,9 @@ import { z } from 'zod';
 
 import { config } from '../config.js';
 import { optionalAuth } from '../middleware/auth.js';
+import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { normalizeAttribution } from '../services/attribution.js';
-import { getCollection } from '../services/cosmosdb.js';
-
-interface PushSubscriptionDoc {
-    endpoint: string;
-    keys: {
-        p256dh: string;
-        auth: string;
-    };
-    userId?: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
 
 const router = Router();
 
@@ -28,8 +17,6 @@ const subscriptionSchema = z.object({
         auth: z.string(),
     }),
 });
-
-const getCollectionRef = () => getCollection<PushSubscriptionDoc>('push_subscriptions');
 
 const pickQueryValue = (value: unknown): string | undefined => {
     if (typeof value === 'string') return value;
@@ -91,23 +78,15 @@ router.post('/subscribe', optionalAuth, async (req, res) => {
     const subscription = parseResult.data;
 
     try {
-        const now = new Date();
         const keys = subscription.keys as { p256dh: string; auth: string };
-        await getCollectionRef().updateOne(
-            { endpoint: subscription.endpoint },
-            {
-                $set: {
-                    keys,
-                    userId: req.user?.userId,
-                    updatedAt: now,
-                },
-                $setOnInsert: {
-                    endpoint: subscription.endpoint,
-                    createdAt: now,
-                },
-            },
-            { upsert: true }
-        );
+        const saved = await PushSubscriptionModelPostgres.upsert({
+            endpoint: subscription.endpoint,
+            keys,
+            userId: req.user?.userId,
+        });
+        if (!saved) {
+            throw new Error('Failed to persist push subscription');
+        }
 
         recordAnalyticsEvent({
             type: 'push_subscribe_success',

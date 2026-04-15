@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
-import { AnnouncementModelMongo } from '../models/announcements.mongo.js';
+import AnnouncementModelPostgres from '../models/announcements.postgres.js';
 import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getPathParam } from '../utils/routeParams.js';
@@ -24,7 +24,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
             return res.json({ data: [], count: 0 });
         }
 
-        const announcements = await AnnouncementModelMongo.findByIds(ids);
+        const announcements = await AnnouncementModelPostgres.findByIds(ids);
         const byId = new Map(announcements.map(item => [item.id.toString(), item]));
         const ordered = ids.map(id => byId.get(id)).filter(Boolean);
 
@@ -55,7 +55,7 @@ router.get('/ids', optionalAuth, async (req: Request, res: Response) => {
 
 // Input validation schema for bookmarks
 const bookmarkSchema = z.object({
-    announcementId: z.string().trim().min(1).max(24).regex(/^[a-fA-F0-9]{24}$/, 'Invalid announcement ID format')
+    announcementId: z.string().trim().min(1).max(120)
 });
 
 /**
@@ -74,7 +74,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 
         const { announcementId } = parseResult.data;
 
-        const announcement = await AnnouncementModelMongo.findById(announcementId);
+        const announcement = await AnnouncementModelPostgres.findById(announcementId);
         if (!announcement) {
             return res.status(404).json({ error: 'Announcement not found' });
         }
@@ -108,8 +108,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
             return res.status(400).json({ error: 'announcementId is required' });
         }
 
-        // Validate ObjectId format
-        if (!/^[a-fA-F0-9]{24}$/.test(announcementId)) {
+        if (announcementId.length > 120) {
             return res.status(400).json({ error: 'Invalid announcement ID format' });
         }
 

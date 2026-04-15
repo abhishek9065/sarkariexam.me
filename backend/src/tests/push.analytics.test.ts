@@ -2,8 +2,14 @@ import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { updateOneMock, recordAnalyticsEventMock } = vi.hoisted(() => ({
-    updateOneMock: vi.fn().mockResolvedValue({ acknowledged: true }),
+const { upsertMock, recordAnalyticsEventMock } = vi.hoisted(() => ({
+    upsertMock: vi.fn().mockResolvedValue({
+        id: 'push-sub-id',
+        endpoint: 'https://example.com/push/subscription/1',
+        keys: { p256dh: 'test-p256dh', auth: 'test-auth' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    }),
     recordAnalyticsEventMock: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -11,10 +17,10 @@ vi.mock('../middleware/auth.js', () => ({
     optionalAuth: (_req: any, _res: any, next: any) => next(),
 }));
 
-vi.mock('../services/cosmosdb.js', () => ({
-    getCollection: vi.fn(() => ({
-        updateOne: updateOneMock,
-    })),
+vi.mock('../models/pushSubscriptions.postgres.js', () => ({
+    default: {
+        upsert: upsertMock,
+    },
 }));
 
 vi.mock('../services/analytics.js', () => ({
@@ -36,7 +42,13 @@ describe('push route analytics tracking', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        updateOneMock.mockResolvedValue({ acknowledged: true });
+        upsertMock.mockResolvedValue({
+            id: 'push-sub-id',
+            endpoint: 'https://example.com/push/subscription/1',
+            keys: { p256dh: 'test-p256dh', auth: 'test-auth' },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
         recordAnalyticsEventMock.mockResolvedValue(undefined);
     });
 
@@ -77,7 +89,7 @@ describe('push route analytics tracking', () => {
             });
 
         expect(response.status).toBe(200);
-        expect(updateOneMock).toHaveBeenCalledTimes(1);
+        expect(upsertMock).toHaveBeenCalledTimes(1);
         expect(recordAnalyticsEventMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: 'push_subscribe_attempt',

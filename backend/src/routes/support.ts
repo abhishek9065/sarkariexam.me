@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { optionalAuth } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { getCollection } from '../services/cosmosdb.js';
+import ErrorReportModelPostgres from '../models/errorReports.postgres.js';
 import ErrorTracking from '../services/errorTracking.js';
 
 const router = Router();
@@ -44,8 +44,6 @@ const reportSchema = z.object({
     timestamp: z.string().trim().optional(),
 });
 
-const reportsCollection = () => getCollection<ErrorReportDoc>('error_reports');
-
 router.post('/error-report', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 20, keyPrefix: 'support-error-report' }), optionalAuth, async (req, res) => {
     const parseResult = reportSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -72,7 +70,24 @@ router.post('/error-report', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 
             status: 'new',
         };
 
-        const result = await reportsCollection().insertOne(doc as any);
+        const result = await ErrorReportModelPostgres.create({
+            errorId: doc.errorId,
+            message: doc.message,
+            pageUrl: doc.pageUrl,
+            userAgent: doc.userAgent,
+            note: doc.note,
+            stack: doc.stack,
+            componentStack: doc.componentStack,
+            createdAt: doc.createdAt,
+            userId: doc.userId,
+            userEmail: doc.userEmail,
+            status: doc.status,
+            reviewNote: doc.reviewNote,
+            assigneeEmail: doc.assigneeEmail,
+            release: doc.release,
+            requestId: doc.requestId,
+            sentryEventUrl: doc.sentryEventUrl,
+        });
 
         ErrorTracking.captureMessage(`Client error report: ${doc.errorId}`, 'warning');
         ErrorTracking.addBreadcrumb({
@@ -81,7 +96,7 @@ router.post('/error-report', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 
             level: 'warning',
         });
 
-        return res.status(201).json({ message: 'Report received', id: result.insertedId });
+        return res.status(201).json({ message: 'Report received', id: result.id });
     } catch (error) {
         console.error('Error report create error:', error);
         return res.status(500).json({ error: 'Failed to submit report' });
