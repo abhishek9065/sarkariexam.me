@@ -1716,6 +1716,26 @@
         }
       }
     },
+    "/api/content/pages": {
+      "get": {
+        "summary": "List public content pages",
+        "responses": {
+          "200": {
+            "description": "Content page list"
+          }
+        }
+      }
+    },
+    "/api/content/pages/{slug}": {
+      "get": {
+        "summary": "Get public content page detail by slug",
+        "responses": {
+          "200": {
+            "description": "Content page detail"
+          }
+        }
+      }
+    },
     "/api/content/taxonomies/{type}": {
       "get": {
         "summary": "List public taxonomies",
