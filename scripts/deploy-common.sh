@@ -109,7 +109,7 @@ resolve_postgres_connection_env() {
     export DATABASE_URL="$database_url"
   fi
 
-  if [[ -n "$POSTGRES_PRISMA_URL" || -n "$DATABASE_URL" ]]; then
+  if [[ -n "${POSTGRES_PRISMA_URL:-}" || -n "${DATABASE_URL:-}" ]]; then
     return 0
   fi
 
