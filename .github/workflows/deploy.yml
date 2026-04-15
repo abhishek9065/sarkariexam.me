@@ -94,6 +94,11 @@ jobs:
             "$DO_USER@$DO_HOST"
           )
 
+          if ! "${ssh_cmd[@]}" "echo 'SSH preflight connected'; whoami; hostname"; then
+            echo "SSH preflight failed. Check DO_HOST, DO_USER, DO_PORT, DO_SSH_KEY, and server firewall rules." >&2
+            exit 1
+          fi
+
           set +e
           "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
