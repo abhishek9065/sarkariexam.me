@@ -122,7 +122,16 @@ jobs:
           fi
 
           if [ -z "$repo_dir" ]; then
-            echo "No deployment entrypoint found. Expected scripts/deploy-live.sh in common locations under $HOME." >&2
+            repo_dir="$HOME/sarkari-result"
+            echo "No existing deploy checkout found. Bootstrapping repository at $repo_dir"
+            if [ ! -d "$repo_dir/.git" ]; then
+              rm -rf "$repo_dir"
+              git clone --depth 1 https://github.com/abhishek9065/sarkariexam.me.git "$repo_dir"
+            fi
+          fi
+
+          if [ ! -f "$repo_dir/scripts/deploy-live.sh" ]; then
+            echo "Deployment entrypoint missing at $repo_dir/scripts/deploy-live.sh" >&2
             exit 1
           fi
 
