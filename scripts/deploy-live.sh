@@ -45,9 +45,13 @@ REPO_DIR="$(resolve_repo_dir)"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 exec 9>"$LOCK_FILE"
-if ! flock -w "$LOCK_WAIT_SECONDS" 9; then
-  echo "ERROR: another deployment is already running and lock wait timed out after ${LOCK_WAIT_SECONDS}s. Lock file: $LOCK_FILE" >&2
-  exit 1
+if command -v flock >/dev/null 2>&1; then
+  if ! flock -w "$LOCK_WAIT_SECONDS" 9; then
+    echo "ERROR: another deployment is already running and lock wait timed out after ${LOCK_WAIT_SECONDS}s. Lock file: $LOCK_FILE" >&2
+    exit 1
+  fi
+else
+  echo "NOTICE: flock is not available; continuing without deployment lock."
 fi
 
 exec > >(tee -a "$LOG_FILE") 2>&1
