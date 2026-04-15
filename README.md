@@ -13,14 +13,14 @@ Core platform areas:
 
 - Jobs, results, admit cards, answer keys, syllabus, and admissions
 - Admin tools for content, SEO, analytics, subscribers, notifications, and moderation
-- MongoDB in local development and Azure Cosmos DB (MongoDB API) in production
+- MongoDB in local development for legacy APIs, plus PostgreSQL for Prisma-backed content data
 - JWT auth, CSRF, rate limiting, caching, and OpenAPI documentation
 
 ## Requirements
 
 - Node.js `22.x`
 - npm `10+`
-- MongoDB for local backend development
+- MongoDB for legacy backend flows in local development and PostgreSQL for Prisma-backed content data
 
 ## Local Development
 
@@ -35,6 +35,8 @@ npm run dev
 
 Runs on `http://localhost:5000`.
 
+The backend now also expects a PostgreSQL database for Prisma-backed content data. Make sure `backend/.env` includes `POSTGRES_PRISMA_URL` before starting the server or running the test suite.
+
 If you only need the local Mongo-compatible database for migration rehearsal or backend work:
 
 ```bash
@@ -45,6 +47,7 @@ npm run dev:db:stop
 ```
 
 This uses an in-memory development Mongo server and seeds sample legacy `announcements`. It is for local development only.
+It does not replace the PostgreSQL database required by the current backend content layer.
 
 ### Public Frontend
 
@@ -102,7 +105,7 @@ Recommended production variables:
 
 Local app development uses app-specific env files instead of the server root `.env`:
 
-- `backend`: `backend/.env`
+- `backend`: `backend/.env` with `POSTGRES_PRISMA_URL` for Prisma-backed content data
 - `frontend`: `frontend/.env.local`
 - `frontend` local API base: `NEXT_PUBLIC_API_URL=http://localhost:5000`
 - `admin-next`: `admin-next/.env.local` when needed
