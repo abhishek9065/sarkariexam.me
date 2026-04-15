@@ -94,41 +94,9 @@ jobs:
             "$DO_USER@$DO_HOST"
           )
 
-          if ! "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' bash -s" <<'REMOTE_SCRIPT'
-          set -euo pipefail
+          remote_entrypoint="DEPLOY_MODE='$DEPLOY_MODE' bash -lc 'set -euo pipefail; repo_dir=\"\"; for candidate in \"\$HOME/sarkari-result\" \"\$HOME/sarkariexam.me\" \"/opt/sarkari-result\" \"/var/www/sarkari-result\" \"/srv/sarkari-result\"; do if [ -f \"\$candidate/scripts/deploy-live.sh\" ]; then repo_dir=\"\$candidate\"; break; fi; done; if [ -z \"\$repo_dir\" ]; then discovered=\$(find \"\$HOME\" -maxdepth 4 -type f -path \"*/scripts/deploy-live.sh\" 2>/dev/null | head -n 1 || true); if [ -n \"\$discovered\" ]; then repo_dir=\$(dirname \$(dirname \"\$discovered\")); fi; fi; if [ -z \"\$repo_dir\" ]; then echo \"No deployment entrypoint found. Expected scripts/deploy-live.sh in common locations under \$HOME.\" >&2; exit 1; fi; echo \"Using deployment checkout: \$repo_dir\"; bash \"\$repo_dir/scripts/deploy-live.sh\"'"
 
-          candidates=(
-            "$HOME/sarkari-result"
-            "$HOME/sarkariexam.me"
-            "/opt/sarkari-result"
-            "/var/www/sarkari-result"
-            "/srv/sarkari-result"
-          )
-
-          repo_dir=""
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate/scripts/deploy-live.sh" ]; then
-              repo_dir="$candidate"
-              break
-            fi
-          done
-
-          if [ -z "$repo_dir" ]; then
-            discovered="$(find "$HOME" -maxdepth 4 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 1 || true)"
-            if [ -n "$discovered" ]; then
-              repo_dir="$(dirname "$(dirname "$discovered")")"
-            fi
-          fi
-
-          if [ -z "$repo_dir" ]; then
-            echo "No deployment entrypoint found. Expected scripts/deploy-live.sh in common locations under $HOME." >&2
-            exit 1
-          fi
-
-          echo "Using deployment checkout: $repo_dir"
-          bash "$repo_dir/scripts/deploy-live.sh"
-REMOTE_SCRIPT
-          then
+          if ! "${ssh_cmd[@]}" "$remote_entrypoint"; then
             echo "Deploy via SSH failed. Attempting to print remote deploy log tail..."
             "${ssh_cmd[@]}" "tail -n 200 /tmp/sarkari-result-deploy.log || true" || true
             exit 1
