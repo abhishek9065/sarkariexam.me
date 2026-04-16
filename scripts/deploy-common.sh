@@ -127,8 +127,15 @@ require_var() {
 
 validate_production_env() {
   MISSING_KEYS=()
-  require_var "COSMOS_CONNECTION_STRING"
   require_var "JWT_SECRET"
+
+  local cosmos_connection_string mongodb_uri
+  cosmos_connection_string="$(read_env_var "COSMOS_CONNECTION_STRING")"
+  mongodb_uri="$(read_env_var "MONGODB_URI")"
+
+  if [[ -z "$cosmos_connection_string" && -z "$mongodb_uri" ]]; then
+    MISSING_KEYS+=("COSMOS_CONNECTION_STRING or MONGODB_URI")
+  fi
 
   if [[ "${#MISSING_KEYS[@]}" -gt 0 ]]; then
     echo "ERROR: missing required production env var(s) in .env:"
