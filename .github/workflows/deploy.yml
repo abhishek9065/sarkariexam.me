@@ -3,7 +3,7 @@ name: Deploy to Production
 on:
   workflow_run:
     workflows:
-      - Production Release Validation
+      - CI
     types:
       - completed
 
@@ -19,6 +19,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
     steps:
 
@@ -81,6 +82,7 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_PORT: ${{ secrets.DO_PORT || 22 }}
+          DO_REPO_DIR: ${{ vars.DO_REPO_DIR }}
           DEPLOY_MODE: fast
         run: |
           set -euo pipefail
@@ -103,6 +105,11 @@ jobs:
           "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' DO_REPO_DIR='${DO_REPO_DIR:-}' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
 
+          has_git_checkout() {
+            local dir="$1"
+            [ -d "$dir/.git" ]
+          }
+
           has_deploy_script() {
             local dir="$1"
             [ -f "$dir/scripts/deploy-live.sh" ]
@@ -115,25 +122,49 @@ jobs:
 
           is_ready_checkout() {
             local dir="$1"
-            has_deploy_script "$dir" && has_root_env "$dir"
+            has_git_checkout "$dir" && has_deploy_script "$dir" && has_root_env "$dir"
+          }
+
+          is_checkout_missing_env() {
+            local dir="$1"
+            has_git_checkout "$dir" && has_deploy_script "$dir" && ! has_root_env "$dir"
           }
 
           candidates=(
-            "$HOME/sarkari-result"
             "$HOME/sarkariexam.me"
+            "$HOME/sarkari-result"
+            "/opt/sarkariexam.me"
             "/opt/sarkari-result"
+            "/var/www/sarkariexam.me"
             "/var/www/sarkari-result"
+            "/srv/sarkariexam.me"
             "/srv/sarkari-result"
           )
 
+          canonical_repo_dir="${DO_REPO_DIR:-$HOME/sarkariexam.me}"
+          bootstrap_repo_dir=""
           repo_dir=""
-          script_only_dir=""
+          missing_env_dir=""
 
           if [ -n "${DO_REPO_DIR:-}" ]; then
+            if [ -e "$DO_REPO_DIR" ] && [ ! -d "$DO_REPO_DIR/.git" ]; then
+              echo "Configured DO_REPO_DIR exists but is not a git checkout: $DO_REPO_DIR" >&2
+              echo "Remove it or point DO_REPO_DIR to the production checkout path." >&2
+              exit 1
+            fi
+            if has_git_checkout "$DO_REPO_DIR" && ! has_deploy_script "$DO_REPO_DIR"; then
+              echo "Configured DO_REPO_DIR is missing scripts/deploy-live.sh: $DO_REPO_DIR" >&2
+              exit 1
+            fi
+            if is_checkout_missing_env "$DO_REPO_DIR"; then
+              echo "Deployment config missing at $DO_REPO_DIR/.env" >&2
+              echo "Create $DO_REPO_DIR/.env from .env.example before rerunning deploy." >&2
+              exit 1
+            fi
             if is_ready_checkout "$DO_REPO_DIR"; then
               repo_dir="$DO_REPO_DIR"
-            elif has_deploy_script "$DO_REPO_DIR"; then
-              script_only_dir="$DO_REPO_DIR"
+            else
+              bootstrap_repo_dir="$DO_REPO_DIR"
             fi
           fi
 
@@ -143,8 +174,8 @@ jobs:
                 repo_dir="$candidate"
                 break
               fi
-              if [ -z "$script_only_dir" ] && has_deploy_script "$candidate"; then
-                script_only_dir="$candidate"
+              if [ -z "$missing_env_dir" ] && is_checkout_missing_env "$candidate"; then
+                missing_env_dir="$candidate"
               fi
             done
           fi
@@ -157,22 +188,28 @@ jobs:
                 repo_dir="$candidate"
                 break
               fi
-              if [ -z "$script_only_dir" ] && has_deploy_script "$candidate"; then
-                script_only_dir="$candidate"
+              if [ -z "$missing_env_dir" ] && is_checkout_missing_env "$candidate"; then
+                missing_env_dir="$candidate"
               fi
             done < <(find "$HOME" -maxdepth 6 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 20 || true)
           fi
 
-          if [ -z "$repo_dir" ] && [ -n "$script_only_dir" ]; then
-            repo_dir="$script_only_dir"
-            echo "NOTICE: found checkout without root .env at $repo_dir"
+          if [ -z "$repo_dir" ] && [ -n "$missing_env_dir" ]; then
+            echo "Deployment config missing at $missing_env_dir/.env" >&2
+            echo "Create $missing_env_dir/.env from .env.example before rerunning deploy." >&2
+            exit 1
           fi
 
           if [ -z "$repo_dir" ]; then
-            repo_dir="$HOME/sarkari-result"
+            repo_dir="${bootstrap_repo_dir:-$canonical_repo_dir}"
             echo "No existing deploy checkout found. Bootstrapping repository at $repo_dir"
+            if [ -e "$repo_dir" ] && [ ! -d "$repo_dir/.git" ]; then
+              echo "Bootstrap target exists but is not a git checkout: $repo_dir" >&2
+              echo "Remove it or set DO_REPO_DIR to a clean target path." >&2
+              exit 1
+            fi
             if [ ! -d "$repo_dir/.git" ]; then
-              rm -rf "$repo_dir"
+              mkdir -p "$(dirname "$repo_dir")"
               git clone --depth 1 https://github.com/abhishek9065/sarkariexam.me.git "$repo_dir"
             fi
           fi

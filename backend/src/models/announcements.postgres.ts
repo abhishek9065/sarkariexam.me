@@ -1,8 +1,5 @@
-import { Prisma } from '@prisma/client';
-
 import type { PostRecord } from '../content/types.js';
-import { ensureWorkflowLogsTable } from '../services/postgres/legacyTables.js';
-import { prisma } from '../services/postgres/prisma.js';
+import { prismaApp } from '../services/postgres/prisma.js';
 import type { CreateAnnouncementDto, Announcement, AnnouncementStatus, ContentType } from '../types.js';
 import { slugify } from '../utils/slugify.js';
 
@@ -203,11 +200,6 @@ async function queryAdminPosts(filters?: AdminFindFilters): Promise<PostRecord[]
   return sortAdminPosts(filtered, filters?.sort);
 }
 
-interface WorkflowLogRow {
-  announcement_id: string;
-  metadata: unknown;
-}
-
 interface AssignmentDetails {
   assigneeUserId?: string;
   assigneeEmail?: string;
@@ -226,23 +218,26 @@ function parseOptionalDate(value: unknown): Date | undefined {
 }
 
 async function loadLatestAssignments(announcementIds: string[]): Promise<Map<string, AssignmentDetails>> {
-  await ensureWorkflowLogsTable();
   if (announcementIds.length === 0) return new Map<string, AssignmentDetails>();
 
-  const rows = await prisma.$queryRaw<WorkflowLogRow[]>(Prisma.sql`
-    SELECT announcement_id, metadata
-    FROM app_workflow_logs
-    WHERE announcement_id IN (${Prisma.join(announcementIds)})
-      AND action = ${'assigned'}
-    ORDER BY created_at DESC
-  `);
+  const rows = await prismaApp.workflowLogEntry.findMany({
+    where: {
+      announcementId: { in: announcementIds },
+      action: 'assigned',
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      announcementId: true,
+      metadata: true,
+    },
+  });
 
   const assignments = new Map<string, AssignmentDetails>();
   for (const row of rows) {
-    if (assignments.has(row.announcement_id)) continue;
+    if (assignments.has(row.announcementId)) continue;
 
     const metadata = asObject(row.metadata);
-    assignments.set(row.announcement_id, {
+    assignments.set(row.announcementId, {
       assigneeUserId: typeof metadata?.assigneeUserId === 'string' ? metadata.assigneeUserId : undefined,
       assigneeEmail: typeof metadata?.assignee === 'string' ? metadata.assignee : undefined,
       reviewDueAt: parseOptionalDate(metadata?.reviewDueAt),

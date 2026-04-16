@@ -1,12 +1,10 @@
 import { randomUUID } from 'crypto';
 
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import PostModelPostgres from '../models/posts.postgres.js';
 
-import { ensureWorkflowLogsTable } from './postgres/legacyTables.js';
-import { prisma } from './postgres/prisma.js';
+import { prismaApp } from './postgres/prisma.js';
 
 const assignmentSchema = z.object({
   announcementId: z.string(),
@@ -14,15 +12,6 @@ const assignmentSchema = z.object({
   assigneeEmail: z.string().email(),
   reviewDueAt: z.string().datetime().optional(),
 });
-
-interface WorkflowLogRow {
-  id: string;
-  announcement_id: string;
-  action: string;
-  actor: string;
-  metadata: unknown;
-  created_at: Date;
-}
 
 interface WorkflowLog {
   id: string;
@@ -54,27 +43,34 @@ function toDateOrUndefined(value: unknown): Date | undefined {
 }
 
 async function getLatestAssignments(announcementIds: string[]): Promise<Map<string, AssignmentDetails>> {
-  await ensureWorkflowLogsTable();
   if (announcementIds.length === 0) {
     return new Map<string, AssignmentDetails>();
   }
 
-  const rows = await prisma.$queryRaw<WorkflowLogRow[]>(Prisma.sql`
-    SELECT id, announcement_id, action, actor, metadata, created_at
-    FROM app_workflow_logs
-    WHERE announcement_id IN (${Prisma.join(announcementIds)})
-      AND action = ${'assigned'}
-    ORDER BY created_at DESC
-  `);
+  const rows = await prismaApp.workflowLogEntry.findMany({
+    where: {
+      announcementId: { in: announcementIds },
+      action: 'assigned',
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      announcementId: true,
+      action: true,
+      actor: true,
+      metadata: true,
+      createdAt: true,
+    },
+  });
 
   const assignments = new Map<string, AssignmentDetails>();
   for (const row of rows) {
-    if (assignments.has(row.announcement_id)) {
+    if (assignments.has(row.announcementId)) {
       continue;
     }
 
     const metadata = asObject(row.metadata);
-    assignments.set(row.announcement_id, {
+    assignments.set(row.announcementId, {
       assigneeUserId: typeof metadata?.assigneeUserId === 'string' ? metadata.assigneeUserId : undefined,
       assigneeEmail: typeof metadata?.assignee === 'string' ? metadata.assignee : undefined,
       assignedAt: toDateOrUndefined(metadata?.assignedAt),
@@ -120,14 +116,11 @@ export async function assignAnnouncement(data: unknown, assignedBy: string) {
 
 export async function approveAnnouncement(announcementId: string, approvedBy: string, note?: string) {
   try {
-    const approvedAt = new Date().toISOString();
     const updated = await PostModelPostgres.update(
       announcementId,
       {
-        status: 'published',
+        status: 'approved',
         approvedBy,
-        publishedBy: approvedBy,
-        publishedAt: approvedAt,
       },
       approvedBy,
       'admin',
@@ -167,47 +160,15 @@ export async function rejectAnnouncement(announcementId: string, rejectedBy: str
 }
 
 async function addWorkflowLog(announcementId: string, action: string, actor: string, metadata?: Record<string, unknown>) {
-  await ensureWorkflowLogsTable();
-  const metadataJson = metadata ? JSON.stringify(metadata) : null;
-
-  if (metadataJson) {
-    await prisma.$executeRaw`
-      INSERT INTO app_workflow_logs (
-        id,
-        announcement_id,
-        action,
-        actor,
-        metadata,
-        created_at
-      ) VALUES (
-        ${randomUUID()},
-        ${announcementId},
-        ${action},
-        ${actor},
-        ${metadataJson}::jsonb,
-        NOW()
-      )
-    `;
-    return;
-  }
-
-  await prisma.$executeRaw`
-    INSERT INTO app_workflow_logs (
-      id,
-      announcement_id,
+  await prismaApp.workflowLogEntry.create({
+    data: {
+      id: randomUUID(),
+      announcementId,
       action,
       actor,
-      metadata,
-      created_at
-    ) VALUES (
-      ${randomUUID()},
-      ${announcementId},
-      ${action},
-      ${actor},
-      ${null},
-      NOW()
-    )
-  `;
+      ...(metadata ? { metadata } : {}),
+    },
+  });
 }
 
 export async function getPendingApprovals(assigneeEmail?: string) {
@@ -253,21 +214,26 @@ export async function getPendingApprovals(assigneeEmail?: string) {
 
 export async function getWorkflowLogs(announcementId: string) {
   try {
-    await ensureWorkflowLogsTable();
-    const rows = await prisma.$queryRaw<WorkflowLogRow[]>(Prisma.sql`
-      SELECT id, announcement_id, action, actor, metadata, created_at
-      FROM app_workflow_logs
-      WHERE announcement_id = ${announcementId}
-      ORDER BY created_at DESC
-    `);
+    const rows = await prismaApp.workflowLogEntry.findMany({
+      where: { announcementId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        announcementId: true,
+        action: true,
+        actor: true,
+        metadata: true,
+        createdAt: true,
+      },
+    });
 
     return rows.map((row): WorkflowLog => ({
       id: row.id,
-      announcementId: row.announcement_id,
+      announcementId: row.announcementId,
       action: row.action,
       actor: row.actor,
       metadata: asObject(row.metadata),
-      createdAt: row.created_at,
+      createdAt: row.createdAt,
     }));
   } catch {
     return [];

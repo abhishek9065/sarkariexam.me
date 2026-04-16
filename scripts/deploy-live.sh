@@ -2,15 +2,29 @@
 
 set -euo pipefail
 
-PRIMARY_REPO_DIR="$HOME/sarkari-result"
-FALLBACK_REPO_DIR="$HOME/sarkariexam.me"
+PRIMARY_REPO_DIR="$HOME/sarkariexam.me"
 LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
 LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-900}"
 
+has_git_checkout() {
+  local dir="$1"
+  [[ -d "$dir/.git" ]]
+}
+
+has_deploy_script() {
+  local dir="$1"
+  [[ -f "$dir/scripts/deploy-live.sh" ]]
+}
+
+has_root_env() {
+  local dir="$1"
+  [[ -f "$dir/.env" ]]
+}
+
 is_valid_repo_dir() {
   local dir="$1"
-  [[ -d "$dir" && -f "$dir/scripts/deploy-live.sh" && -f "$dir/.env" ]]
+  has_git_checkout "$dir" && has_deploy_script "$dir" && has_root_env "$dir"
 }
 
 resolve_repo_dir() {
@@ -20,7 +34,14 @@ resolve_repo_dir() {
       return 0
     fi
 
-    echo "ERROR: REPO_DIR_OVERRIDE is set but missing scripts/deploy-live.sh or root .env: ${REPO_DIR_OVERRIDE}" >&2
+    if ! has_git_checkout "${REPO_DIR_OVERRIDE}"; then
+      echo "ERROR: REPO_DIR_OVERRIDE is not a git checkout: ${REPO_DIR_OVERRIDE}" >&2
+    elif ! has_deploy_script "${REPO_DIR_OVERRIDE}"; then
+      echo "ERROR: REPO_DIR_OVERRIDE is missing scripts/deploy-live.sh: ${REPO_DIR_OVERRIDE}" >&2
+    elif ! has_root_env "${REPO_DIR_OVERRIDE}"; then
+      echo "ERROR: REPO_DIR_OVERRIDE is missing root .env: ${REPO_DIR_OVERRIDE}" >&2
+      echo "Create ${REPO_DIR_OVERRIDE}/.env from .env.example before rerunning deploy." >&2
+    fi
     exit 1
   fi
 
@@ -29,12 +50,14 @@ resolve_repo_dir() {
     return 0
   fi
 
-  if is_valid_repo_dir "$FALLBACK_REPO_DIR"; then
-    printf '%s' "$FALLBACK_REPO_DIR"
-    return 0
-  fi
-
-  for candidate in /opt/sarkari-result /var/www/sarkari-result /srv/sarkari-result; do
+  for candidate in \
+    "$HOME/sarkari-result" \
+    /opt/sarkariexam.me \
+    /opt/sarkari-result \
+    /var/www/sarkariexam.me \
+    /var/www/sarkari-result \
+    /srv/sarkariexam.me \
+    /srv/sarkari-result; do
     if is_valid_repo_dir "$candidate"; then
       printf '%s' "$candidate"
       return 0
@@ -51,7 +74,7 @@ resolve_repo_dir() {
   done < <(find "$HOME" -maxdepth 6 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 20 || true)
 
   echo "ERROR: no deployment checkout with scripts/deploy-live.sh and root .env was found." >&2
-  echo "Checked: $PRIMARY_REPO_DIR, $FALLBACK_REPO_DIR, /opt/sarkari-result, /var/www/sarkari-result, /srv/sarkari-result, and discovered paths under $HOME." >&2
+  echo "Checked: $PRIMARY_REPO_DIR, $HOME/sarkari-result, /opt/sarkariexam.me, /opt/sarkari-result, /var/www/sarkariexam.me, /var/www/sarkari-result, /srv/sarkariexam.me, /srv/sarkari-result, and discovered paths under $HOME." >&2
   exit 1
 }
 

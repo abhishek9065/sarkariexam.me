@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
   workflow_call:
   pull_request:
 
@@ -48,8 +51,11 @@ jobs:
           npx prisma migrate deploy
 
       - name: Verify bundled OpenAPI spec is in sync
-        working-directory: .
-        run: cmp openapi.json backend/openapi.json
+        run: |
+          if ! diff -u ../openapi.json openapi.json; then
+            echo "::error::openapi.json and backend/openapi.json are out of sync. Regenerate and commit both files."
+            exit 1
+          fi
 
       - name: Lint backend
         run: npm run lint
