@@ -8,36 +8,50 @@ LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
 LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-900}"
 
+is_valid_repo_dir() {
+  local dir="$1"
+  [[ -d "$dir" && -f "$dir/scripts/deploy-live.sh" && -f "$dir/.env" ]]
+}
+
 resolve_repo_dir() {
-  if [[ -n "${REPO_DIR_OVERRIDE:-}" && -d "${REPO_DIR_OVERRIDE}" ]]; then
-    printf '%s' "${REPO_DIR_OVERRIDE}"
-    return 0
+  if [[ -n "${REPO_DIR_OVERRIDE:-}" ]]; then
+    if is_valid_repo_dir "${REPO_DIR_OVERRIDE}"; then
+      printf '%s' "${REPO_DIR_OVERRIDE}"
+      return 0
+    fi
+
+    echo "ERROR: REPO_DIR_OVERRIDE is set but missing scripts/deploy-live.sh or root .env: ${REPO_DIR_OVERRIDE}" >&2
+    exit 1
   fi
 
-  if [[ -d "$PRIMARY_REPO_DIR" ]]; then
+  if is_valid_repo_dir "$PRIMARY_REPO_DIR"; then
     printf '%s' "$PRIMARY_REPO_DIR"
     return 0
   fi
 
-  if [[ -d "$FALLBACK_REPO_DIR" ]]; then
+  if is_valid_repo_dir "$FALLBACK_REPO_DIR"; then
     printf '%s' "$FALLBACK_REPO_DIR"
     return 0
   fi
 
   for candidate in /opt/sarkari-result /var/www/sarkari-result /srv/sarkari-result; do
-    if [[ -d "$candidate" ]]; then
+    if is_valid_repo_dir "$candidate"; then
       printf '%s' "$candidate"
       return 0
     fi
   done
 
-  discovered_script="$(find "$HOME" -maxdepth 4 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 1 || true)"
-  if [[ -n "$discovered_script" ]]; then
-    dirname "$(dirname "$discovered_script")"
-    return 0
-  fi
+  while IFS= read -r discovered_script; do
+    [[ -z "$discovered_script" ]] && continue
+    discovered_repo="$(dirname "$(dirname "$discovered_script")")"
+    if is_valid_repo_dir "$discovered_repo"; then
+      printf '%s' "$discovered_repo"
+      return 0
+    fi
+  done < <(find "$HOME" -maxdepth 6 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 20 || true)
 
-  echo "ERROR: deployment checkout not found at $PRIMARY_REPO_DIR or $FALLBACK_REPO_DIR" >&2
+  echo "ERROR: no deployment checkout with scripts/deploy-live.sh and root .env was found." >&2
+  echo "Checked: $PRIMARY_REPO_DIR, $FALLBACK_REPO_DIR, /opt/sarkari-result, /var/www/sarkari-result, /srv/sarkari-result, and discovered paths under $HOME." >&2
   exit 1
 }
 

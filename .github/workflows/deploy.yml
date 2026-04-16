@@ -100,8 +100,23 @@ jobs:
           fi
 
           set +e
-          "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' bash -s" <<'REMOTE_SCRIPT'
+          "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' DO_REPO_DIR='${DO_REPO_DIR:-}' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
+
+          has_deploy_script() {
+            local dir="$1"
+            [ -f "$dir/scripts/deploy-live.sh" ]
+          }
+
+          has_root_env() {
+            local dir="$1"
+            [ -f "$dir/.env" ]
+          }
+
+          is_ready_checkout() {
+            local dir="$1"
+            has_deploy_script "$dir" && has_root_env "$dir"
+          }
 
           candidates=(
             "$HOME/sarkari-result"
@@ -112,18 +127,45 @@ jobs:
           )
 
           repo_dir=""
-          for candidate in "${candidates[@]}"; do
-            if [ -f "$candidate/scripts/deploy-live.sh" ]; then
-              repo_dir="$candidate"
-              break
+          script_only_dir=""
+
+          if [ -n "${DO_REPO_DIR:-}" ]; then
+            if is_ready_checkout "$DO_REPO_DIR"; then
+              repo_dir="$DO_REPO_DIR"
+            elif has_deploy_script "$DO_REPO_DIR"; then
+              script_only_dir="$DO_REPO_DIR"
             fi
-          done
+          fi
 
           if [ -z "$repo_dir" ]; then
-            discovered="$(find "$HOME" -maxdepth 4 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 1 || true)"
-            if [ -n "$discovered" ]; then
-              repo_dir="$(dirname "$(dirname "$discovered")")"
-            fi
+            for candidate in "${candidates[@]}"; do
+              if is_ready_checkout "$candidate"; then
+                repo_dir="$candidate"
+                break
+              fi
+              if [ -z "$script_only_dir" ] && has_deploy_script "$candidate"; then
+                script_only_dir="$candidate"
+              fi
+            done
+          fi
+
+          if [ -z "$repo_dir" ]; then
+            while IFS= read -r discovered; do
+              [ -z "$discovered" ] && continue
+              candidate="$(dirname "$(dirname "$discovered")")"
+              if is_ready_checkout "$candidate"; then
+                repo_dir="$candidate"
+                break
+              fi
+              if [ -z "$script_only_dir" ] && has_deploy_script "$candidate"; then
+                script_only_dir="$candidate"
+              fi
+            done < <(find "$HOME" -maxdepth 6 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 20 || true)
+          fi
+
+          if [ -z "$repo_dir" ] && [ -n "$script_only_dir" ]; then
+            repo_dir="$script_only_dir"
+            echo "NOTICE: found checkout without root .env at $repo_dir"
           fi
 
           if [ -z "$repo_dir" ]; then
@@ -140,8 +182,14 @@ jobs:
             exit 1
           fi
 
+          if [ ! -f "$repo_dir/.env" ]; then
+            echo "Deployment config missing at $repo_dir/.env" >&2
+            echo "Create $repo_dir/.env from .env.example on the deployment checkout path." >&2
+            exit 1
+          fi
+
           echo "Using deployment checkout: $repo_dir"
-          bash "$repo_dir/scripts/deploy-live.sh"
+          REPO_DIR_OVERRIDE="$repo_dir" bash "$repo_dir/scripts/deploy-live.sh"
           REMOTE_SCRIPT
           ssh_exit=$?
           set -e
