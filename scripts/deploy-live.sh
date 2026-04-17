@@ -146,6 +146,7 @@ validate_repo_checkout() {
   [[ -d "$REPO_DIR" ]] || die "Configured repository directory does not exist: ${REPO_DIR}"
   [[ -d "$REPO_DIR/.git" ]] || die "Configured repository directory is not a git checkout: ${REPO_DIR}"
   require_file "$REPO_DIR/scripts/deploy-live.sh"
+  require_file "$REPO_DIR/scripts/deploy-common.sh"
   require_file "$REPO_DIR/scripts/deploy-fast.sh"
   require_file "$REPO_DIR/scripts/deploy-prod.sh"
   require_file "$REPO_DIR/docker-compose.yml"
@@ -196,7 +197,10 @@ validate_mode
 
 mkdir -p "$(dirname "$LOG_FILE")"
 exec 9>"$LOCK_FILE"
-flock -w "$LOCK_WAIT_SECONDS" 9
+if ! flock -w "$LOCK_WAIT_SECONDS" 9; then
+  die "Timed out waiting for deploy lock after ${LOCK_WAIT_SECONDS}s. Another deployment may still be running."
+fi
+: > "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=== Remote deploy started at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ==="

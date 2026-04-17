@@ -282,17 +282,18 @@ purge_cloudflare_cache() {
 verify_public_endpoint() {
   local path="$1"
   local label="$2"
+  local expected_pattern="${3:-^(2|3)}"
   local url="${PUBLIC_BASE_URL%/}${path}"
   local status
 
   status="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 15 "$url" || true)"
-  if [[ "$status" =~ ^(2|3) ]]; then
+  if [[ "$status" =~ $expected_pattern ]]; then
     echo "ok (${label} -> ${url}, status=${status})"
     return 0
   fi
 
   record_diagnosis "Public check '${label}' failed for ${url}. Inspect nginx, backend, frontend, and admin logs plus the public ingress configuration."
-  echo "ERROR: ${label} failed for ${url} (status=${status:-none})"
+  echo "ERROR: ${label} failed for ${url} (status=${status:-none}, expected=${expected_pattern})"
   return 1
 }
 
@@ -350,13 +351,17 @@ print_success_summary() {
   local mode="$1"
   local backend_health_result="$2"
   local public_health_result="$3"
+  local rollback_sha="${DEPLOY_PREVIOUS_SHA:-unknown}"
+  local rollback_repo="${DEPLOY_REPO_DIR:-$ROOT_DIR}"
+  local escaped_repo
+  printf -v escaped_repo '%q' "$rollback_repo"
 
   echo "DEPLOY SUMMARY"
   echo "  deployed_sha: ${DEPLOY_TARGET_SHA:-unknown}"
-  echo "  previous_sha: ${DEPLOY_PREVIOUS_SHA:-unknown}"
-  echo "  repo_path: ${DEPLOY_REPO_DIR:-$ROOT_DIR}"
+  echo "  previous_sha: ${rollback_sha}"
+  echo "  repo_path: ${rollback_repo}"
   echo "  mode: ${mode}"
   echo "  backend_health: ${backend_health_result}"
   echo "  public_health: ${public_health_result}"
-  echo "  rollback_hint: git -C ${DEPLOY_REPO_DIR:-$ROOT_DIR} checkout --detach ${DEPLOY_PREVIOUS_SHA:-unknown}"
+  echo "  rollback_hint: cd ${escaped_repo} && DO_REPO_DIR=${escaped_repo} bash scripts/deploy-live.sh --mode ${mode} --sha ${rollback_sha}"
 }

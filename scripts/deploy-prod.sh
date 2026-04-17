@@ -53,8 +53,8 @@ set_stage "purge-cache"
 purge_cloudflare_cache || true
 
 set_stage "public-checks"
-verify_public_endpoint "/api/health" "backend health"
-verify_public_endpoint "/api/health/deep" "backend deep health"
+verify_public_endpoint "/api/health" "backend health" "^200$"
+verify_public_endpoint "/api/health/deep" "backend deep health" "^200$"
 verify_public_endpoint "/" "homepage"
 check_public_route_assets "/" "homepage"
 verify_public_endpoint "/jobs" "jobs listing"

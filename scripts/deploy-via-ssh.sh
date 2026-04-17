@@ -153,6 +153,8 @@ run_remote_preflight() {
   local remote_command
   remote_command="$(build_remote_helper_command 1)"
   if ! remote_run "$remote_command"; then
+    echo "Remote preflight failed. Recent remote log tail:" >&2
+    remote_run "tail -n 120 $(shell_escape "$REMOTE_LOG_FILE") || true" || true
     fail "Remote preflight failed. Check the remote prerequisite output above."
   fi
 }

@@ -22,6 +22,7 @@ Variables:
 - The checkout contains:
   - `docker-compose.yml`
   - `scripts/deploy-live.sh`
+  - `scripts/deploy-common.sh`
   - `scripts/deploy-fast.sh`
   - `scripts/deploy-prod.sh`
   - root `.env`
@@ -68,7 +69,8 @@ git status --short --untracked-files=all
 5. Run the remote preflight only:
 
 ```bash
-DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --preflight-only --mode fast --sha <main-sha>
+cd "$DO_REPO_DIR"
+DO_REPO_DIR="$DO_REPO_DIR" bash scripts/deploy-live.sh --preflight-only --mode fast --sha <main-sha>
 ```
 
 6. Fix any reported prerequisite failure before attempting a live deploy.
@@ -103,5 +105,6 @@ Common actionable failures:
 - Manual rollback: use the `previous_sha` printed in the deploy summary.
 
 ```bash
-git -C "$DO_REPO_DIR" checkout --detach <previous_sha>
+cd "$DO_REPO_DIR"
+DO_REPO_DIR="$DO_REPO_DIR" bash scripts/deploy-live.sh --mode fast --sha <previous_sha>
 ```
