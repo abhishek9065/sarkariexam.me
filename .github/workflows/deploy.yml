@@ -15,305 +15,75 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    name: Evaluate Deploy Gate
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.evaluate.outputs.should_deploy }}
+    steps:
+      - name: Evaluate workflow_run gate
+        id: evaluate
+        env:
+          TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+          should_deploy=false
+          if [[ "${TRIGGER_CONCLUSION}" == "success" && "${TRIGGER_EVENT}" == "push" && "${TRIGGER_BRANCH}" == "main" ]]; then
+            should_deploy=true
+          fi
+          echo "should_deploy=${should_deploy}" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize gate decision
+        env:
+          SHOULD_DEPLOY: ${{ steps.evaluate.outputs.should_deploy }}
+          TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          {
+            echo "## Production Deploy Gate"
+            echo
+            echo "- Workflow: ${TRIGGER_WORKFLOW}"
+            echo "- Event: ${TRIGGER_EVENT}"
+            echo "- Branch: ${TRIGGER_BRANCH}"
+            echo "- Conclusion: ${TRIGGER_CONCLUSION}"
+            echo "- Target SHA: ${TRIGGER_SHA}"
+            echo "- Allowed to deploy: ${SHOULD_DEPLOY}"
+            if [[ "${SHOULD_DEPLOY}" != "true" ]]; then
+              echo "- Reason: deploy only runs for successful \`CI\` workflow_run events from pushes to \`main\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: Deploy to DigitalOcean
+    needs:
+      - gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment: production
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
+    if: needs.gate.outputs.should_deploy == 'true'
     steps:
-      - name: Check deploy configuration
+      - name: Checkout target commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Run deploy helper
         env:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
-        run: |
-          missing=0
-          for key in DO_HOST DO_USER DO_SSH_KEY; do
-            if [ -z "${!key}" ]; then
-              echo "Missing required secret: $key"
-              missing=1
-            fi
-          done
-          if [ "$missing" -eq 1 ]; then
-            echo "Production deploy secrets are required. Configure them before running this workflow."
-            exit 1
-          fi
-
-      - name: Prepare SSH
-        env:
-          DO_HOST: ${{ secrets.DO_HOST }}
-          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
-          DO_PORT: ${{ secrets.DO_PORT || 22 }}
           DO_HOST_FINGERPRINT: ${{ vars.DO_HOST_FINGERPRINT }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.ssh"
-          chmod 700 "$HOME/.ssh"
-          validate_key() {
-            chmod 600 "$1"
-            ssh-keygen -y -f "$1" > /dev/null 2>&1
-          }
-          key_file="$HOME/.ssh/deploy_key"
-          printf '%s\n' "$DO_SSH_KEY" | tr -d '\r' > "$key_file"
-          if ! validate_key "$key_file"; then
-            printf '%b\n' "$DO_SSH_KEY" | tr -d '\r' > "$key_file"
-          fi
-          if ! validate_key "$key_file"; then
-            printf '%s' "$DO_SSH_KEY" | tr -d '\r\n ' | base64 -d > "$key_file" 2>/dev/null || true
-          fi
-          if ! validate_key "$key_file"; then
-            echo "DO_SSH_KEY is not a valid private key." >&2
-            exit 1
-          fi
-
-          scanned_keys="$(ssh-keyscan -p "$DO_PORT" -H "$DO_HOST" 2>/dev/null || true)"
-          if [ -z "$scanned_keys" ]; then
-            echo "Failed to fetch SSH host key for $DO_HOST:$DO_PORT" >&2
-            exit 1
-          fi
-
-          if [ -n "${DO_HOST_FINGERPRINT:-}" ]; then
-            scanned_fingerprints="$(printf '%s\n' "$scanned_keys" | ssh-keygen -lf - -E sha256 | awk '{print $2}' | sort -u)"
-            if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
-              echo "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)." >&2
-              echo "Expected: $DO_HOST_FINGERPRINT" >&2
-              echo "Scanned:" >&2
-              printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}' >&2
-              exit 1
-            fi
-          else
-            echo "NOTICE: DO_HOST_FINGERPRINT is not configured; host key trust is TOFU."
-          fi
-
-          printf '%s\n' "$scanned_keys" >> "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
-
-      - name: Deploy via SSH
-        env:
-          DO_HOST: ${{ secrets.DO_HOST }}
-          DO_USER: ${{ secrets.DO_USER }}
           DO_PORT: ${{ secrets.DO_PORT || 22 }}
           DO_REPO_DIR: ${{ vars.DO_REPO_DIR }}
-          REPO_SLUG: ${{ github.repository }}
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           DEPLOY_MODE: fast
-          POSTGRES_PRISMA_URL: ${{ secrets.POSTGRES_PRISMA_URL }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          set -euo pipefail
-          ssh_cmd=(
-            ssh
-            -i "$HOME/.ssh/deploy_key"
-            -p "$DO_PORT"
-            -o BatchMode=yes
-            -o StrictHostKeyChecking=yes
-            -o ConnectTimeout=15
-            "$DO_USER@$DO_HOST"
-          )
-          if ! "${ssh_cmd[@]}" "echo 'SSH preflight connected'; whoami; hostname"; then
-            echo "SSH preflight failed." >&2
-            exit 1
-          fi
-
-          if [ -z "${TRIGGER_SHA:-}" ]; then
-            echo "Missing trigger SHA from workflow_run payload; refusing to deploy unpinned code." >&2
-            exit 1
-          fi
-
-          env_payload_file="$(mktemp)"
-          {
-            if [ -n "${POSTGRES_PRISMA_URL:-}" ]; then
-              printf 'POSTGRES_PRISMA_URL=%q\n' "$POSTGRES_PRISMA_URL"
-            fi
-            if [ -n "${DATABASE_URL:-}" ]; then
-              printf 'DATABASE_URL=%q\n' "$DATABASE_URL"
-            fi
-          } > "$env_payload_file"
-
-          remote_env_file="/tmp/sarkari-actions.env"
-          if ! "${ssh_cmd[@]}" "cat > '$remote_env_file' && chmod 600 '$remote_env_file'" < "$env_payload_file"; then
-            rm -f "$env_payload_file"
-            echo "Failed to transfer deploy secret payload to remote host." >&2
-            exit 1
-          fi
-          rm -f "$env_payload_file"
-          set +e
-          "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' DO_REPO_DIR='${DO_REPO_DIR:-}' REPO_SLUG='${REPO_SLUG:-}' TRIGGER_SHA='${TRIGGER_SHA:-}' ACTIONS_ENV_FILE='$remote_env_file' bash -s" <<'REMOTE_SCRIPT'
-          set -euo pipefail
-
-          repo_slug="${REPO_SLUG:-}"
-          if [ -z "$repo_slug" ]; then
-            repo_slug="abhishek9065/sarkariexam.me"
-          fi
-          repo_url="https://github.com/${repo_slug}.git"
-          target_sha="${TRIGGER_SHA:-}"
-
-          if [ -n "${ACTIONS_ENV_FILE:-}" ] && [ -f "${ACTIONS_ENV_FILE:-}" ]; then
-            set -a
-            # shellcheck disable=SC1090
-            . "$ACTIONS_ENV_FILE"
-            set +a
-            rm -f "$ACTIONS_ENV_FILE"
-          fi
-
-          has_git_checkout() {
-            local dir="$1"
-            [ -d "$dir/.git" ]
-          }
-
-          has_deploy_script() {
-            local dir="$1"
-            [ -f "$dir/scripts/deploy-live.sh" ]
-          }
-
-          has_root_env() {
-            local dir="$1"
-            [ -f "$dir/.env" ]
-          }
-
-          is_ready_checkout() {
-            local dir="$1"
-            has_git_checkout "$dir" && has_deploy_script "$dir" && has_root_env "$dir"
-          }
-
-          is_checkout_missing_env() {
-            local dir="$1"
-            has_git_checkout "$dir" && has_deploy_script "$dir" && ! has_root_env "$dir"
-          }
-          candidates=(
-            "$HOME/sarkariexam.me" "$HOME/sarkari-result"
-            "/opt/sarkariexam.me" "/opt/sarkari-result"
-            "/var/www/sarkariexam.me" "/var/www/sarkari-result"
-            "/srv/sarkariexam.me" "/srv/sarkari-result"
-          )
-          canonical_repo_dir="${DO_REPO_DIR:-$HOME/sarkariexam.me}"
-          repo_dir=""
-          missing_env_dir=""
-          bootstrap_repo_dir=""
-          if [ -n "${DO_REPO_DIR:-}" ]; then
-            if is_ready_checkout "$DO_REPO_DIR"; then
-              repo_dir="$DO_REPO_DIR"
-            elif is_checkout_missing_env "$DO_REPO_DIR"; then
-              repo_dir="$DO_REPO_DIR"
-              missing_env_dir="$DO_REPO_DIR"
-            elif [ ! -e "$DO_REPO_DIR" ] || [ -d "$DO_REPO_DIR/.git" ]; then
-              bootstrap_repo_dir="$DO_REPO_DIR"
-            fi
-          fi
-          if [ -z "$repo_dir" ]; then
-            for candidate in "${candidates[@]}"; do
-              if is_ready_checkout "$candidate"; then
-                repo_dir="$candidate"; break
-              elif [ -z "$missing_env_dir" ] && is_checkout_missing_env "$candidate"; then
-                missing_env_dir="$candidate"; repo_dir="$candidate"
-              fi
-            done
-          fi
-          if [ -z "$repo_dir" ]; then
-            while IFS= read -r discovered; do
-              [ -z "$discovered" ] && continue
-              candidate="$(dirname "$(dirname "$discovered")")"  
-              if is_ready_checkout "$candidate"; then
-                repo_dir="$candidate"; break
-              elif [ -z "$missing_env_dir" ] && is_checkout_missing_env "$candidate"; then
-                missing_env_dir="$candidate"; repo_dir="$candidate"
-              fi
-            done < <(find "$HOME" -maxdepth 6 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 20 || true)
-          fi
-          if [ -z "$repo_dir" ]; then
-            repo_dir="${bootstrap_repo_dir:-$canonical_repo_dir}"
-            echo "No existing checkout found. Bootstrapping at $repo_dir"
-            if [ -e "$repo_dir" ] && [ ! -d "$repo_dir/.git" ]; then
-              repo_dir="$HOME/sarkariexam.me"
-            fi
-            if [ ! -d "$repo_dir/.git" ]; then
-              mkdir -p "$(dirname "$repo_dir")"
-              git clone "$repo_url" "$repo_dir"
-            fi
-          fi
-          if [ ! -f "$repo_dir/scripts/deploy-live.sh" ]; then
-            echo "Deployment entrypoint missing at $repo_dir/scripts/deploy-live.sh" >&2; exit 1
-          fi
-
-          sync_checkout_to_target() {
-            local dir="$1"
-            local sha="${2:-}"
-
-            git -C "$dir" config --global --add safe.directory "$dir" >/dev/null 2>&1 || true
-            git -C "$dir" config --add safe.directory "$dir" >/dev/null 2>&1 || true
-
-            git -C "$dir" -c safe.directory="$dir" fetch --prune origin main
-
-            if [ -n "$sha" ]; then
-              if ! git -C "$dir" -c safe.directory="$dir" cat-file -e "${sha}^{commit}" 2>/dev/null; then
-                git -C "$dir" -c safe.directory="$dir" fetch origin "$sha"
-              fi
-              git -C "$dir" -c safe.directory="$dir" checkout --detach "$sha"
-            else
-              git -C "$dir" -c safe.directory="$dir" checkout main
-              git -C "$dir" -c safe.directory="$dir" pull --ff-only origin main
-            fi
-          }
-
-          if ! sync_checkout_to_target "$repo_dir" "$target_sha"; then
-            echo "NOTICE: unable to fast-forward existing checkout at $repo_dir"
-            echo "NOTICE: attempting a clean fallback clone for deploy execution."
-
-            fallback_repo_dir="${repo_dir}.fresh.$$"
-            rm -rf "$fallback_repo_dir"
-            mkdir -p "$(dirname "$fallback_repo_dir")"
-            git clone "$repo_url" "$fallback_repo_dir"
-            if [ -f "$repo_dir/.env" ] && [ ! -f "$fallback_repo_dir/.env" ]; then
-              cp "$repo_dir/.env" "$fallback_repo_dir/.env"
-            fi
-            repo_dir="$fallback_repo_dir"
-
-            if ! sync_checkout_to_target "$repo_dir" "$target_sha"; then
-              echo "Unable to sync fallback checkout to requested target SHA: ${target_sha:-<none>}" >&2
-              exit 1
-            fi
-          fi
-          # Ensure .env exists; create from GitHub Secrets if missing
-          if [ ! -f "$repo_dir/.env" ]; then
-            echo "NOTICE: .env not found -- creating from GitHub Secrets."
-            touch "$repo_dir/.env"
-          fi
-          # Upsert POSTGRES_PRISMA_URL from GitHub Secret
-          if [ -n "${POSTGRES_PRISMA_URL:-}" ]; then
-            if grep -q "^POSTGRES_PRISMA_URL=" "$repo_dir/.env"; then
-              sed -i "s|^POSTGRES_PRISMA_URL=.*|POSTGRES_PRISMA_URL=\"${POSTGRES_PRISMA_URL}\"|" "$repo_dir/.env"
-            else
-              echo "POSTGRES_PRISMA_URL=\"${POSTGRES_PRISMA_URL}\"" >> "$repo_dir/.env"
-            fi
-            echo "Injected POSTGRES_PRISMA_URL into $repo_dir/.env"
-          fi
-          # Upsert DATABASE_URL from GitHub Secret
-          if [ -n "${DATABASE_URL:-}" ]; then
-            if grep -q "^DATABASE_URL=" "$repo_dir/.env"; then
-              sed -i "s|^DATABASE_URL=.*|DATABASE_URL=\"${DATABASE_URL}\"|" "$repo_dir/.env"
-            else
-              echo "DATABASE_URL=\"${DATABASE_URL}\"" >> "$repo_dir/.env"
-            fi
-            echo "Injected DATABASE_URL into $repo_dir/.env"
-          fi
-          echo "Using deployment checkout: $repo_dir"
-          if [ -f "$repo_dir/.env" ]; then
-            REPO_DIR_OVERRIDE="$repo_dir" DEPLOY_GIT_SHA="$target_sha" bash "$repo_dir/scripts/deploy-live.sh"
-          else
-            echo "NOTICE: deployment config missing at $repo_dir/.env"
-            echo "NOTICE: running deploy-live.sh without REPO_DIR_OVERRIDE for fallback resolution."
-            DEPLOY_GIT_SHA="$target_sha" bash "$repo_dir/scripts/deploy-live.sh"
-          fi
-          REMOTE_SCRIPT
-          ssh_exit=$?
-          set -e
-          if [ "$ssh_exit" -ne 0 ]; then
-            echo "Deploy via SSH failed. Attempting to print remote deploy log tail..."
-            "${ssh_cmd[@]}" "tail -n 200 /tmp/sarkari-result-deploy.log || true" || true
-            exit 1
-          fi
+        run: bash scripts/deploy-via-ssh.sh

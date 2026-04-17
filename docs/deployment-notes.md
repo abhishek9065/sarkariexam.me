@@ -98,12 +98,12 @@ npm run lint
 - The CI workflow also validates production and dev compose rendering so obvious deploy YAML regressions fail before merge.
 - `.github/workflows/security.yml` runs reusable npm audit checks.
 - `.github/workflows/codeql.yml` runs standalone CodeQL scanning for pull requests and the scheduled weekly scan.
-- `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, using native OpenSSH from the runner instead of a third-party SSH action wrapper.
+- `.github/workflows/deploy.yml` deploys automatically after `CI` succeeds on a `push` to `main`, using native OpenSSH from the runner instead of a third-party SSH action wrapper.
 
 Release gating detail:
-- On `main` release validation, the reusable `Security` workflow contributes npm audit checks.
-- CodeQL remains active in its own workflow for pull requests and the scheduled weekly security scan.
-- This prevents transient GitHub-hosted CodeQL bootstrap failures from blocking a production deploy when application CI and package-audit checks are already green.
+- Production deploy gating is currently the `CI` workflow only.
+- `Security` and `CodeQL` continue to run, but they are not part of the `workflow_run` chain that triggers production deploys.
+- The deploy workflow checks out the exact triggering commit SHA, performs runner-side SSH validation, uploads the current remote deploy entrypoint, runs a remote preflight, and then deploys the same SHA on the droplet.
 
 ## Health And Readiness
 - Backend health:
@@ -132,7 +132,7 @@ Deployment scripts now verify:
 - optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 
 ## Rollback Guidance
-- Application rollback: revert the offending commit on `main` and let GitHub Actions redeploy, or restore the previous server checkout and rerun the deploy workflow.
+- Application rollback: revert the offending commit on `main` and let GitHub Actions redeploy, or use the `previous_sha` printed in the deploy summary to restore the prior checkout and rerun the remote deploy flow.
 - Content rollback: use post history plus version notes, update or unpublish the affected post, then republish after verification.
 - Cache rollback: frontend revalidation can be called again after restoring a previous content state.
 
@@ -142,3 +142,6 @@ Deployment scripts now verify:
 - Keep frontend and backend revalidation tokens aligned.
 - Keep the public and admin URLs consistent with Nginx and deployment environment variables.
 - Prefer staging validation after schema or editorial workflow changes before promoting to production.
+- The server root `.env` is the only supported source of production runtime secrets. The deploy workflow no longer injects application env values from GitHub.
+- `DO_HOST_FINGERPRINT` and `DO_REPO_DIR` are required GitHub variables for production deploys.
+- The production checkout must already exist and remain clean. Deploy will not clone, discover alternate paths, create `.env`, or recover env values from running containers.

@@ -1,3 +1,5 @@
+# NOTE: This workflow name is the production deploy gate.
+# Keep `name: CI` aligned with `.github/workflows/deploy.yml` workflow_run wiring.
 name: CI
 
 on:

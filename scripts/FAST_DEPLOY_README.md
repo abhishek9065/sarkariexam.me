@@ -1,9 +1,10 @@
 # Fast Deploy
 
 Production deploys now use a GitHub Actions driven rebuild flow:
-- GitHub Actions runs CI and security checks
-- the deploy workflow SSHes into the droplet after those checks pass
-- the droplet `git pull`s the repo for scripts and compose changes
+- GitHub Actions runs `CI`
+- the deploy workflow checks out the exact triggering commit SHA on the runner
+- the runner validates SSH configuration and host fingerprint, uploads the current remote entrypoint, and runs a remote preflight
+- the droplet fetches and deploys that exact SHA from the existing checkout at `DO_REPO_DIR`
 - the deploy scripts rebuild Docker services locally on the droplet and restart them
 
 That removes the external registry dependency from the production release path while keeping GitHub Actions as the only supported deploy trigger.
@@ -21,9 +22,9 @@ The server-side scripts in `scripts/` are still required because the GitHub depl
 ## Runtime Behavior
 
 Production deploys always use the fast path:
-- rebuilds backend first so API readiness is established early
-- rebuilds frontend, admin, and nginx from the checked-out repo
-- restarts Docker services after the rebuild
+- builds backend, frontend, admin, and nginx images before replacing running services
+- restarts backend first so API readiness is established early after builds complete
+- restarts frontend, admin, and nginx after backend is healthy
 - runs compact backend checks plus representative public route checks
 - optionally purges Cloudflare cache
 
@@ -46,6 +47,10 @@ GitHub Actions secrets:
 - `DO_SSH_KEY`
 - optional `DO_PORT`
 
+GitHub Actions variables:
+- `DO_HOST_FINGERPRINT`
+- `DO_REPO_DIR`
+
 Server root `.env`:
 - `POSTGRES_PRISMA_URL` or `DATABASE_URL`
 - `JWT_SECRET`
@@ -62,11 +67,13 @@ Server root `.env`:
 
 The server root `.env` is the production source of truth for deploy scripts and `docker-compose.yml`.
 Do not treat `backend/.env` or `frontend/.env.local` as production Docker config.
-The fast deploy path now validates compose rendering before rebuild so broken production YAML fails earlier.
+The fast deploy path validates compose rendering before rebuild so broken production YAML fails earlier.
+The deploy path will fail if the production checkout is missing, dirty, or missing the root `.env`.
 
 ## Files
 
 - `docker-compose.yml`: production runtime and build definition used by GitHub Actions deploys
+- `scripts/deploy-via-ssh.sh`: runner-side SSH validation and remote deploy orchestration
 - `scripts/deploy-common.sh`: shared production deploy helpers
 - `scripts/deploy-fast.sh`: fast production deploy
 - `scripts/deploy-prod.sh`: full production deploy
@@ -78,4 +85,5 @@ The fast deploy path now validates compose rendering before rebuild so broken pr
 If a deploy fails:
 1. Check the server deploy log at `/tmp/sarkari-result-deploy.log`.
 2. Check container logs with `docker compose -f docker-compose.yml logs`.
-3. Verify the required deploy secrets and server `.env` values exist.
+3. Verify `DO_HOST_FINGERPRINT`, `DO_REPO_DIR`, and the required server root `.env` values exist.
+4. Run the remote preflight-only flow described in `docs/production-deploy-checklist.md`.

@@ -150,12 +150,12 @@ Main branch pushes trigger:
 
 - `CI`
 - `Security`
-- `Production Release Validation`
 - `Deploy to Production`
 
-Production deploys are GitHub Actions driven. After CI and security pass, the deploy workflow SSHes into the droplet, pulls `main`, rebuilds the Docker services from the checked-out repo, and restarts the stack.
+Production deploys are GitHub Actions driven. The production deploy gate is the `CI` workflow only.
+`Deploy to Production` runs as a `workflow_run` after `CI` succeeds for a `push` to `main`, checks out the exact triggering commit SHA on the runner, SSHes into the droplet, runs a remote preflight, and then deploys that exact SHA.
 This is the current production topology, not the long-term target. The platform is being moved toward safer staging and promotion controls while retaining the existing release automation.
-On release pushes, deploy gating depends on CI plus npm audit security checks. CodeQL now runs in its own workflow for pull requests and the scheduled weekly security scan, so transient GitHub-hosted CodeQL setup failures no longer block production deploys.
+Security and CodeQL remain important validation workflows, but they do not currently gate the production deployment chain.
 The backend health endpoints also expose non-secret runtime diagnostics for PostgreSQL readiness, legacy Mongo bridge presence, metrics endpoint protection, and frontend revalidation wiring.
 
 ## Deployment
@@ -173,9 +173,10 @@ Production deploy entrypoint:
 
 - local code change
 - `git push origin main`
-- GitHub Actions `Production Release Validation`
+- GitHub Actions `CI`
 - GitHub Actions `Deploy to Production`
-- droplet-side rebuild from `docker-compose.yml`
+- runner-side SSH validation and remote preflight
+- droplet-side rebuild from `docker-compose.yml` at the triggering commit SHA
 - live health verification
 
 There is no supported manual production deploy trigger in the repository workflows.
@@ -191,6 +192,11 @@ GitHub Actions secrets:
 - `DO_SSH_KEY`
 - optional `DO_PORT`
 
+GitHub Actions variables:
+
+- `DO_HOST_FINGERPRINT`
+- `DO_REPO_DIR`
+
 Server `.env` values for production typically include:
 
 - application secrets such as `POSTGRES_PRISMA_URL` and `JWT_SECRET`
@@ -203,9 +209,11 @@ Before `push to main` can deploy successfully, production must already have:
 
 - a DigitalOcean droplet reachable at `DO_HOST`
 - the deploy user from `DO_USER` able to SSH with `DO_SSH_KEY`
-- the repository checked out on the droplet at `~/sarkari-result` or `~/sarkariexam.me`
-- Docker and Docker Compose installed on the droplet
+- the SSH host fingerprint stored in `DO_HOST_FINGERPRINT`
+- the repository checked out on the droplet at `DO_REPO_DIR`
+- `bash`, `git`, `docker`, Docker Compose plugin, `flock`, `curl`, `mktemp`, and `tee`
 - a root `.env` file on the droplet checkout derived from `.env.example`
+- a clean production checkout with no local modifications or untracked files
 
 ## Production Verification
 
@@ -223,6 +231,7 @@ If a deploy fails, start with:
 - `/tmp/sarkari-result-deploy.log` on the droplet
 - `docker compose -f docker-compose.yml logs` on the droplet
 - `/api/health` and `/api/health/deep` for non-secret runtime diagnostics after the rollout
+- [docs/production-deploy-checklist.md](./docs/production-deploy-checklist.md)
 
 ## Repository Layout
 
