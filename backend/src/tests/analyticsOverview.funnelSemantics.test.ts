@@ -55,7 +55,17 @@ vi.mock('../services/postgres/prisma.js', () => ({
             count: subscriptionsCountMock,
         },
     },
-    prismaApp: {},
+    prismaApp: {
+        userAccountEntry: {
+            findUnique: vi.fn(),
+            findFirst: vi.fn(),
+            create: vi.fn(),
+            update: vi.fn(),
+            deleteMany: vi.fn(),
+            findMany: vi.fn(),
+            count: vi.fn(),
+        },
+    },
 }));
 
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';

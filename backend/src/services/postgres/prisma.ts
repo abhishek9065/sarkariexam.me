@@ -86,6 +86,15 @@ export const prismaApp = prisma as PrismaClient & {
     create(args: any): Promise<any>;
     updateMany(args: any): Promise<{ count: number }>;
   };
+  userAccountEntry: {
+    findUnique(args: any): Promise<any>;
+    findFirst(args: any): Promise<any>;
+    create(args: any): Promise<any>;
+    update(args: any): Promise<any>;
+    deleteMany(args: any): Promise<{ count: number }>;
+    findMany(args: any): Promise<any[]>;
+    count(args?: any): Promise<number>;
+  };
 };
 
 if (process.env.NODE_ENV !== 'production') {

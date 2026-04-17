@@ -349,13 +349,11 @@ router.get('/users', async (req, res) => {
       skip: offset,
       limit,
     });
-
-    // Get total count (rough — the model doesn't have a count method)
-    const allForCount = await UserModelMongo.findAll({ role, isActive, limit: 100000 });
+    const total = await UserModelMongo.count({ role, isActive });
 
     return res.json({
       data: users,
-      total: allForCount.length,
+      total,
       count: users.length,
     });
   } catch (error) {

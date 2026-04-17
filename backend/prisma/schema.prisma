@@ -691,6 +691,29 @@ model UserProfileEntry {
   @@map("app_user_profiles")
 }
 
+model UserAccountEntry {
+  id                            String   @id
+  email                         String   @unique
+  username                      String
+  passwordHash                  String   @map("password_hash")
+  passwordHistory               Json     @default("[]") @map("password_history")
+  role                          String   @default("user")
+  isActive                      Boolean  @default(true) @map("is_active")
+  createdAt                     DateTime @default(now()) @map("created_at")
+  updatedAt                     DateTime @default(now()) @updatedAt @map("updated_at")
+  lastLogin                     DateTime? @map("last_login")
+  twoFactorEnabled              Boolean  @default(false) @map("two_factor_enabled")
+  twoFactorSecret               String?  @map("two_factor_secret")
+  twoFactorTempSecret           String?  @map("two_factor_temp_secret")
+  twoFactorVerifiedAt           DateTime? @map("two_factor_verified_at")
+  twoFactorBackupCodes          Json     @default("[]") @map("two_factor_backup_codes")
+  twoFactorBackupCodesUpdatedAt DateTime? @map("two_factor_backup_codes_updated_at")
+
+  @@index([role, isActive], map: "app_users_role_active_idx")
+  @@index([createdAt], map: "app_users_created_idx")
+  @@map("app_users")
+}
+
 model SlugAlias {
   id         String   @id @default(cuid())
   postId     String
