@@ -41,8 +41,8 @@
 - Rebuild observability around crawl health, content freshness, queue lag, and editorial throughput
 
 ## Current Risks
-- Saved-search alerts are the highest-risk migration seam because scheduler logic and storage are still split across old and new systems.
-- Some operational tables already live in Postgres but outside Prisma, which weakens schema ownership and migration discipline.
+- Tracker reminders are now the highest-risk migration seam because scheduler logic and storage are still split across old and new systems.
+- Most high-value operational tables now live behind Prisma, but the remaining scheduler/runtime seams still read Mongo-compatible collections and keep the migration incomplete.
 - The public frontend has enough backend integration to avoid a rewrite, but blanket dynamic rendering is suppressing the value of cache tags and revalidation.
 - Admin includes real CMS features, but some adjacent operations screens still present mock data as if it were live.
 
@@ -53,3 +53,4 @@
 - Move operational slices into Prisma deliberately.
 - Treat admin/editorial as the canonical CMS surface and quarantine anything still demo-grade.
 - Keep legacy job ownership explicit in code so startup and health outputs show exactly which Mongo/Cosmos subsystems remain transitional.
+- Finish migration by replacing legacy scheduler dependencies rather than re-opening already migrated Prisma-backed account/profile/content paths.

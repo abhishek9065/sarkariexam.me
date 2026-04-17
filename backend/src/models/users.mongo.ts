@@ -100,6 +100,7 @@ async function findUserRowById(id: string): Promise<UserRow | null> {
 }
 
 export class UserModelMongo {
+  // Keep the historical class name for route compatibility while the storage layer moves to Prisma.
   static async findByEmail(email: string): Promise<User | null> {
     try {
       const row = await prismaApp.userAccountEntry.findUnique({
@@ -305,6 +306,33 @@ export class UserModelMongo {
     } catch (error) {
       console.error('[Postgres] count users error:', error);
       return 0;
+    }
+  }
+
+  static async listActiveEmailMap(userIds: string[]): Promise<Map<string, string>> {
+    try {
+      const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+      if (uniqueUserIds.length === 0) return new Map();
+
+      const rows = await prismaApp.userAccountEntry.findMany({
+        where: {
+          id: { in: uniqueUserIds },
+          isActive: true,
+        },
+        select: {
+          id: true,
+          email: true,
+        },
+      }) as Array<{ id: string; email: string }>;
+
+      return new Map(
+        rows
+          .filter((row) => row.email)
+          .map((row) => [row.id, row.email.trim().toLowerCase()] as const),
+      );
+    } catch (error) {
+      console.error('[Postgres] listActiveEmailMap error:', error);
+      return new Map();
     }
   }
 

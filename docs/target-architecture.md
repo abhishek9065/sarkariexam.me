@@ -8,7 +8,8 @@ Build a backend-driven government opportunities platform where structured public
 - PostgreSQL is the primary source of truth for structured runtime data.
 - Prisma is the main schema, migration, and domain access layer for content, taxonomies, workflow, and operational entities that need long-term ownership.
 - Redis is the cache, throttling, queue, and ephemeral state layer.
-- Mongo / Cosmos remains legacy-only and should be removed from core runtime paths over time.
+- Mongo / Cosmos remains legacy-only and should be removed from scheduler and startup paths over time.
+- Auth/account state, profile state, bookmarks, push subscriptions, notification campaigns, site settings, workflow logs, and saved-search alert state now sit on Prisma-managed `app_*` slices instead of raw SQL bootstrap paths.
 
 ### Backend
 - Express + TypeScript remains the primary application API.
@@ -79,3 +80,4 @@ Build a backend-driven government opportunities platform where structured public
 - Prefer explicit cutovers over long-lived dual-write states.
 - Remove Mongo / Cosmos from startup, health, and scheduled-job critical paths once the Postgres replacement path is complete.
 - Keep health and runtime diagnostics honest about which subsystems are core versus transitional.
+- Keep compatibility class names or route contracts only when they reduce migration risk; the storage layer beneath them should still move toward Prisma-first ownership.

@@ -373,7 +373,6 @@ export async function startServer() {
         scheduleAnalyticsRollups,
         scheduleDigestSender,
         scheduleTrackerReminders,
-        scheduleSavedSearchAlerts,
         scheduleAutomationJobs,
       });
     } else {
@@ -385,6 +384,12 @@ export async function startServer() {
       throw error;
     }
     logger.info('[Server] Starting without Mongo/Cosmos bridge in development');
+  }
+
+  if (config.postgresPrismaUrl) {
+    scheduleSavedSearchAlerts();
+  } else {
+    logger.info('[Server] Saved-search alerts disabled because PostgreSQL is not configured');
   }
 
   const server = http.createServer(app);

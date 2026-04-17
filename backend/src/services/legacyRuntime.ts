@@ -14,10 +14,6 @@ export const legacyMongoScheduledSubsystems = [
     description: 'Digest delivery scheduler still depends on legacy Mongo-backed subscriber state',
   },
   {
-    id: 'saved-search-alerts',
-    description: 'Saved-search alerts still read legacy Mongo-compatible saved_searches/user_notifications collections',
-  },
-  {
     id: 'tracker-reminders',
     description: 'Tracker reminders still read legacy Mongo-compatible tracked_applications/user_notifications collections',
   },
@@ -44,7 +40,6 @@ export async function startLegacyMongoRuntime(deps: {
   scheduleAnalyticsRollups: () => Promise<void>;
   scheduleDigestSender: () => void;
   scheduleTrackerReminders: () => void;
-  scheduleSavedSearchAlerts: () => void;
   scheduleAutomationJobs: () => void;
 }) {
   deps.logger.info(
@@ -59,6 +54,5 @@ export async function startLegacyMongoRuntime(deps: {
   });
   deps.scheduleDigestSender();
   deps.scheduleTrackerReminders();
-  deps.scheduleSavedSearchAlerts();
   deps.scheduleAutomationJobs();
 }

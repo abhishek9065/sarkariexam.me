@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+
 import { prismaApp } from '../services/postgres/prisma.js';
 import type { ContentType, TrackerStatus } from '../types.js';
 
@@ -319,6 +320,45 @@ export class ProfileModelPostgres {
     return rows.map((row) => toSavedSearchRecord(row));
   }
 
+  static async listDueSavedSearches(args: {
+    dailyThreshold: Date;
+    weeklyThreshold: Date;
+    instantThreshold: Date;
+    limit: number;
+  }): Promise<SavedSearchRecord[]> {
+    const rows = await prismaApp.savedSearchEntry.findMany({
+      where: {
+        notificationsEnabled: true,
+        OR: [
+          {
+            frequency: 'daily',
+            OR: [
+              { lastNotifiedAt: null },
+              { lastNotifiedAt: { lt: args.dailyThreshold } },
+            ],
+          },
+          {
+            frequency: 'weekly',
+            OR: [
+              { lastNotifiedAt: null },
+              { lastNotifiedAt: { lt: args.weeklyThreshold } },
+            ],
+          },
+          {
+            frequency: 'instant',
+            OR: [
+              { lastNotifiedAt: null },
+              { lastNotifiedAt: { lt: args.instantThreshold } },
+            ],
+          },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: args.limit,
+    });
+    return rows.map((row) => toSavedSearchRecord(row));
+  }
+
   static async createSavedSearch(userId: string, input: Omit<SavedSearchRecord, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<SavedSearchRecord> {
     const id = randomUUID();
     const row = await prismaApp.savedSearchEntry.create({
@@ -415,9 +455,10 @@ export class ProfileModelPostgres {
     type: ContentType;
     slug?: string;
     organization?: string;
-  }>, source: string): Promise<void> {
-    if (!items.length) return;
+  }>, source: string): Promise<number> {
+    if (!items.length) return 0;
 
+    let inserted = 0;
     for (const item of items) {
       try {
         await prismaApp.userNotificationEntry.create({
@@ -433,12 +474,40 @@ export class ProfileModelPostgres {
             readAt: null,
           },
         });
+        inserted += 1;
       } catch (error) {
         if (!isUniqueConstraintError(error)) {
           throw error;
         }
       }
     }
+
+    return inserted;
+  }
+
+  static async getProfilesByUserIds(userIds: string[]): Promise<Map<string, UserProfileRecord>> {
+    if (userIds.length === 0) return new Map();
+    const rows = await prismaApp.userProfileEntry.findMany({
+      where: {
+        userId: { in: Array.from(new Set(userIds)) },
+      },
+    });
+    return new Map(rows.map((row) => {
+      const record = toProfileRecord(row);
+      return [record.userId, record] as const;
+    }));
+  }
+
+  static async markSavedSearchesNotified(ids: string[], notifiedAt: Date): Promise<void> {
+    if (ids.length === 0) return;
+    await prismaApp.savedSearchEntry.updateMany({
+      where: {
+        id: { in: ids },
+      },
+      data: {
+        lastNotifiedAt: notifiedAt,
+      },
+    });
   }
 
   static async listTrackedApplications(userId: string): Promise<TrackedApplicationRecord[]> {

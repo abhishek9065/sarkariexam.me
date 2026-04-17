@@ -1,62 +1,13 @@
-import { Filter, ObjectId } from 'mongodb';
-
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
 import AnnouncementModelPostgres from '../models/announcements.postgres.js';
+import ProfileModelPostgres, {
+    type SavedSearchRecord,
+    type UserProfileRecord,
+} from '../models/profile.postgres.js';
+import { UserModelMongo } from '../models/users.mongo.js';
 import type { ContentType } from '../types.js';
 
-import { getCollection } from './cosmosdb.js';
 import { sendDigestEmail } from './email.js';
-
-interface SavedSearchDoc {
-    _id: ObjectId;
-    userId: string;
-    name: string;
-    query: string;
-    filters?: {
-        type?: ContentType;
-        category?: string;
-        organization?: string;
-        location?: string;
-        qualification?: string;
-        salaryMin?: number;
-        salaryMax?: number;
-    };
-    notificationsEnabled: boolean;
-    frequency: 'instant' | 'daily' | 'weekly';
-    lastNotifiedAt?: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-interface UserProfileDoc {
-    userId: string;
-    alertWindowDays?: number;
-    alertMaxItems?: number;
-}
-
-interface UserDoc {
-    _id: ObjectId;
-    email: string;
-    isActive?: boolean;
-}
-
-interface SubscriptionDoc {
-    email: string;
-    isActive: boolean;
-    verified: boolean;
-    unsubscribeToken: string;
-}
-
-interface NotificationDoc {
-    userId: string;
-    announcementId: string;
-    title: string;
-    type: ContentType;
-    slug?: string;
-    organization?: string;
-    source: string;
-    createdAt: Date;
-    readAt?: Date | null;
-}
 
 interface AnnouncementItem {
     id: string;
@@ -131,14 +82,6 @@ const config = {
 let alertsIntervalRef: NodeJS.Timeout | null = null;
 let alertsRunInFlight = false;
 
-// Transitional legacy scheduler path: this still reads Mongo-compatible saved_searches/user_notifications collections.
-// Keep behavior stable for now; later phases should replace this with the Postgres/Prisma alert pipeline.
-const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searches');
-const profilesCollection = () => getCollection<UserProfileDoc>('user_profiles');
-const notificationsCollection = () => getCollection<NotificationDoc>('user_notifications');
-const usersCollection = () => getCollection<UserDoc>('users');
-const subscriptionsCollection = () => getCollection<SubscriptionDoc>('alert_subscriptions');
-
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
 const startOfUtcDay = (date: Date): Date =>
@@ -177,7 +120,7 @@ function hasFilterValue(value: unknown) {
     return Boolean(value);
 }
 
-function sanitizeFilters(filters?: SavedSearchDoc['filters']) {
+function sanitizeFilters(filters?: SavedSearchRecord['filters']) {
     if (!filters) return undefined;
     const cleaned = {
         type: filters.type,
@@ -191,7 +134,7 @@ function sanitizeFilters(filters?: SavedSearchDoc['filters']) {
     return Object.values(cleaned).some(hasFilterValue) ? cleaned : undefined;
 }
 
-async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, limit: number): Promise<AnnouncementItem[]> {
+async function buildSavedSearchMatches(search: SavedSearchRecord, sinceMs: number, limit: number): Promise<AnnouncementItem[]> {
     const filters = sanitizeFilters(search.filters);
     const searchLimit = Math.min(250, Math.max(limit * 4, 50));
 
@@ -212,43 +155,14 @@ async function buildSavedSearchMatches(search: SavedSearchDoc, sinceMs: number, 
         .slice(0, limit);
 }
 
-function buildDueSearchQuery(now: Date): Filter<SavedSearchDoc> {
+function buildDueSearchThresholds(now: Date) {
     const dailyThreshold = startOfUtcDay(now);
     const weeklyThreshold = startOfUtcWeek(now);
     const instantThreshold = new Date(now.getTime() - config.instantCooldownMinutes * 60 * 1000);
-
-    return {
-        notificationsEnabled: true,
-        $or: [
-            {
-                frequency: 'daily' as const,
-                $or: [
-                    { lastNotifiedAt: { $exists: false } },
-                    { lastNotifiedAt: null },
-                    { lastNotifiedAt: { $lt: dailyThreshold } },
-                ],
-            },
-            {
-                frequency: 'weekly' as const,
-                $or: [
-                    { lastNotifiedAt: { $exists: false } },
-                    { lastNotifiedAt: null },
-                    { lastNotifiedAt: { $lt: weeklyThreshold } },
-                ],
-            },
-            {
-                frequency: 'instant' as const,
-                $or: [
-                    { lastNotifiedAt: { $exists: false } },
-                    { lastNotifiedAt: null },
-                    { lastNotifiedAt: { $lt: instantThreshold } },
-                ],
-            },
-        ],
-    };
+    return { dailyThreshold, weeklyThreshold, instantThreshold };
 }
 
-function resolveWindowDays(search: SavedSearchDoc, profile?: UserProfileDoc): number {
+function resolveWindowDays(search: SavedSearchRecord, profile?: UserProfileRecord): number {
     if (profile?.alertWindowDays && Number.isFinite(profile.alertWindowDays)) {
         return Math.min(30, Math.max(1, Math.round(profile.alertWindowDays)));
     }
@@ -257,102 +171,55 @@ function resolveWindowDays(search: SavedSearchDoc, profile?: UserProfileDoc): nu
     return config.dailyWindowDays;
 }
 
-function resolveAlertLimit(profile?: UserProfileDoc): number {
+function resolveAlertLimit(profile?: UserProfileRecord): number {
     if (profile?.alertMaxItems && Number.isFinite(profile.alertMaxItems)) {
         return Math.min(20, Math.max(1, Math.round(profile.alertMaxItems)));
     }
     return DEFAULT_FALLBACK_LIMIT;
 }
 
-function toDigestFrequency(frequency: SavedSearchDoc['frequency']): 'daily' | 'weekly' {
+function toDigestFrequency(frequency: SavedSearchRecord['frequency']): 'daily' | 'weekly' {
     return frequency === 'weekly' ? 'weekly' : 'daily';
 }
 
-async function listDueSavedSearches(now: Date): Promise<SavedSearchDoc[]> {
-    return savedSearchesCollection()
-        .find(buildDueSearchQuery(now))
-        .sort({ updatedAt: -1 })
-        .limit(config.maxSearchesPerRun)
-        .toArray();
+async function listDueSavedSearches(now: Date): Promise<SavedSearchRecord[]> {
+    const thresholds = buildDueSearchThresholds(now);
+    return ProfileModelPostgres.listDueSavedSearches({
+        ...thresholds,
+        limit: config.maxSearchesPerRun,
+    });
 }
 
-async function loadProfiles(userIds: string[]): Promise<Map<string, UserProfileDoc>> {
-    if (!userIds.length) return new Map();
-    const docs = await profilesCollection().find({ userId: { $in: userIds } }).toArray();
-    return new Map(docs.map((doc) => [doc.userId, doc]));
+async function loadProfiles(userIds: string[]): Promise<Map<string, UserProfileRecord>> {
+    return ProfileModelPostgres.getProfilesByUserIds(userIds);
 }
 
 async function loadUserEmails(userIds: string[]): Promise<Map<string, string>> {
-    const objectIds = userIds
-        .map((userId) => ({ userId, objectId: ObjectId.isValid(userId) ? new ObjectId(userId) : null }))
-        .filter((entry): entry is { userId: string; objectId: ObjectId } => Boolean(entry.objectId));
-
-    if (!objectIds.length) return new Map();
-
-    const docs = await usersCollection().find({
-        _id: { $in: objectIds.map((entry) => entry.objectId) },
-        $or: [{ isActive: true }, { isActive: { $exists: false } }],
-    }).toArray();
-
-    const byObjectId = new Map(
-        docs
-            .filter((doc) => doc.email)
-            .map((doc) => [doc._id.toString(), normalizeEmail(doc.email)])
-    );
-
-    const result = new Map<string, string>();
-    for (const entry of objectIds) {
-        const email = byObjectId.get(entry.objectId.toString());
-        if (email) result.set(entry.userId, email);
-    }
-    return result;
+    return UserModelMongo.listActiveEmailMap(userIds);
 }
 
 async function loadSubscriptionTokens(emails: string[]): Promise<Map<string, string>> {
-    if (!emails.length) return new Map();
-    const docs = await subscriptionsCollection().find({
-        email: { $in: emails },
-        isActive: true,
-        verified: true,
-    }).toArray();
-
-    return new Map(
-        docs
-            .filter((doc) => doc.email && doc.unsubscribeToken)
-            .map((doc) => [normalizeEmail(doc.email), doc.unsubscribeToken])
-    );
+    const subscriptions = await AlertSubscriptionModelPostgres.listByEmails(emails);
+    return new Map(subscriptions.map((item) => [
+        normalizeEmail(item.email),
+        item.unsubscribeToken,
+    ]));
 }
 
 async function upsertNotifications(userId: string, searchId: string, items: AnnouncementItem[]): Promise<number> {
     if (!items.length) return 0;
 
-    const source = `saved:${searchId}`;
-    const ops = items.map((item) => ({
-        updateOne: {
-            filter: {
-                userId,
-                announcementId: String(item.id),
-                source,
-            },
-            update: {
-                $setOnInsert: {
-                    userId,
-                    announcementId: String(item.id),
-                    title: item.title,
-                    type: item.type,
-                    slug: item.slug,
-                    organization: item.organization,
-                    source,
-                    createdAt: new Date(),
-                    readAt: null,
-                },
-            },
-            upsert: true,
-        },
-    }));
-
-    const result = await notificationsCollection().bulkWrite(ops, { ordered: false });
-    return (result as any)?.upsertedCount ?? 0;
+    return ProfileModelPostgres.upsertNotifications(
+        userId,
+        items.map((item) => ({
+            announcementId: String(item.id),
+            title: item.title,
+            type: item.type,
+            slug: item.slug,
+            organization: item.organization,
+        })),
+        `saved:${searchId}`,
+    );
 }
 
 function buildWindowLabel(frequency: 'daily' | 'weekly', windowDays: number): string {
@@ -385,7 +252,7 @@ export async function processSavedSearchAlertsOnce(now: Date = new Date()): Prom
     let emailSent = 0;
     let emailSkippedNoSubscription = 0;
     let errors = 0;
-    const touchedSearchIds: ObjectId[] = [];
+    const touchedSearchIds: string[] = [];
 
     const emailQueue = new Map<string, EmailQueueBucket>();
 
@@ -399,10 +266,10 @@ export async function processSavedSearchAlertsOnce(now: Date = new Date()): Prom
             const matches = await buildSavedSearchMatches(search, sinceMs, limit);
             if (!matches.length) continue;
 
-            const upserted = await upsertNotifications(search.userId, search._id.toString(), matches);
+            const upserted = await upsertNotifications(search.userId, search.id, matches);
             searchesWithMatches += 1;
             notificationsUpserted += upserted;
-            touchedSearchIds.push(search._id);
+            touchedSearchIds.push(search.id);
 
             const frequency = toDigestFrequency(search.frequency);
             const queueKey = `${search.userId}:${frequency}`;
@@ -445,7 +312,7 @@ export async function processSavedSearchAlertsOnce(now: Date = new Date()): Prom
             continue;
         }
 
-        const unsubscribeToken = tokenMap.get(email);
+        const unsubscribeToken = tokenMap.get(normalizeEmail(email));
         if (!unsubscribeToken) {
             emailSkippedNoSubscription += 1;
             continue;
@@ -481,10 +348,7 @@ export async function processSavedSearchAlertsOnce(now: Date = new Date()): Prom
     }
 
     if (touchedSearchIds.length) {
-        await savedSearchesCollection().updateMany(
-            { _id: { $in: touchedSearchIds } },
-            { $set: { lastNotifiedAt: now } }
-        );
+        await ProfileModelPostgres.markSavedSearchesNotified(touchedSearchIds, now);
     }
 
     return {

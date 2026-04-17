@@ -1,4 +1,3 @@
-import { ObjectId } from 'mongodb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -7,8 +6,12 @@ const {
     userDocs,
     subscriptionDocs,
     announcementDocs,
-    notificationsBulkWriteMock,
-    savedSearchesUpdateManyMock,
+    profileListDueSavedSearchesMock,
+    profileGetProfilesByUserIdsMock,
+    profileUpsertNotificationsMock,
+    profileMarkSavedSearchesNotifiedMock,
+    userListActiveEmailMapMock,
+    subscriptionListByEmailsMock,
     announcementFindAllMock,
     sendDigestEmailMock,
 } = vi.hoisted(() => ({
@@ -17,54 +20,35 @@ const {
     userDocs: [] as Array<Record<string, any>>,
     subscriptionDocs: [] as Array<Record<string, any>>,
     announcementDocs: [] as Array<Record<string, any>>,
-    notificationsBulkWriteMock: vi.fn().mockResolvedValue({ upsertedCount: 0 }),
-    savedSearchesUpdateManyMock: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+    profileListDueSavedSearchesMock: vi.fn().mockResolvedValue([]),
+    profileGetProfilesByUserIdsMock: vi.fn().mockResolvedValue(new Map()),
+    profileUpsertNotificationsMock: vi.fn().mockResolvedValue(0),
+    profileMarkSavedSearchesNotifiedMock: vi.fn().mockResolvedValue(undefined),
+    userListActiveEmailMapMock: vi.fn().mockResolvedValue(new Map()),
+    subscriptionListByEmailsMock: vi.fn().mockResolvedValue([]),
     announcementFindAllMock: vi.fn().mockResolvedValue([]),
     sendDigestEmailMock: vi.fn().mockResolvedValue(true),
 }));
 
-const buildCursor = (rows: Array<Record<string, any>>) => {
-    const cursor: any = {
-        sort: vi.fn(),
-        limit: vi.fn(),
-        toArray: vi.fn(),
-    };
-    cursor.sort.mockReturnValue(cursor);
-    cursor.limit.mockReturnValue(cursor);
-    cursor.toArray.mockResolvedValue(rows);
-    return cursor;
-};
+vi.mock('../models/profile.postgres.js', () => ({
+    default: {
+        listDueSavedSearches: profileListDueSavedSearchesMock,
+        getProfilesByUserIds: profileGetProfilesByUserIdsMock,
+        upsertNotifications: profileUpsertNotificationsMock,
+        markSavedSearchesNotified: profileMarkSavedSearchesNotifiedMock,
+    },
+}));
 
-vi.mock('../services/cosmosdb.js', () => ({
-    getCollection: vi.fn((name: string) => {
-        if (name === 'saved_searches') {
-            return {
-                find: vi.fn(() => buildCursor(savedSearchDocs)),
-                updateMany: savedSearchesUpdateManyMock,
-            };
-        }
-        if (name === 'user_profiles') {
-            return {
-                find: vi.fn(() => buildCursor(profileDocs)),
-            };
-        }
-        if (name === 'users') {
-            return {
-                find: vi.fn(() => buildCursor(userDocs)),
-            };
-        }
-        if (name === 'alert_subscriptions') {
-            return {
-                find: vi.fn(() => buildCursor(subscriptionDocs)),
-            };
-        }
-        if (name === 'user_notifications') {
-            return {
-                bulkWrite: notificationsBulkWriteMock,
-            };
-        }
-        throw new Error(`Unexpected collection: ${name}`);
-    }),
+vi.mock('../models/users.mongo.js', () => ({
+    UserModelMongo: {
+        listActiveEmailMap: userListActiveEmailMapMock,
+    },
+}));
+
+vi.mock('../models/alertSubscriptions.postgres.js', () => ({
+    default: {
+        listByEmails: subscriptionListByEmailsMock,
+    },
 }));
 
 vi.mock('../models/announcements.postgres.js', () => ({
@@ -89,19 +73,27 @@ describe('savedSearchAlerts service', () => {
 
         vi.clearAllMocks();
 
-        notificationsBulkWriteMock.mockResolvedValue({ upsertedCount: 0 });
-        savedSearchesUpdateManyMock.mockResolvedValue({ modifiedCount: 0 });
+        profileListDueSavedSearchesMock.mockImplementation(async () => savedSearchDocs);
+        profileGetProfilesByUserIdsMock.mockImplementation(async () => (
+            new Map(profileDocs.map((doc) => [doc.userId, doc]))
+        ));
+        profileUpsertNotificationsMock.mockResolvedValue(0);
+        profileMarkSavedSearchesNotifiedMock.mockResolvedValue(undefined);
+        userListActiveEmailMapMock.mockImplementation(async () => (
+            new Map(userDocs.map((doc) => [doc.id, String(doc.email).trim().toLowerCase()]))
+        ));
+        subscriptionListByEmailsMock.mockImplementation(async () => subscriptionDocs);
         announcementFindAllMock.mockResolvedValue(announcementDocs);
         sendDigestEmailMock.mockResolvedValue(true);
     });
 
     it('upserts notifications, sends digest mail, and marks search notified', async () => {
         const now = new Date('2026-02-13T09:00:00.000Z');
-        const userId = new ObjectId().toString();
-        const searchId = new ObjectId();
+        const userId = 'user-1';
+        const searchId = 'search-1';
 
         savedSearchDocs.push({
-            _id: searchId,
+            id: searchId,
             userId,
             name: 'UPSC jobs',
             query: 'upsc',
@@ -117,7 +109,7 @@ describe('savedSearchAlerts service', () => {
             alertMaxItems: 5,
         });
         userDocs.push({
-            _id: new ObjectId(userId),
+            id: userId,
             email: 'User@Test.com',
             isActive: true,
         });
@@ -152,7 +144,7 @@ describe('savedSearchAlerts service', () => {
             }
         );
 
-        notificationsBulkWriteMock.mockResolvedValue({ upsertedCount: 2 });
+        profileUpsertNotificationsMock.mockResolvedValue(2);
 
         const result = await processSavedSearchAlertsOnce(now);
 
@@ -164,26 +156,23 @@ describe('savedSearchAlerts service', () => {
             emailSkippedNoSubscription: 0,
             errors: 0,
         });
-        expect(notificationsBulkWriteMock).toHaveBeenCalledTimes(1);
+        expect(profileUpsertNotificationsMock).toHaveBeenCalledTimes(1);
         expect(sendDigestEmailMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 email: 'user@test.com',
                 frequency: 'daily',
             })
         );
-        expect(savedSearchesUpdateManyMock).toHaveBeenCalledWith(
-            { _id: { $in: [searchId] } },
-            { $set: { lastNotifiedAt: now } }
-        );
+        expect(profileMarkSavedSearchesNotifiedMock).toHaveBeenCalledWith([searchId], now);
     });
 
     it('records subscription skip when no verified subscription is available', async () => {
         const now = new Date('2026-02-13T09:00:00.000Z');
-        const userId = new ObjectId().toString();
-        const searchId = new ObjectId();
+        const userId = 'user-2';
+        const searchId = 'search-2';
 
         savedSearchDocs.push({
-            _id: searchId,
+            id: searchId,
             userId,
             name: 'Railway weekly',
             query: 'railway',
@@ -199,7 +188,7 @@ describe('savedSearchAlerts service', () => {
             alertMaxItems: 6,
         });
         userDocs.push({
-            _id: new ObjectId(userId),
+            id: userId,
             email: 'weekly@test.com',
             isActive: true,
         });
@@ -213,7 +202,7 @@ describe('savedSearchAlerts service', () => {
             updatedAt: now.toISOString(),
             postedAt: now.toISOString(),
         });
-        notificationsBulkWriteMock.mockResolvedValue({ upsertedCount: 1 });
+        profileUpsertNotificationsMock.mockResolvedValue(1);
 
         const result = await processSavedSearchAlertsOnce(now);
 
@@ -226,6 +215,6 @@ describe('savedSearchAlerts service', () => {
             errors: 0,
         });
         expect(sendDigestEmailMock).not.toHaveBeenCalled();
-        expect(savedSearchesUpdateManyMock).toHaveBeenCalledTimes(1);
+        expect(profileMarkSavedSearchesNotifiedMock).toHaveBeenCalledTimes(1);
     });
 });
