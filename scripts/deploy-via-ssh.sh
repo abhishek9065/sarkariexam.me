@@ -332,13 +332,14 @@ upload_remote_helper() {
 
 run_remote_helper() {
   local preflight_only="${1:-0}"
-  local quoted_repo_dir quoted_project_name quoted_helper_path quoted_deploy_mode quoted_target_sha
+  local quoted_repo_dir quoted_project_name quoted_helper_path quoted_deploy_mode quoted_target_sha quoted_lock_wait_seconds
 
   quoted_repo_dir="$(quote_for_remote_shell "$DO_REPO_DIR")"
   quoted_project_name="$(quote_for_remote_shell "${COMPOSE_PROJECT_NAME:-sarkari-result}")"
   quoted_helper_path="$(quote_for_remote_shell "$REMOTE_HELPER_PATH")"
   quoted_deploy_mode="$(quote_for_remote_shell "${DEPLOY_MODE:-fast}")"
   quoted_target_sha="$(quote_for_remote_shell "$TRIGGER_SHA")"
+  quoted_lock_wait_seconds="$(quote_for_remote_shell "${LOCK_WAIT_SECONDS:-}")"
 
   remote_run "bash -se" <<EOF
 set -Eeuo pipefail
@@ -347,13 +348,14 @@ COMPOSE_PROJECT_NAME=${quoted_project_name}
 REMOTE_HELPER_PATH=${quoted_helper_path}
 DEPLOY_MODE=${quoted_deploy_mode}
 TRIGGER_SHA=${quoted_target_sha}
+LOCK_WAIT_SECONDS=${quoted_lock_wait_seconds}
 PRECHECK_ONLY=${preflight_only}
 
 cmd=(bash "\${REMOTE_HELPER_PATH}" --mode "\${DEPLOY_MODE}" --sha "\${TRIGGER_SHA}")
 if [[ "\${PRECHECK_ONLY}" == "1" ]]; then
   cmd+=(--preflight-only)
 fi
-DO_REPO_DIR="\${DO_REPO_DIR}" COMPOSE_PROJECT_NAME="\${COMPOSE_PROJECT_NAME}" "\${cmd[@]}"
+DO_REPO_DIR="\${DO_REPO_DIR}" COMPOSE_PROJECT_NAME="\${COMPOSE_PROJECT_NAME}" LOCK_WAIT_SECONDS="\${LOCK_WAIT_SECONDS}" "\${cmd[@]}"
 EOF
 }
 

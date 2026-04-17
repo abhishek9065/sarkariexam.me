@@ -80,6 +80,7 @@ jobs:
           DO_USER: ${{ secrets.DO_USER }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
           DO_PORT: '22'
+          LOCK_WAIT_SECONDS: '120'
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
