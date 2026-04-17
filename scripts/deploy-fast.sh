@@ -42,8 +42,8 @@ echo "Container status:"
 dc ps
 
 wait_for_backend_health() {
-  local attempts="${1:-30}"
-  local sleep_seconds="${2:-1}"
+  local attempts="${1:-60}"
+  local sleep_seconds="${2:-2}"
   local i
 
   echo "Waiting for backend container health (fast mode)..."

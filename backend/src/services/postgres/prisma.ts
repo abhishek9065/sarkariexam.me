@@ -42,6 +42,50 @@ export const prismaApp = prisma as PrismaClient & {
     upsert(args: any): Promise<any>;
     count(args?: any): Promise<number>;
   };
+  bookmarkEntry: {
+    findMany(args: any): Promise<any[]>;
+    create(args: any): Promise<any>;
+    deleteMany(args: any): Promise<{ count: number }>;
+  };
+  errorReportEntry: {
+    create(args: any): Promise<any>;
+    findMany(args: any): Promise<any[]>;
+    count(args?: any): Promise<number>;
+    updateMany(args: any): Promise<{ count: number }>;
+  };
+  notificationCampaignEntry: {
+    create(args: any): Promise<any>;
+    findMany(args: any): Promise<any[]>;
+    findUnique(args: any): Promise<any>;
+    updateMany(args: any): Promise<{ count: number }>;
+    deleteMany(args: any): Promise<{ count: number }>;
+  };
+  userNotificationEntry: {
+    findMany(args: any): Promise<any[]>;
+    count(args?: any): Promise<number>;
+    updateMany(args: any): Promise<{ count: number }>;
+    create(args: any): Promise<any>;
+  };
+  savedSearchEntry: {
+    findMany(args: any): Promise<any[]>;
+    create(args: any): Promise<any>;
+    findFirst(args: any): Promise<any>;
+    updateMany(args: any): Promise<{ count: number }>;
+    deleteMany(args: any): Promise<{ count: number }>;
+  };
+  trackedApplicationEntry: {
+    findMany(args: any): Promise<any[]>;
+    create(args: any): Promise<any>;
+    findFirst(args: any): Promise<any>;
+    updateMany(args: any): Promise<{ count: number }>;
+    deleteMany(args: any): Promise<{ count: number }>;
+    upsert(args: any): Promise<any>;
+  };
+  userProfileEntry: {
+    findUnique(args: any): Promise<any>;
+    create(args: any): Promise<any>;
+    updateMany(args: any): Promise<{ count: number }>;
+  };
 };
 
 if (process.env.NODE_ENV !== 'production') {
@@ -50,9 +94,10 @@ if (process.env.NODE_ENV !== 'production') {
 
 export async function postgresHealthCheck(): Promise<boolean> {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRaw`SELECT 1 FROM _prisma_migrations LIMIT 1`;
     return true;
-  } catch {
+  } catch (error) {
+    console.error('Postgres health check failed (migrations might be pending):', error);
     return false;
   }
 }

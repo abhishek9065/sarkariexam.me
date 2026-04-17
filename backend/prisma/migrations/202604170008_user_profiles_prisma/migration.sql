@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS app_user_profiles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  preferred_categories TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  preferred_qualifications TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  preferred_locations TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  preferred_organizations TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  age_group TEXT NULL,
+  education_level TEXT NULL,
+  experience_years INTEGER NOT NULL DEFAULT 0,
+  email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
+  push_notifications BOOLEAN NOT NULL DEFAULT FALSE,
+  notification_frequency TEXT NOT NULL DEFAULT 'daily',
+  alert_window_days INTEGER NOT NULL DEFAULT 7,
+  alert_max_items INTEGER NOT NULL DEFAULT 6,
+  profile_complete BOOLEAN NOT NULL DEFAULT FALSE,
+  onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
