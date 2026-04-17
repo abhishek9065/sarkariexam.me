@@ -148,23 +148,23 @@ jobs:
 
           if [ -n "${DO_REPO_DIR:-}" ]; then
             if [ -e "$DO_REPO_DIR" ] && [ ! -d "$DO_REPO_DIR/.git" ]; then
-              echo "Configured DO_REPO_DIR exists but is not a git checkout: $DO_REPO_DIR" >&2
-              echo "Remove it or point DO_REPO_DIR to the production checkout path." >&2
-              exit 1
+              echo "NOTICE: configured DO_REPO_DIR exists but is not a git checkout: $DO_REPO_DIR"
+              echo "NOTICE: ignoring DO_REPO_DIR and trying automatic checkout discovery."
+            elif has_git_checkout "$DO_REPO_DIR" && ! has_deploy_script "$DO_REPO_DIR"; then
+              echo "NOTICE: configured DO_REPO_DIR is missing scripts/deploy-live.sh: $DO_REPO_DIR"
+              echo "NOTICE: ignoring DO_REPO_DIR and trying automatic checkout discovery."
+            elif is_checkout_missing_env "$DO_REPO_DIR"; then
+              echo "NOTICE: configured DO_REPO_DIR is missing root .env: $DO_REPO_DIR"
+              echo "NOTICE: deploy-live.sh will try fallback checkout discovery."
+              missing_env_dir="$DO_REPO_DIR"
             fi
-            if has_git_checkout "$DO_REPO_DIR" && ! has_deploy_script "$DO_REPO_DIR"; then
-              echo "Configured DO_REPO_DIR is missing scripts/deploy-live.sh: $DO_REPO_DIR" >&2
-              exit 1
-            fi
-            if is_checkout_missing_env "$DO_REPO_DIR"; then
-              echo "Deployment config missing at $DO_REPO_DIR/.env" >&2
-              echo "Create $DO_REPO_DIR/.env from .env.example before rerunning deploy." >&2
-              exit 1
-            fi
+
             if is_ready_checkout "$DO_REPO_DIR"; then
               repo_dir="$DO_REPO_DIR"
             else
-              bootstrap_repo_dir="$DO_REPO_DIR"
+              if [ ! -e "$DO_REPO_DIR" ] || [ -d "$DO_REPO_DIR/.git" ]; then
+                bootstrap_repo_dir="$DO_REPO_DIR"
+              fi
             fi
           fi
 
@@ -194,19 +194,19 @@ jobs:
             done < <(find "$HOME" -maxdepth 6 -type f -path '*/scripts/deploy-live.sh' 2>/dev/null | head -n 20 || true)
           fi
 
-          if [ -z "$repo_dir" ] && [ -n "$missing_env_dir" ]; then
-            echo "Deployment config missing at $missing_env_dir/.env" >&2
-            echo "Create $missing_env_dir/.env from .env.example before rerunning deploy." >&2
-            exit 1
-          fi
-
           if [ -z "$repo_dir" ]; then
             repo_dir="${bootstrap_repo_dir:-$canonical_repo_dir}"
             echo "No existing deploy checkout found. Bootstrapping repository at $repo_dir"
             if [ -e "$repo_dir" ] && [ ! -d "$repo_dir/.git" ]; then
-              echo "Bootstrap target exists but is not a git checkout: $repo_dir" >&2
-              echo "Remove it or set DO_REPO_DIR to a clean target path." >&2
-              exit 1
+              fallback_repo_dir="$HOME/sarkariexam.me"
+              echo "NOTICE: bootstrap target exists but is not a git checkout: $repo_dir"
+              echo "NOTICE: switching bootstrap target to $fallback_repo_dir"
+              repo_dir="$fallback_repo_dir"
+              if [ -e "$repo_dir" ] && [ ! -d "$repo_dir/.git" ]; then
+                echo "Bootstrap target exists but is not a git checkout: $repo_dir" >&2
+                echo "Remove it or set DO_REPO_DIR to a clean target path." >&2
+                exit 1
+              fi
             fi
             if [ ! -d "$repo_dir/.git" ]; then
               mkdir -p "$(dirname "$repo_dir")"
@@ -219,14 +219,14 @@ jobs:
             exit 1
           fi
 
-          if [ ! -f "$repo_dir/.env" ]; then
-            echo "Deployment config missing at $repo_dir/.env" >&2
-            echo "Create $repo_dir/.env from .env.example on the deployment checkout path." >&2
-            exit 1
-          fi
-
           echo "Using deployment checkout: $repo_dir"
-          REPO_DIR_OVERRIDE="$repo_dir" bash "$repo_dir/scripts/deploy-live.sh"
+          if [ -f "$repo_dir/.env" ]; then
+            REPO_DIR_OVERRIDE="$repo_dir" bash "$repo_dir/scripts/deploy-live.sh"
+          else
+            echo "NOTICE: deployment config missing at $repo_dir/.env"
+            echo "NOTICE: running deploy-live.sh without REPO_DIR_OVERRIDE for fallback resolution."
+            bash "$repo_dir/scripts/deploy-live.sh"
+          fi
           REMOTE_SCRIPT
           ssh_exit=$?
           set -e

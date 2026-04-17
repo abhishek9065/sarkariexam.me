@@ -35,14 +35,13 @@ resolve_repo_dir() {
     fi
 
     if ! has_git_checkout "${REPO_DIR_OVERRIDE}"; then
-      echo "ERROR: REPO_DIR_OVERRIDE is not a git checkout: ${REPO_DIR_OVERRIDE}" >&2
+      echo "NOTICE: REPO_DIR_OVERRIDE is not a git checkout: ${REPO_DIR_OVERRIDE}" >&2
     elif ! has_deploy_script "${REPO_DIR_OVERRIDE}"; then
-      echo "ERROR: REPO_DIR_OVERRIDE is missing scripts/deploy-live.sh: ${REPO_DIR_OVERRIDE}" >&2
+      echo "NOTICE: REPO_DIR_OVERRIDE is missing scripts/deploy-live.sh: ${REPO_DIR_OVERRIDE}" >&2
     elif ! has_root_env "${REPO_DIR_OVERRIDE}"; then
-      echo "ERROR: REPO_DIR_OVERRIDE is missing root .env: ${REPO_DIR_OVERRIDE}" >&2
-      echo "Create ${REPO_DIR_OVERRIDE}/.env from .env.example before rerunning deploy." >&2
+      echo "NOTICE: REPO_DIR_OVERRIDE is missing root .env: ${REPO_DIR_OVERRIDE}" >&2
+      echo "NOTICE: falling back to automatic checkout discovery." >&2
     fi
-    exit 1
   fi
 
   if is_valid_repo_dir "$PRIMARY_REPO_DIR"; then
