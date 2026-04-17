@@ -26,6 +26,24 @@ if (prismaDatasourceUrl) {
 
 export const prisma = globalRef.__prismaClient ?? new PrismaClient(prismaClientOptions);
 
+// Prisma's generated default type surface can lag behind the generated model set in this workspace.
+// Keep the runtime client canonical, and add a narrow typed bridge for newly migrated app_* slices.
+export const prismaApp = prisma as PrismaClient & {
+  workflowLogEntry: {
+    findMany(args: any): Promise<any[]>;
+    create(args: any): Promise<any>;
+  };
+  siteSettingRecord: {
+    findUnique(args: any): Promise<any>;
+    upsert(args: any): Promise<any>;
+  };
+  pushSubscriptionEntry: {
+    findMany(args: any): Promise<any[]>;
+    upsert(args: any): Promise<any>;
+    count(args?: any): Promise<number>;
+  };
+};
+
 if (process.env.NODE_ENV !== 'production') {
   globalRef.__prismaClient = prisma;
 }
