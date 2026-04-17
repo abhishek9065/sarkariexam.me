@@ -1,8 +1,4 @@
 import { randomUUID } from 'crypto';
-
-
-
-
 import { prismaApp } from '../services/postgres/prisma.js';
 import type { ContentType, TrackerStatus } from '../types.js';
 

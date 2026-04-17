@@ -204,21 +204,58 @@ if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
   git status --short
 fi
 
-echo "=== Syncing repository ==="
-git fetch origin main
-git checkout main
+deploy_target_sha="${DEPLOY_GIT_SHA:-}"
 
-if ! git pull --ff-only origin main; then
-  echo "WARN: fast-forward pull failed. Attempting checkout recovery."
+if [[ -n "$deploy_target_sha" ]]; then
+  echo "=== Syncing repository to commit $deploy_target_sha ==="
+else
+  echo "=== Syncing repository ==="
+fi
 
-  if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
-    stash_label="deploy-autostash-$(date -u +"%Y%m%dT%H%M%SZ")"
-    git stash push --include-untracked -m "$stash_label" || true
-    echo "NOTICE: saved local checkout changes to stash: $stash_label"
+git fetch --prune origin main
+
+if [[ -n "$deploy_target_sha" ]]; then
+  if ! git cat-file -e "${deploy_target_sha}^{commit}" 2>/dev/null; then
+    echo "WARN: target commit $deploy_target_sha not present locally after main fetch. Attempting direct fetch."
+    if ! git fetch origin "$deploy_target_sha"; then
+      echo "ERROR: unable to fetch target commit $deploy_target_sha from origin." >&2
+      exit 1
+    fi
   fi
 
-  git fetch origin main
-  git checkout -B main origin/main
+  if ! git checkout --detach "$deploy_target_sha"; then
+    echo "WARN: failed to checkout target commit. Attempting checkout recovery."
+
+    if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+      stash_label="deploy-autostash-$(date -u +"%Y%m%dT%H%M%SZ")"
+      git stash push --include-untracked -m "$stash_label" || true
+      echo "NOTICE: saved local checkout changes to stash: $stash_label"
+    fi
+
+    git fetch --prune origin main
+    if ! git cat-file -e "${deploy_target_sha}^{commit}" 2>/dev/null; then
+      if ! git fetch origin "$deploy_target_sha"; then
+        echo "ERROR: unable to fetch target commit $deploy_target_sha during recovery." >&2
+        exit 1
+      fi
+    fi
+    git checkout --detach "$deploy_target_sha"
+  fi
+else
+  git checkout main
+
+  if ! git pull --ff-only origin main; then
+    echo "WARN: fast-forward pull failed. Attempting checkout recovery."
+
+    if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+      stash_label="deploy-autostash-$(date -u +"%Y%m%dT%H%M%SZ")"
+      git stash push --include-untracked -m "$stash_label" || true
+      echo "NOTICE: saved local checkout changes to stash: $stash_label"
+    fi
+
+    git fetch --prune origin main
+    git checkout -B main origin/main
+  fi
 fi
 
 export COMPOSE_PROJECT_NAME="sarkari-result"

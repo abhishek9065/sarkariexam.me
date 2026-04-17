@@ -4,6 +4,12 @@ name: "CodeQL Config"
 paths:
   - backend/src
   - frontend/app
+  - frontend/components
+  - frontend/hooks
+  - frontend/lib
+  - admin-next/app
+  - admin-next/components
+  - admin-next/lib
 
 paths-ignore:
   - backend/src/tests
@@ -14,9 +20,3 @@ paths-ignore:
 
 queries:
   - uses: security-extended
-
-# Keep the Security tab focused on actionable issues.
-query-filters:
-  - exclude:
-      problem.severity:
-        - warning
