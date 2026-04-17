@@ -47,8 +47,9 @@ GitHub Actions secrets:
 - optional `DO_PORT`
 
 Server root `.env`:
-- `COSMOS_CONNECTION_STRING`
+- `POSTGRES_PRISMA_URL` or `DATABASE_URL`
 - `JWT_SECRET`
+- legacy only while compatibility flows remain: `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
 - recommended `COSMOS_DATABASE_NAME`
 - recommended `FRONTEND_URL`
 - recommended `CORS_ORIGINS`
@@ -61,6 +62,7 @@ Server root `.env`:
 
 The server root `.env` is the production source of truth for deploy scripts and `docker-compose.yml`.
 Do not treat `backend/.env` or `frontend/.env.local` as production Docker config.
+The fast deploy path now validates compose rendering before rebuild so broken production YAML fails earlier.
 
 ## Files
 

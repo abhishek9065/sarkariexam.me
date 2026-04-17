@@ -3,7 +3,7 @@ import { buildOrganizationMeta, getTaxonomyList } from '@/lib/content-api';
 
 
 export default async function OrganizationsPage() {
-  const organizations = await getTaxonomyList('organizations');
+  const organizations = await getTaxonomyList('organizations').catch(() => []);
 
   return (
     <PublicStateDirectoryPage

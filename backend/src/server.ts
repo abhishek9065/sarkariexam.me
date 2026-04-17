@@ -43,6 +43,7 @@ import {
 } from './services/cosmosdb.js';
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
+import { getLegacyRuntimeDiagnostics, legacyMongoBackedApiPrefixes, startLegacyMongoRuntime } from './services/legacyRuntime.js';
 import { postgresHealthCheck } from './services/postgres/prisma.js';
 import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
 import { getSecurityMetricSnapshot } from './services/securityMetrics.js';
@@ -51,10 +52,6 @@ import logger from './utils/logger.js';
 
 const app = express();
 const startedAt = Date.now();
-// Only legacy APIs still backed by MongoDB/Cosmos should require Mongo readiness checks.
-const dbBackedApiPrefixes = [
-  '/api/admin',
-];
 
 export { app };
 
@@ -190,7 +187,26 @@ app.get('/api/health/deep', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, ke
 });
 
 function isDatabaseBackedApi(pathname: string): boolean {
-  return dbBackedApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return legacyMongoBackedApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function buildRuntimeDiagnostics() {
+  return {
+    legacyMongo: getLegacyRuntimeDiagnostics(config.legacyMongoConfigured),
+    postgres: {
+      configured: Boolean(config.postgresPrismaUrl),
+      mode: getContentDbMode(),
+    },
+    frontendRevalidation: {
+      configured: config.frontendRevalidationConfigured,
+      urlConfigured: Boolean(config.frontendRevalidateUrl),
+      tokenConfigured: Boolean(config.frontendRevalidateToken),
+    },
+    metrics: {
+      enabled: Boolean(config.metricsToken),
+    },
+    warnings: config.runtimeWarnings,
+  };
 }
 
 async function buildHealthResponse(res: express.Response) {
@@ -219,6 +235,7 @@ async function buildHealthResponse(res: express.Response) {
           ok: postgresOk,
         },
       },
+      runtime: buildRuntimeDiagnostics(),
     });
 }
 
@@ -304,7 +321,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-// Core Routes (MongoDB-based)
+// API routes. Some legacy administrative and scheduler-adjacent flows still rely on the Mongo/Cosmos bridge.
 app.use(
   '/api/auth',
   csrfProtection({
@@ -343,27 +360,31 @@ app.use(errorHandler);
 // Initialize database and start server
 export async function startServer() {
   ErrorTracking.init();
+  for (const warning of config.runtimeWarnings) {
+    logger.warn({ warning }, '[Server] Runtime configuration warning');
+  }
 
   try {
     if (isDatabaseConfigured()) {
       await connectToDatabase();
-      logger.info('[Server] MongoDB connected successfully');
-      await scheduleAnalyticsRollups().catch(error => {
-        logger.error({ err: error }, '[Analytics] Rollup init failed');
+      logger.info('[Server] Legacy Mongo/Cosmos bridge connected successfully');
+      await startLegacyMongoRuntime({
+        logger,
+        scheduleAnalyticsRollups,
+        scheduleDigestSender,
+        scheduleTrackerReminders,
+        scheduleSavedSearchAlerts,
+        scheduleAutomationJobs,
       });
-      scheduleDigestSender();
-      scheduleTrackerReminders();
-      scheduleSavedSearchAlerts();
-      scheduleAutomationJobs();
     } else {
-      logger.info('[Server] No MongoDB configured, using fallback data');
+      logger.info('[Server] Legacy Mongo/Cosmos bridge not configured; Mongo-backed compatibility flows remain disabled');
     }
   } catch (error) {
-    logger.error({ err: error }, '[Server] Database connection failed');
+    logger.error({ err: error }, '[Server] Legacy Mongo/Cosmos bridge connection failed');
     if (config.isProduction) {
       throw error;
     }
-    logger.info('[Server] Starting without database - using fallback data');
+    logger.info('[Server] Starting without Mongo/Cosmos bridge in development');
   }
 
   const server = http.createServer(app);

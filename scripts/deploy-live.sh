@@ -229,7 +229,7 @@ DEPLOY_MODE="${DEPLOY_MODE:-fast}"
 if [[ "$DEPLOY_MODE" == "fast" ]]; then
   echo "=== Running FAST deployment (GitHub Actions triggered rebuild on droplet) ==="
   echo "To use full deployment, set: DEPLOY_MODE=full"
-  export SKIP_CONFIG_VALIDATION=1
+  export SKIP_CONFIG_VALIDATION="${SKIP_CONFIG_VALIDATION:-0}"
   export SKIP_FRONTEND_CHECKS=1
   export SKIP_PUBLIC_CHECKS=0  # Keep essential public checks
   export SKIP_CACHE_PURGE=0

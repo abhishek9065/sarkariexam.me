@@ -1,9 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import { Prisma } from '@prisma/client';
-
-import { ensureNotificationCampaignsTable } from '../services/postgres/legacyTables.js';
-import { prisma } from '../services/postgres/prisma.js';
+import { prismaApp } from '../services/postgres/prisma.js';
 
 export type NotificationCampaignSegmentType =
   | 'all'
@@ -51,18 +48,18 @@ interface NotificationCampaignRow {
   title: string;
   body: string;
   url: string | null;
-  segment_type: string;
-  segment_value: string;
+  segmentType: string;
+  segmentValue: string;
   status: string;
-  sent_count: number;
-  failed_count: number;
-  open_count: number;
-  click_count: number;
-  scheduled_at: Date | null;
-  sent_at: Date | null;
-  created_by: string;
-  created_at: Date;
-  ab_test: unknown;
+  sentCount: number;
+  failedCount: number;
+  openCount: number;
+  clickCount: number;
+  scheduledAt: Date | null;
+  sentAt: Date | null;
+  createdBy: string;
+  createdAt: Date;
+  abTest: unknown;
 }
 
 function asSegmentType(value: string): NotificationCampaignSegmentType {
@@ -134,19 +131,19 @@ function toRecord(row: NotificationCampaignRow): NotificationCampaignRecord {
     body: row.body,
     url: row.url || undefined,
     segment: {
-      type: asSegmentType(row.segment_type),
-      value: row.segment_value,
+      type: asSegmentType(row.segmentType),
+      value: row.segmentValue,
     },
     status: asStatus(row.status),
-    sentCount: row.sent_count,
-    failedCount: row.failed_count,
-    openCount: row.open_count,
-    clickCount: row.click_count,
-    scheduledAt: row.scheduled_at || undefined,
-    sentAt: row.sent_at || undefined,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
-    abTest: asAbTest(row.ab_test),
+    sentCount: row.sentCount,
+    failedCount: row.failedCount,
+    openCount: row.openCount,
+    clickCount: row.clickCount,
+    scheduledAt: row.scheduledAt || undefined,
+    sentAt: row.sentAt || undefined,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+    abTest: asAbTest(row.abTest),
   };
 }
 
@@ -162,240 +159,103 @@ export class NotificationCampaignModelPostgres {
     },
     userId: string,
   ): Promise<NotificationCampaignRecord | null> {
-    await ensureNotificationCampaignsTable();
-
     const id = randomUUID();
     const status: NotificationCampaignStatus = input.scheduledAt ? 'scheduled' : 'draft';
-
-    if (input.abTest) {
-      await prisma.$executeRaw`
-        INSERT INTO app_notification_campaigns (
-          id,
-          title,
-          body,
-          url,
-          segment_type,
-          segment_value,
-          status,
-          sent_count,
-          failed_count,
-          open_count,
-          click_count,
-          scheduled_at,
-          sent_at,
-          created_by,
-          created_at,
-          ab_test
-        ) VALUES (
-          ${id},
-          ${input.title},
-          ${input.body},
-          ${input.url || null},
-          ${input.segment.type},
-          ${input.segment.value},
-          ${status},
-          ${0},
-          ${0},
-          ${0},
-          ${0},
-          ${input.scheduledAt || null},
-          ${null},
-          ${userId},
-          NOW(),
-          ${JSON.stringify(input.abTest)}::jsonb
-        )
-      `;
-    } else {
-      await prisma.$executeRaw`
-        INSERT INTO app_notification_campaigns (
-          id,
-          title,
-          body,
-          url,
-          segment_type,
-          segment_value,
-          status,
-          sent_count,
-          failed_count,
-          open_count,
-          click_count,
-          scheduled_at,
-          sent_at,
-          created_by,
-          created_at,
-          ab_test
-        ) VALUES (
-          ${id},
-          ${input.title},
-          ${input.body},
-          ${input.url || null},
-          ${input.segment.type},
-          ${input.segment.value},
-          ${status},
-          ${0},
-          ${0},
-          ${0},
-          ${0},
-          ${input.scheduledAt || null},
-          ${null},
-          ${userId},
-          NOW(),
-          ${null}
-        )
-      `;
-    }
+    await prismaApp.notificationCampaignEntry.create({
+      data: {
+        id,
+        title: input.title,
+        body: input.body,
+        url: input.url || null,
+        segmentType: input.segment.type,
+        segmentValue: input.segment.value,
+        status,
+        sentCount: 0,
+        failedCount: 0,
+        openCount: 0,
+        clickCount: 0,
+        scheduledAt: input.scheduledAt || null,
+        sentAt: null,
+        createdBy: userId,
+        abTest: input.abTest ?? null,
+      },
+    });
 
     return this.findById(id);
   }
 
   static async list(limit = 50): Promise<NotificationCampaignRecord[]> {
-    await ensureNotificationCampaignsTable();
-
-    const rows = await prisma.$queryRaw<NotificationCampaignRow[]>(Prisma.sql`
-      SELECT
-        id,
-        title,
-        body,
-        url,
-        segment_type,
-        segment_value,
-        status,
-        sent_count,
-        failed_count,
-        open_count,
-        click_count,
-        scheduled_at,
-        sent_at,
-        created_by,
-        created_at,
-        ab_test
-      FROM app_notification_campaigns
-      ORDER BY created_at DESC
-      LIMIT ${limit}
-    `);
+    const rows = await prismaApp.notificationCampaignEntry.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
 
     return rows.map((row) => toRecord(row));
   }
 
   static async findById(id: string): Promise<NotificationCampaignRecord | null> {
-    await ensureNotificationCampaignsTable();
-
-    const rows = await prisma.$queryRaw<NotificationCampaignRow[]>`
-      SELECT
-        id,
-        title,
-        body,
-        url,
-        segment_type,
-        segment_value,
-        status,
-        sent_count,
-        failed_count,
-        open_count,
-        click_count,
-        scheduled_at,
-        sent_at,
-        created_by,
-        created_at,
-        ab_test
-      FROM app_notification_campaigns
-      WHERE id = ${id}
-      LIMIT 1
-    `;
-
-    return rows[0] ? toRecord(rows[0]) : null;
+    const row = await prismaApp.notificationCampaignEntry.findUnique({
+      where: { id },
+    });
+    return row ? toRecord(row) : null;
   }
 
   static async markSending(id: string): Promise<boolean> {
-    await ensureNotificationCampaignsTable();
-
-    const updated = await prisma.$executeRaw`
-      UPDATE app_notification_campaigns
-      SET status = ${'sending'}
-      WHERE id = ${id}
-    `;
-
-    return Number(updated) > 0;
+    const updated = await prismaApp.notificationCampaignEntry.updateMany({
+      where: { id },
+      data: { status: 'sending' },
+    });
+    return updated.count > 0;
   }
 
   static async markSent(id: string, sentCount: number): Promise<boolean> {
-    await ensureNotificationCampaignsTable();
-
-    const updated = await prisma.$executeRaw`
-      UPDATE app_notification_campaigns
-      SET
-        status = ${'sent'},
-        sent_at = NOW(),
-        sent_count = ${sentCount}
-      WHERE id = ${id}
-    `;
-
-    return Number(updated) > 0;
+    const updated = await prismaApp.notificationCampaignEntry.updateMany({
+      where: { id },
+      data: {
+        status: 'sent',
+        sentAt: new Date(),
+        sentCount,
+      },
+    });
+    return updated.count > 0;
   }
 
   static async markFailed(id: string): Promise<boolean> {
-    await ensureNotificationCampaignsTable();
-
-    const updated = await prisma.$executeRaw`
-      UPDATE app_notification_campaigns
-      SET status = ${'failed'}
-      WHERE id = ${id}
-    `;
-
-    return Number(updated) > 0;
+    const updated = await prismaApp.notificationCampaignEntry.updateMany({
+      where: { id },
+      data: { status: 'failed' },
+    });
+    return updated.count > 0;
   }
 
   static async schedule(id: string, scheduledAt: Date): Promise<boolean> {
-    await ensureNotificationCampaignsTable();
-
-    const updated = await prisma.$executeRaw`
-      UPDATE app_notification_campaigns
-      SET
-        scheduled_at = ${scheduledAt},
-        status = ${'scheduled'}
-      WHERE id = ${id}
-    `;
-
-    return Number(updated) > 0;
+    const updated = await prismaApp.notificationCampaignEntry.updateMany({
+      where: { id },
+      data: {
+        scheduledAt,
+        status: 'scheduled',
+      },
+    });
+    return updated.count > 0;
   }
 
   static async remove(id: string): Promise<boolean> {
-    await ensureNotificationCampaignsTable();
-
-    const deleted = await prisma.$executeRaw`
-      DELETE FROM app_notification_campaigns
-      WHERE id = ${id}
-    `;
-
-    return Number(deleted) > 0;
+    const deleted = await prismaApp.notificationCampaignEntry.deleteMany({
+      where: { id },
+    });
+    return deleted.count > 0;
   }
 
   static async listScheduledDue(now: Date): Promise<NotificationCampaignRecord[]> {
-    await ensureNotificationCampaignsTable();
-
-    const rows = await prisma.$queryRaw<NotificationCampaignRow[]>`
-      SELECT
-        id,
-        title,
-        body,
-        url,
-        segment_type,
-        segment_value,
-        status,
-        sent_count,
-        failed_count,
-        open_count,
-        click_count,
-        scheduled_at,
-        sent_at,
-        created_by,
-        created_at,
-        ab_test
-      FROM app_notification_campaigns
-      WHERE status = ${'scheduled'}
-        AND scheduled_at <= ${now}
-      ORDER BY scheduled_at ASC
-    `;
+    const rows = await prismaApp.notificationCampaignEntry.findMany({
+      where: {
+        status: 'scheduled',
+        scheduledAt: {
+          lte: now,
+        },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
 
     return rows.map((row) => toRecord(row));
   }

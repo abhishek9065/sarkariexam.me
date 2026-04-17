@@ -14,7 +14,6 @@ import {
   Bell,
   BookOpen,
   Briefcase,
-  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Command,
@@ -22,7 +21,6 @@ import {
   ExternalLink,
   FileText,
   Hash,
-  Info,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -32,7 +30,6 @@ import {
   Search,
   Settings,
   Shield,
-  TriangleAlert,
   Trophy,
   Users,
   X,
@@ -61,14 +58,6 @@ type NavSection = {
   items: NavItem[];
 };
 
-type NotificationItem = {
-  id: number;
-  text: string;
-  time: string;
-  type: 'info' | 'warning' | 'success';
-  read: boolean;
-};
-
 const NAV_SECTIONS: NavSection[] = [
   {
     label: '',
@@ -81,14 +70,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/announcements',
         label: 'All Posts',
         icon: Hash,
-        badge: 16,
         match: (pathname, searchParams) => pathname === '/announcements' && !searchParams.get('type'),
       },
       {
         href: '/announcements?type=job',
         label: 'Latest Jobs',
         icon: Briefcase,
-        badge: 9,
         sub: true,
         match: (pathname, searchParams) => pathname === '/announcements' && searchParams.get('type') === 'job',
       },
@@ -96,7 +83,6 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/announcements?type=result',
         label: 'Results',
         icon: Trophy,
-        badge: 3,
         sub: true,
         match: (pathname, searchParams) => pathname === '/announcements' && searchParams.get('type') === 'result',
       },
@@ -131,7 +117,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Community',
     items: [
-      { href: '/community', label: 'Q&A Moderation', icon: MessageSquare, badge: 5 },
+      { href: '/community', label: 'Q&A Moderation', icon: MessageSquare, badge: 'Planned' },
     ],
   },
   {
@@ -143,8 +129,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Site',
     items: [
-      { href: '/notifications', label: 'Ticker & Links', icon: Radio },
-      { href: '/subscribers', label: 'Subscribers', icon: Users, badge: '28K', roles: ['superadmin', 'admin'] },
+      { href: '/notifications', label: 'Ticker & Links', icon: Radio, badge: 'Planned' },
+      { href: '/subscribers', label: 'Subscribers', icon: Users, roles: ['superadmin', 'admin'] },
       { href: '/audit-log', label: 'Activity Log', icon: Activity, roles: ['superadmin', 'admin'] },
     ],
   },
@@ -154,14 +140,6 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/settings', label: 'Settings', icon: Settings, roles: ['superadmin', 'admin'] },
     ],
   },
-];
-
-const NOTIFICATIONS: NotificationItem[] = [
-  { id: 1, text: 'SSC CGL 2026 - 5 new Q&A questions pending review', time: '2 min ago', type: 'warning', read: false },
-  { id: 2, text: '142 new subscribers joined today', time: '18 min ago', type: 'success', read: false },
-  { id: 3, text: 'Railway Admit Card last date is tomorrow', time: '1 hr ago', type: 'info', read: false },
-  { id: 4, text: 'Monthly analytics report is ready', time: '3 hr ago', type: 'info', read: true },
-  { id: 5, text: 'UPSC NDA 2026 - last date alert firing', time: '5 hr ago', type: 'warning', read: true },
 ];
 
 function matchesNavItem(item: NavItem, pathname: string, searchParams: ReadonlyURLSearchParams) {
@@ -192,6 +170,14 @@ function getInitials(name?: string | null) {
   return parts.map(part => part[0]?.toUpperCase() ?? '').join('');
 }
 
+function formatRoleLabel(role?: AdminRole | null) {
+  if (!role) return 'Admin';
+  return role
+    .split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -203,7 +189,6 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(NOTIFICATIONS);
   const paletteRef = useRef<HTMLInputElement>(null);
 
   const flatItems = useMemo(() => NAV_SECTIONS.flatMap(section => section.items), []);
@@ -213,8 +198,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   );
   const pageTitle = getPageTitle(pathname, searchParams, currentItem);
   const userLabel = user?.username || user?.email || 'Admin';
-  const unreadCount = notifications.filter(item => !item.read).length;
-  const liveSiteUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+  const userRoleLabel = formatRoleLabel(user?.role);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -226,22 +210,30 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     }
   }, [logout, router]);
 
+  const openLiveSite = useCallback(() => {
+    const liveSiteUrl = typeof window !== 'undefined'
+      ? `${window.location.protocol}//${window.location.host}`
+      : process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+
+    window.open(liveSiteUrl, '_blank', 'noopener,noreferrer');
+  }, []);
+
   const commandItems = useMemo(
     () => [
       { id: 'new-post', label: 'New Post', icon: Plus, description: 'Create a new job / result post', run: () => router.push('/announcements/new') },
       { id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, description: 'Overview & metrics', run: () => router.push('/') },
       { id: 'all-posts', label: 'All Posts', icon: Hash, description: 'Browse all content', run: () => router.push('/announcements') },
       { id: 'taxonomies', label: 'Taxonomies', icon: BookOpen, description: 'Manage states, organizations, and filters', run: () => router.push('/taxonomies') },
-      { id: 'analytics', label: 'Analytics', icon: BarChart3, description: 'Traffic & insights', run: () => router.push('/analytics') },
-      { id: 'qa', label: 'Q&A Moderation', icon: MessageSquare, description: 'Review pending questions', run: () => router.push('/community') },
-      { id: 'ticker', label: 'Ticker & Links', icon: Radio, description: 'Manage scrolling ticker', run: () => router.push('/notifications') },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3, description: 'Live traffic and engagement signals', run: () => router.push('/analytics') },
+      { id: 'qa', label: 'Q&A Moderation', icon: MessageSquare, description: 'Planned moderation workflow notice', run: () => router.push('/community') },
+      { id: 'ticker', label: 'Ticker & Links', icon: Radio, description: 'Planned site operations workflow notice', run: () => router.push('/notifications') },
       { id: 'users', label: 'Subscribers', icon: Users, description: 'Manage subscriber list', run: () => router.push('/subscribers') },
       { id: 'activity', label: 'Activity Log', icon: Activity, description: 'Audit trail', run: () => router.push('/audit-log') },
       { id: 'settings', label: 'Settings', icon: Settings, description: 'Site configuration', run: () => router.push('/settings') },
-      { id: 'view-site', label: 'View Live Site', icon: ExternalLink, description: 'Open homepage', run: () => window.open(liveSiteUrl, '_blank', 'noopener,noreferrer') },
+      { id: 'view-site', label: 'View Live Site', icon: ExternalLink, description: 'Open homepage', run: () => openLiveSite() },
       { id: 'logout', label: 'Logout', icon: LogOut, description: 'End admin session', run: () => void handleLogout() },
     ],
-    [handleLogout, liveSiteUrl, router]
+    [handleLogout, openLiveSite, router]
   );
 
   const filteredCommands = useMemo(() => {
@@ -280,18 +272,6 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => paletteRef.current?.focus(), 50);
     return () => window.clearTimeout(timer);
   }, [paletteOpen]);
-
-  function markAllRead() {
-    setNotifications(items => items.map(item => ({ ...item, read: true })));
-  }
-
-  function markRead(id: number) {
-    setNotifications(items => items.map(item => item.id === id ? { ...item, read: true } : item));
-  }
-
-  function openLiveSite() {
-    window.open(liveSiteUrl, '_blank', 'noopener,noreferrer');
-  }
 
   const editorMode =
     pathname.startsWith('/announcements/new') ||
@@ -550,7 +530,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12px] font-bold text-white">{userLabel}</div>
-                <div className="text-[9px] font-semibold text-[#fdd83599]">Super Admin</div>
+                <div className="text-[9px] font-semibold text-[#fdd83599]">{userRoleLabel}</div>
               </div>
               <div className="h-2 w-2 shrink-0 rounded-full bg-green-400" title="Online" />
             </div>
@@ -621,73 +601,39 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setNotifOpen(open => !open)}
-                  className="relative rounded-xl p-2 text-muted-foreground transition-colors hover:bg-accent"
+                  className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-accent"
                 >
                   <Bell className="h-4 w-4" />
-                  {unreadCount > 0 && (
-                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-red-500 text-[8px] font-extrabold text-white">
-                      {unreadCount}
-                    </span>
-                  )}
                 </button>
 
                 {notifOpen && (
                   <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3" style={{ background: 'linear-gradient(90deg, #060d2e, #1a237e)' }}>
+                    <div className="border-b border-gray-100 px-4 py-3" style={{ background: 'linear-gradient(90deg, #060d2e, #1a237e)' }}>
                       <div className="flex items-center gap-2">
                         <Bell className="h-3.5 w-3.5 text-white" />
-                        <span className="text-[13px] font-bold text-white">Notifications</span>
-                        {unreadCount > 0 && (
-                          <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-extrabold text-white">{unreadCount}</span>
-                        )}
+                        <span className="text-[13px] font-bold text-white">Operational Alerts</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={markAllRead}
-                        className="text-[10px] font-semibold text-blue-300 transition-colors hover:text-white"
-                      >
-                        Mark all read
-                      </button>
                     </div>
 
-                    <div>
-                      {notifications.map(item => {
-                        const tone =
-                          item.type === 'warning'
-                            ? { icon: TriangleAlert, color: '#f57f17' }
-                            : item.type === 'success'
-                              ? { icon: CheckCircle, color: '#2e7d32' }
-                              : { icon: Info, color: '#1565c0' };
-                        const Icon = tone.icon;
-
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => markRead(item.id)}
-                            className={cn(
-                              'flex w-full items-start gap-3 border-b border-gray-50 px-4 py-3 text-left transition-colors hover:bg-gray-50',
-                              !item.read && 'bg-blue-50/30'
-                            )}
-                          >
-                            <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: tone.color }} />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[12px] text-gray-700" style={{ fontWeight: item.read ? 400 : 600 }}>{item.text}</p>
-                              <p className="mt-0.5 text-[10px] text-gray-400">{item.time}</p>
-                            </div>
-                            {!item.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
-                          </button>
-                        );
-                      })}
+                    <div className="space-y-3 px-4 py-4">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <p className="text-[12px] font-bold text-amber-800">Live alerting is not wired yet</p>
+                        <p className="mt-1 text-[11px] leading-5 text-amber-700">
+                          The old dropdown used static sample notifications. It has been quarantined until alerting is backed by real queue and audit data.
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-[11px] leading-5 text-gray-600">
+                        Use Audit Log, Subscribers, and System Admin for live operational checks.
+                      </div>
                     </div>
 
                     <div className="bg-gray-50 px-4 py-2.5 text-center">
                       <Link
-                        href="/notifications"
+                        href="/audit-log"
                         onClick={() => setNotifOpen(false)}
                         className="text-[11px] font-semibold text-blue-600 transition-colors hover:underline"
                       >
-                        View all notifications
+                        Open activity log
                       </Link>
                     </div>
                   </div>

@@ -7,10 +7,32 @@ on:
   workflow_call:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  compose-config:
+    name: Compose Config Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate production compose rendering
+        run: docker compose -f docker-compose.yml config >/dev/null
+
+      - name: Validate dev compose overlay rendering
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config >/dev/null
+
   backend:
     name: Backend Build + Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -69,6 +91,7 @@ jobs:
   frontend:
     name: Public Frontend Lint + Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -95,6 +118,7 @@ jobs:
   admin:
     name: Admin App Lint + Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: admin-next

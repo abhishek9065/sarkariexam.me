@@ -11,10 +11,14 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy to DigitalOcean
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: production
     if: >-
       github.event_name == 'workflow_run' &&
@@ -84,6 +88,8 @@ jobs:
           DO_PORT: ${{ secrets.DO_PORT || 22 }}
           DO_REPO_DIR: ${{ vars.DO_REPO_DIR }}
           DEPLOY_MODE: fast
+          POSTGRES_PRISMA_URL: ${{ secrets.POSTGRES_PRISMA_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
           ssh_cmd=(
@@ -102,7 +108,7 @@ jobs:
           fi
 
           set +e
-          "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' DO_REPO_DIR='${DO_REPO_DIR:-}' bash -s" <<'REMOTE_SCRIPT'
+          "${ssh_cmd[@]}" "DEPLOY_MODE='$DEPLOY_MODE' DO_REPO_DIR='${DO_REPO_DIR:-}' POSTGRES_PRISMA_URL='${POSTGRES_PRISMA_URL:-}' DATABASE_URL='${DATABASE_URL:-}' bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
 
           has_git_checkout() {
@@ -249,6 +255,20 @@ jobs:
           if [ ! -f "$repo_dir/scripts/deploy-live.sh" ]; then
             echo "Deployment entrypoint missing after checkout sync at $repo_dir/scripts/deploy-live.sh" >&2
             exit 1
+          fi
+
+          if [ -n "${POSTGRES_PRISMA_URL:-}" ] && [ -f "$repo_dir/.env" ]; then
+            if ! grep -q "^POSTGRES_PRISMA_URL=" "$repo_dir/.env"; then
+              echo "Injecting POSTGRES_PRISMA_URL into $repo_dir/.env"
+              echo "POSTGRES_PRISMA_URL=\"$POSTGRES_PRISMA_URL\"" >> "$repo_dir/.env"
+            fi
+          fi
+
+          if [ -n "${DATABASE_URL:-}" ] && [ -f "$repo_dir/.env" ]; then
+            if ! grep -q "^DATABASE_URL=" "$repo_dir/.env"; then
+              echo "Injecting DATABASE_URL into $repo_dir/.env"
+              echo "DATABASE_URL=\"$DATABASE_URL\"" >> "$repo_dir/.env"
+            fi
           fi
 
           echo "Using deployment checkout: $repo_dir"

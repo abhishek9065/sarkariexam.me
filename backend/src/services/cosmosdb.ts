@@ -1,8 +1,8 @@
 import { MongoClient, Db, Collection, ObjectId, Document } from 'mongodb';
 
 /**
- * Azure Cosmos DB Service (MongoDB API)
- * Handles connection and provides database/collection access
+ * Legacy Mongo/Cosmos compatibility service.
+ * Keep existing compatibility flows working, but do not expand this surface for new core runtime features.
  */
 
 let client: MongoClient | null = null;

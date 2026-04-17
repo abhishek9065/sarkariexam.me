@@ -124,6 +124,8 @@ const buildDedupeKey = (item: ReminderItem, channel: 'in_app' | 'email'): string
 };
 
 const dispatchLogsCollection = () => getCollection<ReminderDispatchLogDoc>('reminder_dispatch_logs');
+// Transitional legacy scheduler path: tracked applications and reminder notifications here still read Mongo-compatible collections.
+// Later phases should replace this with the Postgres/Prisma reminder pipeline.
 const trackedCollection = () => getCollection<TrackedApplicationDoc>('tracked_applications');
 const bookmarksCollection = () => getCollection<BookmarkDoc>('bookmarks');
 const usersCollection = () => getCollection<UserDoc>('users');

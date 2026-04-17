@@ -13,14 +13,16 @@ Core platform areas:
 
 - Jobs, results, admit cards, answer keys, syllabus, and admissions
 - Admin tools for content, SEO, analytics, subscribers, notifications, and moderation
-- MongoDB in local development for legacy APIs, plus PostgreSQL for Prisma-backed content data
+- PostgreSQL for Prisma-backed content, editorial workflow, taxonomies, and SEO-facing data
+- MongoDB / Cosmos DB only for legacy compatibility paths that are being phased out
 - JWT auth, CSRF, rate limiting, caching, and OpenAPI documentation
 
 ## Requirements
 
 - Node.js `22.x`
 - npm `10+`
-- MongoDB for legacy backend flows in local development and PostgreSQL for Prisma-backed content data
+- PostgreSQL for the current backend content layer
+- MongoDB only when rehearsing or maintaining legacy compatibility flows
 
 ## Local Development
 
@@ -35,7 +37,7 @@ npm run dev
 
 Runs on `http://localhost:5000`.
 
-The backend now also expects a PostgreSQL database for Prisma-backed content data. Make sure `backend/.env` includes `POSTGRES_PRISMA_URL` before starting the server or running the test suite.
+The backend expects PostgreSQL for Prisma-backed content, taxonomy, and editorial data. Make sure `backend/.env` includes `POSTGRES_PRISMA_URL` before starting the server or running the test suite.
 
 If you only need the local Mongo-compatible database for migration rehearsal or backend work:
 
@@ -86,15 +88,18 @@ Root `.env` is the production source of truth for:
 
 Important production variables:
 
-- `COSMOS_CONNECTION_STRING`
-- `COSMOS_DATABASE_NAME`
-- `POSTGRES_PRISMA_URL` (or `DATABASE_URL` fallback)
+- `POSTGRES_PRISMA_URL`
 - `JWT_SECRET`
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
 - `FRONTEND_REVALIDATE_URL`
 - `FRONTEND_REVALIDATE_TOKEN`
 - `METRICS_TOKEN`
+
+Legacy-only production variables:
+
+- `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
+- `COSMOS_DATABASE_NAME`
 
 Recommended production variables:
 
@@ -149,7 +154,9 @@ Main branch pushes trigger:
 - `Deploy to Production`
 
 Production deploys are GitHub Actions driven. After CI and security pass, the deploy workflow SSHes into the droplet, pulls `main`, rebuilds the Docker services from the checked-out repo, and restarts the stack.
+This is the current production topology, not the long-term target. The platform is being moved toward safer staging and promotion controls while retaining the existing release automation.
 On release pushes, deploy gating depends on CI plus npm audit security checks. CodeQL now runs in its own workflow for pull requests and the scheduled weekly security scan, so transient GitHub-hosted CodeQL setup failures no longer block production deploys.
+The backend health endpoints also expose non-secret runtime diagnostics for PostgreSQL readiness, legacy Mongo bridge presence, metrics endpoint protection, and frontend revalidation wiring.
 
 ## Deployment
 
@@ -186,8 +193,9 @@ GitHub Actions secrets:
 
 Server `.env` values for production typically include:
 
-- application secrets such as `COSMOS_CONNECTION_STRING` and `JWT_SECRET`
+- application secrets such as `POSTGRES_PRISMA_URL` and `JWT_SECRET`
 - revalidation settings such as `FRONTEND_REVALIDATE_URL` and `FRONTEND_REVALIDATE_TOKEN`
+- legacy bridge settings such as `COSMOS_CONNECTION_STRING` only if legacy flows still need them
 
 ## Production Prerequisites
 
@@ -214,6 +222,7 @@ If a deploy fails, start with:
 - the GitHub Actions run log
 - `/tmp/sarkari-result-deploy.log` on the droplet
 - `docker compose -f docker-compose.yml logs` on the droplet
+- `/api/health` and `/api/health/deep` for non-secret runtime diagnostics after the rollout
 
 ## Repository Layout
 

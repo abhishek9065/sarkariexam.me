@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const siteConfig = {
   name: "SarkariExams.me",
-  description: "India-focused government opportunities platform for latest jobs, results, admit cards, admissions, and official notices.",
+  description: "Trusted government jobs and exam update platform for latest jobs, results, admit cards, answer keys, syllabus, admissions, scholarships, and official notices.",
   url: "https://sarkariexams.me",
   ogImage: "https://sarkariexams.me/file.svg",
   links: {
@@ -13,21 +13,30 @@ export const siteConfig = {
 
 export const defaultMetadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
   title: {
-    default: `${siteConfig.name} - Government Jobs, Results, Admit Cards 2026`,
+    default: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys 2026`,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  alternates: {
+    canonical: siteConfig.url,
+  },
   keywords: [
     "sarkari result",
     "government jobs",
     "sarkari naukri",
+    "latest govt jobs",
     "railway jobs",
     "bank jobs",
     "SSC jobs",
     "UPSC recruitment",
     "admit card",
     "exam results",
+    "answer key",
+    "syllabus",
+    "scholarship",
+    "admissions",
     "govt jobs 2026",
   ],
   authors: [
@@ -41,7 +50,7 @@ export const defaultMetadata: Metadata = {
     type: "website",
     locale: "en_IN",
     url: siteConfig.url,
-    title: siteConfig.name,
+    title: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys 2026`,
     description: siteConfig.description,
     siteName: siteConfig.name,
     images: [
@@ -55,10 +64,11 @@ export const defaultMetadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: siteConfig.name,
+    title: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys 2026`,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
     creator: "@sarkariexams",
+    site: "@sarkariexams",
   },
   robots: {
     index: true,
@@ -73,8 +83,10 @@ export const defaultMetadata: Metadata = {
   },
   icons: {
     icon: "/file.svg",
+    shortcut: "/file.svg",
   },
   manifest: "/manifest.json",
+  category: "education",
 };
 
 export function generateJobMetadata(job: {

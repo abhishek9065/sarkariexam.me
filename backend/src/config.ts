@@ -59,7 +59,8 @@ const validateSecret = (key: string, value: string, insecureDefaults: string[]):
   }
 };
 
-// Get MongoDB connection string (Cosmos DB)
+// Legacy Mongo/Cosmos bridge configuration.
+// New core runtime dependencies should not be added here; PostgreSQL is the primary domain runtime.
 const getDbConnectionString = (): string => {
   const mongoUrl = process.env.MONGODB_URI;
   const cosmosUrl = process.env.COSMOS_CONNECTION_STRING;
@@ -111,6 +112,8 @@ const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SE
 const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
 const contentDbMode = 'postgres';
 const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
+const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
+const frontendRevalidationConfigured = Boolean(process.env.FRONTEND_REVALIDATE_URL && process.env.FRONTEND_REVALIDATE_TOKEN);
 const featureFlags = {
   search_overlay_v2: parseBoolean(process.env.FEATURE_SEARCH_OVERLAY_V2, true),
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),
@@ -120,6 +123,24 @@ const featureFlags = {
 
 // Validate secrets aren't using known insecure defaults in production
 validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'test-secret', 'change-me', 'secret', 'jwt-secret']);
+
+const runtimeWarnings: string[] = [];
+
+if (!postgresPrismaUrl) {
+  runtimeWarnings.push('POSTGRES_PRISMA_URL is missing; Prisma-backed content and editorial APIs will be unhealthy.');
+}
+
+if (!legacyMongoConfigured) {
+  runtimeWarnings.push('Mongo/Cosmos legacy bridge is not configured; remaining legacy compatibility routes and schedulers stay unavailable.');
+}
+
+if (process.env.FRONTEND_REVALIDATE_URL && !process.env.FRONTEND_REVALIDATE_TOKEN) {
+  runtimeWarnings.push('FRONTEND_REVALIDATE_URL is set without FRONTEND_REVALIDATE_TOKEN; publish-triggered frontend revalidation is disabled.');
+}
+
+if (isProduction && !metricsToken) {
+  runtimeWarnings.push('METRICS_TOKEN is not set in production; /metrics is disabled.');
+}
 
 export const config = {
   port: Number(process.env.PORT ?? 5000),
@@ -144,6 +165,9 @@ export const config = {
   securityLogCleanupIntervalMinutes,
   contentDbMode,
   postgresPrismaUrl,
+  legacyMongoConfigured,
+  frontendRevalidationConfigured,
+  runtimeWarnings,
   featureFlags,
 
   // Cosmos DB specific
@@ -171,13 +195,18 @@ export const config = {
 // Log configuration status on startup (without exposing secrets)
 if (!isProduction) {
   console.log('[CONFIG] Running in development mode');
-  console.log(`[CONFIG] Database: ${databaseUrl.includes('localhost') ? 'local MongoDB' : 'Cosmos DB'}`);
+  console.log(`[CONFIG] Legacy database bridge: ${legacyMongoConfigured ? (databaseUrl.includes('localhost') ? 'local MongoDB' : 'Cosmos DB') : 'not configured'}`);
   if (configuredContentDbMode !== 'postgres') {
     console.log(`[CONFIG] CONTENT_DB_MODE=${configuredContentDbMode} ignored; forcing postgres mode`);
   }
   console.log(`[CONFIG] Content DB mode: ${contentDbMode}`);
   console.log(`[CONFIG] PostgreSQL URL configured: ${postgresPrismaUrl ? 'yes' : 'no'}`);
+  console.log(`[CONFIG] Frontend revalidation: ${frontendRevalidationConfigured ? 'configured' : 'not fully configured'}`);
+  console.log(`[CONFIG] Metrics endpoint protection: ${metricsToken ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Push notifications: ${config.vapidPublicKey ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Email notifications: ${config.emailPass ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Telegram notifications: ${config.telegramBotToken ? 'enabled' : 'disabled'}`);
+  for (const warning of runtimeWarnings) {
+    console.warn(`[CONFIG] Warning: ${warning}`);
+  }
 }

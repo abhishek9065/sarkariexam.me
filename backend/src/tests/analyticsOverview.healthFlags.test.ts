@@ -55,6 +55,7 @@ vi.mock('../services/postgres/prisma.js', () => ({
             count: subscriptionsCountMock,
         },
     },
+    prismaApp: {},
 }));
 
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';

@@ -1,33 +1,30 @@
 import { randomUUID } from 'crypto';
 
-import { Prisma } from '@prisma/client';
-
-import { ensureErrorReportsTable } from '../services/postgres/legacyTables.js';
-import { prisma } from '../services/postgres/prisma.js';
+import { prismaApp } from '../services/postgres/prisma.js';
 
 export type ErrorReportStatus = 'new' | 'triaged' | 'resolved';
 
 interface ErrorReportRow {
   id: string;
-  error_id: string;
+  errorId: string;
   message: string;
-  page_url: string | null;
-  user_agent: string | null;
+  pageUrl: string | null;
+  userAgent: string | null;
   note: string | null;
   stack: string | null;
-  component_stack: string | null;
-  created_at: Date;
-  updated_at: Date | null;
-  user_id: string | null;
-  user_email: string | null;
+  componentStack: string | null;
+  createdAt: Date;
+  updatedAt: Date | null;
+  userId: string | null;
+  userEmail: string | null;
   status: string;
-  review_note: string | null;
-  assignee_email: string | null;
+  reviewNote: string | null;
+  assigneeEmail: string | null;
   release: string | null;
-  request_id: string | null;
-  sentry_event_url: string | null;
-  resolved_at: Date | null;
-  resolved_by: string | null;
+  requestId: string | null;
+  sentryEventUrl: string | null;
+  resolvedAt: Date | null;
+  resolvedBy: string | null;
 }
 
 export interface ErrorReportRecord {
@@ -61,78 +58,55 @@ function toStatus(value: string): ErrorReportStatus {
 function toRecord(row: ErrorReportRow): ErrorReportRecord {
   return {
     id: row.id,
-    errorId: row.error_id,
+    errorId: row.errorId,
     message: row.message,
-    pageUrl: row.page_url,
-    userAgent: row.user_agent,
+    pageUrl: row.pageUrl,
+    userAgent: row.userAgent,
     note: row.note,
     stack: row.stack,
-    componentStack: row.component_stack,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    userId: row.user_id,
-    userEmail: row.user_email,
+    componentStack: row.componentStack,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    userId: row.userId,
+    userEmail: row.userEmail,
     status: toStatus(row.status),
-    reviewNote: row.review_note,
-    assigneeEmail: row.assignee_email,
+    reviewNote: row.reviewNote,
+    assigneeEmail: row.assigneeEmail,
     release: row.release,
-    requestId: row.request_id,
-    sentryEventUrl: row.sentry_event_url,
-    resolvedAt: row.resolved_at,
-    resolvedBy: row.resolved_by,
+    requestId: row.requestId,
+    sentryEventUrl: row.sentryEventUrl,
+    resolvedAt: row.resolvedAt,
+    resolvedBy: row.resolvedBy,
   };
 }
 
 export class ErrorReportModelPostgres {
   static async create(input: Omit<ErrorReportRecord, 'id' | 'updatedAt' | 'resolvedAt' | 'resolvedBy'>): Promise<{ id: string }> {
-    await ensureErrorReportsTable();
-
     const id = randomUUID();
-    await prisma.$executeRaw`
-      INSERT INTO app_error_reports (
+    await prismaApp.errorReportEntry.create({
+      data: {
         id,
-        error_id,
-        message,
-        page_url,
-        user_agent,
-        note,
-        stack,
-        component_stack,
-        created_at,
-        updated_at,
-        user_id,
-        user_email,
-        status,
-        review_note,
-        assignee_email,
-        release,
-        request_id,
-        sentry_event_url,
-        resolved_at,
-        resolved_by
-      ) VALUES (
-        ${id},
-        ${input.errorId},
-        ${input.message},
-        ${input.pageUrl ?? null},
-        ${input.userAgent ?? null},
-        ${input.note ?? null},
-        ${input.stack ?? null},
-        ${input.componentStack ?? null},
-        ${input.createdAt},
-        ${null},
-        ${input.userId ?? null},
-        ${input.userEmail ?? null},
-        ${input.status},
-        ${input.reviewNote ?? null},
-        ${input.assigneeEmail ?? null},
-        ${input.release ?? null},
-        ${input.requestId ?? null},
-        ${input.sentryEventUrl ?? null},
-        ${null},
-        ${null}
-      )
-    `;
+        errorId: input.errorId,
+        message: input.message,
+        pageUrl: input.pageUrl ?? null,
+        userAgent: input.userAgent ?? null,
+        note: input.note ?? null,
+        stack: input.stack ?? null,
+        componentStack: input.componentStack ?? null,
+        createdAt: input.createdAt,
+        updatedAt: null,
+        userId: input.userId ?? null,
+        userEmail: input.userEmail ?? null,
+        status: input.status,
+        reviewNote: input.reviewNote ?? null,
+        assigneeEmail: input.assigneeEmail ?? null,
+        release: input.release ?? null,
+        requestId: input.requestId ?? null,
+        sentryEventUrl: input.sentryEventUrl ?? null,
+        resolvedAt: null,
+        resolvedBy: null,
+      },
+    });
 
     return { id };
   }
@@ -142,74 +116,45 @@ export class ErrorReportModelPostgres {
     offset = 0,
     status?: ErrorReportStatus,
   ): Promise<{ data: ErrorReportRecord[]; total: number; count: number }> {
-    await ensureErrorReportsTable();
-
-    const whereClause = status ? Prisma.sql`WHERE status = ${status}` : Prisma.empty;
+    const where = status ? { status } : undefined;
 
     const [rows, totalRows] = await Promise.all([
-      prisma.$queryRaw<ErrorReportRow[]>(Prisma.sql`
-        SELECT
-          id,
-          error_id,
-          message,
-          page_url,
-          user_agent,
-          note,
-          stack,
-          component_stack,
-          created_at,
-          updated_at,
-          user_id,
-          user_email,
-          status,
-          review_note,
-          assignee_email,
-          release,
-          request_id,
-          sentry_event_url,
-          resolved_at,
-          resolved_by
-        FROM app_error_reports
-        ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `),
-      prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS count
-        FROM app_error_reports
-        ${whereClause}
-      `),
+      prismaApp.errorReportEntry.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prismaApp.errorReportEntry.count({ where }),
     ]);
 
     const data = rows.map((row) => toRecord(row));
-    return { data, total: Number(totalRows[0]?.count || 0), count: data.length };
+    return { data, total: totalRows, count: data.length };
   }
 
   static async update(
     id: string,
     patch: { status: 'triaged' | 'resolved'; reviewNote?: string; resolvedBy?: string },
   ): Promise<boolean> {
-    await ensureErrorReportsTable();
-
-    const setClauses: Prisma.Sql[] = [
-      Prisma.sql`status = ${patch.status}`,
-      Prisma.sql`updated_at = NOW()`,
-    ];
+    const data: Record<string, unknown> = {
+      status: patch.status,
+      updatedAt: new Date(),
+    };
 
     if (patch.reviewNote !== undefined) {
-      setClauses.push(Prisma.sql`review_note = ${patch.reviewNote || null}`);
+      data.reviewNote = patch.reviewNote || null;
     }
 
     if (patch.status === 'resolved') {
-      setClauses.push(Prisma.sql`resolved_at = NOW()`);
-      setClauses.push(Prisma.sql`resolved_by = ${patch.resolvedBy || 'admin'}`);
+      data.resolvedAt = new Date();
+      data.resolvedBy = patch.resolvedBy || 'admin';
     }
 
-    const updated = await prisma.$executeRaw(
-      Prisma.sql`UPDATE app_error_reports SET ${Prisma.join(setClauses, ', ')} WHERE id = ${id}`,
-    );
-    return Number(updated) > 0;
+    const updated = await prismaApp.errorReportEntry.updateMany({
+      where: { id },
+      data,
+    });
+    return updated.count > 0;
   }
 }
 

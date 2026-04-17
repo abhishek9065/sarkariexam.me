@@ -131,6 +131,8 @@ const config = {
 let alertsIntervalRef: NodeJS.Timeout | null = null;
 let alertsRunInFlight = false;
 
+// Transitional legacy scheduler path: this still reads Mongo-compatible saved_searches/user_notifications collections.
+// Keep behavior stable for now; later phases should replace this with the Postgres/Prisma alert pipeline.
 const savedSearchesCollection = () => getCollection<SavedSearchDoc>('saved_searches');
 const profilesCollection = () => getCollection<UserProfileDoc>('user_profiles');
 const notificationsCollection = () => getCollection<NotificationDoc>('user_notifications');

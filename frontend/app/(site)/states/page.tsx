@@ -5,7 +5,7 @@ import { getTaxonomyList } from '@/lib/content-api';
 
 export default async function StatesPage() {
   const meta = getCategoryMetaBySlug('states');
-  const states = await getTaxonomyList('states');
+  const states = await getTaxonomyList('states').catch(() => []);
 
   if (!meta) {
     return null;

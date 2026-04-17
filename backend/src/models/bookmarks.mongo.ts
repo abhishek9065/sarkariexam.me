@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import { ensureBookmarksTable } from '../services/postgres/legacyTables.js';
-import { prisma } from '../services/postgres/prisma.js';
+import { prismaApp } from '../services/postgres/prisma.js';
 
 interface BookmarkDoc {
   id: string;
@@ -10,25 +9,22 @@ interface BookmarkDoc {
   createdAt: Date;
 }
 
-function toBookmarkDoc(row: { id: string; user_id: string; announcement_id: string; created_at: Date }): BookmarkDoc {
+function toBookmarkDoc(row: { id: string; userId: string; announcementId: string; createdAt: Date }): BookmarkDoc {
   return {
     id: row.id,
-    userId: row.user_id,
-    announcementId: row.announcement_id,
-    createdAt: row.created_at,
+    userId: row.userId,
+    announcementId: row.announcementId,
+    createdAt: row.createdAt,
   };
 }
 
 export class BookmarkModelMongo {
   static async findByUser(userId: string): Promise<BookmarkDoc[]> {
     try {
-      await ensureBookmarksTable();
-      const rows = await prisma.$queryRaw<Array<{ id: string; user_id: string; announcement_id: string; created_at: Date }>>`
-        SELECT id, user_id, announcement_id, created_at
-        FROM app_bookmarks
-        WHERE user_id = ${userId}
-        ORDER BY created_at DESC
-      `;
+      const rows = await prismaApp.bookmarkEntry.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
       return rows.map((row) => toBookmarkDoc(row));
     } catch (error) {
       console.error('[Postgres] findByUser bookmarks error:', error);
@@ -43,15 +39,19 @@ export class BookmarkModelMongo {
 
   static async add(userId: string, announcementId: string): Promise<boolean> {
     try {
-      await ensureBookmarksTable();
       const id = randomUUID();
-      await prisma.$executeRaw`
-        INSERT INTO app_bookmarks (id, user_id, announcement_id, created_at)
-        VALUES (${id}, ${userId}, ${announcementId}, NOW())
-        ON CONFLICT (user_id, announcement_id) DO NOTHING
-      `;
+      await prismaApp.bookmarkEntry.create({
+        data: {
+          id,
+          userId,
+          announcementId,
+        },
+      });
       return true;
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        return true;
+      }
       console.error('[Postgres] add bookmark error:', error);
       return false;
     }
@@ -59,18 +59,25 @@ export class BookmarkModelMongo {
 
   static async remove(userId: string, announcementId: string): Promise<boolean> {
     try {
-      await ensureBookmarksTable();
-      const deleted = await prisma.$executeRaw`
-        DELETE FROM app_bookmarks
-        WHERE user_id = ${userId}
-          AND announcement_id = ${announcementId}
-      `;
-      return Number(deleted) > 0;
+      const deleted = await prismaApp.bookmarkEntry.deleteMany({
+        where: {
+          userId,
+          announcementId,
+        },
+      });
+      return deleted.count > 0;
     } catch (error) {
       console.error('[Postgres] remove bookmark error:', error);
       return false;
     }
   }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 'P2002';
 }
 
 export default BookmarkModelMongo;

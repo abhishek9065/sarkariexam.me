@@ -12,14 +12,15 @@ The production runtime source of truth is the repository root `.env` on the serv
 Do not rely on `backend/.env` or `frontend/.env.local` for Docker production deploys. Those files are for local development only.
 
 ### Backend
-- `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
-- `COSMOS_DATABASE_NAME`
+- `POSTGRES_PRISMA_URL` or `DATABASE_URL`
 - `JWT_SECRET`
 - `FRONTEND_URL`
 - `FRONTEND_REVALIDATE_URL`
 - `FRONTEND_REVALIDATE_TOKEN`
 - `CORS_ORIGINS`
 - `METRICS_TOKEN`
+- legacy only: `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
+- legacy only: `COSMOS_DATABASE_NAME`
 
 ### Frontend
 - `NEXT_PUBLIC_API_URL`
@@ -30,8 +31,9 @@ Do not rely on `backend/.env` or `frontend/.env.local` for Docker production dep
 ### Production Root `.env`
 
 Required for deploy:
-- `COSMOS_CONNECTION_STRING`
+- `POSTGRES_PRISMA_URL` or `DATABASE_URL`
 - `JWT_SECRET`
+- legacy only while compatibility routes/jobs still exist: `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
 
 Strongly recommended for runtime:
 - `COSMOS_DATABASE_NAME`
@@ -50,8 +52,8 @@ Strongly recommended for runtime:
 - `docker-compose.yml` maps the same root `.env` secret into both:
   - backend `FRONTEND_REVALIDATE_TOKEN`
   - frontend `REVALIDATE_TOKEN`
-- Public pages remain request-time rendered today because the current Docker and CI build topology does not guarantee a live backend during frontend compilation.
-- The tag-based revalidation hook is therefore scaffolded and ready for a later selective ISR rollout after build and runtime networking are separated cleanly.
+- Stable public surfaces now use a mixed strategy: homepage, sitemap, and lightweight taxonomy directories can use bounded ISR, while backend-sensitive listings and detail pages still remain dynamic where that is safer today.
+- The tag-based revalidation hook is already active for the current selective ISR surfaces and remains the migration path for broader cache rollout later.
 
 ## Migration And Backfill
 - Legacy `Announcement` data remains available during transition.
@@ -93,9 +95,9 @@ npm run lint
 
 ## CI
 - `.github/workflows/ci.yml` runs backend lint/build/tests, frontend lint/build, and admin lint/build.
+- The CI workflow also validates production and dev compose rendering so obvious deploy YAML regressions fail before merge.
 - `.github/workflows/security.yml` runs reusable npm audit checks.
 - `.github/workflows/codeql.yml` runs standalone CodeQL scanning for pull requests and the scheduled weekly scan.
-- `.github/workflows/build-publish-images.yml` now acts as production release validation and gates deploy after CI and security pass.
 - `.github/workflows/deploy.yml` deploys automatically after the validation workflow succeeds on `main`, using native OpenSSH from the runner instead of a third-party SSH action wrapper.
 
 Release gating detail:
@@ -106,10 +108,19 @@ Release gating detail:
 ## Health And Readiness
 - Backend health:
   `/api/health`
+- Backend readiness alias:
+  `/api/healthz`
 - Backend deep readiness:
   `/api/health/deep`
 - Edge or proxy health:
   `/healthz`
+
+Health responses now include non-secret runtime diagnostics for:
+- Prisma/PostgreSQL readiness
+- legacy Mongo/Cosmos bridge presence
+- metrics endpoint protection
+- frontend revalidation wiring
+- startup warnings for incomplete production wiring
 
 Deployment scripts now verify:
 - `/api/health`
@@ -127,6 +138,7 @@ Deployment scripts now verify:
 
 ## Production Notes
 - Do not run production with the default `JWT_SECRET`.
+- Do not treat missing `POSTGRES_PRISMA_URL` as recoverable. The current structured content/editorial runtime is Postgres-first.
 - Keep frontend and backend revalidation tokens aligned.
 - Keep the public and admin URLs consistent with Nginx and deployment environment variables.
 - Prefer staging validation after schema or editorial workflow changes before promoting to production.

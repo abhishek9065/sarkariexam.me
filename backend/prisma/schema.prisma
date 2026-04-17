@@ -520,6 +520,177 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model WorkflowLogEntry {
+  id             String   @id
+  announcementId String   @map("announcement_id")
+  action         String
+  actor          String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([announcementId, createdAt], map: "app_workflow_logs_announcement_created_idx")
+  @@map("app_workflow_logs")
+}
+
+model SiteSettingRecord {
+  id        String   @id
+  payload   Json     @default("{}")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("app_site_settings")
+}
+
+model PushSubscriptionEntry {
+  id        String   @id
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userId    String?  @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId, createdAt], map: "app_push_subscriptions_user_created_idx")
+  @@map("app_push_subscriptions")
+}
+
+model BookmarkEntry {
+  id             String   @id
+  userId         String   @map("user_id")
+  announcementId String   @map("announcement_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, announcementId])
+  @@index([userId, createdAt], map: "app_bookmarks_user_created_idx")
+  @@index([announcementId], map: "app_bookmarks_announcement_idx")
+  @@map("app_bookmarks")
+}
+
+model ErrorReportEntry {
+  id             String   @id
+  errorId        String   @map("error_id")
+  message        String
+  pageUrl        String?  @map("page_url")
+  userAgent      String?  @map("user_agent")
+  note           String?
+  stack          String?
+  componentStack String?  @map("component_stack")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime? @map("updated_at")
+  userId         String?  @map("user_id")
+  userEmail      String?  @map("user_email")
+  status         String   @default("new")
+  reviewNote     String?  @map("review_note")
+  assigneeEmail  String?  @map("assignee_email")
+  release        String?
+  requestId      String?  @map("request_id")
+  sentryEventUrl String?  @map("sentry_event_url")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolvedBy     String?  @map("resolved_by")
+
+  @@index([status, createdAt], map: "app_error_reports_status_created_idx")
+  @@map("app_error_reports")
+}
+
+model NotificationCampaignEntry {
+  id           String   @id
+  title        String
+  body         String
+  url          String?
+  segmentType  String   @map("segment_type")
+  segmentValue String   @map("segment_value")
+  status       String   @default("draft")
+  sentCount    Int      @default(0) @map("sent_count")
+  failedCount  Int      @default(0) @map("failed_count")
+  openCount    Int      @default(0) @map("open_count")
+  clickCount   Int      @default(0) @map("click_count")
+  scheduledAt  DateTime? @map("scheduled_at")
+  sentAt       DateTime? @map("sent_at")
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  abTest       Json?    @map("ab_test")
+
+  @@index([status, scheduledAt], map: "app_notification_campaigns_status_scheduled_idx")
+  @@index([createdAt], map: "app_notification_campaigns_created_idx")
+  @@map("app_notification_campaigns")
+}
+
+model UserNotificationEntry {
+  id             String   @id
+  userId         String   @map("user_id")
+  announcementId String   @map("announcement_id")
+  title          String
+  type           String
+  slug           String?
+  organization   String?
+  source         String
+  createdAt      DateTime @default(now()) @map("created_at")
+  readAt         DateTime? @map("read_at")
+
+  @@unique([userId, announcementId, source])
+  @@index([userId, createdAt], map: "app_user_notifications_user_created_idx")
+  @@index([userId, readAt], map: "app_user_notifications_unread_idx")
+  @@map("app_user_notifications")
+}
+
+model SavedSearchEntry {
+  id                   String   @id
+  userId               String   @map("user_id")
+  name                 String
+  query                String   @default("")
+  filters              Json?
+  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
+  frequency            String   @default("daily")
+  lastNotifiedAt       DateTime? @map("last_notified_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt], map: "app_saved_searches_user_updated_idx")
+  @@map("app_saved_searches")
+}
+
+model TrackedApplicationEntry {
+  id             String   @id
+  userId         String   @map("user_id")
+  announcementId String?  @map("announcement_id")
+  slug           String
+  type           String
+  title          String
+  organization   String?
+  deadline       DateTime?
+  status         String
+  notes          String?
+  reminderAt     DateTime? @map("reminder_at")
+  trackedAt      DateTime @default(now()) @map("tracked_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([userId, slug])
+  @@index([userId, updatedAt], map: "app_tracked_applications_user_updated_idx")
+  @@map("app_tracked_applications")
+}
+
+model UserProfileEntry {
+  id                       String   @id
+  userId                   String   @unique @map("user_id")
+  preferredCategories      String[] @default([]) @map("preferred_categories")
+  preferredQualifications   String[] @default([]) @map("preferred_qualifications")
+  preferredLocations       String[] @default([]) @map("preferred_locations")
+  preferredOrganizations   String[] @default([]) @map("preferred_organizations")
+  ageGroup                 String?  @map("age_group")
+  educationLevel           String?  @map("education_level")
+  experienceYears          Int      @default(0) @map("experience_years")
+  emailNotifications       Boolean  @default(true) @map("email_notifications")
+  pushNotifications        Boolean  @default(false) @map("push_notifications")
+  notificationFrequency    String   @default("daily") @map("notification_frequency")
+  alertWindowDays          Int      @default(7) @map("alert_window_days")
+  alertMaxItems            Int      @default(6) @map("alert_max_items")
+  profileComplete          Boolean  @default(false) @map("profile_complete")
+  onboardingCompleted      Boolean  @default(false) @map("onboarding_completed")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("app_user_profiles")
+}
+
 model SlugAlias {
   id         String   @id @default(cuid())
   postId     String

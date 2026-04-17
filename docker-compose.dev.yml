@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: sarkari-postgres
+    environment:
+      - POSTGRES_DB=sarkari_content
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d sarkari_content" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    networks:
+      - sarkari-network
+
   mongo:
     image: mongo:latest
     container_name: sarkari-mongo
@@ -11,6 +30,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=5000
+      - POSTGRES_PRISMA_URL=postgresql://postgres:postgres@postgres:5432/sarkari_content?schema=public
       - COSMOS_CONNECTION_STRING=mongodb://mongo:27017/sarkari_db
       - COSMOS_DATABASE_NAME=sarkari_db
       - JWT_SECRET=dev-secret-123
@@ -19,6 +39,7 @@ services:
       - UPSTASH_REDIS_REST_URL=http://mock-redis
       - UPSTASH_REDIS_REST_TOKEN=mock
     depends_on:
+      - postgres
       - mongo
 
   nginx:
@@ -27,4 +48,7 @@ services:
     ports:
       - "8080:80" 
       # Map to 8080 to avoid conflict with standard 80 if used, and easy access
+
+volumes:
+  postgres-dev-data:
 
