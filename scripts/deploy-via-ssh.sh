@@ -177,41 +177,116 @@ resolve_remote_repo_dir() {
     return 0
   fi
 
-  local repo_hint quoted_repo_hint detected
+  local repo_hint repo_name quoted_repo_hint quoted_repo_name detected
   repo_hint="${GITHUB_REPOSITORY:-}"
+  repo_name="${repo_hint##*/}"
+  if [[ -z "$repo_name" || "$repo_name" == "$repo_hint" ]]; then
+    repo_name="sarkariexam.me"
+  fi
   quoted_repo_hint="$(quote_for_remote_shell "$repo_hint")"
+  quoted_repo_name="$(quote_for_remote_shell "$repo_name")"
+
+  log "DO_REPO_DIR not provided; attempting remote auto-detection."
 
   detected="$(remote_run "bash -se" <<EOF || true
 set -Eeuo pipefail
 repo_hint=${quoted_repo_hint}
+repo_name=${quoted_repo_name}
+
+is_valid_repo() {
+  local repo="\$1"
+  [[ -d "\$repo/.git" && -f "\$repo/docker-compose.yml" && -f "\$repo/scripts/deploy-live.sh" ]]
+}
+
+try_candidate() {
+  local candidate="\$1"
+  if ! is_valid_repo "\$candidate"; then
+    return 1
+  fi
+
+  if [[ -z "\$repo_hint" ]]; then
+    echo "\$candidate"
+    return 0
+  fi
+
+  local url
+  url="\$(git -C "\$candidate" remote get-url origin 2>/dev/null || true)"
+  if [[ "\$url" == *"\$repo_hint"* ]]; then
+    echo "\$candidate"
+    return 0
+  fi
+
+  return 1
+}
+
+list_gitdirs() {
+  local root="\$1"
+  if ! [[ -d "\$root" ]]; then
+    return 0
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 20s find "\$root" -maxdepth 4 -type d -name .git 2>/dev/null || true
+  else
+    find "\$root" -maxdepth 4 -type d -name .git 2>/dev/null || true
+  fi
+}
+
+candidate_paths=(
+  "\$HOME/\$repo_name"
+  "\$HOME/\${repo_name%.git}"
+  "\$HOME/sarkari-result-git-clean"
+  "\$HOME/sarkariexam.me"
+  "/opt/\$repo_name"
+  "/opt/\${repo_name%.git}"
+  "/opt/sarkari-result-git-clean"
+  "/opt/sarkariexam.me"
+  "/srv/\$repo_name"
+  "/srv/\${repo_name%.git}"
+  "/srv/sarkari-result-git-clean"
+  "/var/www/\$repo_name"
+  "/var/www/\${repo_name%.git}"
+  "/var/www/sarkari-result-git-clean"
+)
+
+for candidate in "\${candidate_paths[@]}"; do
+  if try_candidate "\$candidate"; then
+    exit 0
+  fi
+done
 
 find_match_by_remote() {
   local root="\$1"
-  [[ -d "\$root" ]] || return 1
 
   while IFS= read -r gitdir; do
     repo="\${gitdir%/.git}"
-    url="\$(git -C "\$repo" remote get-url origin 2>/dev/null || true)"
-    if [[ -n "\$repo_hint" && "\$url" == *"\$repo_hint"* ]]; then
+    if ! is_valid_repo "\$repo"; then
+      continue
+    fi
+    if [[ -z "\$repo_hint" ]]; then
       echo "\$repo"
       return 0
     fi
-  done < <(find "\$root" -maxdepth 6 -type d -name .git 2>/dev/null)
+    url="\$(git -C "\$repo" remote get-url origin 2>/dev/null || true)"
+    if [[ "\$url" == *"\$repo_hint"* ]]; then
+      echo "\$repo"
+      return 0
+    fi
+  done < <(list_gitdirs "\$root")
 
   return 1
 }
 
 find_match_by_shape() {
   local root="\$1"
-  [[ -d "\$root" ]] || return 1
 
   while IFS= read -r gitdir; do
     repo="\${gitdir%/.git}"
-    if [[ -f "\$repo/docker-compose.yml" && -f "\$repo/scripts/deploy-live.sh" ]]; then
+    if is_valid_repo "\$repo"; then
       echo "\$repo"
       return 0
     fi
-  done < <(find "\$root" -maxdepth 6 -type d -name .git 2>/dev/null)
+  done < <(list_gitdirs "\$root")
 
   return 1
 }
