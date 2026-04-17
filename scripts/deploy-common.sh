@@ -212,52 +212,9 @@ wait_for_service_health() {
   return 1
 }
 
-wait_for_http_inside() {
-  local service="$1"
-  local url="$2"
-  local label="$3"
-  local attempts="${4:-30}"
-  local sleep_seconds="${5:-2}"
-  local i
-
-  for ((i=1; i<=attempts; i++)); do
-    if dc exec -T "$service" wget -qO- --timeout=2 "$url" >/dev/null 2>&1; then
-      echo "${label} ready after ${i} attempt(s)."
-      return 0
-    fi
-    echo "  [$i/$attempts] ${label} not ready"
-    sleep "$sleep_seconds"
-  done
-
-  record_diagnosis "${label} did not become reachable from inside the '${service}' container."
-  tail_service_logs "$service" 120
-  return 1
-}
-
-wait_for_http_spider_inside() {
-  local service="$1"
-  local url="$2"
-  local label="$3"
-  local attempts="${4:-30}"
-  local sleep_seconds="${5:-2}"
-  local i
-
-  for ((i=1; i<=attempts; i++)); do
-    if dc exec -T "$service" wget -q --spider --timeout=2 "$url" >/dev/null 2>&1; then
-      echo "${label} ready after ${i} attempt(s)."
-      return 0
-    fi
-    echo "  [$i/$attempts] ${label} not ready"
-    sleep "$sleep_seconds"
-  done
-
-  record_diagnosis "${label} did not become reachable from inside the '${service}' container."
-  tail_service_logs "$service" 120
-  return 1
-}
-
 purge_cloudflare_cache() {
   local cf_zone_id cf_api_token
+  local response
   cf_zone_id="$(read_env_var "CF_ZONE_ID")"
   cf_api_token="$(read_env_var "CF_API_TOKEN")"
 
@@ -266,16 +223,21 @@ purge_cloudflare_cache() {
     return 0
   fi
 
-  if curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/purge_cache" \
+  response="$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${cf_zone_id}/purge_cache" \
     -H "Authorization: Bearer ${cf_api_token}" \
     -H "Content-Type: application/json" \
     --data '{"purge_everything":true}' \
-    --max-time 10 >/dev/null; then
+    --max-time 10 || true)"
+
+  if [[ -n "$response" ]] && printf '%s' "$response" | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'; then
     echo "Cloudflare cache purged."
     return 0
   fi
 
-  warn "Cloudflare cache purge failed. Continuing because cache purge is non-blocking."
+  warn "Cloudflare cache purge failed or returned an unsuccessful response. Continuing because cache purge is non-blocking."
+  if [[ -n "$response" ]]; then
+    warn "Cloudflare purge response: $response"
+  fi
   return 1
 }
 
@@ -283,14 +245,24 @@ verify_public_endpoint() {
   local path="$1"
   local label="$2"
   local expected_pattern="${3:-^(2|3)}"
+  local attempts="${4:-20}"
+  local sleep_seconds="${5:-3}"
   local url="${PUBLIC_BASE_URL%/}${path}"
-  local status
+  local status=""
+  local i
 
-  status="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 15 "$url" || true)"
-  if [[ "$status" =~ $expected_pattern ]]; then
-    echo "ok (${label} -> ${url}, status=${status})"
-    return 0
-  fi
+  for ((i=1; i<=attempts; i++)); do
+    status="$(curl -sS -L -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 "$url" || true)"
+    if [[ "$status" =~ $expected_pattern ]]; then
+      echo "ok (${label} -> ${url}, status=${status}, attempts=${i})"
+      return 0
+    fi
+
+    echo "  [$i/$attempts] ${label} not ready (status=${status:-none}, expected=${expected_pattern})"
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$sleep_seconds"
+    fi
+  done
 
   record_diagnosis "Public check '${label}' failed for ${url}. Inspect nginx, backend, frontend, and admin logs plus the public ingress configuration."
   echo "ERROR: ${label} failed for ${url} (status=${status:-none}, expected=${expected_pattern})"

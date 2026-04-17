@@ -18,7 +18,7 @@ Variables:
 - The deploy user from `DO_USER` can SSH with `DO_SSH_KEY`
 - The host key fingerprint matches `DO_HOST_FINGERPRINT`
 - The production checkout already exists at `DO_REPO_DIR`
-- The checkout is clean: no local modifications and no untracked files
+- The checkout has no tracked local modifications
 - The checkout contains:
   - `docker-compose.yml`
   - `scripts/deploy-live.sh`
@@ -33,7 +33,6 @@ Variables:
   - Docker Compose plugin (`docker compose`)
   - `flock`
   - `curl`
-  - `mktemp`
   - `tee`
 
 ## Required Server Root `.env`
@@ -63,7 +62,7 @@ Recommended:
 
 ```bash
 cd "$DO_REPO_DIR"
-git status --short --untracked-files=all
+git status --short --untracked-files=no
 ```
 
 5. Run the remote preflight only:
@@ -81,7 +80,7 @@ DO_REPO_DIR="$DO_REPO_DIR" bash scripts/deploy-live.sh --preflight-only --mode f
   - `/api/health/deep`
   - `/`
   - `/jobs`
-  - `/results/upsc-civil-services-2025-final-result`
+  - `/results`
   - `/admin`
 
 ## Failure Triage

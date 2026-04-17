@@ -28,10 +28,11 @@ jobs:
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           should_deploy=false
-          if [[ "${TRIGGER_CONCLUSION}" == "success" && "${TRIGGER_EVENT}" == "push" && "${TRIGGER_BRANCH}" == "main" ]]; then
+          if [[ "${TRIGGER_WORKFLOW}" == "CI" && "${TRIGGER_CONCLUSION}" == "success" && "${TRIGGER_EVENT}" == "push" && "${TRIGGER_BRANCH}" == "main" && "${TRIGGER_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
             should_deploy=true
           fi
           echo "should_deploy=${should_deploy}" >> "$GITHUB_OUTPUT"
@@ -55,7 +56,7 @@ jobs:
             echo "- Target SHA: ${TRIGGER_SHA}"
             echo "- Allowed to deploy: ${SHOULD_DEPLOY}"
             if [[ "${SHOULD_DEPLOY}" != "true" ]]; then
-              echo "- Reason: deploy only runs for successful \`CI\` workflow_run events from pushes to \`main\`."
+              echo "- Reason: deploy only runs for successful \`CI\` workflow_run events from pushes to \`main\` with a valid 40-char target SHA."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -78,9 +79,7 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
-          DO_HOST_FINGERPRINT: ${{ vars.DO_HOST_FINGERPRINT }}
-          DO_PORT: ${{ secrets.DO_PORT || 22 }}
-          DO_REPO_DIR: ${{ vars.DO_REPO_DIR }}
+          DO_PORT: '22'
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}

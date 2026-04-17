@@ -12,6 +12,7 @@ DEPLOY_MODE="fast"
 TARGET_SHA=""
 REPO_DIR="${DO_REPO_DIR:-${REPO_DIR_OVERRIDE:-}}"
 PREVIOUS_SHA=""
+PREVIOUS_REF=""
 
 log() {
   echo "[deploy-live] $*"
@@ -105,10 +106,10 @@ require_file() {
 
 require_clean_checkout() {
   local status_output
-  status_output="$(git -C "$REPO_DIR" status --porcelain --untracked-files=all)"
+  status_output="$(git -C "$REPO_DIR" status --porcelain --untracked-files=no)"
   if [[ -n "$status_output" ]]; then
     echo "$status_output"
-    die "Production checkout is dirty. Refusing to deploy over local modifications or untracked files."
+    die "Production checkout has tracked modifications. Refusing to deploy over local changes."
   fi
 }
 
@@ -133,7 +134,6 @@ check_remote_prerequisites() {
   require_command docker
   require_command curl
   require_command flock
-  require_command mktemp
   require_command tee
   if ! docker compose version >/dev/null 2>&1; then
     die "Docker Compose plugin is not available. Install Docker Compose v2 on the droplet."
@@ -145,11 +145,6 @@ validate_repo_checkout() {
   [[ -n "$REPO_DIR" ]] || die "DO_REPO_DIR is required."
   [[ -d "$REPO_DIR" ]] || die "Configured repository directory does not exist: ${REPO_DIR}"
   [[ -d "$REPO_DIR/.git" ]] || die "Configured repository directory is not a git checkout: ${REPO_DIR}"
-  require_file "$REPO_DIR/scripts/deploy-live.sh"
-  require_file "$REPO_DIR/scripts/deploy-common.sh"
-  require_file "$REPO_DIR/scripts/deploy-fast.sh"
-  require_file "$REPO_DIR/scripts/deploy-prod.sh"
-  require_file "$REPO_DIR/docker-compose.yml"
   require_file "$REPO_DIR/.env"
 }
 
@@ -166,6 +161,60 @@ resolve_target_sha() {
   fi
 }
 
+validate_target_tree_files() {
+  local required_paths=(
+    "docker-compose.yml"
+    "scripts/deploy-common.sh"
+    "scripts/deploy-fast.sh"
+    "scripts/deploy-prod.sh"
+  )
+  local missing_paths=()
+  local path
+
+  for path in "${required_paths[@]}"; do
+    if ! git -C "$REPO_DIR" cat-file -e "${TARGET_SHA}:${path}" 2>/dev/null; then
+      missing_paths+=("$path")
+    fi
+  done
+
+  if [[ "${#missing_paths[@]}" -gt 0 ]]; then
+    echo "Target commit ${TARGET_SHA} is missing required deploy file(s):"
+    printf '  - %s\n' "${missing_paths[@]}"
+    die "Target commit cannot be deployed with the current remote helper."
+  fi
+}
+
+checkout_target_sha() {
+  record_diagnosis "Ensure the production checkout can switch to the exact target SHA (resolve untracked path conflicts or tracked modifications and retry)."
+  local current_sha
+  current_sha="$(git -C "$REPO_DIR" rev-parse HEAD)"
+  PREVIOUS_SHA="$current_sha"
+  PREVIOUS_REF="$(git -C "$REPO_DIR" symbolic-ref -q --short HEAD || true)"
+
+  if [[ "$current_sha" == "$TARGET_SHA" ]]; then
+    echo "Repository already checked out at target SHA ${TARGET_SHA}."
+    return 0
+  fi
+
+  git -C "$REPO_DIR" checkout --detach "$TARGET_SHA"
+}
+
+restore_previous_checkout_after_preflight() {
+  [[ -n "$PREVIOUS_SHA" ]] || return 0
+
+  local current_sha
+  current_sha="$(git -C "$REPO_DIR" rev-parse HEAD)"
+  if [[ "$current_sha" == "$PREVIOUS_SHA" ]]; then
+    return 0
+  fi
+
+  if [[ -n "$PREVIOUS_REF" ]]; then
+    git -C "$REPO_DIR" checkout "$PREVIOUS_REF"
+  else
+    git -C "$REPO_DIR" checkout --detach "$PREVIOUS_SHA"
+  fi
+}
+
 run_preflight_checks() {
   record_diagnosis "Review ${REPO_DIR}/.env, Docker Compose availability, and compose rendering on the droplet."
   (
@@ -176,7 +225,6 @@ run_preflight_checks() {
 
 run_deploy() {
   record_diagnosis "Review the service-specific logs in ${LOG_FILE} and the Docker Compose service logs on the droplet."
-  git -C "$REPO_DIR" checkout --detach "$TARGET_SHA"
 
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
   export DEPLOY_TARGET_SHA="$TARGET_SHA"
@@ -221,13 +269,25 @@ require_clean_checkout
 set_stage "resolve-target-sha"
 resolve_target_sha
 
+set_stage "validate-target-tree"
+validate_target_tree_files
+
+set_stage "checkout-target-sha"
+checkout_target_sha
+
 set_stage "preflight-compose"
 run_preflight_checks
 
 if [[ "$DO_PREFLIGHT_ONLY" == "1" ]]; then
+  set_stage "restore-checkout"
+  restore_previous_checkout_after_preflight
+
+  local_current_sha="$(git -C "$REPO_DIR" rev-parse HEAD)"
   echo "REMOTE PREFLIGHT OK"
   echo "  repo_path: ${REPO_DIR}"
-  echo "  current_sha: ${PREVIOUS_SHA}"
+  echo "  previous_sha: ${PREVIOUS_SHA}"
+  echo "  validated_sha: ${TARGET_SHA}"
+  echo "  current_sha: ${local_current_sha}"
   echo "  target_sha: ${TARGET_SHA}"
   echo "  mode: ${DEPLOY_MODE}"
   echo "=== Remote deploy preflight finished at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ==="

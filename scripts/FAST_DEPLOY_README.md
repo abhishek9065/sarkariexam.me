@@ -33,9 +33,11 @@ Fast public verification includes:
 - `/api/health/deep`
 - `/`
 - `/jobs`
-- `/results/upsc-civil-services-2025-final-result`
+- `/results`
 - `/admin`
 - optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
+
+Readiness checks use Docker health status plus host-side HTTP checks, and no longer depend on `wget` being present in runtime app containers.
 
 The deeper full-deploy script remains in the repo as server-side maintenance plumbing, but it is not a supported release trigger or operator-facing deployment mode.
 

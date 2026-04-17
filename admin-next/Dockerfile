@@ -40,6 +40,6 @@ USER nextjs
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/admin || exit 1
+    CMD node -e "const http=require('http');const req=http.get('http://127.0.0.1:3001/admin',(res)=>{res.resume();process.exit(res.statusCode>=200&&res.statusCode<400?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});"
 
 CMD ["node", "server.js"]

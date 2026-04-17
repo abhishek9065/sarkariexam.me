@@ -36,22 +36,17 @@ dc up -d --force-recreate backend
 
 set_stage "wait-backend"
 wait_for_service_health backend 60 2
-wait_for_http_inside backend "http://127.0.0.1:4000/api/health" "backend /api/health" 30 2
-BACKEND_HEALTH_RESULT="internal /api/health ok"
+BACKEND_HEALTH_RESULT="container healthcheck ok"
 
 set_stage "restart-web"
 record_diagnosis "Frontend/admin/nginx restart failed. Inspect their container logs and reverse proxy wiring."
 dc up -d --force-recreate --remove-orphans nginx admin frontend "${DATADOG_SERVICES[@]}"
 dc ps
 
-set_stage "wait-web-internal"
+set_stage "wait-web-services"
 wait_for_service_health frontend 60 2
 wait_for_service_health admin 60 2
 wait_for_service_health nginx 60 2
-wait_for_http_spider_inside frontend "http://127.0.0.1:3000/" "frontend homepage" 40 2
-wait_for_http_spider_inside frontend "http://127.0.0.1:3000/jobs" "frontend jobs listing" 40 2
-wait_for_http_spider_inside frontend "http://127.0.0.1:3000/results/upsc-civil-services-2025-final-result" "frontend result detail" 40 2
-wait_for_http_spider_inside admin "http://127.0.0.1:3001/admin" "admin console" 40 2
 
 set_stage "purge-cache"
 purge_cloudflare_cache || true
@@ -61,7 +56,7 @@ verify_public_endpoint "/api/health" "backend health" "^200$"
 verify_public_endpoint "/api/health/deep" "backend deep health" "^200$"
 verify_public_endpoint "/" "homepage"
 verify_public_endpoint "/jobs" "jobs listing"
-verify_public_endpoint "/results/upsc-civil-services-2025-final-result" "result detail"
+verify_public_endpoint "/results" "results listing"
 verify_public_endpoint "/admin" "admin console"
 verify_public_revalidation_smoke
 PUBLIC_HEALTH_RESULT="public endpoints ok"

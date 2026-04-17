@@ -103,7 +103,7 @@ npm run lint
 Release gating detail:
 - Production deploy gating is currently the `CI` workflow only.
 - `Security` and `CodeQL` continue to run, but they are not part of the `workflow_run` chain that triggers production deploys.
-- The deploy workflow checks out the exact triggering commit SHA, performs runner-side SSH validation, uploads the current remote deploy entrypoint, runs a remote preflight, and then deploys the same SHA on the droplet.
+- The deploy workflow checks out the exact triggering commit SHA, performs runner-side SSH validation, uploads the current remote deploy entrypoint, runs a remote preflight that validates compose rendering against that exact target SHA, and then deploys the same SHA on the droplet.
 
 ## Health And Readiness
 - Backend health:
@@ -127,7 +127,7 @@ Deployment scripts now verify:
 - `/api/health/deep`
 - `/`
 - `/jobs`
-- `/results/upsc-civil-services-2025-final-result`
+- `/results`
 - `/admin`
 - optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
 

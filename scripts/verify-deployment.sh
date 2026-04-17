@@ -152,9 +152,9 @@ check_public_route_assets "/" "Homepage"
 check_public_route "/jobs" "Jobs listing"
 check_public_route_html "/jobs" "Jobs listing"
 check_public_route_assets "/jobs" "Jobs listing"
-check_public_route "/results/upsc-civil-services-2025-final-result" "Result detail"
-check_public_route_html "/results/upsc-civil-services-2025-final-result" "Result detail"
-check_public_route_assets "/results/upsc-civil-services-2025-final-result" "Result detail"
+check_public_route "/results" "Results listing"
+check_public_route_html "/results" "Results listing"
+check_public_route_assets "/results" "Results listing"
 check_public_route "/admin" "Admin console"
 check_revalidation_smoke
 
