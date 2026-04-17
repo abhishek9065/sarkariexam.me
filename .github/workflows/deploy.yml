@@ -219,6 +219,38 @@ jobs:
             exit 1
           fi
 
+          sync_checkout_to_main() {
+            local dir="$1"
+
+            git -C "$dir" config --global --add safe.directory "$dir" >/dev/null 2>&1 || true
+            git -C "$dir" config --add safe.directory "$dir" >/dev/null 2>&1 || true
+
+            git -C "$dir" -c safe.directory="$dir" fetch origin main
+            git -C "$dir" -c safe.directory="$dir" checkout main
+            git -C "$dir" -c safe.directory="$dir" pull --ff-only origin main
+          }
+
+          if ! sync_checkout_to_main "$repo_dir"; then
+            echo "NOTICE: unable to fast-forward existing checkout at $repo_dir"
+            echo "NOTICE: attempting a clean fallback clone for deploy execution."
+
+            fallback_repo_dir="${repo_dir}.fresh.$$"
+            rm -rf "$fallback_repo_dir"
+            mkdir -p "$(dirname "$fallback_repo_dir")"
+            git clone --depth 1 https://github.com/abhishek9065/sarkariexam.me.git "$fallback_repo_dir"
+
+            if [ -f "$repo_dir/.env" ] && [ ! -f "$fallback_repo_dir/.env" ]; then
+              cp "$repo_dir/.env" "$fallback_repo_dir/.env"
+            fi
+
+            repo_dir="$fallback_repo_dir"
+          fi
+
+          if [ ! -f "$repo_dir/scripts/deploy-live.sh" ]; then
+            echo "Deployment entrypoint missing after checkout sync at $repo_dir/scripts/deploy-live.sh" >&2
+            exit 1
+          fi
+
           echo "Using deployment checkout: $repo_dir"
           if [ -f "$repo_dir/.env" ]; then
             REPO_DIR_OVERRIDE="$repo_dir" bash "$repo_dir/scripts/deploy-live.sh"
