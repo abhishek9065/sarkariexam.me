@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
 
-import { Prisma } from '@prisma/client';
 
-import { ensureProfileTables } from '../services/postgres/legacyTables.js';
-import { prisma, prismaApp } from '../services/postgres/prisma.js';
+
+
+import { prismaApp } from '../services/postgres/prisma.js';
 import type { ContentType, TrackerStatus } from '../types.js';
 
 export interface UserProfileRecord {
