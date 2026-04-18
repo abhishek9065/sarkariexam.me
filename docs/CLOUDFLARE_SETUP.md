@@ -44,7 +44,8 @@ Ensure your records have the **orange cloud** (Proxied) enabled:
 
 ### 4.1 SSL/TLS
 - Go to **SSL/TLS** → Overview
-- Set encryption mode to **Full (strict)**
+- Set encryption mode to **Full**
+  - *(Note: Use **Full (strict)** ONLY if you have generated Cloudflare Origin CA certificates and saved them as `nginx/ssl/origin.crt` and `nginx/ssl/origin.key` on your server).*
 
 ### 4.2 Bot Fight Mode
 - Go to **Security** → Bots
