@@ -93,8 +93,22 @@ const getBearerToken = (req: express.Request): string | undefined => {
 const getAuthToken = (req: express.Request): string | undefined =>
   getBearerToken(req) || (req as any).cookies?.[AUTH_COOKIE_NAME];
 
+const getRequestCsrfToken = (req: express.Request): string | null => {
+  const tokenFactory = (req as express.Request & { csrfToken?: () => string }).csrfToken;
+  if (typeof tokenFactory !== 'function') {
+    return null;
+  }
+
+  try {
+    return tokenFactory();
+  } catch {
+    return null;
+  }
+};
+
 router.get('/csrf', rateLimit({ windowMs: 60000, maxRequests: 30, keyPrefix: 'auth-csrf' }), (req, res) => {
-  const csrfToken = ensureCsrfCookie(req, res);
+  const csrfToken = getRequestCsrfToken(req) ?? ensureCsrfCookie(req, res);
+  setCsrfCookie(res, csrfToken);
   res.set('Cache-Control', 'no-store');
   return res.json({ data: { csrfToken } });
 });
@@ -214,6 +228,12 @@ router.post('/logout', async (req, res) => {
     httpOnly: true,
     secure: config.isProduction,
     sameSite: 'lax',
+    path: '/',
+  });
+  res.clearCookie('_csrf', {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'strict',
     path: '/',
   });
   clearCsrfCookie(res);

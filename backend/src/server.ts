@@ -5,13 +5,13 @@ import path from 'path';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import csurf from 'csurf';
 import express from 'express';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
-import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit as distributedRateLimit } from './middleware/rateLimit.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
@@ -111,14 +111,40 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
-app.use(csrfProtection({
-  exempt: [
-    { method: 'POST', path: '/auth/login' },
-    { method: 'POST', path: '/auth/register' },
-    { method: 'POST', path: '/api/auth/login' },
-    { method: 'POST', path: '/api/auth/register' },
-  ],
-}));
+
+const apiCsrfProtection = csurf({
+  cookie: {
+    key: '_csrf',
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'strict',
+    path: '/',
+  },
+  value: (req) => {
+    const headerToken = req.get('x-csrf-token') ?? req.get('x-xsrf-token');
+    if (headerToken) return headerToken;
+
+    const body = req.body as Record<string, unknown> | undefined;
+    if (body && typeof body._csrf === 'string') return body._csrf;
+    if (body && typeof body.csrfToken === 'string') return body.csrfToken;
+    return '';
+  },
+});
+
+app.use('/api', (req, res, next) => {
+  const normalizedPath = req.path.endsWith('/') && req.path.length > 1
+    ? req.path.slice(0, -1)
+    : req.path;
+  const isAuthBootstrap = req.method === 'POST'
+    && (normalizedPath === '/auth/login' || normalizedPath === '/auth/register');
+
+  if (isAuthBootstrap) {
+    next();
+    return;
+  }
+
+  apiCsrfProtection(req, res, next);
+});
 
 // Swagger UI
 try {

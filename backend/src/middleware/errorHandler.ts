@@ -77,6 +77,17 @@ export const errorHandler = (
     });
   }
 
+  if ((err as { code?: string }).code === 'EBADCSRFTOKEN') {
+    logger.warn({ path: req.path, requestId }, 'CSRF validation failed');
+    return res.status(403).json({
+      status: 'fail',
+      error: 'csrf_invalid',
+      code: 'FORBIDDEN',
+      message: 'CSRF validation failed.',
+      requestId,
+    });
+  }
+
   // Fallback for unknown/programming errors
   logger.error({ err, requestId }, 'Unhandled Exception');
   
