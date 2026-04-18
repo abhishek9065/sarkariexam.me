@@ -1,62 +1,14 @@
-import { ObjectId } from 'mongodb';
+import { randomUUID } from 'crypto';
 
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
 import AnnouncementModelPostgres from '../models/announcements.postgres.js';
+import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
+import ProfileModelPostgres from '../models/profile.postgres.js';
+import { UserModelMongo } from '../models/users.mongo.js';
 import type { ContentType } from '../types.js';
 
-import { getCollection } from './cosmosdb.js';
 import { sendDigestEmail } from './email.js';
-
-interface TrackedApplicationDoc {
-    _id: ObjectId;
-    userId: string;
-    announcementId?: string;
-    slug: string;
-    type: ContentType;
-    title: string;
-    organization?: string;
-    deadline?: Date | null;
-    reminderAt?: Date | null;
-}
-
-interface BookmarkDoc {
-    userId: string;
-    announcementId: string;
-}
-
-interface UserDoc {
-    _id: ObjectId;
-    email: string;
-    isActive?: boolean;
-}
-
-interface SubscriptionDoc {
-    email: string;
-    isActive: boolean;
-    verified: boolean;
-    unsubscribeToken: string;
-}
-
-interface ReminderDispatchLogDoc {
-    dedupeKey: string;
-    userId: string;
-    channel: 'in_app' | 'email';
-    source: 'tracked' | 'bookmark';
-    announcementId: string;
-    deadlineDate: string | null;
-    sentAt: Date;
-}
-
-interface ReminderNotificationDoc {
-    userId: string;
-    announcementId: string;
-    title: string;
-    type: ContentType;
-    slug?: string;
-    organization?: string;
-    source: string;
-    createdAt: Date;
-    readAt: Date | null;
-}
+import { prismaApp } from './postgres/prisma.js';
 
 interface ReminderItem {
     userId: string;
@@ -101,11 +53,6 @@ let reminderRunInFlight = false;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-const toObjectId = (value: string): ObjectId | null => {
-    if (!ObjectId.isValid(value)) return null;
-    return new ObjectId(value);
-};
-
 const toDate = (value: Date | string | null | undefined): Date | null => {
     if (!value) return null;
     const parsed = value instanceof Date ? value : new Date(value);
@@ -123,31 +70,23 @@ const buildDedupeKey = (item: ReminderItem, channel: 'in_app' | 'email'): string
     return `${channel}:${item.source}:${item.userId}:${item.announcementId}:${deadlineDate}`;
 };
 
-const dispatchLogsCollection = () => getCollection<ReminderDispatchLogDoc>('reminder_dispatch_logs');
-// Transitional legacy scheduler path: tracked applications and reminder notifications here still read Mongo-compatible collections.
-// Later phases should replace this with the Postgres/Prisma reminder pipeline.
-const trackedCollection = () => getCollection<TrackedApplicationDoc>('tracked_applications');
-const bookmarksCollection = () => getCollection<BookmarkDoc>('bookmarks');
-const usersCollection = () => getCollection<UserDoc>('users');
-const subscriptionsCollection = () => getCollection<SubscriptionDoc>('alert_subscriptions');
-const notificationsCollection = () => getCollection<ReminderNotificationDoc>('user_notifications');
-
 async function reserveDispatch(item: ReminderItem, channel: 'in_app' | 'email'): Promise<boolean> {
     const dedupeKey = buildDedupeKey(item, channel);
-    const now = new Date();
     try {
-        await dispatchLogsCollection().insertOne({
-            dedupeKey,
-            userId: item.userId,
-            channel,
-            source: item.source,
-            announcementId: item.announcementId,
-            deadlineDate: formatDeadlineDate(item.deadline),
-            sentAt: now,
-        } as ReminderDispatchLogDoc);
+        await prismaApp.reminderDispatchLogEntry.create({
+            data: {
+                id: randomUUID(),
+                dedupeKey,
+                userId: item.userId,
+                channel,
+                source: item.source,
+                announcementId: item.announcementId,
+                deadlineDate: formatDeadlineDate(item.deadline),
+            },
+        });
         return true;
     } catch (error) {
-        if (isDuplicateKeyError(error)) return false;
+        if (isDuplicateKeyError(error) || isUniqueConstraintError(error)) return false;
         console.error('[TrackerReminders] Failed to reserve dispatch slot:', error);
         return false;
     }
@@ -156,28 +95,18 @@ async function reserveDispatch(item: ReminderItem, channel: 'in_app' | 'email'):
 async function upsertInAppReminder(item: ReminderItem): Promise<boolean> {
     const source = item.source === 'tracked' ? 'reminder:tracked' : 'reminder:bookmark';
     try {
-        await notificationsCollection().updateOne(
-            {
-                userId: item.userId,
+        const inserted = await ProfileModelPostgres.upsertNotifications(
+            item.userId,
+            [{
                 announcementId: item.announcementId,
-                source,
-            },
-            {
-                $setOnInsert: {
-                    userId: item.userId,
-                    announcementId: item.announcementId,
-                    title: item.title,
-                    type: item.type,
-                    slug: item.slug,
-                    organization: item.organization,
-                    source,
-                    createdAt: new Date(),
-                    readAt: null,
-                },
-            },
-            { upsert: true }
+                title: item.title,
+                type: item.type,
+                slug: item.slug,
+                organization: item.organization,
+            }],
+            source,
         );
-        return true;
+        return inserted >= 0;
     } catch (error) {
         console.error('[TrackerReminders] Failed to upsert in-app reminder:', error);
         return false;
@@ -185,63 +114,27 @@ async function upsertInAppReminder(item: ReminderItem): Promise<boolean> {
 }
 
 async function loadUserEmailMap(userIds: string[]): Promise<Map<string, string>> {
-    const objectIds = userIds
-        .map((userId) => ({ userId, objectId: toObjectId(userId) }))
-        .filter((entry): entry is { userId: string; objectId: ObjectId } => Boolean(entry.objectId));
-
-    if (objectIds.length === 0) return new Map();
-
-    const docs = await usersCollection()
-        .find({
-            _id: { $in: objectIds.map((entry) => entry.objectId) },
-            $or: [{ isActive: true }, { isActive: { $exists: false } }],
-        })
-        .project({ _id: 1, email: 1 })
-        .toArray();
-
-    const byObjectId = new Map(docs.map((doc) => [doc._id.toString(), normalizeEmail(doc.email)]));
-    const result = new Map<string, string>();
-    for (const entry of objectIds) {
-        const email = byObjectId.get(entry.objectId.toString());
-        if (email) result.set(entry.userId, email);
-    }
-    return result;
+    return UserModelMongo.listActiveEmailMap(userIds);
 }
 
 async function loadSubscriptionTokenMap(emails: string[]): Promise<Map<string, string>> {
-    if (!emails.length) return new Map();
-    const docs = await subscriptionsCollection()
-        .find({
-            email: { $in: emails },
-            isActive: true,
-            verified: true,
-        })
-        .project({ email: 1, unsubscribeToken: 1 })
-        .toArray();
+    const subscriptions = await AlertSubscriptionModelPostgres.listByEmails(emails);
     return new Map(
-        docs
-            .filter((doc) => doc.email && doc.unsubscribeToken)
-            .map((doc) => [normalizeEmail(doc.email), doc.unsubscribeToken])
+        subscriptions.map((doc) => [normalizeEmail(doc.email), doc.unsubscribeToken]),
     );
 }
 
 async function getTrackedReminderItems(now: Date, horizon: Date): Promise<ReminderItem[]> {
-    const docs = await trackedCollection()
-        .find({
-            deadline: { $gte: now, $lte: horizon },
-            $or: [
-                { reminderAt: { $exists: false } },
-                { reminderAt: null },
-                { reminderAt: { $lte: now } },
-            ],
-        })
-        .limit(DEFAULT_MAX_TRACKED_SCAN)
-        .toArray();
+    const docs = await ProfileModelPostgres.listDueTrackedApplications({
+        now,
+        horizon,
+        limit: DEFAULT_MAX_TRACKED_SCAN,
+    });
 
     return docs.map((doc) => ({
         userId: doc.userId,
         source: 'tracked',
-        announcementId: doc.announcementId || `tracked:${doc._id.toString()}`,
+        announcementId: doc.announcementId || `tracked:${doc.id}`,
         title: doc.title,
         type: doc.type,
         slug: doc.slug,
@@ -263,9 +156,7 @@ async function getBookmarkReminderItems(now: Date, horizon: Date): Promise<Remin
     const byAnnouncementId = new Map(dueAnnouncements.map((announcement) => [announcement.id, announcement]));
     const announcementIds = Array.from(byAnnouncementId.keys());
 
-    const bookmarks = await bookmarksCollection()
-        .find({ announcementId: { $in: announcementIds } })
-        .toArray();
+    const bookmarks = await BookmarkModelMongo.findByAnnouncementIds(announcementIds);
 
     const results: ReminderItem[] = [];
     for (const bookmark of bookmarks) {
@@ -417,5 +308,12 @@ export function stopTrackerReminders(): void {
     if (!reminderInterval) return;
     clearInterval(reminderInterval);
     reminderInterval = null;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+    return typeof error === 'object'
+        && error !== null
+        && 'code' in error
+        && error.code === 'P2002';
 }
 

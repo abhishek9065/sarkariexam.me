@@ -1,24 +1,8 @@
+import type { AlertSubscriptionRecord } from '../content/types.js';
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
 import { Announcement } from '../types.js';
 
-import { getCollection } from './cosmosdb.js';
 import { sendAnnouncementEmail } from './email.js';
-
-interface SubscriptionDoc {
-    email: string;
-    categories?: string[];
-    categorySlugs?: string[];
-    states?: string[];
-    stateSlugs?: string[];
-    organizations?: string[];
-    organizationSlugs?: string[];
-    qualifications?: string[];
-    qualificationSlugs?: string[];
-    postTypes?: string[];
-    frequency?: 'instant' | 'daily' | 'weekly';
-    verified: boolean;
-    isActive: boolean;
-    unsubscribeToken: string;
-}
 
 export interface SubscriberDispatchResult {
     matched: number;
@@ -42,7 +26,7 @@ const buildAnnouncementMatchState = (announcement: Announcement) => ({
 
 const shouldDispatchToSubscriber = (
     announcement: ReturnType<typeof buildAnnouncementMatchState>,
-    subscriber: SubscriptionDoc
+    subscriber: AlertSubscriptionRecord
 ): boolean => {
     const matchesArray = (values?: string[], target?: string) => {
         const normalized = (values || []).map((value) => normalizeToken(value)).filter(Boolean);
@@ -51,11 +35,11 @@ const shouldDispatchToSubscriber = (
         return normalized.includes(target);
     };
 
-    return matchesArray(subscriber.categorySlugs || subscriber.categories, announcement.category)
+    return matchesArray(subscriber.categorySlugs, announcement.category)
         && matchesArray(subscriber.postTypes, announcement.type)
-        && matchesArray(subscriber.organizationSlugs || subscriber.organizations, announcement.organization)
-        && matchesArray(subscriber.stateSlugs || subscriber.states, announcement.state)
-        && matchesArray(subscriber.qualificationSlugs || subscriber.qualifications, announcement.qualification);
+        && matchesArray(subscriber.organizationSlugs, announcement.organization)
+        && matchesArray(subscriber.stateSlugs, announcement.state)
+        && matchesArray(subscriber.qualificationSlugs, announcement.qualification);
 };
 
 export async function dispatchAnnouncementToSubscribers(
@@ -70,26 +54,32 @@ export async function dispatchAnnouncementToSubscribers(
         return { matched: 0, sent: 0, skipped: 0, frequency };
     }
 
-    let subscribers: SubscriptionDoc[] = [];
+    let subscribers: AlertSubscriptionRecord[] = [];
     try {
-        const collection = getCollection<SubscriptionDoc>('alert_subscriptions');
-        subscribers = await collection
-            .find({
-                isActive: true,
-                verified: true,
-                frequency,
-            })
-            .project({
-                email: 1,
-                categorySlugs: 1,
-                stateSlugs: 1,
-                organizationSlugs: 1,
-                qualificationSlugs: 1,
-                postTypes: 1,
-                unsubscribeToken: 1,
-                frequency: 1,
-            })
-            .toArray() as SubscriptionDoc[];
+        // This temporary announcement-to-post shim preserves the legacy route contract
+        // while subscription matching is now driven by the Prisma/Postgres content shape.
+        const postRecord = {
+            id: announcement.id,
+            title: announcement.title,
+            slug: announcement.slug,
+            type: announcement.type,
+            summary: announcement.content || announcement.title,
+            status: announcement.status,
+            version: announcement.version || 1,
+            isActive: announcement.isActive,
+            createdAt: (announcement as any).createdAt || new Date().toISOString(),
+            updatedAt: (announcement.updatedAt as any)?.toISOString?.() || new Date().toISOString(),
+            publishedAt: (announcement.postedAt as any)?.toISOString?.() || new Date().toISOString(),
+            categories: announcement.category ? [{ id: 'legacy-category', name: announcement.category, slug: normalizeToken(announcement.category) }] : [],
+            states: announcement.location ? [{ id: 'legacy-state', name: announcement.location, slug: normalizeToken(announcement.location) }] : [],
+            organization: announcement.organization
+              ? { id: 'legacy-organization', name: announcement.organization, slug: normalizeToken(announcement.organization) }
+              : undefined,
+            qualifications: announcement.minQualification
+              ? [{ id: 'legacy-qualification', name: announcement.minQualification, slug: normalizeToken(announcement.minQualification) }]
+              : [],
+        } as any;
+        subscribers = await AlertSubscriptionModelPostgres.listMatchingPost(postRecord, frequency);
     } catch (error) {
         console.error('[SubscriberDispatch] Failed to load subscriptions:', error);
         return { matched: 0, sent: 0, skipped: 0, frequency };

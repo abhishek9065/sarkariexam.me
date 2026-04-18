@@ -132,14 +132,58 @@ const trimOrNull = (value?: string | null): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const isAlphaNumeric = (charCode: number): boolean => (
+  (charCode >= 48 && charCode <= 57) ||
+  (charCode >= 97 && charCode <= 122)
+);
+
+const trimBoundarySeparators = (value: string): string => {
+  let start = 0;
+  let end = value.length;
+
+  while (start < end && (value[start] === '-' || value[start] === '_')) {
+    start += 1;
+  }
+
+  while (end > start && (value[end - 1] === '-' || value[end - 1] === '_')) {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
+};
+
 const normalizeToken = (value?: string | null, maxLength = 64): string | null => {
   const trimmed = trimOrNull(value);
   if (!trimmed) return null;
-  const sanitized = trimmed
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-_]+|[-_]+$/g, '');
+
+  const lower = trimmed.toLowerCase();
+  let sanitized = '';
+  let previousWasDash = false;
+
+  for (const char of lower) {
+    const charCode = char.charCodeAt(0);
+
+    if (isAlphaNumeric(charCode) || char === '_') {
+      sanitized += char;
+      previousWasDash = false;
+      continue;
+    }
+
+    if (char === '-') {
+      if (!previousWasDash) {
+        sanitized += '-';
+        previousWasDash = true;
+      }
+      continue;
+    }
+
+    if (!previousWasDash) {
+      sanitized += '-';
+      previousWasDash = true;
+    }
+  }
+
+  sanitized = trimBoundarySeparators(sanitized);
   if (!sanitized) return null;
   return sanitized.slice(0, maxLength);
 };

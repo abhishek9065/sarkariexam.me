@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 
 import { config } from '../config.js';
@@ -8,6 +9,13 @@ import { recordAnalyticsEvent } from '../services/analytics.js';
 import { normalizeAttribution } from '../services/attribution.js';
 
 const router = Router();
+
+router.use(expressRateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 const subscriptionSchema = z.object({
     endpoint: z.string().url(),

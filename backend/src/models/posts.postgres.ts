@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 
 import type {
+  AlertMatchPreview,
   AdminPostListResult,
   AuditLogRecord,
   PostRecord,
@@ -22,6 +23,7 @@ import { publicSectionMap } from '../content/types.js';
 import { prisma } from '../services/postgres/prisma.js';
 import { slugify } from '../utils/slugify.js';
 
+import AlertSubscriptionModelPostgres from './alertSubscriptions.postgres.js';
 import ContentTaxonomyModelPostgres from './contentTaxonomies.postgres.js';
 
 const postInclude = {
@@ -59,7 +61,84 @@ const postInclude = {
 } satisfies Prisma.PostInclude;
 
 type PostWithRelations = Prisma.PostGetPayload<{ include: typeof postInclude }>;
-type PostInput = Omit<PostRecord, 'id' | 'createdAt' | 'updatedAt' | 'currentVersion' | 'searchText'>;
+type PostInput = Omit<PostRecord, 'id' | 'createdAt' | 'updatedAt' | 'currentVersion' | 'searchText' | 'freshness' | 'searchMeta' | 'readiness'>;
+
+const SEARCH_STOP_WORDS = new Set(['the', 'for', 'and', 'with', 'from', 'into', 'over', 'under', 'exam', 'online']);
+const SEARCH_TYPE_TERMS: Record<PostType, string[]> = {
+  job: ['job', 'jobs', 'recruitment', 'vacancy', 'vacancies', 'bharti'],
+  result: ['result', 'results', 'score', 'merit', 'cutoff'],
+  'admit-card': ['admit', 'card', 'hall', 'ticket'],
+  admission: ['admission', 'admissions', 'counselling', 'seat'],
+  'answer-key': ['answer', 'key', 'objection', 'response'],
+  syllabus: ['syllabus', 'scheme', 'exam', 'pattern'],
+};
+
+function formatEditorialDate(value?: Date | null): string | undefined {
+  if (!value) return undefined;
+  return value.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function normalizeHostname(value?: string | null): string | null {
+  if (!value?.trim()) return null;
+  try {
+    return new URL(value).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function hostsMatch(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  return a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`);
+}
+
+function trimToLength(value: string, max: number) {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function normalizeSearchTokens(value?: string | null) {
+  return Array.from(new Set(
+    (value || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/g)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2 && !SEARCH_STOP_WORDS.has(token)),
+  ));
+}
+
+function buildSearchTokenClauses(term?: string | null): Prisma.PostWhereInput[] {
+  const tokens = normalizeSearchTokens(term);
+  return tokens.map((token) => ({
+    OR: [
+      { slug: { contains: token, mode: 'insensitive' } },
+      { title: { contains: token, mode: 'insensitive' } },
+      { summary: { contains: token, mode: 'insensitive' } },
+      { searchText: { contains: token, mode: 'insensitive' } },
+      { organization: { is: { OR: [
+        { name: { contains: token, mode: 'insensitive' } },
+        { slug: { contains: token, mode: 'insensitive' } },
+      ] } } },
+      { postCategories: { some: { category: { OR: [
+        { name: { contains: token, mode: 'insensitive' } },
+        { slug: { contains: token, mode: 'insensitive' } },
+      ] } } } },
+      { postStates: { some: { state: { OR: [
+        { name: { contains: token, mode: 'insensitive' } },
+        { slug: { contains: token, mode: 'insensitive' } },
+      ] } } } },
+      { postQualifications: { some: { qualification: { OR: [
+        { name: { contains: token, mode: 'insensitive' } },
+        { slug: { contains: token, mode: 'insensitive' } },
+      ] } } } },
+    ],
+  }));
+}
 
 function toTaxonomyRef(record?: { id: string; name: string; slug: string } | null): TaxonomyRef | null {
   if (!record) return null;
@@ -168,6 +247,49 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     isPrimary: item.isPrimary,
     capturedAt: item.capturedAt?.toISOString(),
   }));
+  const contentType = mapPrismaTypeToContent(post.type);
+  const legacySlugs = Array.from(new Set([...(post.legacySlugs || []), ...post.slugAliases.map((item) => item.slug)]));
+  const trustSummary = deriveTrust({
+    organization: post.organization,
+    officialSources: post.officialSources,
+    verificationNote: post.verificationNote,
+    updatedAt: post.updatedAt,
+  });
+  const seoSummary = deriveSeo({
+    title: post.title,
+    summary: post.summary,
+    type: contentType,
+    slug: post.slug,
+    organization: post.organization,
+    seoTitle: post.seoTitle,
+    seoDescription: post.seoDescription,
+    seoCanonicalPath: post.seoCanonicalPath,
+    seoIndexable: post.seoIndexable,
+    seoOgImage: post.seoOgImage,
+    lastDate: post.lastDate,
+    examDate: post.examDate,
+    resultDate: post.resultDate,
+  });
+  const freshnessSummary = deriveFreshness({
+    status: post.status,
+    expiresAt: post.expiresAt,
+    publishedAt: post.publishedAt,
+    updatedAt: post.updatedAt,
+    trust: trustSummary,
+  });
+  const searchMeta = deriveSearchMeta(post.searchText, legacySlugs);
+  const readiness = deriveReadiness({
+    status: mapWorkflowStatus(post.status),
+    summary: post.summary,
+    body: post.body || undefined,
+    type: contentType,
+    officialSources: post.officialSources,
+    trust: trustSummary,
+    seo: seoSummary,
+    freshness: freshnessSummary,
+    lastDate: post.lastDate,
+    importantDates: post.importantDates,
+  });
 
   return {
     id: post.id,
@@ -175,8 +297,8 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     legacyId: post.legacyId || undefined,
     title: post.title,
     slug: post.slug,
-    legacySlugs: Array.from(new Set([...(post.legacySlugs || []), ...post.slugAliases.map((item) => item.slug)])),
-    type: mapPrismaTypeToContent(post.type),
+    legacySlugs,
+    type: contentType,
     status: mapWorkflowStatus(post.status),
     summary: post.summary,
     shortInfo: post.shortInfo || undefined,
@@ -232,16 +354,11 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     officialSources,
     trust: {
       verificationNote: post.verificationNote || undefined,
-      updatedLabel: post.updatedLabel || undefined,
+      updatedLabel: post.updatedLabel || formatEditorialDate(post.updatedAt),
       officialSources,
+      ...trustSummary,
     },
-    seo: {
-      metaTitle: post.seoTitle || undefined,
-      metaDescription: post.seoDescription || undefined,
-      canonicalPath: post.seoCanonicalPath || undefined,
-      indexable: post.seoIndexable,
-      ogImage: post.seoOgImage || undefined,
-    },
+    seo: seoSummary,
     tag: post.tag ? post.tag.toLowerCase().replace('_', '-') as PostRecord['tag'] : undefined,
     flags: {
       urgent: post.isUrgent,
@@ -273,6 +390,9 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     publishedBy: post.publishedBy || undefined,
     currentVersion: post.currentVersion,
     searchText: post.searchText,
+    freshness: freshnessSummary,
+    searchMeta,
+    readiness,
   };
 }
 
@@ -295,12 +415,15 @@ function buildPublicWhere(filters?: {
 
   if (filters?.search?.trim()) {
     const term = filters.search.trim();
-    andClauses.push({ OR: [
-      { title: { contains: term, mode: 'insensitive' } },
-      { summary: { contains: term, mode: 'insensitive' } },
-      { slug: { contains: term, mode: 'insensitive' } },
-      { searchText: { contains: term, mode: 'insensitive' } },
-    ] });
+    andClauses.push({
+      OR: [
+        { title: { contains: term, mode: 'insensitive' } },
+        { summary: { contains: term, mode: 'insensitive' } },
+        { slug: { contains: term, mode: 'insensitive' } },
+        { searchText: { contains: term, mode: 'insensitive' } },
+      ],
+    });
+    andClauses.push(...buildSearchTokenClauses(term));
   }
 
   if (filters?.organization) {
@@ -432,30 +555,242 @@ function toJsonValue(value: unknown): Prisma.InputJsonValue {
 function buildSearchText(input: {
   title: string;
   summary: string;
+  type: PostType;
   organization?: TaxonomyRef | null;
   categories: TaxonomyRef[];
   states: TaxonomyRef[];
   qualifications: TaxonomyRef[];
   institution?: TaxonomyRef | null;
   exam?: TaxonomyRef | null;
+  shortInfo?: string;
   body?: string;
+  legacySlugs?: string[];
+  location?: string;
+  officialSources?: Array<{ label: string; sourceType?: string }>;
+  importantDates?: Array<{ label: string; value: string; kind?: string }>;
+  admissionPrograms?: Array<{ programName: string; department?: string; level?: string }>;
 }): string {
-  return [
+  return Array.from(new Set([
     input.title,
     input.summary,
+    input.shortInfo,
     input.organization?.name,
     ...input.categories.map((item) => item.name),
     ...input.states.map((item) => item.name),
     ...input.qualifications.map((item) => item.name),
     input.institution?.name,
     input.exam?.name,
+    input.location,
+    ...SEARCH_TYPE_TERMS[input.type],
+    ...(input.legacySlugs || []),
+    ...(input.officialSources || []).flatMap((item) => [item.label, item.sourceType || '']),
+    ...(input.importantDates || []).flatMap((item) => [item.label, item.value, item.kind || '']),
+    ...(input.admissionPrograms || []).flatMap((item) => [item.programName, item.department || '', item.level || '']),
     input.body,
-  ]
+  ]))
     .filter(Boolean)
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+function deriveTrust(post: {
+  organization?: { officialWebsite?: string | null } | null;
+  officialSources: Array<{ label: string; url: string; isPrimary: boolean; capturedAt?: Date | null; sourceType?: string | null }>;
+  verificationNote?: string | null;
+  updatedAt: Date;
+}) {
+  const sourceCount = post.officialSources.length;
+  const primarySource = post.officialSources.find((item) => item.isPrimary) || post.officialSources[0] || null;
+  const latestSourceCapturedAt = post.officialSources
+    .map((item) => item.capturedAt || null)
+    .filter((item): item is Date => Boolean(item))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  const primarySourceDomain = normalizeHostname(primarySource?.url || null);
+  const officialDomain = normalizeHostname(post.organization?.officialWebsite || null);
+  const domainMatch = primarySourceDomain && officialDomain ? hostsMatch(primarySourceDomain, officialDomain) : undefined;
+
+  let verificationStatus: 'verified' | 'review' | 'source_light' = 'source_light';
+  if (sourceCount > 0 && Boolean(primarySource) && Boolean(post.verificationNote?.trim())) {
+    verificationStatus = 'verified';
+  } else if (sourceCount > 0 || Boolean(post.verificationNote?.trim())) {
+    verificationStatus = 'review';
+  }
+
+  return {
+    verificationStatus,
+    sourceCount,
+    hasPrimarySource: Boolean(primarySource),
+    primarySourceLabel: primarySource?.label || undefined,
+    latestSourceCapturedAt: latestSourceCapturedAt?.toISOString(),
+    primarySourceDomain: primarySourceDomain || undefined,
+    officialDomain: officialDomain || undefined,
+    domainMatch,
+  };
+}
+
+function deriveSeo(post: {
+  title: string;
+  summary: string;
+  type: PostType;
+  slug: string;
+  organization?: { name: string } | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoCanonicalPath?: string | null;
+  seoIndexable: boolean;
+  seoOgImage?: string | null;
+  lastDate?: string | null;
+  examDate?: string | null;
+  resultDate?: string | null;
+}) {
+  const orgName = post.organization?.name?.trim();
+  const effectiveTitle = trimToLength(
+    post.seoTitle?.trim()
+      || [post.title.trim(), orgName ? `- ${orgName}` : '', '| Sarkari Exam'].filter(Boolean).join(' '),
+    160,
+  );
+  const dateHint = post.lastDate || post.examDate || post.resultDate;
+  const effectiveDescription = trimToLength(
+    post.seoDescription?.trim()
+      || [
+        post.summary.trim(),
+        orgName ? `Official update from ${orgName}.` : '',
+        dateHint ? `Important date: ${dateHint}.` : '',
+      ].filter(Boolean).join(' '),
+    320,
+  );
+  const effectiveCanonicalPath = post.seoCanonicalPath?.trim() || canonicalPath(post.type, post.slug);
+
+  return {
+    metaTitle: post.seoTitle || undefined,
+    metaDescription: post.seoDescription || undefined,
+    canonicalPath: post.seoCanonicalPath || undefined,
+    indexable: post.seoIndexable,
+    ogImage: post.seoOgImage || undefined,
+    effectiveTitle,
+    effectiveDescription,
+    effectiveCanonicalPath,
+  };
+}
+
+function deriveFreshness(post: {
+  status: PrismaWorkflowStatus;
+  expiresAt?: Date | null;
+  publishedAt?: Date | null;
+  updatedAt: Date;
+  trust: ReturnType<typeof deriveTrust>;
+}) {
+  const now = Date.now();
+  const archiveState =
+    post.status === PrismaWorkflowStatus.ARCHIVED
+      ? 'archived'
+      : post.expiresAt && post.expiresAt.getTime() <= now
+        ? 'expired'
+        : 'active';
+  const daysToExpiry = post.expiresAt
+    ? Math.ceil((post.expiresAt.getTime() - now) / (24 * 60 * 60 * 1000))
+    : undefined;
+  const daysSinceUpdate = Math.floor((now - post.updatedAt.getTime()) / (24 * 60 * 60 * 1000));
+  const sourceCapturedAt = post.trust.latestSourceCapturedAt ? new Date(post.trust.latestSourceCapturedAt) : null;
+  const daysSinceSourceCapture = sourceCapturedAt
+    ? Math.floor((now - sourceCapturedAt.getTime()) / (24 * 60 * 60 * 1000))
+    : undefined;
+
+  const expiresSoon = typeof daysToExpiry === 'number' && daysToExpiry >= 0 && daysToExpiry <= 7;
+  const isStale = archiveState === 'active' && (
+    daysSinceUpdate >= 45
+    || typeof daysSinceSourceCapture === 'number' && daysSinceSourceCapture >= 30
+  );
+
+  let staleReason: string | undefined;
+  if (archiveState === 'expired') staleReason = 'Expiry date has passed';
+  else if (typeof daysToExpiry === 'number' && daysToExpiry < 0) staleReason = 'Content should be archived';
+  else if (typeof daysSinceSourceCapture === 'number' && daysSinceSourceCapture >= 30) staleReason = `Primary source check is ${daysSinceSourceCapture} days old`;
+  else if (daysSinceUpdate >= 45) staleReason = `Content has not been updated for ${daysSinceUpdate} days`;
+
+  return {
+    archiveState,
+    expiresSoon,
+    isStale,
+    needsReview: archiveState !== 'active' || expiresSoon || isStale || post.trust.verificationStatus !== 'verified',
+    daysToExpiry,
+    daysSinceUpdate,
+    daysSinceSourceCapture,
+    staleReason,
+  } as const;
+}
+
+function deriveSearchMeta(searchText: string, legacySlugs: string[]) {
+  const tokens = normalizeSearchTokens(searchText);
+  return {
+    termCount: tokens.length,
+    aliasCount: legacySlugs.length,
+    termsPreview: tokens.slice(0, 12),
+    searchReady: tokens.length >= 8,
+  };
+}
+
+function deriveReadiness(post: {
+  status: PostWorkflowStatus;
+  summary: string;
+  body?: string;
+  type: PostType;
+  officialSources: Array<{ isPrimary: boolean }>;
+  trust: ReturnType<typeof deriveTrust>;
+  seo: ReturnType<typeof deriveSeo>;
+  freshness: ReturnType<typeof deriveFreshness>;
+  lastDate?: string | null;
+  importantDates: Array<unknown>;
+}) {
+  const issues: string[] = [];
+  const warnings: string[] = [];
+
+  if (post.officialSources.length === 0) {
+    issues.push('Add at least one official source before review or publish.');
+  }
+  if (!post.trust.hasPrimarySource) {
+    issues.push('Mark one official source as primary.');
+  }
+  if (!post.trust.verificationStatus || post.trust.verificationStatus === 'source_light') {
+    issues.push('Add a verification note that explains what was checked.');
+  }
+  if (post.freshness.archiveState === 'expired') {
+    issues.push('This content is already expired and should not be newly published.');
+  }
+  if (post.summary.trim().length < 40) {
+    warnings.push('Summary is short; expand it for search snippets and trust context.');
+  }
+  if (!post.body?.trim()) {
+    warnings.push('Detailed body content is missing.');
+  }
+  if (!post.lastDate?.trim() && ['job', 'admission'].includes(post.type)) {
+    warnings.push('Last date is missing for this application-driven post.');
+  }
+  if (post.importantDates.length === 0 && ['result', 'admit-card', 'answer-key', 'admission'].includes(post.type)) {
+    warnings.push('Important dates are missing for this post type.');
+  }
+  if (post.freshness.expiresSoon) {
+    warnings.push('This content is close to expiry. Confirm dates before publishing.');
+  }
+  if (post.freshness.isStale && post.freshness.staleReason) {
+    warnings.push(post.freshness.staleReason);
+  }
+  if (!post.seo.effectiveTitle || !post.seo.effectiveDescription) {
+    warnings.push('SEO fallbacks could not be generated cleanly.');
+  }
+
+  const blocked = issues.length > 0;
+  return {
+    canSubmit: !blocked,
+    canApprove: !blocked,
+    canPublish: !blocked,
+    issueCount: issues.length,
+    warningCount: warnings.length,
+    issues,
+    warnings,
+  };
 }
 
 async function ensureUniqueSlug(tx: Prisma.TransactionClient, baseSlug: string, excludeId?: string) {
@@ -606,11 +941,14 @@ function buildAdminWhere(filters?: {
 
   if (filters?.search?.trim()) {
     const term = filters.search.trim();
-    andClauses.push({ OR: [
-      { searchText: { contains: term, mode: 'insensitive' } },
-      { title: { contains: term, mode: 'insensitive' } },
-      { slug: { contains: term, mode: 'insensitive' } },
-    ] });
+    andClauses.push({
+      OR: [
+        { searchText: { contains: term, mode: 'insensitive' } },
+        { title: { contains: term, mode: 'insensitive' } },
+        { slug: { contains: term, mode: 'insensitive' } },
+      ],
+    });
+    andClauses.push(...buildSearchTokenClauses(term));
   }
 
   if (filters?.category) {
@@ -894,6 +1232,11 @@ export class PostModelPostgres {
 
       const current = mapWorkflowStatus(existing.status);
       const nextStatus = this.resolveNextStatus(current, action);
+      const existingRecord = toPostRecord(existing);
+      if (['submit', 'approve', 'publish'].includes(action) && !existingRecord.readiness?.canPublish) {
+        const issues = existingRecord.readiness?.issues || ['Post is not ready for editorial workflow'];
+        throw new Error(issues.join(' '));
+      }
       const now = new Date();
 
       const updated = await tx.post.update({
@@ -984,6 +1327,57 @@ export class PostModelPostgres {
     };
   }
 
+  static async getAlertMatchPreview(id: string): Promise<AlertMatchPreview | null> {
+    const post = await this.findById(id);
+    if (!post) return null;
+
+    const matches = await AlertSubscriptionModelPostgres.listMatchingPost(post);
+    return matches.reduce<AlertMatchPreview>((acc, item) => {
+      acc.total += 1;
+      if (item.frequency === 'instant') acc.instant += 1;
+      else if (item.frequency === 'weekly') acc.weekly += 1;
+      else acc.daily += 1;
+      return acc;
+    }, {
+      total: 0,
+      instant: 0,
+      daily: 0,
+      weekly: 0,
+    });
+  }
+
+  static async listFreshnessQueue(limit = 24): Promise<PostRecord[]> {
+    const rows = await prisma.post.findMany({
+      where: {
+        status: {
+          in: [PrismaWorkflowStatus.PUBLISHED, PrismaWorkflowStatus.APPROVED],
+        },
+      },
+      include: postInclude,
+      orderBy: [
+        { expiresAt: 'asc' },
+        { updatedAt: 'asc' },
+      ],
+      take: Math.max(limit * 4, 80),
+    });
+
+    return rows
+      .map((row) => toPostRecord(row))
+      .filter((post) => post.freshness?.needsReview)
+      .sort((a, b) => {
+        const aPriority = (a.freshness?.archiveState !== 'active' ? 100 : 0)
+          + (a.freshness?.expiresSoon ? 50 : 0)
+          + (a.freshness?.isStale ? 20 : 0)
+          + (a.readiness?.issueCount || 0);
+        const bPriority = (b.freshness?.archiveState !== 'active' ? 100 : 0)
+          + (b.freshness?.expiresSoon ? 50 : 0)
+          + (b.freshness?.isStale ? 20 : 0)
+          + (b.readiness?.issueCount || 0);
+        return bPriority - aPriority;
+      })
+      .slice(0, limit);
+  }
+
   private static async persistPost(params: {
     input: PostInput;
     actorId?: string;
@@ -1023,14 +1417,37 @@ export class PostModelPostgres {
       const searchText = buildSearchText({
         title: input.title,
         summary: input.summary,
+        type: input.type,
         organization: normalizedOrganization,
         categories: normalizedCategories,
         states: normalizedStates,
         qualifications: normalizedQualifications,
         institution: normalizedInstitution,
         exam: normalizedExam,
+        shortInfo: input.shortInfo,
         body: input.body,
+        legacySlugs,
+        location: input.location,
+        officialSources: input.officialSources,
+        importantDates: input.importantDates,
+        admissionPrograms: input.admissionPrograms,
       });
+      const derivedSeo = deriveSeo({
+        title: input.title.trim(),
+        summary: input.summary.trim(),
+        type: input.type,
+        slug: finalSlug,
+        organization: normalizedOrganization,
+        seoTitle: input.seo?.metaTitle || null,
+        seoDescription: input.seo?.metaDescription || null,
+        seoCanonicalPath: input.seo?.canonicalPath || null,
+        seoIndexable: input.seo?.indexable ?? true,
+        seoOgImage: input.seo?.ogImage || null,
+        lastDate: input.lastDate || null,
+        examDate: input.examDate || null,
+        resultDate: input.resultDate || null,
+      });
+      const defaultUpdatedLabel = formatEditorialDate(now);
 
       const baseData = {
         legacyAnnouncementId: input.legacyAnnouncementId || null,
@@ -1062,7 +1479,7 @@ export class PostModelPostgres {
         publishedBy: input.publishedBy || null,
         searchText,
         verificationNote: input.trust?.verificationNote?.trim() || null,
-        updatedLabel: input.trust?.updatedLabel?.trim() || null,
+        updatedLabel: input.trust?.updatedLabel?.trim() || defaultUpdatedLabel || null,
         tag: mapTagToPrisma(input.tag),
         isUrgent: Boolean(input.flags?.urgent),
         isNew: Boolean(input.flags?.isNew),
@@ -1072,9 +1489,9 @@ export class PostModelPostgres {
         stickyRank: input.home?.stickyRank ?? null,
         highlight: Boolean(input.home?.highlight),
         trendingScore: input.home?.trendingScore ?? null,
-        seoTitle: input.seo?.metaTitle?.trim() || null,
-        seoDescription: input.seo?.metaDescription?.trim() || null,
-        seoCanonicalPath: input.seo?.canonicalPath?.trim() || null,
+        seoTitle: derivedSeo.effectiveTitle,
+        seoDescription: derivedSeo.effectiveDescription,
+        seoCanonicalPath: derivedSeo.effectiveCanonicalPath,
         seoIndexable: input.seo?.indexable ?? true,
         seoOgImage: input.seo?.ogImage?.trim() || null,
       };

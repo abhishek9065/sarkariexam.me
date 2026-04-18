@@ -8,14 +8,17 @@ Build a backend-driven government opportunities platform where structured public
 - PostgreSQL is the primary source of truth for structured runtime data.
 - Prisma is the main schema, migration, and domain access layer for content, taxonomies, workflow, and operational entities that need long-term ownership.
 - Redis is the cache, throttling, queue, and ephemeral state layer.
-- Mongo / Cosmos remains legacy-only and should be removed from scheduler and startup paths over time.
-- Auth/account state, profile state, bookmarks, push subscriptions, notification campaigns, site settings, workflow logs, and saved-search alert state now sit on Prisma-managed `app_*` slices instead of raw SQL bootstrap paths.
+- Mongo / Cosmos remains legacy-only and should be removed from the remaining scheduler and startup paths over time.
+- Auth/account state, profile state, bookmarks, push subscriptions, notification campaigns, site settings, workflow logs, saved-search alert state, reminder dispatch state, and subscription digest timing state now sit on Prisma-managed tables instead of raw SQL or Mongo-compatible bootstrap paths.
 
 ### Backend
 - Express + TypeScript remains the primary application API.
 - The editorial/content platform is centered on Prisma-backed `posts`, taxonomies, versions, audit logs, and content pages.
 - Compatibility endpoints may remain temporarily, but new behavior should land on the canonical editorial/content path.
 - Legacy Mongo/Cosmos-backed jobs and guarded API prefixes should be registered explicitly as transitional subsystems instead of being hidden in generic startup flow.
+- Digest sender, saved-search alerts, and tracker reminders now start from the Postgres-backed runtime path; analytics and automation jobs are the remaining legacy scheduled subsystems.
+- Analytics rollups now derive published-content counts from Prisma/Postgres, even though event ingestion and rollup document storage are still transitional.
+- Automation jobs already use Prisma/Postgres for publish/archive content actions; the remaining legacy piece is link-health record persistence, which is now isolated behind an explicit compatibility adapter.
 
 ### Admin app
 - `admin-next` is the editorial CMS and operations console.

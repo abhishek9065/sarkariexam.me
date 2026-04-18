@@ -26,6 +26,7 @@ export interface CmsOfficialSource {
   url: string;
   sourceType?: string;
   isPrimary?: boolean;
+  capturedAt?: string;
 }
 
 export interface CmsImportantDate {
@@ -58,7 +59,18 @@ export interface CmsPost {
   vacancyRows: Array<{ postName: string; department?: string; vacancies: string; payLevel?: string; salaryNote?: string }>;
   admissionPrograms: Array<{ programName: string; level?: string; department?: string; intake?: string; eligibilityNote?: string }>;
   officialSources: CmsOfficialSource[];
-  trust: { verificationNote?: string };
+  trust: {
+    verificationNote?: string;
+    updatedLabel?: string;
+    verificationStatus?: 'verified' | 'review' | 'source_light';
+    sourceCount?: number;
+    hasPrimarySource?: boolean;
+    primarySourceLabel?: string;
+    latestSourceCapturedAt?: string;
+    primarySourceDomain?: string;
+    officialDomain?: string;
+    domainMatch?: boolean;
+  };
   tag?: 'new' | 'hot' | 'update' | 'last-date';
   flags: { urgent?: boolean; isNew?: boolean; lastDate?: boolean; featured?: boolean };
   home: { section?: string; stickyRank?: number; highlight?: boolean; trendingScore?: number };
@@ -72,12 +84,40 @@ export interface CmsPost {
   updatedAt: string;
   createdAt: string;
   currentVersion: number;
+  freshness?: {
+    archiveState: 'active' | 'expired' | 'archived';
+    expiresSoon: boolean;
+    isStale: boolean;
+    needsReview: boolean;
+    daysToExpiry?: number;
+    daysSinceUpdate?: number;
+    daysSinceSourceCapture?: number;
+    staleReason?: string;
+  };
+  searchMeta?: {
+    termCount: number;
+    aliasCount: number;
+    termsPreview: string[];
+    searchReady: boolean;
+  };
+  readiness?: {
+    canSubmit: boolean;
+    canApprove: boolean;
+    canPublish: boolean;
+    issueCount: number;
+    warningCount: number;
+    issues: string[];
+    warnings: string[];
+  };
   seo?: {
     metaTitle?: string;
     metaDescription?: string;
     canonicalPath?: string;
     indexable?: boolean;
     ogImage?: string;
+    effectiveTitle?: string;
+    effectiveDescription?: string;
+    effectiveCanonicalPath?: string;
   };
 }
 
@@ -94,6 +134,13 @@ export interface WorkflowViolation {
   id: string;
   title: string;
   hoursOverdue: number;
+}
+
+export interface AlertMatchPreview {
+  total: number;
+  instant: number;
+  daily: number;
+  weekly: number;
 }
 
 export interface CmsTaxonomy {

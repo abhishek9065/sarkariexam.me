@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 import { recordActiveUser } from '../services/activeUsers.js';
+import { sanitizeForLog } from '../utils/logSanitizer.js';
 
 import { getClientIP } from './security.js';
 
@@ -49,12 +50,16 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
 
         // Log slow requests (> 500ms)
         if (durationMs > 500) {
-            console.warn(`[SLOW] ${req.method} ${req.path} - ${durationMs}ms (${res.statusCode})`);
+            console.warn(
+                `[SLOW] ${sanitizeForLog(req.method, 16)} ${sanitizeForLog(req.path, 200)} - ${durationMs}ms (${res.statusCode})`
+            );
         }
 
         // Log errors
         if (res.statusCode >= 400) {
-            console.error(`[ERROR] ${req.method} ${req.path} - ${durationMs}ms (${res.statusCode})`);
+            console.error(
+                `[ERROR] ${sanitizeForLog(req.method, 16)} ${sanitizeForLog(req.path, 200)} - ${durationMs}ms (${res.statusCode})`
+            );
         }
     });
 

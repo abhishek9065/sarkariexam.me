@@ -1,4 +1,5 @@
 import { getCache as getMemoryCache, setCache as setMemoryCache, deleteCache as deleteMemoryCache, invalidateCache } from '../utils/cache.js';
+import { sanitizeForLog } from '../utils/logSanitizer.js';
 
 /**
  * Redis Cache Service using Upstash REST API
@@ -189,14 +190,16 @@ export async function getOrFetch<T>(
     fetcher: () => Promise<T | null>,
     ttlSeconds: number = 3600
 ): Promise<T | null> {
+    const safeKey = sanitizeForLog(key, 160);
+
     // 1. Check cache first (Redis or memory)
     const cached = await get(key);
     if (cached !== null && cached !== undefined) {
-        console.log(`[Cache HIT] ${key}`);
+        console.log(`[Cache HIT] ${safeKey}`);
         return cached as T;
     }
 
-    console.log(`[Cache MISS] ${key}`);
+    console.log(`[Cache MISS] ${safeKey}`);
 
     // 2. Fetch from database
     const data = await fetcher();

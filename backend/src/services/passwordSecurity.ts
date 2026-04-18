@@ -1,4 +1,5 @@
-import crypto from 'crypto';
+import { sha1 } from '@noble/hashes/legacy.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 
 import { config } from '../config.js';
 
@@ -26,11 +27,11 @@ const containsRepetitivePattern = (password: string): boolean => {
   return false;
 };
 
-const sha1 = (input: string) => crypto.createHash('sha1').update(input).digest('hex').toUpperCase();
+const sha1Hex = (input: string) => bytesToHex(sha1(new TextEncoder().encode(input))).toUpperCase();
 
 const fetchPwnedCount = async (password: string): Promise<number | null> => {
   if (!config.passwordBreachCheckEnabled) return null;
-  const hash = sha1(password);
+  const hash = sha1Hex(password);
   const prefix = hash.slice(0, 5);
   const suffix = hash.slice(5);
 

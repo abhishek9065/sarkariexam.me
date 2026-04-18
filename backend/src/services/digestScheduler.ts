@@ -1,24 +1,9 @@
+import type { AlertSubscriptionRecord } from '../content/types.js';
+import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
 import PostModelPostgres from '../models/posts.postgres.js';
 import type { ContentType } from '../types.js';
 
-import { getCollection } from './cosmosdb.js';
 import { sendDigestEmail } from './email.js';
-
-interface SubscriptionDoc {
-    email: string;
-    categorySlugs?: string[];
-    stateSlugs?: string[];
-    organizationSlugs?: string[];
-    qualificationSlugs?: string[];
-    postTypes?: string[];
-    frequency: 'instant' | 'daily' | 'weekly';
-    verified: boolean;
-    isActive: boolean;
-    unsubscribeToken: string;
-    updatedAt?: Date;
-    lastDigestDailySentAt?: Date | null;
-    lastDigestWeeklySentAt?: Date | null;
-}
 
 interface CandidateDigestAnnouncement {
     title: string;
@@ -65,7 +50,7 @@ const normalizeToken = (value?: string | null): string => {
 
 const matchesSubscription = (
     announcement: CandidateDigestAnnouncement,
-    subscriber: SubscriptionDoc
+    subscriber: AlertSubscriptionRecord
 ): boolean => {
     const matchesArray = (values?: string[], target?: string) => {
         const normalized = (values || []).map((value) => normalizeToken(value)).filter(Boolean);
@@ -129,37 +114,11 @@ const getFrequencyWindowLabel = (frequency: 'daily' | 'weekly', now: Date): stri
     return `${formatter.format(start)} - ${formatter.format(now)} (UTC)`;
 };
 
-const getSubscriptionCollection = () => getCollection<SubscriptionDoc>('alert_subscriptions');
-
-async function listDueSubscribers(frequency: 'daily' | 'weekly', now: Date): Promise<SubscriptionDoc[]> {
+async function listDueSubscribers(frequency: 'daily' | 'weekly', now: Date): Promise<AlertSubscriptionRecord[]> {
     const threshold = getFrequencyThreshold(frequency, now);
-    const lastSentField = frequency === 'daily' ? 'lastDigestDailySentAt' : 'lastDigestWeeklySentAt';
-    const query = {
-        isActive: true,
-        verified: true,
-        frequency,
-        $or: [
-            { [lastSentField]: { $exists: false } },
-            { [lastSentField]: null },
-            { [lastSentField]: { $lt: threshold } },
-        ],
-    };
-
-    return getSubscriptionCollection()
-        .find(query)
-        .project({
-            email: 1,
-            categorySlugs: 1,
-            stateSlugs: 1,
-            organizationSlugs: 1,
-            qualificationSlugs: 1,
-            postTypes: 1,
-            unsubscribeToken: 1,
-            frequency: 1,
-            lastDigestDailySentAt: 1,
-            lastDigestWeeklySentAt: 1,
-        })
-        .toArray() as Promise<SubscriptionDoc[]>;
+    // Digest scheduling now depends on Prisma-managed subscription timing state.
+    // Keep cadence policy here, but keep durable subscriber state in Postgres.
+    return AlertSubscriptionModelPostgres.listDueDigestSubscribers({ frequency, threshold });
 }
 
 async function listCandidateAnnouncements(frequency: 'daily' | 'weekly', now: Date): Promise<CandidateDigestAnnouncement[]> {
@@ -197,12 +156,7 @@ async function listCandidateAnnouncements(frequency: 'daily' | 'weekly', now: Da
 }
 
 async function markDigestSent(subscriptionEmail: string, frequency: 'daily' | 'weekly', sentAt: Date): Promise<void> {
-    const collection = getSubscriptionCollection();
-    const field = frequency === 'daily' ? 'lastDigestDailySentAt' : 'lastDigestWeeklySentAt';
-    await collection.updateOne(
-        { email: subscriptionEmail },
-        { $set: { [field]: sentAt, updatedAt: sentAt } }
-    );
+    await AlertSubscriptionModelPostgres.markDigestSentByEmail(subscriptionEmail, frequency, sentAt);
 }
 
 async function processFrequency(frequency: 'daily' | 'weekly', now: Date): Promise<void> {

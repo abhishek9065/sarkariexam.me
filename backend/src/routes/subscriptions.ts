@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 
 import { alertSubscriptionPublicSchema } from '../content/types.js';
 import { rateLimit } from '../middleware/rateLimit.js';
@@ -7,6 +8,13 @@ import { recordAnalyticsEvent } from '../services/analytics.js';
 import { isEmailConfigured, sendVerificationEmail } from '../services/email.js';
 
 const router = Router();
+
+router.use(expressRateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 function buildPreferenceSummary(data: {
     categories?: string[];

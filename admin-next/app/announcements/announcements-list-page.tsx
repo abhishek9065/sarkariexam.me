@@ -43,15 +43,15 @@ function formatDate(value?: string) {
 }
 
 function canSubmit(post: CmsPost) {
-  return post.status === 'draft';
+  return post.status === 'draft' && (post.readiness?.canSubmit ?? true);
 }
 
 function canApprove(post: CmsPost, role?: string) {
-  return post.status === 'in_review' && ['reviewer', 'admin', 'superadmin'].includes(role || '');
+  return post.status === 'in_review' && (post.readiness?.canApprove ?? true) && ['reviewer', 'admin', 'superadmin'].includes(role || '');
 }
 
 function canPublish(post: CmsPost, role?: string) {
-  return post.status === 'approved' && ['admin', 'superadmin'].includes(role || '');
+  return post.status === 'approved' && (post.readiness?.canPublish ?? true) && ['admin', 'superadmin'].includes(role || '');
 }
 
 function canArchive(post: CmsPost, role?: string) {
@@ -226,6 +226,31 @@ export function AnnouncementsListPage() {
                     <td className="px-4 py-3 align-top">
                       <div className="font-semibold text-gray-900">{post.title}</div>
                       <div className="mt-1 text-[11px] text-gray-500">/{post.slug}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {post.readiness?.issueCount ? (
+                          <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700">
+                            {post.readiness.issueCount} issue(s)
+                          </span>
+                        ) : post.readiness?.warningCount ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+                            {post.readiness.warningCount} warning(s)
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                            Ready
+                          </span>
+                        )}
+                        {post.freshness?.expiresSoon ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+                            Expiring Soon
+                          </span>
+                        ) : null}
+                        {post.freshness?.isStale ? (
+                          <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700">
+                            Stale
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 align-top text-[12px] font-semibold text-gray-700">{typeLabel[post.type]}</td>
                     <td className="px-4 py-3 align-top">

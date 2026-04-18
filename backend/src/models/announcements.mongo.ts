@@ -15,6 +15,27 @@ function parseFilterList(value?: string): string[] {
         .filter(Boolean);
 }
 
+const ALLOWED_CONTENT_TYPES = new Set<ContentType>([
+    'job',
+    'result',
+    'admit-card',
+    'syllabus',
+    'answer-key',
+    'admission',
+]);
+
+function normalizeContentType(value?: unknown): ContentType | undefined {
+    if (typeof value !== 'string') return undefined;
+    const normalized = value.trim().toLowerCase() as ContentType;
+    return ALLOWED_CONTENT_TYPES.has(normalized) ? normalized : undefined;
+}
+
+function clampLimit(value: unknown, fallback: number, min: number, max: number): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+    const rounded = Math.trunc(value);
+    return Math.min(max, Math.max(min, rounded));
+}
+
 function buildStringFilter(value?: string) {
     if (!value) return undefined;
     const values = parseFilterList(value);
@@ -1411,13 +1432,16 @@ export class AnnouncementModelMongo {
      */
     static async getTrending(options?: { type?: ContentType; limit?: number }): Promise<Announcement[]> {
         try {
-            const query: Filter<AnnouncementDoc> = buildLiveQuery();
-            if (options?.type) query.type = options.type;
+            const safeType = normalizeContentType(options?.type);
+            const safeLimit = clampLimit(options?.limit, 10, 1, 100);
+            const query: Filter<AnnouncementDoc> = safeType
+                ? { ...buildLiveQuery(), type: safeType }
+                : buildLiveQuery();
 
             const docs = await this.collection
                 .find(query)
                 .sort({ viewCount: -1 })
-                .limit(options?.limit || 10)
+                .limit(safeLimit)
                 .toArray();
 
             return docs.map(this.docToAnnouncement);

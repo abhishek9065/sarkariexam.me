@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 
 import {
   alertSubscriptionAdminQuerySchema,
@@ -16,6 +17,13 @@ import { triggerFrontendRevalidation } from '../services/frontendRevalidation.js
 
 const router = express.Router();
 const { postModel, taxonomyModel, auditLogModel } = getEditorialDataProvider();
+
+router.use(expressRateLimit({
+  windowMs: 60 * 1000,
+  limit: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
 
 async function buildEditorialResponse(post: PostRecord | null, forceRevalidate = false) {
   if (!post) {
@@ -283,6 +291,19 @@ router.get('/posts/:id/history', async (req, res) => {
   }
 });
 
+router.get('/posts/:id/alert-preview', async (req, res) => {
+  try {
+    const preview = await postModel.getAlertMatchPreview(String(req.params.id));
+    if (!preview) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    return res.json({ data: preview });
+  } catch (error) {
+    console.error('[Editorial] Alert preview error:', error);
+    return res.status(500).json({ error: 'Failed to fetch alert preview' });
+  }
+});
+
 router.get('/workflow/pending', async (_req, res) => {
   try {
     const result = await postModel.findAdmin({ status: 'in_review', limit: 100, sort: 'updated' });
@@ -290,6 +311,16 @@ router.get('/workflow/pending', async (_req, res) => {
   } catch (error) {
     console.error('[Editorial] Pending workflow error:', error);
     return res.status(500).json({ error: 'Failed to fetch pending approvals' });
+  }
+});
+
+router.get('/workflow/freshness', async (_req, res) => {
+  try {
+    const result = await postModel.listFreshnessQueue(24);
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('[Editorial] Freshness queue error:', error);
+    return res.status(500).json({ error: 'Failed to fetch freshness queue' });
   }
 });
 

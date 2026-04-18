@@ -714,6 +714,20 @@ model UserAccountEntry {
   @@map("app_users")
 }
 
+model ReminderDispatchLogEntry {
+  id             String   @id
+  dedupeKey      String   @unique @map("dedupe_key")
+  userId         String   @map("user_id")
+  channel        String
+  source         String
+  announcementId String   @map("announcement_id")
+  deadlineDate   String?  @map("deadline_date")
+  sentAt         DateTime @default(now()) @map("sent_at")
+
+  @@index([userId, sentAt], map: "app_reminder_dispatch_logs_user_sent_idx")
+  @@map("app_reminder_dispatch_logs")
+}
+
 model SlugAlias {
   id         String   @id @default(cuid())
   postId     String
@@ -764,7 +778,9 @@ model Subscription {
   unsubscribeToken   String                @unique
   source             String?
   alertCount         Int                   @default(0)
-  lastAlertedAt      DateTime?
+  lastAlertedAt          DateTime?
+  lastDigestDailySentAt  DateTime?              @map("last_digest_daily_sent_at")
+  lastDigestWeeklySentAt DateTime?              @map("last_digest_weekly_sent_at")
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
@@ -776,6 +792,8 @@ model Subscription {
   dispatchLogs       AlertDispatchLog[]
 
   @@index([isActive, verified, frequency])
+  @@index([frequency, lastDigestDailySentAt])
+  @@index([frequency, lastDigestWeeklySentAt])
   @@map("subscriptions")
 }
 
@@ -860,4 +878,63 @@ model AlertDispatchLog {
   @@index([subscriptionId, dispatchedAt])
   @@index([postId, dispatchedAt])
   @@map("alert_dispatch_logs")
+}
+
+model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  type           String
+  announcementId String?  @map("announcement_id")
+  userId         String?  @map("user_id")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([type, createdAt])
+  @@index([announcementId, type, createdAt])
+  @@index([userId, createdAt])
+  @@map("app_analytics_events")
+}
+
+model AnalyticsRollup {
+  id                        String   @id @default(cuid())
+  date                      String   @unique
+  viewCount                 Int      @default(0) @map("view_count")
+  listingViews              Int      @default(0) @map("listing_views")
+  cardClicks                Int      @default(0) @map("card_clicks")
+  categoryClicks            Int      @default(0) @map("category_clicks")
+  filterApplies             Int      @default(0) @map("filter_applies")
+  searchCount               Int      @default(0) @map("search_count")
+  bookmarkAdds              Int      @default(0) @map("bookmark_adds")
+  bookmarkRemoves           Int      @default(0) @map("bookmark_removes")
+  registrations             Int      @default(0) @map("registrations")
+  subscriptionsVerified     Int      @default(0) @map("subscriptions_verified")
+  subscriptionsUnsubscribed Int      @default(0) @map("subscriptions_unsubscribed")
+  savedSearches             Int      @default(0) @map("saved_searches")
+  digestPreviews            Int      @default(0) @map("digest_previews")
+  digestClicks              Int      @default(0) @map("digest_clicks")
+  deepLinkClicks            Int      @default(0) @map("deep_link_clicks")
+  alertsViewed              Int      @default(0) @map("alerts_viewed")
+  pushSubscribeAttempts     Int      @default(0) @map("push_subscribe_attempts")
+  pushSubscribeSuccesses    Int      @default(0) @map("push_subscribe_successes")
+  pushSubscribeFailures     Int      @default(0) @map("push_subscribe_failures")
+  announcementCount         Int      @default(0) @map("announcement_count")
+  updatedAt                 DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([date])
+  @@map("app_analytics_rollups")
+}
+
+model SecurityLog {
+  id             String   @id @default(cuid())
+  ipAddress      String   @map("ip_address")
+  eventType      String   @map("event_type")
+  endpoint       String
+  metadata       Json?
+  incidentStatus String   @default("new") @map("incident_status")
+  assigneeEmail  String?  @map("assignee_email")
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([eventType, createdAt])
+  @@index([ipAddress, createdAt])
+  @@map("app_security_logs")
 }

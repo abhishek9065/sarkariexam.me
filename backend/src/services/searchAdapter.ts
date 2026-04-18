@@ -15,19 +15,29 @@ export interface ContentSearchAdapter {
   normalize(query: ContentSearchQuery): ContentSearchQuery;
 }
 
-export const mongoRegexSearchAdapter: ContentSearchAdapter = {
-  name: 'mongo-regex',
+function normalizeSegment(value?: string) {
+  return value?.trim().replace(/\s+/g, ' ');
+}
+
+// Transitional Postgres-backed search adapter.
+// Ranking is still lightweight, but query normalization is now aligned with the
+// Prisma/Postgres content read path rather than the old Mongo regex mindset.
+export const postgresTokenSearchAdapter: ContentSearchAdapter = {
+  name: 'postgres-tokenized',
   supportsAdvancedRanking: false,
   normalize(query) {
     return {
-      search: query.search?.trim(),
+      search: normalizeSegment(query.search),
       type: query.type,
-      category: query.category?.trim(),
-      state: query.state?.trim(),
-      organization: query.organization?.trim(),
-      qualification: query.qualification?.trim(),
+      category: normalizeSegment(query.category),
+      state: normalizeSegment(query.state),
+      organization: normalizeSegment(query.organization),
+      qualification: normalizeSegment(query.qualification),
     };
   },
 };
 
-export default mongoRegexSearchAdapter;
+// Compatibility alias for older imports that still expect the old adapter name.
+export const mongoRegexSearchAdapter = postgresTokenSearchAdapter;
+
+export default postgresTokenSearchAdapter;

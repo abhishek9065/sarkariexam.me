@@ -5,7 +5,7 @@ import { contentPageTypeValues, publicPostListQuerySchema, taxonomyTypeValues } 
 import { cacheMiddleware } from '../middleware/cache.js';
 import { cacheControl } from '../middleware/cacheControl.js';
 import { getContentPageReadModel, getContentPostReadModel, getContentTaxonomyReadModel } from '../services/contentReadProvider.js';
-import mongoRegexSearchAdapter from '../services/searchAdapter.js';
+import { postgresTokenSearchAdapter } from '../services/searchAdapter.js';
 
 const router = express.Router();
 const PostModel = getContentPostReadModel();
@@ -56,7 +56,7 @@ router.get(
         return res.status(400).json({ error: parse.error.flatten() });
       }
 
-      const filters = mongoRegexSearchAdapter.normalize(parse.data);
+      const filters = postgresTokenSearchAdapter.normalize(parse.data);
       const result = await PostModel.findPublicCards({
         ...filters,
         status: parse.data.status,

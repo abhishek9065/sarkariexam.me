@@ -1,9 +1,16 @@
-import { getCollection } from './cosmosdb.js';
+import { config } from '../config.js';
+import { postgresHealthCheck } from './postgres/prisma.js';
+import { healthCheck as legacyMongoHealthCheck } from './cosmosdb.js';
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   checks: {
-    database: { status: 'healthy' | 'unhealthy'; latency: number };
+    database: { 
+      status: 'healthy' | 'unhealthy'; 
+      latency: number;
+      postgres: { configured: boolean; ok: boolean };
+      mongo: { configured: boolean; ok: boolean | null };
+    };
     memory: { status: 'healthy' | 'warning' | 'critical'; usage: number };
     disk: { status: 'healthy' | 'warning' | 'critical'; usage: number };
     uptime: { status: 'healthy'; seconds: number };
@@ -14,16 +21,17 @@ interface HealthStatus {
 export async function getSystemHealth(): Promise<HealthStatus> {
   const startTime = Date.now();
   
-  // Database check
-  let dbStatus: 'healthy' | 'unhealthy' = 'healthy';
-  let dbLatency = 0;
-  try {
-    const col = getCollection('health_check');
-    await col.findOne({});
-    dbLatency = Date.now() - startTime;
-  } catch {
-    dbStatus = 'unhealthy';
-  }
+  // Database checks
+  const postgresConfigured = Boolean(config.postgresPrismaUrl);
+  const postgresOk = postgresConfigured ? await postgresHealthCheck() : false;
+  
+  const mongoConfigured = config.legacyMongoConfigured;
+  const mongoOk = mongoConfigured ? await legacyMongoHealthCheck() : null;
+
+  const dbLatency = Date.now() - startTime;
+  
+  // Overall DB status: Healthy if Postgres (primary) is OK
+  let dbStatus: 'healthy' | 'unhealthy' = postgresOk ? 'healthy' : 'unhealthy';
   
   // Memory usage
   const memUsage = process.memoryUsage();
@@ -31,21 +39,27 @@ export async function getSystemHealth(): Promise<HealthStatus> {
   const memStatus: 'healthy' | 'warning' | 'critical' = 
     memPercent > 90 ? 'critical' : memPercent > 75 ? 'warning' : 'healthy';
   
-  // Disk usage (approximate from memory as we can't easily check disk in container)
-  const diskStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
-  const diskUsage = 0;
-  
   // Overall status
   let overallStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-  if (dbStatus === 'unhealthy') overallStatus = 'unhealthy';
-  else if (memStatus === 'critical' || memStatus === 'warning') overallStatus = 'degraded';
+  if (dbStatus === 'unhealthy') {
+    overallStatus = 'unhealthy';
+  } else if (mongoConfigured && !mongoOk) {
+    overallStatus = 'degraded'; // Degraded if legacy Mongo is down but Postgres is up
+  } else if (memStatus === 'critical' || memStatus === 'warning') {
+    overallStatus = 'degraded';
+  }
   
   return {
     status: overallStatus,
     checks: {
-      database: { status: dbStatus, latency: dbLatency },
+      database: { 
+        status: dbStatus, 
+        latency: dbLatency,
+        postgres: { configured: postgresConfigured, ok: postgresOk },
+        mongo: { configured: mongoConfigured, ok: mongoOk },
+      },
       memory: { status: memStatus, usage: Math.round(memPercent) },
-      disk: { status: diskStatus, usage: diskUsage },
+      disk: { status: 'healthy', usage: 0 },
       uptime: { status: 'healthy', seconds: Math.floor(process.uptime()) },
     },
     timestamp: new Date(),

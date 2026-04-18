@@ -6,13 +6,14 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { rateLimit } from './middleware/rateLimit.js';
+import { rateLimit as distributedRateLimit } from './middleware/rateLimit.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { responseTimeLogger } from './middleware/responseTime.js';
 import {
@@ -110,6 +111,7 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
+app.use('/api/auth', csrfProtection());
 
 // Swagger UI
 try {
@@ -134,8 +136,20 @@ try {
 }
 
 // Rate limiting
-app.use('/api', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));
-app.use('/api/auth', rateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.authRateLimitMax }));
+app.use('/api', expressRateLimit({
+  windowMs: config.rateLimitWindowMs,
+  limit: config.rateLimitMax,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
+app.use('/api/auth', expressRateLimit({
+  windowMs: config.rateLimitWindowMs,
+  limit: config.authRateLimitMax,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
+app.use('/api', distributedRateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));
+app.use('/api/auth', distributedRateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.authRateLimitMax }));
 
 // Response time logging
 app.use(responseTimeLogger);
@@ -149,15 +163,15 @@ app.get('/', (_req, res) => {
   });
 });
 
-app.get('/api/health', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
+app.get('/api/health', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
   return buildHealthResponse(res);
 });
 
-app.get('/api/healthz', rateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
+app.get('/api/healthz', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
   return buildHealthResponse(res);
 });
 
-app.get('/api/health/deep', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
+app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
   const contentDbMode = getContentDbMode();
@@ -302,23 +316,38 @@ app.get('/metrics', (req, res) => {
 });
 
 app.use(async (req, res, next) => {
-  if (!isDatabaseBackedApi(req.path) || !isDatabaseConfigured()) {
-    next();
-    return;
+  // If this is a Postgres-backed route (which is almost all of them now), check Postgres health
+  const isPostgresRequired = shouldReadFromPostgres();
+  
+  if (isPostgresRequired) {
+    const isPostgresOk = await postgresHealthCheck();
+    if (!isPostgresOk) {
+      logger.error({ path: req.path }, '[Server] PostgreSQL primary database unavailable');
+      return res.status(503).json({
+        error: 'Service unavailable',
+        code: 'PRIMARY_DB_UNAVAILABLE',
+        message: 'Primary content database is temporarily unavailable. Please retry shortly.',
+        requestId: req.requestId,
+      });
+    }
   }
 
-  try {
-    await ensureDatabaseReady();
-    next();
-  } catch (error) {
-    logger.error({ err: error, path: req.path }, '[Server] Database unavailable for API request');
-    res.status(503).json({
-      error: 'Service unavailable',
-      code: 'SERVICE_UNAVAILABLE',
-      message: 'Database is temporarily unavailable. Please retry shortly.',
-      requestId: req.requestId,
-    });
+  // If this is one of the remaining legacy Mongo-backed routes, check Mongo health
+  if (isDatabaseBackedApi(req.path) && isDatabaseConfigured()) {
+    try {
+      await ensureDatabaseReady();
+    } catch (error) {
+      logger.error({ err: error, path: req.path }, '[Server] Legacy Mongo database unavailable');
+      return res.status(503).json({
+        error: 'Service unavailable',
+        code: 'LEGACY_DB_UNAVAILABLE',
+        message: 'Legacy database is temporarily unavailable. Please retry shortly.',
+        requestId: req.requestId,
+      });
+    }
   }
+
+  next();
 });
 
 // API routes. Some legacy administrative and scheduler-adjacent flows still rely on the Mongo/Cosmos bridge.
@@ -371,8 +400,6 @@ export async function startServer() {
       await startLegacyMongoRuntime({
         logger,
         scheduleAnalyticsRollups,
-        scheduleDigestSender,
-        scheduleTrackerReminders,
         scheduleAutomationJobs,
       });
     } else {
@@ -387,9 +414,11 @@ export async function startServer() {
   }
 
   if (config.postgresPrismaUrl) {
+    scheduleDigestSender();
     scheduleSavedSearchAlerts();
+    scheduleTrackerReminders();
   } else {
-    logger.info('[Server] Saved-search alerts disabled because PostgreSQL is not configured');
+    logger.info('[Server] Digest sender, saved-search alerts, and tracker reminders disabled because PostgreSQL is not configured');
   }
 
   const server = http.createServer(app);

@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../services/cosmosdb.js', () => ({
-    getCollection: vi.fn(),
+const { listMatchingPostMock } = vi.hoisted(() => ({
+    listMatchingPostMock: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../services/email.js', () => ({
     sendAnnouncementEmail: vi.fn().mockResolvedValue(0),
 }));
 
-import { getCollection } from '../services/cosmosdb.js';
+vi.mock('../models/alertSubscriptions.postgres.js', () => ({
+    default: {
+        listMatchingPost: listMatchingPostMock,
+    },
+}));
+
 import { sendAnnouncementEmail } from '../services/email.js';
 import { dispatchAnnouncementToSubscribers } from '../services/subscriberDispatch.js';
 import type { Announcement } from '../types.js';
@@ -28,43 +33,57 @@ const baseAnnouncement: Announcement = {
     viewCount: 0,
 };
 
-const mockSubscriptionQuery = (subscriptions: Array<Record<string, any>>) => {
-    const toArray = vi.fn().mockResolvedValue(subscriptions);
-    const project = vi.fn().mockReturnValue({ toArray });
-    const find = vi.fn().mockReturnValue({ project });
-    vi.mocked(getCollection as any).mockReturnValue({ find });
-};
-
 describe('subscriberDispatch', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     it('sends instant notifications to category-matching or all-category subscribers', async () => {
-        mockSubscriptionQuery([
+        listMatchingPostMock.mockResolvedValue([
             {
+                id: 'sub-1',
                 email: 'all@example.com',
-                categories: [],
+                categorySlugs: [],
+                stateSlugs: [],
+                organizationSlugs: [],
+                qualificationSlugs: [],
+                postTypes: [],
                 frequency: 'instant',
                 unsubscribeToken: 'tok-all',
                 verified: true,
                 isActive: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             },
             {
+                id: 'sub-2',
                 email: 'category@example.com',
-                categories: ['central government'],
+                categorySlugs: ['central-government'],
+                stateSlugs: [],
+                organizationSlugs: [],
+                qualificationSlugs: [],
+                postTypes: [],
                 frequency: 'instant',
                 unsubscribeToken: 'tok-category',
                 verified: true,
                 isActive: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             },
             {
+                id: 'sub-3',
                 email: 'other@example.com',
-                categories: ['state government'],
+                categorySlugs: ['state-government'],
+                stateSlugs: [],
+                organizationSlugs: [],
+                qualificationSlugs: [],
+                postTypes: [],
                 frequency: 'instant',
                 unsubscribeToken: 'tok-other',
                 verified: true,
                 isActive: true,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             },
         ]);
         vi.mocked(sendAnnouncementEmail as any).mockResolvedValue(2);
@@ -83,7 +102,7 @@ describe('subscriberDispatch', () => {
     });
 
     it('skips dispatch when announcement is not published', async () => {
-        mockSubscriptionQuery([]);
+        listMatchingPostMock.mockResolvedValue([]);
 
         const result = await dispatchAnnouncementToSubscribers(
             { ...baseAnnouncement, status: 'draft' },

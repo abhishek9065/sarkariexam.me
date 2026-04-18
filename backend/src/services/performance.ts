@@ -7,53 +7,68 @@ interface PerformanceMetrics {
   timestamp: Date;
 }
 
+// In-memory store for performance metrics (capped to avoid memory leaks)
+const metricsHistory: Array<{ 
+  route: string; 
+  method: string; 
+  duration: number; 
+  statusCode: number; 
+  isError: boolean; 
+  timestamp: Date 
+}> = [];
+const MAX_METRICS = 5000;
+
 export async function recordApiMetrics(route: string, method: string, duration: number, statusCode: number) {
   try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('performance_metrics');
-    
-    await col.insertOne({
+    metricsHistory.push({
       route,
       method,
       duration,
       statusCode,
       isError: statusCode >= 400,
       timestamp: new Date(),
-    } as any);
+    });
+
+    if (metricsHistory.length > MAX_METRICS) {
+      metricsHistory.shift();
+    }
   } catch {
-    // Silently fail to avoid affecting performance
+    // Silent fail
   }
 }
 
 export async function getPerformanceSummary(minutes = 60): Promise<PerformanceMetrics> {
   try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('performance_metrics');
-    const since = new Date(Date.now() - minutes * 60 * 1000);
+    const since = Date.now() - minutes * 60 * 1000;
+    const recent = metricsHistory.filter(m => m.timestamp.getTime() >= since);
     
-    const pipeline = [
-      { $match: { timestamp: { $gte: since } } },
-      {
-        $group: {
-          _id: null,
-          avgDuration: { $avg: '$duration' },
-          p95Duration: { $percentile: { p: [0.95], input: '$duration' } },
-          p99Duration: { $percentile: { p: [0.99], input: '$duration' } },
-          totalRequests: { $sum: 1 },
-          errorCount: { $sum: { $cond: ['$isError', 1, 0] } },
-        },
-      },
-    ];
+    if (recent.length === 0) {
+      return {
+        avgResponseTime: 0,
+        p95ResponseTime: 0,
+        p99ResponseTime: 0,
+        requestsPerMinute: 0,
+        errorRate: 0,
+        timestamp: new Date(),
+      };
+    }
+
+    const durations = recent.map(m => m.duration).sort((a, b) => a - b);
+    const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
     
-    const result = await col.aggregate(pipeline).toArray();
-    const data = result[0] || {};
+    const getPercentile = (p: number) => {
+      const idx = Math.floor(p * durations.length);
+      return durations[idx] || 0;
+    };
+
+    const errorCount = recent.filter(m => m.isError).length;
     
     return {
-      avgResponseTime: Math.round(data.avgDuration || 0),
-      p95ResponseTime: Math.round(data.p95Duration?.[0] || 0),
-      p99ResponseTime: Math.round(data.p99Duration?.[0] || 0),
-      requestsPerMinute: Math.round((data.totalRequests || 0) / minutes),
-      errorRate: data.totalRequests ? (data.errorCount / data.totalRequests) * 100 : 0,
+      avgResponseTime: Math.round(avgDuration),
+      p95ResponseTime: Math.round(getPercentile(0.95)),
+      p99ResponseTime: Math.round(getPercentile(0.99)),
+      requestsPerMinute: Math.round(recent.length / minutes),
+      errorRate: (errorCount / recent.length) * 100,
       timestamp: new Date(),
     };
   } catch {
@@ -70,29 +85,27 @@ export async function getPerformanceSummary(minutes = 60): Promise<PerformanceMe
 
 export async function getSlowEndpoints(limit = 10): Promise<{ route: string; avgDuration: number; count: number }[]> {
   try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('performance_metrics');
-    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const since = Date.now() - 60 * 60 * 1000;
+    const recent = metricsHistory.filter(m => m.timestamp.getTime() >= since);
     
-    const pipeline = [
-      { $match: { timestamp: { $gte: since } } },
-      {
-        $group: {
-          _id: { route: '$route', method: '$method' },
-          avgDuration: { $avg: '$duration' },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { avgDuration: -1 } },
-      { $limit: limit },
-    ];
+    const groups = new Map<string, { totalDuration: number; count: number }>();
     
-    const results = await col.aggregate(pipeline).toArray();
-    return results.map((r: any) => ({
-      route: `${r._id.method} ${r._id.route}`,
-      avgDuration: Math.round(r.avgDuration),
-      count: r.count,
-    }));
+    recent.forEach(m => {
+      const key = `${m.method} ${m.route}`;
+      const g = groups.get(key) || { totalDuration: 0, count: 0 };
+      g.totalDuration += m.duration;
+      g.count++;
+      groups.set(key, g);
+    });
+
+    return Array.from(groups.entries())
+      .map(([route, data]) => ({
+        route,
+        avgDuration: Math.round(data.totalDuration / data.count),
+        count: data.count,
+      }))
+      .sort((a, b) => b.avgDuration - a.avgDuration)
+      .slice(0, limit);
   } catch {
     return [];
   }
@@ -100,24 +113,23 @@ export async function getSlowEndpoints(limit = 10): Promise<{ route: string; avg
 
 export async function getErrorSummary(hours = 24): Promise<{ code: number; count: number; percentage: number }[]> {
   try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('performance_metrics');
-    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const since = Date.now() - hours * 60 * 60 * 1000;
+    const recentErrors = metricsHistory.filter(m => m.timestamp.getTime() >= since && m.isError);
     
-    const pipeline = [
-      { $match: { timestamp: { $gte: since }, isError: true } },
-      { $group: { _id: '$statusCode', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ];
+    const groups = new Map<number, number>();
+    recentErrors.forEach(m => {
+      groups.set(m.statusCode, (groups.get(m.statusCode) || 0) + 1);
+    });
+
+    const total = recentErrors.length;
     
-    const results = await col.aggregate(pipeline).toArray();
-    const total = results.reduce((sum, r) => sum + r.count, 0);
-    
-    return results.map((r: any) => ({
-      code: r._id,
-      count: r.count,
-      percentage: total ? Math.round((r.count / total) * 100) : 0,
-    }));
+    return Array.from(groups.entries())
+      .map(([code, count]) => ({
+        code,
+        count,
+        percentage: total ? Math.round((count / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   } catch {
     return [];
   }

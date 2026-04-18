@@ -1,5 +1,9 @@
-// In-memory rate limit store (use Redis in production)
+// In-memory rate limit store (use Redis in production for distributed environments)
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Simple in-memory history for stats (capped at 1000 items to avoid memory leaks)
+const rateLimitHistory: Array<{ key: string; endpoint: string; timestamp: Date }> = [];
+const MAX_HISTORY = 1000;
 
 export function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
@@ -19,12 +23,10 @@ export function checkRateLimit(key: string, limit: number, windowMs: number): bo
 }
 
 export async function recordRateLimitHit(key: string, endpoint: string) {
-  try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('rate_limit_hits');
-    await col.insertOne({ key, endpoint, timestamp: new Date() } as any);
-  } catch {
-    // Silent fail
+  // Use in-memory history instead of Mongo to decouple from legacy storage
+  rateLimitHistory.push({ key, endpoint, timestamp: new Date() });
+  if (rateLimitHistory.length > MAX_HISTORY) {
+    rateLimitHistory.shift();
   }
 }
 
@@ -33,50 +35,35 @@ export async function getRateLimitStats(): Promise<{
   uniqueIPs: number;
   mostLimited: Array<{ key: string; count: number }>;
 }> {
-  try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('rate_limit_hits');
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const since = Date.now() - 24 * 60 * 60 * 1000;
+  const recent = rateLimitHistory.filter(h => h.timestamp.getTime() >= since);
+  
+  const counts = new Map<string, number>();
+  recent.forEach(h => counts.set(h.key, (counts.get(h.key) || 0) + 1));
+  
+  const mostLimited = Array.from(counts.entries())
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
     
-    const [totalHits24h, uniqueIPsAgg, mostLimitedAgg] = await Promise.all([
-      col.countDocuments({ timestamp: { $gte: since } }),
-      col.distinct('key', { timestamp: { $gte: since } }),
-      col.aggregate([
-        { $match: { timestamp: { $gte: since } } },
-        { $group: { _id: '$key', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 },
-      ]).toArray(),
-    ]);
-    
-    return {
-      totalHits24h,
-      uniqueIPs: uniqueIPsAgg.length,
-      mostLimited: mostLimitedAgg.map((m: any) => ({ key: m._id, count: m.count })),
-    };
-  } catch {
-    return { totalHits24h: 0, uniqueIPs: 0, mostLimited: [] };
-  }
+  return {
+    totalHits24h: recent.length,
+    uniqueIPs: counts.size,
+    mostLimited,
+  };
 }
 
 export async function getRateLimitByEndpoint(): Promise<{ endpoint: string; hits: number; blocked: number }[]> {
-  try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('rate_limit_hits');
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    const pipeline = [
-      { $match: { timestamp: { $gte: since } } },
-      { $group: { _id: '$endpoint', hits: { $sum: 1 } } },
-      { $sort: { hits: -1 } },
-      { $limit: 20 },
-    ];
-    
-    const results = await col.aggregate(pipeline).toArray();
-    return results.map((r: any) => ({ endpoint: r._id, hits: r.hits, blocked: 0 }));
-  } catch {
-    return [];
-  }
+  const since = Date.now() - 24 * 60 * 60 * 1000;
+  const recent = rateLimitHistory.filter(h => h.timestamp.getTime() >= since);
+  
+  const counts = new Map<string, number>();
+  recent.forEach(h => counts.set(h.endpoint, (counts.get(h.endpoint) || 0) + 1));
+  
+  return Array.from(counts.entries())
+    .map(([endpoint, hits]) => ({ endpoint, hits, blocked: 0 }))
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, 20);
 }
 
 export const rateLimitService = {

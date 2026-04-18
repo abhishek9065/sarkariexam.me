@@ -1,12 +1,10 @@
-import { ObjectId } from 'mongodb';
-
 import { config } from '../config.js';
-
-import { getCollectionAsync } from './cosmosdb.js';
+import { sanitizeForLog } from '../utils/logSanitizer.js';
+import { prismaApp } from './postgres/prisma.js';
 
 /**
  * Security Logger Service
- * Logs security events in-memory and optionally persists to MongoDB.
+ * Logs security events in-memory (latest) and persists to PostgreSQL.
  */
 
 export interface SecurityEvent {
@@ -22,12 +20,7 @@ export interface SecurityEvent {
 }
 
 interface StoredEvent extends SecurityEvent {
-    id: number;
-    created_at: Date;
-}
-
-interface SecurityLogDoc extends SecurityEvent {
-    id: number;
+    id: string; // Changed to string (CUID) to match Postgres
     created_at: Date;
 }
 
@@ -39,15 +32,11 @@ export interface SecurityLogFilters {
     end?: Date;
 }
 
-// In-memory store for security logs
+// In-memory store for recent security logs
 const securityLogs: StoredEvent[] = [];
-const MAX_LOGS = 1000;
-let eventCounter = 0;
+const MAX_MEMORY_LOGS = 500;
 const securityLogRetentionMs = config.securityLogRetentionHours * 60 * 60 * 1000;
 const securityLogDbRetentionMs = config.securityLogDbRetentionDays * 24 * 60 * 60 * 1000;
-
-const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const toCaseInsensitiveRegex = (value: string) => ({ $regex: escapeRegex(value), $options: 'i' });
 
 const applyMemoryFilters = (logs: StoredEvent[], filters: SecurityLogFilters): StoredEvent[] => {
     const eventType = filters.eventType?.trim();
@@ -67,68 +56,36 @@ const applyMemoryFilters = (logs: StoredEvent[], filters: SecurityLogFilters): S
     });
 };
 
-const buildDbQuery = (filters: SecurityLogFilters): Record<string, any> => {
-    const query: Record<string, any> = {};
-    const eventType = filters.eventType?.trim();
-    const ipAddress = filters.ipAddress?.trim();
-    const endpoint = filters.endpoint?.trim();
-
-    if (eventType) {
-        query.event_type = eventType;
-    }
-    if (ipAddress) {
-        query.ip_address = toCaseInsensitiveRegex(ipAddress);
-    }
-    if (endpoint) {
-        query.endpoint = toCaseInsensitiveRegex(endpoint);
-    }
-    if (filters.start || filters.end) {
-        query.created_at = {};
-        if (filters.start) query.created_at.$gte = filters.start;
-        if (filters.end) query.created_at.$lte = filters.end;
-    }
-
-    return query;
-};
-
-const mapDocToStoredEvent = (doc: SecurityLogDoc & { _id?: ObjectId }): StoredEvent => ({
-    id: Number(doc.id ?? 0),
-    ip_address: doc.ip_address,
-    event_type: doc.event_type,
-    endpoint: doc.endpoint,
-    metadata: doc.metadata,
-    incidentStatus: doc.incidentStatus,
-    assigneeEmail: doc.assigneeEmail ?? null,
-    note: doc.note ?? null,
-    created_at: new Date(doc.created_at),
-});
-
-const persistSecurityEvent = async (event: StoredEvent): Promise<void> => {
-    if (!config.securityLogPersistenceEnabled) return;
+const persistSecurityEvent = async (event: SecurityEvent): Promise<string | null> => {
+    if (!config.securityLogPersistenceEnabled) return null;
     try {
-        const collection = await getCollectionAsync<SecurityLogDoc>('security_logs');
-        await collection.insertOne({
-            id: event.id,
-            ip_address: event.ip_address,
-            event_type: event.event_type,
-            endpoint: event.endpoint,
-            metadata: event.metadata,
-            incidentStatus: event.incidentStatus ?? 'new',
-            assigneeEmail: event.assigneeEmail ?? null,
-            note: event.note ?? null,
-            created_at: event.created_at,
-        } as SecurityLogDoc);
+        const doc = await prismaApp.securityLog.create({
+            data: {
+                ipAddress: event.ip_address,
+                eventType: event.event_type,
+                endpoint: event.endpoint,
+                metadata: event.metadata || {},
+                incidentStatus: event.incidentStatus ?? 'new',
+                assigneeEmail: event.assigneeEmail ?? null,
+                note: event.note ?? null,
+            },
+        });
+        return doc.id;
     } catch (error) {
-        console.warn('[SecurityLogger] Failed to persist event:', error);
+        console.warn('[SecurityLogger] Failed to persist event to Postgres:', error);
+        return null;
     }
 };
 
 export class SecurityLogger {
-    static log(event: SecurityEvent): void {
+    static async log(event: SecurityEvent): Promise<void> {
         try {
+            // Persist to DB first to get a real ID
+            const dbId = await persistSecurityEvent(event);
+
             const storedEvent: StoredEvent = {
                 ...event,
-                id: ++eventCounter,
+                id: dbId || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                 incidentStatus: event.incidentStatus ?? 'new',
                 assigneeEmail: event.assigneeEmail ?? null,
                 note: event.note ?? null,
@@ -137,15 +94,15 @@ export class SecurityLogger {
 
             securityLogs.unshift(storedEvent);
 
-            // Keep only last MAX_LOGS entries
-            if (securityLogs.length > MAX_LOGS) {
+            // Keep only last MAX_LOGS entries in memory
+            if (securityLogs.length > MAX_MEMORY_LOGS) {
                 securityLogs.pop();
             }
 
-            void persistSecurityEvent(storedEvent);
-
             // Also console log for visibility
-            console.log(`[Security] ${event.event_type}: ${event.ip_address} -> ${event.endpoint}`);
+            console.log(
+                `[Security] ${sanitizeForLog(event.event_type, 40)}: ${sanitizeForLog(event.ip_address, 64)} -> ${sanitizeForLog(event.endpoint, 200)}`
+            );
         } catch (error) {
             console.error('Failed to log security event:', error);
         }
@@ -169,24 +126,43 @@ export class SecurityLogger {
 
         if (config.securityLogPersistenceEnabled) {
             try {
-                const collection = await getCollectionAsync<SecurityLogDoc>('security_logs');
-                const query = buildDbQuery(filters);
+                const where: any = {};
+                if (filters.eventType) where.eventType = filters.eventType;
+                if (filters.ipAddress) where.ipAddress = { contains: filters.ipAddress, mode: 'insensitive' };
+                if (filters.endpoint) where.endpoint = { contains: filters.endpoint, mode: 'insensitive' };
+                if (filters.start || filters.end) {
+                    where.createdAt = {};
+                    if (filters.start) where.createdAt.gte = filters.start;
+                    if (filters.end) where.createdAt.lte = filters.end;
+                }
+
                 const [docs, total] = await Promise.all([
-                    collection
-                        .find(query)
-                        .sort({ created_at: -1 })
-                        .skip(normalizedOffset)
-                        .limit(normalizedLimit)
-                        .toArray(),
-                    collection.countDocuments(query),
+                    prismaApp.securityLog.findMany({
+                        where,
+                        orderBy: { createdAt: 'desc' },
+                        skip: normalizedOffset,
+                        take: normalizedLimit,
+                    }),
+                    prismaApp.securityLog.count({ where }),
                 ]);
+
                 return {
-                    data: docs.map((doc) => mapDocToStoredEvent(doc as SecurityLogDoc)),
+                    data: docs.map((doc: any) => ({
+                        id: doc.id,
+                        ip_address: doc.ipAddress,
+                        event_type: doc.eventType,
+                        endpoint: doc.endpoint,
+                        metadata: doc.metadata,
+                        incidentStatus: doc.incidentStatus,
+                        assigneeEmail: doc.assigneeEmail,
+                        note: doc.note,
+                        created_at: doc.createdAt,
+                    })),
                     total,
                     source: 'database',
                 };
             } catch (error) {
-                console.warn('[SecurityLogger] Failed to query persisted logs, falling back to memory:', error);
+                console.warn('[SecurityLogger] Failed to query Postgres logs, falling back to memory:', error);
             }
         }
 
@@ -199,7 +175,7 @@ export class SecurityLogger {
     }
 
     static async updateIncident(
-        id: number,
+        id: string,
         patch: {
             incidentStatus?: 'new' | 'investigating' | 'resolved';
             assigneeEmail?: string | null;
@@ -213,25 +189,29 @@ export class SecurityLogger {
             if (patch.note !== undefined) memoryEvent.note = patch.note;
         }
 
-        if (config.securityLogPersistenceEnabled) {
+        if (config.securityLogPersistenceEnabled && !id.startsWith('mem_')) {
             try {
-                const collection = await getCollectionAsync<SecurityLogDoc>('security_logs');
-                await collection.updateOne(
-                    { id },
-                    {
-                        $set: {
-                            ...(patch.incidentStatus !== undefined ? { incidentStatus: patch.incidentStatus } : {}),
-                            ...(patch.assigneeEmail !== undefined ? { assigneeEmail: patch.assigneeEmail } : {}),
-                            ...(patch.note !== undefined ? { note: patch.note } : {}),
-                        },
-                    }
-                );
-                const updated = await collection.findOne({ id });
-                if (updated) {
-                    return mapDocToStoredEvent(updated as SecurityLogDoc);
-                }
+                const updated = await prismaApp.securityLog.update({
+                    where: { id },
+                    data: {
+                        ...(patch.incidentStatus !== undefined ? { incidentStatus: patch.incidentStatus } : {}),
+                        ...(patch.assigneeEmail !== undefined ? { assigneeEmail: patch.assigneeEmail } : {}),
+                        ...(patch.note !== undefined ? { note: patch.note } : {}),
+                    },
+                });
+                return {
+                    id: updated.id,
+                    ip_address: updated.ipAddress,
+                    event_type: updated.eventType,
+                    endpoint: updated.endpoint,
+                    metadata: updated.metadata,
+                    incidentStatus: updated.incidentStatus,
+                    assigneeEmail: updated.assigneeEmail,
+                    note: updated.note,
+                    created_at: updated.createdAt,
+                };
             } catch (error) {
-                console.warn('[SecurityLogger] Failed to update persisted incident state:', error);
+                console.warn('[SecurityLogger] Failed to update Postgres incident state:', error);
             }
         }
 
@@ -249,13 +229,14 @@ export class SecurityLogger {
     static async clearOldLogsFromDb(olderThanMs: number = securityLogDbRetentionMs): Promise<void> {
         if (!config.securityLogPersistenceEnabled) return;
         try {
-            const collection = await getCollectionAsync<SecurityLogDoc>('security_logs');
             const cutoff = new Date(Date.now() - olderThanMs);
-            await collection.deleteMany({
-                created_at: { $lt: cutoff },
+            await prismaApp.securityLog.deleteMany({
+                where: {
+                    createdAt: { lt: cutoff },
+                },
             });
         } catch (error) {
-            console.warn('[SecurityLogger] Failed to cleanup persisted logs:', error);
+            console.warn('[SecurityLogger] Failed to cleanup Postgres logs:', error);
         }
     }
 }

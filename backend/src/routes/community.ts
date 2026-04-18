@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 
 import { optionalAuth } from '../middleware/auth.js';
@@ -6,6 +7,13 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import CommunityModelPostgres from '../models/community.postgres.js';
 
 const router = Router();
+
+router.use(expressRateLimit({
+    windowMs: 60 * 1000,
+    limit: 180,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 const listQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(50).optional(),

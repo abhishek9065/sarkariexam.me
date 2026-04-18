@@ -518,6 +518,28 @@ export class ProfileModelPostgres {
     return rows.map((row) => toTrackedRecord(row));
   }
 
+  static async listDueTrackedApplications(args: {
+    now: Date;
+    horizon: Date;
+    limit: number;
+  }): Promise<TrackedApplicationRecord[]> {
+    const rows = await prismaApp.trackedApplicationEntry.findMany({
+      where: {
+        deadline: {
+          gte: args.now,
+          lte: args.horizon,
+        },
+        OR: [
+          { reminderAt: null },
+          { reminderAt: { lte: args.now } },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: args.limit,
+    });
+    return rows.map((row) => toTrackedRecord(row));
+  }
+
   static async upsertTrackedApplicationBySlug(userId: string, payload: {
     announcementId?: string;
     slug: string;

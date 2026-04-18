@@ -1,7 +1,7 @@
-import type { Collection } from 'mongodb';
+import { WorkflowStatus } from '@prisma/client';
 
 import { classifySource, normalizeAttribution } from './attribution.js';
-import { getCollection } from './cosmosdb.js';
+import { prismaApp } from './postgres/prisma.js';
 
 export type AnalyticsEventType =
     | 'announcement_view'
@@ -24,53 +24,12 @@ export type AnalyticsEventType =
     | 'push_subscribe_success'
     | 'push_subscribe_failure';
 
-interface AnalyticsEventDoc {
-    type: AnalyticsEventType;
-    createdAt: Date;
-    announcementId?: string;
-    userId?: string;
-    metadata?: Record<string, unknown>;
-}
-
-interface AnalyticsRollupDoc {
-    date: string;
-    viewCount: number;
-    listingViews: number;
-    cardClicks: number;
-    categoryClicks: number;
-    filterApplies: number;
-    searchCount: number;
-    bookmarkAdds: number;
-    bookmarkRemoves: number;
-    registrations: number;
-    subscriptionsVerified: number;
-    subscriptionsUnsubscribed: number;
-    savedSearches: number;
-    digestPreviews: number;
-    digestClicks: number;
-    deepLinkClicks: number;
-    alertsViewed: number;
-    pushSubscribeAttempts: number;
-    pushSubscribeSuccesses: number;
-    pushSubscribeFailures: number;
-    announcementCount: number;
-    updatedAt: Date;
-}
-
 const DEFAULT_ROLLUP_DAYS = 30;
 const DEFAULT_ROLLUP_INTERVAL_MS = 15 * 60 * 1000;
 
 let rollupInterval: NodeJS.Timeout | null = null;
 
 const getDateKey = (date: Date): string => date.toISOString().slice(0, 10);
-
-const getCollectionSafe = <T>(name: string): Collection<T> | null => {
-    try {
-        return getCollection<T>(name);
-    } catch {
-        return null;
-    }
-};
 
 const TRAFFIC_SOURCE_LABELS = {
     seo: 'Organic',
@@ -114,75 +73,56 @@ export async function recordAnalyticsEvent(input: {
     userId?: string;
     metadata?: Record<string, unknown>;
 }): Promise<void> {
-    const collection = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!collection) return;
-
     try {
-        await collection.insertOne({
-            type: input.type,
-            announcementId: input.announcementId,
-            userId: input.userId,
-            metadata: input.metadata,
-            createdAt: new Date(),
-        } as AnalyticsEventDoc);
+        await prismaApp.analyticsEvent.create({
+            data: {
+                type: input.type,
+                announcementId: input.announcementId,
+                userId: input.userId,
+                metadata: input.metadata || {},
+            },
+        });
     } catch (error) {
-        console.error('[Analytics] Failed to record event:', error);
+        console.error('[Analytics] Failed to record event in Postgres:', error);
     }
 }
 
 export async function getTopSearches(days: number = DEFAULT_ROLLUP_DAYS, limit = 10): Promise<Array<{ query: string; count: number }>> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) return [];
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
     try {
-        const rows = await events.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: start },
-                    type: 'search',
-                    'metadata.query': { $exists: true, $type: 'string', $ne: '' },
-                },
-            },
-            {
-                $group: {
-                    _id: '$metadata.query',
-                    count: { $sum: 1 },
-                },
-            },
-            { $sort: { count: -1 } },
-            { $limit: Math.max(1, Math.min(50, limit)) },
-            {
-                $project: {
-                    _id: 0,
-                    query: '$_id',
-                    count: 1,
-                },
-            },
-        ]).toArray();
+        const rows = await prismaApp.$queryRaw`
+            SELECT (metadata->>'query') as query, CAST(COUNT(*) AS INTEGER) as count
+            FROM app_analytics_events
+            WHERE type = 'search'
+              AND created_at >= ${start}
+              AND metadata->>'query' IS NOT NULL
+              AND metadata->>'query' != ''
+            GROUP BY metadata->>'query'
+            ORDER BY count DESC
+            LIMIT ${Math.max(1, Math.min(50, limit))}
+        ` as Array<{ query: string; count: number }>;
 
-        return rows as Array<{ query: string; count: number }>;
+        return rows;
     } catch (error) {
-        console.error('[Analytics] Failed to load top searches:', error);
+        console.error('[Analytics] Failed to load top searches from Postgres:', error);
         return [];
     }
 }
 
 export async function getRecentEngagementCount(windowMinutes: number = 5): Promise<number> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) return 0;
-
     const safeWindowMinutes = Math.max(1, Math.min(120, Math.round(windowMinutes)));
     const start = new Date(Date.now() - safeWindowMinutes * 60 * 1000);
 
     try {
-        return await events.countDocuments({
-            createdAt: { $gte: start },
-            type: {
-                $in: ['announcement_view', 'listing_view', 'search'] as AnalyticsEventType[],
+        return await prismaApp.analyticsEvent.count({
+            where: {
+                createdAt: { gte: start },
+                type: {
+                    in: ['announcement_view', 'listing_view', 'search'],
+                },
             },
         });
     } catch (error) {
@@ -195,46 +135,24 @@ export async function getGeoStateActivity(hours: number = 24, limit: number = 20
     state: string;
     users: number;
 }>> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) return [];
-
-    const safeHours = Math.max(1, Math.min(168, Math.round(hours)));
-    const safeLimit = Math.max(1, Math.min(100, Math.round(limit)));
-    const start = new Date(Date.now() - safeHours * 60 * 60 * 1000);
+    const start = new Date(Date.now() - hours * 60 * 60 * 1000);
 
     try {
-        const rows = await events.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: start },
-                    type: {
-                        $in: ['announcement_view', 'listing_view'] as AnalyticsEventType[],
-                    },
-                    'metadata.state': {
-                        $exists: true,
-                        $type: 'string',
-                        $ne: '',
-                    },
-                },
-            },
-            {
-                $group: {
-                    _id: '$metadata.state',
-                    users: { $sum: 1 },
-                },
-            },
-            { $sort: { users: -1 } },
-            { $limit: safeLimit },
-        ]).toArray();
+        const rows = await prismaApp.$queryRaw`
+            SELECT (metadata->>'state') as state, CAST(COUNT(*) AS INTEGER) as users
+            FROM app_analytics_events
+            WHERE type IN ('announcement_view', 'listing_view')
+              AND created_at >= ${start}
+              AND metadata->>'state' IS NOT NULL
+              AND metadata->>'state' != ''
+            GROUP BY metadata->>'state'
+            ORDER BY users DESC
+            LIMIT ${limit}
+        ` as Array<{ state: string; users: number }>;
 
-        return rows
-            .map((row) => ({
-                state: String((row as { _id?: unknown })._id || '').trim(),
-                users: Number((row as { users?: unknown }).users || 0),
-            }))
-            .filter((row) => row.state.length > 0 && Number.isFinite(row.users) && row.users > 0);
+        return rows;
     } catch (error) {
-        console.error('[Analytics] Failed to load geo state activity:', error);
+        console.error('[Analytics] Failed to load geo activity from Postgres:', error);
         return [];
     }
 }
@@ -245,50 +163,24 @@ export async function getFunnelAttributionSplit(days: number = DEFAULT_ROLLUP_DA
     detailViewsDirect: number;
     detailViewsUnattributed: number;
 }> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) {
-        return {
-            totalCardClicks: 0,
-            cardClicksInApp: 0,
-            detailViewsDirect: 0,
-            detailViewsUnattributed: 0,
-        };
-    }
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
     try {
         const [cardClickRows, detailViewRows] = await Promise.all([
-            events.aggregate([
-                {
-                    $match: {
-                        type: 'card_click',
-                        createdAt: { $gte: start },
-                    },
-                },
-                {
-                    $group: {
-                        _id: { $ifNull: ['$metadata.source', '__none__'] },
-                        count: { $sum: 1 },
-                    },
-                },
-            ]).toArray(),
-            events.aggregate([
-                {
-                    $match: {
-                        type: 'announcement_view',
-                        createdAt: { $gte: start },
-                    },
-                },
-                {
-                    $group: {
-                        _id: { $ifNull: ['$metadata.source', '__none__'] },
-                        count: { $sum: 1 },
-                    },
-                },
-            ]).toArray(),
+            prismaApp.$queryRaw`
+                SELECT COALESCE(metadata->>'source', '__none__') as source, CAST(COUNT(*) AS INTEGER) as count
+                FROM app_analytics_events
+                WHERE type = 'card_click' AND created_at >= ${start}
+                GROUP BY metadata->>'source'
+            ` as Promise<Array<{ source: string; count: number }>>,
+            prismaApp.$queryRaw`
+                SELECT COALESCE(metadata->>'source', '__none__') as source, CAST(COUNT(*) AS INTEGER) as count
+                FROM app_analytics_events
+                WHERE type = 'announcement_view' AND created_at >= ${start}
+                GROUP BY metadata->>'source'
+            ` as Promise<Array<{ source: string; count: number }>>,
         ]);
 
         let totalCardClicks = 0;
@@ -297,96 +189,63 @@ export async function getFunnelAttributionSplit(days: number = DEFAULT_ROLLUP_DA
         let detailViewsUnattributed = 0;
 
         for (const row of cardClickRows) {
-            const count = Number(row.count ?? 0);
-            if (!Number.isFinite(count) || count <= 0) continue;
-
-            totalCardClicks += count;
-
-            const source = row._id === '__none__' ? null : String(row._id);
-            const sourceClass = classifySource(source);
-            if (sourceClass === 'in_app') {
-                cardClicksInApp += count;
-            }
+            totalCardClicks += row.count;
+            const sourceClass = classifySource(row.source === '__none__' ? null : row.source);
+            if (sourceClass === 'in_app') cardClicksInApp += row.count;
         }
 
         for (const row of detailViewRows) {
-            const count = Number(row.count ?? 0);
-            if (!Number.isFinite(count) || count <= 0) continue;
-
-            const source = row._id === '__none__' ? null : String(row._id);
-            const sourceClass = classifySource(source);
-            if (sourceClass === 'direct') {
-                detailViewsDirect += count;
-            } else if (sourceClass !== 'in_app') {
-                detailViewsUnattributed += count;
-            }
+            const sourceClass = classifySource(row.source === '__none__' ? null : row.source);
+            if (sourceClass === 'direct') detailViewsDirect += row.count;
+            else if (sourceClass !== 'in_app') detailViewsUnattributed += row.count;
         }
 
-        return {
-            totalCardClicks,
-            cardClicksInApp,
-            detailViewsDirect,
-            detailViewsUnattributed,
-        };
+        return { totalCardClicks, cardClicksInApp, detailViewsDirect, detailViewsUnattributed };
     } catch (error) {
-        console.error('[Analytics] Failed to load funnel attribution split:', error);
-        return {
-            totalCardClicks: 0,
-            cardClicksInApp: 0,
-            detailViewsDirect: 0,
-            detailViewsUnattributed: 0,
-        };
+        console.error('[Analytics] Failed funnel split from Postgres:', error);
+        return { totalCardClicks: 0, cardClicksInApp: 0, detailViewsDirect: 0, detailViewsUnattributed: 0 };
     }
 }
 
+async function buildPublishedPostCountMap(start: Date): Promise<Map<string, number>> {
+    const rows = await prismaApp.post.findMany({
+        where: {
+            status: WorkflowStatus.PUBLISHED,
+            publishedAt: { gte: start },
+        },
+        select: { publishedAt: true },
+    });
+
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+        if (!row.publishedAt) continue;
+        const dateKey = getDateKey(row.publishedAt);
+        counts.set(dateKey, (counts.get(dateKey) ?? 0) + 1);
+    }
+    return counts;
+}
+
 export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promise<void> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');
-    const announcements = getCollectionSafe<any>('announcements');
-
-    if (!events || !rollups || !announcements) return;
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const [eventAgg, postAgg] = await Promise.all([
-        events.aggregate([
-            { $match: { createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: {
-                        date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' } },
-                        type: '$type',
-                    },
-                    count: { $sum: 1 }
-                }
-            }
-        ]).toArray(),
-        announcements.aggregate([
-            { $match: { postedAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: {
-                        $dateToString: { format: '%Y-%m-%d', date: '$postedAt', timezone: 'UTC' }
-                    },
-                    count: { $sum: 1 }
-                }
-            }
-        ]).toArray()
-    ]);
+    const eventAgg = await prismaApp.analyticsEvent.groupBy({
+        by: ['type', 'createdAt'],
+        where: { createdAt: { gte: start } },
+        _count: { _all: true },
+    });
 
     const eventMap = new Map<string, Partial<Record<AnalyticsEventType, number>>>();
     for (const entry of eventAgg) {
-        const id = entry._id as { date: string; type: AnalyticsEventType };
-        if (!id?.date || !id?.type) continue;
-        const bucket = eventMap.get(id.date) ?? {};
-        bucket[id.type] = entry.count as number;
-        eventMap.set(id.date, bucket);
+        const dateKey = getDateKey(entry.createdAt);
+        const type = entry.type as AnalyticsEventType;
+        const bucket = eventMap.get(dateKey) ?? {};
+        bucket[type] = (bucket[type] ?? 0) + entry._count._all;
+        eventMap.set(dateKey, bucket);
     }
 
-    const postMap = new Map(postAgg.map(entry => [entry._id as string, entry.count as number]));
-
+    const postMap = await buildPublishedPostCountMap(start);
     const now = new Date();
 
     for (let i = 0; i < days; i++) {
@@ -395,36 +254,56 @@ export async function rollupAnalytics(days: number = DEFAULT_ROLLUP_DAYS): Promi
         const dateKey = getDateKey(date);
 
         const counts = eventMap.get(dateKey) ?? {};
-        await rollups.updateOne(
-            { date: dateKey },
-            {
-                $set: {
-                    date: dateKey,
-                    viewCount: counts.announcement_view ?? 0,
-                    listingViews: counts.listing_view ?? 0,
-                    cardClicks: counts.card_click ?? 0,
-                    categoryClicks: counts.category_click ?? 0,
-                    filterApplies: counts.filter_apply ?? 0,
-                    searchCount: counts.search ?? 0,
-                    bookmarkAdds: counts.bookmark_add ?? 0,
-                    bookmarkRemoves: counts.bookmark_remove ?? 0,
-                    registrations: counts.auth_register ?? 0,
-                    subscriptionsVerified: counts.subscription_verify ?? 0,
-                    subscriptionsUnsubscribed: counts.subscription_unsubscribe ?? 0,
-                    savedSearches: counts.saved_search_create ?? 0,
-                    digestPreviews: counts.digest_preview ?? 0,
-                    digestClicks: counts.digest_click ?? 0,
-                    deepLinkClicks: counts.deep_link_click ?? 0,
-                    alertsViewed: counts.alerts_view ?? 0,
-                    pushSubscribeAttempts: counts.push_subscribe_attempt ?? 0,
-                    pushSubscribeSuccesses: counts.push_subscribe_success ?? 0,
-                    pushSubscribeFailures: counts.push_subscribe_failure ?? 0,
-                    announcementCount: postMap.get(dateKey) ?? 0,
-                    updatedAt: now,
-                }
+        await prismaApp.analyticsRollup.upsert({
+            where: { date: dateKey },
+            update: {
+                viewCount: counts.announcement_view ?? 0,
+                listingViews: counts.listing_view ?? 0,
+                cardClicks: counts.card_click ?? 0,
+                categoryClicks: counts.category_click ?? 0,
+                filterApplies: counts.filter_apply ?? 0,
+                searchCount: counts.search ?? 0,
+                bookmarkAdds: counts.bookmark_add ?? 0,
+                bookmarkRemoves: counts.bookmark_remove ?? 0,
+                registrations: counts.auth_register ?? 0,
+                subscriptionsVerified: counts.subscription_verify ?? 0,
+                subscriptionsUnsubscribed: counts.subscription_unsubscribe ?? 0,
+                savedSearches: counts.saved_search_create ?? 0,
+                digestPreviews: counts.digest_preview ?? 0,
+                digestClicks: counts.digest_click ?? 0,
+                deepLinkClicks: counts.deep_link_click ?? 0,
+                alertsViewed: counts.alerts_view ?? 0,
+                pushSubscribeAttempts: counts.push_subscribe_attempt ?? 0,
+                pushSubscribeSuccesses: counts.push_subscribe_success ?? 0,
+                pushSubscribeFailures: counts.push_subscribe_failure ?? 0,
+                announcementCount: postMap.get(dateKey) ?? 0,
+                updatedAt: now,
             },
-            { upsert: true }
-        );
+            create: {
+                date: dateKey,
+                viewCount: counts.announcement_view ?? 0,
+                listingViews: counts.listing_view ?? 0,
+                cardClicks: counts.card_click ?? 0,
+                categoryClicks: counts.category_click ?? 0,
+                filterApplies: counts.filter_apply ?? 0,
+                searchCount: counts.search ?? 0,
+                bookmarkAdds: counts.bookmark_add ?? 0,
+                bookmarkRemoves: counts.bookmark_remove ?? 0,
+                registrations: counts.auth_register ?? 0,
+                subscriptionsVerified: counts.subscription_verify ?? 0,
+                subscriptionsUnsubscribed: counts.subscription_unsubscribe ?? 0,
+                savedSearches: counts.saved_search_create ?? 0,
+                digestPreviews: counts.digest_preview ?? 0,
+                digestClicks: counts.digest_click ?? 0,
+                deepLinkClicks: counts.deep_link_click ?? 0,
+                alertsViewed: counts.alerts_view ?? 0,
+                pushSubscribeAttempts: counts.push_subscribe_attempt ?? 0,
+                pushSubscribeSuccesses: counts.push_subscribe_success ?? 0,
+                pushSubscribeFailures: counts.push_subscribe_failure ?? 0,
+                announcementCount: postMap.get(dateKey) ?? 0,
+                updatedAt: now,
+            }
+        });
     }
 }
 
@@ -440,17 +319,14 @@ export async function getDailyRollups(days: number = 14): Promise<Array<{
     bookmarkAdds: number;
     registrations: number;
 }>> {
-    const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');
-    if (!rollups) return [];
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const docs = await rollups
-        .find({ date: { $gte: getDateKey(start) } })
-        .sort({ date: 1 })
-        .toArray();
+    const docs = await prismaApp.analyticsRollup.findMany({
+        where: { date: { gte: getDateKey(start) } },
+        orderBy: { date: 'asc' },
+    });
 
     const map = new Map(docs.map(doc => [doc.date, doc]));
     const results: Array<{
@@ -492,38 +368,23 @@ export async function getTopAnnouncementViews(hours: number = 24, limit: number 
     announcementId: string;
     views: number;
 }>> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) return [];
-
     const start = new Date(Date.now() - hours * 60 * 60 * 1000);
 
     try {
-        const rows = await events.aggregate([
-            {
-                $match: {
-                    type: 'announcement_view',
-                    createdAt: { $gte: start },
-                    announcementId: { $exists: true, $ne: null },
-                },
-            },
-            {
-                $group: {
-                    _id: '$announcementId',
-                    views: { $sum: 1 },
-                },
-            },
-            { $sort: { views: -1 } },
-            { $limit: limit },
-        ]).toArray();
+        const rows = await prismaApp.$queryRaw`
+            SELECT announcement_id as "announcementId", CAST(COUNT(*) AS INTEGER) as views
+            FROM app_analytics_events
+            WHERE type = 'announcement_view'
+              AND created_at >= ${start}
+              AND announcement_id IS NOT NULL
+            GROUP BY announcement_id
+            ORDER BY views DESC
+            LIMIT ${limit}
+        ` as Array<{ announcementId: string; views: number }>;
 
-        return rows
-            .map((row) => ({
-                announcementId: String((row as { _id?: unknown })._id ?? ''),
-                views: Number((row as { views?: unknown }).views ?? 0),
-            }))
-            .filter((row) => row.announcementId && Number.isFinite(row.views) && row.views > 0);
+        return rows;
     } catch (error) {
-        console.error('[Analytics] Failed to load top announcement views:', error);
+        console.error('[Analytics] Failed top views from Postgres:', error);
         return [];
     }
 }
@@ -533,45 +394,28 @@ export async function getAnnouncementViewTrafficSources(days: number = 7, limit:
     label: string;
     views: number;
 }>> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) return [];
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
     try {
-        const rows = await events.aggregate([
-            {
-                $match: {
-                    type: 'announcement_view',
-                    createdAt: { $gte: start },
-                },
-            },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.source', '__none__'] },
-                    views: { $sum: 1 },
-                },
-            },
-        ]).toArray();
+        const rows = await prismaApp.$queryRaw`
+            SELECT COALESCE(metadata->>'source', '__none__') as source, CAST(COUNT(*) AS INTEGER) as views
+            FROM app_analytics_events
+            WHERE type = 'announcement_view' AND created_at >= ${start}
+            GROUP BY metadata->>'source'
+        ` as Array<{ source: string; views: number }>;
 
         const buckets = new Map<TrafficSourceBucket, { source: string; label: string; views: number }>();
 
         for (const row of rows) {
-            const views = Number((row as { views?: unknown }).views ?? 0);
-            if (!Number.isFinite(views) || views <= 0) continue;
-
-            const rawSource = (row as { _id?: unknown })._id === '__none__'
-                ? null
-                : String((row as { _id?: unknown })._id ?? '');
-            const bucket = toTrafficSourceBucket(rawSource);
+            const bucket = toTrafficSourceBucket(row.source === '__none__' ? null : row.source);
             const existing = buckets.get(bucket) ?? {
                 source: bucket,
                 label: TRAFFIC_SOURCE_LABELS[bucket],
                 views: 0,
             };
-            existing.views += views;
+            existing.views += row.views;
             buckets.set(bucket, existing);
         }
 
@@ -579,7 +423,7 @@ export async function getAnnouncementViewTrafficSources(days: number = 7, limit:
             .sort((a, b) => b.views - a.views)
             .slice(0, limit);
     } catch (error) {
-        console.error('[Analytics] Failed to load announcement traffic sources:', error);
+        console.error('[Analytics] Failed traffic sources from Postgres:', error);
         return [];
     }
 }
@@ -607,118 +451,15 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
     pushSubscribeSuccesses: number;
     pushSubscribeFailures: number;
 }> {
-    const rollups = getCollectionSafe<AnalyticsRollupDoc>('analytics_rollups');
-    if (!rollups) {
-        return {
-            days,
-            lastUpdatedAt: null,
-            viewCount: 0,
-            listingViews: 0,
-            cardClicks: 0,
-            categoryClicks: 0,
-            filterApplies: 0,
-            searchCount: 0,
-            bookmarkAdds: 0,
-            bookmarkRemoves: 0,
-            registrations: 0,
-            subscriptionsVerified: 0,
-            subscriptionsUnsubscribed: 0,
-            savedSearches: 0,
-            digestPreviews: 0,
-            digestClicks: 0,
-            deepLinkClicks: 0,
-            alertsViewed: 0,
-            pushSubscribeAttempts: 0,
-            pushSubscribeSuccesses: 0,
-            pushSubscribeFailures: 0,
-        };
-    }
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const docs = await rollups
-        .find({ date: { $gte: getDateKey(start) } })
-        .toArray();
+    const docs = await prismaApp.analyticsRollup.findMany({
+        where: { date: { gte: getDateKey(start) } },
+    });
 
-    if (docs.length === 0) {
-        const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-        if (!events) {
-            return {
-                days,
-                lastUpdatedAt: null,
-                viewCount: 0,
-                listingViews: 0,
-                cardClicks: 0,
-                categoryClicks: 0,
-                filterApplies: 0,
-                searchCount: 0,
-                bookmarkAdds: 0,
-                bookmarkRemoves: 0,
-                registrations: 0,
-                subscriptionsVerified: 0,
-                subscriptionsUnsubscribed: 0,
-                savedSearches: 0,
-                digestPreviews: 0,
-                digestClicks: 0,
-                deepLinkClicks: 0,
-                alertsViewed: 0,
-                pushSubscribeAttempts: 0,
-                pushSubscribeSuccesses: 0,
-                pushSubscribeFailures: 0,
-            };
-        }
-
-        try {
-            const eventAgg = await events.aggregate([
-                { $match: { createdAt: { $gte: start } } },
-                {
-                    $group: {
-                        _id: '$type',
-                        count: { $sum: 1 }
-                    }
-                }
-            ]).toArray();
-
-            const counts = new Map<AnalyticsEventType, number>();
-            for (const entry of eventAgg) {
-                const type = entry._id as AnalyticsEventType;
-                if (!type) continue;
-                counts.set(type, entry.count as number);
-            }
-
-            const getCount = (type: AnalyticsEventType) => counts.get(type) ?? 0;
-
-            return {
-                days,
-                lastUpdatedAt: null,
-                viewCount: getCount('announcement_view'),
-                listingViews: getCount('listing_view'),
-                cardClicks: getCount('card_click'),
-                categoryClicks: getCount('category_click'),
-                filterApplies: getCount('filter_apply'),
-                searchCount: getCount('search'),
-                bookmarkAdds: getCount('bookmark_add'),
-                bookmarkRemoves: getCount('bookmark_remove'),
-                registrations: getCount('auth_register'),
-                subscriptionsVerified: getCount('subscription_verify'),
-                subscriptionsUnsubscribed: getCount('subscription_unsubscribe'),
-                savedSearches: getCount('saved_search_create'),
-                digestPreviews: getCount('digest_preview'),
-                digestClicks: getCount('digest_click'),
-                deepLinkClicks: getCount('deep_link_click'),
-                alertsViewed: getCount('alerts_view'),
-                pushSubscribeAttempts: getCount('push_subscribe_attempt'),
-                pushSubscribeSuccesses: getCount('push_subscribe_success'),
-                pushSubscribeFailures: getCount('push_subscribe_failure'),
-            };
-        } catch (error) {
-            console.error('[Analytics] Rollup fallback failed:', error);
-        }
-    }
-
-    return docs.reduce((acc, doc) => {
+    const summary = docs.reduce((acc, doc) => {
         const updatedAt = doc.updatedAt ? doc.updatedAt.toISOString() : null;
         const lastUpdatedAt = updatedAt && (!acc.lastUpdatedAt || updatedAt > acc.lastUpdatedAt)
             ? updatedAt
@@ -770,6 +511,8 @@ export async function getRollupSummary(days: number = DEFAULT_ROLLUP_DAYS): Prom
         pushSubscribeSuccesses: 0,
         pushSubscribeFailures: 0,
     });
+
+    return summary;
 }
 
 export async function getCtrByType(days: number = DEFAULT_ROLLUP_DAYS): Promise<Array<{
@@ -778,60 +521,40 @@ export async function getCtrByType(days: number = DEFAULT_ROLLUP_DAYS): Promise<
     cardClicks: number;
     ctr: number;
 }>> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) return [];
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const [listingAgg, clickAgg] = await Promise.all([
-        events.aggregate([
-            {
-                $match: {
-                    type: 'listing_view',
-                    createdAt: { $gte: start },
-                    'metadata.type': { $exists: true, $ne: null }
-                }
-            },
-            {
-                $group: {
-                    _id: '$metadata.type',
-                    count: { $sum: 1 }
-                }
-            }
-        ]).toArray(),
-        events.aggregate([
-            {
-                $match: {
-                    type: 'card_click',
-                    createdAt: { $gte: start },
-                    'metadata.type': { $exists: true, $ne: null }
-                }
-            },
-            {
-                $group: {
-                    _id: '$metadata.type',
-                    count: { $sum: 1 }
-                }
-            }
-        ]).toArray(),
-    ]);
+    try {
+        const [listingAgg, clickAgg] = await Promise.all([
+            prismaApp.$queryRaw`
+                SELECT (metadata->>'type') as type, CAST(COUNT(*) AS INTEGER) as count
+                FROM app_analytics_events
+                WHERE type = 'listing_view' AND created_at >= ${start} AND metadata->>'type' IS NOT NULL
+                GROUP BY metadata->>'type'
+            ` as Promise<Array<{ type: string; count: number }>>,
+            prismaApp.$queryRaw`
+                SELECT (metadata->>'type') as type, CAST(COUNT(*) AS INTEGER) as count
+                FROM app_analytics_events
+                WHERE type = 'card_click' AND created_at >= ${start} AND metadata->>'type' IS NOT NULL
+                GROUP BY metadata->>'type'
+            ` as Promise<Array<{ type: string; count: number }>>,
+        ]);
 
-    const listingMap = new Map<string, number>(
-        listingAgg.map((entry) => [String(entry._id ?? 'unknown'), entry.count as number])
-    );
-    const clickMap = new Map<string, number>(
-        clickAgg.map((entry) => [String(entry._id ?? 'unknown'), entry.count as number])
-    );
+        const listingMap = new Map<string, number>(listingAgg.map(r => [r.type, r.count]));
+        const clickMap = new Map<string, number>(clickAgg.map(r => [r.type, r.count]));
 
-    const types = new Set([...listingMap.keys(), ...clickMap.keys()]);
-    return Array.from(types).map((type) => {
-        const listingViews = listingMap.get(type) ?? 0;
-        const cardClicks = clickMap.get(type) ?? 0;
-        const ctr = listingViews > 0 ? Math.round((cardClicks / listingViews) * 100) : 0;
-        return { type, listingViews, cardClicks, ctr };
-    }).sort((a, b) => b.cardClicks - a.cardClicks);
+        const types = new Set([...listingMap.keys(), ...clickMap.keys()]);
+        return Array.from(types).map((type) => {
+            const listingViews = listingMap.get(type) ?? 0;
+            const cardClicks = clickMap.get(type) ?? 0;
+            const ctr = listingViews > 0 ? Math.round((cardClicks / listingViews) * 100) : 0;
+            return { type, listingViews, cardClicks, ctr };
+        }).sort((a, b) => b.cardClicks - a.cardClicks);
+    } catch (error) {
+        console.error('[Analytics] Failed CTR by type from Postgres:', error);
+        return [];
+    }
 }
 
 export async function getDigestClickStats(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
@@ -840,60 +563,28 @@ export async function getDigestClickStats(days: number = DEFAULT_ROLLUP_DAYS): P
     frequencies: Array<{ frequency: string; clicks: number }>;
     campaigns: Array<{ campaign: string; clicks: number }>;
 }> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) {
-        return { total: 0, variants: [], frequencies: [], campaigns: [] };
-    }
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const [variantAgg, frequencyAgg, campaignAgg, totalAgg] = await Promise.all([
-        events.aggregate([
-            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.variant', 'unknown'] },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } }
-        ]).toArray(),
-        events.aggregate([
-            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.digestType', 'unknown'] },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } }
-        ]).toArray(),
-        events.aggregate([
-            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.campaign', 'unknown'] },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } },
-            { $limit: 8 }
-        ]).toArray(),
-        events.aggregate([
-            { $match: { type: 'digest_click', createdAt: { $gte: start } } },
-            { $count: 'total' }
-        ]).toArray(),
-    ]);
+    try {
+        const [variantAgg, frequencyAgg, campaignAgg, totalCount] = await Promise.all([
+            prismaApp.$queryRaw`SELECT COALESCE(metadata->>'variant', 'unknown') as variant, CAST(COUNT(*) AS INTEGER) as count FROM app_analytics_events WHERE type = 'digest_click' AND created_at >= ${start} GROUP BY metadata->>'variant' ORDER BY count DESC` as Promise<any[]>,
+            prismaApp.$queryRaw`SELECT COALESCE(metadata->>'digestType', 'unknown') as frequency, CAST(COUNT(*) AS INTEGER) as count FROM app_analytics_events WHERE type = 'digest_click' AND created_at >= ${start} GROUP BY metadata->>'digestType' ORDER BY count DESC` as Promise<any[]>,
+            prismaApp.$queryRaw`SELECT COALESCE(metadata->>'campaign', 'unknown') as campaign, CAST(COUNT(*) AS INTEGER) as count FROM app_analytics_events WHERE type = 'digest_click' AND created_at >= ${start} GROUP BY metadata->>'campaign' ORDER BY count DESC LIMIT 8` as Promise<any[]>,
+            prismaApp.analyticsEvent.count({ where: { type: 'digest_click', createdAt: { gte: start } } }),
+        ]);
 
-    const total = totalAgg[0]?.total ?? 0;
-    return {
-        total,
-        variants: variantAgg.map((entry) => ({ variant: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
-        frequencies: frequencyAgg.map((entry) => ({ frequency: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
-        campaigns: campaignAgg.map((entry) => ({ campaign: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
-    };
+        return {
+            total: totalCount,
+            variants: variantAgg.map(r => ({ variant: r.variant, clicks: r.count })),
+            frequencies: frequencyAgg.map(r => ({ frequency: r.frequency, clicks: r.count })),
+            campaigns: campaignAgg.map(r => ({ campaign: r.campaign, clicks: r.count })),
+        };
+    } catch (error) {
+        console.error('[Analytics] Failed digest stats from Postgres:', error);
+        return { total: 0, variants: [], frequencies: [], campaigns: [] };
+    }
 }
 
 export async function getDeepLinkAttribution(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
@@ -902,62 +593,28 @@ export async function getDeepLinkAttribution(days: number = DEFAULT_ROLLUP_DAYS)
     mediums: Array<{ medium: string; clicks: number }>;
     campaigns: Array<{ campaign: string; clicks: number }>;
 }> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) {
-        return { total: 0, sources: [], mediums: [], campaigns: [] };
-    }
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const [sourceAgg, mediumAgg, campaignAgg, totalAgg] = await Promise.all([
-        events.aggregate([
-            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.source', 'unknown'] },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } },
-            { $limit: 8 }
-        ]).toArray(),
-        events.aggregate([
-            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.medium', 'unknown'] },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } },
-            { $limit: 8 }
-        ]).toArray(),
-        events.aggregate([
-            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
-            {
-                $group: {
-                    _id: { $ifNull: ['$metadata.campaign', 'unknown'] },
-                    count: { $sum: 1 }
-                }
-            },
-            { $sort: { count: -1 } },
-            { $limit: 8 }
-        ]).toArray(),
-        events.aggregate([
-            { $match: { type: 'deep_link_click', createdAt: { $gte: start } } },
-            { $count: 'total' }
-        ]).toArray(),
-    ]);
+    try {
+        const [sourceAgg, mediumAgg, campaignAgg, totalCount] = await Promise.all([
+            prismaApp.$queryRaw`SELECT COALESCE(metadata->>'source', 'unknown') as source, CAST(COUNT(*) AS INTEGER) as count FROM app_analytics_events WHERE type = 'deep_link_click' AND created_at >= ${start} GROUP BY metadata->>'source' ORDER BY count DESC LIMIT 8` as Promise<any[]>,
+            prismaApp.$queryRaw`SELECT COALESCE(metadata->>'medium', 'unknown') as medium, CAST(COUNT(*) AS INTEGER) as count FROM app_analytics_events WHERE type = 'deep_link_click' AND created_at >= ${start} GROUP BY metadata->>'medium' ORDER BY count DESC LIMIT 8` as Promise<any[]>,
+            prismaApp.$queryRaw`SELECT COALESCE(metadata->>'campaign', 'unknown') as campaign, CAST(COUNT(*) AS INTEGER) as count FROM app_analytics_events WHERE type = 'deep_link_click' AND created_at >= ${start} GROUP BY metadata->>'campaign' ORDER BY count DESC LIMIT 8` as Promise<any[]>,
+            prismaApp.analyticsEvent.count({ where: { type: 'deep_link_click', createdAt: { gte: start } } }),
+        ]);
 
-    const total = totalAgg[0]?.total ?? 0;
-    return {
-        total,
-        sources: sourceAgg.map((entry) => ({ source: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
-        mediums: mediumAgg.map((entry) => ({ medium: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
-        campaigns: campaignAgg.map((entry) => ({ campaign: String(entry._id ?? 'unknown'), clicks: entry.count as number })),
-    };
+        return {
+            total: totalCount,
+            sources: sourceAgg.map(r => ({ source: r.source, clicks: r.count })),
+            mediums: mediumAgg.map(r => ({ medium: r.medium, clicks: r.count })),
+            campaigns: campaignAgg.map(r => ({ campaign: r.campaign, clicks: r.count })),
+        };
+    } catch (error) {
+        console.error('[Analytics] Failed deep link stats from Postgres:', error);
+        return { total: 0, sources: [], mediums: [], campaigns: [] };
+    }
 }
 
 export async function getPushSubscriptionStats(days: number = DEFAULT_ROLLUP_DAYS): Promise<{
@@ -966,63 +623,28 @@ export async function getPushSubscriptionStats(days: number = DEFAULT_ROLLUP_DAY
     failures: number;
     bySource: Array<{ source: string; attempts: number; successes: number; failures: number }>;
 }> {
-    const events = getCollectionSafe<AnalyticsEventDoc>('analytics_events');
-    if (!events) {
-        return { attempts: 0, successes: 0, failures: 0, bySource: [] };
-    }
-
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - (days - 1));
     start.setUTCHours(0, 0, 0, 0);
 
-    const pushTypes: AnalyticsEventType[] = [
-        'push_subscribe_attempt',
-        'push_subscribe_success',
-        'push_subscribe_failure',
-    ];
-
     try {
-        const rows = await events.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: start },
-                    type: { $in: pushTypes },
-                },
-            },
-            {
-                $group: {
-                    _id: {
-                        source: { $ifNull: ['$metadata.source', 'unknown'] },
-                        type: '$type',
-                    },
-                    count: { $sum: 1 },
-                },
-            },
-        ]).toArray();
+        const rows = await prismaApp.$queryRaw`
+            SELECT COALESCE(metadata->>'source', 'unknown') as source, type, CAST(COUNT(*) AS INTEGER) as count
+            FROM app_analytics_events
+            WHERE type IN ('push_subscribe_attempt', 'push_subscribe_success', 'push_subscribe_failure')
+              AND created_at >= ${start}
+            GROUP BY metadata->>'source', type
+        ` as Array<{ source: string; type: string; count: number }>;
 
         const bySourceMap = new Map<string, { source: string; attempts: number; successes: number; failures: number }>();
-        let attempts = 0;
-        let successes = 0;
-        let failures = 0;
+        let attempts = 0, successes = 0, failures = 0;
 
         for (const row of rows) {
-            const source = String((row as any)._id?.source ?? 'unknown');
-            const type = (row as any)._id?.type as AnalyticsEventType | undefined;
-            const count = Number((row as any).count ?? 0);
-            if (!type || !Number.isFinite(count) || count <= 0) continue;
-
-            const bucket = bySourceMap.get(source) ?? { source, attempts: 0, successes: 0, failures: 0 };
-            if (type === 'push_subscribe_attempt') {
-                bucket.attempts += count;
-                attempts += count;
-            } else if (type === 'push_subscribe_success') {
-                bucket.successes += count;
-                successes += count;
-            } else if (type === 'push_subscribe_failure') {
-                bucket.failures += count;
-                failures += count;
-            }
-            bySourceMap.set(source, bucket);
+            const bucket = bySourceMap.get(row.source) ?? { source: row.source, attempts: 0, successes: 0, failures: 0 };
+            if (row.type === 'push_subscribe_attempt') { bucket.attempts += row.count; attempts += row.count; }
+            else if (row.type === 'push_subscribe_success') { bucket.successes += row.count; successes += row.count; }
+            else if (row.type === 'push_subscribe_failure') { bucket.failures += row.count; failures += row.count; }
+            bySourceMap.set(row.source, bucket);
         }
 
         const bySource = Array.from(bySourceMap.values())
@@ -1031,7 +653,7 @@ export async function getPushSubscriptionStats(days: number = DEFAULT_ROLLUP_DAY
 
         return { attempts, successes, failures, bySource };
     } catch (error) {
-        console.error('[Analytics] Failed to load push subscription stats:', error);
+        console.error('[Analytics] Failed push stats from Postgres:', error);
         return { attempts: 0, successes: 0, failures: 0, bySource: [] };
     }
 }

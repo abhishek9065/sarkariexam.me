@@ -1,4 +1,5 @@
 import type {
+  AlertMatchPreview,
   AlertSubscriber,
   AlertSubscriberStats,
   Announcement,
@@ -621,6 +622,10 @@ export function getCmsPostHistory(id: string) {
   return apiFetch<{ data: { versions: any[]; audit: any[] } }>(`/editorial/posts/${id}/history`);
 }
 
+export function getCmsPostAlertPreview(id: string) {
+  return apiFetch<{ data: AlertMatchPreview }>(`/editorial/posts/${id}/alert-preview`);
+}
+
 export function getEditorialTaxonomies(type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications') {
   return apiFetch<{ data: CmsTaxonomy[] }>(`/editorial/taxonomies/${type}`);
 }
@@ -665,4 +670,8 @@ export function getEditorialWorkflowQueue() {
 
 export function getEditorialWorkflowSla() {
   return apiFetch<{ data: WorkflowViolation[] }>('/editorial/workflow/sla');
+}
+
+export function getEditorialWorkflowFreshness() {
+  return apiFetch<{ data: CmsPost[] }>('/editorial/workflow/freshness');
 }

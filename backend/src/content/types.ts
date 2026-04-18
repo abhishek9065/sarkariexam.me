@@ -73,12 +73,58 @@ export interface SeoFields {
   canonicalPath?: string;
   indexable?: boolean;
   ogImage?: string;
+  effectiveTitle?: string;
+  effectiveDescription?: string;
+  effectiveCanonicalPath?: string;
 }
 
 export interface TrustFields {
   verificationNote?: string;
   updatedLabel?: string;
   officialSources: OfficialSource[];
+  verificationStatus?: 'verified' | 'review' | 'source_light';
+  sourceCount?: number;
+  hasPrimarySource?: boolean;
+  primarySourceLabel?: string;
+  latestSourceCapturedAt?: string;
+  primarySourceDomain?: string;
+  officialDomain?: string;
+  domainMatch?: boolean;
+}
+
+export interface FreshnessSignals {
+  archiveState: 'active' | 'expired' | 'archived';
+  expiresSoon: boolean;
+  isStale: boolean;
+  needsReview: boolean;
+  daysToExpiry?: number;
+  daysSinceUpdate?: number;
+  daysSinceSourceCapture?: number;
+  staleReason?: string;
+}
+
+export interface SearchMeta {
+  termCount: number;
+  aliasCount: number;
+  termsPreview: string[];
+  searchReady: boolean;
+}
+
+export interface EditorialReadiness {
+  canSubmit: boolean;
+  canApprove: boolean;
+  canPublish: boolean;
+  issueCount: number;
+  warningCount: number;
+  issues: string[];
+  warnings: string[];
+}
+
+export interface AlertMatchPreview {
+  total: number;
+  instant: number;
+  daily: number;
+  weekly: number;
 }
 
 export interface PostRecord {
@@ -138,6 +184,9 @@ export interface PostRecord {
   publishedBy?: string;
   currentVersion: number;
   searchText: string;
+  freshness?: FreshnessSignals;
+  searchMeta?: SearchMeta;
+  readiness?: EditorialReadiness;
 }
 
 export interface PostVersionRecord {
@@ -220,6 +269,8 @@ export interface AlertSubscriptionRecord {
   source?: string;
   alertCount?: number;
   lastAlertedAt?: string;
+  lastDigestDailySentAt?: string;
+  lastDigestWeeklySentAt?: string;
   createdAt: string;
   updatedAt: string;
 }

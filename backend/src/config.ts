@@ -112,6 +112,7 @@ const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SE
 const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
 const contentDbMode = 'postgres';
 const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
+const postgresDirectUrl = process.env.POSTGRES_DIRECT_URL ?? process.env.DIRECT_URL ?? '';
 const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
 const frontendRevalidationConfigured = Boolean(process.env.FRONTEND_REVALIDATE_URL && process.env.FRONTEND_REVALIDATE_TOKEN);
 const featureFlags = {
@@ -127,7 +128,7 @@ validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'test-secret', 'change-me
 const runtimeWarnings: string[] = [];
 
 if (!postgresPrismaUrl) {
-  runtimeWarnings.push('POSTGRES_PRISMA_URL is missing; Prisma-backed content and editorial APIs will be unhealthy.');
+  runtimeWarnings.push('POSTGRES_PRISMA_URL (or DATABASE_URL) is missing; primary content and editorial APIs will be unhealthy.');
 }
 
 if (!legacyMongoConfigured) {
@@ -165,6 +166,7 @@ export const config = {
   securityLogCleanupIntervalMinutes,
   contentDbMode,
   postgresPrismaUrl,
+  postgresDirectUrl,
   legacyMongoConfigured,
   frontendRevalidationConfigured,
   runtimeWarnings,
@@ -195,12 +197,12 @@ export const config = {
 // Log configuration status on startup (without exposing secrets)
 if (!isProduction) {
   console.log('[CONFIG] Running in development mode');
+  console.log(`[CONFIG] Primary Content DB: PostgreSQL (Neon compatible)`);
   console.log(`[CONFIG] Legacy database bridge: ${legacyMongoConfigured ? (databaseUrl.includes('localhost') ? 'local MongoDB' : 'Cosmos DB') : 'not configured'}`);
   if (configuredContentDbMode !== 'postgres') {
     console.log(`[CONFIG] CONTENT_DB_MODE=${configuredContentDbMode} ignored; forcing postgres mode`);
   }
-  console.log(`[CONFIG] Content DB mode: ${contentDbMode}`);
-  console.log(`[CONFIG] PostgreSQL URL configured: ${postgresPrismaUrl ? 'yes' : 'no'}`);
+  console.log(`[CONFIG] PostgreSQL URLs: Prisma=${postgresPrismaUrl ? 'yes' : 'no'}, Direct=${postgresDirectUrl ? 'yes' : 'no'}`);
   console.log(`[CONFIG] Frontend revalidation: ${frontendRevalidationConfigured ? 'configured' : 'not fully configured'}`);
   console.log(`[CONFIG] Metrics endpoint protection: ${metricsToken ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Push notifications: ${config.vapidPublicKey ? 'enabled' : 'disabled'}`);

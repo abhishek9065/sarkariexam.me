@@ -8,6 +8,22 @@ interface SecurityEvent {
   timestamp: Date;
 }
 
+const SAFE_TOKEN_PATTERN = /^[a-z0-9_-]+$/i;
+
+function sanitizeToken(value: unknown, maxLength = 64): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLength) return undefined;
+  if (!SAFE_TOKEN_PATTERN.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+function normalizeLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return 100;
+  const rounded = Math.trunc(limit);
+  return Math.min(500, Math.max(1, rounded));
+}
+
 export async function logSecurityEvent(event: SecurityEvent) {
   try {
     const { getCollection } = await import('./cosmosdb.js');
@@ -25,13 +41,19 @@ export async function getSecurityEvents(
   try {
     const { getCollection } = await import('./cosmosdb.js');
     const col = getCollection('security_audit_log');
-    
+
+    const safeFilters = {
+      type: sanitizeToken(filters?.type),
+      severity: sanitizeToken(filters?.severity, 16),
+      userId: sanitizeToken(filters?.userId, 120),
+    };
+
     const query: Record<string, unknown> = {};
-    if (filters?.type) query.type = filters.type;
-    if (filters?.severity) query.severity = filters.severity;
-    if (filters?.userId) query.userId = filters.userId;
-    
-    const results = await col.find(query).sort({ timestamp: -1 }).limit(limit).toArray();
+    if (safeFilters.type) query.type = safeFilters.type;
+    if (safeFilters.severity) query.severity = safeFilters.severity;
+    if (safeFilters.userId) query.userId = safeFilters.userId;
+
+    const results = await col.find(query).sort({ timestamp: -1 }).limit(normalizeLimit(limit)).toArray();
     return results as unknown as SecurityEvent[];
   } catch {
     return [];

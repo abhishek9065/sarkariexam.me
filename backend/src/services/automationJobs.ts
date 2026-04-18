@@ -2,8 +2,12 @@ import { WorkflowStatus } from '@prisma/client';
 
 import PostModelPostgres from '../models/posts.postgres.js';
 
+import {
+    getLegacyLinkHealthEventsCollection,
+    getLegacyLinkRecordsCollection,
+    type LegacyLinkHealthEventDoc,
+} from './automationStore.mongo.js';
 import { invalidateAnnouncementCaches } from './cacheInvalidation.js';
-import { getCollection } from './cosmosdb.js';
 import { prisma } from './postgres/prisma.js';
 
 let automationIntervalRef: NodeJS.Timeout | null = null;
@@ -41,34 +45,52 @@ export async function runAutomationJobs() {
         // 1. Link Manager Automation
         // Check links that haven't been checked recently (oldest first)
         console.log('[Automation] Running Link Health Check...');
-        const linksCollection = getCollection<any>('link_records');
-        const linksToCheck = await linksCollection.find({
-            status: { $ne: 'expired' },
-            url: { $exists: true, $ne: '' }
-        }).sort({ updatedAt: 1 }).limit(50).toArray();
+        const linksCollection = getLegacyLinkRecordsCollection();
+        if (linksCollection) {
+            const linksToCheck = await linksCollection.find({
+                status: { $ne: 'expired' },
+                url: { $exists: true, $ne: '' }
+            }).sort({ updatedAt: 1 }).limit(50).toArray();
 
-        for (const link of linksToCheck) {
-            const status = await checkLinkHealth(link.url);
-            await linksCollection.updateOne(
-                { _id: link._id },
-                { $set: { status, updatedAt: new Date(), lastCheckedAt: new Date() } }
-            );
-        }
+            const checkedLinks: Array<{
+                _id: unknown;
+                url: string;
+                announcementId?: string;
+                status: 'active' | 'broken';
+            }> = [];
 
-        // Persist health events for the reporting dashboard
-        if (linksToCheck.length > 0) {
-            const healthEventsCollection = getCollection<any>('link_health_events');
-            const events = linksToCheck.map((link: any) => ({
-                url: link.url,
-                linkId: link._id?.toHexString?.() || String(link._id),
-                announcementId: link.announcementId,
-                status: link.status === 'broken' ? 'broken' : 'ok',
-                checkedAt: new Date(),
-                checkedBy: 'system',
-            }));
-            await healthEventsCollection.insertMany(events).catch((err: any) => {
-                console.error('[Automation] Failed to persist link health events:', err);
-            });
+            for (const link of linksToCheck) {
+                const status = await checkLinkHealth(link.url || '');
+                checkedLinks.push({
+                    _id: link._id,
+                    url: String(link.url || ''),
+                    announcementId: link.announcementId,
+                    status,
+                });
+                await linksCollection.updateOne(
+                    { _id: link._id },
+                    { $set: { status, updatedAt: now, lastCheckedAt: now } }
+                );
+            }
+
+            // Persist health events for the reporting dashboard.
+            // Record the status produced by the current check, not the stale pre-check value.
+            if (checkedLinks.length > 0) {
+                const healthEventsCollection = getLegacyLinkHealthEventsCollection();
+                if (healthEventsCollection) {
+                    const events: LegacyLinkHealthEventDoc[] = checkedLinks.map((link) => ({
+                        url: link.url,
+                        linkId: (link._id as any)?.toHexString?.() || String(link._id),
+                        announcementId: link.announcementId,
+                        status: link.status === 'broken' ? 'broken' : 'ok',
+                        checkedAt: now,
+                        checkedBy: 'system',
+                    }));
+                    await healthEventsCollection.insertMany(events).catch((err: any) => {
+                        console.error('[Automation] Failed to persist link health events:', err);
+                    });
+                }
+            }
         }
 
         // 2. Scheduling Automation

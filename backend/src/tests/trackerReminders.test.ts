@@ -1,4 +1,3 @@
-import { ObjectId } from 'mongodb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -7,8 +6,12 @@ const {
     userDocs,
     subscriptionDocs,
     dueAnnouncementDocs,
-    dispatchInsertOneMock,
-    notificationUpdateOneMock,
+    dispatchCreateMock,
+    profileListDueTrackedApplicationsMock,
+    profileUpsertNotificationsMock,
+    bookmarkFindByAnnouncementIdsMock,
+    userListActiveEmailMapMock,
+    subscriptionListByEmailsMock,
     announcementFindAllMock,
     sendDigestEmailMock,
 } = vi.hoisted(() => ({
@@ -17,60 +20,47 @@ const {
     userDocs: [] as Array<Record<string, any>>,
     subscriptionDocs: [] as Array<Record<string, any>>,
     dueAnnouncementDocs: [] as Array<Record<string, any>>,
-    dispatchInsertOneMock: vi.fn().mockResolvedValue({ acknowledged: true }),
-    notificationUpdateOneMock: vi.fn().mockResolvedValue({ acknowledged: true }),
+    dispatchCreateMock: vi.fn().mockResolvedValue({}),
+    profileListDueTrackedApplicationsMock: vi.fn().mockResolvedValue([]),
+    profileUpsertNotificationsMock: vi.fn().mockResolvedValue(1),
+    bookmarkFindByAnnouncementIdsMock: vi.fn().mockResolvedValue([]),
+    userListActiveEmailMapMock: vi.fn().mockResolvedValue(new Map()),
+    subscriptionListByEmailsMock: vi.fn().mockResolvedValue([]),
     announcementFindAllMock: vi.fn().mockResolvedValue([]),
     sendDigestEmailMock: vi.fn().mockResolvedValue(true),
 }));
 
-const buildCursor = (rows: Array<Record<string, any>>) => {
-    const cursor: any = {
-        sort: vi.fn(),
-        limit: vi.fn(),
-        project: vi.fn(),
-        toArray: vi.fn(),
-    };
-    cursor.sort.mockReturnValue(cursor);
-    cursor.limit.mockReturnValue(cursor);
-    cursor.project.mockReturnValue(cursor);
-    cursor.toArray.mockResolvedValue(rows);
-    return cursor;
-};
+vi.mock('../services/postgres/prisma.js', () => ({
+    prismaApp: {
+        reminderDispatchLogEntry: {
+            create: dispatchCreateMock,
+        },
+    },
+}));
 
-vi.mock('../services/cosmosdb.js', () => ({
-    getCollection: vi.fn((name: string) => {
-        if (name === 'tracked_applications') {
-            return {
-                find: vi.fn(() => buildCursor(trackedDocs)),
-            };
-        }
-        if (name === 'bookmarks') {
-            return {
-                find: vi.fn(() => buildCursor(bookmarkDocs)),
-            };
-        }
-        if (name === 'users') {
-            return {
-                find: vi.fn(() => buildCursor(userDocs)),
-            };
-        }
-        if (name === 'alert_subscriptions') {
-            return {
-                find: vi.fn(() => buildCursor(subscriptionDocs)),
-            };
-        }
-        if (name === 'reminder_dispatch_logs') {
-            return {
-                insertOne: dispatchInsertOneMock,
-            };
-        }
-        if (name === 'user_notifications') {
-            return {
-                updateOne: notificationUpdateOneMock,
-            };
-        }
-        throw new Error(`Unexpected collection: ${name}`);
-    }),
+vi.mock('../models/profile.postgres.js', () => ({
+    default: {
+        listDueTrackedApplications: profileListDueTrackedApplicationsMock,
+        upsertNotifications: profileUpsertNotificationsMock,
+    },
+}));
+
+vi.mock('../models/bookmarks.mongo.js', () => ({
+    BookmarkModelMongo: {
+        findByAnnouncementIds: bookmarkFindByAnnouncementIdsMock,
+    },
+}));
+
+vi.mock('../models/users.mongo.js', () => ({
+    UserModelMongo: {
+        listActiveEmailMap: userListActiveEmailMapMock,
+    },
+}));
+
+vi.mock('../models/alertSubscriptions.postgres.js', () => ({
+    default: {
+        listByEmails: subscriptionListByEmailsMock,
+    },
 }));
 
 vi.mock('../models/announcements.postgres.js', () => ({
@@ -95,19 +85,25 @@ describe('trackerReminders service', () => {
 
         vi.clearAllMocks();
 
-        dispatchInsertOneMock.mockResolvedValue({ acknowledged: true });
-        notificationUpdateOneMock.mockResolvedValue({ acknowledged: true });
+        dispatchCreateMock.mockResolvedValue({});
+        profileListDueTrackedApplicationsMock.mockImplementation(async () => trackedDocs);
+        profileUpsertNotificationsMock.mockResolvedValue(1);
+        bookmarkFindByAnnouncementIdsMock.mockImplementation(async () => bookmarkDocs);
+        userListActiveEmailMapMock.mockImplementation(async () => (
+            new Map(userDocs.map((doc) => [doc.id, String(doc.email).trim().toLowerCase()]))
+        ));
+        subscriptionListByEmailsMock.mockImplementation(async () => subscriptionDocs);
         announcementFindAllMock.mockResolvedValue(dueAnnouncementDocs);
         sendDigestEmailMock.mockResolvedValue(true);
     });
 
     it('sends in-app and digest reminders for due tracked applications', async () => {
         const now = new Date('2026-02-13T09:00:00.000Z');
-        const userId = new ObjectId().toString();
-        const trackedId = new ObjectId();
+        const userId = 'user-1';
+        const trackedId = 'tracked-1';
 
         trackedDocs.push({
-            _id: trackedId,
+            id: trackedId,
             userId,
             announcementId: 'ann-1',
             slug: 'upsc-job-2026',
@@ -118,7 +114,7 @@ describe('trackerReminders service', () => {
             reminderAt: null,
         });
         userDocs.push({
-            _id: new ObjectId(userId),
+            id: userId,
             email: 'tracker@test.com',
             isActive: true,
         });
@@ -138,8 +134,8 @@ describe('trackerReminders service', () => {
             emailSkippedNoSubscription: 0,
             deduped: 0,
         });
-        expect(dispatchInsertOneMock).toHaveBeenCalledTimes(2);
-        expect(notificationUpdateOneMock).toHaveBeenCalledTimes(1);
+        expect(dispatchCreateMock).toHaveBeenCalledTimes(2);
+        expect(profileUpsertNotificationsMock).toHaveBeenCalledTimes(1);
         expect(sendDigestEmailMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 email: 'tracker@test.com',
@@ -150,11 +146,11 @@ describe('trackerReminders service', () => {
 
     it('treats duplicate email dispatch reservations as deduped and skips email send', async () => {
         const now = new Date('2026-02-13T09:00:00.000Z');
-        const userId = new ObjectId().toString();
-        const trackedId = new ObjectId();
+        const userId = 'user-2';
+        const trackedId = 'tracked-2';
 
         trackedDocs.push({
-            _id: trackedId,
+            id: trackedId,
             userId,
             announcementId: 'ann-2',
             slug: 'ssc-job-2026',
@@ -165,8 +161,8 @@ describe('trackerReminders service', () => {
             reminderAt: null,
         });
 
-        dispatchInsertOneMock
-            .mockResolvedValueOnce({ acknowledged: true })
+        dispatchCreateMock
+            .mockResolvedValueOnce({})
             .mockRejectedValueOnce(new Error('E11000 duplicate key error'));
 
         const result = await processTrackerRemindersOnce(now);
@@ -178,7 +174,7 @@ describe('trackerReminders service', () => {
             emailSkippedNoSubscription: 0,
             deduped: 1,
         });
-        expect(notificationUpdateOneMock).toHaveBeenCalledTimes(1);
+        expect(profileUpsertNotificationsMock).toHaveBeenCalledTimes(1);
         expect(sendDigestEmailMock).not.toHaveBeenCalled();
     });
 });

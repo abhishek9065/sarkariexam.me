@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 
 import { optionalAuth } from '../middleware/auth.js';
@@ -7,6 +8,13 @@ import ErrorReportModelPostgres from '../models/errorReports.postgres.js';
 import ErrorTracking from '../services/errorTracking.js';
 
 const router = Router();
+
+router.use(expressRateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 interface ErrorReportDoc {
     errorId: string;

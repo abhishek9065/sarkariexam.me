@@ -1,16 +1,19 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 
+import { config } from '../../config.js';
+
 type GlobalWithPrisma = typeof globalThis & {
   __prismaClient?: PrismaClient;
 };
 
 const globalRef = globalThis as GlobalWithPrisma;
 
-const prismaLogLevels: Prisma.LogLevel[] = process.env.NODE_ENV === 'production'
+const prismaLogLevels: Prisma.LogLevel[] = config.isProduction
   ? ['error']
   : ['error', 'warn'];
 
-const prismaDatasourceUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
+const prismaDatasourceUrl = config.postgresPrismaUrl;
+const prismaDirectUrl = config.postgresDirectUrl;
 
 const prismaClientOptions: Prisma.PrismaClientOptions = {
   log: prismaLogLevels,
@@ -22,6 +25,11 @@ if (prismaDatasourceUrl) {
       url: prismaDatasourceUrl,
     },
   };
+}
+
+// Add directUrl support for Neon if configured
+if (prismaDirectUrl && prismaClientOptions.datasources?.db) {
+  (prismaClientOptions.datasources.db as any).directUrl = prismaDirectUrl;
 }
 
 export const prisma = globalRef.__prismaClient ?? new PrismaClient(prismaClientOptions);
@@ -81,6 +89,27 @@ export const prismaApp = prisma as PrismaClient & {
     deleteMany(args: any): Promise<{ count: number }>;
     upsert(args: any): Promise<any>;
   };
+  analyticsEvent: {
+    create(args: any): Promise<any>;
+    findMany(args: any): Promise<any[]>;
+    count(args?: any): Promise<number>;
+    aggregate(args: any): Promise<any>;
+    groupBy(args: any): Promise<any[]>;
+  };
+  analyticsRollup: {
+    findMany(args: any): Promise<any[]>;
+    findUnique(args: any): Promise<any>;
+    upsert(args: any): Promise<any>;
+    update(args: any): Promise<any>;
+  };
+  securityLog: {
+    create(args: any): Promise<any>;
+    findMany(args: any): Promise<any[]>;
+    count(args?: any): Promise<number>;
+    update(args: any): Promise<any>;
+    findUnique(args: any): Promise<any>;
+    deleteMany(args: any): Promise<{ count: number }>;
+  };
   userProfileEntry: {
     findUnique(args: any): Promise<any>;
     create(args: any): Promise<any>;
@@ -94,6 +123,9 @@ export const prismaApp = prisma as PrismaClient & {
     deleteMany(args: any): Promise<{ count: number }>;
     findMany(args: any): Promise<any[]>;
     count(args?: any): Promise<number>;
+  };
+  reminderDispatchLogEntry: {
+    create(args: any): Promise<any>;
   };
 };
 

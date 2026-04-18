@@ -107,6 +107,8 @@ function toRecord(row: SubscriptionRow): AlertSubscriptionRecord {
     source: row.source || undefined,
     alertCount: row.alertCount,
     lastAlertedAt: row.lastAlertedAt?.toISOString(),
+    lastDigestDailySentAt: row.lastDigestDailySentAt?.toISOString(),
+    lastDigestWeeklySentAt: row.lastDigestWeeklySentAt?.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -420,6 +422,48 @@ export class AlertSubscriptionModelPostgres {
       include: includeRelations,
     });
     return rows.map((row) => toRecord(row));
+  }
+
+  static async listDueDigestSubscribers(args: {
+    frequency: 'daily' | 'weekly';
+    threshold: Date;
+  }) {
+    const frequency = toPrismaFrequency(args.frequency);
+    const lastSentField = args.frequency === 'daily'
+      ? { lastDigestDailySentAt: { lt: args.threshold } }
+      : { lastDigestWeeklySentAt: { lt: args.threshold } };
+    const nullField = args.frequency === 'daily'
+      ? { lastDigestDailySentAt: null }
+      : { lastDigestWeeklySentAt: null };
+
+    const rows = await prisma.subscription.findMany({
+      where: {
+        isActive: true,
+        verified: true,
+        frequency,
+        OR: [
+          nullField,
+          lastSentField,
+        ],
+      },
+      include: includeRelations,
+      orderBy: { updatedAt: 'desc' },
+    });
+    return rows.map((row) => toRecord(row));
+  }
+
+  static async markDigestSentByEmail(email: string, frequency: 'daily' | 'weekly', sentAt: Date) {
+    const normalizedEmail = email.trim().toLowerCase();
+    await prisma.subscription.updateMany({
+      where: { email: normalizedEmail },
+      data: frequency === 'daily'
+        ? {
+            lastDigestDailySentAt: sentAt,
+          }
+        : {
+            lastDigestWeeklySentAt: sentAt,
+          },
+    });
   }
 
   static async markAlerted(ids: string[]) {

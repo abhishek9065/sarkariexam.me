@@ -10,6 +10,7 @@ import {
   archiveCmsPost,
   createCmsPost,
   getCmsPost,
+  getCmsPostAlertPreview,
   getCmsPostHistory,
   publishCmsPost,
   restoreCmsPost,
@@ -17,7 +18,7 @@ import {
   updateCmsPost,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import type { CmsPost, CmsImportantDate, CmsOfficialSource, EditorialStatus } from '@/lib/types';
+import type { AlertMatchPreview, CmsPost, CmsImportantDate, CmsOfficialSource, EditorialStatus } from '@/lib/types';
 
 interface AnnouncementFormProps {
   id?: string;
@@ -172,6 +173,12 @@ function statusPill(status: EditorialStatus) {
   return map[status];
 }
 
+function readinessTone(issueCount = 0, warningCount = 0) {
+  if (issueCount > 0) return 'text-red-700 bg-red-50 border-red-200';
+  if (warningCount > 0) return 'text-amber-700 bg-amber-50 border-amber-200';
+  return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+}
+
 function RowEditor<T extends Record<string, any>>({
   title,
   rows,
@@ -237,6 +244,11 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
     queryFn: () => getCmsPostHistory(id!),
     enabled: isEdit,
   });
+  const alertPreviewQuery = useQuery({
+    queryKey: ['cms-post-alert-preview', id],
+    queryFn: async () => (await getCmsPostAlertPreview(id!)).data,
+    enabled: isEdit,
+  });
 
   useEffect(() => {
     if (postQuery.data?.data) {
@@ -278,6 +290,11 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
   });
 
   const currentStatus = postQuery.data?.data.status || 'draft';
+  const currentPost = postQuery.data?.data;
+  const alertPreview: AlertMatchPreview | undefined = alertPreviewQuery.data;
+  const canSubmit = currentPost?.readiness?.canSubmit ?? true;
+  const canApprove = currentPost?.readiness?.canApprove ?? true;
+  const canPublish = currentPost?.readiness?.canPublish ?? true;
 
   return (
     <div className="space-y-5">
@@ -303,6 +320,7 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
             <button
               type="button"
               onClick={() => workflowMutation.mutate('submit')}
+              disabled={!canSubmit}
               className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-3 py-2 text-[12px] font-semibold text-blue-700 hover:bg-blue-50"
             >
               <Send size={14} />
@@ -313,6 +331,7 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
             <button
               type="button"
               onClick={() => workflowMutation.mutate('approve')}
+              disabled={!canApprove}
               className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 px-3 py-2 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-50"
             >
               <CheckCircle2 size={14} />
@@ -323,6 +342,7 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
             <button
               type="button"
               onClick={() => workflowMutation.mutate('publish')}
+              disabled={!canPublish}
               className="inline-flex items-center gap-2 rounded-xl bg-[#e65100] px-4 py-2 text-[12px] font-bold text-white hover:opacity-90"
             >
               <CheckCircle2 size={14} />
@@ -442,10 +462,41 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
         <div className="space-y-5">
           <div className="space-y-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
             <h3 className="text-[13px] font-bold text-gray-900">Trust and SEO</h3>
+            {currentPost?.readiness ? (
+              <div className={`rounded-xl border px-3 py-3 text-[12px] ${readinessTone(currentPost.readiness.issueCount, currentPost.readiness.warningCount)}`}>
+                <div className="font-bold">Publishing Readiness</div>
+                <div className="mt-1">{currentPost.readiness.issueCount} issue(s) · {currentPost.readiness.warningCount} warning(s)</div>
+                {currentPost.readiness.issues.slice(0, 3).map((issue) => (
+                  <div key={issue} className="mt-1">• {issue}</div>
+                ))}
+                {currentPost.readiness.issueCount === 0 && currentPost.readiness.warningCount === 0 ? (
+                  <div className="mt-1">Ready for review and publish.</div>
+                ) : null}
+              </div>
+            ) : null}
             <div>
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">Verification Note</label>
               <textarea value={form.verificationNote} onChange={(event) => setForm((current) => ({ ...current, verificationNote: event.target.value }))} rows={4} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[13px] text-gray-800 outline-none" />
             </div>
+            {currentPost?.trust ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] text-gray-700">
+                <div className="font-bold text-gray-900">Verification Summary</div>
+                <div className="mt-1">Status: {currentPost.trust.verificationStatus || 'source_light'}</div>
+                <div>Sources: {currentPost.trust.sourceCount || 0}{currentPost.trust.hasPrimarySource ? ' · Primary source set' : ' · No primary source'}</div>
+                {currentPost.trust.primarySourceLabel ? <div>Primary: {currentPost.trust.primarySourceLabel}</div> : null}
+                {currentPost.trust.latestSourceCapturedAt ? <div>Last captured: {new Date(currentPost.trust.latestSourceCapturedAt).toLocaleDateString('en-IN')}</div> : null}
+                {currentPost.trust.officialDomain ? <div>Official domain: {currentPost.trust.officialDomain}{currentPost.trust.primarySourceDomain ? ` · Source domain: ${currentPost.trust.primarySourceDomain}` : ''}</div> : null}
+              </div>
+            ) : null}
+            {currentPost?.freshness ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] text-gray-700">
+                <div className="font-bold text-gray-900">Freshness</div>
+                <div className="mt-1">State: {currentPost.freshness.archiveState}</div>
+                {currentPost.freshness.daysToExpiry !== undefined ? <div>Days to expiry: {currentPost.freshness.daysToExpiry}</div> : null}
+                {currentPost.freshness.daysSinceUpdate !== undefined ? <div>Days since update: {currentPost.freshness.daysSinceUpdate}</div> : null}
+                {currentPost.freshness.staleReason ? <div className="mt-1 text-amber-700">{currentPost.freshness.staleReason}</div> : null}
+              </div>
+            ) : null}
             <div>
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">Urgency Tag</label>
               <select value={form.tag} onChange={(event) => setForm((current) => ({ ...current, tag: event.target.value as FormState['tag'] }))} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[13px] text-gray-800 outline-none">
@@ -464,6 +515,37 @@ export function AnnouncementForm({ id }: AnnouncementFormProps) {
               <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">Meta Description</label>
               <textarea value={form.metaDescription} onChange={(event) => setForm((current) => ({ ...current, metaDescription: event.target.value }))} rows={4} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-[13px] text-gray-800 outline-none" />
             </div>
+            {currentPost?.seo ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] text-gray-700">
+                <div className="font-bold text-gray-900">Effective SEO Output</div>
+                <div className="mt-1">{currentPost.seo.effectiveTitle || 'No effective title'}</div>
+                <div className="mt-1">{currentPost.seo.effectiveDescription || 'No effective description'}</div>
+                <div className="mt-1 text-[11px] text-gray-500">{currentPost.seo.effectiveCanonicalPath || 'No canonical path'}</div>
+              </div>
+            ) : null}
+            {currentPost?.searchMeta ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] text-gray-700">
+                <div className="font-bold text-gray-900">Search Readiness</div>
+                <div className="mt-1">{currentPost.searchMeta.termCount} search terms indexed · {currentPost.searchMeta.aliasCount} alias(es)</div>
+                <div className="mt-1">{currentPost.searchMeta.searchReady ? 'Search text is rich enough for token search.' : 'Search text is still thin; add more structured detail.'}</div>
+                {currentPost.searchMeta.termsPreview.length ? <div className="mt-1 text-[11px] text-gray-500">{currentPost.searchMeta.termsPreview.join(', ')}</div> : null}
+              </div>
+            ) : null}
+            {isEdit ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 text-[12px] text-gray-700">
+                <div className="font-bold text-gray-900">Alert Preview</div>
+                {alertPreviewQuery.isLoading ? (
+                  <div className="mt-1 text-gray-500">Loading alert match preview…</div>
+                ) : alertPreview ? (
+                  <>
+                    <div className="mt-1">{alertPreview.total} verified subscribers match this post.</div>
+                    <div className="mt-1 text-[11px] text-gray-500">Instant {alertPreview.instant} · Daily {alertPreview.daily} · Weekly {alertPreview.weekly}</div>
+                  </>
+                ) : (
+                  <div className="mt-1 text-gray-500">No preview available yet.</div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">

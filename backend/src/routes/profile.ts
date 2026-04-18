@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 
 import { authenticateToken } from '../middleware/auth.js';
@@ -82,6 +83,13 @@ interface DashboardWidgetPayload {
 }
 
 const router = Router();
+
+router.use(expressRateLimit({
+    windowMs: 60 * 1000,
+    limit: 180,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 function isValidEntityId(value: string): boolean {
     return Boolean(value) && value.length <= 120;

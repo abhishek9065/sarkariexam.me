@@ -1,9 +1,10 @@
 import express from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { config } from '../config.js';
-import { AUTH_COOKIE_NAME, blacklistToken, isTokenBlacklisted } from '../middleware/auth.js';
+import { AUTH_COOKIE_NAME, authenticateToken, blacklistToken } from '../middleware/auth.js';
 import { clearCsrfCookie, ensureCsrfCookie, setCsrfCookie } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
@@ -16,9 +17,15 @@ import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { checkPasswordSecurity } from '../services/passwordSecurity.js';
 import { incrementAuthLoginFailure, incrementBruteForceBlockedResponse } from '../services/securityMetrics.js';
-import type { JwtPayload } from '../types.js';
 
 const router = express.Router();
+
+router.use(expressRateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
 
 const passwordSchema = z.string()
   .min(8, 'Password must be at least 8 characters')
@@ -86,13 +93,6 @@ const getBearerToken = (req: express.Request): string | undefined => {
 const getAuthToken = (req: express.Request): string | undefined =>
   getBearerToken(req) || (req as any).cookies?.[AUTH_COOKIE_NAME];
 
-const verifyJwtToken = (token: string): JwtPayload => {
-  const verifyOptions: jwt.VerifyOptions = {};
-  if (config.jwtIssuer) verifyOptions.issuer = config.jwtIssuer;
-  if (config.jwtAudience) verifyOptions.audience = config.jwtAudience;
-  return jwt.verify(token, config.jwtSecret, verifyOptions) as JwtPayload;
-};
-
 router.get('/csrf', rateLimit({ windowMs: 60000, maxRequests: 30, keyPrefix: 'auth-csrf' }), (req, res) => {
   const csrfToken = ensureCsrfCookie(req, res);
   res.set('Cache-Control', 'no-store');
@@ -154,7 +154,7 @@ router.post('/register', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 10, 
   }
 });
 
-router.post('/login', bruteForceProtection, async (req, res) => {
+router.post('/login', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'auth-login' }), bruteForceProtection, async (req, res) => {
   const clientIP = getClientIP(req);
 
   try {
@@ -221,19 +221,9 @@ router.post('/logout', async (req, res) => {
   return res.json({ message: 'Logged out successfully' });
 });
 
-router.get('/me', async (req, res) => {
+router.get('/me', rateLimit({ windowMs: 60 * 1000, maxRequests: 60, keyPrefix: 'auth-me' }), authenticateToken, async (req, res) => {
   try {
-    const token = getAuthToken(req);
-    if (!token) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    if (await isTokenBlacklisted(token)) {
-      return res.status(401).json({ error: 'Session expired' });
-    }
-
-    const decoded = verifyJwtToken(token);
-    const user = await UserModelMongo.findById(decoded.userId);
+    const user = await UserModelMongo.findById(req.user!.userId);
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'User account deactivated' });
     }
@@ -254,12 +244,6 @@ router.get('/me', async (req, res) => {
       },
     });
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ error: 'Session expired', code: 'TOKEN_EXPIRED' });
-    }
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: 'Invalid session', code: 'TOKEN_INVALID' });
-    }
     console.error('[Auth] Current user error:', error);
     return res.status(500).json({ error: 'Failed to load user' });
   }

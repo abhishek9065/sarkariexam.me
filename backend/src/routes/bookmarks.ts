@@ -1,13 +1,21 @@
 import { Router, Request, Response } from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 import AnnouncementModelPostgres from '../models/announcements.postgres.js';
-import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
+import { BookmarkModelMongo } from '../models/bookmarks.postgres.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getPathParam } from '../utils/routeParams.js';
 
 const router = Router();
+
+router.use(expressRateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+}));
 
 /**
  * GET /api/bookmarks

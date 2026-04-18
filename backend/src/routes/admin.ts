@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
@@ -9,11 +10,18 @@ import CommunityModelPostgres from '../models/community.postgres.js';
 import ErrorReportModelPostgres from '../models/errorReports.postgres.js';
 import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
 import SiteSettingsModelPostgres from '../models/siteSettings.postgres.js';
-import { UserModelMongo } from '../models/users.mongo.js';
+import { UserModelPostgres } from '../models/users.postgres.js';
 import { getAnalyticsOverview } from '../services/analyticsOverview.js';
 import type { ContentType, AnnouncementStatus, CreateAnnouncementDto } from '../types.js';
 
 const router = express.Router();
+
+router.use(expressRateLimit({
+  windowMs: 60 * 1000,
+  limit: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
 
 // All admin routes require authentication + admin role
 router.use(authenticateToken);
@@ -128,7 +136,7 @@ router.get('/dashboard', async (_req, res) => {
     ]);
 
     // Get total user count
-    const allUsers = await UserModelMongo.findAll({ limit: 10000 });
+    const allUsers = await UserModelPostgres.findAll({ limit: 10000 });
     const totalUsers = allUsers.length;
     const activeUsers = allUsers.filter(u => u.isActive).length;
     const adminUsers = allUsers.filter(u => u.role === 'admin').length;
@@ -343,13 +351,13 @@ router.get('/users', async (req, res) => {
     }
 
     const { role, isActive, limit, offset } = parseResult.data;
-    const users = await UserModelMongo.findAll({
+    const users = await UserModelPostgres.findAll({
       role,
       isActive,
       skip: offset,
       limit,
     });
-    const total = await UserModelMongo.count({ role, isActive });
+    const total = await UserModelPostgres.count({ role, isActive });
 
     return res.json({
       data: users,
@@ -366,7 +374,7 @@ router.get('/users', async (req, res) => {
 router.get('/users/:id', async (req, res) => {
   try {
     const id = req.params.id as string;
-    const user = await UserModelMongo.findById(id);
+    const user = await UserModelPostgres.findById(id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -391,7 +399,7 @@ router.patch('/users/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot deactivate your own account' });
     }
 
-    const user = await UserModelMongo.update(id, parseResult.data);
+    const user = await UserModelPostgres.update(id, parseResult.data);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -412,7 +420,7 @@ router.delete('/users/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    const deleted = await UserModelMongo.delete(id);
+    const deleted = await UserModelPostgres.delete(id);
     if (!deleted) {
       return res.status(404).json({ error: 'User not found' });
     }

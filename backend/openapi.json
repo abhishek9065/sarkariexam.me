@@ -1872,12 +1872,32 @@
         }
       }
     },
+    "/api/editorial/posts/{id}/alert-preview": {
+      "get": {
+        "summary": "Get matched alert subscriber preview for an editorial post",
+        "responses": {
+          "200": {
+            "description": "Alert match preview"
+          }
+        }
+      }
+    },
     "/api/editorial/workflow/pending": {
       "get": {
         "summary": "List editorial workflow queue",
         "responses": {
           "200": {
             "description": "Pending workflow items"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/freshness": {
+      "get": {
+        "summary": "List editorial freshness and expiry watch items",
+        "responses": {
+          "200": {
+            "description": "Freshness workflow response"
           }
         }
       }

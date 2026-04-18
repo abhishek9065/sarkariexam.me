@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 
 import RedisCache from '../services/redis.js';
+import { sanitizeForLog } from '../utils/logSanitizer.js';
 
 /**
  * Comprehensive security middleware
@@ -20,6 +21,7 @@ const normalizeEmail = (email?: string): string | null => {
 
 const buildIpKey = (ip: string) => `bf:ip:${ip}`;
 const buildEmailKey = (email: string) => `bf:email:${email}`;
+const BLOCKED_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 const normalizeIp = (value?: string | null): string => {
     if (!value) return '';
@@ -129,9 +131,13 @@ export async function recordFailedLoginWithEmail(ip: string, email?: string): Pr
                 
                 if (newCount >= MAX_FAILED_ATTEMPTS) {
                     if (key.startsWith('bf:ip:')) {
-                        console.log(`[SECURITY] IP ${ip} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`);
+                        console.log(
+                            `[SECURITY] IP ${sanitizeForLog(ip, 64)} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`
+                        );
                     } else if (normalizedEmail) {
-                        console.log(`[SECURITY] Account ${normalizedEmail} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`);
+                        console.log(
+                            `[SECURITY] Account ${sanitizeForLog(normalizedEmail, 120)} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`
+                        );
                     }
                 }
             }
@@ -212,8 +218,12 @@ const SENSITIVE_FIELDS = new Set([
  * Sanitize object recursively, skipping sensitive fields
  */
 export function sanitizeObject<T extends object>(obj: T): T {
-    const result: any = {};
+    const result: Record<string, unknown> = Object.create(null);
     for (const [key, value] of Object.entries(obj)) {
+        if (BLOCKED_OBJECT_KEYS.has(key)) {
+            continue;
+        }
+
         if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
             result[key] = value;
         } else if (typeof value === 'string') {
@@ -250,7 +260,7 @@ export function blockSuspiciousAgents(req: Request, res: Response, next: NextFun
     ];
 
     if (maliciousPatterns.some(pattern => pattern.test(userAgent))) {
-        console.log(`[SECURITY] Blocked suspicious user agent: ${userAgent}`);
+        console.log(`[SECURITY] Blocked suspicious user agent: ${sanitizeForLog(userAgent, 200)}`);
         return res.status(403).json({ error: 'Access denied' });
     }
 
