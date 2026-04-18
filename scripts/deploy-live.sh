@@ -5,8 +5,10 @@ set -Eeuo pipefail
 LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
 LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-900}"
+
 CURRENT_STAGE="init"
-LAST_ACTIONABLE_DIAGNOSIS="Inspect the remote deploy log and validate the production checkout and server prerequisites."
+LAST_ACTIONABLE_DIAGNOSIS="Inspect the remote deploy log and deployment helper output."
+
 DO_PREFLIGHT_ONLY=0
 DEPLOY_MODE="fast"
 TARGET_SHA=""
@@ -16,10 +18,6 @@ PREVIOUS_REF=""
 
 log() {
   echo "[deploy-live] $*"
-}
-
-warn() {
-  echo "WARNING: $*" >&2
 }
 
 set_stage() {
@@ -104,19 +102,6 @@ require_file() {
   [[ -f "$file_path" ]] || die "Missing required file: ${file_path}"
 }
 
-require_clean_checkout() {
-  local status_output
-  status_output="$(git -C "$REPO_DIR" status --porcelain --untracked-files=no)"
-  if [[ -n "$status_output" ]]; then
-    echo "$status_output"
-    die "Production checkout has tracked modifications. Refusing to deploy over local changes."
-  fi
-}
-
-ensure_git_safe_directory() {
-  git config --global --add safe.directory "$REPO_DIR" >/dev/null 2>&1 || true
-}
-
 validate_mode() {
   case "$DEPLOY_MODE" in
     fast|full)
@@ -127,14 +112,28 @@ validate_mode() {
   esac
 }
 
+ensure_git_safe_directory() {
+  git config --global --add safe.directory "$REPO_DIR" >/dev/null 2>&1 || true
+}
+
+require_clean_checkout() {
+  local status_output
+  status_output="$(git -C "$REPO_DIR" status --porcelain --untracked-files=no)"
+  if [[ -n "$status_output" ]]; then
+    echo "$status_output"
+    die "Production checkout has tracked modifications. Refusing to deploy over local changes."
+  fi
+}
+
 check_remote_prerequisites() {
-  record_diagnosis "Install the missing server prerequisites and ensure the deploy user can run Docker and Git in ${REPO_DIR}."
+  record_diagnosis "Install missing server prerequisites and verify deploy user permissions for Docker and Git."
   require_command bash
   require_command git
   require_command docker
   require_command curl
   require_command flock
   require_command tee
+
   if ! docker compose version >/dev/null 2>&1; then
     die "Docker Compose plugin is not available. Install Docker Compose v2 on the droplet."
   fi
@@ -143,22 +142,26 @@ check_remote_prerequisites() {
 validate_repo_checkout() {
   record_diagnosis "Provision the repository at DO_REPO_DIR and keep the production checkout clean before rerunning deploy."
   [[ -n "$REPO_DIR" ]] || die "DO_REPO_DIR is required."
+  [[ "$REPO_DIR" == /* ]] || die "DO_REPO_DIR must be an absolute path. Received: ${REPO_DIR}"
   [[ -d "$REPO_DIR" ]] || die "Configured repository directory does not exist: ${REPO_DIR}"
   [[ -d "$REPO_DIR/.git" ]] || die "Configured repository directory is not a git checkout: ${REPO_DIR}"
   require_file "$REPO_DIR/.env"
 }
 
 resolve_target_sha() {
-  record_diagnosis "Verify the target commit exists on origin and that the production checkout can fetch from the repository remote."
+  record_diagnosis "Verify the target commit exists on origin/main and can be checked out cleanly."
   [[ -n "$TARGET_SHA" ]] || die "A target commit SHA is required."
+  [[ "$TARGET_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || die "Target commit SHA must be a 40-character git commit SHA."
 
   PREVIOUS_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
   git -C "$REPO_DIR" fetch --prune origin main
 
   if ! git -C "$REPO_DIR" cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
-    git -C "$REPO_DIR" fetch origin "$TARGET_SHA"
+    git -C "$REPO_DIR" fetch --no-tags origin "$TARGET_SHA"
     git -C "$REPO_DIR" cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null || die "Target commit SHA is not available from origin: ${TARGET_SHA}"
   fi
+
+  git -C "$REPO_DIR" merge-base --is-ancestor "$TARGET_SHA" "origin/main" || die "Target commit SHA is not reachable from origin/main: ${TARGET_SHA}"
 }
 
 validate_target_tree_files() {
@@ -185,8 +188,9 @@ validate_target_tree_files() {
 }
 
 checkout_target_sha() {
-  record_diagnosis "Ensure the production checkout can switch to the exact target SHA (resolve untracked path conflicts or tracked modifications and retry)."
+  record_diagnosis "Resolve checkout conflicts in production working tree and retry exact target SHA checkout."
   local current_sha
+
   current_sha="$(git -C "$REPO_DIR" rev-parse HEAD)"
   PREVIOUS_SHA="$current_sha"
   PREVIOUS_REF="$(git -C "$REPO_DIR" symbolic-ref -q --short HEAD || true)"
@@ -224,7 +228,7 @@ run_preflight_checks() {
 }
 
 run_deploy() {
-  record_diagnosis "Review the service-specific logs in ${LOG_FILE} and the Docker Compose service logs on the droplet."
+  record_diagnosis "Inspect /tmp/sarkari-result-deploy.log and Docker Compose service logs for deployment-stage failures."
 
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
   export DEPLOY_TARGET_SHA="$TARGET_SHA"
@@ -248,7 +252,8 @@ exec 9>"$LOCK_FILE"
 if ! flock -w "$LOCK_WAIT_SECONDS" 9; then
   die "Timed out waiting for deploy lock after ${LOCK_WAIT_SECONDS}s. Another deployment may still be running."
 fi
-: > "$LOG_FILE"
+
+: >"$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "=== Remote deploy started at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ==="
@@ -282,12 +287,12 @@ if [[ "$DO_PREFLIGHT_ONLY" == "1" ]]; then
   set_stage "restore-checkout"
   restore_previous_checkout_after_preflight
 
-  local_current_sha="$(git -C "$REPO_DIR" rev-parse HEAD)"
+  current_sha="$(git -C "$REPO_DIR" rev-parse HEAD)"
   echo "REMOTE PREFLIGHT OK"
   echo "  repo_path: ${REPO_DIR}"
   echo "  previous_sha: ${PREVIOUS_SHA}"
   echo "  validated_sha: ${TARGET_SHA}"
-  echo "  current_sha: ${local_current_sha}"
+  echo "  current_sha: ${current_sha}"
   echo "  target_sha: ${TARGET_SHA}"
   echo "  mode: ${DEPLOY_MODE}"
   echo "=== Remote deploy preflight finished at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ==="

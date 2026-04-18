@@ -23,11 +23,6 @@ append_summary_line() {
   fi
 }
 
-quote_for_remote_shell() {
-  local value="$1"
-  printf "'%s'" "${value//\'/\'\"\'\"\'}"
-}
-
 trim_whitespace() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -35,9 +30,15 @@ trim_whitespace() {
   printf '%s' "$value"
 }
 
+quote_for_remote_shell() {
+  local value="$1"
+  printf "'%s'" "${value//\'/\'\"\'\"\'}"
+}
+
 fail() {
   local message="$1"
   echo "::error title=Deploy failed::stage=${CURRENT_STAGE} ${message}" >&2
+
   append_summary_line "## Deploy Failure"
   append_summary_line
   append_summary_line "- Stage: \`${CURRENT_STAGE}\`"
@@ -53,6 +54,7 @@ cleanup_remote_helper() {
   if [[ ${#SSH_CMD[@]} -eq 0 ]]; then
     return 0
   fi
+
   "${SSH_CMD[@]}" "rm -f '$REMOTE_HELPER_PATH'" >/dev/null 2>&1 || true
 }
 
@@ -75,6 +77,8 @@ validate_config() {
   require_var "DO_HOST"
   require_var "DO_USER"
   require_var "DO_SSH_KEY"
+  require_var "DO_HOST_FINGERPRINT"
+  require_var "DO_REPO_DIR"
   require_var "TRIGGER_SHA"
 
   if [[ "${#MISSING_CONFIG_KEYS[@]}" -gt 0 ]]; then
@@ -97,8 +101,12 @@ validate_config() {
     fail "TRIGGER_SHA must be a 40-character git commit SHA."
   fi
 
-  if [[ -n "$DO_HOST_FINGERPRINT" && ! "$DO_HOST_FINGERPRINT" =~ ^SHA256:[A-Za-z0-9+/=]+$ ]]; then
+  if [[ ! "$DO_HOST_FINGERPRINT" =~ ^SHA256:[A-Za-z0-9+/=]+$ ]]; then
     fail "DO_HOST_FINGERPRINT must be a SHA256 fingerprint in the form SHA256:<base64>."
+  fi
+
+  if [[ "$DO_REPO_DIR" != /* ]]; then
+    fail "DO_REPO_DIR must be an absolute path on the droplet. Received: ${DO_REPO_DIR}"
   fi
 }
 
@@ -132,17 +140,14 @@ prepare_ssh() {
 
   local scanned_fingerprints
   scanned_fingerprints="$(printf '%s\n' "$scanned_keys" | ssh-keygen -lf - -E sha256 | awk '{print $2}' | sort -u)"
-  if [[ -n "$DO_HOST_FINGERPRINT" ]]; then
-    if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
-      {
-        echo "Expected fingerprint: ${DO_HOST_FINGERPRINT}"
-        echo "Scanned fingerprints:"
-        printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}'
-      } >&2
-      fail "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)."
-    fi
-  else
-    echo "WARNING: DO_HOST_FINGERPRINT not set; proceeding without explicit fingerprint pinning." >&2
+
+  if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
+    {
+      echo "Expected fingerprint: ${DO_HOST_FINGERPRINT}"
+      echo "Scanned fingerprints:"
+      printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}'
+    } >&2
+    fail "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)."
   fi
 
   printf '%s\n' "$scanned_keys" >"$HOME/.ssh/known_hosts"
@@ -172,151 +177,6 @@ prepare_ssh() {
   )
 }
 
-resolve_remote_repo_dir() {
-  if [[ -n "$DO_REPO_DIR" ]]; then
-    return 0
-  fi
-
-  local repo_hint repo_name quoted_repo_hint quoted_repo_name detected
-  repo_hint="${GITHUB_REPOSITORY:-}"
-  repo_name="${repo_hint##*/}"
-  if [[ -z "$repo_name" || "$repo_name" == "$repo_hint" ]]; then
-    repo_name="sarkariexam.me"
-  fi
-  quoted_repo_hint="$(quote_for_remote_shell "$repo_hint")"
-  quoted_repo_name="$(quote_for_remote_shell "$repo_name")"
-
-  log "DO_REPO_DIR not provided; attempting remote auto-detection."
-
-  detected="$(remote_run "bash -se" <<EOF || true
-set -Eeuo pipefail
-repo_hint=${quoted_repo_hint}
-repo_name=${quoted_repo_name}
-
-is_valid_repo() {
-  local repo="\$1"
-  [[ -d "\$repo/.git" && -f "\$repo/docker-compose.yml" && -f "\$repo/scripts/deploy-live.sh" ]]
-}
-
-try_candidate() {
-  local candidate="\$1"
-  if ! is_valid_repo "\$candidate"; then
-    return 1
-  fi
-
-  if [[ -z "\$repo_hint" ]]; then
-    echo "\$candidate"
-    return 0
-  fi
-
-  local url
-  url="\$(git -C "\$candidate" remote get-url origin 2>/dev/null || true)"
-  if [[ "\$url" == *"\$repo_hint"* ]]; then
-    echo "\$candidate"
-    return 0
-  fi
-
-  return 1
-}
-
-list_gitdirs() {
-  local root="\$1"
-  if ! [[ -d "\$root" ]]; then
-    return 0
-  fi
-
-  if command -v timeout >/dev/null 2>&1; then
-    timeout 20s find "\$root" -maxdepth 4 -type d -name .git 2>/dev/null || true
-  else
-    find "\$root" -maxdepth 4 -type d -name .git 2>/dev/null || true
-  fi
-}
-
-candidate_paths=(
-  "\$HOME/\$repo_name"
-  "\$HOME/\${repo_name%.git}"
-  "\$HOME/sarkari-result-git-clean"
-  "\$HOME/sarkariexam.me"
-  "/opt/\$repo_name"
-  "/opt/\${repo_name%.git}"
-  "/opt/sarkari-result-git-clean"
-  "/opt/sarkariexam.me"
-  "/srv/\$repo_name"
-  "/srv/\${repo_name%.git}"
-  "/srv/sarkari-result-git-clean"
-  "/var/www/\$repo_name"
-  "/var/www/\${repo_name%.git}"
-  "/var/www/sarkari-result-git-clean"
-)
-
-for candidate in "\${candidate_paths[@]}"; do
-  if try_candidate "\$candidate"; then
-    exit 0
-  fi
-done
-
-find_match_by_remote() {
-  local root="\$1"
-
-  while IFS= read -r gitdir; do
-    repo="\${gitdir%/.git}"
-    if ! is_valid_repo "\$repo"; then
-      continue
-    fi
-    if [[ -z "\$repo_hint" ]]; then
-      echo "\$repo"
-      return 0
-    fi
-    url="\$(git -C "\$repo" remote get-url origin 2>/dev/null || true)"
-    if [[ "\$url" == *"\$repo_hint"* ]]; then
-      echo "\$repo"
-      return 0
-    fi
-  done < <(list_gitdirs "\$root")
-
-  return 1
-}
-
-find_match_by_shape() {
-  local root="\$1"
-
-  while IFS= read -r gitdir; do
-    repo="\${gitdir%/.git}"
-    if is_valid_repo "\$repo"; then
-      echo "\$repo"
-      return 0
-    fi
-  done < <(list_gitdirs "\$root")
-
-  return 1
-}
-
-search_roots=("\$HOME" /opt /srv /var/www)
-for root in "\${search_roots[@]}"; do
-  if find_match_by_remote "\$root"; then
-    exit 0
-  fi
-done
-
-for root in "\${search_roots[@]}"; do
-  if find_match_by_shape "\$root"; then
-    exit 0
-  fi
-done
-
-exit 1
-EOF
-)"
-
-  detected="$(printf '%s' "$detected" | tr -d '\r' | tail -n 1)"
-  if [[ -z "$detected" ]]; then
-    fail "DO_REPO_DIR is not set and auto-detection failed. Set DO_REPO_DIR in the workflow environment."
-  fi
-
-  DO_REPO_DIR="$detected"
-  log "Auto-detected DO_REPO_DIR=${DO_REPO_DIR}"
-}
-
 remote_run() {
   "${SSH_CMD[@]}" "$1"
 }
@@ -325,21 +185,22 @@ upload_remote_helper() {
   if ! "${SCP_CMD[@]}" "scripts/deploy-live.sh" "${DO_USER}@${DO_HOST}:${REMOTE_HELPER_PATH}"; then
     fail "Failed to upload remote deploy helper."
   fi
+
   if ! remote_run "chmod 700 '$REMOTE_HELPER_PATH'"; then
-    fail "Failed to upload remote deploy helper."
+    fail "Failed to set execute permission on remote deploy helper."
   fi
 }
 
 run_remote_helper() {
   local preflight_only="${1:-0}"
-  local quoted_repo_dir quoted_project_name quoted_helper_path quoted_deploy_mode quoted_target_sha quoted_lock_wait_seconds
+  local quoted_repo_dir quoted_project_name quoted_helper_path quoted_deploy_mode quoted_target_sha quoted_lock_wait
 
   quoted_repo_dir="$(quote_for_remote_shell "$DO_REPO_DIR")"
   quoted_project_name="$(quote_for_remote_shell "${COMPOSE_PROJECT_NAME:-sarkari-result}")"
   quoted_helper_path="$(quote_for_remote_shell "$REMOTE_HELPER_PATH")"
   quoted_deploy_mode="$(quote_for_remote_shell "${DEPLOY_MODE:-fast}")"
   quoted_target_sha="$(quote_for_remote_shell "$TRIGGER_SHA")"
-  quoted_lock_wait_seconds="$(quote_for_remote_shell "${LOCK_WAIT_SECONDS:-}")"
+  quoted_lock_wait="$(quote_for_remote_shell "${LOCK_WAIT_SECONDS:-}")"
 
   remote_run "bash -se" <<EOF
 set -Eeuo pipefail
@@ -348,13 +209,14 @@ COMPOSE_PROJECT_NAME=${quoted_project_name}
 REMOTE_HELPER_PATH=${quoted_helper_path}
 DEPLOY_MODE=${quoted_deploy_mode}
 TRIGGER_SHA=${quoted_target_sha}
-LOCK_WAIT_SECONDS=${quoted_lock_wait_seconds}
+LOCK_WAIT_SECONDS=${quoted_lock_wait}
 PRECHECK_ONLY=${preflight_only}
 
 cmd=(bash "\${REMOTE_HELPER_PATH}" --mode "\${DEPLOY_MODE}" --sha "\${TRIGGER_SHA}")
 if [[ "\${PRECHECK_ONLY}" == "1" ]]; then
   cmd+=(--preflight-only)
 fi
+
 DO_REPO_DIR="\${DO_REPO_DIR}" COMPOSE_PROJECT_NAME="\${COMPOSE_PROJECT_NAME}" LOCK_WAIT_SECONDS="\${LOCK_WAIT_SECONDS}" "\${cmd[@]}"
 EOF
 }
@@ -406,11 +268,8 @@ prepare_ssh
 
 set_stage "ssh-preflight"
 if ! remote_run "echo 'SSH preflight connected'; whoami; hostname"; then
-  fail "SSH preflight failed. Verify DO_HOST, DO_USER, DO_PORT, firewall rules, and the deploy key."
+  fail "SSH preflight failed. Verify DO_HOST, DO_USER, DO_PORT, firewall rules, and deploy key validity."
 fi
-
-set_stage "resolve-repo-dir"
-resolve_remote_repo_dir
 
 set_stage "upload-helper"
 upload_remote_helper

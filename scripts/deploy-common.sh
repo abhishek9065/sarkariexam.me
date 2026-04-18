@@ -6,13 +6,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-sarkari-result}"
 export COMPOSE_PROJECT_NAME
 
-PRODUCTION_COMPOSE_FILES=(-f "$ROOT_DIR/docker-compose.yml")
 CURRENT_STAGE="${CURRENT_STAGE:-bootstrap}"
-LAST_ACTIONABLE_DIAGNOSIS="${LAST_ACTIONABLE_DIAGNOSIS:-Inspect the deploy log and the relevant Docker Compose service logs.}"
+LAST_ACTIONABLE_DIAGNOSIS="${LAST_ACTIONABLE_DIAGNOSIS:-Inspect the deploy log and relevant Docker Compose service logs.}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 
 dc() {
-  docker compose "${PRODUCTION_COMPOSE_FILES[@]}" --project-name "$COMPOSE_PROJECT_NAME" --env-file "$ROOT_DIR/.env" "$@"
+  docker compose -f "$ROOT_DIR/docker-compose.yml" --project-name "$COMPOSE_PROJECT_NAME" --env-file "$ROOT_DIR/.env" "$@"
 }
 
 set_stage() {
@@ -89,11 +88,12 @@ validate_production_env() {
 
   frontend_revalidate_url="$(read_env_var "FRONTEND_REVALIDATE_URL")"
   frontend_revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+
   if [[ -n "$frontend_revalidate_url" && -z "$frontend_revalidate_token" ]]; then
     die "FRONTEND_REVALIDATE_URL is set but FRONTEND_REVALIDATE_TOKEN is missing."
   fi
   if [[ -z "$frontend_revalidate_url" && -n "$frontend_revalidate_token" ]]; then
-    warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL is missing. Publish-triggered revalidation will stay disabled."
+    warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL is missing. Publish-triggered revalidation stays disabled."
   fi
 
   PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-$(read_env_var "FRONTEND_URL")}"
@@ -161,15 +161,18 @@ tail_core_service_logs() {
 handle_deploy_error() {
   local exit_code="${1:-1}"
   local line_number="${2:-unknown}"
+
   echo
   echo "ERROR: deployment stage '${CURRENT_STAGE}' failed at line ${line_number}."
   echo "Actionable diagnosis: ${LAST_ACTIONABLE_DIAGNOSIS}"
   echo "Repo path: ${DEPLOY_REPO_DIR:-$ROOT_DIR}"
   echo "Target SHA: ${DEPLOY_TARGET_SHA:-unknown}"
   echo "Previous SHA: ${DEPLOY_PREVIOUS_SHA:-unknown}"
+
   if command -v docker >/dev/null 2>&1; then
     tail_core_service_logs 80
   fi
+
   exit "$exit_code"
 }
 
@@ -186,7 +189,7 @@ wait_for_service_health() {
   for ((i=1; i<=attempts; i++)); do
     container_id="$(service_container_id "$service")"
     if [[ -z "$container_id" ]]; then
-      record_diagnosis "Service '${service}' was not created by Docker Compose. Inspect docker compose output and service definitions."
+      record_diagnosis "Service '${service}' was not created by Docker Compose. Inspect compose output and service definitions."
       echo "  [$i/$attempts] ${service} container not yet created"
       sleep "$sleep_seconds"
       continue
@@ -198,7 +201,7 @@ wait_for_service_health() {
       return 0
     fi
     if [[ "$health" == "unhealthy" || "$health" == "exited" ]]; then
-      record_diagnosis "Service '${service}' became ${health}. Inspect its container logs and environment wiring."
+      record_diagnosis "Service '${service}' became ${health}. Inspect container logs and environment wiring."
       tail_service_logs "$service" 120
       return 1
     fi
@@ -213,8 +216,7 @@ wait_for_service_health() {
 }
 
 purge_cloudflare_cache() {
-  local cf_zone_id cf_api_token
-  local response
+  local cf_zone_id cf_api_token response
   cf_zone_id="$(read_env_var "CF_ZONE_ID")"
   cf_api_token="$(read_env_var "CF_API_TOKEN")"
 
@@ -264,7 +266,7 @@ verify_public_endpoint() {
     fi
   done
 
-  record_diagnosis "Public check '${label}' failed for ${url}. Inspect nginx, backend, frontend, and admin logs plus the public ingress configuration."
+  record_diagnosis "Public check '${label}' failed for ${url}. Inspect ingress, nginx, backend, frontend, and admin logs."
   echo "ERROR: ${label} failed for ${url} (status=${status:-none}, expected=${expected_pattern})"
   return 1
 }
@@ -314,7 +316,7 @@ verify_public_revalidation_smoke() {
     return 0
   fi
 
-  record_diagnosis "The protected frontend revalidation smoke check failed. Verify FRONTEND_REVALIDATE_TOKEN and frontend runtime wiring."
+  record_diagnosis "Frontend revalidation smoke check failed. Verify FRONTEND_REVALIDATE_TOKEN and frontend runtime wiring."
   echo "ERROR: frontend revalidation smoke check failed for internal frontend container route"
   return 1
 }
@@ -326,6 +328,7 @@ print_success_summary() {
   local rollback_sha="${DEPLOY_PREVIOUS_SHA:-unknown}"
   local rollback_repo="${DEPLOY_REPO_DIR:-$ROOT_DIR}"
   local escaped_repo
+
   printf -v escaped_repo '%q' "$rollback_repo"
 
   echo "DEPLOY SUMMARY"

@@ -27,11 +27,11 @@ record_diagnosis "Docker Compose failed to render with the current root .env. Fi
 dc config >/dev/null
 
 set_stage "build-images"
-record_diagnosis "Docker image build failed. Inspect the build logs for backend/frontend/admin/nginx."
+record_diagnosis "Docker image build failed. Inspect build logs for backend/frontend/admin/nginx."
 dc build --pull backend frontend admin nginx
 
 set_stage "restart-all"
-record_diagnosis "Docker Compose failed to restart the production services."
+record_diagnosis "Docker Compose failed to restart production services."
 dc up -d --force-recreate --remove-orphans nginx backend admin frontend "${DATADOG_SERVICES[@]}"
 dc ps
 

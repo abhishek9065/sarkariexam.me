@@ -27,7 +27,7 @@ record_diagnosis "Docker Compose failed to render with the current root .env. Fi
 dc config >/dev/null
 
 set_stage "build-images"
-record_diagnosis "Docker image build failed. Inspect the build logs for backend/frontend/admin/nginx."
+record_diagnosis "Docker image build failed. Inspect build logs for backend/frontend/admin/nginx."
 dc build --pull backend frontend admin nginx
 
 set_stage "restart-backend"
@@ -39,7 +39,7 @@ wait_for_service_health backend 60 2
 BACKEND_HEALTH_RESULT="container healthcheck ok"
 
 set_stage "restart-web"
-record_diagnosis "Frontend/admin/nginx restart failed. Inspect their container logs and reverse proxy wiring."
+record_diagnosis "Frontend/admin/nginx restart failed. Inspect container logs and reverse proxy wiring."
 dc up -d --force-recreate --remove-orphans nginx admin frontend "${DATADOG_SERVICES[@]}"
 dc ps
 

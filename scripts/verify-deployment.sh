@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
 
-PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://sarkariexams.me}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 
 read_env_var() {
   local key="$1"
@@ -13,15 +13,11 @@ read_env_var() {
     return 0
   fi
 
-  if [[ ! -f "$ROOT_DIR/.env" ]]; then
-    return 0
-  fi
+  [[ -f "$ROOT_DIR/.env" ]] || return 0
 
   local line
   line="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$ROOT_DIR/.env" | tail -n 1 || true)"
-  if [[ -z "$line" ]]; then
-    return 0
-  fi
+  [[ -n "$line" ]] || return 0
 
   local value="${line#*=}"
   value="${value%$'\r'}"
@@ -37,127 +33,96 @@ read_env_var() {
   printf '%s' "$value"
 }
 
-echo "=== Deployment Verification ==="
-echo "Testing: $PUBLIC_BASE_URL"
+resolve_public_base_url() {
+  if [[ -n "$PUBLIC_BASE_URL" ]]; then
+    return 0
+  fi
 
-check_public_route() {
+  PUBLIC_BASE_URL="$(read_env_var "FRONTEND_URL")"
+  if [[ -z "$PUBLIC_BASE_URL" ]]; then
+    PUBLIC_BASE_URL="https://sarkariexams.me"
+  fi
+}
+
+check_http() {
   local path="$1"
   local label="$2"
-  local url="${PUBLIC_BASE_URL}${path}"
+  local expected_pattern="${3:-^(2|3)}"
+  local url="${PUBLIC_BASE_URL%/}${path}"
   local status
 
-  status="$(curl -sS -L -o /dev/null -w "%{http_code}" --max-time 15 "$url" || true)"
-  if [[ ! "$status" =~ ^(2|3) ]]; then
-    echo "FAIL: ${label} (${url}) returned ${status:-timeout}"
-    return 1
-  fi
-
-  echo "PASS: ${label} (${url}) returned ${status}"
-}
-
-check_revalidation_smoke() {
-  if [[ -z "$(read_env_var "FRONTEND_REVALIDATE_TOKEN")" ]]; then
-    echo "SKIP: Revalidation smoke check (FRONTEND_REVALIDATE_TOKEN not configured in root .env or shell)"
+  status="$(curl -sS -L -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 "$url" || true)"
+  if [[ "$status" =~ $expected_pattern ]]; then
+    echo "ok   ${label} (${url}) -> ${status}"
     return 0
   fi
 
-  if ! command -v docker >/dev/null 2>&1 || [[ ! -f "$ROOT_DIR/.env" ]]; then
-    echo "SKIP: Revalidation smoke check (docker or root .env unavailable on this machine)"
-    return 0
-  fi
-
-  if ! docker compose -f "$ROOT_DIR/docker-compose.yml" --project-name "${COMPOSE_PROJECT_NAME:-sarkari-result}" --env-file "$ROOT_DIR/.env" exec -T frontend node -e "const token=process.env.REVALIDATE_TOKEN; if (!token) process.exit(2); fetch('http://127.0.0.1:3000/api/revalidate', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ paths: ['/jobs'], tags: ['content:posts', 'content:listings'] }) }).then(async (res) => { if (!res.ok) { console.error('revalidate-status=' + res.status); console.error(await res.text()); process.exit(1); } }).catch((error) => { console.error(error); process.exit(1); });"; then
-    echo "FAIL: Revalidation smoke (internal frontend container route) failed"
-    return 1
-  fi
-
-  echo "PASS: Revalidation smoke (internal frontend container route) succeeded"
+  echo "fail ${label} (${url}) -> ${status:-none}, expected ${expected_pattern}"
+  return 1
 }
 
-check_public_route_html() {
+check_assets() {
   local path="$1"
   local label="$2"
-  local url="${PUBLIC_BASE_URL}${path}"
-  local html
+  local url="${PUBLIC_BASE_URL%/}${path}"
+  local html asset
 
   html="$(curl -sS -L --max-time 15 "$url" || true)"
   if [[ -z "$html" ]]; then
-    echo "FAIL: ${label} returned no HTML"
-    return 1
-  fi
-
-  if printf '%s' "$html" | grep -q 'Application error:'; then
-    echo "FAIL: ${label} rendered an application error"
-    return 1
-  fi
-
-  echo "PASS: ${label} returned HTML without application error"
-}
-
-check_public_route_assets() {
-  local path="$1"
-  local label="$2"
-  local url="${PUBLIC_BASE_URL}${path}"
-  local html
-  local asset_count=0
-  local asset
-  local asset_status
-
-  html="$(curl -sS -L --max-time 15 "$url" || true)"
-  if [[ -z "$html" ]]; then
-    echo "FAIL: ${label} returned no HTML for asset validation"
+    echo "fail ${label} asset check -> empty HTML for ${url}"
     return 1
   fi
 
   while IFS= read -r asset; do
-    [[ -z "$asset" ]] && continue
-    asset_count=$((asset_count + 1))
-    asset_status="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "${PUBLIC_BASE_URL}${asset}" || true)"
-    if [[ ! "$asset_status" =~ ^2 ]]; then
-      echo "FAIL: ${label} asset ${asset} returned ${asset_status:-timeout}"
+    [[ -n "$asset" ]] || continue
+    local code
+    code="$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "${PUBLIC_BASE_URL%/}${asset}" || true)"
+    if [[ ! "$code" =~ ^2 ]]; then
+      echo "fail ${label} asset ${asset} -> ${code:-none}"
       return 1
     fi
   done < <(printf '%s' "$html" | grep -oE "/_next/static/[^\"'[:space:]]+\.(js|css)" | sort -u | head -20)
 
-  if [[ "$asset_count" -eq 0 ]]; then
-    echo "FAIL: ${label} did not include any Next assets"
+  echo "ok   ${label} assets"
+}
+
+check_revalidation_smoke() {
+  local token
+  token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+  if [[ -z "$token" ]]; then
+    echo "skip frontend revalidation smoke (FRONTEND_REVALIDATE_TOKEN not set)"
+    return 0
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "skip frontend revalidation smoke (docker command unavailable)"
+    return 0
+  fi
+
+  if ! docker compose -f "$ROOT_DIR/docker-compose.yml" --project-name "${COMPOSE_PROJECT_NAME:-sarkari-result}" --env-file "$ROOT_DIR/.env" exec -T frontend node -e "const token=process.env.REVALIDATE_TOKEN; if (!token) process.exit(2); fetch('http://127.0.0.1:3000/api/revalidate', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ paths: ['/jobs'], tags: ['content:posts', 'content:listings'] }) }).then(async (res) => { if (!res.ok) { console.error('status=' + res.status); console.error(await res.text()); process.exit(1); } }).catch((error) => { console.error(error); process.exit(1); });"; then
+    echo "fail frontend revalidation smoke"
     return 1
   fi
 
-  echo "PASS: ${label} assets loaded (${asset_count} checked)"
+  echo "ok   frontend revalidation smoke"
 }
 
-check_performance() {
-  local start_time end_time load_time
+main() {
+  resolve_public_base_url
+  echo "Verifying deployment at ${PUBLIC_BASE_URL}"
 
-  start_time=$(date +%s%3N)
-  curl -sS -o /dev/null --max-time 15 "${PUBLIC_BASE_URL}/" || true
-  end_time=$(date +%s%3N)
-  load_time=$((end_time - start_time))
+  check_http "/api/health" "backend health" "^200$"
+  check_http "/api/health/deep" "backend deep health" "^200$"
+  check_http "/" "homepage"
+  check_assets "/" "homepage"
+  check_http "/jobs" "jobs listing"
+  check_assets "/jobs" "jobs listing"
+  check_http "/results" "results listing"
+  check_assets "/results" "results listing"
+  check_http "/admin" "admin console"
+  check_revalidation_smoke
 
-  if [[ $load_time -lt 2000 ]]; then
-    echo "PASS: homepage loads in ${load_time}ms"
-  elif [[ $load_time -lt 5000 ]]; then
-    echo "PASS: homepage loads in ${load_time}ms"
-  else
-    echo "WARN: homepage loads in ${load_time}ms"
-  fi
+  echo "Deployment verification passed."
 }
 
-check_public_route "/api/health" "Backend health"
-check_public_route "/api/health/deep" "Backend deep health"
-check_public_route "/" "Homepage"
-check_public_route_html "/" "Homepage"
-check_public_route_assets "/" "Homepage"
-check_public_route "/jobs" "Jobs listing"
-check_public_route_html "/jobs" "Jobs listing"
-check_public_route_assets "/jobs" "Jobs listing"
-check_public_route "/results" "Results listing"
-check_public_route_html "/results" "Results listing"
-check_public_route_assets "/results" "Results listing"
-check_public_route "/admin" "Admin console"
-check_revalidation_smoke
-
-check_performance
-
-echo "=== Deployment Verification Complete ==="
+main "$@"

@@ -1,91 +1,72 @@
-# Fast Deploy
+# Fast Deploy Runbook
 
-Production deploys now use a GitHub Actions driven rebuild flow:
-- GitHub Actions runs `CI`
-- the deploy workflow checks out the exact triggering commit SHA on the runner
-- the runner validates SSH configuration and host fingerprint, uploads the current remote entrypoint, and runs a remote preflight
-- the droplet fetches and deploys that exact SHA from the existing checkout at `DO_REPO_DIR`
-- the deploy scripts rebuild Docker services locally on the droplet and restart them
+This document explains the fast production deploy path used by the GitHub Actions deployment workflow and the droplet helper scripts.
 
-That removes the external registry dependency from the production release path while keeping GitHub Actions as the only supported deploy trigger.
+## Goal
 
-GitHub Actions is the only supported production release entrypoint.
+Fast deploy minimizes downtime by rebuilding images and restarting backend first, then restarting frontend/admin/nginx.
 
-## Default Release
+## Deploy Entry Points
 
-```bash
-git push origin main
-```
+- GitHub Actions runner helper: `scripts/deploy-via-ssh.sh`
+- Remote droplet helper: `scripts/deploy-live.sh`
+- Fast mode executor: `scripts/deploy-fast.sh`
+- Shared deploy library: `scripts/deploy-common.sh`
 
-The server-side scripts in `scripts/` are still required because the GitHub deploy workflow invokes `scripts/deploy-live.sh` on the droplet over SSH.
+## Required GitHub Configuration
 
-## Runtime Behavior
+### Secrets
 
-Production deploys always use the fast path:
-- builds backend, frontend, admin, and nginx images before replacing running services
-- restarts backend first so API readiness is established early after builds complete
-- restarts frontend, admin, and nginx after backend is healthy
-- runs compact backend checks plus representative public route checks
-- optionally purges Cloudflare cache
-
-Fast public verification includes:
-- `/api/health`
-- `/api/health/deep`
-- `/`
-- `/jobs`
-- `/results`
-- `/admin`
-- optional authenticated internal frontend `/api/revalidate` smoke check when `FRONTEND_REVALIDATE_TOKEN` is configured
-
-Readiness checks use Docker health status plus host-side HTTP checks, and no longer depend on `wget` being present in runtime app containers.
-
-The deeper full-deploy script remains in the repo as server-side maintenance plumbing, but it is not a supported release trigger or operator-facing deployment mode.
-
-## Required Configuration
-
-GitHub Actions secrets:
 - `DO_HOST`
 - `DO_USER`
 - `DO_SSH_KEY`
-- optional `DO_PORT`
+- `DO_PORT` (optional, defaults to `22`)
 
-GitHub Actions variables:
-- `DO_HOST_FINGERPRINT`
-- `DO_REPO_DIR`
+### Repository Variables
 
-Server root `.env`:
-- `POSTGRES_PRISMA_URL` or `DATABASE_URL`
-- `JWT_SECRET`
-- legacy only while compatibility flows remain: `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
-- recommended `COSMOS_DATABASE_NAME`
-- recommended `FRONTEND_URL`
-- recommended `CORS_ORIGINS`
-- recommended `FRONTEND_REVALIDATE_URL`
-- recommended `FRONTEND_REVALIDATE_TOKEN`
-- recommended `METRICS_TOKEN`
-- optional `CF_ZONE_ID`
-- optional `CF_API_TOKEN`
-- optional `DD_API_KEY`
+- `DO_REPO_DIR` (absolute path on droplet)
+- `DO_HOST_FINGERPRINT` (exact `SHA256:<base64>` host key fingerprint)
 
-The server root `.env` is the production source of truth for deploy scripts and `docker-compose.yml`.
-Do not treat `backend/.env` or `frontend/.env.local` as production Docker config.
-The fast deploy path validates compose rendering before rebuild so broken production YAML fails earlier.
-The deploy path will fail if the production checkout is missing, dirty, or missing the root `.env`.
+Deploy fails closed when required values are missing.
 
-## Files
+## Security Model
 
-- `docker-compose.yml`: production runtime and build definition used by GitHub Actions deploys
-- `scripts/deploy-via-ssh.sh`: runner-side SSH validation and remote deploy orchestration
-- `scripts/deploy-common.sh`: shared production deploy helpers
-- `scripts/deploy-fast.sh`: fast production deploy
-- `scripts/deploy-prod.sh`: full production deploy
-- `scripts/deploy-live.sh`: server-side entrypoint used by GitHub Actions deploy over SSH
-- `docker-compose.fast.yml`: local build override, not used by production deploys
+- No repository path auto-discovery.
+- No trust-on-first-use host key behavior.
+- Host key fingerprint must match exactly.
+- Target commit SHA must be a 40-character SHA and reachable from `origin/main`.
 
-## Troubleshooting
+## What Fast Deploy Does
 
-If a deploy fails:
-1. Check the server deploy log at `/tmp/sarkari-result-deploy.log`.
-2. Check container logs with `docker compose -f docker-compose.yml logs`.
-3. Verify `DO_HOST_FINGERPRINT`, `DO_REPO_DIR`, and the required server root `.env` values exist.
-4. Run the remote preflight-only flow described in `docs/production-deploy-checklist.md`.
+1. Validates server prerequisites and deployment configuration.
+2. Validates root `.env` contains required production variables.
+3. Renders Docker Compose config.
+4. Rebuilds backend/frontend/admin/nginx images.
+5. Restarts backend and waits for backend health.
+6. Restarts nginx/admin/frontend (and Datadog if configured).
+7. Runs public endpoint checks and optional revalidation smoke check.
+
+## Manual Invocation On Droplet
+
+```bash
+cd /absolute/path/to/repo
+DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha>
+```
+
+## Post-Deploy Verification
+
+Use:
+
+```bash
+bash scripts/verify-deployment.sh
+```
+
+or set a custom URL:
+
+```bash
+PUBLIC_BASE_URL=https://sarkariexams.me bash scripts/verify-deployment.sh
+```
+
+## Rollback
+
+`deploy-fast.sh` prints a rollback hint with the previous commit SHA. Use that SHA with `deploy-live.sh`.
