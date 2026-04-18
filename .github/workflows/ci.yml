@@ -1,13 +1,12 @@
-# NOTE: This workflow name is the production deploy gate.
-# Keep `name: CI` aligned with `.github/workflows/deploy.yml` workflow_run wiring.
 name: CI
 
 on:
   push:
     branches:
       - main
-  workflow_call:
   pull_request:
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -17,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  compose-config:
+  compose-validation:
     name: Compose Config Validation
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -32,9 +31,9 @@ jobs:
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config >/dev/null
 
   backend:
-    name: Backend Build + Tests
+    name: Backend Lint + Build + Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: backend

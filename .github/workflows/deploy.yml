@@ -7,22 +7,22 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+
 concurrency:
   group: production-deploy
   cancel-in-progress: true
-
-permissions:
-  contents: read
 
 jobs:
   gate:
     name: Evaluate Deploy Gate
     runs-on: ubuntu-latest
     outputs:
-      should_deploy: ${{ steps.evaluate.outputs.should_deploy }}
+      should_deploy: ${{ steps.gate.outputs.should_deploy }}
     steps:
       - name: Evaluate workflow_run gate
-        id: evaluate
+        id: gate
         env:
           TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
@@ -32,14 +32,20 @@ jobs:
         run: |
           set -euo pipefail
           should_deploy=false
-          if [[ "${TRIGGER_WORKFLOW}" == "CI" && "${TRIGGER_CONCLUSION}" == "success" && "${TRIGGER_EVENT}" == "push" && "${TRIGGER_BRANCH}" == "main" && "${TRIGGER_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+
+          if [[ "${TRIGGER_WORKFLOW}" == "CI" \
+             && "${TRIGGER_CONCLUSION}" == "success" \
+             && "${TRIGGER_EVENT}" == "push" \
+             && "${TRIGGER_BRANCH}" == "main" \
+             && "${TRIGGER_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
             should_deploy=true
           fi
+
           echo "should_deploy=${should_deploy}" >> "$GITHUB_OUTPUT"
 
       - name: Summarize gate decision
         env:
-          SHOULD_DEPLOY: ${{ steps.evaluate.outputs.should_deploy }}
+          SHOULD_DEPLOY: ${{ steps.gate.outputs.should_deploy }}
           TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
@@ -56,7 +62,7 @@ jobs:
             echo "- Target SHA: ${TRIGGER_SHA}"
             echo "- Allowed to deploy: ${SHOULD_DEPLOY}"
             if [[ "${SHOULD_DEPLOY}" != "true" ]]; then
-              echo "- Reason: deploy only runs for successful \`CI\` workflow_run events from pushes to \`main\` with a valid 40-char target SHA."
+              echo "- Reason: deploy runs only for successful CI workflow_run events from pushes to main with a valid 40-character SHA."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -64,10 +70,10 @@ jobs:
     name: Deploy to DigitalOcean
     needs:
       - gate
+    if: needs.gate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: production
-    if: needs.gate.outputs.should_deploy == 'true'
     steps:
       - name: Checkout target commit
         uses: actions/checkout@v6
@@ -79,8 +85,9 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
-          DO_PORT: '22'
-          LOCK_WAIT_SECONDS: '120'
+          DO_PORT: ${{ secrets.DO_PORT || '22' }}
+          DO_HOST_FINGERPRINT: ${{ vars.DO_HOST_FINGERPRINT }}
+          DO_REPO_DIR: ${{ vars.DO_REPO_DIR }}
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
