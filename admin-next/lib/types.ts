@@ -187,7 +187,7 @@ export interface AlertSubscriberStats {
 }
 
 export interface Tag {
-  id: number;
+  id: string;
   name: string;
   slug: string;
 }

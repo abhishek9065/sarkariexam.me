@@ -294,7 +294,10 @@ model Post {
   slugAliases          SlugAlias[]
   alertDispatchLogs    AlertDispatchLog[]
 
+  @@index([status, publishedAt])
   @@index([type, status, publishedAt])
+  @@index([isFeatured, status, publishedAt])
+  @@index([isUrgent, status, publishedAt])
   @@index([status, updatedAt])
   @@index([organizationId, status, publishedAt])
   @@index([institutionId, status, publishedAt])
@@ -517,6 +520,7 @@ model AuditLog {
   @@index([postId, createdAt])
   @@index([entityType, entityId, createdAt])
   @@index([action, createdAt])
+  @@index([actorId, createdAt])
   @@map("audit_logs")
 }
 

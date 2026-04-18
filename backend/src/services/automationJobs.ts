@@ -1,14 +1,8 @@
 import { WorkflowStatus } from '@prisma/client';
 
 import PostModelPostgres from '../models/posts.postgres.js';
-
-import {
-    getLegacyLinkHealthEventsCollection,
-    getLegacyLinkRecordsCollection,
-    type LegacyLinkHealthEventDoc,
-} from './automationStore.mongo.js';
 import { invalidateAnnouncementCaches } from './cacheInvalidation.js';
-import { prisma } from './postgres/prisma.js';
+import { prismaApp } from './postgres/prisma.js';
 
 let automationIntervalRef: NodeJS.Timeout | null = null;
 const RUN_EVERY_MINUTES = 60; // Run every hour
@@ -43,60 +37,41 @@ export async function runAutomationJobs() {
         const now = new Date();
 
         // 1. Link Manager Automation
-        // Check links that haven't been checked recently (oldest first)
-        console.log('[Automation] Running Link Health Check...');
-        const linksCollection = getLegacyLinkRecordsCollection();
-        if (linksCollection) {
-            const linksToCheck = await linksCollection.find({
-                status: { $ne: 'expired' },
-                url: { $exists: true, $ne: '' }
-            }).sort({ updatedAt: 1 }).limit(50).toArray();
-
-            const checkedLinks: Array<{
-                _id: unknown;
-                url: string;
-                announcementId?: string;
-                status: 'active' | 'broken';
-            }> = [];
-
-            for (const link of linksToCheck) {
-                const status = await checkLinkHealth(link.url || '');
-                checkedLinks.push({
-                    _id: link._id,
-                    url: String(link.url || ''),
-                    announcementId: link.announcementId,
-                    status,
-                });
-                await linksCollection.updateOne(
-                    { _id: link._id },
-                    { $set: { status, updatedAt: now, lastCheckedAt: now } }
-                );
+        // Check official sources that haven't been checked recently
+        console.log('[Automation] Running Link Health Check (Postgres)...');
+        
+        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        
+        const linksToCheck = await prismaApp.officialSource.findMany({
+            where: {
+                OR: [
+                    { capturedAt: { lt: oneWeekAgo } },
+                    { capturedAt: null }
+                ]
+            },
+            take: 50,
+            orderBy: {
+                capturedAt: 'asc' // Nulls will typically be ordered first or last depending on db, let's just take oldest
             }
+        });
 
-            // Persist health events for the reporting dashboard.
-            // Record the status produced by the current check, not the stale pre-check value.
-            if (checkedLinks.length > 0) {
-                const healthEventsCollection = getLegacyLinkHealthEventsCollection();
-                if (healthEventsCollection) {
-                    const events: LegacyLinkHealthEventDoc[] = checkedLinks.map((link) => ({
-                        url: link.url,
-                        linkId: (link._id as any)?.toHexString?.() || String(link._id),
-                        announcementId: link.announcementId,
-                        status: link.status === 'broken' ? 'broken' : 'ok',
-                        checkedAt: now,
-                        checkedBy: 'system',
-                    }));
-                    await healthEventsCollection.insertMany(events).catch((err: any) => {
-                        console.error('[Automation] Failed to persist link health events:', err);
-                    });
+        for (const link of linksToCheck) {
+            const status = await checkLinkHealth(link.url || '');
+            
+            await prismaApp.officialSource.update({
+                where: { id: link.id },
+                data: {
+                    capturedAt: now,
+                    // In the future, we could add a `status` or `isAlive` column to OfficialSource if needed
                 }
-            }
+            });
+            // We are skipping persisting health events to Mongo.
         }
 
         // 2. Scheduling Automation
         // Find scheduled posts where publishAt <= now
         console.log('[Automation] Executing Scheduled Posts...');
-        const scheduledPosts = await prisma.post.findMany({
+        const scheduledPosts = await prismaApp.post.findMany({
             where: {
                 status: WorkflowStatus.APPROVED,
                 publishedAt: { lte: now },
@@ -122,7 +97,7 @@ export async function runAutomationJobs() {
         // Find published posts where deadline has passed by 30 days
         console.log('[Automation] Expiring Old Posts...');
         const expiryThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
-        const expiredPosts = await prisma.post.findMany({
+        const expiredPosts = await prismaApp.post.findMany({
             where: {
                 status: WorkflowStatus.PUBLISHED,
                 expiresAt: { lt: expiryThreshold },
