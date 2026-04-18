@@ -359,7 +359,10 @@ export async function sendCampaign(campaignId: string): Promise<{ success: boole
 
     await NotificationCampaignModelPostgres.markSent(campaignId, sentCount);
 
-    console.log(`[NotificationService] Campaign ${sanitizeForLog(campaignId, 80)} sent to ${sentCount} users`);
+    console.log('[NotificationService] Campaign sent', {
+      campaignId: sanitizeForLog(campaignId, 80),
+      sentCount,
+    });
     return { success: true };
   } catch (error) {
     console.error('[NotificationService] Error sending campaign:', error);

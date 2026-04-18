@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 import AnnouncementModelPostgres from '../models/announcements.postgres.js';
-import { BookmarkModelMongo } from '../models/bookmarks.postgres.js';
+import { BookmarkModelPostgres } from '../models/bookmarks.postgres.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { getPathParam } from '../utils/routeParams.js';
 
@@ -27,7 +27,7 @@ router.get('/', optionalAuth, async (req: Request, res: Response) => {
     }
 
     try {
-        const ids = await BookmarkModelMongo.findAnnouncementIdsByUser(req.user.userId);
+        const ids = await BookmarkModelPostgres.findAnnouncementIdsByUser(req.user.userId);
         if (ids.length === 0) {
             return res.json({ data: [], count: 0 });
         }
@@ -53,7 +53,7 @@ router.get('/ids', optionalAuth, async (req: Request, res: Response) => {
     }
 
     try {
-        const ids = await BookmarkModelMongo.findAnnouncementIdsByUser(req.user.userId);
+        const ids = await BookmarkModelPostgres.findAnnouncementIdsByUser(req.user.userId);
         return res.json({ data: ids });
     } catch (error) {
         console.error('Error fetching bookmark ids:', error);
@@ -87,7 +87,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Announcement not found' });
         }
 
-        const saved = await BookmarkModelMongo.add(req.user!.userId, announcementId);
+        const saved = await BookmarkModelPostgres.add(req.user!.userId, announcementId);
         if (!saved) {
             return res.status(500).json({ error: 'Failed to save bookmark' });
         }
@@ -120,7 +120,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
             return res.status(400).json({ error: 'Invalid announcement ID format' });
         }
 
-        const removed = await BookmarkModelMongo.remove(req.user!.userId, announcementId);
+        const removed = await BookmarkModelPostgres.remove(req.user!.userId, announcementId);
         if (!removed) {
             return res.status(404).json({ error: 'Bookmark not found' });
         }

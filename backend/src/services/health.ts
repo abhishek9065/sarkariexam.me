@@ -1,6 +1,7 @@
 import { config } from '../config.js';
-import { postgresHealthCheck } from './postgres/prisma.js';
+
 import { healthCheck as legacyMongoHealthCheck } from './cosmosdb.js';
+import { postgresHealthCheck, prismaApp } from './postgres/prisma.js';
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -31,7 +32,7 @@ export async function getSystemHealth(): Promise<HealthStatus> {
   const dbLatency = Date.now() - startTime;
   
   // Overall DB status: Healthy if Postgres (primary) is OK
-  let dbStatus: 'healthy' | 'unhealthy' = postgresOk ? 'healthy' : 'unhealthy';
+  const dbStatus: 'healthy' | 'unhealthy' = postgresOk ? 'healthy' : 'unhealthy';
   
   // Memory usage
   const memUsage = process.memoryUsage();
@@ -86,14 +87,17 @@ export async function getRecentErrors(limit = 10): Promise<Array<{
   count: number;
 }>> {
   try {
-    const { getCollection } = await import('./cosmosdb.js');
-    const col = getCollection('error_logs');
+    const docs = await prismaApp.errorReportEntry.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
     
-    return await col
-      .find({})
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .toArray() as any[];
+    return docs.map((d: any) => ({
+      message: d.message,
+      stack: d.stack,
+      timestamp: d.createdAt,
+      count: 1, // Simplified
+    }));
   } catch {
     return [];
   }

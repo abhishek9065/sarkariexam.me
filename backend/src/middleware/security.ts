@@ -131,13 +131,17 @@ export async function recordFailedLoginWithEmail(ip: string, email?: string): Pr
                 
                 if (newCount >= MAX_FAILED_ATTEMPTS) {
                     if (key.startsWith('bf:ip:')) {
-                        console.log(
-                            `[SECURITY] IP ${sanitizeForLog(ip, 64)} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`
-                        );
+                        console.log('[SECURITY_BRUTE_FORCE_BLOCK]', {
+                            scope: 'ip',
+                            ip: sanitizeForLog(ip, 64),
+                            blockMinutes: Math.round(BLOCK_DURATION_SEC / 60),
+                        });
                     } else if (normalizedEmail) {
-                        console.log(
-                            `[SECURITY] Account ${sanitizeForLog(normalizedEmail, 120)} blocked for ${Math.round(BLOCK_DURATION_SEC / 60)} minutes due to failed login attempts`
-                        );
+                        console.log('[SECURITY_BRUTE_FORCE_BLOCK]', {
+                            scope: 'account',
+                            account: sanitizeForLog(normalizedEmail, 120),
+                            blockMinutes: Math.round(BLOCK_DURATION_SEC / 60),
+                        });
                     }
                 }
             }
@@ -218,23 +222,33 @@ const SENSITIVE_FIELDS = new Set([
  * Sanitize object recursively, skipping sensitive fields
  */
 export function sanitizeObject<T extends object>(obj: T): T {
-    const result: Record<string, unknown> = Object.create(null);
-    for (const [key, value] of Object.entries(obj)) {
-        if (BLOCKED_OBJECT_KEYS.has(key)) {
-            continue;
-        }
+    return sanitizeValue(obj) as T;
+}
 
-        if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
-            result[key] = value;
-        } else if (typeof value === 'string') {
-            result[key] = sanitizeInput(value);
-        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-            result[key] = sanitizeObject(value);
-        } else {
-            result[key] = value;
-        }
+function sanitizeValue(value: unknown, fieldName?: string): unknown {
+    if (typeof value === 'string') {
+        if (fieldName && SENSITIVE_FIELDS.has(fieldName.toLowerCase())) return value;
+        return sanitizeInput(value);
     }
-    return result as T;
+
+    if (Array.isArray(value)) {
+        return value.map((item) => sanitizeValue(item));
+    }
+
+    if (value && typeof value === 'object') {
+        const safeEntries = Object.entries(value as Record<string, unknown>)
+            .filter(([key]) => !BLOCKED_OBJECT_KEYS.has(key))
+            .map(([key, nestedValue]) => {
+                if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
+                    return [key, nestedValue] as const;
+                }
+                return [key, sanitizeValue(nestedValue, key)] as const;
+            });
+
+        return Object.assign(Object.create(null), Object.fromEntries(safeEntries));
+    }
+
+    return value;
 }
 
 /**
@@ -260,7 +274,9 @@ export function blockSuspiciousAgents(req: Request, res: Response, next: NextFun
     ];
 
     if (maliciousPatterns.some(pattern => pattern.test(userAgent))) {
-        console.log(`[SECURITY] Blocked suspicious user agent: ${sanitizeForLog(userAgent, 200)}`);
+        console.log('[SECURITY_BLOCKED_USER_AGENT]', {
+            userAgent: sanitizeForLog(userAgent, 200),
+        });
         return res.status(403).json({ error: 'Access denied' });
     }
 

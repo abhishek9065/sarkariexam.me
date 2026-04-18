@@ -938,3 +938,31 @@ model SecurityLog {
   @@index([ipAddress, createdAt])
   @@map("app_security_logs")
 }
+
+model UserFeedback {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  email     String?
+  subject   String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("app_user_feedback")
+}
+
+model CommunityComment {
+  id             String    @id @default(cuid())
+  postId         String?   @map("post_id")
+  userId         String?   @map("user_id")
+  username       String?
+  body           String
+  status         String    @default("pending")
+  moderatedAt    DateTime? @map("moderated_at")
+  moderatedBy    String?   @map("moderated_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@index([postId, status])
+  @@map("app_community_comments")
+}

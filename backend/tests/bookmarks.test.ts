@@ -42,8 +42,15 @@ describe('bookmarks', () => {
 
         const announcementId = seededPost.id;
 
+        const csrfRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const csrfToken = csrfRes.body?.data?.csrfToken;
+        expect(typeof csrfToken).toBe('string');
+
         await agent
             .post('/api/bookmarks')
+            .set('x-csrf-token', csrfToken)
             .send({ announcementId })
             .expect(201);
 
@@ -55,6 +62,7 @@ describe('bookmarks', () => {
 
         await agent
             .delete(`/api/bookmarks/${announcementId}`)
+            .set('x-csrf-token', csrfToken)
             .expect(200);
 
         const idsAfter = await agent

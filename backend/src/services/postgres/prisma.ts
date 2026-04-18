@@ -110,6 +110,15 @@ export const prismaApp = prisma as PrismaClient & {
     findUnique(args: any): Promise<any>;
     deleteMany(args: any): Promise<{ count: number }>;
   };
+  userFeedback: {
+    findMany(args: any): Promise<any[]>;
+    count(args?: any): Promise<number>;
+  };
+  communityComment: {
+    findMany(args: any): Promise<any[]>;
+    update(args: any): Promise<any>;
+    count(args?: any): Promise<number>;
+  };
   userProfileEntry: {
     findUnique(args: any): Promise<any>;
     create(args: any): Promise<any>;

@@ -83,7 +83,7 @@ describe('server readiness', () => {
 
     expect(response.status).toBe(503);
     expect(response.body).toMatchObject({
-      code: 'SERVICE_UNAVAILABLE',
+      code: 'LEGACY_DB_UNAVAILABLE',
       error: 'Service unavailable',
     });
   });

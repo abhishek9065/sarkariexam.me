@@ -48,18 +48,27 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
             recentLogs.shift();
         }
 
+        const safeMethod = sanitizeForLog(req.method, 16);
+        const safePath = sanitizeForLog(req.path, 200);
+
         // Log slow requests (> 500ms)
         if (durationMs > 500) {
-            console.warn(
-                `[SLOW] ${sanitizeForLog(req.method, 16)} ${sanitizeForLog(req.path, 200)} - ${durationMs}ms (${res.statusCode})`
-            );
+            console.warn('[SLOW_REQUEST]', {
+                method: safeMethod,
+                path: safePath,
+                durationMs,
+                statusCode: res.statusCode,
+            });
         }
 
         // Log errors
         if (res.statusCode >= 400) {
-            console.error(
-                `[ERROR] ${sanitizeForLog(req.method, 16)} ${sanitizeForLog(req.path, 200)} - ${durationMs}ms (${res.statusCode})`
-            );
+            console.error('[ERROR_REQUEST]', {
+                method: safeMethod,
+                path: safePath,
+                durationMs,
+                statusCode: res.statusCode,
+            });
         }
     });
 

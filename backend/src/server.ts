@@ -111,7 +111,12 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
-app.use('/api/auth', csrfProtection());
+app.use('/api', csrfProtection({
+  exempt: [
+    { method: 'POST', path: '/auth/login' },
+    { method: 'POST', path: '/auth/register' },
+  ],
+}));
 
 // Swagger UI
 try {
@@ -351,16 +356,7 @@ app.use(async (req, res, next) => {
 });
 
 // API routes. Some legacy administrative and scheduler-adjacent flows still rely on the Mongo/Cosmos bridge.
-app.use(
-  '/api/auth',
-  csrfProtection({
-    exempt: [
-      { method: 'POST', path: '/login' },
-      { method: 'POST', path: '/register' },
-    ],
-  }),
-  authRouter
-);
+app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/content', contentRouter);
