@@ -111,10 +111,12 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
-app.use('/api', csrfProtection({
+app.use(csrfProtection({
   exempt: [
     { method: 'POST', path: '/auth/login' },
     { method: 'POST', path: '/auth/register' },
+    { method: 'POST', path: '/api/auth/login' },
+    { method: 'POST', path: '/api/auth/register' },
   ],
 }));
 
