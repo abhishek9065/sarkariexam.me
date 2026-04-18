@@ -28,9 +28,10 @@ backend/node_modules/
 backend/dist/
 backend/.env
 
-# SSL private keys
+# SSL certificates and private keys
 nginx/ssl/*.key
 nginx/ssl/*.pem
+nginx/ssl/*.crt
 
 .gemini/
 gha-creds-*.json
