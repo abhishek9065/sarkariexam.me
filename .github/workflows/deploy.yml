@@ -85,9 +85,9 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
-          DO_PORT: ${{ secrets.DO_PORT || '22' }}
-          DO_HOST_FINGERPRINT: ${{ vars.DO_HOST_FINGERPRINT }}
-          DO_REPO_DIR: ${{ vars.DO_REPO_DIR }}
+          DO_PORT: ${{ vars.DO_PORT || secrets.DO_PORT || '22' }}
+          DO_HOST_FINGERPRINT: ${{ vars.DO_HOST_FINGERPRINT || secrets.DO_HOST_FINGERPRINT }}
+          DO_REPO_DIR: ${{ vars.DO_REPO_DIR || secrets.DO_REPO_DIR }}
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
