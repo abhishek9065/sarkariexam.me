@@ -28,6 +28,12 @@ FROM deps AS prod-deps
 
 WORKDIR /app
 
+# Copy source code (Prisma schema required for generate)
+COPY . .
+
+# Generate Prisma Client BEFORE pruning dev dependencies
+RUN npx prisma generate
+
 RUN npm prune --omit=dev && npm cache clean --force
 
 # Production stage
@@ -60,5 +66,5 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD node -e "const http=require('http');const req=http.get('http://127.0.0.1:4000/api/health',(res)=>{res.resume();process.exit(res.statusCode===200?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});"
 
-# Start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Start server (use npx --yes to prevent hanging if prisma is not locally installed due to pruning)
+CMD ["sh", "-c", "npx --yes prisma migrate deploy && node dist/server.js"]

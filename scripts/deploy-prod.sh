@@ -32,7 +32,7 @@ dc build --pull backend frontend admin nginx
 
 set_stage "restart-all"
 record_diagnosis "Docker Compose failed to restart production services."
-dc up -d --force-recreate --remove-orphans nginx backend admin frontend "${DATADOG_SERVICES[@]}"
+dc up -d --force-recreate --remove-orphans nginx backend admin frontend ${DATADOG_SERVICES[@]:+"${DATADOG_SERVICES[@]}"}
 dc ps
 
 set_stage "wait-backend"

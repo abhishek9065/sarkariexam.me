@@ -40,7 +40,7 @@ BACKEND_HEALTH_RESULT="container healthcheck ok"
 
 set_stage "restart-web"
 record_diagnosis "Frontend/admin/nginx restart failed. Inspect container logs and reverse proxy wiring."
-dc up -d --force-recreate --remove-orphans nginx admin frontend "${DATADOG_SERVICES[@]}"
+dc up -d --force-recreate --remove-orphans nginx admin frontend ${DATADOG_SERVICES[@]:+"${DATADOG_SERVICES[@]}"}
 dc ps
 
 set_stage "wait-web-services"
