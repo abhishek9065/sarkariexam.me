@@ -33,6 +33,23 @@ export interface SecurityLogFilters {
     end?: Date;
 }
 
+const SECURITY_EVENT_TYPES: SecurityEvent['event_type'][] = ['rate_limit', 'auth_failure', 'suspicious_activity'];
+const INCIDENT_STATUSES: NonNullable<SecurityEvent['incidentStatus']>[] = ['new', 'investigating', 'resolved'];
+
+const toSecurityEventType = (value: unknown): SecurityEvent['event_type'] => {
+    if (typeof value === 'string' && SECURITY_EVENT_TYPES.includes(value as SecurityEvent['event_type'])) {
+        return value as SecurityEvent['event_type'];
+    }
+    return 'suspicious_activity';
+};
+
+const toIncidentStatus = (value: unknown): NonNullable<SecurityEvent['incidentStatus']> => {
+    if (typeof value === 'string' && INCIDENT_STATUSES.includes(value as NonNullable<SecurityEvent['incidentStatus']>)) {
+        return value as NonNullable<SecurityEvent['incidentStatus']>;
+    }
+    return 'new';
+};
+
 // In-memory store for recent security logs
 const securityLogs: StoredEvent[] = [];
 const MAX_MEMORY_LOGS = 500;
@@ -153,10 +170,10 @@ export class SecurityLogger {
                     data: docs.map((doc: any) => ({
                         id: doc.id,
                         ip_address: doc.ipAddress,
-                        event_type: doc.eventType,
+                        event_type: toSecurityEventType(doc.eventType),
                         endpoint: doc.endpoint,
                         metadata: doc.metadata,
-                        incidentStatus: doc.incidentStatus,
+                        incidentStatus: toIncidentStatus(doc.incidentStatus),
                         assigneeEmail: doc.assigneeEmail,
                         note: doc.note,
                         created_at: doc.createdAt,
@@ -205,10 +222,10 @@ export class SecurityLogger {
                 return {
                     id: updated.id,
                     ip_address: updated.ipAddress,
-                    event_type: updated.eventType,
+                    event_type: toSecurityEventType(updated.eventType),
                     endpoint: updated.endpoint,
                     metadata: updated.metadata,
-                    incidentStatus: updated.incidentStatus,
+                    incidentStatus: toIncidentStatus(updated.incidentStatus),
                     assigneeEmail: updated.assigneeEmail,
                     note: updated.note,
                     created_at: updated.createdAt,
