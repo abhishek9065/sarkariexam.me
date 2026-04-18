@@ -31,3 +31,6 @@ backend/.env
 # SSL private keys
 nginx/ssl/*.key
 nginx/ssl/*.pem
+
+.gemini/
+gha-creds-*.json
