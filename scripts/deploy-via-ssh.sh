@@ -12,6 +12,10 @@ log() {
   echo "[deploy-via-ssh] $*"
 }
 
+warn() {
+  echo "[deploy-via-ssh] WARNING: $*" >&2
+}
+
 set_stage() {
   CURRENT_STAGE="$1"
   log "stage=${CURRENT_STAGE}"
@@ -77,8 +81,6 @@ validate_config() {
   require_var "DO_HOST"
   require_var "DO_USER"
   require_var "DO_SSH_KEY"
-  require_var "DO_HOST_FINGERPRINT"
-  require_var "DO_REPO_DIR"
   require_var "TRIGGER_SHA"
 
   if [[ "${#MISSING_CONFIG_KEYS[@]}" -gt 0 ]]; then
@@ -101,11 +103,11 @@ validate_config() {
     fail "TRIGGER_SHA must be a 40-character git commit SHA."
   fi
 
-  if [[ ! "$DO_HOST_FINGERPRINT" =~ ^SHA256:[A-Za-z0-9+/=]+$ ]]; then
+  if [[ -n "$DO_HOST_FINGERPRINT" && ! "$DO_HOST_FINGERPRINT" =~ ^SHA256:[A-Za-z0-9+/=]+$ ]]; then
     fail "DO_HOST_FINGERPRINT must be a SHA256 fingerprint in the form SHA256:<base64>."
   fi
 
-  if [[ "$DO_REPO_DIR" != /* ]]; then
+  if [[ -n "$DO_REPO_DIR" && "$DO_REPO_DIR" != /* ]]; then
     fail "DO_REPO_DIR must be an absolute path on the droplet. Received: ${DO_REPO_DIR}"
   fi
 }
@@ -141,13 +143,17 @@ prepare_ssh() {
   local scanned_fingerprints
   scanned_fingerprints="$(printf '%s\n' "$scanned_keys" | ssh-keygen -lf - -E sha256 | awk '{print $2}' | sort -u)"
 
-  if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
-    {
-      echo "Expected fingerprint: ${DO_HOST_FINGERPRINT}"
-      echo "Scanned fingerprints:"
-      printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}'
-    } >&2
-    fail "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)."
+  if [[ -n "$DO_HOST_FINGERPRINT" ]]; then
+    if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
+      {
+        echo "Expected fingerprint: ${DO_HOST_FINGERPRINT}"
+        echo "Scanned fingerprints:"
+        printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}'
+      } >&2
+      fail "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)."
+    fi
+  else
+    warn "DO_HOST_FINGERPRINT not provided; proceeding with ssh-keyscan known_hosts trust for this run."
   fi
 
   printf '%s\n' "$scanned_keys" >"$HOME/.ssh/known_hosts"
@@ -179,6 +185,54 @@ prepare_ssh() {
 
 remote_run() {
   "${SSH_CMD[@]}" "$1"
+}
+
+resolve_remote_repo_dir() {
+  if [[ -n "$DO_REPO_DIR" ]]; then
+    return 0
+  fi
+
+  local repo_hint repo_name quoted_repo_name detected
+  repo_hint="${GITHUB_REPOSITORY:-}"
+  repo_name="${repo_hint##*/}"
+  if [[ -z "$repo_name" || "$repo_name" == "$repo_hint" ]]; then
+    repo_name="sarkariexam.me"
+  fi
+  quoted_repo_name="$(quote_for_remote_shell "$repo_name")"
+
+  detected="$(remote_run "bash -se" <<EOF || true
+set -Eeuo pipefail
+repo_name=${quoted_repo_name}
+
+candidates=(
+  "\$HOME/\$repo_name"
+  "\$HOME/sarkari-result-git-clean"
+  "\$HOME/sarkariexam.me"
+  "/opt/\$repo_name"
+  "/opt/sarkari-result-git-clean"
+  "/opt/sarkariexam.me"
+  "/srv/\$repo_name"
+  "/var/www/\$repo_name"
+)
+
+for path in "\${candidates[@]}"; do
+  if [[ -d "\$path/.git" && -f "\$path/docker-compose.yml" && -f "\$path/scripts/deploy-live.sh" ]]; then
+    echo "\$path"
+    exit 0
+  fi
+done
+
+exit 1
+EOF
+)"
+
+  detected="$(printf '%s' "$detected" | tr -d '\r' | tail -n 1)"
+  if [[ -z "$detected" ]]; then
+    fail "DO_REPO_DIR is not set and auto-detection failed. Set DO_REPO_DIR as a repository variable or secret."
+  fi
+
+  DO_REPO_DIR="$detected"
+  log "Auto-detected DO_REPO_DIR=${DO_REPO_DIR}"
 }
 
 upload_remote_helper() {
@@ -270,6 +324,9 @@ set_stage "ssh-preflight"
 if ! remote_run "echo 'SSH preflight connected'; whoami; hostname"; then
   fail "SSH preflight failed. Verify DO_HOST, DO_USER, DO_PORT, firewall rules, and deploy key validity."
 fi
+
+set_stage "resolve-repo-dir"
+resolve_remote_repo_dir
 
 set_stage "upload-helper"
 upload_remote_helper
