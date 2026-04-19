@@ -1,5 +1,4 @@
 import { config } from '../config.js';
-import { sanitizeForLog } from '../utils/logSanitizer.js';
 
 import { prismaApp } from './postgres/prisma.js';
 
@@ -119,9 +118,7 @@ export class SecurityLogger {
 
             // Also console log for visibility
             console.log('[Security] Event captured', {
-                eventType: sanitizeForLog(event.event_type, 40),
-                ipAddress: sanitizeForLog(event.ip_address, 64),
-                endpoint: sanitizeForLog(event.endpoint, 200),
+                eventType: toSecurityEventType(event.event_type),
             });
         } catch (error) {
             console.error('Failed to log security event:', error);

@@ -294,17 +294,17 @@ model Post {
   slugAliases          SlugAlias[]
   alertDispatchLogs    AlertDispatchLog[]
 
-  @@index([status, publishedAt])
-  @@index([type, status, publishedAt])
-  @@index([isFeatured, status, publishedAt])
-  @@index([isUrgent, status, publishedAt])
-  @@index([status, updatedAt])
-  @@index([organizationId, status, publishedAt])
-  @@index([institutionId, status, publishedAt])
-  @@index([examId, status, publishedAt])
-  @@index([programId, status, publishedAt])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([type, status, publishedAt(sort: Desc)])
+  @@index([isFeatured, status, publishedAt(sort: Desc)])
+  @@index([isUrgent, status, publishedAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
+  @@index([organizationId, status, publishedAt(sort: Desc)])
+  @@index([institutionId, status, publishedAt(sort: Desc)])
+  @@index([examId, status, publishedAt(sort: Desc)])
+  @@index([programId, status, publishedAt(sort: Desc)])
   @@index([expiresAt])
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)])
   @@map("posts")
 }
 

@@ -9,9 +9,17 @@ describeOrSkip('auth/register', () => {
     it('registers and logs in a user', async () => {
         const email = `test-${Date.now()}@example.com`;
         const password = `Str0ng!${Date.now()}Aa`;
+        const agent = request.agent(app);
 
-        const registerRes = await request(app)
+        const csrfRegisterRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const registerCsrfToken = csrfRegisterRes.body?.data?.csrfToken;
+        expect(typeof registerCsrfToken).toBe('string');
+
+        const registerRes = await agent
             .post('/api/auth/register')
+            .set('x-csrf-token', registerCsrfToken)
             .send({
                 name: 'Test User',
                 email,
@@ -23,8 +31,15 @@ describeOrSkip('auth/register', () => {
         expect(registerRes.body?.data?.user?.email).toBe(email);
         expect(registerRes.headers['set-cookie']).toBeDefined();
 
-        const loginRes = await request(app)
+        const csrfLoginRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const loginCsrfToken = csrfLoginRes.body?.data?.csrfToken;
+        expect(typeof loginCsrfToken).toBe('string');
+
+        const loginRes = await agent
             .post('/api/auth/login')
+            .set('x-csrf-token', loginCsrfToken)
             .send({ email, password })
             .expect(200);
 

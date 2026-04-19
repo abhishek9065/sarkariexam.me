@@ -10,8 +10,15 @@ async function createUserToken() {
     const email = `bookmark-${Date.now()}@example.com`;
     const password = `Strong!${Date.now()}Aa`;
 
+    const csrfRes = await agent
+        .get('/api/auth/csrf')
+        .expect(200);
+    const csrfToken = csrfRes.body?.data?.csrfToken;
+    expect(typeof csrfToken).toBe('string');
+
     const registerRes = await agent
         .post('/api/auth/register')
+        .set('x-csrf-token', csrfToken)
         .send({
             name: 'Bookmark User',
             email,

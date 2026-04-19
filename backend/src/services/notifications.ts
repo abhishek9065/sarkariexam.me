@@ -6,7 +6,6 @@ import NotificationCampaignModelPostgres, {
   type NotificationCampaignSegmentType,
 } from '../models/notificationCampaigns.postgres.js';
 import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
-import { sanitizeForLog } from '../utils/logSanitizer.js';
 import { slugify } from '../utils/slugify.js';
 
 import { prisma } from './postgres/prisma.js';
@@ -360,7 +359,6 @@ export async function sendCampaign(campaignId: string): Promise<{ success: boole
     await NotificationCampaignModelPostgres.markSent(campaignId, sentCount);
 
     console.log('[NotificationService] Campaign sent', {
-      campaignId: sanitizeForLog(campaignId, 80),
       sentCount,
     });
     return { success: true };

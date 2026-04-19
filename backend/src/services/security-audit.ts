@@ -49,9 +49,9 @@ export async function getSecurityEvents(
     };
 
     const query: Record<string, unknown> = {};
-    if (safeFilters.type) query.type = safeFilters.type;
-    if (safeFilters.severity) query.severity = safeFilters.severity;
-    if (safeFilters.userId) query.userId = safeFilters.userId;
+    if (safeFilters.type) query.type = { $eq: safeFilters.type };
+    if (safeFilters.severity) query.severity = { $eq: safeFilters.severity };
+    if (safeFilters.userId) query.userId = { $eq: safeFilters.userId };
 
     const results = await col.find(query).sort({ timestamp: -1 }).limit(normalizeLimit(limit)).toArray();
     return results as unknown as SecurityEvent[];

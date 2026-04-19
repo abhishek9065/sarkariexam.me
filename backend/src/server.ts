@@ -131,20 +131,7 @@ const apiCsrfProtection = csurf({
   },
 });
 
-app.use('/api', (req, res, next) => {
-  const normalizedPath = req.path.endsWith('/') && req.path.length > 1
-    ? req.path.slice(0, -1)
-    : req.path;
-  const isAuthBootstrap = req.method === 'POST'
-    && (normalizedPath === '/auth/login' || normalizedPath === '/auth/register');
-
-  if (isAuthBootstrap) {
-    next();
-    return;
-  }
-
-  apiCsrfProtection(req, res, next);
-});
+app.use('/api', apiCsrfProtection);
 
 // Swagger UI
 try {

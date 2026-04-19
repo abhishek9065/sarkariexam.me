@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 
 import RedisCache from '../services/redis.js';
-import { sanitizeForLog } from '../utils/logSanitizer.js';
 
 /**
  * Comprehensive security middleware
@@ -133,13 +132,11 @@ export async function recordFailedLoginWithEmail(ip: string, email?: string): Pr
                     if (key.startsWith('bf:ip:')) {
                         console.log('[SECURITY_BRUTE_FORCE_BLOCK]', {
                             scope: 'ip',
-                            ip: sanitizeForLog(ip, 64),
                             blockMinutes: Math.round(BLOCK_DURATION_SEC / 60),
                         });
                     } else if (normalizedEmail) {
                         console.log('[SECURITY_BRUTE_FORCE_BLOCK]', {
                             scope: 'account',
-                            account: sanitizeForLog(normalizedEmail, 120),
                             blockMinutes: Math.round(BLOCK_DURATION_SEC / 60),
                         });
                     }
@@ -275,7 +272,7 @@ export function blockSuspiciousAgents(req: Request, res: Response, next: NextFun
 
     if (maliciousPatterns.some(pattern => pattern.test(userAgent))) {
         console.log('[SECURITY_BLOCKED_USER_AGENT]', {
-            userAgent: sanitizeForLog(userAgent, 200),
+            reason: 'suspicious-user-agent',
         });
         return res.status(403).json({ error: 'Access denied' });
     }

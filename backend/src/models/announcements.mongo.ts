@@ -30,6 +30,12 @@ function normalizeContentType(value?: unknown): ContentType | undefined {
     return ALLOWED_CONTENT_TYPES.has(normalized) ? normalized : undefined;
 }
 
+function buildTypeEqualityFilter(value?: unknown): { $eq: ContentType } | undefined {
+    const normalized = normalizeContentType(value);
+    if (!normalized) return undefined;
+    return { $eq: normalized };
+}
+
 function clampLimit(value: unknown, fallback: number, min: number, max: number): number {
     if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
     const rounded = Math.trunc(value);
@@ -43,6 +49,13 @@ function buildStringFilter(value?: string) {
         return { $in: values };
     }
     return { $regex: escapeRegex(values[0]), $options: 'i' };
+}
+
+function buildContainsRegexFilter(value?: string) {
+    if (!value) return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    return { $regex: escapeRegex(trimmed), $options: 'i' };
 }
 
 function buildSearchRegexes(value: string): RegExp[] {
@@ -284,8 +297,9 @@ function buildAdminQuery(filters?: {
         query.status = filters.status as AnnouncementStatus;
     }
 
-    if (filters?.type) {
-        query.type = filters.type;
+    const typeFilter = buildTypeEqualityFilter(filters?.type);
+    if (typeFilter) {
+        query.type = typeFilter;
     }
 
     if (filters?.category) {
@@ -455,8 +469,9 @@ export class AnnouncementModelMongo {
         try {
             const query: Filter<AnnouncementDoc> = buildLiveQuery();
 
-            if (filters?.type) {
-                query.type = filters.type;
+            const typeFilter = buildTypeEqualityFilter(filters?.type);
+            if (typeFilter) {
+                query.type = typeFilter;
             }
 
             if (filters?.category) {
@@ -468,11 +483,11 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.location) {
-                query.location = { $regex: filters.location, $options: 'i' };
+                query.location = buildContainsRegexFilter(filters.location);
             }
 
             if (filters?.qualification) {
-                query.minQualification = { $regex: filters.qualification, $options: 'i' };
+                query.minQualification = buildContainsRegexFilter(filters.qualification);
             }
 
             if (filters?.search && filters.search.trim()) {
@@ -982,11 +997,12 @@ export class AnnouncementModelMongo {
                 }
             }
 
-            if (filters?.type) query.type = filters.type;
+            const typeFilter = buildTypeEqualityFilter(filters?.type);
+            if (typeFilter) query.type = typeFilter;
             if (filters?.category) query.category = buildStringFilter(filters.category);
             if (filters?.organization) query.organization = buildStringFilter(filters.organization);
-            if (filters?.location) query.location = { $regex: filters.location, $options: 'i' };
-            if (filters?.qualification) query.minQualification = { $regex: filters.qualification, $options: 'i' };
+            if (filters?.location) query.location = buildContainsRegexFilter(filters.location);
+            if (filters?.qualification) query.minQualification = buildContainsRegexFilter(filters.qualification);
             if (filters?.search && filters.search.trim()) {
                 addSearchFilter(query, buildSearchRegexes(filters.search));
             }
@@ -1072,8 +1088,9 @@ export class AnnouncementModelMongo {
             const query: Filter<AnnouncementDoc> = buildLiveQuery();
             const limit = filters?.limit || 20;
 
-            if (filters?.type) {
-                query.type = filters.type;
+            const typeFilter = buildTypeEqualityFilter(filters?.type);
+            if (typeFilter) {
+                query.type = typeFilter;
             }
 
             if (filters?.category) {
@@ -1085,11 +1102,11 @@ export class AnnouncementModelMongo {
             }
 
             if (filters?.location) {
-                query.location = { $regex: filters.location, $options: 'i' };
+                query.location = buildContainsRegexFilter(filters.location);
             }
 
             if (filters?.qualification) {
-                query.minQualification = { $regex: filters.qualification, $options: 'i' };
+                query.minQualification = buildContainsRegexFilter(filters.qualification);
             }
 
             if (filters?.search && filters.search.trim()) {
@@ -1434,9 +1451,10 @@ export class AnnouncementModelMongo {
         try {
             const safeType = normalizeContentType(options?.type);
             const safeLimit = clampLimit(options?.limit, 10, 1, 100);
-            const query: Filter<AnnouncementDoc> = safeType
-                ? { ...buildLiveQuery(), type: safeType }
-                : buildLiveQuery();
+            const query: Filter<AnnouncementDoc> = buildLiveQuery();
+            if (safeType) {
+                query.type = { $eq: safeType };
+            }
 
             const docs = await this.collection
                 .find(query)

@@ -32,10 +32,15 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
         });
         const [seconds, nanoseconds] = process.hrtime(startTime);
         const durationMs = Math.round((seconds * 1000) + (nanoseconds / 1000000));
+        const routePath = typeof req.route?.path === 'string'
+            ? req.route.path
+            : typeof req.baseUrl === 'string' && req.baseUrl.length > 0
+                ? req.baseUrl
+                : 'unmatched';
 
         const log: RequestLog = {
             method: req.method,
-            path: req.path,
+            path: routePath,
             duration: durationMs,
             status: res.statusCode,
             timestamp: new Date().toISOString(),
@@ -49,7 +54,7 @@ export function responseTimeLogger(req: Request, res: Response, next: NextFuncti
         }
 
         const safeMethod = sanitizeForLog(req.method, 16);
-        const safePath = sanitizeForLog(req.path, 200);
+        const safePath = sanitizeForLog(routePath, 200);
 
         // Log slow requests (> 500ms)
         if (durationMs > 500) {

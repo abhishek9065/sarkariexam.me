@@ -1,5 +1,4 @@
 import { getCache as getMemoryCache, setCache as setMemoryCache, deleteCache as deleteMemoryCache, invalidateCache } from '../utils/cache.js';
-import { sanitizeForLog } from '../utils/logSanitizer.js';
 
 /**
  * Redis Cache Service using Upstash REST API
@@ -165,7 +164,7 @@ export async function invalidatePattern(pattern: string): Promise<void> {
     if (isRedisConfigured) {
         // Upstash doesn't support KEYS in free tier, so we skip pattern deletion
         // The TTL will handle expiration
-        console.log(`Cache pattern invalidation requested: ${pattern}`);
+        console.log('Cache pattern invalidation requested');
     }
     invalidateCache(pattern);
 }
@@ -190,16 +189,14 @@ export async function getOrFetch<T>(
     fetcher: () => Promise<T | null>,
     ttlSeconds: number = 3600
 ): Promise<T | null> {
-    const safeKey = sanitizeForLog(key, 160);
-
     // 1. Check cache first (Redis or memory)
     const cached = await get(key);
     if (cached !== null && cached !== undefined) {
-        console.log(`[Cache HIT] ${safeKey}`);
+        console.log('[Cache HIT]');
         return cached as T;
     }
 
-    console.log(`[Cache MISS] ${safeKey}`);
+    console.log('[Cache MISS]');
 
     // 2. Fetch from database
     const data = await fetcher();
@@ -217,7 +214,7 @@ export async function getOrFetch<T>(
  */
 export async function invalidate(key: string): Promise<void> {
     await del(key);
-    console.log(`[Cache INVALIDATED] ${key}`);
+    console.log('[Cache INVALIDATED]');
 }
 
 export const RedisCache = {

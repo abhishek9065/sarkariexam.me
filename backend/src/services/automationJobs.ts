@@ -1,6 +1,7 @@
 import { WorkflowStatus } from '@prisma/client';
 
 import PostModelPostgres from '../models/posts.postgres.js';
+
 import { invalidateAnnouncementCaches } from './cacheInvalidation.js';
 import { prismaApp } from './postgres/prisma.js';
 
@@ -56,7 +57,7 @@ export async function runAutomationJobs() {
         });
 
         for (const link of linksToCheck) {
-            const status = await checkLinkHealth(link.url || '');
+            await checkLinkHealth(link.url || '');
             
             await prismaApp.officialSource.update({
                 where: { id: link.id },
