@@ -93,4 +93,6 @@ jobs:
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
           TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           DEPLOY_MODE: fast
+          DEPLOY_AUTOCLEAN_TRACKED: '1'
+          DEPLOY_AUTOCLEAN_TRACKED_PATHS: backend/package-lock.json
         run: bash scripts/deploy-via-ssh.sh

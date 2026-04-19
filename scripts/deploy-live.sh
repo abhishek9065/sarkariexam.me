@@ -119,6 +119,55 @@ ensure_git_safe_directory() {
 require_clean_checkout() {
   local status_output
   status_output="$(git -C "$REPO_DIR" status --porcelain --untracked-files=no)"
+
+  if [[ -n "$status_output" && "${DEPLOY_AUTOCLEAN_TRACKED:-1}" == "1" ]]; then
+    local allowlist_raw allowlist_entry
+    local -a allowlist=()
+    local -a restore_paths=()
+    local can_autoclean=1
+
+    allowlist_raw="${DEPLOY_AUTOCLEAN_TRACKED_PATHS:-backend/package-lock.json}"
+    IFS=',' read -r -a allowlist <<< "$allowlist_raw"
+
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+
+      local status_code changed_path
+      local is_allowlisted=0
+
+      status_code="${line:0:2}"
+      changed_path="${line:3}"
+
+      if [[ "$status_code" != " M" && "$status_code" != "M " && "$status_code" != "MM" ]]; then
+        can_autoclean=0
+        break
+      fi
+
+      for allowlist_entry in "${allowlist[@]}"; do
+        allowlist_entry="${allowlist_entry#"${allowlist_entry%%[![:space:]]*}"}"
+        allowlist_entry="${allowlist_entry%"${allowlist_entry##*[![:space:]]}"}"
+        if [[ -n "$allowlist_entry" && "$changed_path" == "$allowlist_entry" ]]; then
+          is_allowlisted=1
+          break
+        fi
+      done
+
+      if [[ "$is_allowlisted" != "1" ]]; then
+        can_autoclean=0
+        break
+      fi
+
+      restore_paths+=("$changed_path")
+    done <<< "$status_output"
+
+    if [[ "$can_autoclean" == "1" && "${#restore_paths[@]}" -gt 0 ]]; then
+      echo "Auto-restoring allowlisted tracked modifications before deploy preflight:"
+      printf '  - %s\n' "${restore_paths[@]}"
+      git -C "$REPO_DIR" restore --worktree --staged -- "${restore_paths[@]}"
+      status_output="$(git -C "$REPO_DIR" status --porcelain --untracked-files=no)"
+    fi
+  fi
+
   if [[ -n "$status_output" ]]; then
     echo "$status_output"
     die "Production checkout has tracked modifications. Refusing to deploy over local changes."

@@ -38,7 +38,7 @@ This repository uses a strict deployment model for production delivery to a Digi
 - Deployment refuses to run if host key fingerprint does not match.
 - Deployment refuses non-40-character SHAs.
 - Deployment refuses SHAs not reachable from `origin/main`.
-- Deployment refuses to proceed when remote working tree has tracked local modifications.
+- Deployment auto-restores allowlisted tracked drift (`backend/package-lock.json` by default) before preflight; any other tracked local modification still aborts deploy.
 
 ## Root .env Requirements
 
