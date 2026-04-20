@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCircle, Download, Mail, Search, Trash2, Users, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { deleteSubscriber, getSubscriberStats, getSubscribers } from '@/lib/api';
+import { deleteSubscriber, getEditorialSubscriberCoverage, getSubscriberStats, getSubscribers } from '@/lib/api';
 import type { AlertSubscriber } from '@/lib/types';
 
 function formatDate(value?: string) {
@@ -70,11 +70,17 @@ export function SubscribersPage() {
     queryFn: () => getSubscribers({ search: search || undefined, status, frequency, limit: 100 }),
   });
 
+  const coverageQuery = useQuery({
+    queryKey: ['alert-subscriber-coverage'],
+    queryFn: () => getEditorialSubscriberCoverage(8),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteSubscriber(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-subscribers'] });
       queryClient.invalidateQueries({ queryKey: ['alert-subscriber-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['alert-subscriber-coverage'] });
       toast.success('Subscriber removed.');
     },
     onError: (error: Error) => {
@@ -84,6 +90,7 @@ export function SubscribersPage() {
 
   const subscribers = subscribersQuery.data?.data || [];
   const stats = statsQuery.data?.data;
+  const coverage = coverageQuery.data?.data;
 
   const activeCount = stats?.active ?? subscribers.filter((item) => item.isActive).length;
   const inactiveCount = stats?.inactive ?? subscribers.filter((item) => !item.isActive).length;
@@ -163,6 +170,75 @@ export function SubscribersPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-[22px] border border-gray-100 bg-white p-5 shadow-sm">
+        <h3 className="mb-3 text-[13px] font-bold text-gray-800">Preference Coverage Snapshot</h3>
+        {coverageQuery.isLoading ? (
+          <p className="text-[12px] text-gray-500">Loading preference coverage…</p>
+        ) : coverage ? (
+          <div className="space-y-4">
+            <p className="text-[11px] text-gray-500">
+              Sampled from {coverage.sampleSize.toLocaleString()} active verified subscribers.
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-gray-100 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Top Categories</p>
+                <div className="mt-2 space-y-1.5">
+                  {(coverage.categories || []).slice(0, 4).map((item) => (
+                    <div key={item.slug} className="flex items-center justify-between text-[11px]">
+                      <span className="truncate text-gray-700">{item.name}</span>
+                      <span className="font-semibold text-gray-900">{item.count}</span>
+                    </div>
+                  ))}
+                  {(coverage.categories || []).length === 0 ? <p className="text-[11px] text-gray-400">No category preferences.</p> : null}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Top States</p>
+                <div className="mt-2 space-y-1.5">
+                  {(coverage.states || []).slice(0, 4).map((item) => (
+                    <div key={item.slug} className="flex items-center justify-between text-[11px]">
+                      <span className="truncate text-gray-700">{item.name}</span>
+                      <span className="font-semibold text-gray-900">{item.count}</span>
+                    </div>
+                  ))}
+                  {(coverage.states || []).length === 0 ? <p className="text-[11px] text-gray-400">No state preferences.</p> : null}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Top Organizations</p>
+                <div className="mt-2 space-y-1.5">
+                  {(coverage.organizations || []).slice(0, 4).map((item) => (
+                    <div key={item.slug} className="flex items-center justify-between text-[11px]">
+                      <span className="truncate text-gray-700">{item.name}</span>
+                      <span className="font-semibold text-gray-900">{item.count}</span>
+                    </div>
+                  ))}
+                  {(coverage.organizations || []).length === 0 ? <p className="text-[11px] text-gray-400">No organization preferences.</p> : null}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Top Post Types</p>
+                <div className="mt-2 space-y-1.5">
+                  {(coverage.postTypes || []).slice(0, 4).map((item) => (
+                    <div key={item.key} className="flex items-center justify-between text-[11px]">
+                      <span className="truncate capitalize text-gray-700">{item.key}</span>
+                      <span className="font-semibold text-gray-900">{item.count}</span>
+                    </div>
+                  ))}
+                  {(coverage.postTypes || []).length === 0 ? <p className="text-[11px] text-gray-400">No post type preferences.</p> : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[12px] text-gray-500">Coverage snapshot is unavailable right now.</p>
+        )}
       </div>
 
       <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">

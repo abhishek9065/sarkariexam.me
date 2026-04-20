@@ -52,6 +52,8 @@ set_stage "purge-cache"
 purge_cloudflare_cache || true
 
 set_stage "public-checks"
+verify_public_endpoint "/api/livez" "backend liveness" "^200$"
+verify_public_endpoint "/api/readyz" "backend readiness" "^200$"
 verify_public_endpoint "/api/health" "backend health" "^200$"
 verify_public_endpoint "/api/health/deep" "backend deep health" "^200$"
 verify_public_endpoint "/" "homepage"

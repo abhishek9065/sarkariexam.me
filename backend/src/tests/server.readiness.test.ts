@@ -41,6 +41,7 @@ vi.mock('../services/postgres/prisma.js', async (importOriginal) => {
 
 describe('server readiness', () => {
   beforeEach(() => {
+    process.env.POSTGRES_PRISMA_URL = 'postgresql://postgres:postgres@localhost:5432/sarkari_test?schema=public';
     vi.resetModules();
     connectToDatabase.mockReset();
     ensureDatabaseReady.mockReset();
@@ -88,6 +89,38 @@ describe('server readiness', () => {
       },
     });
     expect(healthCheck).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 for /api/livez even when PostgreSQL checks fail', async () => {
+    isDatabaseConfigured.mockReturnValue(true);
+    postgresHealthCheck.mockResolvedValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app).get('/api/livez');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'ok',
+    });
+  });
+
+  it('returns 503 for /api/readyz when PostgreSQL is unavailable', async () => {
+    isDatabaseConfigured.mockReturnValue(false);
+    postgresHealthCheck.mockResolvedValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app).get('/api/readyz');
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({
+      status: 'error',
+      contentDb: {
+        postgres: {
+          configured: true,
+          ok: false,
+        },
+      },
+    });
   });
 
   it('does not block /api/admin routes on legacy bridge readiness anymore', async () => {

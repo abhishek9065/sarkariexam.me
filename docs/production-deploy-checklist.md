@@ -20,6 +20,7 @@ Use this checklist for every production deployment.
 ## 2. Trigger Deploy
 
 - Push to `main` (normal path) and wait for workflow-run deploy.
+- Optional preflight-only gate before release windows: run GitHub Actions `Deploy Preflight` with `target_environment=production`.
 - Or run manual command on droplet for emergency controlled deploy:
 
 ```bash
@@ -41,6 +42,8 @@ DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha
 ## 4. Post Deploy Validation
 
 - Verify endpoints:
+  - `/api/livez` returns `200`
+  - `/api/readyz` returns `200`
   - `/api/health` returns `200`
   - `/api/health/deep` returns `200`
   - `/` loads
@@ -56,10 +59,18 @@ bash scripts/verify-deployment.sh
 ## 5. Rollback Plan
 
 - Use the `previous_sha` printed in deploy summary.
+- Or read `.deploy-state/last-release.env` in the production checkout.
 - Execute rollback:
 
 ```bash
 DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <previous_sha>
+```
+
+- Safer helper flow:
+
+```bash
+bash scripts/rollback-last.sh
+bash scripts/rollback-last.sh --yes
 ```
 
 - Re-run `bash scripts/verify-deployment.sh` after rollback.

@@ -86,6 +86,28 @@ check_assets() {
   echo "ok   ${label} assets"
 }
 
+check_metrics() {
+  local token url body
+  token="$(read_env_var "METRICS_TOKEN")"
+  if [[ -z "$token" ]]; then
+    echo "skip metrics endpoint check (METRICS_TOKEN not set)"
+    return 0
+  fi
+
+  url="${PUBLIC_BASE_URL%/}/metrics"
+  body="$(curl -sS -L --connect-timeout 5 --max-time 15 -H "Authorization: Bearer ${token}" "$url" || true)"
+  if [[ -z "$body" ]]; then
+    echo "fail metrics endpoint (${url}) -> empty response"
+    return 1
+  fi
+  if ! printf '%s' "$body" | grep -q '^app_uptime_seconds '; then
+    echo "fail metrics endpoint (${url}) -> expected app_uptime_seconds metric missing"
+    return 1
+  fi
+
+  echo "ok   metrics endpoint (${url})"
+}
+
 check_revalidation_smoke() {
   local token
   token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
@@ -111,6 +133,8 @@ main() {
   resolve_public_base_url
   echo "Verifying deployment at ${PUBLIC_BASE_URL}"
 
+  check_http "/api/livez" "backend liveness" "^200$"
+  check_http "/api/readyz" "backend readiness" "^200$"
   check_http "/api/health" "backend health" "^200$"
   check_http "/api/health/deep" "backend deep health" "^200$"
   check_http "/" "homepage"
@@ -120,6 +144,7 @@ main() {
   check_http "/results" "results listing"
   check_assets "/results" "results listing"
   check_http "/admin" "admin console"
+  check_metrics
   check_revalidation_smoke
 
   echo "Deployment verification passed."

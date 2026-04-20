@@ -89,6 +89,9 @@ export interface TrustFields {
   hasPrimarySource?: boolean;
   primarySourceLabel?: string;
   latestSourceCapturedAt?: string;
+  primarySourceCapturedAt?: string;
+  daysSincePrimarySourceCapture?: number;
+  sourceNeedsRefresh?: boolean;
   primarySourceDomain?: string;
   officialDomain?: string;
   domainMatch?: boolean;
@@ -110,6 +113,7 @@ export interface SearchMeta {
   aliasCount: number;
   termsPreview: string[];
   searchReady: boolean;
+  coverageScore?: number;
 }
 
 export interface EditorialReadiness {
@@ -120,6 +124,8 @@ export interface EditorialReadiness {
   warningCount: number;
   issues: string[];
   warnings: string[];
+  publishIssueCount?: number;
+  publishIssues?: string[];
 }
 
 export interface AlertMatchPreview {
@@ -471,6 +477,26 @@ export type TaxonomyType = (typeof taxonomyTypeValues)[number];
 
 export const workflowNoteSchema = z.object({
   note: z.string().trim().max(500).optional(),
+});
+
+export const editorialQueueQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(24),
+});
+
+export const workflowBulkActionSchema = z.object({
+  ids: z.array(z.string().trim().min(1)).min(1).max(200),
+  action: z.enum(['submit', 'approve', 'publish', 'unpublish', 'archive', 'restore']),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const workflowFreshnessSweepSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  dryRun: z.coerce.boolean().default(false),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const alertCoverageQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
 export const taxonomyEditorSchema = z.object({

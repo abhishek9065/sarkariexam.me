@@ -2,12 +2,16 @@ import express from 'express';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
 
 import {
+  alertCoverageQuerySchema,
   alertSubscriptionAdminQuerySchema,
   adminPostListQuerySchema,
+  editorialQueueQuerySchema,
   type PostRecord,
   postEditorSchema,
   taxonomyEditorSchema,
   taxonomyTypeValues,
+  workflowBulkActionSchema,
+  workflowFreshnessSweepSchema,
   workflowNoteSchema,
 } from '../content/types.js';
 import { authenticateToken, requireEditorialAccess, requireRoles } from '../middleware/auth.js';
@@ -36,6 +40,13 @@ async function buildEditorialResponse(post: PostRecord | null, forceRevalidate =
 
   const revalidation = await triggerFrontendRevalidation(post);
   return { data: post, revalidation };
+}
+
+function canRunWorkflowAction(role: string | undefined, action: 'submit' | 'approve' | 'publish' | 'unpublish' | 'archive' | 'restore') {
+  if (['admin', 'superadmin'].includes(role || '')) return true;
+  if (action === 'submit' && role === 'editor') return true;
+  if (action === 'approve' && role === 'reviewer') return true;
+  return false;
 }
 
 router.use(authenticateToken);
@@ -158,16 +169,19 @@ router.put('/posts/:id', requireRoles('editor', 'reviewer', 'admin', 'superadmin
     const userId = req.user?.userId;
     const role = req.user?.role;
     const payload = parse.data;
+    const hasContentJson = Object.prototype.hasOwnProperty.call(payload, 'contentJson');
+    const hasOfficialSources = Object.prototype.hasOwnProperty.call(payload, 'officialSources');
+
     const post = await postModel.update(
       String(req.params.id),
       {
         ...payload,
-        contentJson: payload.contentJson ?? null,
+        ...(hasContentJson ? { contentJson: payload.contentJson ?? null } : {}),
         trust: {
           verificationNote: payload.verificationNote,
           sourceNote: payload.sourceNote,
           correctionNote: payload.correctionNote,
-          officialSources: payload.officialSources ?? [],
+          ...(hasOfficialSources ? { officialSources: payload.officialSources ?? [] } : {}),
         },
       } as any,
       userId,
@@ -320,13 +334,143 @@ router.get('/workflow/pending', async (_req, res) => {
   }
 });
 
-router.get('/workflow/freshness', async (_req, res) => {
+router.get('/workflow/freshness', async (req, res) => {
   try {
-    const result = await postModel.listFreshnessQueue(24);
+    const parse = editorialQueueQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+    const result = await postModel.listFreshnessQueue(parse.data.limit);
     return res.json({ data: result });
   } catch (error) {
     console.error('[Editorial] Freshness queue error:', error);
     return res.status(500).json({ error: 'Failed to fetch freshness queue' });
+  }
+});
+
+router.get('/workflow/trust', async (req, res) => {
+  try {
+    const parse = editorialQueueQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+    const result = await postModel.listTrustQueue(parse.data.limit);
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('[Editorial] Trust queue error:', error);
+    return res.status(500).json({ error: 'Failed to fetch trust queue' });
+  }
+});
+
+router.get('/workflow/search-readiness', async (req, res) => {
+  try {
+    const parse = editorialQueueQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+    const result = await postModel.listSearchReadinessQueue(parse.data.limit);
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('[Editorial] Search readiness queue error:', error);
+    return res.status(500).json({ error: 'Failed to fetch search readiness queue' });
+  }
+});
+
+router.get('/workflow/seo', async (req, res) => {
+  try {
+    const parse = editorialQueueQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+    const result = await postModel.listSeoQueue(parse.data.limit);
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('[Editorial] SEO queue error:', error);
+    return res.status(500).json({ error: 'Failed to fetch SEO queue' });
+  }
+});
+
+router.get('/workflow/alerts-impact', async (req, res) => {
+  try {
+    const parse = editorialQueueQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+    const result = await postModel.listAlertImpactQueue(Math.min(parse.data.limit, 30));
+    return res.json({ data: result });
+  } catch (error) {
+    console.error('[Editorial] Alert impact queue error:', error);
+    return res.status(500).json({ error: 'Failed to fetch alert impact queue' });
+  }
+});
+
+router.post('/workflow/bulk-transition', requireRoles('editor', 'reviewer', 'admin', 'superadmin'), async (req, res) => {
+  try {
+    const parse = workflowBulkActionSchema.safeParse(req.body ?? {});
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+
+    if (!canRunWorkflowAction(req.user?.role, parse.data.action)) {
+      return res.status(403).json({ error: 'Insufficient role for requested workflow action' });
+    }
+
+    const result = await postModel.bulkTransition(
+      parse.data.ids,
+      parse.data.action,
+      req.user?.userId,
+      req.user?.role,
+      parse.data.note,
+    );
+
+    let revalidatedCount = 0;
+    if (['publish', 'unpublish', 'archive', 'restore'].includes(parse.data.action) && result.updated.length > 0) {
+      const settled = await Promise.allSettled(result.updated.map((post) => triggerFrontendRevalidation(post)));
+      revalidatedCount = settled.filter((item) => item.status === 'fulfilled').length;
+    }
+
+    return res.json({
+      data: {
+        ...result,
+        revalidatedCount,
+      },
+    });
+  } catch (error) {
+    console.error('[Editorial] Bulk workflow transition error:', error);
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to run bulk workflow transition' });
+  }
+});
+
+router.post('/workflow/freshness/sweep', requireRoles('admin', 'superadmin'), async (req, res) => {
+  try {
+    const parse = workflowFreshnessSweepSchema.safeParse(req.body ?? {});
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+
+    const result = await postModel.sweepExpiredPublishedPosts({
+      limit: parse.data.limit,
+      dryRun: parse.data.dryRun,
+      actorId: req.user?.userId,
+      actorRole: req.user?.role,
+      note: parse.data.note,
+    });
+
+    let revalidatedCount = 0;
+    if (!result.dryRun && result.archived.length > 0) {
+      const settled = await Promise.allSettled(result.archived.map((post) => triggerFrontendRevalidation(post)));
+      revalidatedCount = settled.filter((item) => item.status === 'fulfilled').length;
+    }
+
+    return res.json({
+      data: {
+        ...result,
+        revalidatedCount,
+      },
+    });
+  } catch (error) {
+    console.error('[Editorial] Freshness sweep error:', error);
+    return res.status(500).json({ error: 'Failed to run freshness sweep' });
   }
 });
 
@@ -460,6 +604,21 @@ router.get('/alert-subscriptions/stats', requireRoles('admin', 'superadmin'), as
   } catch (error) {
     console.error('[Editorial] Alert subscriptions stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch alert subscription stats' });
+  }
+});
+
+router.get('/alert-subscriptions/coverage', requireRoles('admin', 'superadmin'), async (req, res) => {
+  try {
+    const parse = alertCoverageQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+
+    const data = await AlertSubscriptionModelPostgres.getPreferenceCoverage(parse.data.limit);
+    return res.json({ data });
+  } catch (error) {
+    console.error('[Editorial] Alert subscriptions coverage error:', error);
+    return res.status(500).json({ error: 'Failed to fetch alert subscription coverage' });
   }
 });
 

@@ -1,5 +1,7 @@
 import type {
+  AlertImpactQueueItem,
   AlertMatchPreview,
+  AlertPreferenceCoverage,
   AlertSubscriber,
   AlertSubscriberStats,
   Announcement,
@@ -8,6 +10,7 @@ import type {
   CmsPost,
   CmsTaxonomy,
   DashboardData,
+  EditorialBulkTransitionResult,
   PaginatedResponse,
   SiteSettings,
   User,
@@ -674,4 +677,52 @@ export function getEditorialWorkflowSla() {
 
 export function getEditorialWorkflowFreshness() {
   return apiFetch<{ data: CmsPost[] }>('/editorial/workflow/freshness');
+}
+
+export function getEditorialWorkflowTrust(limit = 24) {
+  return apiFetch<{ data: CmsPost[] }>(`/editorial/workflow/trust${qs({ limit })}`);
+}
+
+export function getEditorialWorkflowSearchReadiness(limit = 24) {
+  return apiFetch<{ data: CmsPost[] }>(`/editorial/workflow/search-readiness${qs({ limit })}`);
+}
+
+export function getEditorialWorkflowSeo(limit = 24) {
+  return apiFetch<{ data: CmsPost[] }>(`/editorial/workflow/seo${qs({ limit })}`);
+}
+
+export function getEditorialWorkflowAlertsImpact(limit = 12) {
+  return apiFetch<{ data: AlertImpactQueueItem[] }>(`/editorial/workflow/alerts-impact${qs({ limit })}`);
+}
+
+export function bulkTransitionCmsPosts(
+  ids: string[],
+  action: 'submit' | 'approve' | 'publish' | 'unpublish' | 'archive' | 'restore',
+  note?: string,
+) {
+  return apiFetchWithCsrf<{ data: EditorialBulkTransitionResult }>('/editorial/workflow/bulk-transition', {
+    method: 'POST',
+    body: JSON.stringify({ ids, action, note }),
+  });
+}
+
+export function runEditorialFreshnessSweep(params: { limit?: number; dryRun?: boolean; note?: string } = {}) {
+  return apiFetchWithCsrf<{
+    data: {
+      dryRun: boolean;
+      totalCandidates: number;
+      archivedCount: number;
+      candidates: CmsPost[];
+      archived: CmsPost[];
+      failures: Array<{ id: string; error: string }>;
+      revalidatedCount: number;
+    };
+  }>('/editorial/workflow/freshness/sweep', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export function getEditorialSubscriberCoverage(limit = 10) {
+  return apiFetch<{ data: AlertPreferenceCoverage }>(`/editorial/alert-subscriptions/coverage${qs({ limit })}`);
 }
