@@ -72,10 +72,27 @@ is_truthy() {
   esac
 }
 
+is_known_placeholder_value() {
+  local value="${1:-}"
+  case "$value" in
+    ""|"change-me"|"changeme"|"your-super-secret-jwt-key"|"your-sendgrid-api-key"|"your-datadog-api-key"|"replace-with-a-long-random-token"|"postgresql://username:password@host:5432/database?sslmode=require")
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+is_localhost_url() {
+  local url="${1:-}"
+  [[ "$url" =~ ^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:[0-9]+)?(/|$) ]]
+}
+
 validate_production_env() {
   local missing=()
   local jwt_secret postgres_prisma_url database_url cosmos_connection_string mongodb_uri legacy_mongo_required
-  local frontend_revalidate_url frontend_revalidate_token
+  local frontend_revalidate_url frontend_revalidate_token frontend_url primary_postgres_url
 
   jwt_secret="$(read_env_var "JWT_SECRET")"
   postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
@@ -98,11 +115,35 @@ validate_production_env() {
     exit 1
   fi
 
+  primary_postgres_url="$postgres_prisma_url"
+  if [[ -z "$primary_postgres_url" ]]; then
+    primary_postgres_url="$database_url"
+  fi
+
+  if is_known_placeholder_value "$jwt_secret"; then
+    die "JWT_SECRET is still set to a placeholder value. Set a strong production secret before deploying."
+  fi
+  if [[ "${#jwt_secret}" -lt 24 ]]; then
+    warn "JWT_SECRET appears short for production use (length=${#jwt_secret}). Prefer 32+ random characters."
+  fi
+
+  if is_known_placeholder_value "$primary_postgres_url"; then
+    die "POSTGRES_PRISMA_URL/DATABASE_URL is still set to a placeholder value. Set a real PostgreSQL URL before deploying."
+  fi
+
+  frontend_url="$(read_env_var "FRONTEND_URL")"
+  if [[ -n "$frontend_url" ]] && is_localhost_url "$frontend_url"; then
+    die "FRONTEND_URL must not point to localhost/loopback for production deploys."
+  fi
+
   frontend_revalidate_url="$(read_env_var "FRONTEND_REVALIDATE_URL")"
   frontend_revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
 
   if [[ -n "$frontend_revalidate_url" && -z "$frontend_revalidate_token" ]]; then
     die "FRONTEND_REVALIDATE_URL is set but FRONTEND_REVALIDATE_TOKEN is missing."
+  fi
+  if [[ -n "$frontend_revalidate_token" ]] && is_known_placeholder_value "$frontend_revalidate_token"; then
+    die "FRONTEND_REVALIDATE_TOKEN is still set to a placeholder value. Set a real token before deploying."
   fi
   if [[ -z "$frontend_revalidate_url" && -n "$frontend_revalidate_token" ]]; then
     warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL is missing. Publish-triggered revalidation stays disabled."
@@ -348,6 +389,7 @@ print_success_summary() {
   local public_health_result="$3"
   local rollback_sha="${DEPLOY_PREVIOUS_SHA:-unknown}"
   local rollback_repo="${DEPLOY_REPO_DIR:-$ROOT_DIR}"
+  local rollback_state_file="${DEPLOY_RELEASE_STATE_FILE_PATH:-$rollback_repo/.deploy-state/last-release.env}"
   local escaped_repo
 
   printf -v escaped_repo '%q' "$rollback_repo"
@@ -359,5 +401,7 @@ print_success_summary() {
   echo "  mode: ${mode}"
   echo "  backend_health: ${backend_health_result}"
   echo "  public_health: ${public_health_result}"
+  echo "  rollback_state_file: ${rollback_state_file}"
   echo "  rollback_hint: cd ${escaped_repo} && DO_REPO_DIR=${escaped_repo} bash scripts/deploy-live.sh --mode ${mode} --sha ${rollback_sha}"
+  echo "  rollback_helper_hint: cd ${escaped_repo} && bash scripts/rollback-last.sh --yes"
 }

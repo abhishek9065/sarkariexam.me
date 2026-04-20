@@ -57,6 +57,10 @@ This document outlines the environment variables used across the Sarkari Result 
 | `METRICS_TOKEN` | Bearer token to protect the `/metrics` endpoint. If omitted in prod, metrics are disabled. | No |
 | `FRONTEND_REVALIDATE_URL` | Endpoint to trigger Next.js cache revalidation. | No |
 | `FRONTEND_REVALIDATE_TOKEN` | Secret token to authenticate revalidation requests. | No |
+| `READINESS_CACHE_TTL_MS` | In-memory cache TTL for PostgreSQL readiness checks used by `/api/readyz` and API guardrail middleware. | No (default: `3000`) |
+| `POSTGRES_HEALTH_TIMEOUT_MS` | Timeout for PostgreSQL health probes before they are treated as failed. | No (default: `1500`) |
+| `CONTENT_EXPIRY_GRACE_DAYS` | Grace period (days) before auto-archiving published posts whose `expiresAt` has passed. | No (default: `0`) |
+| `CONTENT_EXPIRY_SWEEP_LIMIT` | Max posts processed per automation expiry sweep run. | No (default: `200`) |
 
 ---
 

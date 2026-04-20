@@ -34,6 +34,14 @@ trim_whitespace() {
   printf '%s' "$value"
 }
 
+is_truthy() {
+  local value="${1:-}"
+  case "${value,,}" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 quote_for_remote_shell() {
   local value="$1"
   printf "'%s'" "${value//\'/\'\"\'\"\'}"
@@ -76,12 +84,15 @@ validate_config() {
   DO_USER="$(trim_whitespace "${DO_USER:-}")"
   DO_REPO_DIR="$(trim_whitespace "${DO_REPO_DIR:-}")"
   DO_HOST_FINGERPRINT="$(trim_whitespace "$(printf '%s' "${DO_HOST_FINGERPRINT:-}" | tr -d '\r')")"
+  DEPLOY_PREFLIGHT_ONLY="$(trim_whitespace "${DEPLOY_PREFLIGHT_ONLY:-0}")"
 
   MISSING_CONFIG_KEYS=()
   require_var "DO_HOST"
   require_var "DO_USER"
   require_var "DO_SSH_KEY"
   require_var "TRIGGER_SHA"
+  require_var "DO_REPO_DIR"
+  require_var "DO_HOST_FINGERPRINT"
 
   if [[ "${#MISSING_CONFIG_KEYS[@]}" -gt 0 ]]; then
     fail "Missing required deploy configuration: ${MISSING_CONFIG_KEYS[*]}"
@@ -109,6 +120,10 @@ validate_config() {
 
   if [[ -n "$DO_REPO_DIR" && "$DO_REPO_DIR" != /* ]]; then
     fail "DO_REPO_DIR must be an absolute path on the droplet. Received: ${DO_REPO_DIR}"
+  fi
+
+  if [[ -n "$DEPLOY_PREFLIGHT_ONLY" ]] && ! [[ "${DEPLOY_PREFLIGHT_ONLY,,}" =~ ^(0|1|true|false|yes|no|on|off)$ ]]; then
+    fail "DEPLOY_PREFLIGHT_ONLY must be a boolean-like value (0/1/true/false)."
   fi
 }
 
@@ -143,17 +158,13 @@ prepare_ssh() {
   local scanned_fingerprints
   scanned_fingerprints="$(printf '%s\n' "$scanned_keys" | ssh-keygen -lf - -E sha256 | awk '{print $2}' | sort -u)"
 
-  if [[ -n "$DO_HOST_FINGERPRINT" ]]; then
-    if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
-      {
-        echo "Expected fingerprint: ${DO_HOST_FINGERPRINT}"
-        echo "Scanned fingerprints:"
-        printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}'
-      } >&2
-      fail "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)."
-    fi
-  else
-    warn "DO_HOST_FINGERPRINT not provided; proceeding with ssh-keyscan known_hosts trust for this run."
+  if ! printf '%s\n' "$scanned_fingerprints" | grep -Fxq "$DO_HOST_FINGERPRINT"; then
+    {
+      echo "Expected fingerprint: ${DO_HOST_FINGERPRINT}"
+      echo "Scanned fingerprints:"
+      printf '%s\n' "$scanned_fingerprints" | awk '{print "  - "$0}'
+    } >&2
+    fail "DO_HOST_FINGERPRINT does not match the scanned host key fingerprint(s)."
   fi
 
   printf '%s\n' "$scanned_keys" >"$HOME/.ssh/known_hosts"
@@ -188,51 +199,7 @@ remote_run() {
 }
 
 resolve_remote_repo_dir() {
-  if [[ -n "$DO_REPO_DIR" ]]; then
-    return 0
-  fi
-
-  local repo_hint repo_name quoted_repo_name detected
-  repo_hint="${GITHUB_REPOSITORY:-}"
-  repo_name="${repo_hint##*/}"
-  if [[ -z "$repo_name" || "$repo_name" == "$repo_hint" ]]; then
-    repo_name="sarkariexam.me"
-  fi
-  quoted_repo_name="$(quote_for_remote_shell "$repo_name")"
-
-  detected="$(remote_run "bash -se" <<EOF || true
-set -Eeuo pipefail
-repo_name=${quoted_repo_name}
-
-candidates=(
-  "\$HOME/\$repo_name"
-  "\$HOME/sarkari-result-git-clean"
-  "\$HOME/sarkariexam.me"
-  "/opt/\$repo_name"
-  "/opt/sarkari-result-git-clean"
-  "/opt/sarkariexam.me"
-  "/srv/\$repo_name"
-  "/var/www/\$repo_name"
-)
-
-for path in "\${candidates[@]}"; do
-  if [[ -d "\$path/.git" && -f "\$path/docker-compose.yml" && -f "\$path/scripts/deploy-live.sh" ]]; then
-    echo "\$path"
-    exit 0
-  fi
-done
-
-exit 1
-EOF
-)"
-
-  detected="$(printf '%s' "$detected" | tr -d '\r' | tail -n 1)"
-  if [[ -z "$detected" ]]; then
-    fail "DO_REPO_DIR is not set and auto-detection failed. Set DO_REPO_DIR as a repository variable or secret."
-  fi
-
-  DO_REPO_DIR="$detected"
-  log "Auto-detected DO_REPO_DIR=${DO_REPO_DIR}"
+  [[ -n "$DO_REPO_DIR" ]] || fail "DO_REPO_DIR is required. Auto-discovery is intentionally disabled for safety."
 }
 
 upload_remote_helper() {
@@ -296,16 +263,19 @@ run_remote_deploy() {
 }
 
 collect_remote_summary() {
+  local summary_title="${1:-Deploy Result}"
   local remote_summary
   remote_summary="$(remote_run "tail -n 40 '$REMOTE_LOG_FILE' || true" || true)"
 
-  append_summary_line "## Deploy Result"
+  append_summary_line "## ${summary_title}"
   append_summary_line
   append_summary_line "- Branch: \`${TRIGGER_BRANCH}\`"
   append_summary_line "- Event: \`${TRIGGER_EVENT}\`"
   append_summary_line "- Conclusion: \`${TRIGGER_CONCLUSION}\`"
   append_summary_line "- Target SHA: \`${TRIGGER_SHA}\`"
   append_summary_line "- Repo path: \`${DO_REPO_DIR}\`"
+  append_summary_line "- Mode: \`${DEPLOY_MODE:-fast}\`"
+  append_summary_line "- Preflight only: \`${DEPLOY_PREFLIGHT_ONLY:-0}\`"
   append_summary_line
   append_summary_line "### Remote Log Tail"
   append_summary_line
@@ -338,10 +308,17 @@ upload_remote_helper
 set_stage "remote-preflight"
 run_remote_preflight
 
+if is_truthy "${DEPLOY_PREFLIGHT_ONLY:-0}"; then
+  set_stage "remote-summary"
+  collect_remote_summary "Deploy Preflight Result"
+  log "Remote preflight completed successfully (deployment skipped)."
+  exit 0
+fi
+
 set_stage "remote-deploy"
 run_remote_deploy
 
 set_stage "remote-summary"
-collect_remote_summary
+collect_remote_summary "Deploy Result"
 
 log "Deployment completed successfully."

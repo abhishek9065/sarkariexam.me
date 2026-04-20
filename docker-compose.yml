@@ -14,9 +14,17 @@ services:
       - frontend
       - backend
       - admin
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - sarkari-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: [ "CMD-SHELL", "nginx -t >/dev/null 2>&1" ]
       interval: 30s
@@ -48,13 +56,23 @@ services:
       - FRONTEND_REVALIDATE_TOKEN=${FRONTEND_REVALIDATE_TOKEN:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://sarkariexams.me,https://www.sarkariexams.me}
       - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - READINESS_CACHE_TTL_MS=${READINESS_CACHE_TTL_MS:-3000}
+      - POSTGRES_HEALTH_TIMEOUT_MS=${POSTGRES_HEALTH_TIMEOUT_MS:-1500}
     expose:
       - "4000"
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - sarkari-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: [ "CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4000/api/health',(res)=>{res.resume();process.exit(res.statusCode===200?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});" ]
+      test: [ "CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:4000/api/readyz',(res)=>{res.resume();process.exit(res.statusCode===200?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -67,9 +85,17 @@ services:
     container_name: sarkari-admin
     expose:
       - "3001"
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - sarkari-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: [ "CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:3001/admin',(res)=>{res.resume();process.exit(res.statusCode>=200&&res.statusCode<400?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});" ]
       interval: 30s
@@ -93,9 +119,17 @@ services:
       - CONTENT_CACHE_REVALIDATE_SECONDS=${CONTENT_CACHE_REVALIDATE_SECONDS:-300}
     expose:
       - "3000"
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - sarkari-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: [ "CMD", "node", "-e", "const http=require('http');const req=http.get('http://127.0.0.1:3000/',(res)=>{res.resume();process.exit(res.statusCode>=200&&res.statusCode<400?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});" ]
       interval: 30s

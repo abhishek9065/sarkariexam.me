@@ -153,6 +153,10 @@ Main branch pushes trigger:
 - `Security`
 - `Deploy to Production`
 
+Manual reliability validation is also available via:
+
+- `Deploy Preflight` (`workflow_dispatch`, no service restart)
+
 Production deploys are GitHub Actions driven. The production deploy gate is the `CI` workflow only.
 `Deploy to Production` runs as a `workflow_run` after `CI` succeeds for a `push` to `main`, checks out the exact triggering commit SHA on the runner, SSHes into the droplet, runs a remote preflight, and then deploys that exact SHA.
 This is the current production topology, not the long-term target. The platform is being moved toward safer staging and promotion controls while retaining the existing release automation.
@@ -181,6 +185,7 @@ Production deploy entrypoint:
 - live health verification
 
 There is no supported manual production deploy trigger in the repository workflows.
+Manual preflight checks against configured `staging` or `production` environments are supported via `Deploy Preflight`.
 
 Detailed deploy notes live in [scripts/FAST_DEPLOY_README.md](./scripts/FAST_DEPLOY_README.md).
 
@@ -223,6 +228,8 @@ After a successful deploy, the expected health checks are:
 - `/`
 - `/jobs`
 - `/admin`
+- `/api/livez`
+- `/api/readyz`
 - `/api/health`
 - `/api/health/deep`
 
@@ -230,8 +237,9 @@ If a deploy fails, start with:
 
 - the GitHub Actions run log
 - `/tmp/sarkari-result-deploy.log` on the droplet
+- `.deploy-state/last-release.env` on the droplet checkout (latest deploy/rollback metadata)
 - `docker compose -f docker-compose.yml logs` on the droplet
-- `/api/health` and `/api/health/deep` for non-secret runtime diagnostics after the rollout
+- `/api/livez`, `/api/readyz`, `/api/health`, and `/api/health/deep` for non-secret runtime diagnostics after the rollout
 - [docs/production-deploy-checklist.md](./docs/production-deploy-checklist.md)
 
 ## Repository Layout

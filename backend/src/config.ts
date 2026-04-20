@@ -102,6 +102,8 @@ const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_L
 const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
 const securityLogDbRetentionDays = Math.max(1, parseNumber(process.env.SECURITY_LOG_DB_RETENTION_DAYS, 30));
 const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SECURITY_LOG_CLEANUP_INTERVAL_MINUTES, 60));
+const readinessCacheTtlMs = Math.max(250, parseNumber(process.env.READINESS_CACHE_TTL_MS, 3000));
+const postgresHealthTimeoutMs = Math.max(500, parseNumber(process.env.POSTGRES_HEALTH_TIMEOUT_MS, 1500));
 const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
 const contentDbMode = 'postgres';
 const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
@@ -162,6 +164,8 @@ export const config = {
   securityLogPersistenceEnabled,
   securityLogDbRetentionDays,
   securityLogCleanupIntervalMinutes,
+  readinessCacheTtlMs,
+  postgresHealthTimeoutMs,
   contentDbMode,
   postgresPrismaUrl,
   postgresDirectUrl,
@@ -204,6 +208,8 @@ if (!isProduction) {
   }
   console.log(`[CONFIG] PostgreSQL URLs: Prisma=${postgresPrismaUrl ? 'yes' : 'no'}, Direct=${postgresDirectUrl ? 'yes' : 'no'}`);
   console.log(`[CONFIG] Frontend revalidation: ${frontendRevalidationConfigured ? 'configured' : 'not fully configured'}`);
+  console.log(`[CONFIG] Readiness cache TTL: ${readinessCacheTtlMs}ms`);
+  console.log(`[CONFIG] PostgreSQL health timeout: ${postgresHealthTimeoutMs}ms`);
   console.log(`[CONFIG] Metrics endpoint protection: ${metricsToken ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Push notifications: ${config.vapidPublicKey ? 'enabled' : 'disabled'}`);
   console.log(`[CONFIG] Email notifications: ${config.emailPass ? 'enabled' : 'disabled'}`);

@@ -1,0 +1,9 @@
+# Keep Linux-executed deploy/runtime scripts on LF line endings.
+*.sh text eol=lf
+
+# Keep workflow YAML on LF for GitHub Actions reliability.
+.github/workflows/*.yml text eol=lf
+.github/workflows/*.yaml text eol=lf
+
+# Compose files are parsed in Linux environments during CI/deploy.
+docker-compose*.yml text eol=lf

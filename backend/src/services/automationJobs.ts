@@ -7,6 +7,9 @@ import { prismaApp } from './postgres/prisma.js';
 
 let automationIntervalRef: NodeJS.Timeout | null = null;
 const RUN_EVERY_MINUTES = 60; // Run every hour
+const DAY_MS = 24 * 60 * 60 * 1000;
+const EXPIRY_GRACE_DAYS = Math.max(0, Math.min(45, Number(process.env.CONTENT_EXPIRY_GRACE_DAYS ?? 0) || 0));
+const EXPIRY_SWEEP_LIMIT = Math.max(1, Math.min(500, Number(process.env.CONTENT_EXPIRY_SWEEP_LIMIT ?? 200) || 200));
 
 async function checkLinkHealth(url: string): Promise<'active' | 'broken'> {
     if (!url || !url.startsWith('http')) return 'broken';
@@ -81,43 +84,39 @@ export async function runAutomationJobs() {
         });
 
         for (const post of scheduledPosts) {
-            await PostModelPostgres.update(
-                post.id,
-                {
-                    status: 'published',
-                    publishedAt: now.toISOString(),
-                },
-                'system',
-                'system',
-                'Auto-published by scheduling automation',
-            );
-            cachesInvalidated = true;
+            try {
+                const published = await PostModelPostgres.transition(
+                    post.id,
+                    'publish',
+                    'system',
+                    'system',
+                    'Auto-published by scheduling automation',
+                );
+                if (published) {
+                    cachesInvalidated = true;
+                }
+            } catch (error) {
+                console.warn(`[Automation] Failed to auto-publish ${post.id}:`, error);
+            }
         }
 
         // 3. Expiry Automation
-        // Find published posts where deadline has passed by 30 days
+        // Archive published posts whose expiry is beyond the configured grace period.
         console.log('[Automation] Expiring Old Posts...');
-        const expiryThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
-        const expiredPosts = await prismaApp.post.findMany({
-            where: {
-                status: WorkflowStatus.PUBLISHED,
-                expiresAt: { lt: expiryThreshold },
-            },
-            select: { id: true },
+        const expiryCutoff = new Date(now.getTime() - (EXPIRY_GRACE_DAYS * DAY_MS));
+        const sweepResult = await PostModelPostgres.sweepExpiredPublishedPosts({
+            limit: EXPIRY_SWEEP_LIMIT,
+            actorId: 'system',
+            actorRole: 'system',
+            note: `Auto-archived by expiry automation (grace=${EXPIRY_GRACE_DAYS}d)`,
+            now: expiryCutoff,
         });
 
-        for (const post of expiredPosts) {
-            await PostModelPostgres.update(
-                post.id,
-                {
-                    status: 'archived',
-                    archivedAt: now.toISOString(),
-                },
-                'system',
-                'system',
-                'Auto-archived by expiry automation',
-            );
+        if (sweepResult.archivedCount > 0) {
             cachesInvalidated = true;
+        }
+        if (sweepResult.failures.length > 0) {
+            console.warn(`[Automation] Expiry sweep failures=${sweepResult.failures.length}`);
         }
 
         if (cachesInvalidated) {

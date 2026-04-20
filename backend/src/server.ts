@@ -53,6 +53,14 @@ import logger from './utils/logger.js';
 const app = express();
 const startedAt = Date.now();
 
+type PostgresReadinessSnapshot = {
+  checkedAt: number;
+  ok: boolean;
+};
+
+let postgresReadinessSnapshot: PostgresReadinessSnapshot | null = null;
+let postgresReadinessInFlight: Promise<boolean> | null = null;
+
 export { app };
 
 // Trust proxy for accurate IP detection behind reverse proxies
@@ -190,29 +198,34 @@ app.get('/api/healthz', distributedRateLimit({ windowMs: 60 * 1000, maxRequests:
   return buildHealthResponse(res);
 });
 
-app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
-  const dbConfigured = isDatabaseConfigured();
-  const dbOk = dbConfigured ? await healthCheck() : null;
-  const postgresConfigured = Boolean(config.postgresPrismaUrl);
-  const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
-  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk);
-  const hasPostgresFailure = !postgresConfigured || postgresOk === false;
-  const status = hasPostgresFailure ? 'error' : 'ok';
-
+app.get('/api/livez', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health-live' }), (_req, res) => {
   res
-    .status(status === 'error' ? 503 : 200)
+    .status(200)
     .set('Cache-Control', 'no-store')
     .json({
-      status,
+      status: 'ok',
       timestamp: new Date().toISOString(),
-      db: legacyBridge,
-      legacyBridge,
-      contentDb: {
-        postgres: {
-          configured: postgresConfigured,
-          ok: postgresOk,
-        },
-      },
+      uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+    });
+});
+
+app.get('/api/readyz', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health-ready' }), async (_req, res) => {
+  const readiness = await buildReadinessPayload();
+  res
+    .status(readiness.status === 'error' ? 503 : 200)
+    .set('Cache-Control', 'no-store')
+    .json(readiness);
+});
+
+app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
+  const readiness = await buildReadinessPayload();
+
+  res
+    .status(readiness.status === 'error' ? 503 : 200)
+    .set('Cache-Control', 'no-store')
+    .json({
+      ...readiness,
+      runtime: buildRuntimeDiagnostics(),
     });
 });
 
@@ -236,11 +249,95 @@ function buildLegacyBridgeHealth(dbConfigured: boolean, dbOk: boolean | null) {
   };
 }
 
+function buildPostgresReadinessCacheDiagnostics() {
+  if (!postgresReadinessSnapshot) {
+    return {
+      cached: false,
+      ttlMs: config.readinessCacheTtlMs,
+    };
+  }
+
+  const ageMs = Math.max(0, Date.now() - postgresReadinessSnapshot.checkedAt);
+  return {
+    cached: true,
+    ttlMs: config.readinessCacheTtlMs,
+    ageMs,
+    fresh: ageMs <= config.readinessCacheTtlMs,
+    lastCheckedAt: new Date(postgresReadinessSnapshot.checkedAt).toISOString(),
+    lastResult: postgresReadinessSnapshot.ok,
+  };
+}
+
+async function getPostgresReadinessCached(): Promise<boolean> {
+  const now = Date.now();
+
+  if (
+    postgresReadinessSnapshot
+    && (now - postgresReadinessSnapshot.checkedAt) <= config.readinessCacheTtlMs
+  ) {
+    return postgresReadinessSnapshot.ok;
+  }
+
+  if (postgresReadinessInFlight) {
+    return postgresReadinessInFlight;
+  }
+
+  postgresReadinessInFlight = postgresHealthCheck()
+    .then((ok) => {
+      postgresReadinessSnapshot = {
+        checkedAt: Date.now(),
+        ok,
+      };
+      return ok;
+    })
+    .catch((error) => {
+      logger.error({ err: error }, '[Server] Postgres readiness probe threw an unexpected error');
+      postgresReadinessSnapshot = {
+        checkedAt: Date.now(),
+        ok: false,
+      };
+      return false;
+    })
+    .finally(() => {
+      postgresReadinessInFlight = null;
+    });
+
+  return postgresReadinessInFlight;
+}
+
+async function buildReadinessPayload() {
+  const dbConfigured = isDatabaseConfigured();
+  const dbOk = dbConfigured ? await healthCheck() : null;
+  const postgresConfigured = Boolean(config.postgresPrismaUrl);
+  const postgresOk = postgresConfigured ? await getPostgresReadinessCached() : null;
+  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk);
+  const hasPostgresFailure = !postgresConfigured || postgresOk === false;
+  const status = hasPostgresFailure ? 'error' : 'ok';
+
+  return {
+    status,
+    timestamp: new Date().toISOString(),
+    db: legacyBridge,
+    legacyBridge,
+    contentDb: {
+      postgres: {
+        configured: postgresConfigured,
+        ok: postgresOk,
+        readinessCache: buildPostgresReadinessCacheDiagnostics(),
+      },
+    },
+  };
+}
+
 function buildRuntimeDiagnostics() {
   return {
     legacyMongo: getLegacyRuntimeDiagnostics(config.legacyMongoConfigured),
     postgres: {
       configured: Boolean(config.postgresPrismaUrl),
+      readinessCache: buildPostgresReadinessCacheDiagnostics(),
+    },
+    readiness: {
+      cacheTtlMs: config.readinessCacheTtlMs,
     },
     frontendRevalidation: {
       configured: config.frontendRevalidationConfigured,
@@ -255,28 +352,13 @@ function buildRuntimeDiagnostics() {
 }
 
 async function buildHealthResponse(res: express.Response) {
-  const dbConfigured = isDatabaseConfigured();
-  const dbOk = dbConfigured ? await healthCheck() : null;
-  const postgresConfigured = Boolean(config.postgresPrismaUrl);
-  const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
-  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk);
-  const hasPostgresFailure = !postgresConfigured || postgresOk === false;
-  const status = hasPostgresFailure ? 'error' : 'ok';
+  const readiness = await buildReadinessPayload();
 
   return res
-    .status(status === 'error' ? 503 : 200)
+    .status(readiness.status === 'error' ? 503 : 200)
     .set('Cache-Control', 'no-store')
     .json({
-      status,
-      timestamp: new Date().toISOString(),
-      db: legacyBridge,
-      legacyBridge,
-      contentDb: {
-        postgres: {
-          configured: postgresConfigured,
-          ok: postgresOk,
-        },
-      },
+      ...readiness,
       runtime: buildRuntimeDiagnostics(),
     });
 }
@@ -341,9 +423,15 @@ app.get('/metrics', (req, res) => {
 
 app.use(async (req, res, next) => {
   // PostgreSQL is the primary runtime dependency for API request handling.
-  const isPostgresOk = await postgresHealthCheck();
+  const isPostgresOk = await getPostgresReadinessCached();
   if (!isPostgresOk) {
-    logger.error({ path: req.path }, '[Server] PostgreSQL primary database unavailable');
+    logger.error(
+      {
+        path: req.path,
+        readinessCache: buildPostgresReadinessCacheDiagnostics(),
+      },
+      '[Server] PostgreSQL primary database unavailable',
+    );
     return res.status(503).json({
       error: 'Service unavailable',
       code: 'PRIMARY_DB_UNAVAILABLE',

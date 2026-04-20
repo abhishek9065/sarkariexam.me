@@ -342,6 +342,83 @@ export class AlertSubscriptionModelPostgres {
     };
   }
 
+  static async getPreferenceCoverage(limit = 10) {
+    const safeLimit = Math.min(Math.max(Math.floor(limit || 10), 1), 50);
+    const rows = await prisma.subscription.findMany({
+      where: {
+        isActive: true,
+        verified: true,
+      },
+      include: includeRelations,
+      orderBy: { updatedAt: 'desc' },
+      take: 5000,
+    });
+
+    const frequencies = new Map<string, number>();
+    const postTypes = new Map<string, number>();
+    const categories = new Map<string, { name: string; count: number }>();
+    const states = new Map<string, { name: string; count: number }>();
+    const organizations = new Map<string, { name: string; count: number }>();
+    const qualifications = new Map<string, { name: string; count: number }>();
+
+    const bumpFlat = (bucket: Map<string, number>, key: string) => {
+      bucket.set(key, (bucket.get(key) || 0) + 1);
+    };
+
+    const bumpNamed = (bucket: Map<string, { name: string; count: number }>, slug: string, name: string) => {
+      const current = bucket.get(slug);
+      if (current) {
+        current.count += 1;
+        return;
+      }
+      bucket.set(slug, { name, count: 1 });
+    };
+
+    for (const row of rows) {
+      bumpFlat(frequencies, fromPrismaFrequency(row.frequency));
+
+      const uniquePostTypes = new Set(row.postTypePrefs
+        .map((item) => postTypeFromPrisma[item.postType])
+        .filter((value): value is PostType => Boolean(value)));
+      for (const postType of uniquePostTypes) {
+        bumpFlat(postTypes, postType);
+      }
+
+      for (const item of row.categoryPrefs) {
+        bumpNamed(categories, item.category.slug, item.category.name);
+      }
+      for (const item of row.statePrefs) {
+        bumpNamed(states, item.state.slug, item.state.name);
+      }
+      for (const item of row.organizationPrefs) {
+        bumpNamed(organizations, item.organization.slug, item.organization.name);
+      }
+      for (const item of row.qualificationPrefs) {
+        bumpNamed(qualifications, item.qualification.slug, item.qualification.name);
+      }
+    }
+
+    const topNamed = (bucket: Map<string, { name: string; count: number }>) => Array.from(bucket.entries())
+      .map(([slug, value]) => ({ slug, name: value.name, count: value.count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, safeLimit);
+
+    const topFlat = (bucket: Map<string, number>) => Array.from(bucket.entries())
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, safeLimit);
+
+    return {
+      sampleSize: rows.length,
+      frequencies: topFlat(frequencies),
+      postTypes: topFlat(postTypes),
+      categories: topNamed(categories),
+      states: topNamed(states),
+      organizations: topNamed(organizations),
+      qualifications: topNamed(qualifications),
+    };
+  }
+
   static async deleteById(id: string) {
     try {
       await prisma.subscription.delete({ where: { id } });

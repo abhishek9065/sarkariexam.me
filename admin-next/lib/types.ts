@@ -61,12 +61,17 @@ export interface CmsPost {
   officialSources: CmsOfficialSource[];
   trust: {
     verificationNote?: string;
+    sourceNote?: string;
+    correctionNote?: string;
     updatedLabel?: string;
     verificationStatus?: 'verified' | 'review' | 'source_light';
     sourceCount?: number;
     hasPrimarySource?: boolean;
     primarySourceLabel?: string;
     latestSourceCapturedAt?: string;
+    primarySourceCapturedAt?: string;
+    daysSincePrimarySourceCapture?: number;
+    sourceNeedsRefresh?: boolean;
     primarySourceDomain?: string;
     officialDomain?: string;
     domainMatch?: boolean;
@@ -99,6 +104,7 @@ export interface CmsPost {
     aliasCount: number;
     termsPreview: string[];
     searchReady: boolean;
+    coverageScore?: number;
   };
   readiness?: {
     canSubmit: boolean;
@@ -108,6 +114,8 @@ export interface CmsPost {
     warningCount: number;
     issues: string[];
     warnings: string[];
+    publishIssueCount?: number;
+    publishIssues?: string[];
   };
   seo?: {
     metaTitle?: string;
@@ -184,6 +192,30 @@ export interface AlertSubscriberStats {
   active: number;
   inactive: number;
   byFrequency: Array<{ _id: string; count: number }>;
+}
+
+export interface EditorialBulkTransitionResult {
+  total: number;
+  successCount: number;
+  failureCount: number;
+  updated: CmsPost[];
+  failures: Array<{ id: string; error: string }>;
+  revalidatedCount?: number;
+}
+
+export interface AlertImpactQueueItem {
+  post: CmsPost;
+  preview: AlertMatchPreview;
+}
+
+export interface AlertPreferenceCoverage {
+  sampleSize: number;
+  frequencies: Array<{ key: string; count: number }>;
+  postTypes: Array<{ key: string; count: number }>;
+  categories: Array<{ slug: string; name: string; count: number }>;
+  states: Array<{ slug: string; name: string; count: number }>;
+  organizations: Array<{ slug: string; name: string; count: number }>;
+  qualifications: Array<{ slug: string; name: string; count: number }>;
 }
 
 export interface Tag {

@@ -15,6 +15,8 @@ TARGET_SHA=""
 REPO_DIR="${DO_REPO_DIR:-${REPO_DIR_OVERRIDE:-}}"
 PREVIOUS_SHA=""
 PREVIOUS_REF=""
+RELEASE_STATE_FILE_CONFIG="${DEPLOY_RELEASE_STATE_FILE:-.deploy-state/last-release.env}"
+RELEASE_STATE_FILE=""
 
 log() {
   echo "[deploy-live] $*"
@@ -197,6 +199,18 @@ validate_repo_checkout() {
   require_file "$REPO_DIR/.env"
 }
 
+resolve_release_state_file() {
+  if [[ -z "$RELEASE_STATE_FILE_CONFIG" ]]; then
+    die "DEPLOY_RELEASE_STATE_FILE must not be empty when provided."
+  fi
+
+  if [[ "$RELEASE_STATE_FILE_CONFIG" == /* ]]; then
+    RELEASE_STATE_FILE="$RELEASE_STATE_FILE_CONFIG"
+  else
+    RELEASE_STATE_FILE="$REPO_DIR/$RELEASE_STATE_FILE_CONFIG"
+  fi
+}
+
 resolve_target_sha() {
   record_diagnosis "Verify the target commit exists on origin/main and can be checked out cleanly."
   [[ -n "$TARGET_SHA" ]] || die "A target commit SHA is required."
@@ -283,6 +297,7 @@ run_deploy() {
   export DEPLOY_TARGET_SHA="$TARGET_SHA"
   export DEPLOY_PREVIOUS_SHA="$PREVIOUS_SHA"
   export DEPLOY_REPO_DIR="$REPO_DIR"
+  export DEPLOY_RELEASE_STATE_FILE_PATH="$RELEASE_STATE_FILE"
   export DEPLOY_MODE
 
   cd "$REPO_DIR"
@@ -291,6 +306,27 @@ run_deploy() {
   else
     bash scripts/deploy-prod.sh
   fi
+}
+
+write_release_state() {
+  [[ -n "$RELEASE_STATE_FILE" ]] || die "Release state file path was not resolved."
+
+  local release_dir deployed_at
+  release_dir="$(dirname "$RELEASE_STATE_FILE")"
+  deployed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  mkdir -p "$release_dir"
+
+  {
+    printf 'DEPLOYED_AT_UTC=%q\n' "$deployed_at"
+    printf 'DEPLOYED_SHA=%q\n' "$TARGET_SHA"
+    printf 'PREVIOUS_SHA=%q\n' "$PREVIOUS_SHA"
+    printf 'DEPLOY_MODE=%q\n' "$DEPLOY_MODE"
+    printf 'REPO_DIR=%q\n' "$REPO_DIR"
+  } > "$RELEASE_STATE_FILE"
+
+  chmod 600 "$RELEASE_STATE_FILE" || true
+  echo "Release state written: ${RELEASE_STATE_FILE}"
 }
 
 parse_args "$@"
@@ -317,6 +353,7 @@ check_remote_prerequisites
 
 set_stage "validate-repo"
 validate_repo_checkout
+resolve_release_state_file
 ensure_git_safe_directory
 require_clean_checkout
 
@@ -351,9 +388,14 @@ fi
 set_stage "deploy"
 run_deploy
 
+set_stage "write-release-state"
+record_diagnosis "Failed to persist deploy release metadata. Check write permissions in the repository directory."
+write_release_state
+
 echo "REMOTE DEPLOY COMPLETE"
 echo "  previous_sha: ${PREVIOUS_SHA}"
 echo "  deployed_sha: ${TARGET_SHA}"
 echo "  repo_path: ${REPO_DIR}"
+echo "  release_state_file: ${RELEASE_STATE_FILE}"
 echo "  mode: ${DEPLOY_MODE}"
 echo "=== Remote deploy finished at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ==="

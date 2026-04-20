@@ -12,6 +12,12 @@ Fast deploy minimizes downtime by rebuilding images and restarting backend first
 - Remote droplet helper: `scripts/deploy-live.sh`
 - Fast mode executor: `scripts/deploy-fast.sh`
 - Shared deploy library: `scripts/deploy-common.sh`
+- Rollback helper: `scripts/rollback-last.sh`
+
+## Staging/Preflight Path
+
+- Use GitHub Actions `Deploy Preflight` (`workflow_dispatch`) with `target_environment=staging` for remote safety checks without restarting services.
+- Use `target_environment=production` for production preflight-only checks when validating secrets/config before a release window.
 
 ## Required GitHub Configuration
 
@@ -46,6 +52,17 @@ Deploy fails closed when required values are missing.
 6. Restarts nginx/admin/frontend (and Datadog if configured).
 7. Runs public endpoint checks and optional revalidation smoke check.
 
+Public checks include `/api/livez`, `/api/readyz`, `/api/health`, and `/api/health/deep`.
+
+After a successful deploy, release metadata is written to `.deploy-state/last-release.env` in the repository checkout.
+
+## Preflight Only On Droplet
+
+```bash
+cd /absolute/path/to/repo
+DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha> --preflight-only
+```
+
 ## Manual Invocation On Droplet
 
 ```bash
@@ -70,3 +87,11 @@ PUBLIC_BASE_URL=https://sarkariexams.me bash scripts/verify-deployment.sh
 ## Rollback
 
 `deploy-fast.sh` prints a rollback hint with the previous commit SHA. Use that SHA with `deploy-live.sh`.
+
+For a safer operator flow, use the rollback helper:
+
+```bash
+cd /absolute/path/to/repo
+bash scripts/rollback-last.sh
+bash scripts/rollback-last.sh --yes
+```

@@ -937,6 +937,64 @@
         }
       }
     },
+    "/api/livez": {
+      "get": {
+        "summary": "GET /api/livez",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getApiLivez",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/readyz": {
+      "get": {
+        "summary": "GET /api/readyz",
+        "tags": [
+          "system"
+        ],
+        "operationId": "getApiReadyz",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/api/jobs/match": {
       "get": {
         "summary": "GET /api/jobs/match",
@@ -1902,6 +1960,66 @@
         }
       }
     },
+    "/api/editorial/workflow/trust": {
+      "get": {
+        "summary": "List editorial trust verification queue",
+        "responses": {
+          "200": {
+            "description": "Trust queue response"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/search-readiness": {
+      "get": {
+        "summary": "List editorial search readiness queue",
+        "responses": {
+          "200": {
+            "description": "Search readiness queue response"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/seo": {
+      "get": {
+        "summary": "List editorial SEO readiness queue",
+        "responses": {
+          "200": {
+            "description": "SEO readiness queue response"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/alerts-impact": {
+      "get": {
+        "summary": "List editorial alert impact queue",
+        "responses": {
+          "200": {
+            "description": "Alert impact queue response"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/bulk-transition": {
+      "post": {
+        "summary": "Run bulk editorial workflow transition",
+        "responses": {
+          "200": {
+            "description": "Bulk workflow transition response"
+          }
+        }
+      }
+    },
+    "/api/editorial/workflow/freshness/sweep": {
+      "post": {
+        "summary": "Run editorial freshness sweep",
+        "responses": {
+          "200": {
+            "description": "Freshness sweep response"
+          }
+        }
+      }
+    },
     "/api/editorial/workflow/sla": {
       "get": {
         "summary": "Get editorial workflow SLA violations",
@@ -1964,6 +2082,16 @@
         "responses": {
           "200": {
             "description": "Alert subscription stats"
+          }
+        }
+      }
+    },
+    "/api/editorial/alert-subscriptions/coverage": {
+      "get": {
+        "summary": "Get alert subscription preference coverage",
+        "responses": {
+          "200": {
+            "description": "Alert subscription preference coverage"
           }
         }
       }

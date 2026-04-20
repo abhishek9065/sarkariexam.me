@@ -72,6 +72,10 @@ const SEARCH_TYPE_TERMS: Record<PostType, string[]> = {
   'answer-key': ['answer', 'key', 'objection', 'response'],
   syllabus: ['syllabus', 'scheme', 'exam', 'pattern'],
 };
+const TRUST_SOURCE_REFRESH_DAYS = 30;
+const TRUST_SOURCE_STALE_DAYS = 45;
+const SEARCH_READY_MIN_TERMS = 8;
+const SEARCH_PUBLISH_MIN_TERMS = 12;
 
 function formatEditorialDate(value?: Date | null): string | undefined {
   if (!value) return undefined;
@@ -253,7 +257,6 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     organization: post.organization,
     officialSources: post.officialSources,
     verificationNote: post.verificationNote,
-    updatedAt: post.updatedAt,
   });
   const seoSummary = deriveSeo({
     title: post.title,
@@ -287,6 +290,7 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     trust: trustSummary,
     seo: seoSummary,
     freshness: freshnessSummary,
+    searchMeta,
     lastDate: post.lastDate,
     importantDates: post.importantDates,
   });
@@ -355,6 +359,8 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     officialSources,
     trust: {
       verificationNote: post.verificationNote || undefined,
+      sourceNote: post.sourceNote || undefined,
+      correctionNote: post.correctionNote || undefined,
       updatedLabel: post.updatedLabel || formatEditorialDate(post.updatedAt),
       officialSources,
       ...trustSummary,
@@ -600,22 +606,33 @@ function deriveTrust(post: {
   organization?: { officialWebsite?: string | null } | null;
   officialSources: Array<{ label: string; url: string; isPrimary: boolean; capturedAt?: Date | null; sourceType?: string | null }>;
   verificationNote?: string | null;
-  updatedAt: Date;
 }) {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
   const sourceCount = post.officialSources.length;
   const primarySource = post.officialSources.find((item) => item.isPrimary) || post.officialSources[0] || null;
   const latestSourceCapturedAt = post.officialSources
     .map((item) => item.capturedAt || null)
     .filter((item): item is Date => Boolean(item))
     .sort((a, b) => b.getTime() - a.getTime())[0];
+  const primarySourceCapturedAt = primarySource?.capturedAt || latestSourceCapturedAt || null;
+  const daysSincePrimarySourceCapture = primarySourceCapturedAt
+    ? Math.max(0, Math.floor((now - primarySourceCapturedAt.getTime()) / dayMs))
+    : undefined;
+  const sourceNeedsRefresh = typeof daysSincePrimarySourceCapture === 'number'
+    ? daysSincePrimarySourceCapture >= TRUST_SOURCE_REFRESH_DAYS
+    : sourceCount > 0;
   const primarySourceDomain = normalizeHostname(primarySource?.url || null);
   const officialDomain = normalizeHostname(post.organization?.officialWebsite || null);
   const domainMatch = primarySourceDomain && officialDomain ? hostsMatch(primarySourceDomain, officialDomain) : undefined;
+  const hasVerificationNote = Boolean(post.verificationNote?.trim());
 
   let verificationStatus: 'verified' | 'review' | 'source_light' = 'source_light';
-  if (sourceCount > 0 && Boolean(primarySource) && Boolean(post.verificationNote?.trim())) {
-    verificationStatus = 'verified';
-  } else if (sourceCount > 0 || Boolean(post.verificationNote?.trim())) {
+  if (sourceCount > 0 && Boolean(primarySource) && hasVerificationNote) {
+    const sourceRecencyOk = typeof daysSincePrimarySourceCapture === 'number' && daysSincePrimarySourceCapture <= TRUST_SOURCE_STALE_DAYS;
+    const domainLooksValid = domainMatch !== false;
+    verificationStatus = sourceRecencyOk && domainLooksValid ? 'verified' : 'review';
+  } else if (sourceCount > 0 || hasVerificationNote) {
     verificationStatus = 'review';
   }
 
@@ -625,6 +642,9 @@ function deriveTrust(post: {
     hasPrimarySource: Boolean(primarySource),
     primarySourceLabel: primarySource?.label || undefined,
     latestSourceCapturedAt: latestSourceCapturedAt?.toISOString(),
+    primarySourceCapturedAt: primarySourceCapturedAt?.toISOString(),
+    daysSincePrimarySourceCapture,
+    sourceNeedsRefresh,
     primarySourceDomain: primarySourceDomain || undefined,
     officialDomain: officialDomain || undefined,
     domainMatch,
@@ -694,7 +714,8 @@ function deriveFreshness(post: {
     ? Math.ceil((post.expiresAt.getTime() - now) / (24 * 60 * 60 * 1000))
     : undefined;
   const daysSinceUpdate = Math.floor((now - post.updatedAt.getTime()) / (24 * 60 * 60 * 1000));
-  const sourceCapturedAt = post.trust.latestSourceCapturedAt ? new Date(post.trust.latestSourceCapturedAt) : null;
+  const sourceCapturedAtRef = post.trust.primarySourceCapturedAt || post.trust.latestSourceCapturedAt;
+  const sourceCapturedAt = sourceCapturedAtRef ? new Date(sourceCapturedAtRef) : null;
   const daysSinceSourceCapture = sourceCapturedAt
     ? Math.floor((now - sourceCapturedAt.getTime()) / (24 * 60 * 60 * 1000))
     : undefined;
@@ -725,11 +746,13 @@ function deriveFreshness(post: {
 
 function deriveSearchMeta(searchText: string, legacySlugs: string[]) {
   const tokens = normalizeSearchTokens(searchText);
+  const coverageScore = Math.min(100, (tokens.length * 8) + (Math.min(legacySlugs.length, 5) * 6));
   return {
     termCount: tokens.length,
     aliasCount: legacySlugs.length,
     termsPreview: tokens.slice(0, 12),
-    searchReady: tokens.length >= 8,
+    searchReady: tokens.length >= SEARCH_READY_MIN_TERMS,
+    coverageScore,
   };
 }
 
@@ -742,11 +765,13 @@ function deriveReadiness(post: {
   trust: ReturnType<typeof deriveTrust>;
   seo: ReturnType<typeof deriveSeo>;
   freshness: ReturnType<typeof deriveFreshness>;
+  searchMeta: ReturnType<typeof deriveSearchMeta>;
   lastDate?: string | null;
   importantDates: Array<unknown>;
 }) {
   const issues: string[] = [];
   const warnings: string[] = [];
+  const publishOnlyIssues: string[] = [];
 
   if (post.officialSources.length === 0) {
     issues.push('Add at least one official source before review or publish.');
@@ -760,11 +785,23 @@ function deriveReadiness(post: {
   if (post.freshness.archiveState === 'expired') {
     issues.push('This content is already expired and should not be newly published.');
   }
+  if (post.trust.verificationStatus === 'review') {
+    warnings.push('Trust verification is pending review; publish is blocked until sources are refreshed and matched.');
+    publishOnlyIssues.push('Trust verification is pending review. Refresh source timestamps and confirm authority domain match before publishing.');
+  }
+  if (!post.searchMeta.searchReady) {
+    publishOnlyIssues.push('Search readiness is low. Expand summary/body with precise keywords and entities before publishing.');
+  } else if (post.searchMeta.termCount < SEARCH_PUBLISH_MIN_TERMS) {
+    publishOnlyIssues.push(`Search readiness has only ${post.searchMeta.termCount} indexed terms; target at least ${SEARCH_PUBLISH_MIN_TERMS}.`);
+  }
   if (post.summary.trim().length < 40) {
     warnings.push('Summary is short; expand it for search snippets and trust context.');
   }
   if (!post.body?.trim()) {
     warnings.push('Detailed body content is missing.');
+  }
+  if (post.searchMeta.coverageScore !== undefined && post.searchMeta.coverageScore < 55) {
+    warnings.push('Search coverage score is low; add more concrete terms such as exam, organization, state, and qualification.');
   }
   if (!post.lastDate?.trim() && ['job', 'admission'].includes(post.type)) {
     warnings.push('Last date is missing for this application-driven post.');
@@ -781,16 +818,25 @@ function deriveReadiness(post: {
   if (!post.seo.effectiveTitle || !post.seo.effectiveDescription) {
     warnings.push('SEO fallbacks could not be generated cleanly.');
   }
+  if ((post.seo.effectiveDescription || '').trim().length < 110) {
+    warnings.push('SEO description is short; add more context for better search snippet quality.');
+  }
+  if (post.seo.indexable === false && post.status !== 'archived') {
+    warnings.push('Post is marked noindex while still in active workflow. Confirm if this is intentional.');
+  }
 
+  const publishIssues = [...issues, ...publishOnlyIssues];
   const blocked = issues.length > 0;
   return {
     canSubmit: !blocked,
     canApprove: !blocked,
-    canPublish: !blocked,
+    canPublish: publishIssues.length === 0,
     issueCount: issues.length,
     warningCount: warnings.length,
     issues,
     warnings,
+    publishIssueCount: publishIssues.length,
+    publishIssues,
   };
 }
 
@@ -1194,6 +1240,12 @@ export class PostModelPostgres {
     if (!existing) return null;
 
     const existingRecord = toPostRecord(existing);
+    const mergedOfficialSources =
+      input.officialSources
+      ?? input.trust?.officialSources
+      ?? existingRecord.officialSources
+      ?? [];
+
     const merged = {
       ...existingRecord,
       ...input,
@@ -1201,10 +1253,12 @@ export class PostModelPostgres {
       status: input.status || existingRecord.status,
       trust: {
         verificationNote: input.trust?.verificationNote ?? existingRecord.trust?.verificationNote,
+        sourceNote: input.trust?.sourceNote ?? existingRecord.trust?.sourceNote,
+        correctionNote: input.trust?.correctionNote ?? existingRecord.trust?.correctionNote,
         updatedLabel: input.trust?.updatedLabel ?? existingRecord.trust?.updatedLabel,
-        officialSources: input.officialSources ?? existingRecord.officialSources ?? [],
+        officialSources: mergedOfficialSources,
       },
-      officialSources: input.officialSources ?? existingRecord.officialSources ?? [],
+      officialSources: mergedOfficialSources,
       seo: input.seo ?? existingRecord.seo ?? {},
       flags: input.flags ?? existingRecord.flags ?? {},
       home: input.home ?? existingRecord.home ?? {},
@@ -1234,9 +1288,21 @@ export class PostModelPostgres {
       const current = mapWorkflowStatus(existing.status);
       const nextStatus = this.resolveNextStatus(current, action);
       const existingRecord = toPostRecord(existing);
-      if (['submit', 'approve', 'publish'].includes(action) && !existingRecord.readiness?.canPublish) {
-        const issues = existingRecord.readiness?.issues || ['Post is not ready for editorial workflow'];
-        throw new Error(issues.join(' '));
+      const readinessGate =
+        action === 'submit'
+          ? existingRecord.readiness?.canSubmit
+          : action === 'approve'
+            ? existingRecord.readiness?.canApprove
+            : action === 'publish'
+              ? existingRecord.readiness?.canPublish
+              : true;
+
+      if (['submit', 'approve', 'publish'].includes(action) && !readinessGate) {
+        const issues =
+          action === 'publish'
+            ? existingRecord.readiness?.publishIssues || existingRecord.readiness?.issues
+            : existingRecord.readiness?.issues;
+        throw new Error((issues && issues.length > 0 ? issues : ['Post is not ready for this workflow action']).join(' '));
       }
       const now = new Date();
 
@@ -1377,6 +1443,302 @@ export class PostModelPostgres {
         return bPriority - aPriority;
       })
       .slice(0, limit);
+  }
+
+  static async listTrustQueue(limit = 24): Promise<PostRecord[]> {
+    const rows = await prisma.post.findMany({
+      where: {
+        status: {
+          in: [PrismaWorkflowStatus.IN_REVIEW, PrismaWorkflowStatus.APPROVED, PrismaWorkflowStatus.PUBLISHED],
+        },
+      },
+      include: postInclude,
+      orderBy: [
+        { updatedAt: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      take: Math.max(limit * 4, 80),
+    });
+
+    return rows
+      .map((row) => toPostRecord(row))
+      .filter((post) => {
+        const trust = post.trust;
+        return (
+          trust.verificationStatus !== 'verified'
+          || !trust.hasPrimarySource
+          || trust.domainMatch === false
+          || trust.sourceNeedsRefresh
+        );
+      })
+      .sort((a, b) => {
+        const score = (post: PostRecord) => {
+          let total = 0;
+          if (post.trust.verificationStatus === 'source_light') total += 120;
+          else if (post.trust.verificationStatus === 'review') total += 80;
+          if (!post.trust.hasPrimarySource) total += 60;
+          if (post.trust.domainMatch === false) total += 50;
+          if (post.trust.sourceNeedsRefresh) total += 40;
+          total += Math.min(post.trust.daysSincePrimarySourceCapture || 0, 60);
+          total += post.readiness?.issueCount || 0;
+          return total;
+        };
+        return score(b) - score(a);
+      })
+      .slice(0, limit);
+  }
+
+  static async listSearchReadinessQueue(limit = 24): Promise<PostRecord[]> {
+    const rows = await prisma.post.findMany({
+      where: {
+        status: {
+          in: [
+            PrismaWorkflowStatus.DRAFT,
+            PrismaWorkflowStatus.IN_REVIEW,
+            PrismaWorkflowStatus.APPROVED,
+            PrismaWorkflowStatus.PUBLISHED,
+          ],
+        },
+      },
+      include: postInclude,
+      orderBy: [
+        { updatedAt: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      take: Math.max(limit * 4, 80),
+    });
+
+    return rows
+      .map((row) => toPostRecord(row))
+      .filter((post) => {
+        const searchMeta = post.searchMeta;
+        const termCount = searchMeta?.termCount || 0;
+        return (
+          !searchMeta?.searchReady
+          || termCount < SEARCH_PUBLISH_MIN_TERMS
+          || post.summary.trim().length < 80
+          || !post.body?.trim()
+        );
+      })
+      .sort((a, b) => {
+        const score = (post: PostRecord) => {
+          const termCount = post.searchMeta?.termCount || 0;
+          let total = 0;
+          if (!post.searchMeta?.searchReady) total += 90;
+          total += Math.max(0, SEARCH_PUBLISH_MIN_TERMS - termCount) * 8;
+          if (post.summary.trim().length < 80) total += 25;
+          if (!post.body?.trim()) total += 35;
+          total += post.readiness?.issueCount || 0;
+          return total;
+        };
+        return score(b) - score(a);
+      })
+      .slice(0, limit);
+  }
+
+  static async listSeoQueue(limit = 24): Promise<PostRecord[]> {
+    const rows = await prisma.post.findMany({
+      where: {
+        status: {
+          in: [
+            PrismaWorkflowStatus.DRAFT,
+            PrismaWorkflowStatus.IN_REVIEW,
+            PrismaWorkflowStatus.APPROVED,
+            PrismaWorkflowStatus.PUBLISHED,
+          ],
+        },
+      },
+      include: postInclude,
+      orderBy: [
+        { updatedAt: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      take: Math.max(limit * 4, 80),
+    });
+
+    return rows
+      .map((row) => toPostRecord(row))
+      .filter((post) => {
+        const titleLength = (post.seo?.effectiveTitle || '').trim().length;
+        const descriptionLength = (post.seo?.effectiveDescription || '').trim().length;
+        const canonicalPath = (post.seo?.effectiveCanonicalPath || '').trim();
+        return (
+          titleLength < 35
+          || titleLength > 160
+          || descriptionLength < 110
+          || !canonicalPath.startsWith('/')
+          || post.seo?.indexable === false
+        );
+      })
+      .sort((a, b) => {
+        const score = (post: PostRecord) => {
+          const titleLength = (post.seo?.effectiveTitle || '').trim().length;
+          const descriptionLength = (post.seo?.effectiveDescription || '').trim().length;
+          const canonicalPath = (post.seo?.effectiveCanonicalPath || '').trim();
+          let total = 0;
+          if (titleLength < 35 || titleLength > 160) total += 45;
+          if (descriptionLength < 110) total += 40;
+          if (!canonicalPath.startsWith('/')) total += 35;
+          if (post.seo?.indexable === false) total += 20;
+          total += post.readiness?.warningCount || 0;
+          return total;
+        };
+        return score(b) - score(a);
+      })
+      .slice(0, limit);
+  }
+
+  static async listAlertImpactQueue(limit = 12): Promise<Array<{ post: PostRecord; preview: AlertMatchPreview }>> {
+    const rows = await prisma.post.findMany({
+      where: {
+        status: {
+          in: [PrismaWorkflowStatus.APPROVED, PrismaWorkflowStatus.PUBLISHED],
+        },
+      },
+      include: postInclude,
+      orderBy: [
+        { updatedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: Math.max(limit * 3, 36),
+    });
+
+    const candidates = rows.map((row) => toPostRecord(row));
+    const withPreview = await Promise.all(candidates.map(async (post) => {
+      const matches = await AlertSubscriptionModelPostgres.listMatchingPost(post);
+      const preview = matches.reduce<AlertMatchPreview>((acc, item) => {
+        acc.total += 1;
+        if (item.frequency === 'instant') acc.instant += 1;
+        else if (item.frequency === 'weekly') acc.weekly += 1;
+        else acc.daily += 1;
+        return acc;
+      }, {
+        total: 0,
+        instant: 0,
+        daily: 0,
+        weekly: 0,
+      });
+
+      return {
+        post,
+        preview,
+      };
+    }));
+
+    return withPreview
+      .sort((a, b) => {
+        const aScore = (a.preview.total * 10) + (a.preview.instant * 4) + (a.post.freshness?.expiresSoon ? 2 : 0);
+        const bScore = (b.preview.total * 10) + (b.preview.instant * 4) + (b.post.freshness?.expiresSoon ? 2 : 0);
+        return bScore - aScore;
+      })
+      .slice(0, limit);
+  }
+
+  static async bulkTransition(
+    ids: string[],
+    action: 'submit' | 'approve' | 'publish' | 'unpublish' | 'archive' | 'restore',
+    actorId?: string,
+    actorRole?: string,
+    note?: string,
+  ) {
+    const uniqueIds = Array.from(new Set(ids.map((item) => String(item).trim()).filter(Boolean)));
+    const updated: PostRecord[] = [];
+    const failures: Array<{ id: string; error: string }> = [];
+
+    for (const id of uniqueIds) {
+      try {
+        const result = await this.transition(id, action, actorId, actorRole, note);
+        if (!result) {
+          failures.push({ id, error: 'Post not found' });
+          continue;
+        }
+        updated.push(result);
+      } catch (error) {
+        failures.push({
+          id,
+          error: error instanceof Error ? error.message : 'Transition failed',
+        });
+      }
+    }
+
+    return {
+      total: uniqueIds.length,
+      successCount: updated.length,
+      failureCount: failures.length,
+      updated,
+      failures,
+    };
+  }
+
+  static async sweepExpiredPublishedPosts(params?: {
+    limit?: number;
+    dryRun?: boolean;
+    actorId?: string;
+    actorRole?: string;
+    note?: string;
+    now?: Date;
+  }) {
+    const limit = Math.min(Math.max(params?.limit ?? 100, 1), 200);
+    const now = params?.now || new Date();
+
+    const rows = await prisma.post.findMany({
+      where: {
+        status: PrismaWorkflowStatus.PUBLISHED,
+        expiresAt: { lte: now },
+      },
+      include: postInclude,
+      orderBy: [
+        { expiresAt: 'asc' },
+        { updatedAt: 'asc' },
+      ],
+      take: limit,
+    });
+
+    const candidates = rows.map((row) => toPostRecord(row));
+    if (params?.dryRun) {
+      return {
+        dryRun: true,
+        totalCandidates: candidates.length,
+        archivedCount: 0,
+        candidates,
+        archived: [] as PostRecord[],
+        failures: [] as Array<{ id: string; error: string }>,
+      };
+    }
+
+    const archived: PostRecord[] = [];
+    const failures: Array<{ id: string; error: string }> = [];
+
+    for (const candidate of candidates) {
+      try {
+        const updated = await this.transition(
+          candidate.id,
+          'archive',
+          params?.actorId,
+          params?.actorRole,
+          params?.note || 'Auto-archived by freshness sweep (expiry reached)',
+        );
+        if (!updated) {
+          failures.push({ id: candidate.id, error: 'Post not found' });
+          continue;
+        }
+        archived.push(updated);
+      } catch (error) {
+        failures.push({
+          id: candidate.id,
+          error: error instanceof Error ? error.message : 'Archive failed',
+        });
+      }
+    }
+
+    return {
+      dryRun: false,
+      totalCandidates: candidates.length,
+      archivedCount: archived.length,
+      candidates,
+      archived,
+      failures,
+    };
   }
 
   private static async persistPost(params: {

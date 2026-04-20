@@ -42,6 +42,100 @@ jobs:
             exit 1
           fi
 
+  shell-safety:
+    name: Shell Safety Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Validate shell syntax
+        run: |
+          set -euo pipefail
+          bash -n scripts/deploy-common.sh
+          bash -n scripts/deploy-live.sh
+          bash -n scripts/deploy-via-ssh.sh
+          bash -n scripts/deploy-fast.sh
+          bash -n scripts/deploy-prod.sh
+          bash -n scripts/verify-deployment.sh
+          bash -n scripts/rollback-last.sh
+
+      - name: Lint critical deploy scripts
+        run: |
+          set -euo pipefail
+          shellcheck --severity=error \
+            scripts/deploy-common.sh \
+            scripts/deploy-live.sh \
+            scripts/deploy-via-ssh.sh \
+            scripts/deploy-fast.sh \
+            scripts/deploy-prod.sh \
+            scripts/verify-deployment.sh \
+            scripts/rollback-last.sh
+
+  deploy-doc-consistency:
+    name: Deploy Docs Consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine diff base
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          base_sha=""
+          if [[ "${EVENT_NAME}" == "pull_request" && -n "${PR_BASE_SHA:-}" ]]; then
+            base_sha="${PR_BASE_SHA}"
+          elif [[ "${EVENT_NAME}" == "push" && -n "${PUSH_BEFORE_SHA:-}" && "${PUSH_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+            base_sha="${PUSH_BEFORE_SHA}"
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+            base_sha="$(git rev-parse HEAD~1)"
+          fi
+
+          if [[ -z "${base_sha}" ]]; then
+            echo "has_base=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_base=true" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${base_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce deploy docs updates when deploy controls change
+        if: steps.base.outputs.has_base == 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+
+          changed_files="$(git diff --name-only "${BASE_SHA}" HEAD)"
+
+          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(scripts/deploy-(common|live|via-ssh|fast|prod)\.sh|scripts/verify-deployment\.sh|scripts/rollback-last\.sh|docker-compose\.yml|\.github/workflows/deploy\.yml|\.github/workflows/deploy-preflight\.yml)$'; then
+            echo "No deploy-control changes detected; docs consistency check skipped."
+            exit 0
+          fi
+
+          if printf '%s\n' "${changed_files}" | grep -Eq '^(README\.md|docs/deployment-notes\.md|docs/production-deploy-checklist\.md|scripts/FAST_DEPLOY_README\.md|docs/phase4-reliability-hardening\.md|docs/deploy-incident-faq\.md)$'; then
+            echo "Deploy controls changed and operational docs were updated."
+            exit 0
+          fi
+
+          echo "::error::Deploy controls changed without matching docs updates. Update at least one of: README.md, docs/deployment-notes.md, docs/production-deploy-checklist.md, scripts/FAST_DEPLOY_README.md, docs/phase4-reliability-hardening.md, docs/deploy-incident-faq.md"
+          exit 1
+
   compose-validation:
     name: Compose Config Validation
     runs-on: ubuntu-latest
