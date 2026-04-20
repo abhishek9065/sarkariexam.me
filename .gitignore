@@ -38,5 +38,5 @@ nginx/ssl/*.key
 nginx/ssl/*.pem
 nginx/ssl/*.crt
 
-.gemini/
-gha-creds-*.json
+# Deployment state metadata on servers
+.deploy-state/
