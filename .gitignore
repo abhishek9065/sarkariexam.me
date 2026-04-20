@@ -3,6 +3,11 @@ node_modules/
 
 # Build output
 dist/
+frontend/.next/
+admin-next/.next/
+frontend/out/
+admin-next/out/
+.copilot-artifacts/
 
 # Environment files
 .env

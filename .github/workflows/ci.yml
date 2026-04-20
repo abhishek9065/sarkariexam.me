@@ -16,6 +16,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repository-hygiene:
+    name: Repository Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure generated artifacts are not tracked
+        run: |
+          set -euo pipefail
+
+          tracked_next="$(git ls-files | grep -E '^(frontend|admin-next)/\\.next/' || true)"
+          if [[ -n "${tracked_next}" ]]; then
+            echo "::error::Generated Next.js .next artifacts are tracked in git. Remove them from version control."
+            echo "${tracked_next}"
+            exit 1
+          fi
+
+          tracked_copilot="$(git ls-files | grep -E '^\\.copilot-artifacts/' || true)"
+          if [[ -n "${tracked_copilot}" ]]; then
+            echo "::error::Copilot artifact files are tracked in git. Remove .copilot-artifacts from version control."
+            echo "${tracked_copilot}"
+            exit 1
+          fi
+
   compose-validation:
     name: Compose Config Validation
     runs-on: ubuntu-latest

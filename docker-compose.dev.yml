@@ -34,6 +34,7 @@ services:
       - COSMOS_CONNECTION_STRING=mongodb://mongo:27017/sarkari_db
       - COSMOS_DATABASE_NAME=sarkari_db
       - JWT_SECRET=dev-secret-123
+      - LEGACY_MONGO_REQUIRED=false
       # Mock other services to prevent startup errors
       - SENDGRID_API_KEY=SG.mock
       - UPSTASH_REDIS_REST_URL=http://mock-redis

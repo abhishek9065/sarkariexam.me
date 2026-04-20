@@ -46,7 +46,11 @@ Minimum required values:
 
 - `JWT_SECRET`
 - `POSTGRES_PRISMA_URL` or `DATABASE_URL`
-- `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
+
+Conditionally required values:
+
+- `COSMOS_CONNECTION_STRING` or `MONGODB_URI` only when `LEGACY_MONGO_REQUIRED=true`
+- `COSMOS_DATABASE_NAME` only when legacy bridge variables are configured
 
 Optional but recommended values are logged when missing.
 

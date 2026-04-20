@@ -5,6 +5,7 @@ const connectToDatabase = vi.fn();
 const ensureDatabaseReady = vi.fn();
 const healthCheck = vi.fn();
 const isDatabaseConfigured = vi.fn();
+const postgresHealthCheck = vi.fn();
 
 vi.mock('../services/cosmosdb.js', () => ({
   closeConnection: vi.fn(),
@@ -30,6 +31,14 @@ vi.mock('../services/cosmosdb.js', () => ({
   toObjectId: vi.fn((id: string) => id),
 }));
 
+vi.mock('../services/postgres/prisma.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/postgres/prisma.js')>();
+  return {
+    ...actual,
+    postgresHealthCheck,
+  };
+});
+
 describe('server readiness', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -37,21 +46,29 @@ describe('server readiness', () => {
     ensureDatabaseReady.mockReset();
     healthCheck.mockReset();
     isDatabaseConfigured.mockReset();
+    postgresHealthCheck.mockReset();
+    postgresHealthCheck.mockResolvedValue(true);
   });
 
-  it('returns 503 from /api/health when the database is configured but unavailable', async () => {
+  it('keeps /api/health healthy when legacy bridge is configured but unavailable', async () => {
     isDatabaseConfigured.mockReturnValue(true);
     healthCheck.mockResolvedValue(false);
 
     const { app } = await import('../server.js');
     const response = await request(app).get('/api/health');
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
-      status: 'error',
+      status: 'ok',
       db: {
         configured: true,
         ok: false,
+        status: 'degraded',
+      },
+      legacyBridge: {
+        configured: true,
+        ok: false,
+        status: 'degraded',
       },
     });
   });
@@ -73,7 +90,7 @@ describe('server readiness', () => {
     expect(healthCheck).not.toHaveBeenCalled();
   });
 
-  it('returns 503 for legacy mongo-backed API routes when the database cannot be readied', async () => {
+  it('does not block /api/admin routes on legacy bridge readiness anymore', async () => {
     isDatabaseConfigured.mockReturnValue(true);
     healthCheck.mockResolvedValue(true);
     ensureDatabaseReady.mockRejectedValue(new Error('database unavailable'));
@@ -81,10 +98,8 @@ describe('server readiness', () => {
     const { app } = await import('../server.js');
     const response = await request(app).get('/api/admin/announcements');
 
-    expect(response.status).toBe(503);
-    expect(response.body).toMatchObject({
-      code: 'LEGACY_DB_UNAVAILABLE',
-      error: 'Service unavailable',
-    });
+    expect(response.status).toBe(401);
+    expect(response.body.code).not.toBe('LEGACY_DB_UNAVAILABLE');
+    expect(ensureDatabaseReady).not.toHaveBeenCalled();
   });
 });

@@ -98,6 +98,7 @@ Important production variables:
 
 Legacy-only production variables:
 
+- `LEGACY_MONGO_REQUIRED` (set `true` only if a release still depends on transitional legacy bridge paths)
 - `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
 - `COSMOS_DATABASE_NAME`
 

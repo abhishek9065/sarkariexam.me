@@ -64,9 +64,17 @@ read_env_var() {
   printf '%s' "$value"
 }
 
+is_truthy() {
+  local value="${1:-}"
+  case "${value,,}" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 validate_production_env() {
   local missing=()
-  local jwt_secret postgres_prisma_url database_url cosmos_connection_string mongodb_uri
+  local jwt_secret postgres_prisma_url database_url cosmos_connection_string mongodb_uri legacy_mongo_required
   local frontend_revalidate_url frontend_revalidate_token
 
   jwt_secret="$(read_env_var "JWT_SECRET")"
@@ -74,10 +82,14 @@ validate_production_env() {
   database_url="$(read_env_var "DATABASE_URL")"
   cosmos_connection_string="$(read_env_var "COSMOS_CONNECTION_STRING")"
   mongodb_uri="$(read_env_var "MONGODB_URI")"
+  legacy_mongo_required="$(read_env_var "LEGACY_MONGO_REQUIRED")"
 
   [[ -n "$jwt_secret" ]] || missing+=("JWT_SECRET")
   [[ -n "$postgres_prisma_url" || -n "$database_url" ]] || missing+=("POSTGRES_PRISMA_URL or DATABASE_URL")
-  [[ -n "$cosmos_connection_string" || -n "$mongodb_uri" ]] || missing+=("COSMOS_CONNECTION_STRING or MONGODB_URI")
+
+  if is_truthy "$legacy_mongo_required"; then
+    [[ -n "$cosmos_connection_string" || -n "$mongodb_uri" ]] || missing+=("COSMOS_CONNECTION_STRING or MONGODB_URI (required when LEGACY_MONGO_REQUIRED=true)")
+  fi
 
   if [[ "${#missing[@]}" -gt 0 ]]; then
     echo "ERROR: missing required production env var(s) in $ROOT_DIR/.env:"
@@ -96,6 +108,10 @@ validate_production_env() {
     warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL is missing. Publish-triggered revalidation stays disabled."
   fi
 
+  if ! is_truthy "$legacy_mongo_required" && [[ -z "$cosmos_connection_string" && -z "$mongodb_uri" ]]; then
+    warn "Legacy Mongo/Cosmos bridge is not configured. Transitional legacy-guarded routes and bridge-bound startup paths stay disabled."
+  fi
+
   PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-$(read_env_var "FRONTEND_URL")}"
   if [[ -z "$PUBLIC_BASE_URL" ]]; then
     PUBLIC_BASE_URL="https://sarkariexams.me"
@@ -104,8 +120,8 @@ validate_production_env() {
 }
 
 warn_if_missing_production_runtime_vars() {
+  local legacy_mongo_required
   local recommended_keys=(
-    "COSMOS_DATABASE_NAME"
     "FRONTEND_URL"
     "CORS_ORIGINS"
     "FRONTEND_REVALIDATE_URL"
@@ -122,6 +138,11 @@ warn_if_missing_production_runtime_vars() {
       missing+=("$key")
     fi
   done
+
+  legacy_mongo_required="$(read_env_var "LEGACY_MONGO_REQUIRED")"
+  if is_truthy "$legacy_mongo_required" && [[ -z "$(read_env_var "COSMOS_DATABASE_NAME")" ]]; then
+    missing+=("COSMOS_DATABASE_NAME")
+  fi
 
   if [[ "${#missing[@]}" -gt 0 ]]; then
     echo "NOTICE: recommended production env var(s) missing from $ROOT_DIR/.env:"
