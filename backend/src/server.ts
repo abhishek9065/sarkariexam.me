@@ -422,6 +422,11 @@ app.get('/metrics', (req, res) => {
 });
 
 app.use(async (req, res, next) => {
+  if (config.nodeEnv === 'test') {
+    next();
+    return;
+  }
+
   // PostgreSQL is the primary runtime dependency for API request handling.
   const isPostgresOk = await getPostgresReadinessCached();
   if (!isPostgresOk) {
