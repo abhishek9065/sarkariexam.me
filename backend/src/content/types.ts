@@ -80,6 +80,8 @@ export interface SeoFields {
 
 export interface TrustFields {
   verificationNote?: string;
+  sourceNote?: string;
+  correctionNote?: string;
   updatedLabel?: string;
   officialSources: OfficialSource[];
   verificationStatus?: 'verified' | 'review' | 'source_light';
@@ -139,6 +141,7 @@ export interface PostRecord {
   summary: string;
   shortInfo?: string;
   body?: string;
+  contentJson?: Record<string, unknown> | any[] | null;
   organization?: TaxonomyRef | null;
   categories: TaxonomyRef[];
   states: TaxonomyRef[];
@@ -397,6 +400,7 @@ export const postEditorSchema = z.object({
   summary: z.string().trim().min(10).max(500),
   shortInfo: z.string().trim().max(600).optional(),
   body: z.string().trim().max(50000).optional(),
+  contentJson: z.any().optional(),
   organization: taxonomyRefSchema.nullish(),
   categories: z.array(taxonomyRefSchema).min(1),
   states: z.array(taxonomyRefSchema).default([]),
@@ -410,6 +414,8 @@ export const postEditorSchema = z.object({
   admissionPrograms: z.array(admissionProgramSchema).default([]),
   officialSources: z.array(officialSourceSchema).default([]),
   verificationNote: z.string().trim().max(500).optional(),
+  sourceNote: z.string().trim().max(500).optional(),
+  correctionNote: z.string().trim().max(500).optional(),
   tag: z.enum(['new', 'hot', 'update', 'last-date']).optional(),
   flags: z.object({
     urgent: z.boolean().optional(),

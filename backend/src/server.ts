@@ -35,7 +35,6 @@ import subscriptionsRouter from './routes/subscriptions.js';
 import supportRouter from './routes/support.js';
 import { scheduleAnalyticsRollups } from './services/analytics.js';
 import { scheduleAutomationJobs } from './services/automationJobs.js';
-import { getContentDbMode, shouldReadFromPostgres } from './services/contentDbMode.js';
 import {
   connectToDatabase,
   ensureDatabaseReady,
@@ -194,13 +193,11 @@ app.get('/api/healthz', distributedRateLimit({ windowMs: 60 * 1000, maxRequests:
 app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
-  const contentDbMode = getContentDbMode();
   const postgresConfigured = Boolean(config.postgresPrismaUrl);
   const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
-  const postgresRequired = shouldReadFromPostgres();
-  const hasDbFailure = dbConfigured && !dbOk;
-  const hasPostgresFailure = postgresRequired && (!postgresConfigured || postgresOk === false);
-  const status = hasDbFailure || hasPostgresFailure ? 'error' : 'ok';
+  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk);
+  const hasPostgresFailure = !postgresConfigured || postgresOk === false;
+  const status = hasPostgresFailure ? 'error' : 'ok';
 
   res
     .status(status === 'error' ? 503 : 200)
@@ -208,20 +205,35 @@ app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxReque
     .json({
       status,
       timestamp: new Date().toISOString(),
-      db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' },
+      db: legacyBridge,
+      legacyBridge,
       contentDb: {
-        mode: contentDbMode,
         postgres: {
           configured: postgresConfigured,
-          required: postgresRequired,
           ok: postgresOk,
         },
       },
     });
 });
 
-function isDatabaseBackedApi(pathname: string): boolean {
+// Transitional safety boundary for any route prefixes that still require the legacy bridge.
+function isLegacyMongoGuardedApi(pathname: string): boolean {
   return legacyMongoBackedApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function buildLegacyBridgeHealth(dbConfigured: boolean, dbOk: boolean | null) {
+  if (!dbConfigured) {
+    return {
+      configured: false,
+      status: 'not_configured' as const,
+    };
+  }
+
+  return {
+    configured: true,
+    ok: Boolean(dbOk),
+    status: dbOk ? ('ok' as const) : ('degraded' as const),
+  };
 }
 
 function buildRuntimeDiagnostics() {
@@ -229,7 +241,6 @@ function buildRuntimeDiagnostics() {
     legacyMongo: getLegacyRuntimeDiagnostics(config.legacyMongoConfigured),
     postgres: {
       configured: Boolean(config.postgresPrismaUrl),
-      mode: getContentDbMode(),
     },
     frontendRevalidation: {
       configured: config.frontendRevalidationConfigured,
@@ -246,13 +257,11 @@ function buildRuntimeDiagnostics() {
 async function buildHealthResponse(res: express.Response) {
   const dbConfigured = isDatabaseConfigured();
   const dbOk = dbConfigured ? await healthCheck() : null;
-  const contentDbMode = getContentDbMode();
   const postgresConfigured = Boolean(config.postgresPrismaUrl);
   const postgresOk = postgresConfigured ? await postgresHealthCheck() : null;
-  const postgresRequired = shouldReadFromPostgres();
-  const hasDbFailure = dbConfigured && !dbOk;
-  const hasPostgresFailure = postgresRequired && (!postgresConfigured || postgresOk === false);
-  const status = hasDbFailure || hasPostgresFailure ? 'error' : 'ok';
+  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk);
+  const hasPostgresFailure = !postgresConfigured || postgresOk === false;
+  const status = hasPostgresFailure ? 'error' : 'ok';
 
   return res
     .status(status === 'error' ? 503 : 200)
@@ -260,12 +269,11 @@ async function buildHealthResponse(res: express.Response) {
     .json({
       status,
       timestamp: new Date().toISOString(),
-      db: dbConfigured ? { configured: true, ok: dbOk } : { configured: false, status: 'not_configured' },
+      db: legacyBridge,
+      legacyBridge,
       contentDb: {
-        mode: contentDbMode,
         postgres: {
           configured: postgresConfigured,
-          required: postgresRequired,
           ok: postgresOk,
         },
       },
@@ -289,7 +297,6 @@ app.get('/metrics', (req, res) => {
   const memory = process.memoryUsage();
   const dbConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
   const postgresConfigured = Boolean(config.postgresPrismaUrl);
-  const contentDbMode = getContentDbMode();
   const securityMetrics = getSecurityMetricSnapshot();
 
   const lines = [
@@ -314,9 +321,6 @@ app.get('/metrics', (req, res) => {
     '# HELP app_postgres_configured PostgreSQL configured for Prisma (1=yes, 0=no)',
     '# TYPE app_postgres_configured gauge',
     `app_postgres_configured ${postgresConfigured ? 1 : 0}`,
-    '# HELP app_content_db_mode Active content data source mode (postgres=1)',
-    '# TYPE app_content_db_mode gauge',
-    `app_content_db_mode ${contentDbMode === 'postgres' ? 1 : 0}`,
     '# HELP app_build_info Build information',
     '# TYPE app_build_info gauge',
     `app_build_info{node_version="${process.version}"} 1`,
@@ -336,24 +340,30 @@ app.get('/metrics', (req, res) => {
 });
 
 app.use(async (req, res, next) => {
-  // If this is a Postgres-backed route (which is almost all of them now), check Postgres health
-  const isPostgresRequired = shouldReadFromPostgres();
-  
-  if (isPostgresRequired) {
-    const isPostgresOk = await postgresHealthCheck();
-    if (!isPostgresOk) {
-      logger.error({ path: req.path }, '[Server] PostgreSQL primary database unavailable');
+  // PostgreSQL is the primary runtime dependency for API request handling.
+  const isPostgresOk = await postgresHealthCheck();
+  if (!isPostgresOk) {
+    logger.error({ path: req.path }, '[Server] PostgreSQL primary database unavailable');
+    return res.status(503).json({
+      error: 'Service unavailable',
+      code: 'PRIMARY_DB_UNAVAILABLE',
+      message: 'Primary content database is temporarily unavailable. Please retry shortly.',
+      requestId: req.requestId,
+    });
+  }
+
+  // Legacy Mongo/Cosmos compatibility guardrail for transitional prefixes only.
+  if (isLegacyMongoGuardedApi(req.path)) {
+    if (!isDatabaseConfigured()) {
+      logger.warn({ path: req.path }, '[Server] Legacy Mongo database not configured for guarded compatibility route');
       return res.status(503).json({
         error: 'Service unavailable',
-        code: 'PRIMARY_DB_UNAVAILABLE',
-        message: 'Primary content database is temporarily unavailable. Please retry shortly.',
+        code: 'LEGACY_DB_UNAVAILABLE',
+        message: 'Legacy database is not configured for this compatibility route.',
         requestId: req.requestId,
       });
     }
-  }
 
-  // If this is one of the remaining legacy Mongo-backed routes, check Mongo health
-  if (isDatabaseBackedApi(req.path) && isDatabaseConfigured()) {
     try {
       await ensureDatabaseReady();
     } catch (error) {
@@ -370,7 +380,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// API routes. Some legacy administrative and scheduler-adjacent flows still rely on the Mongo/Cosmos bridge.
+// API routes.
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/announcements', announcementsRouter);
@@ -398,6 +408,29 @@ app.use('/api', (req, res) => {
 app.use(errorHandler);
 
 // Initialize database and start server
+async function startPostgresPrimaryRuntime() {
+  if (!config.postgresPrismaUrl) {
+    logger.info('[Server] Postgres primary schedulers disabled because PostgreSQL is not configured');
+    return;
+  }
+
+  await scheduleAnalyticsRollups().catch((error) => {
+    logger.error({ err: error }, '[Server] Analytics rollup scheduler init failed');
+  });
+
+  try {
+    scheduleAutomationJobs();
+  } catch (error) {
+    logger.error({ err: error }, '[Server] Automation scheduler init failed');
+  }
+
+  scheduleDigestSender();
+  scheduleSavedSearchAlerts();
+  scheduleTrackerReminders();
+
+  logger.info('[Server] Postgres primary runtime schedulers started');
+}
+
 export async function startServer() {
   ErrorTracking.init();
   for (const warning of config.runtimeWarnings) {
@@ -410,27 +443,22 @@ export async function startServer() {
       logger.info('[Server] Legacy Mongo/Cosmos bridge connected successfully');
       await startLegacyMongoRuntime({
         logger,
-        scheduleAnalyticsRollups,
-        scheduleAutomationJobs,
       });
     } else {
-      logger.info('[Server] Legacy Mongo/Cosmos bridge not configured; Mongo-backed compatibility flows remain disabled');
+      logger.info(
+        { guardedApiPrefixes: legacyMongoBackedApiPrefixes },
+        '[Server] Legacy Mongo/Cosmos bridge not configured; compatibility-only bridge features remain unavailable',
+      );
     }
   } catch (error) {
     logger.error({ err: error }, '[Server] Legacy Mongo/Cosmos bridge connection failed');
-    if (config.isProduction) {
+    if (config.isProduction && config.legacyMongoRequired) {
       throw error;
     }
-    logger.info('[Server] Starting without Mongo/Cosmos bridge in development');
+    logger.info('[Server] Starting without Mongo/Cosmos bridge; compatibility-only bridge features will be degraded');
   }
 
-  if (config.postgresPrismaUrl) {
-    scheduleDigestSender();
-    scheduleSavedSearchAlerts();
-    scheduleTrackerReminders();
-  } else {
-    logger.info('[Server] Digest sender, saved-search alerts, and tracker reminders disabled because PostgreSQL is not configured');
-  }
+  await startPostgresPrimaryRuntime();
 
   const server = http.createServer(app);
 

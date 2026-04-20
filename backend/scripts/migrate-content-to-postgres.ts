@@ -37,6 +37,8 @@ function mapPostType(type: string | undefined): PrismaPostType {
   if (type === 'admit-card') return PrismaPostType.ADMIT_CARD;
   if (type === 'answer-key') return PrismaPostType.ANSWER_KEY;
   if (type === 'admission') return PrismaPostType.ADMISSION;
+  if (type === 'scholarship') return PrismaPostType.SCHOLARSHIP;
+  if (type === 'board-result' || type === 'board_result') return PrismaPostType.BOARD_RESULT;
   if (type === 'syllabus') return PrismaPostType.SYLLABUS;
   return PrismaPostType.JOB;
 }
@@ -294,8 +296,8 @@ async function migratePosts(dryRun: boolean, limit: number) {
         programId = program.id;
       }
 
-      const slug = slugify(doc.slug || doc.title || postId);
-      const legacySlugs = Array.from(new Set((doc.legacySlugs || []).map((value: string) => slugify(value)).filter(Boolean)));
+      const slug = doc.slug ? String(doc.slug).trim() : slugify(doc.title || postId);
+      const legacySlugs = Array.from(new Set((doc.legacySlugs || []).map((value: string) => String(value).trim()).filter(Boolean)));
 
       await tx.post.upsert({
         where: { id: postId },
@@ -334,6 +336,9 @@ async function migratePosts(dryRun: boolean, limit: number) {
           searchText: String(doc.searchText || '').trim().toLowerCase(),
           verificationNote: doc.trust?.verificationNote?.trim() || null,
           updatedLabel: doc.trust?.updatedLabel?.trim() || null,
+          sourceNote: doc.sourceNote?.trim() || null,
+          correctionNote: doc.correctionNote?.trim() || null,
+          contentJson: doc.contentJson ? (JSON.parse(JSON.stringify(doc.contentJson)) as any) : null,
           tag: mapTag(doc.tag),
           isUrgent: Boolean(doc.flags?.urgent),
           isNew: Boolean(doc.flags?.isNew),
@@ -385,6 +390,9 @@ async function migratePosts(dryRun: boolean, limit: number) {
           searchText: String(doc.searchText || '').trim().toLowerCase(),
           verificationNote: doc.trust?.verificationNote?.trim() || null,
           updatedLabel: doc.trust?.updatedLabel?.trim() || null,
+          sourceNote: doc.sourceNote?.trim() || null,
+          correctionNote: doc.correctionNote?.trim() || null,
+          contentJson: doc.contentJson ? (JSON.parse(JSON.stringify(doc.contentJson)) as any) : null,
           tag: mapTag(doc.tag),
           isUrgent: Boolean(doc.flags?.urgent),
           isNew: Boolean(doc.flags?.isNew),

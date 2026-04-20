@@ -1,16 +1,20 @@
 import type logger from '../utils/logger.js';
 
-export const legacyMongoBackedApiPrefixes = [
-  '/api/admin',
-  '/api/push',
-  '/api/community',
-  '/api/support',
-] as const;
+// Transitional boundary only. Keep this list explicit until each prefix is verified bridge-free.
+export const legacyMongoBackedApiPrefixes = [] as const;
 
-export const legacyMongoScheduledSubsystems = [
+export const legacyMongoCompatibilitySurfaces = [
   {
-    id: 'automation-jobs',
-    description: 'Automation link-health records still persist through Mongo-compatible collections while content-state actions run from Prisma/Postgres',
+    id: 'backup-metadata',
+    description: 'Admin backup metadata still reads/writes a legacy Mongo collection when configured',
+  },
+  {
+    id: 'security-audit-history',
+    description: 'Security audit history can read from a legacy Mongo collection when configured',
+  },
+  {
+    id: 'migration-and-backfill-scripts',
+    description: 'Migration and backfill scripts still use Mongo/Cosmos as a transitional source',
   },
 ] as const;
 
@@ -19,7 +23,8 @@ export function getLegacyRuntimeDiagnostics(legacyMongoConfigured: boolean) {
     configured: legacyMongoConfigured,
     requiredForCoreContent: false,
     guardedApiPrefixes: [...legacyMongoBackedApiPrefixes],
-    scheduledSubsystems: legacyMongoScheduledSubsystems.map((item) => ({
+    startupCoupledSubsystems: [] as string[],
+    compatibilitySurfaces: legacyMongoCompatibilitySurfaces.map((item) => ({
       id: item.id,
       description: item.description,
     })),
@@ -28,21 +33,12 @@ export function getLegacyRuntimeDiagnostics(legacyMongoConfigured: boolean) {
 
 export async function startLegacyMongoRuntime(deps: {
   logger: typeof logger;
-  scheduleAnalyticsRollups: () => Promise<void>;
-  scheduleAutomationJobs: () => void;
 }) {
   deps.logger.info(
     {
-      scheduledSubsystems: legacyMongoScheduledSubsystems.map((item) => item.id),
+      guardedApiPrefixes: legacyMongoBackedApiPrefixes,
+      compatibilitySurfaces: legacyMongoCompatibilitySurfaces.map((item) => item.id),
     },
-    '[LegacyRuntime] Starting Mongo/Cosmos-backed transitional subsystems',
+    '[LegacyRuntime] Legacy Mongo/Cosmos bridge connected for compatibility-only surfaces',
   );
-
-  // Analytics now run from Postgres via prismaApp, but we still trigger the rollup scheduler here for consistency
-  // since the initialization logic was already wired through startLegacyMongoRuntime.
-  await deps.scheduleAnalyticsRollups().catch((error) => {
-    deps.logger.error({ err: error }, '[LegacyRuntime] Analytics rollup init failed');
-  });
-  
-  deps.scheduleAutomationJobs();
 }

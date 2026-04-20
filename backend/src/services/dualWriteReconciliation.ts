@@ -2,6 +2,9 @@ import logger from '../utils/logger.js';
 
 import { getCollectionAsync } from './cosmosdb.js';
 
+// Transitional compatibility logger only.
+// TODO(phase-2): retire this service after legacy bridge dependency reaches zero.
+
 export type DualWriteStatus = 'ok' | 'mismatch' | 'mirror_failed';
 
 export interface DualWriteReconciliationEntry {

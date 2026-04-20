@@ -126,8 +126,11 @@ router.post('/posts', requireRoles('editor', 'reviewer', 'admin', 'superadmin'),
       feeRules: parse.data.feeRules ?? [],
       vacancyRows: parse.data.vacancyRows ?? [],
       admissionPrograms: parse.data.admissionPrograms ?? [],
+      contentJson: parse.data.contentJson ?? null,
       trust: {
         verificationNote: parse.data.verificationNote,
+        sourceNote: parse.data.sourceNote,
+        correctionNote: parse.data.correctionNote,
         officialSources: parse.data.officialSources ?? [],
       },
     } as any;
@@ -159,8 +162,11 @@ router.put('/posts/:id', requireRoles('editor', 'reviewer', 'admin', 'superadmin
       String(req.params.id),
       {
         ...payload,
+        contentJson: payload.contentJson ?? null,
         trust: {
           verificationNote: payload.verificationNote,
+          sourceNote: payload.sourceNote,
+          correctionNote: payload.correctionNote,
           officialSources: payload.officialSources ?? [],
         },
       } as any,

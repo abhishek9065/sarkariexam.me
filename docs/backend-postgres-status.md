@@ -1,39 +1,27 @@
 # Backend PostgreSQL Transition Status
 
-## Current State: COMPLETE
-The backend has been fully refactored to use **PostgreSQL (Neon)** as the primary and exclusive source of truth for all domain entities, telemetry, administrative data, and background jobs. The legacy MongoDB/Cosmos DB bridge is completely decoupled from the runtime.
+## Current State: Postgres Primary, Legacy Bridge Transitional
+The backend runtime is Postgres-primary for content, editorial, admin, analytics, and user-facing domains. Legacy Mongo/Cosmos compatibility code still exists as a transitional boundary and is not yet fully removed.
 
-## PostgreSQL-Backed Routes (100% Migrated)
-The following routes are now fully backed by PostgreSQL (Prisma):
-- `/api/content/*` (Listing, Details, Pages, Taxonomies)
-- `/api/posts/*` (Core Content CRUD)
-- `/api/announcements/*`
-- `/api/jobs/*`
-- `/api/auth/*` (Login, Register, Session via `userAccountEntry`)
-- `/api/bookmarks/*` (User Bookmarks via `bookmarkEntry`)
-- `/api/admin/*` (Content Management & User Management)
-- `/api/subscriptions/*`
-- `/api/push/*`
-- `/api/profile/*`
-- `/api/community/*`
-- `/api/support/*` (Error Reports via `errorReportEntry`)
-- `/api/editorial/*` (CMS Workflow)
-- `/api/analytics/*` (Events, Aggregates, and Daily Rollups)
+## Postgres-Backed Runtime Paths
+- `/api/content/*`, `/api/posts/*`, `/api/jobs/*`, `/api/announcements/*`
+- `/api/editorial/*`, `/api/admin/*`
+- `/api/auth/*`, `/api/bookmarks/*`, `/api/profile/*`
+- `/api/community/*`, `/api/push/*`, `/api/support/*`, `/api/subscriptions/*`
 
-## Refactored Services (100% Decoupled)
-- **Analytics:** Fully Postgres-native. Aggregation logic uses raw SQL for efficient JSON metadata processing.
-- **Security Logger:** Fully Postgres-native for persistence; memory-buffered for recent events.
-- **Rate Limiting:** Decoupled from Mongo; now uses optimized In-Memory storage (Redis-ready).
-- **Performance Metrics:** Decoupled from Mongo; now uses optimized In-Memory storage.
-- **Engagement:** User Feedback and Community Comments migrated to Postgres models.
-- **Automation Jobs:** Link health checks and expiry automations now utilize Prisma and Postgres `officialSource` and `post` tables directly, abandoning the legacy `automationStore.mongo.ts`.
+## Transitional Legacy Coupling Still Present
+- Legacy request guard list is now empty for active API routes.
+- Legacy runtime bootstrap no longer starts Postgres schedulers.
+- Legacy bridge remains for compatibility-only surfaces (backup metadata, security audit history, migration/backfill scripts).
+- `dualWriteReconciliation.ts` still records transitional `mode: dual` semantics.
+- Mongo/Cosmos bridge code remains available for compatibility paths.
 
-## Remaining Legacy Bridge
-- **None.**
+## Operational Contract (Phase 1)
+- PostgreSQL remains required for production runtime health.
+- Mongo/Cosmos bridge is optional by default.
+- Set `LEGACY_MONGO_REQUIRED=true` to fail preflight/startup when legacy bridge credentials are missing.
 
-## Infrastructure Updates
-- **Neon Optimization:** Supports `POSTGRES_DIRECT_URL` for migrations and pooled `DATABASE_URL` for runtime.
-- **Health Checks:** The `/api/health` system correctly prioritizes Postgres health.
-
-## Recommended Final Step
-- **Delete `cosmosdb.ts` and Mongo Containers:** After verifying the data migration from production Cosmos to Neon using the provided sync scripts, the legacy `*.mongo.ts` files, `cosmosdb.ts`, and the Mongo docker container can be safely deleted.
+## Recommended Next Steps
+1. Retire dual-write reconciliation semantics once bridge paths are removed.
+2. Migrate backup/security audit collections to Postgres or durable alternative storage.
+3. Remove bridge code and infra only after dependency reaches zero.
