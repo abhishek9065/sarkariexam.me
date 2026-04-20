@@ -60,6 +60,8 @@ type PostgresReadinessSnapshot = {
 
 let postgresReadinessSnapshot: PostgresReadinessSnapshot | null = null;
 let postgresReadinessInFlight: Promise<boolean> | null = null;
+let postgresGuardFailureActive = false;
+let postgresGuardLastFailureLogAt = 0;
 
 export { app };
 
@@ -234,18 +236,30 @@ function isLegacyMongoGuardedApi(pathname: string): boolean {
   return legacyMongoBackedApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function buildLegacyBridgeHealth(dbConfigured: boolean, dbOk: boolean | null) {
+function buildLegacyBridgeHealth(dbConfigured: boolean, dbOk: boolean | null, checked: boolean) {
   if (!dbConfigured) {
     return {
       configured: false,
+      required: config.legacyMongoRequired,
       status: 'not_configured' as const,
     };
   }
 
+  if (!checked) {
+    return {
+      configured: true,
+      required: false,
+      status: 'not_required' as const,
+    };
+  }
+
+  const ok = dbOk === true;
+
   return {
     configured: true,
-    ok: Boolean(dbOk),
-    status: dbOk ? ('ok' as const) : ('degraded' as const),
+    required: true,
+    ok,
+    status: ok ? ('ok' as const) : ('degraded' as const),
   };
 }
 
@@ -268,7 +282,46 @@ function buildPostgresReadinessCacheDiagnostics() {
   };
 }
 
+function logPostgresGuardUnavailable(pathname: string) {
+  const now = Date.now();
+  const throttleMs = Math.max(250, config.readinessCacheTtlMs);
+  const shouldLog = !postgresGuardFailureActive || (now - postgresGuardLastFailureLogAt) >= throttleMs;
+
+  postgresGuardFailureActive = true;
+  if (!shouldLog) {
+    return;
+  }
+
+  postgresGuardLastFailureLogAt = now;
+  logger.error(
+    {
+      path: pathname,
+      postgresConfigured: Boolean(config.postgresPrismaUrl),
+      readinessCache: buildPostgresReadinessCacheDiagnostics(),
+    },
+    '[Server] PostgreSQL primary database unavailable',
+  );
+}
+
+function logPostgresGuardRecovered() {
+  if (!postgresGuardFailureActive) {
+    return;
+  }
+
+  postgresGuardFailureActive = false;
+  logger.info(
+    {
+      readinessCache: buildPostgresReadinessCacheDiagnostics(),
+    },
+    '[Server] PostgreSQL primary database recovered',
+  );
+}
+
 async function getPostgresReadinessCached(): Promise<boolean> {
+  if (!config.postgresPrismaUrl) {
+    return false;
+  }
+
   const now = Date.now();
 
   if (
@@ -307,10 +360,11 @@ async function getPostgresReadinessCached(): Promise<boolean> {
 
 async function buildReadinessPayload() {
   const dbConfigured = isDatabaseConfigured();
-  const dbOk = dbConfigured ? await healthCheck() : null;
+  const shouldCheckLegacyBridge = dbConfigured && config.legacyMongoRequired;
+  const dbOk = shouldCheckLegacyBridge ? await healthCheck() : null;
   const postgresConfigured = Boolean(config.postgresPrismaUrl);
   const postgresOk = postgresConfigured ? await getPostgresReadinessCached() : null;
-  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk);
+  const legacyBridge = buildLegacyBridgeHealth(dbConfigured, dbOk, shouldCheckLegacyBridge);
   const hasPostgresFailure = !postgresConfigured || postgresOk === false;
   const status = hasPostgresFailure ? 'error' : 'ok';
 
@@ -430,13 +484,7 @@ app.use(async (req, res, next) => {
   // PostgreSQL is the primary runtime dependency for API request handling.
   const isPostgresOk = await getPostgresReadinessCached();
   if (!isPostgresOk) {
-    logger.error(
-      {
-        path: req.path,
-        readinessCache: buildPostgresReadinessCacheDiagnostics(),
-      },
-      '[Server] PostgreSQL primary database unavailable',
-    );
+    logPostgresGuardUnavailable(req.path);
     return res.status(503).json({
       error: 'Service unavailable',
       code: 'PRIMARY_DB_UNAVAILABLE',
@@ -444,6 +492,8 @@ app.use(async (req, res, next) => {
       requestId: req.requestId,
     });
   }
+
+  logPostgresGuardRecovered();
 
   // Legacy Mongo/Cosmos compatibility guardrail for transitional prefixes only.
   if (isLegacyMongoGuardedApi(req.path)) {

@@ -34,7 +34,35 @@ const includeRelations = {
   postTypePrefs: true,
 } satisfies Prisma.SubscriptionInclude;
 
+const preferenceCoverageInclude = {
+  categoryPrefs: { select: { category: { select: { slug: true, name: true } } } },
+  statePrefs: { select: { state: { select: { slug: true, name: true } } } },
+  organizationPrefs: { select: { organization: { select: { slug: true, name: true } } } },
+  qualificationPrefs: { select: { qualification: { select: { slug: true, name: true } } } },
+  postTypePrefs: { select: { postType: true } },
+} satisfies Prisma.SubscriptionInclude;
+
 type SubscriptionRow = Prisma.SubscriptionGetPayload<{ include: typeof includeRelations }>;
+type PreferenceCoverageRow = Prisma.SubscriptionGetPayload<{ include: typeof preferenceCoverageInclude }>;
+
+type PreferenceCoverageSnapshot = {
+  sampleSize: number;
+  frequencies: Array<{ key: string; count: number }>;
+  postTypes: Array<{ key: string; count: number }>;
+  categories: Array<{ slug: string; name: string; count: number }>;
+  states: Array<{ slug: string; name: string; count: number }>;
+  organizations: Array<{ slug: string; name: string; count: number }>;
+  qualifications: Array<{ slug: string; name: string; count: number }>;
+};
+
+const PREFERENCE_COVERAGE_CACHE_TTL_MS = 30_000;
+const PREFERENCE_COVERAGE_SAMPLE_LIMIT = 1200;
+const PREFERENCE_COVERAGE_MAX_LIMIT = 50;
+
+let preferenceCoverageCache: {
+  expiresAt: number;
+  snapshot: PreferenceCoverageSnapshot;
+} | null = null;
 
 const postTypeToPrisma: Record<PostType, PrismaPostType> = {
   job: PrismaPostType.JOB,
@@ -111,6 +139,22 @@ function toRecord(row: SubscriptionRow): AlertSubscriptionRecord {
     lastDigestWeeklySentAt: row.lastDigestWeeklySentAt?.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function invalidatePreferenceCoverageCache() {
+  preferenceCoverageCache = null;
+}
+
+function limitPreferenceCoverageSnapshot(snapshot: PreferenceCoverageSnapshot, limit: number): PreferenceCoverageSnapshot {
+  return {
+    sampleSize: snapshot.sampleSize,
+    frequencies: snapshot.frequencies.slice(0, limit),
+    postTypes: snapshot.postTypes.slice(0, limit),
+    categories: snapshot.categories.slice(0, limit),
+    states: snapshot.states.slice(0, limit),
+    organizations: snapshot.organizations.slice(0, limit),
+    qualifications: snapshot.qualifications.slice(0, limit),
   };
 }
 
@@ -243,6 +287,7 @@ export class AlertSubscriptionModelPostgres {
         where: { id: subscription.id },
         include: includeRelations,
       });
+      invalidatePreferenceCoverageCache();
       return record ? toRecord(record) : null;
     });
   }
@@ -262,6 +307,7 @@ export class AlertSubscriptionModelPostgres {
       },
       include: includeRelations,
     });
+    invalidatePreferenceCoverageCache();
     return toRecord(updated);
   }
 
@@ -277,6 +323,7 @@ export class AlertSubscriptionModelPostgres {
       data: { isActive: false },
       include: includeRelations,
     });
+    invalidatePreferenceCoverageCache();
     return toRecord(updated);
   }
 
@@ -343,15 +390,20 @@ export class AlertSubscriptionModelPostgres {
   }
 
   static async getPreferenceCoverage(limit = 10) {
-    const safeLimit = Math.min(Math.max(Math.floor(limit || 10), 1), 50);
+    const safeLimit = Math.min(Math.max(Math.floor(limit || 10), 1), PREFERENCE_COVERAGE_MAX_LIMIT);
+
+    if (preferenceCoverageCache && preferenceCoverageCache.expiresAt > Date.now()) {
+      return limitPreferenceCoverageSnapshot(preferenceCoverageCache.snapshot, safeLimit);
+    }
+
     const rows = await prisma.subscription.findMany({
       where: {
         isActive: true,
         verified: true,
       },
-      include: includeRelations,
+      include: preferenceCoverageInclude,
       orderBy: { updatedAt: 'desc' },
-      take: 5000,
+      take: PREFERENCE_COVERAGE_SAMPLE_LIMIT,
     });
 
     const frequencies = new Map<string, number>();
@@ -374,7 +426,7 @@ export class AlertSubscriptionModelPostgres {
       bucket.set(slug, { name, count: 1 });
     };
 
-    for (const row of rows) {
+    for (const row of rows as PreferenceCoverageRow[]) {
       bumpFlat(frequencies, fromPrismaFrequency(row.frequency));
 
       const uniquePostTypes = new Set(row.postTypePrefs
@@ -400,15 +452,13 @@ export class AlertSubscriptionModelPostgres {
 
     const topNamed = (bucket: Map<string, { name: string; count: number }>) => Array.from(bucket.entries())
       .map(([slug, value]) => ({ slug, name: value.name, count: value.count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, safeLimit);
+      .sort((a, b) => b.count - a.count);
 
     const topFlat = (bucket: Map<string, number>) => Array.from(bucket.entries())
       .map(([key, count]) => ({ key, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, safeLimit);
+      .sort((a, b) => b.count - a.count);
 
-    return {
+    const snapshot: PreferenceCoverageSnapshot = {
       sampleSize: rows.length,
       frequencies: topFlat(frequencies),
       postTypes: topFlat(postTypes),
@@ -417,11 +467,19 @@ export class AlertSubscriptionModelPostgres {
       organizations: topNamed(organizations),
       qualifications: topNamed(qualifications),
     };
+
+    preferenceCoverageCache = {
+      expiresAt: Date.now() + PREFERENCE_COVERAGE_CACHE_TTL_MS,
+      snapshot,
+    };
+
+    return limitPreferenceCoverageSnapshot(snapshot, safeLimit);
   }
 
   static async deleteById(id: string) {
     try {
       await prisma.subscription.delete({ where: { id } });
+      invalidatePreferenceCoverageCache();
       return true;
     } catch {
       return false;
