@@ -1358,7 +1358,7 @@ export function getCategoryMetaBySlug(slug: string) {
         'Users can move from state pages into job, result, and admit-card details without a design jump.',
         'Regional pages stay connected to national category pages through shared quick links.',
       ],
-    } as CategoryPageMeta;
+    } satisfies CategoryPageMeta;
   }
 
   if (slug in announcementCategoryMeta) {
