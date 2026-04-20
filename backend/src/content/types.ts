@@ -147,7 +147,7 @@ export interface PostRecord {
   summary: string;
   shortInfo?: string;
   body?: string;
-  contentJson?: Record<string, unknown> | any[] | null;
+  contentJson?: string | number | boolean | Record<string, unknown> | any[] | null;
   organization?: TaxonomyRef | null;
   categories: TaxonomyRef[];
   states: TaxonomyRef[];

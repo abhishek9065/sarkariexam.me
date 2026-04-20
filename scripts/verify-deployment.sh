@@ -95,7 +95,7 @@ check_metrics() {
   fi
 
   url="${PUBLIC_BASE_URL%/}/metrics"
-  body="$(curl -sS -L --connect-timeout 5 --max-time 15 -H "Authorization: Bearer ${token}" "$url" || true)"
+  body="$(curl -sS --connect-timeout 5 --max-time 15 -H "Authorization: Bearer ${token}" "$url" || true)"
   if [[ -z "$body" ]]; then
     echo "fail metrics endpoint (${url}) -> empty response"
     return 1

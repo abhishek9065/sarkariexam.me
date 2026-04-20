@@ -144,25 +144,17 @@ if (process.env.NODE_ENV !== 'production') {
 
 export async function postgresHealthCheck(): Promise<boolean> {
   const timeoutMs = config.postgresHealthTimeoutMs;
-  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const safeTimeoutMs = Math.max(500, Math.floor(timeoutMs));
 
   try {
-    await Promise.race([
-      prisma.$queryRaw`SELECT 1 FROM _prisma_migrations LIMIT 1`,
-      new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => {
-          reject(new Error(`Postgres health check timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${safeTimeoutMs}`);
+      await tx.$queryRaw`SELECT 1 FROM _prisma_migrations LIMIT 1`;
+    });
     return true;
   } catch (error) {
     console.error('Postgres health check failed (migrations might be pending):', error);
     return false;
-  } finally {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-    }
   }
 }
 

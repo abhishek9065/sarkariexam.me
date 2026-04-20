@@ -307,7 +307,7 @@ function toPostRecord(post: PostWithRelations): PostRecord {
     summary: post.summary,
     shortInfo: post.shortInfo || undefined,
     body: post.body || undefined,
-    contentJson: (post.contentJson as Record<string, unknown>) || undefined,
+    contentJson: post.contentJson ?? undefined,
     organization: toTaxonomyRef(post.organization),
     categories: post.postCategories.map((item) => ({ id: item.category.id, name: item.category.name, slug: item.category.slug })),
     states: post.postStates.map((item) => ({ id: item.state.id, name: item.state.name, slug: item.state.slug })),
@@ -1774,6 +1774,7 @@ export class PostModelPostgres {
       const status = mapContentStatusToPrisma(input.status);
       const expiresAt = maybeDate(input.expiresAt) || maybeDate(input.lastDate);
       const legacySlugs = Array.from(new Set((input.legacySlugs || []).map((item) => slugify(item)).filter(Boolean)));
+      const hasContentJson = Object.prototype.hasOwnProperty.call(input, 'contentJson');
       const publishedAt = existing?.publishedAt ?? maybeDate(input.publishedAt) ?? (status === PrismaWorkflowStatus.PUBLISHED ? now : null);
       const archivedAt = existing?.archivedAt ?? maybeDate(input.archivedAt) ?? null;
 
@@ -1845,7 +1846,10 @@ export class PostModelPostgres {
         correctionNote: input.trust?.correctionNote?.trim() || null,
         verificationNote: input.trust?.verificationNote?.trim() || null,
         updatedLabel: input.trust?.updatedLabel?.trim() || defaultUpdatedLabel || null,
-        contentJson: input.contentJson ? toJsonValue(input.contentJson) : null,
+        contentJson:
+          hasContentJson && input.contentJson !== undefined
+            ? toJsonValue(input.contentJson)
+            : null,
         tag: mapTagToPrisma(input.tag),
         isUrgent: Boolean(input.flags?.urgent),
         isNew: Boolean(input.flags?.isNew),

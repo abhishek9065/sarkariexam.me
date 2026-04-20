@@ -42,6 +42,7 @@ vi.mock('../services/postgres/prisma.js', async (importOriginal) => {
 describe('server readiness', () => {
   beforeEach(() => {
     process.env.POSTGRES_PRISMA_URL = 'postgresql://postgres:postgres@localhost:5432/sarkari_test?schema=public';
+    delete process.env.LEGACY_MONGO_REQUIRED;
     vi.resetModules();
     connectToDatabase.mockReset();
     ensureDatabaseReady.mockReset();
@@ -51,7 +52,7 @@ describe('server readiness', () => {
     postgresHealthCheck.mockResolvedValue(true);
   });
 
-  it('keeps /api/health healthy when legacy bridge is configured but unavailable', async () => {
+  it('skips optional legacy bridge checks in /api/health', async () => {
     isDatabaseConfigured.mockReturnValue(true);
     healthCheck.mockResolvedValue(false);
 
@@ -63,15 +64,37 @@ describe('server readiness', () => {
       status: 'ok',
       db: {
         configured: true,
-        ok: false,
-        status: 'degraded',
+        required: false,
+        status: 'not_required',
       },
       legacyBridge: {
         configured: true,
+        required: false,
+        status: 'not_required',
+      },
+    });
+    expect(healthCheck).not.toHaveBeenCalled();
+  });
+
+  it('keeps /api/health healthy when required legacy bridge is unavailable', async () => {
+    process.env.LEGACY_MONGO_REQUIRED = 'true';
+    isDatabaseConfigured.mockReturnValue(true);
+    healthCheck.mockResolvedValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'ok',
+      db: {
+        configured: true,
+        required: true,
         ok: false,
         status: 'degraded',
       },
     });
+    expect(healthCheck).toHaveBeenCalledTimes(1);
   });
 
   it('keeps /api/health healthy when no database is configured', async () => {
@@ -85,6 +108,7 @@ describe('server readiness', () => {
       status: 'ok',
       db: {
         configured: false,
+        required: false,
         status: 'not_configured',
       },
     });
