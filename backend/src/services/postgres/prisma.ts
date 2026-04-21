@@ -1,3 +1,4 @@
+import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 import { config } from '../../config.js';
@@ -12,25 +13,17 @@ const prismaLogLevels: Prisma.LogLevel[] = config.isProduction
   ? ['error']
   : ['error', 'warn'];
 
-const prismaDatasourceUrl = config.postgresPrismaUrl;
-const prismaDirectUrl = config.postgresDirectUrl;
+const prismaDatasourceUrl =
+  config.postgresPrismaUrl ||
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:5432/postgres?schema=public';
+
+const prismaAdapter = new PrismaPg(prismaDatasourceUrl);
 
 const prismaClientOptions: Prisma.PrismaClientOptions = {
   log: prismaLogLevels,
+  adapter: prismaAdapter,
 };
-
-if (prismaDatasourceUrl) {
-  prismaClientOptions.datasources = {
-    db: {
-      url: prismaDatasourceUrl,
-    },
-  };
-}
-
-// Add directUrl support for Neon if configured
-if (prismaDirectUrl && prismaClientOptions.datasources?.db) {
-  (prismaClientOptions.datasources.db as any).directUrl = prismaDirectUrl;
-}
 
 export const prisma = globalRef.__prismaClient ?? new PrismaClient(prismaClientOptions);
 
