@@ -13,9 +13,17 @@ import {
   getClientIP,
   recordFailedLoginWithEmail,
 } from '../middleware/security.js';
+import AuditLogModelPostgres from '../models/auditLogs.postgres.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
+import { sendPasswordRecoveryEmail } from '../services/email.js';
 import { checkPasswordSecurity } from '../services/passwordSecurity.js';
+import {
+  consumePasswordRecoveryToken,
+  getPasswordRecoveryToken,
+  issuePasswordRecoveryToken,
+  revokePasswordRecoveryTokenForUser,
+} from '../services/passwordRecovery.js';
 import { incrementAuthLoginFailure, incrementBruteForceBlockedResponse } from '../services/securityMetrics.js';
 
 const router = express.Router();
@@ -43,6 +51,18 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z.string().min(1),
+});
+
+const passwordRecoveryRequestSchema = z.object({
+  email: z.string().email().toLowerCase().trim(),
+});
+
+const passwordRecoveryTokenSchema = z.object({
+  token: z.string().trim().min(20).max(300),
+});
+
+const passwordRecoveryResetSchema = passwordRecoveryTokenSchema.extend({
+  password: passwordSchema,
 });
 
 const buildJwtOptions = (expiresIn: SignOptions['expiresIn']): SignOptions => {
@@ -104,6 +124,16 @@ const getRequestCsrfToken = (req: express.Request): string | null => {
   } catch {
     return null;
   }
+};
+
+const maskEmail = (value: string): string => {
+  const email = value.trim().toLowerCase();
+  const [localPart = '', domain = ''] = email.split('@');
+  if (!localPart || !domain) return 'unknown';
+  const visibleLocal = localPart.length <= 2
+    ? `${localPart[0] || '*'}*`
+    : `${localPart.slice(0, 2)}***`;
+  return `${visibleLocal}@${domain}`;
 };
 
 router.get('/csrf', rateLimit({ windowMs: 60000, maxRequests: 30, keyPrefix: 'auth-csrf' }), (req, res) => {
@@ -215,6 +245,151 @@ router.post('/login', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefi
     }
     console.error('[Auth] Login error:', error);
     return res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+router.post('/password-recovery/request', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10, keyPrefix: 'auth-password-recovery-request' }), async (req, res) => {
+  try {
+    const validated = passwordRecoveryRequestSchema.parse(req.body);
+    const user = await UserModelMongo.findByEmail(validated.email);
+
+    let testToken: string | undefined;
+
+    if (user && user.isActive) {
+      const token = await issuePasswordRecoveryToken({
+        userId: user.id,
+        email: user.email,
+        requestIp: getClientIP(req),
+      });
+
+      if (config.nodeEnv === 'test') {
+        testToken = token;
+      }
+
+      await sendPasswordRecoveryEmail(user.email, token);
+
+      await AuditLogModelPostgres.create({
+        entityType: 'auth',
+        entityId: user.id,
+        action: 'password_recovery_requested',
+        actorId: user.id,
+        actorRole: user.role,
+        summary: `Password recovery requested for ${maskEmail(user.email)}`,
+        metadata: {
+          requestIp: getClientIP(req),
+        },
+      });
+    }
+
+    return res.json({
+      message: 'If an account exists for this email, recovery instructions have been sent.',
+      ...(testToken ? { data: { testToken } } : {}),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+    console.error('[Auth] Password recovery request error:', error);
+    return res.status(500).json({ error: 'Failed to process recovery request' });
+  }
+});
+
+router.post('/password-recovery/verify', rateLimit({ windowMs: 10 * 60 * 1000, maxRequests: 30, keyPrefix: 'auth-password-recovery-verify' }), async (req, res) => {
+  try {
+    const validated = passwordRecoveryTokenSchema.parse(req.body);
+    const payload = await getPasswordRecoveryToken(validated.token);
+
+    if (!payload) {
+      return res.status(400).json({
+        error: 'invalid_or_expired_token',
+        message: 'Recovery token is invalid or has expired.',
+      });
+    }
+
+    return res.json({
+      data: {
+        valid: true,
+        email: maskEmail(payload.email),
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+    console.error('[Auth] Password recovery verify error:', error);
+    return res.status(500).json({ error: 'Failed to verify recovery token' });
+  }
+});
+
+router.post('/password-recovery/reset', rateLimit({ windowMs: 10 * 60 * 1000, maxRequests: 20, keyPrefix: 'auth-password-recovery-reset' }), async (req, res) => {
+  try {
+    const validated = passwordRecoveryResetSchema.parse(req.body);
+
+    const tokenPayload = await getPasswordRecoveryToken(validated.token);
+    if (!tokenPayload) {
+      return res.status(400).json({
+        error: 'invalid_or_expired_token',
+        message: 'Recovery token is invalid or has expired.',
+      });
+    }
+
+    const passwordSecurity = await checkPasswordSecurity(validated.password);
+    if (passwordSecurity.breached) {
+      return res.status(400).json({
+        error: 'weak_password',
+        message: 'Choose a stronger password that has not appeared in known breach datasets.',
+      });
+    }
+
+    const isReused = await UserModelMongo.isPasswordReused(
+      tokenPayload.userId,
+      validated.password,
+      config.passwordHistoryLimit,
+    );
+    if (isReused) {
+      return res.status(400).json({
+        error: 'password_reused',
+        message: 'Choose a password that has not been used recently.',
+      });
+    }
+
+    const consumed = await consumePasswordRecoveryToken(validated.token);
+    if (!consumed) {
+      return res.status(400).json({
+        error: 'invalid_or_expired_token',
+        message: 'Recovery token is invalid or has expired.',
+      });
+    }
+
+    const updatedUser = await UserModelMongo.update(consumed.userId, {
+      password: validated.password,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await revokePasswordRecoveryTokenForUser(consumed.userId);
+
+    await AuditLogModelPostgres.create({
+      entityType: 'auth',
+      entityId: consumed.userId,
+      action: 'password_recovery_completed',
+      actorId: consumed.userId,
+      actorRole: updatedUser.role,
+      summary: `Password reset completed for ${maskEmail(consumed.email)}`,
+      metadata: {
+        requestIp: getClientIP(req),
+      },
+    });
+
+    return res.json({ message: 'Password reset successful. Please sign in with your new password.' });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.flatten() });
+    }
+    console.error('[Auth] Password recovery reset error:', error);
+    return res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

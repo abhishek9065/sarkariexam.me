@@ -84,3 +84,56 @@ Rollback source of truth:
 
 - `Deploy Preflight`: validate target SHA + env + compose wiring without restart.
 - `Deploy to Production`: live rollout path, triggered only after CI success on push to main.
+
+## 7) Lost admin credentials
+
+Use password recovery first (preferred):
+- Open admin login and request password recovery for the account email.
+- If email delivery is unavailable, use the token path in the login UI (`Have recovery token?`).
+
+Break-glass account recovery (last resort):
+
+```bash
+cd /absolute/path/to/repo/backend
+npm run recover:admin -- --email <admin-email> --actor <operator-id> --reason "incident recovery" --confirm <ADMIN_RECOVERY_CONFIRM_TOKEN> --password '<StrongPassword123!>'
+```
+
+Safety controls:
+- Requires `ADMIN_RECOVERY_CONFIRM_TOKEN`.
+- Use `--if-no-admin` to restrict execution to bootstrap scenarios only.
+- Use `--dry-run` before live execution.
+
+## 8) Need data backup before risky change
+
+Create a durable Postgres backup and metadata entry:
+
+```bash
+cd /absolute/path/to/repo/backend
+npm run backup:postgres -- --actor <operator-id> --reason "pre-deploy snapshot"
+```
+
+Notes:
+- Dumps are stored under `DATA_BACKUP_DIR` (default `backend/.data/backups`).
+- Metadata is recorded in `manifest.json` for admin visibility.
+- Ensure `pg_dump` is available on the host.
+
+## 9) Need data restore after bad deploy/content incident
+
+Restore from backup metadata id:
+
+```bash
+cd /absolute/path/to/repo/backend
+npm run restore:postgres -- --actor <operator-id> --reason "incident rollback" --backup-id <backup_id> --drop-schema
+```
+
+Or restore from an explicit file path:
+
+```bash
+cd /absolute/path/to/repo/backend
+npm run restore:postgres -- --actor <operator-id> --reason "manual restore" --file /absolute/path/to/backup.dump --drop-schema
+```
+
+Verification after restore:
+- Run API health checks (`/api/livez`, `/api/readyz`).
+- Validate critical auth and editorial flows.
+- Confirm expected content history and audit records in admin.

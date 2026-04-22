@@ -36,6 +36,9 @@ This document outlines the environment variables used across the Sarkari Result 
 |----------|-------------|-----------|
 | `JWT_SECRET` | Secret key used to sign JSON Web Tokens. | **Yes** |
 | `JWT_EXPIRY` | Duration until JWT expires (e.g., `1d`, `12h`). | No (default: `1d`) |
+| `ADMIN_RECOVERY_CONFIRM_TOKEN` | Break-glass confirmation token required by `npm run recover:admin`. Keep this secret and rotate after use. | No (required only for admin recovery script) |
+| `PASSWORD_RECOVERY_TOKEN_TTL_SECONDS` | Password recovery token lifetime in seconds. | No (default: `1200`) |
+| `PASSWORD_RECOVERY_MAX_ATTEMPTS` | Max verification attempts for a recovery token before invalidation. | No (default: `5`) |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. | No |
 | `RATE_LIMIT_MAX` | Max requests per IP within the window. | No (default: `200`) |
 | `AUTH_RATE_LIMIT_MAX` | Max auth-specific requests per IP. | No (default: `20`) |
@@ -59,6 +62,9 @@ This document outlines the environment variables used across the Sarkari Result 
 | `FRONTEND_REVALIDATE_TOKEN` | Secret token to authenticate revalidation requests. | No |
 | `READINESS_CACHE_TTL_MS` | In-memory cache TTL for PostgreSQL readiness checks used by `/api/readyz` and API guardrail middleware. | No (default: `3000`) |
 | `POSTGRES_HEALTH_TIMEOUT_MS` | Timeout for PostgreSQL health probes before they are treated as failed. | No (default: `1500`) |
+| `ADMIN_URL` | Absolute admin app URL used in password recovery emails. | No (default: `${FRONTEND_URL}/admin`) |
+| `DATA_BACKUP_DIR` | Directory where Postgres dump files and backup manifest are stored. | No (default: `backend/.data/backups`) |
+| `DATA_BACKUP_MANIFEST` | Optional path override for backup metadata manifest file. | No (default: `${DATA_BACKUP_DIR}/manifest.json`) |
 | `CONTENT_EXPIRY_GRACE_DAYS` | Grace period (days) before auto-archiving published posts whose `expiresAt` has passed. | No (default: `0`) |
 | `CONTENT_EXPIRY_SWEEP_LIMIT` | Max posts processed per automation expiry sweep run. | No (default: `200`) |
 

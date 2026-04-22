@@ -1,5 +1,6 @@
 import express from 'express';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
+import { z } from 'zod';
 
 import {
   alertCoverageQuerySchema,
@@ -48,6 +49,11 @@ function canRunWorkflowAction(role: string | undefined, action: 'submit' | 'appr
   if (action === 'approve' && role === 'reviewer') return true;
   return false;
 }
+
+const revertVersionSchema = z.object({
+  version: z.coerce.number().int().min(1),
+  note: z.string().trim().max(500).optional(),
+});
 
 router.use(authenticateToken);
 router.use(requireEditorialAccess);
@@ -308,6 +314,32 @@ router.get('/posts/:id/history', async (req, res) => {
   } catch (error) {
     console.error('[Editorial] History error:', error);
     return res.status(500).json({ error: 'Failed to fetch post history' });
+  }
+});
+
+router.post('/posts/:id/revert', requireRoles('admin', 'superadmin'), async (req, res) => {
+  try {
+    const parse = revertVersionSchema.safeParse(req.body ?? {});
+    if (!parse.success) {
+      return res.status(400).json({ error: parse.error.flatten() });
+    }
+
+    const reverted = await postModel.revertToVersion(
+      String(req.params.id),
+      parse.data.version,
+      req.user?.userId,
+      req.user?.role,
+      parse.data.note,
+    );
+
+    if (!reverted) {
+      return res.status(404).json({ error: 'Post or version not found' });
+    }
+
+    return res.json(await buildEditorialResponse(reverted, true));
+  } catch (error) {
+    console.error('[Editorial] Revert version error:', error);
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to revert post version' });
   }
 });
 

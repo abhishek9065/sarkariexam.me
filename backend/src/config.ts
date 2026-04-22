@@ -97,6 +97,8 @@ const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
 const passwordHistoryLimit = Math.max(1, parseNumber(process.env.PASSWORD_HISTORY_LIMIT, 5));
 const passwordBreachCheckEnabled = parseBoolean(process.env.PASSWORD_BREACH_CHECK_ENABLED, true);
 const passwordBreachCheckTimeoutMs = Math.max(500, parseNumber(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS, 2500));
+const passwordRecoveryTokenTtlSeconds = Math.max(300, parseNumber(process.env.PASSWORD_RECOVERY_TOKEN_TTL_SECONDS, 20 * 60));
+const passwordRecoveryMaxAttempts = Math.max(1, parseNumber(process.env.PASSWORD_RECOVERY_MAX_ATTEMPTS, 5));
 const metricsToken = process.env.METRICS_TOKEN ?? '';
 const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24));
 const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
@@ -111,6 +113,9 @@ const postgresDirectUrl = process.env.POSTGRES_DIRECT_URL ?? process.env.DIRECT_
 const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
 const legacyMongoRequired = parseBoolean(process.env.LEGACY_MONGO_REQUIRED, false);
 const frontendRevalidationConfigured = Boolean(process.env.FRONTEND_REVALIDATE_URL && process.env.FRONTEND_REVALIDATE_TOKEN);
+const frontendUrl = process.env.FRONTEND_URL ?? 'https://sarkariexams.me';
+const adminUrl = process.env.ADMIN_URL ?? process.env.NEXT_PUBLIC_ADMIN_URL ?? `${frontendUrl.replace(/\/$/, '')}/admin`;
+const adminRecoveryConfirmToken = process.env.ADMIN_RECOVERY_CONFIRM_TOKEN ?? '';
 const featureFlags = {
   search_overlay_v2: parseBoolean(process.env.FEATURE_SEARCH_OVERLAY_V2, true),
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),
@@ -159,6 +164,8 @@ export const config = {
   passwordHistoryLimit,
   passwordBreachCheckEnabled,
   passwordBreachCheckTimeoutMs,
+  passwordRecoveryTokenTtlSeconds,
+  passwordRecoveryMaxAttempts,
   metricsToken,
   securityLogRetentionHours,
   securityLogPersistenceEnabled,
@@ -188,9 +195,11 @@ export const config = {
   emailFrom: process.env.EMAIL_FROM ?? 'Sarkari Result <noreply@sarkariresult.com>',
 
   // Frontend URL for links in emails
-  frontendUrl: process.env.FRONTEND_URL ?? 'https://sarkariexams.me',
+  frontendUrl,
+  adminUrl,
   frontendRevalidateUrl: process.env.FRONTEND_REVALIDATE_URL ?? '',
   frontendRevalidateToken: process.env.FRONTEND_REVALIDATE_TOKEN ?? '',
+  adminRecoveryConfirmToken,
 
   // VAPID keys for web push notifications (optional)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',

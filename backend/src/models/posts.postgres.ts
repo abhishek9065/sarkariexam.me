@@ -1394,6 +1394,51 @@ export class PostModelPostgres {
     };
   }
 
+  static async revertToVersion(
+    id: string,
+    version: number,
+    actorId?: string,
+    actorRole?: string,
+    note?: string,
+  ): Promise<PostRecord | null> {
+    const [existing, versionRow] = await Promise.all([
+      prisma.post.findUnique({
+        where: { id },
+        include: postInclude,
+      }),
+      prisma.postVersion.findFirst({
+        where: { postId: id, version },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    if (!existing || !versionRow) return null;
+    if (!versionRow.snapshot || typeof versionRow.snapshot !== 'object' || Array.isArray(versionRow.snapshot)) {
+      throw new Error('Selected snapshot payload is invalid');
+    }
+
+    const snapshot = versionRow.snapshot as Record<string, unknown>;
+    const input: any = { ...snapshot };
+
+    delete input.id;
+    delete input.createdAt;
+    delete input.updatedAt;
+    delete input.currentVersion;
+    delete input.searchText;
+    delete input.freshness;
+    delete input.searchMeta;
+    delete input.readiness;
+
+    return this.persistPost({
+      input,
+      actorId,
+      actorRole,
+      note: note?.trim() || `Reverted to version ${version}`,
+      reason: 'update',
+      existing,
+    });
+  }
+
   static async getAlertMatchPreview(id: string): Promise<AlertMatchPreview | null> {
     const post = await this.findById(id);
     if (!post) return null;

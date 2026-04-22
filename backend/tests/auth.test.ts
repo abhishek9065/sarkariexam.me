@@ -47,4 +47,84 @@ describeOrSkip('auth/register', () => {
         expect(loginRes.body?.data?.user?.email).toBe(email);
         expect(loginRes.headers['set-cookie']).toBeDefined();
     });
+
+    it('resets password with recovery token', async () => {
+        const email = `recover-${Date.now()}@example.com`;
+        const oldPassword = `Old!${Date.now()}Aa`;
+        const newPassword = `New!${Date.now()}Bb`;
+        const agent = request.agent(app);
+
+        const csrfRegisterRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const registerCsrfToken = csrfRegisterRes.body?.data?.csrfToken;
+
+        await agent
+            .post('/api/auth/register')
+            .set('x-csrf-token', registerCsrfToken)
+            .send({
+                name: 'Recovery User',
+                email,
+                password: oldPassword,
+            })
+            .expect(201);
+
+        const csrfRequestRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const recoveryRequestCsrf = csrfRequestRes.body?.data?.csrfToken;
+
+        const recoveryRequest = await agent
+            .post('/api/auth/password-recovery/request')
+            .set('x-csrf-token', recoveryRequestCsrf)
+            .send({ email })
+            .expect(200);
+
+        const recoveryToken = recoveryRequest.body?.data?.testToken;
+        expect(typeof recoveryToken).toBe('string');
+
+        const csrfVerifyRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const verifyCsrfToken = csrfVerifyRes.body?.data?.csrfToken;
+
+        await agent
+            .post('/api/auth/password-recovery/verify')
+            .set('x-csrf-token', verifyCsrfToken)
+            .send({ token: recoveryToken })
+            .expect(200);
+
+        const csrfResetRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const resetCsrfToken = csrfResetRes.body?.data?.csrfToken;
+
+        await agent
+            .post('/api/auth/password-recovery/reset')
+            .set('x-csrf-token', resetCsrfToken)
+            .send({ token: recoveryToken, password: newPassword })
+            .expect(200);
+
+        const csrfOldLoginRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const oldLoginCsrf = csrfOldLoginRes.body?.data?.csrfToken;
+
+        await agent
+            .post('/api/auth/login')
+            .set('x-csrf-token', oldLoginCsrf)
+            .send({ email, password: oldPassword })
+            .expect(401);
+
+        const csrfNewLoginRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const newLoginCsrf = csrfNewLoginRes.body?.data?.csrfToken;
+
+        await agent
+            .post('/api/auth/login')
+            .set('x-csrf-token', newLoginCsrf)
+            .send({ email, password: newPassword })
+            .expect(200);
+    });
 });

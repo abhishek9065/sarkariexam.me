@@ -23,6 +23,72 @@ export const isEmailConfigured = (): boolean => {
 };
 
 /**
+ * Send password recovery email.
+ */
+export const sendPasswordRecoveryEmail = async (
+  email: string,
+  recoveryToken: string,
+): Promise<boolean> => {
+  if (!isConfigured) {
+    console.log('SendGrid not configured, skipping password recovery email');
+    return false;
+  }
+
+  const baseUrl = (config.adminUrl || `${config.frontendUrl.replace(/\/$/, '')}/admin`).replace(/\/$/, '');
+  const resetUrl = `${baseUrl}?recovery_token=${encodeURIComponent(recoveryToken)}`;
+
+  try {
+    await sgMail.send({
+      to: email,
+      from: config.emailFrom || 'noreply@sarkariresult.com',
+      subject: 'Reset your SarkariExams account password',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #111827; }
+            .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+            .header { background: #1a365d; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f8fafc; }
+            .card { background: white; padding: 18px; border-radius: 8px; }
+            .button { display: inline-block; background: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
+            .token { margin-top: 16px; padding: 10px; border-radius: 6px; background: #f3f4f6; font-family: monospace; word-break: break-all; }
+            .footer { padding: 16px; text-align: center; font-size: 12px; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>SarkariExams Account Recovery</h1>
+            </div>
+            <div class="content">
+              <div class="card">
+                <p>We received a password recovery request for your account.</p>
+                <p>Use the secure link below to continue:</p>
+                <p><a href="${resetUrl}" class="button">Reset Password</a></p>
+                <p>If the link does not open in the admin console, use this token manually:</p>
+                <div class="token">${recoveryToken}</div>
+                <p>This token expires automatically. If you did not request this, you can ignore this email.</p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>© SarkariExams.me</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Failed to send password recovery email:', error);
+    return false;
+  }
+};
+
+/**
  * Send verification email to new subscriber
  */
 export const sendVerificationEmail = async (

@@ -551,6 +551,36 @@
         }
       }
     },
+    "/api/auth/password-recovery/request": {
+      "post": {
+        "summary": "Request password recovery",
+        "responses": {
+          "200": {
+            "description": "Password recovery request accepted"
+          }
+        }
+      }
+    },
+    "/api/auth/password-recovery/verify": {
+      "post": {
+        "summary": "Verify password recovery token",
+        "responses": {
+          "200": {
+            "description": "Password recovery token valid"
+          }
+        }
+      }
+    },
+    "/api/auth/password-recovery/reset": {
+      "post": {
+        "summary": "Reset password with recovery token",
+        "responses": {
+          "200": {
+            "description": "Password reset completed"
+          }
+        }
+      }
+    },
     "/api/bookmarks": {
       "get": {
         "summary": "List bookmarks",
@@ -1926,6 +1956,16 @@
         "responses": {
           "200": {
             "description": "Editorial post history"
+          }
+        }
+      }
+    },
+    "/api/editorial/posts/{id}/revert": {
+      "post": {
+        "summary": "Revert editorial post to a prior version",
+        "responses": {
+          "200": {
+            "description": "Editorial post reverted"
           }
         }
       }

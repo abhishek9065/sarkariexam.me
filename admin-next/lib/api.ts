@@ -116,6 +116,27 @@ export function logout() {
   return apiFetchWithCsrf<{ message: string }>('/auth/logout', { method: 'POST' });
 }
 
+export function requestPasswordRecovery(email: string) {
+  return apiFetchWithCsrf<{ message: string; data?: { testToken?: string } }>('/auth/password-recovery/request', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function verifyPasswordRecoveryToken(token: string) {
+  return apiFetchWithCsrf<{ data: { valid: boolean; email: string } }>('/auth/password-recovery/verify', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function resetPasswordWithRecoveryToken(token: string, password: string) {
+  return apiFetchWithCsrf<{ message: string }>('/auth/password-recovery/reset', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export function clearCsrfCache() {
   csrfTokenCache = null;
 }
@@ -619,6 +640,13 @@ export function archiveCmsPost(id: string, note?: string) {
 
 export function restoreCmsPost(id: string, note?: string) {
   return editorialWorkflowAction(`/editorial/posts/${id}/restore`, note);
+}
+
+export function revertCmsPostVersion(id: string, version: number, note?: string) {
+  return apiFetchWithCsrf<{ data: CmsPost }>(`/editorial/posts/${id}/revert`, {
+    method: 'POST',
+    body: JSON.stringify({ version, note }),
+  });
 }
 
 export function getCmsPostHistory(id: string) {
