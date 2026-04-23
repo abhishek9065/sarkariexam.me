@@ -61,6 +61,16 @@ Conditionally required values:
 
 Optional but recommended values are logged when missing.
 
+## Frontend and Revalidation Wiring
+
+- Browser traffic should continue using the public site origin for API requests.
+- Server-rendered frontend content fetches now prefer the internal Docker network path `http://backend:4000/api`.
+- `docker-compose.yml` and `docker-compose.fast.yml` provide this through `INTERNAL_API_BASE_URL=http://backend:4000/api` on the `frontend` service.
+- This avoids deploy-time dependence on the public `nginx -> backend` path for homepage and listing SSR during container startup.
+- Frontend cache invalidation remains token-protected.
+- If `FRONTEND_REVALIDATE_URL` is unset but `FRONTEND_URL` and `FRONTEND_REVALIDATE_TOKEN` are present, the backend falls back to `${FRONTEND_URL}/api/revalidate`.
+- Production should still set `FRONTEND_REVALIDATE_URL` explicitly when a non-default revalidation endpoint is required.
+
 ## Validation and Health Checks
 
 Deployment validates:

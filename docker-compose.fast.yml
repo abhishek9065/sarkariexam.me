@@ -23,6 +23,7 @@ services:
       - DISABLE_ESLINT_PLUGIN=true
       # Production API URLs
       - NEXT_PUBLIC_API_URL=https://sarkariexams.me/api
+      - INTERNAL_API_BASE_URL=http://backend:4000/api
       - NEXT_PUBLIC_ADMIN_URL=https://sarkariexams.me/admin
   
   backend:
