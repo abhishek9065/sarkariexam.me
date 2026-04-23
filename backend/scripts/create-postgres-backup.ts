@@ -1,7 +1,7 @@
+import { spawn } from 'child_process';
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
-import crypto from 'crypto';
-import { spawn } from 'child_process';
 
 import { config } from '../src/config.js';
 import {

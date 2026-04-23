@@ -1,6 +1,6 @@
+import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
-import { spawn } from 'child_process';
 
 import { config } from '../src/config.js';
 import { getBackupById, resolveBackupArtifactPath } from '../src/services/backup.js';

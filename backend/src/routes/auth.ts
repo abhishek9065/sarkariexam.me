@@ -17,13 +17,13 @@ import AuditLogModelPostgres from '../models/auditLogs.postgres.js';
 import { UserModelMongo } from '../models/users.mongo.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { sendPasswordRecoveryEmail } from '../services/email.js';
-import { checkPasswordSecurity } from '../services/passwordSecurity.js';
 import {
   consumePasswordRecoveryToken,
   getPasswordRecoveryToken,
   issuePasswordRecoveryToken,
   revokePasswordRecoveryTokenForUser,
 } from '../services/passwordRecovery.js';
+import { checkPasswordSecurity } from '../services/passwordSecurity.js';
 import { incrementAuthLoginFailure, incrementBruteForceBlockedResponse } from '../services/securityMetrics.js';
 
 const router = express.Router();
