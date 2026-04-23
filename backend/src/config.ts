@@ -112,8 +112,10 @@ const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABAS
 const postgresDirectUrl = process.env.POSTGRES_DIRECT_URL ?? process.env.DIRECT_URL ?? '';
 const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
 const legacyMongoRequired = parseBoolean(process.env.LEGACY_MONGO_REQUIRED, false);
-const frontendRevalidationConfigured = Boolean(process.env.FRONTEND_REVALIDATE_URL && process.env.FRONTEND_REVALIDATE_TOKEN);
 const frontendUrl = process.env.FRONTEND_URL ?? 'https://sarkariexams.me';
+const derivedFrontendRevalidateUrl = `${frontendUrl.replace(/\/$/, '')}/api/revalidate`;
+const frontendRevalidateUrl = process.env.FRONTEND_REVALIDATE_URL?.trim() || derivedFrontendRevalidateUrl;
+const frontendRevalidationConfigured = Boolean(frontendRevalidateUrl && process.env.FRONTEND_REVALIDATE_TOKEN);
 const adminUrl = process.env.ADMIN_URL ?? process.env.NEXT_PUBLIC_ADMIN_URL ?? `${frontendUrl.replace(/\/$/, '')}/admin`;
 const adminRecoveryConfirmToken = process.env.ADMIN_RECOVERY_CONFIRM_TOKEN ?? '';
 const featureFlags = {
@@ -138,6 +140,10 @@ if (!legacyMongoConfigured) {
 
 if (process.env.FRONTEND_REVALIDATE_URL && !process.env.FRONTEND_REVALIDATE_TOKEN) {
   runtimeWarnings.push('FRONTEND_REVALIDATE_URL is set without FRONTEND_REVALIDATE_TOKEN; publish-triggered frontend revalidation is disabled.');
+}
+
+if (!process.env.FRONTEND_REVALIDATE_URL && process.env.FRONTEND_REVALIDATE_TOKEN) {
+  runtimeWarnings.push(`FRONTEND_REVALIDATE_URL is not set; falling back to ${derivedFrontendRevalidateUrl} for publish-triggered frontend revalidation.`);
 }
 
 if (isProduction && !metricsToken) {
@@ -197,7 +203,7 @@ export const config = {
   // Frontend URL for links in emails
   frontendUrl,
   adminUrl,
-  frontendRevalidateUrl: process.env.FRONTEND_REVALIDATE_URL ?? '',
+  frontendRevalidateUrl,
   frontendRevalidateToken: process.env.FRONTEND_REVALIDATE_TOKEN ?? '',
   adminRecoveryConfirmToken,
 

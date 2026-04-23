@@ -115,7 +115,7 @@ export async function triggerFrontendRevalidation(post: PostRecord): Promise<Fro
       ok: false,
       paths: [],
       tags: [],
-      skippedReason: 'FRONTEND_REVALIDATE_URL is not configured',
+      skippedReason: 'Frontend revalidation URL is not configured',
     };
   }
 

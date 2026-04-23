@@ -147,7 +147,11 @@ validate_production_env() {
     die "FRONTEND_REVALIDATE_TOKEN is still set to a placeholder value. Set a real token before deploying."
   fi
   if [[ -z "$frontend_revalidate_url" && -n "$frontend_revalidate_token" ]]; then
-    warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL is missing. Publish-triggered revalidation stays disabled."
+    if [[ -n "$frontend_url" ]]; then
+      warn "FRONTEND_REVALIDATE_URL is missing. Backend will fall back to ${frontend_url%/}/api/revalidate for publish-triggered revalidation."
+    else
+      warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL and FRONTEND_URL are missing. Publish-triggered revalidation stays disabled."
+    fi
   fi
 
   if ! is_truthy "$legacy_mongo_required" && [[ -z "$cosmos_connection_string" && -z "$mongodb_uri" ]]; then
