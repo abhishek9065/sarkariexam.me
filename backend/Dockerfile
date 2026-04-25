@@ -52,6 +52,7 @@ COPY --from=prod-deps /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/openapi.json ./openapi.json
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Set ownership
 RUN chown -R nodejs:nodejs /app
