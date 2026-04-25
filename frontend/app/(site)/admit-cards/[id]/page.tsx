@@ -3,6 +3,7 @@ import { PublicAnnouncementDetailPage } from '@/app/components/public-site/Publi
 import { normalizeInternalHref } from '@/app/lib/public-content';
 import { loadDetailPage } from '@/lib/content-page';
 
+export const revalidate = 300;
 
 export default async function AdmitCardDetailPage({
   params,

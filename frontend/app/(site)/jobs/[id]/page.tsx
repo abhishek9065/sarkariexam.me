@@ -3,6 +3,7 @@ import { normalizeInternalHref } from '@/app/lib/public-content';
 import { PublicAnnouncementDetailPage } from '@/app/components/public-site/PublicAnnouncementDetailPage';
 import { loadDetailPage } from '@/lib/content-page';
 
+export const revalidate = 300;
 
 export default async function JobDetailPage({
   params,

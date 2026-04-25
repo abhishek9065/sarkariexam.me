@@ -60,7 +60,19 @@ const postInclude = {
   slugAliases: true,
 } satisfies Prisma.PostInclude;
 
+const postCardInclude = {
+  organization: true,
+  postQualifications: {
+    include: { qualification: true },
+  },
+  postStates: {
+    include: { state: true },
+  },
+  slugAliases: true,
+} satisfies Prisma.PostInclude;
+
 type PostWithRelations = Prisma.PostGetPayload<{ include: typeof postInclude }>;
+type PostCardWithRelations = Prisma.PostGetPayload<{ include: typeof postCardInclude }>;
 type PostInput = Omit<PostRecord, 'id' | 'createdAt' | 'updatedAt' | 'currentVersion' | 'searchText' | 'freshness' | 'searchMeta' | 'readiness'>;
 
 const SEARCH_STOP_WORDS = new Set(['the', 'for', 'and', 'with', 'from', 'into', 'over', 'under', 'exam', 'online']);
@@ -220,7 +232,7 @@ function canonicalPath(type: PostType, slug: string): string {
   return `/${section}/${slug}`;
 }
 
-function toPublicCard(post: PostWithRelations): PublicPostCard {
+function toPublicCard(post: PostWithRelations | PostCardWithRelations): PublicPostCard {
   const contentType = mapPrismaTypeToContent(post.type);
   const qualificationNames = post.postQualifications.map((item) => item.qualification.name).filter(Boolean);
 
@@ -1057,7 +1069,7 @@ export class PostModelPostgres {
     const [rows, total] = await Promise.all([
       prisma.post.findMany({
         where,
-        include: postInclude,
+        include: postCardInclude,
         orderBy: buildSort(filters?.sort),
         skip,
         take,
@@ -1125,11 +1137,18 @@ export class PostModelPostgres {
 
     const card = toPublicCard(row);
     const postType = mapPrismaTypeToContent(row.type);
-    const related = await this.findPublicCards({
-      type: postType,
-      organization: row.organization?.slug || undefined,
-      status: 'active',
-      limit: 6,
+    const relatedRows = await prisma.post.findMany({
+      where: {
+        ...buildPublicWhere({
+          type: postType,
+          organization: row.organization?.slug || undefined,
+          status: 'active',
+        }),
+        id: { not: row.id },
+      },
+      include: postCardInclude,
+      orderBy: buildSort('newest'),
+      take: 6,
     });
 
     return {
@@ -1137,7 +1156,7 @@ export class PostModelPostgres {
       card,
       canonicalPath: canonicalPath(postType, row.slug),
       section: publicSectionMap[postType],
-      relatedCards: related.data.filter((item) => item.id !== row.id).slice(0, 6),
+      relatedCards: relatedRows.map((item) => toPublicCard(item)),
       breadcrumbs: [
         { label: 'Home', href: '/' },
         { label: publicSectionMap[postType], href: `/${publicSectionMap[postType]}` },

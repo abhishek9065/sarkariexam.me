@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { normalizeInternalHref } from '@/app/lib/public-content';
 import { loadDetailPage } from '@/lib/content-page';
 
+export const revalidate = 300;
 
 export default async function AdmitCardAliasPage({
   params,

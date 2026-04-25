@@ -1,6 +1,5 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowRight,
@@ -1078,21 +1077,13 @@ function PublicAnnouncementDetailPageInner({
                               <ChevronDown size={15} className="text-gray-400" />
                             </div>
                           </button>
-                          <AnimatePresence initial={false}>
-                            {isOpen ? (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="border-t border-orange-100 px-4 pb-4 pt-2">
-                                  <p className="text-[12px] leading-[1.8] text-gray-600">{faq.answer}</p>
-                                </div>
-                              </motion.div>
-                            ) : null}
-                          </AnimatePresence>
+                          {isOpen ? (
+                            <div className="overflow-hidden">
+                              <div className="border-t border-orange-100 px-4 pb-4 pt-2">
+                                <p className="text-[12px] leading-[1.8] text-gray-600">{faq.answer}</p>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -1117,43 +1108,35 @@ function PublicAnnouncementDetailPageInner({
                       </button>
                     </div>
 
-                    <AnimatePresence initial={false}>
-                      {askOpen ? (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="mt-4 space-y-3 rounded-2xl border border-blue-100 bg-white p-4">
-                            <input
-                              value={newQuestionAuthor}
-                              onChange={(event) => setNewQuestionAuthor(event.target.value)}
-                              placeholder="Your name (optional)"
-                              className="w-full rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-300"
-                            />
-                            <textarea
-                              value={newQuestion}
-                              onChange={(event) => setNewQuestion(event.target.value)}
-                                      placeholder={`Ask something about ${detail.summaryMeta.orgShort} ${categoryLabel.toLowerCase()}...`}
-                              rows={3}
-                              className="w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm leading-7 text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-300"
-                            />
-                            <div className="flex justify-end">
-                              <button
-                                type="button"
-                                onClick={handleSubmitQuestion}
-                                className="inline-flex items-center gap-2 rounded-xl bg-[linear-gradient(135deg,#e65100,#bf360c)] px-4 py-2.5 text-[12px] font-bold text-white shadow-[0_10px_22px_rgba(230,81,0,0.22)] transition-transform hover:-translate-y-0.5"
-                              >
-                                <Send size={13} />
-                                Post Question
-                              </button>
-                            </div>
+                    {askOpen ? (
+                      <div className="overflow-hidden">
+                        <div className="mt-4 space-y-3 rounded-2xl border border-blue-100 bg-white p-4">
+                          <input
+                            value={newQuestionAuthor}
+                            onChange={(event) => setNewQuestionAuthor(event.target.value)}
+                            placeholder="Your name (optional)"
+                            className="w-full rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-300"
+                          />
+                          <textarea
+                            value={newQuestion}
+                            onChange={(event) => setNewQuestion(event.target.value)}
+                            placeholder={`Ask something about ${detail.summaryMeta.orgShort} ${categoryLabel.toLowerCase()}...`}
+                            rows={3}
+                            className="w-full resize-none rounded-xl border border-blue-100 bg-[#fbfdff] px-3 py-2.5 text-sm leading-7 text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-300"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={handleSubmitQuestion}
+                              className="inline-flex items-center gap-2 rounded-xl bg-[linear-gradient(135deg,#e65100,#bf360c)] px-4 py-2.5 text-[12px] font-bold text-white shadow-[0_10px_22px_rgba(230,81,0,0.22)] transition-transform hover:-translate-y-0.5"
+                            >
+                              <Send size={13} />
+                              Post Question
+                            </button>
                           </div>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="space-y-4">
@@ -1232,18 +1215,11 @@ function PublicAnnouncementDetailPageInner({
                             </div>
                           </div>
 
-                          <AnimatePresence initial={false}>
-                            {isExpanded && question.answers.length ? (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="divide-y divide-gray-100 bg-[#fafcff]">
-                                  {question.answers.map((answer, answerIndex) => (
-                                    <div key={answer.id} className="flex items-start gap-3 px-5 py-4">
+                          {isExpanded && question.answers.length ? (
+                            <div className="overflow-hidden">
+                              <div className="divide-y divide-gray-100 bg-[#fafcff]">
+                                {question.answers.map((answer, answerIndex) => (
+                                  <div key={answer.id} className="flex items-start gap-3 px-5 py-4">
                                       <CornerDownRight size={14} className="mt-2 shrink-0 text-blue-300" />
                                       <div
                                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white shadow-sm"
@@ -1278,23 +1254,15 @@ function PublicAnnouncementDetailPageInner({
                                           {formatCount(answer.likes)} Helpful
                                         </button>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            ) : null}
-                          </AnimatePresence>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
 
-                          <AnimatePresence initial={false}>
-                            {isReplying ? (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="border-t border-orange-100 bg-[linear-gradient(90deg,#fff8f5,#fffdfb)] px-5 py-4">
+                          {isReplying ? (
+                            <div className="overflow-hidden">
+                              <div className="border-t border-orange-100 bg-[linear-gradient(90deg,#fff8f5,#fffdfb)] px-5 py-4">
                                   <div className="flex items-start gap-3">
                                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#ffb74d,#e65100)] text-white">
                                       <User size={14} />
@@ -1332,10 +1300,9 @@ function PublicAnnouncementDetailPageInner({
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              </motion.div>
-                            ) : null}
-                          </AnimatePresence>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -1396,10 +1363,7 @@ function PublicAnnouncementDetailPageInner({
           </div>
 
           <aside className="space-y-4 xl:sticky xl:top-[57px] xl:self-start">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.24, ease: 'easeOut' }}
+            <div
               className="overflow-hidden rounded-2xl shadow-lg"
               style={{ background: sidebarGradient }}
             >
@@ -1434,7 +1398,7 @@ function PublicAnnouncementDetailPageInner({
                   ) : null}
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {detail.importantDates.length ? (
               <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -1582,20 +1546,13 @@ function PublicAnnouncementDetailPageInner({
       </div>
       </div>
 
-      <AnimatePresence>
+      <>
         {showShareModal ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div
             className="fixed inset-0 z-[70] flex items-center justify-center bg-[#020617]/55 p-4 backdrop-blur-sm"
             onClick={() => setShowShareModal(false)}
           >
-            <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
+            <div
               className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
@@ -1647,15 +1604,11 @@ function PublicAnnouncementDetailPageInner({
                   <ChevronRight size={15} className="text-gray-400" />
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ) : null}
         {mobileCtaVisible && primaryAction ? (
-          <motion.div
-            initial={{ y: 88 }}
-            animate={{ y: 0 }}
-            exit={{ y: 88 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+          <div
             className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 p-3 shadow-[0_-10px_28px_rgba(15,23,42,0.12)] backdrop-blur-md lg:hidden"
           >
             <div className="mx-auto flex max-w-6xl gap-3">
@@ -1684,9 +1637,9 @@ function PublicAnnouncementDetailPageInner({
                 <Share2 size={16} />
               </button>
             </div>
-          </motion.div>
+          </div>
         ) : null}
-      </AnimatePresence>
+      </>
     </div>
   );
 }
