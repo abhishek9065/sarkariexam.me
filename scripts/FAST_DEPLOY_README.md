@@ -54,6 +54,12 @@ Deploy fails closed when required values are missing.
 
 Public checks include `/api/livez`, `/api/readyz`, `/api/health`, and `/api/health/deep`.
 
+Image builds run with `COMPOSE_PARALLEL_LIMIT=1` by default so the small production droplet does not build backend, frontend, and admin images concurrently. On a larger build host, override it explicitly:
+
+```bash
+COMPOSE_PARALLEL_LIMIT=3 DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha>
+```
+
 After a successful deploy, release metadata is written to `.deploy-state/last-release.env` in the repository checkout.
 
 ## Preflight Only On Droplet

@@ -28,7 +28,7 @@ dc config >/dev/null
 
 set_stage "build-images"
 record_diagnosis "Docker image build failed. Inspect build logs for backend/frontend/admin/nginx."
-dc build --pull backend frontend admin nginx
+COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}" dc build --pull backend frontend admin nginx
 
 set_stage "restart-all"
 record_diagnosis "Docker Compose failed to restart production services."
