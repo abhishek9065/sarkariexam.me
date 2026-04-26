@@ -1,6 +1,16 @@
+import type { Metadata } from 'next';
+
 import { PublicSearchPage } from '@/app/components/public-site/PublicSearchPage';
+import { buildNoIndexMetadata } from '@/app/lib/metadata';
 import { announcementCategoryMeta } from '@/app/lib/public-content';
 import { getRawListing } from '@/lib/content-api';
+
+export const metadata: Metadata = buildNoIndexMetadata({
+  title: 'Search Updates',
+  description: 'Internal search results for jobs, results, admit cards, and admissions.',
+  canonicalPath: '/search',
+  keywords: ['search'],
+});
 
 
 export default async function SearchPage({

@@ -4,3 +4,4 @@ Disallow: /admin
 Disallow: /metrics
 Disallow: /healthz
 Allow: /
+Sitemap: https://sarkariexams.me/sitemap.xml

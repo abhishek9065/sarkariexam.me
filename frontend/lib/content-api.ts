@@ -57,6 +57,16 @@ interface BackendPostRecord {
   admissionPrograms: Array<{ programName: string; level?: string; department?: string; intake?: string; eligibilityNote?: string }>;
   officialSources: BackendOfficialSource[];
   trust: { verificationNote?: string };
+  seo?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    canonicalPath?: string;
+    indexable?: boolean;
+    ogImage?: string;
+    effectiveTitle?: string;
+    effectiveDescription?: string;
+    effectiveCanonicalPath?: string;
+  };
   tag?: 'new' | 'hot' | 'update' | 'last-date';
   location?: string;
   salary?: string;
@@ -85,6 +95,9 @@ interface BackendPublicCard {
   tag?: 'new' | 'hot' | 'update' | 'last-date';
   summary?: string;
   stateSlugs: string[];
+  publishedAt?: string;
+  updatedAt?: string;
+  indexable?: boolean;
 }
 
 interface BackendPublicDetail {
@@ -101,6 +114,7 @@ interface BackendTaxonomyDocument {
   id: string;
   name: string;
   slug: string;
+  updatedAt?: string;
 }
 
 interface BackendTaxonomyLanding {
@@ -460,6 +474,8 @@ function toPortalEntry(card: BackendPublicCard): PortalListEntry {
     tag: card.tag,
     postCount: card.postCount,
     qualification: card.qualification,
+    publishedAt: card.publishedAt,
+    updatedAt: card.updatedAt,
   };
 }
 
@@ -612,6 +628,7 @@ export function mapDetailToAnnouncementItem(detail: BackendPublicDetail): Announ
     ],
     org: detail.card.org,
     postCount: detail.card.postCount,
+    publishedAt: detail.post.publishedAt,
     qualification: detail.card.qualification,
     section,
     shortInfo: detail.post.shortInfo || detail.post.summary,
@@ -620,6 +637,7 @@ export function mapDetailToAnnouncementItem(detail: BackendPublicDetail): Announ
     summary: detail.post.summary,
     tag: detail.card.tag,
     title: detail.post.title,
+    updatedAt: detail.post.updatedAt,
     usefulLinks: detail.breadcrumbs.slice(0, 3).map((crumb) => ({ href: crumb.href, label: crumb.label })),
   };
 }

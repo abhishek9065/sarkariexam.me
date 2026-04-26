@@ -252,6 +252,9 @@ function toPublicCard(post: PostWithRelations | PostCardWithRelations): PublicPo
     tag: post.tag ? post.tag.toLowerCase().replace('_', '-') as PublicPostCard['tag'] : undefined,
     summary: post.summary,
     stateSlugs: post.postStates.map((item) => item.state.slug),
+    publishedAt: post.publishedAt?.toISOString(),
+    updatedAt: post.updatedAt.toISOString(),
+    indexable: post.seoIndexable,
   };
 }
 

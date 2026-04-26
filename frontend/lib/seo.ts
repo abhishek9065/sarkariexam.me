@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
+const siteUrl = "https://sarkariexams.me";
+
 export const siteConfig = {
   name: "SarkariExams.me",
   description: "Trusted government jobs and exam update platform for latest jobs, results, admit cards, answer keys, syllabus, admissions, scholarships, and official notices.",
-  url: "https://sarkariexams.me",
-  ogImage: "https://sarkariexams.me/file.svg",
+  url: siteUrl,
+  ogImage: `${siteUrl}/opengraph-image`,
   links: {
     twitter: "https://twitter.com/sarkariexams",
     facebook: "https://facebook.com/sarkariexams",
@@ -15,12 +17,12 @@ export const defaultMetadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   applicationName: siteConfig.name,
   title: {
-    default: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys 2026`,
+    default: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys`,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
   alternates: {
-    canonical: siteConfig.url,
+    canonical: '/',
   },
   keywords: [
     "sarkari result",
@@ -37,7 +39,7 @@ export const defaultMetadata: Metadata = {
     "syllabus",
     "scholarship",
     "admissions",
-    "govt jobs 2026",
+    "govt jobs",
   ],
   authors: [
     {
@@ -50,7 +52,7 @@ export const defaultMetadata: Metadata = {
     type: "website",
     locale: "en_IN",
     url: siteConfig.url,
-    title: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys 2026`,
+    title: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys`,
     description: siteConfig.description,
     siteName: siteConfig.name,
     images: [
@@ -64,7 +66,7 @@ export const defaultMetadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys 2026`,
+    title: `${siteConfig.name} - Government Jobs, Results, Admit Cards, Answer Keys`,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
     creator: "@sarkariexams",

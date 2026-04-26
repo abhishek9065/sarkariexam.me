@@ -1,6 +1,30 @@
+import type { Metadata } from 'next';
+
 import { PublicCategoryHubPage } from '@/app/components/public-site/PublicCategoryHubPage';
+import { JsonLd } from '@/app/components/seo/JsonLd';
+import { buildListingMetadata } from '@/app/lib/listing-seo';
 import { announcementCategoryMeta } from '@/app/lib/public-content';
+import { collectionJsonLd } from '@/app/lib/structured-data';
 import { getListingEntries } from '@/lib/content-api';
+
+const pageSeo = {
+  title: 'Latest Government Jobs and Online Forms',
+  description:
+    'Browse the latest government job notifications, online forms, eligibility details, and deadline updates across central and state recruitment boards.',
+  keywords: ['latest jobs', 'government job vacancy', 'sarkari naukri online form', 'recruitment notification'],
+};
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ department?: string; organization?: string; state?: string; qualification?: string; search?: string }>;
+}): Promise<Metadata> {
+  return buildListingMetadata({
+    meta: announcementCategoryMeta.jobs,
+    ...pageSeo,
+    searchParams: await searchParams,
+  });
+}
 
 
 function buildJobsSummary(search?: string, organization?: string, state?: string, qualification?: string) {
@@ -42,11 +66,14 @@ export default async function JobsPage({
   });
 
   return (
-    <PublicCategoryHubPage
-      meta={announcementCategoryMeta.jobs}
-      entries={entries}
-      querySummary={buildJobsSummary(search, effectiveOrganization, state, qualification)}
-      clearHref={announcementCategoryMeta.jobs.canonicalPath}
-    />
+    <>
+      <JsonLd data={collectionJsonLd(announcementCategoryMeta.jobs, entries)} />
+      <PublicCategoryHubPage
+        meta={announcementCategoryMeta.jobs}
+        entries={entries}
+        querySummary={buildJobsSummary(search, effectiveOrganization, state, qualification)}
+        clearHref={announcementCategoryMeta.jobs.canonicalPath}
+      />
+    </>
   );
 }

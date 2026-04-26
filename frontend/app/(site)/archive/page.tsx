@@ -1,6 +1,17 @@
+import type { Metadata } from 'next';
+
 import { PublicCategoryHubPage } from '@/app/components/public-site/PublicCategoryHubPage';
 import { announcementCategoryMeta } from '@/app/lib/public-content';
+import { buildPageMetadata } from '@/app/lib/metadata';
 import { getListingEntries } from '@/lib/content-api';
+
+export const metadata: Metadata = buildPageMetadata({
+  title: 'Archived and Expired Government Updates',
+  description:
+    'Review expired or archived government jobs, results, admit cards, and admission notices for historical reference.',
+  canonicalPath: '/archive',
+  keywords: ['archive', 'expired jobs', 'old government notifications', 'past results'],
+});
 
 
 export default async function ArchivePage() {

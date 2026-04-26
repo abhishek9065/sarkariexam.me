@@ -88,13 +88,13 @@ export function SEODashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Schema Markup</CardTitle>
+            <CardTitle className="text-sm font-medium">Canonical Paths</CardTitle>
             <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics?.withSchema?.toLocaleString() || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {metrics?.total ? Math.round((metrics.withSchema / metrics.total) * 100) : 0}% structured
+              {metrics?.total ? Math.round((metrics.withSchema / metrics.total) * 100) : 0}% canonical
             </p>
           </CardContent>
         </Card>
@@ -183,7 +183,7 @@ export function SEODashboardPage() {
             {metrics?.total && metrics?.withMeta ? metrics.total - metrics.withMeta : 0} pages need meta descriptions
           </Badge>
           <Badge variant="outline" className="cursor-pointer hover:bg-primary/10">
-            {metrics?.total && metrics?.withSchema ? metrics.total - metrics.withSchema : 0} pages need schema markup
+            {metrics?.total && metrics?.withSchema ? metrics.total - metrics.withSchema : 0} pages need canonical paths
           </Badge>
         </CardContent>
       </Card>

@@ -300,6 +300,9 @@ export interface PublicPostCard {
   tag?: 'new' | 'hot' | 'update' | 'last-date';
   summary?: string;
   stateSlugs: string[];
+  publishedAt?: string;
+  updatedAt?: string;
+  indexable?: boolean;
 }
 
 export interface PublicPostDetail {

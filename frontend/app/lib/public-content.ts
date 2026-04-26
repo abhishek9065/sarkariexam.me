@@ -63,9 +63,11 @@ export interface PortalListEntry {
   href: string;
   org: string;
   postCount?: string;
+  publishedAt?: string;
   qualification?: string;
   tag?: LinkItemTag;
   title: string;
+  updatedAt?: string;
 }
 
 export interface ResourceCard {
@@ -261,6 +263,7 @@ export interface AnnouncementItem {
   keywords: string[];
   org: string;
   postCount?: string;
+  publishedAt?: string;
   qualification?: string;
   section: AnnouncementSection;
   shortInfo: string;
@@ -269,6 +272,7 @@ export interface AnnouncementItem {
   summary: string;
   tag?: LinkItemTag;
   title: string;
+  updatedAt?: string;
   usefulLinks: QuickLink[];
 }
 
