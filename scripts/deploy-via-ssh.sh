@@ -181,6 +181,9 @@ prepare_ssh() {
     -o StrictHostKeyChecking=yes
     -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
     -o ConnectTimeout=15
+    -o ServerAliveInterval=30
+    -o ServerAliveCountMax=120
+    -o TCPKeepAlive=yes
     "$DO_USER@$DO_HOST"
   )
 
@@ -193,6 +196,9 @@ prepare_ssh() {
     -o StrictHostKeyChecking=yes
     -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
     -o ConnectTimeout=15
+    -o ServerAliveInterval=30
+    -o ServerAliveCountMax=120
+    -o TCPKeepAlive=yes
   )
 }
 
