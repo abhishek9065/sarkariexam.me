@@ -61,7 +61,11 @@ export function HomePageNavbar() {
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Element;
+      if (!(event.target instanceof Element)) {
+        return;
+      }
+
+      const target = event.target;
       // Don't close if clicking inside any menu
       if (target.closest('[data-user-menu]') || 
           target.closest('[data-notification-menu]') ||
@@ -212,7 +216,10 @@ export function HomePageNavbar() {
               <div className="relative" data-notification-menu>
                 <button
                   type="button"
-                  onClick={() => setIsNotificationOpen((current) => !current)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsNotificationOpen((current) => !current);
+                  }}
                   className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14 hover:scale-105 active:scale-95"
                   aria-label="Toggle notifications"
                   title="Notifications"
@@ -224,7 +231,10 @@ export function HomePageNavbar() {
                   />
                 </button>
                 {isNotificationOpen && (
-                  <div className="absolute right-0 top-12 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5">
+                  <div
+                    className="absolute right-0 top-12 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <div className="flex items-center justify-between bg-gradient-to-r from-[#0d1b6e] to-[#1565c0] px-3.5 py-2.5">
                       <span className="text-[12px] font-bold text-white">Notifications</span>
                       <span className="rounded-full bg-[#e53935] px-1.5 py-0.5 text-[9px] font-extrabold text-white">
@@ -245,7 +255,13 @@ export function HomePageNavbar() {
                       </Link>
                     ))}
                     <div className="bg-gray-50 px-3.5 py-2.5 text-center">
-                      <Link href={homePageLinks.results} className="text-[11px] font-semibold text-[#1a237e] hover:underline">
+                      <Link
+                        href={homePageLinks.results}
+                        className="text-[11px] font-semibold text-[#1a237e] hover:underline"
+                        onClick={() => {
+                          setIsNotificationOpen(false);
+                        }}
+                      >
                         View all notifications →
                       </Link>
                     </div>
@@ -322,7 +338,10 @@ export function HomePageNavbar() {
               <div data-notification-menu>
                 <button
                   type="button"
-                  onClick={() => setIsNotificationOpen((current) => !current)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsNotificationOpen((current) => !current);
+                  }}
                   className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14"
                   aria-label="Toggle notifications"
                   title="Notifications"
@@ -589,7 +608,11 @@ export function HomePageNavbar() {
 
         {/* Mobile Notification Dropdown - positioned outside hamburger menu */}
         {isNotificationOpen && (
-          <div className="absolute right-4 top-20 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5 md:hidden" data-notification-menu>
+          <div
+            className="absolute right-4 top-20 z-[9999] w-[272px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl ring-1 ring-black/5 md:hidden"
+            data-notification-menu
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between bg-gradient-to-r from-[#0d1b6e] to-[#1565c0] px-3.5 py-2.5">
               <span className="text-[12px] font-bold text-white">Notifications</span>
               <span className="rounded-full bg-[#e53935] px-1.5 py-0.5 text-[9px] font-extrabold text-white">
