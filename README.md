@@ -145,6 +145,41 @@ npm run lint
 npm run build
 ```
 
+## SEO and Indexing
+
+The public frontend uses route-level metadata, canonical URL normalization, and structured data helpers to keep search indexing consistent.
+
+- Shared metadata helpers: `frontend/app/lib/metadata.ts`
+- Listing-page metadata policy: `frontend/app/lib/listing-seo.ts`
+- Detail-page metadata policy: `frontend/lib/content-page.ts`
+- Robots policy sources (keep aligned):
+	- `frontend/app/robots.ts`
+	- `frontend/public/robots.txt`
+- Sitemap source: `frontend/app/sitemap.ts`
+
+Current indexing behavior:
+
+- Indexable: core public pages and canonical detail pages.
+- Noindex: internal search and duplicate/doorway routes (`/search`, legacy alias redirect routes, `/join/*`, and selected user utility pages such as `/profile` and `/bookmarks`).
+- Admin is non-indexable via metadata (`admin-next/app/layout.tsx`) and proxy response headers (`nginx/default.conf`).
+
+### SEO Verification
+
+After frontend changes, run:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+Then verify crawler-facing outputs:
+
+- `GET /robots.txt` includes expected disallow paths.
+- `GET /sitemap.xml` excludes intentionally noindexed routes.
+- Canonical pages render canonical tags and page-specific titles/descriptions.
+- Noindex pages render robots noindex directives.
+
 ## CI and Release Flow
 
 Main branch pushes trigger:
