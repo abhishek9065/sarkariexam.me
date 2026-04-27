@@ -733,7 +733,7 @@ export function mapTaxonomyStateToMeta(state: BackendTaxonomyDocument, _counts?:
 
 export function buildOrganizationMeta(name: string): CategoryPageMeta {
   return {
-    canonicalPath: `/organizations/${name}`,
+    canonicalPath: '/organizations',
     description: `Officially sourced government jobs, results, admit cards, and admissions from ${name}.`,
     eyebrow: 'Organization Wise Updates',
     headerColor: 'bg-[#37474f]',
@@ -749,7 +749,7 @@ export function buildOrganizationMeta(name: string): CategoryPageMeta {
       { label: 'Latest Admit Cards', href: '/admit-cards' },
       { label: 'Latest Admissions', href: '/admissions' },
     ],
-    slug: 'states',
+    slug: 'organizations',
     stats: [
       { label: 'Source', value: 'Backend' },
       { label: 'Trust', value: 'Official Links' },

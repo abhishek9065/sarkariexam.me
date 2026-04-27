@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { siteConfig } from '@/lib/seo';
 import { getContentPagesByType, getRawListing, getTaxonomyList } from '@/lib/content-api';
-import { auxiliaryPageMeta, communityPageMeta, infoPageMeta, resourceCategoryMeta } from '@/app/lib/public-content';
+import { auxiliaryPageMeta, infoPageMeta, resourceCategoryMeta } from '@/app/lib/public-content';
 
 export const revalidate = 300;
 
@@ -13,7 +13,9 @@ const LISTING_TYPES = [
   { type: 'answer-key' as const, path: '/answer-keys', priority: 0.85 },
 ] as const;
 
-const CONTENT_PAGE_TYPES = ['info', 'auxiliary', 'community', 'resource_meta'] as const;
+const CONTENT_PAGE_TYPES = ['info', 'auxiliary', 'resource_meta'] as const;
+
+const NOINDEX_PATHS = new Set(['/search', '/profile', '/bookmarks']);
 
 function contentPageHref(page: { slug: string; pageType: string; seoCanonicalPath?: string | null }) {
   if (page.seoCanonicalPath) {
@@ -27,6 +29,10 @@ function contentPageHref(page: { slug: string; pageType: string; seoCanonicalPat
   return `/${page.slug}`;
 }
 
+function isNoIndexPath(path: string) {
+  return NOINDEX_PATHS.has(path);
+}
+
 function lastModified(value?: string) {
   if (!value) return new Date();
   const parsed = new Date(value);
@@ -36,10 +42,11 @@ function lastModified(value?: string) {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const localStaticPaths = [
-    ...Object.values(infoPageMeta).map((item) => item.canonicalPath),
+    ...Object.values(infoPageMeta)
+      .map((item) => item.canonicalPath)
+      .filter((path) => !isNoIndexPath(path)),
     ...Object.values(auxiliaryPageMeta).map((item) => item.canonicalPath),
     ...Object.values(resourceCategoryMeta).map((item) => item.canonicalPath),
-    ...Object.values(communityPageMeta).map((item) => item.canonicalPath),
   ];
   const staticEntries: MetadataRoute.Sitemap = [
     { url: siteConfig.url, lastModified: now, changeFrequency: 'hourly', priority: 1 },
@@ -88,7 +95,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     organizations.forEach((item) => addEntry({ url: `${siteConfig.url}/organizations/${item.slug}`, lastModified: lastModified(item.updatedAt), changeFrequency: 'daily', priority: 0.7 }));
     contentPageResults
       .flat()
-      .forEach((page) => addEntry({ url: `${siteConfig.url}${contentPageHref(page)}`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 }));
+      .forEach((page) => {
+        const path = contentPageHref(page);
+        if (isNoIndexPath(path) || path.startsWith('/join/')) {
+          return;
+        }
+
+        addEntry({ url: `${siteConfig.url}${path}`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 });
+      });
 
     return Array.from(entries.values());
   } catch {

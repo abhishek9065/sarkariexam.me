@@ -20,6 +20,8 @@ const topLevelSlugs = [
   ...Object.keys(infoPageMeta),
 ];
 
+const NOINDEX_INFO_SLUGS = new Set(['profile', 'bookmarks']);
+
 export function generateStaticParams() {
   return topLevelSlugs.map((slug) => ({ slug }));
 }
@@ -28,11 +30,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const infoPage = await loadInfoPageMeta(slug, getInfoPageBySlug(slug) || undefined);
   if (infoPage) {
+    const noindex = NOINDEX_INFO_SLUGS.has(slug);
     return buildPageMetadata({
       title: infoPage.title,
       description: infoPage.description,
       canonicalPath: infoPage.canonicalPath,
       keywords: [infoPage.slug, infoPage.eyebrow],
+      noindex,
     });
   }
 

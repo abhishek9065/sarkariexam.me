@@ -3,5 +3,6 @@ Disallow: /api/
 Disallow: /admin
 Disallow: /metrics
 Disallow: /healthz
+Disallow: /search
 Allow: /
 Sitemap: https://sarkariexams.me/sitemap.xml

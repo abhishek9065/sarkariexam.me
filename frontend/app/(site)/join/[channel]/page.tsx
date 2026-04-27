@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { PublicCommunityPage } from '@/app/components/public-site/PublicCommunityPage';
 import { JsonLd } from '@/app/components/seo/JsonLd';
 import { getCommunityPageBySlug, normalizeExternalHref } from '@/app/lib/public-content';
-import { buildPageMetadata } from '@/app/lib/metadata';
+import { buildNoIndexMetadata } from '@/app/lib/metadata';
 import { breadcrumbJsonLd } from '@/app/lib/structured-data';
 import { loadCommunityPageMeta } from '@/lib/content-api';
 
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ channel: 
     notFound();
   }
 
-  return buildPageMetadata({
+  return buildNoIndexMetadata({
     title: meta.title,
     description: meta.description,
     canonicalPath: meta.canonicalPath,

@@ -284,7 +284,7 @@ export interface CategoryPageMeta {
   highlights: string[];
   listingTitle: string;
   quickLinks: QuickLink[];
-  slug: AnnouncementSection | ResourceCategorySlug | 'states';
+  slug: AnnouncementSection | ResourceCategorySlug | 'states' | 'organizations';
   stats: PublicStat[];
   title: string;
 }

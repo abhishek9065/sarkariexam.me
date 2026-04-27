@@ -10,6 +10,17 @@ const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700
 export const metadata: Metadata = {
   title: 'Admin Console | SarkariExams.me',
   description: 'Admin console for managing SarkariExams.me',
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+      'max-snippet': 0,
+      'max-image-preview': 'none',
+      'max-video-preview': 0,
+    },
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
