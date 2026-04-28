@@ -650,29 +650,33 @@ function PublicAnnouncementDetailPageInner({
       </section>
 
       <div className="border-b border-gray-100 bg-white">
-        <div className="mx-auto grid max-w-6xl grid-cols-4 divide-x divide-gray-100">
-          {[
-            { label: 'POSTS', value: item.postCount ?? 'N/A', icon: Users, tone: 'text-[#a855f7]' },
-            { label: 'LAST DATE', value: detail.summaryMeta.lastDate, icon: Clock, tone: 'text-[#ef4444]' },
-            { label: 'SALARY', value: detail.summaryMeta.salary.split(' — ')[0], icon: IndianRupee, tone: 'text-[#16a34a]' },
-            { label: 'QUALIFICATION', value: item.qualification ?? 'Refer notice', icon: GraduationCap, tone: 'text-[#2563eb]' },
-          ].map((stat) => {
-            const Icon = stat.icon;
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: 'POSTS', value: item.postCount ?? 'N/A', icon: Users, tone: 'text-[#a855f7]' },
+              { label: 'LAST DATE', value: detail.summaryMeta.lastDate, icon: Clock, tone: 'text-[#ef4444]' },
+              { label: 'SALARY', value: detail.summaryMeta.salary.split(' — ')[0], icon: IndianRupee, tone: 'text-[#16a34a]' },
+              { label: 'QUALIFICATION', value: item.qualification ?? 'Refer notice', icon: GraduationCap, tone: 'text-[#2563eb]' },
+            ].map((stat) => {
+              const Icon = stat.icon;
 
-            return (
-              <div key={stat.label} className="px-5 py-3.5">
-                <Icon size={14} className={stat.tone} />
-                <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.04em] text-gray-400">{stat.label}</div>
-                <div className="mt-1 text-[12px] font-bold text-gray-800">{stat.value}</div>
-              </div>
-            );
-          })}
+              return (
+                <div key={stat.label} className="rounded-2xl border border-gray-100 bg-[#fbfcfe] px-4 py-3.5 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Icon size={14} className={stat.tone} />
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400">{stat.label}</div>
+                  </div>
+                  <div className="mt-1.5 text-[12px] font-bold text-gray-800">{stat.value}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       <div className="space-y-4 pb-24 lg:pb-0">
-        <nav className="sticky top-[57px] z-20 border-b border-gray-200 bg-white shadow-sm">
-          <div className="mx-auto flex max-w-6xl min-w-max items-center gap-1 px-4">
+        <nav className="sticky top-[57px] z-20 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur">
+          <div className="mx-auto flex max-w-6xl min-w-max items-center gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {navSections.map((section) => {
               const Icon = section.icon;
 
@@ -682,7 +686,7 @@ function PublicAnnouncementDetailPageInner({
                   type="button"
                   onClick={() => scrollToSection(section.id)}
                   className={cn(
-                    'inline-flex items-center gap-2 border-b-2 px-4 py-4 text-[12px] font-semibold transition-colors',
+                    'inline-flex items-center gap-2 border-b-2 px-3.5 py-4 text-[12px] font-semibold transition-colors',
                     activeSection === section.id
                       ? 'border-[#e65100] text-[#e65100]'
                       : 'border-transparent text-gray-500 hover:text-gray-800',

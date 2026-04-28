@@ -30,15 +30,15 @@ const tagStyles: Record<NonNullable<HomePageLinkItemProps['tag']>, { bg: string;
 
 export function HomePageSectionBox({ id, title, headerColor, children, viewAllLink }: HomePageSectionBoxProps) {
   return (
-    <div id={id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <div className={`${headerColor} flex items-center justify-between px-4 py-2.5`}>
-        <h2 className="flex items-center gap-2 text-white">
+    <div id={id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+      <div className={`${headerColor} flex items-center justify-between gap-3 px-4 py-3`}>
+        <h2 className="flex min-w-0 items-center gap-2 text-white">
           <span className="h-4 w-1 rounded-full bg-white/50" />
-          <span className="text-[12px] font-bold uppercase tracking-wide">{title}</span>
+          <span className="truncate text-[12px] font-bold uppercase tracking-[0.08em]">{title}</span>
         </h2>
         <SafeLink
           href={viewAllLink}
-          className="flex items-center gap-0.5 rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/75 transition-all hover:bg-white/20 hover:text-white"
+          className="flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/80 transition-all hover:bg-white/20 hover:text-white"
         >
           View All <ChevronRight size={11} />
         </SafeLink>
@@ -54,7 +54,7 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
   return (
     <SafeLink
       href={href}
-      className="group flex cursor-pointer items-start gap-2.5 px-4 py-2.5 transition-colors hover:bg-orange-50/60"
+      className="group flex cursor-pointer items-start gap-2.5 px-4 py-3 transition-colors hover:bg-orange-50/60"
     >
       <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400 transition-transform group-hover:scale-125" />
       <div className="min-w-0 flex-1">
@@ -70,23 +70,21 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
             </span>
           )}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-[11px] text-gray-400">
-          <span>{org}</span>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-400">
+          <span className="max-w-[12rem] truncate">{org}</span>
           {postCount && (
-            <span className="flex items-center gap-1">
-              <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
               {postCount} Posts
             </span>
           )}
           {qualification && (
-            <span className="flex items-center gap-1">
-              <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
               {qualification}
             </span>
           )}
         </div>
       </div>
-      <span className="mt-0.5 shrink-0 text-[11px] text-gray-400 transition-colors group-hover:text-orange-400">
+      <span className="mt-0.5 shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500 transition-colors group-hover:bg-orange-100 group-hover:text-orange-500">
         {date}
       </span>
     </SafeLink>
