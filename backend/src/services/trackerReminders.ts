@@ -4,7 +4,7 @@ import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgre
 import AnnouncementModelPostgres from '../models/announcements.postgres.js';
 import { BookmarkModelMongo } from '../models/bookmarks.mongo.js';
 import ProfileModelPostgres from '../models/profile.postgres.js';
-import { UserModelMongo } from '../models/users.mongo.js';
+import { UserModelPostgres } from '../models/users.postgres.js';
 import type { ContentType } from '../types.js';
 
 import { sendDigestEmail } from './email.js';
@@ -114,7 +114,7 @@ async function upsertInAppReminder(item: ReminderItem): Promise<boolean> {
 }
 
 async function loadUserEmailMap(userIds: string[]): Promise<Map<string, string>> {
-    return UserModelMongo.listActiveEmailMap(userIds);
+    return UserModelPostgres.listActiveEmailMap(userIds);
 }
 
 async function loadSubscriptionTokenMap(emails: string[]): Promise<Map<string, string>> {

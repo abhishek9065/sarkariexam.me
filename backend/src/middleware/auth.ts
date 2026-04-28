@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt, { type VerifyOptions } from 'jsonwebtoken';
 
 import { config } from '../config.js';
-import { UserModelMongo } from '../models/users.mongo.js';
+import { UserModelPostgres } from '../models/users.postgres.js';
 import RedisCache from '../services/redis.js';
 import type { JwtPayload } from '../types.js';
 
@@ -69,7 +69,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
 
   try {
     const decoded = verifyToken(token);
-    const user = await UserModelMongo.findById(decoded.userId);
+    const user = await UserModelPostgres.findById(decoded.userId);
     if (!user || !user.isActive) {
       res.status(401).json({ error: 'User account deactivated' });
       return;
@@ -106,7 +106,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
 
   try {
     const decoded = verifyToken(token);
-    const user = await UserModelMongo.findById(decoded.userId);
+    const user = await UserModelPostgres.findById(decoded.userId);
     if (user?.isActive) {
       decoded.role = user.role;
       req.user = decoded;

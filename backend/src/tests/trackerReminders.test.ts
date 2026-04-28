@@ -51,8 +51,8 @@ vi.mock('../models/bookmarks.mongo.js', () => ({
     },
 }));
 
-vi.mock('../models/users.mongo.js', () => ({
-    UserModelMongo: {
+vi.mock('../models/users.postgres.js', () => ({
+    UserModelPostgres: {
         listActiveEmailMap: userListActiveEmailMapMock,
     },
 }));

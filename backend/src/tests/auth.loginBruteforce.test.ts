@@ -16,8 +16,8 @@ const {
   bruteForceProtectionImpl: vi.fn((req: any, _res: any, next: any) => next()),
 }));
 
-vi.mock('../models/users.mongo.js', () => ({
-  UserModelMongo: {
+vi.mock('../models/users.postgres.js', () => ({
+  UserModelPostgres: {
     verifyPassword: verifyPasswordMock,
   },
 }));

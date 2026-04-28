@@ -12,6 +12,7 @@ interface RateLimitOptions {
     windowMs?: number;  // Time window in milliseconds
     maxRequests?: number;  // Max requests per window
     keyPrefix?: string;  // Prefix for rate limit key (e.g., 'api', 'auth')
+    requireDistributedStore?: boolean; // Fail closed when Redis is unavailable
 }
 
 async function checkRateLimit(
@@ -44,10 +45,31 @@ export function rateLimit(options: RateLimitOptions = {}) {
     const windowMs = options.windowMs || 60000; // 1 minute default
     const maxRequests = options.maxRequests || 100; // 100 requests default
     const keyPrefix = options.keyPrefix || 'rl';
+    const requireDistributedStore = options.requireDistributedStore || false;
 
     return async (req: Request, res: Response, next: NextFunction) => {
         const clientIp = getRealIp(req);
         const key = `${keyPrefix}:${clientIp}`;
+
+        if (requireDistributedStore && !RedisCache.isAvailable()) {
+            SecurityLogger.log({
+                ip_address: clientIp,
+                event_type: 'suspicious_activity',
+                endpoint: req.originalUrl || req.url,
+                metadata: {
+                    reason: 'rate_limit_backend_unavailable',
+                    keyPrefix,
+                    windowMs,
+                    maxRequests,
+                }
+            });
+            res.status(503).json({
+                error: 'Service unavailable',
+                code: 'RATE_LIMIT_BACKEND_UNAVAILABLE',
+                message: 'Request throttling backend is temporarily unavailable. Please retry shortly.',
+            });
+            return;
+        }
 
         const result = await checkRateLimit(key, maxRequests, windowMs);
 

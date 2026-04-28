@@ -14,7 +14,7 @@ import {
   recordFailedLoginWithEmail,
 } from '../middleware/security.js';
 import AuditLogModelPostgres from '../models/auditLogs.postgres.js';
-import { UserModelMongo } from '../models/users.mongo.js';
+import { UserModelPostgres } from '../models/users.postgres.js';
 import { recordAnalyticsEvent } from '../services/analytics.js';
 import { sendPasswordRecoveryEmail } from '../services/email.js';
 import {
@@ -154,12 +154,12 @@ router.post('/register', rateLimit({ windowMs: 60 * 60 * 1000, maxRequests: 10, 
       });
     }
 
-    const existingUser = await UserModelMongo.findByEmail(validated.email);
+    const existingUser = await UserModelPostgres.findByEmail(validated.email);
     if (existingUser) {
       return res.status(409).json({ error: 'Email already registered. Please log in.' });
     }
 
-    const user = await UserModelMongo.create({
+    const user = await UserModelPostgres.create({
       email: validated.email,
       username: validated.name,
       password: validated.password,
@@ -203,7 +203,7 @@ router.post('/login', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefi
 
   try {
     const validated = loginSchema.parse(req.body);
-    const user = await UserModelMongo.verifyPassword(validated.email, validated.password);
+    const user = await UserModelPostgres.verifyPassword(validated.email, validated.password);
 
     if (!user) {
       incrementAuthLoginFailure();
@@ -251,7 +251,7 @@ router.post('/login', rateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefi
 router.post('/password-recovery/request', rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10, keyPrefix: 'auth-password-recovery-request' }), async (req, res) => {
   try {
     const validated = passwordRecoveryRequestSchema.parse(req.body);
-    const user = await UserModelMongo.findByEmail(validated.email);
+    const user = await UserModelPostgres.findByEmail(validated.email);
 
     let testToken: string | undefined;
 
@@ -341,7 +341,7 @@ router.post('/password-recovery/reset', rateLimit({ windowMs: 10 * 60 * 1000, ma
       });
     }
 
-    const isReused = await UserModelMongo.isPasswordReused(
+    const isReused = await UserModelPostgres.isPasswordReused(
       tokenPayload.userId,
       validated.password,
       config.passwordHistoryLimit,
@@ -361,7 +361,7 @@ router.post('/password-recovery/reset', rateLimit({ windowMs: 10 * 60 * 1000, ma
       });
     }
 
-    const updatedUser = await UserModelMongo.update(consumed.userId, {
+    const updatedUser = await UserModelPostgres.update(consumed.userId, {
       password: validated.password,
     });
 
@@ -418,7 +418,7 @@ router.post('/logout', async (req, res) => {
 
 router.get('/me', rateLimit({ windowMs: 60 * 1000, maxRequests: 60, keyPrefix: 'auth-me' }), authenticateToken, async (req, res) => {
   try {
-    const user = await UserModelMongo.findById(req.user!.userId);
+    const user = await UserModelPostgres.findById(req.user!.userId);
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'User account deactivated' });
     }

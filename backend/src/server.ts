@@ -65,8 +65,23 @@ let postgresGuardLastFailureLogAt = 0;
 
 export { app };
 
-// Trust proxy for accurate IP detection behind reverse proxies
-app.set('trust proxy', 1);
+// Trust proxy only for local/private networks where the edge proxy runs.
+const isTrustedProxyIp = (value: string) => {
+  const normalized = value.trim().replace(/^::ffff:/, '');
+  if (!normalized) return false;
+  if (normalized === '127.0.0.1' || normalized === '::1') return true;
+  if (normalized.startsWith('10.')) return true;
+  if (/^192\.168\./.test(normalized)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)) return true;
+  return normalized.startsWith('fc') || normalized.startsWith('fd');
+};
+app.set('trust proxy', (ip) => isTrustedProxyIp(ip));
+app.disable('x-powered-by');
+
+const proxyGuardExemptApiPaths = new Set(['/health', '/healthz', '/livez', '/readyz', '/health/deep']);
+const mutatingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const enforceTrustedProxy = config.isProduction || process.env.ENFORCE_TRUSTED_PROXY === 'true';
+const requireOriginForMutatingApi = config.isProduction || process.env.ENFORCE_API_ORIGIN === 'true';
 
 // ============ SECURITY MIDDLEWARE ============
 app.use(requestIdMiddleware);
@@ -111,8 +126,30 @@ app.use(cors({
     'Authorization',
     'X-Requested-With',
     'X-CSRF-Token',
+    'X-XSRF-Token',
     'Idempotency-Key',
   ]
+}));
+
+// Rate limiting
+app.use('/api', expressRateLimit({
+  windowMs: config.rateLimitWindowMs,
+  limit: config.rateLimitMax,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
+app.use('/api/auth', expressRateLimit({
+  windowMs: config.rateLimitWindowMs,
+  limit: config.authRateLimitMax,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
+app.use('/api', distributedRateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax, keyPrefix: 'api' }));
+app.use('/api/auth', distributedRateLimit({
+  windowMs: config.rateLimitWindowMs,
+  maxRequests: config.authRateLimitMax,
+  keyPrefix: 'auth',
+  requireDistributedStore: config.isProduction,
 }));
 
 // Body parsing
@@ -120,6 +157,48 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(validateContentType);
+
+app.use('/api', (req, res, next) => {
+  if (enforceTrustedProxy && !proxyGuardExemptApiPaths.has(req.path)) {
+    const upstreamIp = (req.socket.remoteAddress ?? '').trim().replace(/^::ffff:/, '');
+    if (!isTrustedProxyIp(upstreamIp)) {
+      logger.warn({ path: req.path, upstreamIp }, '[Network] Blocked direct API access outside trusted proxy');
+      res.status(403).json({
+        error: 'Proxy required',
+        code: 'PROXY_REQUIRED',
+        message: 'API access must come through a trusted reverse proxy.',
+        requestId: req.requestId,
+      });
+      return;
+    }
+  }
+
+  const isMutating = mutatingMethods.has(req.method.toUpperCase());
+  if (!isMutating) {
+    next();
+    return;
+  }
+
+  if (!requireOriginForMutatingApi) {
+    next();
+    return;
+  }
+
+  const origin = req.get('origin');
+  const hasBearerToken = /^Bearer\s+/i.test(req.get('authorization') ?? '');
+  if (!origin && !hasBearerToken) {
+    logger.warn({ path: req.path }, '[CORS] Missing origin on mutating request');
+    res.status(403).json({
+      error: 'Origin header required',
+      code: 'ORIGIN_REQUIRED',
+      message: 'Origin header is required for browser-style state-changing requests.',
+      requestId: req.requestId,
+    });
+    return;
+  }
+
+  next();
+});
 
 const apiCsrfProtection = csurf({
   cookie: {
@@ -163,22 +242,6 @@ try {
 } catch (err) {
   logger.error({ err }, '[Server] Failed to load Swagger UI');
 }
-
-// Rate limiting
-app.use('/api', expressRateLimit({
-  windowMs: config.rateLimitWindowMs,
-  limit: config.rateLimitMax,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-}));
-app.use('/api/auth', expressRateLimit({
-  windowMs: config.rateLimitWindowMs,
-  limit: config.authRateLimitMax,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-}));
-app.use('/api', distributedRateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.rateLimitMax }));
-app.use('/api/auth', distributedRateLimit({ windowMs: config.rateLimitWindowMs, maxRequests: config.authRateLimitMax }));
 
 // Response time logging
 app.use(responseTimeLogger);

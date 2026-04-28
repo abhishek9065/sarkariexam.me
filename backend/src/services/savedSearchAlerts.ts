@@ -4,7 +4,7 @@ import ProfileModelPostgres, {
     type SavedSearchRecord,
     type UserProfileRecord,
 } from '../models/profile.postgres.js';
-import { UserModelMongo } from '../models/users.mongo.js';
+import { UserModelPostgres } from '../models/users.postgres.js';
 import type { ContentType } from '../types.js';
 
 import { sendDigestEmail } from './email.js';
@@ -195,7 +195,7 @@ async function loadProfiles(userIds: string[]): Promise<Map<string, UserProfileR
 }
 
 async function loadUserEmails(userIds: string[]): Promise<Map<string, string>> {
-    return UserModelMongo.listActiveEmailMap(userIds);
+    return UserModelPostgres.listActiveEmailMap(userIds);
 }
 
 async function loadSubscriptionTokens(emails: string[]): Promise<Map<string, string>> {

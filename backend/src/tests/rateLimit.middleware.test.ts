@@ -1,8 +1,9 @@
 import express from 'express';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { rateLimit } from '../middleware/rateLimit.js';
+import RedisCache from '../services/redis.js';
 
 const createAppWithLimiter = (keyPrefix: string, maxRequests: number) => {
   const app = express();
@@ -12,6 +13,10 @@ const createAppWithLimiter = (keyPrefix: string, maxRequests: number) => {
 };
 
 describe('rateLimit middleware', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('enforces request caps and emits rate limit headers', async () => {
     const keyPrefix = `rl:test:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
     const app = createAppWithLimiter(keyPrefix, 2);
@@ -42,5 +47,22 @@ describe('rateLimit middleware', () => {
     expect(firstA.status).toBe(200);
     expect(secondA.status).toBe(429);
     expect(firstB.status).toBe(200);
+  });
+
+  it('fails closed when distributed store is required but unavailable', async () => {
+    vi.spyOn(RedisCache, 'isAvailable').mockReturnValue(false);
+
+    const app = express();
+    app.use(rateLimit({
+      keyPrefix: `rl:strict:${Date.now()}`,
+      maxRequests: 2,
+      windowMs: 60_000,
+      requireDistributedStore: true,
+    }));
+    app.get('/ping', (_req, res) => res.json({ ok: true }));
+
+    const response = await request(app).get('/ping');
+    expect(response.status).toBe(503);
+    expect(response.body.code).toBe('RATE_LIMIT_BACKEND_UNAVAILABLE');
   });
 });

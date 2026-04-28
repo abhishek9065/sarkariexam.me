@@ -88,6 +88,9 @@ const TRUST_SOURCE_REFRESH_DAYS = 30;
 const TRUST_SOURCE_STALE_DAYS = 45;
 const SEARCH_READY_MIN_TERMS = 8;
 const SEARCH_PUBLISH_MIN_TERMS = 12;
+const SEARCH_MAX_QUERY_LENGTH = 120;
+const SEARCH_MAX_TOKENS = 8;
+const MAX_PUBLIC_LIST_LIMIT = 200;
 
 function formatEditorialDate(value?: Date | null): string | undefined {
   if (!value) return undefined;
@@ -118,14 +121,14 @@ function trimToLength(value: string, max: number) {
   return `${normalized.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }
 
-function normalizeSearchTokens(value?: string | null) {
+function normalizeSearchTokens(value?: string | null, maxTokens = SEARCH_MAX_TOKENS) {
   return Array.from(new Set(
     (value || '')
       .toLowerCase()
       .split(/[^a-z0-9]+/g)
       .map((token) => token.trim())
       .filter((token) => token.length >= 2 && !SEARCH_STOP_WORDS.has(token)),
-  ));
+  )).slice(0, Math.max(1, maxTokens));
 }
 
 function buildSearchTokenClauses(term?: string | null): Prisma.PostWhereInput[] {
@@ -436,7 +439,7 @@ function buildPublicWhere(filters?: {
   }
 
   if (filters?.search?.trim()) {
-    const term = filters.search.trim();
+    const term = filters.search.trim().slice(0, SEARCH_MAX_QUERY_LENGTH);
     andClauses.push({
       OR: [
         { title: { contains: term, mode: 'insensitive' } },
@@ -1066,8 +1069,8 @@ export class PostModelPostgres {
     offset?: number;
   }) {
     const where = buildPublicWhere(filters);
-    const take = filters?.limit ?? 20;
-    const skip = filters?.offset ?? 0;
+    const take = Math.min(Math.max(filters?.limit ?? 20, 1), MAX_PUBLIC_LIST_LIMIT);
+    const skip = Math.max(filters?.offset ?? 0, 0);
 
     const [rows, total] = await Promise.all([
       prisma.post.findMany({
