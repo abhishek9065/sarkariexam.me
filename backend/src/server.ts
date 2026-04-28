@@ -15,6 +15,7 @@ import { cloudflareMiddleware } from './middleware/cloudflare.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit as distributedRateLimit } from './middleware/rateLimit.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
+import { correlationIdMiddleware, requestMetricsMiddleware } from './middleware/requestTracking.js';
 import { responseTimeLogger } from './middleware/responseTime.js';
 import {
   securityHeaders,
@@ -84,6 +85,8 @@ const enforceTrustedProxy = config.isProduction || process.env.ENFORCE_TRUSTED_P
 const requireOriginForMutatingApi = config.isProduction || process.env.ENFORCE_API_ORIGIN === 'true';
 
 // ============ SECURITY MIDDLEWARE ============
+app.use(correlationIdMiddleware);
+app.use(requestMetricsMiddleware);
 app.use(requestIdMiddleware);
 app.use(cloudflareMiddleware());
 app.use(securityHeaders);
