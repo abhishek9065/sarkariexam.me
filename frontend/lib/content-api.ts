@@ -123,6 +123,8 @@ interface BackendTaxonomyLanding {
   relatedCounts: Record<string, number>;
 }
 
+type BackendTaxonomyType = 'states' | 'organizations' | 'categories' | 'institutions' | 'exams' | 'qualifications';
+
 type BackendContentPageType = 'auxiliary' | 'info' | 'community' | 'category_meta' | 'resource_meta' | 'state_directory';
 
 interface BackendContentPageRecord {
@@ -210,6 +212,7 @@ function buildContentTags(path: string) {
     if (safeType === 'categories' && safeSlug) tags.add(`content:category:${safeSlug}`);
     if (safeType === 'institutions' && safeSlug) tags.add(`content:institution:${safeSlug}`);
     if (safeType === 'exams' && safeSlug) tags.add(`content:exam:${safeSlug}`);
+    if (safeType === 'qualifications' && safeSlug) tags.add(`content:qualification:${safeSlug}`);
   }
 
   return Array.from(tags);
@@ -700,17 +703,17 @@ export async function getRawListing(params: {
 }
 
 export async function getDetail(slug: string) {
-  const response = await fetchJson<{ data: BackendPublicDetail }>(`/posts/${slug}`);
+  const response = await fetchJson<{ data: BackendPublicDetail }>(`/posts/${encodeURIComponent(slug)}`);
   return response.data;
 }
 
-export async function getTaxonomyList(type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams') {
+export async function getTaxonomyList(type: BackendTaxonomyType) {
   const response = await fetchJson<{ data: BackendTaxonomyDocument[] }>(`/taxonomies/${type}`);
   return response.data;
 }
 
-export async function getTaxonomyLanding(type: 'states' | 'organizations' | 'categories' | 'institutions' | 'exams', slug: string) {
-  const response = await fetchJson<{ data: BackendTaxonomyLanding }>(`/taxonomies/${type}/${slug}`);
+export async function getTaxonomyLanding(type: BackendTaxonomyType, slug: string) {
+  const response = await fetchJson<{ data: BackendTaxonomyLanding }>(`/taxonomies/${type}/${encodeURIComponent(slug)}`);
   return response.data;
 }
 
