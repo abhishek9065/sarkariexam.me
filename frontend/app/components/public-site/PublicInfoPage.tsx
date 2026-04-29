@@ -44,8 +44,8 @@ export function PublicInfoPage({ meta }: { meta: InfoPageMeta }) {
 
           <PublicPanel title="Reader Note" headerColor="bg-[#1a237e]">
             <div className="space-y-3 p-4 text-sm leading-7 text-gray-600">
-              <p>This page is intentionally kept inside the same public shell as the homepage.</p>
-              <p>Supporting pages should never feel like a second product or a generic placeholder screen.</p>
+              <p>Use the links above to move quickly between official updates, support pages, and public resources.</p>
+              <p>Always confirm important dates and instructions from the official source before taking action.</p>
             </div>
           </PublicPanel>
         </div>

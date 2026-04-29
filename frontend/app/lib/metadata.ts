@@ -157,7 +157,7 @@ export function buildAnnouncementMetadata(
 ): Metadata {
   const sectionLabel = item.section.replace('-', ' ');
   const deadline = item.detail.summaryMeta.lastDate;
-  const hasDeadline = Boolean(deadline && deadline !== 'Check notice');
+  const hasDeadline = Boolean(deadline && deadline !== 'Check notice' && deadline !== 'Check official notice');
   const description = hasDeadline
     ? `${item.summary} Last date: ${deadline}.`
     : item.summary || item.shortInfo;

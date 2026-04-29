@@ -103,8 +103,8 @@ export function PublicStateDetailPage({
 
           <PublicPanel title="Coverage Note" headerColor="bg-[#1a237e]">
             <div className="space-y-3 p-4 text-sm leading-7 text-gray-600">
-              <p>State pages now stay in the same public shell as the homepage and category hubs.</p>
-              <p>Regional users can move from this page to item details without being dropped into a different design system.</p>
+              <p>State pages group jobs, results, admit cards, and admissions for faster regional browsing.</p>
+              <p>Open each listing to review dates, eligibility, official links, and verification notes.</p>
             </div>
           </PublicPanel>
         </div>

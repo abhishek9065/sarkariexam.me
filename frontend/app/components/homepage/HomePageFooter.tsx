@@ -182,8 +182,8 @@ export function HomePageFooter() {
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <p className="mb-6 text-[13px] leading-[1.8] text-blue-200">
-              India&apos;s most trusted platform for Sarkari Naukri alerts, Results, Admit Cards and Answer Keys —
-              covering <span className="text-white">500+ exams</span>{' '}across all departments &amp; states.
+              Sarkari Naukri alerts, results, admit cards, and answer keys for
+              <span className="text-white"> 500+ exams</span> across departments and states.
             </p>
 
             <div className="mb-6 space-y-2.5">
@@ -266,7 +266,7 @@ export function HomePageFooter() {
               </div>
               <p className="mb-0.5 text-[16px] font-extrabold tracking-[-0.02em] text-white">Get Instant Job Alerts</p>
               <p className="text-[12px] text-blue-300">
-                Daily digest — new jobs, results &amp; admit cards, straight to your inbox.
+                Daily digest with new jobs, results, and admit cards in your inbox.
               </p>
             </div>
 
@@ -313,8 +313,8 @@ export function HomePageFooter() {
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <p className="text-center text-[11px] text-blue-400 sm:text-left">
-              © 2026 <span className="text-blue-300">SarkariExams.me</span> — All rights reserved. Not affiliated with
-              any Government body.
+              © 2026 <span className="text-blue-300">SarkariExams.me</span>. All rights reserved. Not affiliated with
+              any government body.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
               {legalLinks.map((link) => (

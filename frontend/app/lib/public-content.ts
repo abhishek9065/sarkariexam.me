@@ -375,7 +375,7 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
     title: 'Government Jobs',
     eyebrow: 'Sarkari Naukri Hub',
     description:
-      'Browse fresh online forms, recruitment notices, important dates, and exam-linked updates in the same dense Sarkari Result style as the homepage.',
+      'Browse fresh online forms, recruitment notices, important dates, and exam-linked updates in one compact public portal.',
     headerColor: 'bg-[#d32f2f]',
     listingTitle: 'Latest Jobs / Online Form',
     stats: [
@@ -391,9 +391,9 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'Every row on this page now keeps the same dense portal rhythm as the homepage.',
-      'Important labels, dates, counts, and qualification notes stay visible without opening a second UI system.',
-      'Item clicks now open real detail pages instead of bouncing back to generic listings.',
+      'Every row keeps important labels, dates, counts, and qualification notes easy to scan.',
+      'Official links and verification notes stay close to each update.',
+      'Open any listing to review the full details before taking action.',
     ],
   },
   results: {
@@ -402,7 +402,7 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
     title: 'Latest Results',
     eyebrow: 'Result Updates',
     description:
-      'Track declared results, merit lists, score cards, and expected result windows in a layout that mirrors the homepage announcement grid.',
+      'Track declared results, merit lists, score cards, and expected result windows in a compact announcement list.',
     headerColor: 'bg-[#1565c0]',
     listingTitle: 'Latest Result',
     stats: [
@@ -418,9 +418,9 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'Result rows open dedicated result pages with matching UI instead of generic dashboards.',
+      'Result rows open dedicated detail pages with dates, source links, and verification notes.',
       'Declared and expected updates stay grouped in one information-dense stream.',
-      'Result detail pages preserve the same border, spacing, and hierarchy as the homepage.',
+      'Result detail pages keep roll-number, scorecard, and follow-up information easy to review.',
     ],
   },
   'admit-cards': {
@@ -429,7 +429,7 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
     title: 'Latest Admit Cards',
     eyebrow: 'Exam Entry Documents',
     description:
-      'Find city slips, hall tickets, reporting instructions, and exam-day documents in the same Sarkari-style information layout.',
+      'Find city slips, hall tickets, reporting instructions, and exam-day documents in one organized list.',
     headerColor: 'bg-[#6a1b9a]',
     listingTitle: 'Latest Admit Card',
     stats: [
@@ -445,9 +445,9 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'Admit card notices now land on consistent detail pages instead of another unrelated interface.',
+      'Admit card notices include direct official links and exam-day instructions.',
       'Urgent status, exam dates, and supporting actions stay visible above the fold.',
-      'The page keeps the Sarkari Result color and border treatment used on the homepage.',
+      'Important exam dates and supporting actions remain easy to scan.',
     ],
   },
   'answer-keys': {
@@ -456,7 +456,7 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
     title: 'Answer Keys',
     eyebrow: 'Official Response Sheets',
     description:
-      'Follow official answer keys, objection windows, response sheets, and exam-wise key updates using the same public portal layout as the homepage.',
+      'Follow official answer keys, objection windows, response sheets, and exam-wise key updates in one public portal.',
     headerColor: 'bg-[#00695c]',
     listingTitle: 'Answer Key',
     stats: [
@@ -472,9 +472,9 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'Answer key rows now support direct detail pages instead of dropping users into unrelated placeholders.',
-      'Objection timing and source information stay in the same compact layout language as the homepage.',
-      'Related exam resources remain one click away in the same shell.',
+      'Answer key rows include official source links and objection-window details.',
+      'Objection timing and source information stay visible before users open external portals.',
+      'Related exam resources remain one click away.',
     ],
   },
   admissions: {
@@ -483,7 +483,7 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
     title: 'Latest Admissions',
     eyebrow: 'Entrance + University Updates',
     description:
-      'Explore admission forms, counseling notices, and entrance registrations with the same dense government-portal presentation used on the homepage.',
+      'Explore admission forms, counseling notices, and entrance registrations in a compact government-update layout.',
     headerColor: 'bg-[#ad1457]',
     listingTitle: 'Latest Admission',
     stats: [
@@ -499,8 +499,8 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       { label: 'Important Links', href: '/important' },
     ],
     highlights: [
-      'Admission notices now keep the homepage visual hierarchy after click-through.',
-      'Users stay inside one public shell across forms, counseling updates, and detail pages.',
+      'Admission notices keep important dates, fees, and official links visible.',
+      'Users can move between forms, counseling updates, and detail pages without losing context.',
       'University and exam actions stay grouped with clear next steps and quick navigation.',
     ],
   },
@@ -513,7 +513,7 @@ export const resourceCategoryMeta: Record<ResourceCategorySlug, ResourceCategory
     title: 'Syllabus',
     eyebrow: 'Exam Pattern + Topics',
     description:
-      'Review syllabus outlines, exam pattern snapshots, and prep-entry points without leaving the public homepage design system.',
+      'Review syllabus outlines, exam pattern snapshots, and preparation links in one place.',
     headerColor: 'bg-[#5d4037]',
     listingTitle: 'Syllabus Desk',
     stats: [
@@ -529,9 +529,9 @@ export const resourceCategoryMeta: Record<ResourceCategorySlug, ResourceCategory
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'This page keeps the homepage typography, borders, and dense link-first layout.',
-      'Users can jump from syllabus to jobs, answer keys, or admissions without a shell switch.',
-      'Featured resources stay surfaced in short, scannable cards instead of generic placeholders.',
+      'Syllabus resources are grouped into short, scannable cards.',
+      'Users can jump from syllabus to jobs, answer keys, or admissions quickly.',
+      'Featured resources highlight patterns, topics, and next actions.',
     ],
     resourceCards: [
       {
@@ -562,7 +562,7 @@ export const resourceCategoryMeta: Record<ResourceCategorySlug, ResourceCategory
     title: 'Board Results',
     eyebrow: 'Board Exam Updates',
     description:
-      'Track board score cards, mark sheets, topper releases, and board-level notices with the same Sarkari portal look and spacing.',
+      'Track board score cards, mark sheets, topper releases, and board-level notices in one organized hub.',
     headerColor: 'bg-[#283593]',
     listingTitle: 'Board Result Desk',
     stats: [
@@ -578,7 +578,7 @@ export const resourceCategoryMeta: Record<ResourceCategorySlug, ResourceCategory
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'Board-result visitors stay on the same public shell instead of hitting a generic category fallback.',
+      'Board-result visitors can move directly to result links, notices, and related student resources.',
       'Top notices and action links remain dense and easy to scan on desktop and mobile.',
       'The page keeps direct links into results, admissions, and scholarship flows.',
     ],
@@ -611,7 +611,7 @@ export const resourceCategoryMeta: Record<ResourceCategorySlug, ResourceCategory
     title: 'Scholarship',
     eyebrow: 'Funding + Renewal Forms',
     description:
-      'Follow scholarship openings, renewal windows, payment status reminders, and document requirements in the homepage portal style.',
+      'Follow scholarship openings, renewal windows, payment status reminders, and document requirements.',
     headerColor: 'bg-[#ef6c00]',
     listingTitle: 'Scholarship Desk',
     stats: [
@@ -627,9 +627,9 @@ export const resourceCategoryMeta: Record<ResourceCategorySlug, ResourceCategory
       { label: 'Homepage', href: '/' },
     ],
     highlights: [
-      'Scholarship and admission flows now feel like one product instead of separate page systems.',
+      'Scholarship and admission links are grouped together for student workflows.',
       'Important schemes stay grouped with direct next actions and related student resources.',
-      'The page preserves dense public-service styling instead of reverting to generic cards.',
+      'The page keeps schemes, deadlines, and support links easy to scan.',
     ],
     resourceCards: [
       {
@@ -663,7 +663,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
     title: 'Bookmarks',
     eyebrow: 'Saved Public Items',
     description:
-      'Keep the same Sarkari Result browsing rhythm while revisiting saved jobs, results, admissions, or resource pages.',
+      'Revisit saved jobs, results, admissions, and resource pages quickly.',
     headerColor: 'bg-[#37474f]',
     stats: [
       { label: 'Saved Groups', value: 'Jobs + Results' },
@@ -681,7 +681,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
       {
         title: 'How Bookmarks Work',
         body: [
-          'Saved public pages should feel like a continuation of homepage browsing, not a different app shell.',
+          'Saved public pages help you return to important jobs, results, and notices quickly.',
           'This screen is positioned as a lightweight portal page where users can jump back into jobs, results, and notices quickly.',
         ],
       },
@@ -700,7 +700,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
     title: 'Profile',
     eyebrow: 'Reader Preferences',
     description:
-      'Manage alert preferences, saved sections, and public reading shortcuts in the same public shell as the homepage.',
+      'Manage alert preferences, saved sections, and public reading shortcuts.',
     headerColor: 'bg-[#455a64]',
     stats: [
       { label: 'Saved Sections', value: 'Flexible' },
@@ -737,7 +737,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
     title: 'About SarkariExams.me',
     eyebrow: 'Platform Overview',
     description:
-      'Explain the platform, update process, and public-information approach using the same homepage-driven portal styling.',
+      'Learn about the platform, update process, and public-information approach.',
     headerColor: 'bg-[#1a237e]',
     stats: [
       { label: 'Public Focus', value: 'Govt Updates' },
@@ -763,7 +763,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
         title: 'Editorial Direction',
         body: [
           'The page structure favors scan-first reading, compact cards, visible dates, and direct category pivots.',
-          'Users should feel the same visual hierarchy on supporting pages as they do on the homepage.',
+          'Supporting pages keep navigation clear so users can return to important updates quickly.',
         ],
       },
     ],
@@ -793,7 +793,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
         title: 'Editorial Contact',
         body: [
           'Use this page for corrections, update requests, and public-content issues that affect live announcements or resource links.',
-          'The page keeps the homepage shell so users can keep browsing after sending or reading support information.',
+          'Users can keep browsing public updates after sending or reading support information.',
         ],
       },
       {
@@ -811,7 +811,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
     title: 'Privacy Policy',
     eyebrow: 'Data Handling',
     description:
-      'Explain data use, cookies, and communication preferences in the same public-shell UI users see on the homepage.',
+      'Understand data use, cookies, and communication preferences.',
     headerColor: 'bg-[#4e342e]',
     stats: [
       { label: 'Cookies', value: 'Limited Use' },
@@ -885,7 +885,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
     title: 'Advertise',
     eyebrow: 'Campaign Placement',
     description:
-      'Explain sponsorship and campaign options in the same public-site shell users already trust from the homepage.',
+      'Review sponsorship and campaign options for public-information placements.',
     headerColor: 'bg-[#bf360c]',
     stats: [
       { label: 'Audience', value: 'Exam + Job Seekers' },
@@ -910,7 +910,7 @@ export const infoPageMeta: Record<InfoPageSlug, InfoPageMeta> = {
       {
         title: 'Placement Context',
         body: [
-          'Sections such as jobs, results, admissions, and scholarships are high-intent areas for visible public placements.',
+          'Sections such as jobs, results, admissions, and scholarships are priority areas for visible public placements.',
           'The information architecture should explain placement context without switching to a different app design language.',
         ],
       },
@@ -925,7 +925,7 @@ export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
     title: 'Certificates & Verification',
     eyebrow: 'Document Support Desk',
     description:
-      'Find certificate-linked services, verification help, and document support links without dropping out of the public homepage shell.',
+      'Find certificate-linked services, verification help, and document support links.',
     headerColor: 'bg-[#455a64]',
     stats: [
       { label: 'Support Type', value: 'Documents' },
@@ -943,7 +943,7 @@ export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
       {
         label: 'Board Result Access',
         href: '/board-results',
-        description: 'Result desks, mark sheet checkpoints, and official board result references.',
+        description: 'Result links, mark sheet checkpoints, and official board result references.',
       },
       {
         label: 'Admissions Support',
@@ -965,7 +965,7 @@ export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
       {
         title: 'How To Use This Page',
         body: [
-          'This page exists so certificate-related calls to action do not land on a fake 200 page or a generic placeholder shell.',
+          'Use this page to reach certificate-related actions, verification notes, and support links.',
           'Readers should be able to move from certificate support into board results, admissions, or official portals without losing the Sarkari-style browsing context.',
         ],
       },
@@ -984,7 +984,7 @@ export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
     title: 'Important Links',
     eyebrow: 'Official Portals',
     description:
-      'A dedicated important-links desk for official websites, high-intent public routes, and commonly used follow-up actions.',
+      'A dedicated important-links page for official websites, public routes, and commonly used follow-up actions.',
     headerColor: 'bg-[#37474f]',
     stats: [
       { label: 'Portal Type', value: 'Official + Public' },
@@ -1025,7 +1025,7 @@ export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
         title: 'Why This Page Exists',
         body: [
           'The old important-links destination should resolve to a real public page, not a fake success response or a dead anchor target.',
-          'This desk keeps official-site pivots, public support pages, and category routes inside one consistent UX.',
+          'This page groups official websites, support pages, and category routes in one place.',
         ],
       },
       {
@@ -1043,7 +1043,7 @@ export const auxiliaryPageMeta: Record<AuxiliaryPageSlug, AuxiliaryPageMeta> = {
     title: 'App Download',
     eyebrow: 'Mobile Access',
     description:
-      'Provide a real app/download destination with the same public shell, even when a direct store link is not configured yet.',
+      'Use the web app, community links, and update pages until a direct store link is available.',
     headerColor: 'bg-[#283593]',
     stats: [
       { label: 'Primary Surface', value: 'Web First' },
@@ -1186,8 +1186,8 @@ export const communityPageMeta: Record<CommunityChannel, CommunityPageMeta> = {
       {
         title: 'Social Access',
         body: [
-          'Footer social links should never point to placeholder anchors.',
-          'When no external profile is configured, this page acts as the safe public fallback instead of sending users to nowhere.',
+          'Footer social links should point to active public community pages.',
+          'When no external profile is configured, this page provides the current public community link.',
         ],
       },
     ],
@@ -1218,7 +1218,7 @@ export const communityPageMeta: Record<CommunityChannel, CommunityPageMeta> = {
         title: 'Video Access',
         body: [
           'When a YouTube destination is configured, this route should redirect outward.',
-          'Until then, users still need a real public landing page rather than a placeholder footer link.',
+          'Until then, users can use this public landing page for current updates and contact routes.',
         ],
       },
     ],
@@ -1342,7 +1342,7 @@ export function getCategoryMetaBySlug(slug: string) {
       title: 'State Wise Jobs',
       eyebrow: 'Regional Public Updates',
       description:
-        'Open state-focused job, result, and admit-card streams without leaving the homepage shell or dense Sarkari portal layout.',
+        'Open state-focused job, result, and admit-card streams from one organized state directory.',
       headerColor: 'bg-[#4e342e]',
       listingTitle: 'State Directory',
       stats: [
@@ -1358,7 +1358,7 @@ export function getCategoryMetaBySlug(slug: string) {
         { label: 'Admissions', href: '/admissions' },
       ],
       highlights: [
-        'State pages now keep the same public shell and portal density as the homepage.',
+        'State pages group regional jobs, results, admit cards, and admissions for faster browsing.',
         'Users can move from state pages into job, result, and admit-card details without a design jump.',
         'Regional pages stay connected to national category pages through shared quick links.',
       ],

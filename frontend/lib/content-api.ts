@@ -592,13 +592,13 @@ export function mapDetailToAnnouncementItem(detail: BackendPublicDetail): Announ
       },
       summaryMeta: {
         ageLimit: detail.post.eligibility.find((item) => /age/i.test(item.label))?.description,
-        applicationStartDate: safeDateLabel(detail.post.applicationStartDate) || 'Check notice',
-        examDate: safeDateLabel(detail.post.examDate) || safeDateLabel(detail.post.resultDate) || 'Check notice',
-        lastDate: safeDateLabel(detail.post.lastDate) || 'Check notice',
+        applicationStartDate: safeDateLabel(detail.post.applicationStartDate) || 'Check official notice',
+        examDate: safeDateLabel(detail.post.examDate) || safeDateLabel(detail.post.resultDate) || 'Check official notice',
+        lastDate: safeDateLabel(detail.post.lastDate) || 'Check official notice',
         location: detail.post.location || 'India',
         orgShort: detail.card.org,
         publishedDate: safeDateLabel(detail.post.publishedAt) || detail.card.date || 'Recent',
-        salary: detail.post.salary || 'Refer official notification',
+        salary: detail.post.salary || 'Refer to the official notification',
       },
       theme,
       vacancyTable: detail.post.vacancyRows.length
@@ -742,7 +742,7 @@ export function buildOrganizationMeta(name: string): CategoryPageMeta {
     headerColor: 'bg-[#37474f]',
     highlights: [
       'Organization pages group updates from one recruiting body or institution.',
-      'Each listing and detail page preserves canonical public paths and dense browsing.',
+      'Each listing and detail page keeps official links, dates, and verification notes easy to review.',
       'Official links and verification notes remain visible on detail pages.',
     ],
     listingTitle: `Latest ${name} Updates`,

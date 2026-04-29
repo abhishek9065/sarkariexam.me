@@ -109,10 +109,10 @@ const sectionVisualTheme: Record<AnnouncementItem['section'], SectionVisualTheme
 };
 
 const tagConfig = {
-  hot: { className: 'border-red-400 bg-red-500 text-white', label: '🔥 HOT' },
+  hot: { className: 'border-red-400 bg-red-500 text-white', label: 'HOT' },
   new: { className: 'border-emerald-400 bg-emerald-500 text-white', label: 'NEW' },
   update: { className: 'border-blue-400 bg-blue-500 text-white', label: 'UPDATE' },
-  'last-date': { className: 'border-amber-400 bg-amber-500 text-white', label: '⏰ LAST DATE' },
+  'last-date': { className: 'border-amber-400 bg-amber-500 text-white', label: 'LAST DATE' },
 } as const;
 
 const sectionCategoryLabel: Record<AnnouncementItem['section'], string> = {
@@ -121,6 +121,65 @@ const sectionCategoryLabel: Record<AnnouncementItem['section'], string> = {
   'admit-cards': 'Latest Admit Card',
   'answer-keys': 'Answer Key',
   admissions: 'Latest Admission',
+};
+
+const shortInfoText: Record<
+  AnnouncementItem['section'],
+  {
+    countLabel: string;
+    locationLabel: string;
+    primaryLabel: string;
+    salaryLabel: string;
+    startDateLabel: string;
+    statLabel: string;
+    feeLabel: string;
+  }
+> = {
+  jobs: {
+    primaryLabel: 'Post Name:',
+    countLabel: 'Total Vacancy:',
+    salaryLabel: 'Salary / Pay Scale:',
+    startDateLabel: 'Application Begin:',
+    feeLabel: 'Application Fee:',
+    locationLabel: 'Job Location:',
+    statLabel: 'VACANCIES',
+  },
+  results: {
+    primaryLabel: 'Result Name:',
+    countLabel: 'Update Type:',
+    salaryLabel: 'Official Note:',
+    startDateLabel: 'Result Date:',
+    feeLabel: 'Fee / Charge:',
+    locationLabel: 'Region:',
+    statLabel: 'UPDATE',
+  },
+  'admit-cards': {
+    primaryLabel: 'Admit Card:',
+    countLabel: 'Update Type:',
+    salaryLabel: 'Instructions:',
+    startDateLabel: 'Release Date:',
+    feeLabel: 'Fee / Charge:',
+    locationLabel: 'Exam Location:',
+    statLabel: 'DOCUMENT',
+  },
+  'answer-keys': {
+    primaryLabel: 'Answer Key:',
+    countLabel: 'Update Type:',
+    salaryLabel: 'Objection Note:',
+    startDateLabel: 'Release Date:',
+    feeLabel: 'Fee / Charge:',
+    locationLabel: 'Exam Location:',
+    statLabel: 'DOCUMENT',
+  },
+  admissions: {
+    primaryLabel: 'Admission Form:',
+    countLabel: 'Seats / Programs:',
+    salaryLabel: 'Course / Fee Note:',
+    startDateLabel: 'Application Begin:',
+    feeLabel: 'Application Fee:',
+    locationLabel: 'Institute / Location:',
+    statLabel: 'SEATS',
+  },
 };
 
 function SmartLink({
@@ -167,6 +226,16 @@ function createInteractiveQa(qa: DetailQaQuestion[]): InteractiveQaQuestion[] {
 
 function getShortInfoTitle(item: AnnouncementItem) {
   return item.title.split(' — ')[0].split(' - ')[0].trim();
+}
+
+function formatPostCountLabel(value?: string | number) {
+  if (value === undefined || value === null) return undefined;
+  const text = String(value).trim();
+  if (!text) return undefined;
+  if (/\bposts?$/i.test(text)) return text;
+  const numericValue = Number(text.replace(/,/g, ''));
+  const suffix = numericValue === 1 ? 'Post' : 'Posts';
+  return `${text} ${suffix}`;
 }
 
 function buildFallbackRelatedPosts(meta: CategoryPageMeta, relatedEntries: PortalListEntry[]): DetailRelatedPost[] {
@@ -260,18 +329,20 @@ function PublicAnnouncementDetailPageInner({
   const relatedPosts = detail.relatedPosts.length ? detail.relatedPosts : buildFallbackRelatedPosts(meta, relatedEntries);
   const faqItems = buildDetailFaqItems(item);
   const categoryLabel = sectionCategoryLabel[item.section];
+  const copy = shortInfoText[item.section];
+  const postCountLabel = formatPostCountLabel(item.postCount);
   const shortInfoTitle = getShortInfoTitle(item);
   const shortInfoRowsLeft = [
-    { label: 'Post Name:', value: shortInfoTitle, tone: 'default' as const, weight: 'font-bold' },
+    { label: copy.primaryLabel, value: shortInfoTitle, tone: 'default' as const, weight: 'font-bold' },
     { label: 'Organization:', value: item.org, tone: 'default' as const, weight: 'font-semibold' },
-    { label: 'Total Vacancy:', value: item.postCount ?? 'Refer notice', tone: 'accent' as const, weight: 'font-bold' },
-    { label: 'Salary / Pay Scale:', value: detail.summaryMeta.salary, tone: 'default' as const, weight: 'font-semibold' },
+    { label: copy.countLabel, value: postCountLabel ?? categoryLabel, tone: 'accent' as const, weight: 'font-bold' },
+    { label: copy.salaryLabel, value: detail.summaryMeta.salary, tone: 'default' as const, weight: 'font-semibold' },
   ];
   const shortInfoRowsRight = [
-    { label: 'Application Begin:', value: detail.summaryMeta.applicationStartDate },
+    { label: copy.startDateLabel, value: detail.summaryMeta.applicationStartDate },
     { label: 'Last Date:', value: detail.summaryMeta.lastDate },
-    { label: 'Application Fee (Gen):', value: detail.applicationFee?.rows[0]?.value ?? 'Refer notice' },
-    { label: 'Job Location:', value: detail.summaryMeta.location },
+    { label: copy.feeLabel, value: detail.applicationFee?.rows[0]?.value ?? 'Check official notice' },
+    { label: copy.locationLabel, value: detail.summaryMeta.location },
   ];
   const visibleVacancyRows = showAllVacancies ? detail.vacancyTable?.rows ?? [] : (detail.vacancyTable?.rows ?? []).slice(0, 5);
   const navSections: NavSection[] = [
@@ -602,7 +673,7 @@ function PublicAnnouncementDetailPageInner({
                 {item.postCount ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80 backdrop-blur-sm">
                     <Users size={11} className="text-white/60" />
-                    {item.postCount} Posts
+                    {postCountLabel}
                   </span>
                 ) : null}
               </div>
@@ -653,10 +724,10 @@ function PublicAnnouncementDetailPageInner({
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: 'POSTS', value: item.postCount ?? 'N/A', icon: Users, tone: 'text-[#a855f7]' },
+              { label: copy.statLabel, value: postCountLabel ?? categoryLabel, icon: Users, tone: 'text-[#a855f7]' },
               { label: 'LAST DATE', value: detail.summaryMeta.lastDate, icon: Clock, tone: 'text-[#ef4444]' },
-              { label: 'SALARY', value: detail.summaryMeta.salary.split(' — ')[0], icon: IndianRupee, tone: 'text-[#16a34a]' },
-              { label: 'QUALIFICATION', value: item.qualification ?? 'Refer notice', icon: GraduationCap, tone: 'text-[#2563eb]' },
+              { label: item.section === 'jobs' ? 'SALARY' : 'NOTE', value: detail.summaryMeta.salary.split(' — ')[0], icon: IndianRupee, tone: 'text-[#16a34a]' },
+              { label: 'QUALIFICATION', value: item.qualification ?? 'Check official notice', icon: GraduationCap, tone: 'text-[#2563eb]' },
             ].map((stat) => {
               const Icon = stat.icon;
 
@@ -760,15 +831,15 @@ function PublicAnnouncementDetailPageInner({
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#e65100]/20" style={{ background: 'linear-gradient(135deg, rgba(230,81,0,0.13), rgba(230,81,0,0.07))' }}>
                     <FileText size={15} className="text-[#e65100]" />
                   </div>
-                  <h2 className="text-[13px] font-bold text-gray-800">About This Post</h2>
+                  <h2 className="text-[13px] font-bold text-gray-800">About This Update</h2>
                 </div>
                 <div className="p-5">
                   <p className="text-[13px] leading-[1.85] text-gray-600">{item.summary}</p>
                   <div className="mt-5 grid grid-cols-2 gap-3">
                     {[
-                      { label: 'QUALIFICATION', value: item.qualification ?? 'Refer notice', icon: GraduationCap, tone: 'bg-blue-50 border-blue-100 text-blue-600' },
-                      { label: 'AGE LIMIT', value: detail.summaryMeta.ageLimit ?? detail.ageLimit?.summary ?? 'Refer notice', icon: Users, tone: 'bg-purple-50 border-purple-100 text-purple-600' },
-                      { label: 'SALARY RANGE', value: detail.summaryMeta.salary, icon: IndianRupee, tone: 'bg-green-50 border-green-100 text-green-600' },
+                      { label: 'QUALIFICATION', value: item.qualification ?? 'Check official notice', icon: GraduationCap, tone: 'bg-blue-50 border-blue-100 text-blue-600' },
+                      { label: item.section === 'jobs' ? 'AGE LIMIT' : 'ELIGIBILITY', value: detail.summaryMeta.ageLimit ?? detail.ageLimit?.summary ?? 'Check official notice', icon: Users, tone: 'bg-purple-50 border-purple-100 text-purple-600' },
+                      { label: item.section === 'jobs' ? 'SALARY RANGE' : 'OFFICIAL NOTE', value: detail.summaryMeta.salary, icon: IndianRupee, tone: 'bg-green-50 border-green-100 text-green-600' },
                       { label: 'LAST DATE', value: detail.summaryMeta.lastDate, icon: Clock, tone: 'bg-red-50 border-red-100 text-red-600' },
                     ].map((card) => {
                       const Icon = card.icon;
@@ -867,7 +938,7 @@ function PublicAnnouncementDetailPageInner({
                       </div>
                       <div>
                         <h2 className="text-[13px] font-bold uppercase tracking-[0.04em] text-gray-800">VACANCY BREAKDOWN</h2>
-                        <p className="mt-0.5 text-[10px] text-gray-400">Total: {item.postCount ?? detail.vacancyTable.rows.length} Posts</p>
+                        <p className="mt-0.5 text-[10px] text-gray-400">Total: {postCountLabel ?? formatPostCountLabel(detail.vacancyTable.rows.length)}</p>
                       </div>
                     </div>
                   </div>
@@ -889,7 +960,7 @@ function PublicAnnouncementDetailPageInner({
                             <td className="px-4 py-3 text-[12px] font-semibold text-gray-800">{row.post}</td>
                             <td className="px-4 py-3 text-[12px] text-gray-700">{row.department}</td>
                             <td className="px-4 py-3 text-[12px] font-bold text-gray-800">{row.vacancies}</td>
-                            <td className="px-4 py-3 text-[12px] text-gray-700">{row.payLevel ?? 'Refer notice'}</td>
+                            <td className="px-4 py-3 text-[12px] text-gray-700">{row.payLevel ?? 'Check official notice'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -902,7 +973,7 @@ function PublicAnnouncementDetailPageInner({
                         onClick={() => setShowAllVacancies((current) => !current)}
                         className="text-[12px] font-semibold text-[#e65100] transition-colors hover:text-[#bf360c]"
                       >
-                        {showAllVacancies ? 'Show Fewer Posts' : `View All ${detail.vacancyTable.rows.length} Posts`}
+                        {showAllVacancies ? 'Show Fewer Posts' : `View All ${formatPostCountLabel(detail.vacancyTable.rows.length)}`}
                       </button>
                     </div>
                   ) : null}
@@ -975,7 +1046,7 @@ function PublicAnnouncementDetailPageInner({
                           style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 3px 12px rgba(22,163,74,0.28)', letterSpacing: '0.3px' }}
                         >
                           <ArrowUpRight size={11} />
-                          Click Here
+                          Open Link
                         </SmartLink>
                       </div>
                     ))}
@@ -1381,7 +1452,7 @@ function PublicAnnouncementDetailPageInner({
                   ))}
                 </div>
                 <div className="border-t border-gray-100 px-4 py-2.5" style={{ background: '#fafafa' }}>
-                  <p className="text-[10px] text-gray-400">* All dates are tentative and subject to change by the authority.</p>
+                  <p className="text-[10px] text-gray-400">Dates may change. Confirm the latest schedule on the official portal.</p>
                 </div>
               </div>
             ) : null}
@@ -1416,8 +1487,12 @@ function PublicAnnouncementDetailPageInner({
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400">
                         <Users size={10} />
-                        <span>{post.posts} Posts</span>
-                        <span>·</span>
+                        {post.posts ? (
+                          <>
+                            <span>{formatPostCountLabel(post.posts)}</span>
+                            <span>·</span>
+                          </>
+                        ) : null}
                         <span>{post.date}</span>
                         <span>·</span>
                         <span>{post.category}</span>
@@ -1435,7 +1510,7 @@ function PublicAnnouncementDetailPageInner({
                 </div>
                 <div>
                   <div className="text-[13px] font-bold text-gray-800">Get Job Alerts</div>
-                  <div className="text-[10px] text-gray-400">Instant notification to your inbox</div>
+                  <div className="text-[10px] text-gray-400">Instant notifications in your inbox</div>
                 </div>
               </div>
               <p className="mb-3 text-[11px] leading-[1.6] text-gray-500">

@@ -5,18 +5,70 @@ export interface DetailFaqItem {
   question: string;
 }
 
+const sectionActionCopy: Record<AnnouncementItem['section'], { answer: string; question: string }> = {
+  jobs: {
+    question: 'How do I apply or use the official link?',
+    answer:
+      'Open the official link on this page, read the notification carefully, complete the form with your registration details, and keep a copy of the final submission or receipt.',
+  },
+  results: {
+    question: 'How do I check the result?',
+    answer:
+      'Open the official result link on this page, enter the required roll number or registration details if asked, and save the result PDF or scorecard for later reference.',
+  },
+  'admit-cards': {
+    question: 'How do I download the admit card?',
+    answer:
+      'Open the official admit card link, log in with your registration details, download the PDF, and keep a printed copy for the relevant exam or document-verification stage.',
+  },
+  'answer-keys': {
+    question: 'How do I check the answer key?',
+    answer:
+      'Open the official answer key link, select the relevant exam or paper, and compare the published answers with your response sheet before the objection deadline.',
+  },
+  admissions: {
+    question: 'How do I complete the admission form?',
+    answer:
+      'Open the official admission link, read the prospectus or notice, complete the form with accurate academic details, and keep a copy of the confirmation page.',
+  },
+};
+
+function buildLastDateAnswer(item: AnnouncementItem) {
+  const lastDate = item.detail.summaryMeta.lastDate;
+  if (!lastDate || lastDate === 'Check notice' || lastDate === 'Check official notice') {
+    return 'The deadline is not available in this summary. Verify the current deadline from the official notification before taking action.';
+  }
+  return `The currently tracked last date is ${lastDate}. Verify the final deadline from the official notification before taking action.`;
+}
+
+function buildProcessAnswer(item: AnnouncementItem) {
+  const stages = item.detail.selectionProcess?.filter(Boolean) ?? [];
+  if (stages.length > 0) {
+    return `The selection or next-step process for this update includes: ${stages.join(' -> ')}.`;
+  }
+  return 'Refer to the official notification for the complete stage-wise process, document requirements, and final instructions.';
+}
+
+function buildFeeAnswer(item: AnnouncementItem) {
+  const rows = item.detail.applicationFee?.rows ?? [];
+  if (rows.length > 0) {
+    return `${rows.map((row) => `${row.label}: ${row.value}`).join(', ')}.`;
+  }
+  return 'Refer to the official notification for the category-wise fee, payment mode, and any exemption rules.';
+}
+
 export function buildDetailFaqItems(item: AnnouncementItem): DetailFaqItem[] {
   if (item.slug === 'upsc-civil-services-2025-final-result') {
     return [
       {
-        question: 'What is the last date to apply for Union Public Service Commission?',
+        question: 'What is the current status of the UPSC Civil Services 2025 update?',
         answer:
-          'The last date to apply is N/A. We strongly recommend applying at least 2-3 days before the deadline to avoid last-minute server congestion issues.',
+          'This page tracks the UPSC Civil Services 2025 final result update. Use the official UPSC source link on the page for roll numbers, marks, and follow-up notices.',
       },
       {
-        question: 'How to download the admit card?',
+        question: 'How do I check the UPSC Civil Services 2025 final result?',
         answer:
-          'Visit the official website, login with your registration number and date of birth, navigate to the Admit Card section, and download the PDF. Keep a print-out for the exam day.',
+          'Visit the official UPSC result link, open the final result notice or PDF, search your roll number carefully, and save a copy for document verification or future reference.',
       },
       {
         question: 'What is the selection process?',
@@ -26,41 +78,37 @@ export function buildDetailFaqItems(item: AnnouncementItem): DetailFaqItem[] {
       {
         question: 'What is the application fee?',
         answer:
-          'General/OBC: Rs. 100, SC/ST: Rs. 0, Female (All Category): Rs. 0, Ex-Servicemen: Rs. 0. Fee is paid online via debit/credit card or net banking.',
+          'For the original application, General/OBC candidates paid Rs. 100, while SC/ST, female candidates, and ex-servicemen were exempt. Always verify fee details from the official notice.',
       },
       {
-        question: 'Is there negative marking?',
+        question: 'Where can I verify exam rules such as negative marking?',
         answer:
-          'Yes, for objective type papers there is a deduction of 0.25 marks for each wrong answer. Unattempted questions carry no penalty.',
+          'Check the official UPSC exam rules and question-paper instructions. Marking rules can vary by paper, so the official notice is the final source.',
       },
     ];
   }
 
   return [
     {
-      question: `What is the last date for ${item.org}?`,
-      answer: `The currently tracked last date is ${item.detail.summaryMeta.lastDate}. Verify the final deadline from the official notification before taking action.`,
+      question: 'What is the last date for this update?',
+      answer: buildLastDateAnswer(item),
     },
     {
-      question: 'How to download the admit card?',
-      answer:
-        'Visit the official website, sign in with your registration details, open the admit card or document section, and download the PDF. Keep a printed copy for the relevant stage.',
+      question: sectionActionCopy[item.section].question,
+      answer: sectionActionCopy[item.section].answer,
     },
     {
-      question: 'What is the selection process?',
-      answer: `The selection process for this update includes the following stages: ${item.detail.selectionProcess?.join(' -> ') ?? 'Refer official notification for the complete stage-wise process.'}`,
+      question: 'What is the selection or next-step process?',
+      answer: buildProcessAnswer(item),
     },
     {
       question: 'What is the application fee?',
-      answer:
-        item.detail.applicationFee?.rows.length
-          ? `${item.detail.applicationFee.rows.map((row) => `${row.label}: ${row.value}`).join(', ')}.`
-          : 'Refer the official notification for the category-wise application fee and payment mode.',
+      answer: buildFeeAnswer(item),
     },
     {
-      question: 'Is there negative marking?',
+      question: 'Where can I verify exam rules such as negative marking?',
       answer:
-        'Check the exam scheme in the official notification. Negative marking varies by authority and paper, so use the official exam instructions as the final source.',
+        'Check the exam scheme in the official notification. Negative marking and evaluation rules vary by authority and paper, so use the official instructions as the final source.',
     },
   ];
 }
