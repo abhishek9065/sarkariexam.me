@@ -12,13 +12,22 @@ interface SubscribeToAlertsInput {
 }
 
 export async function subscribeToAlerts(input: SubscribeToAlertsInput) {
-  const response = await fetch(`${resolvePublicApiBase()}/subscriptions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${resolvePublicApiBase()}/subscriptions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    return {
+      data: { verified: false },
+      message: 'Preview mode: alert API is not connected yet.',
+    };
+  }
 
   const body = await response.json().catch(() => null);
   if (!response.ok) {

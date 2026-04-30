@@ -49,9 +49,11 @@ export function useCurrentUser() {
         setUser(null);
         setError(null); // Not logged in is not an error
       }
-    } catch (err) {
-      console.error('Failed to fetch user:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch user');
+    } catch {
+      // Treat an unreachable auth API like a logged-out session. This check runs
+      // in the background on every public page, and local dev often has the
+      // frontend running without the backend.
+      setError(null);
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -93,7 +95,6 @@ export function useCurrentUser() {
       setUser(null);
       setError(null);
     } catch (err) {
-      console.error('Failed to logout:', err);
       setError(err instanceof Error ? err.message : 'Failed to logout');
     }
   };

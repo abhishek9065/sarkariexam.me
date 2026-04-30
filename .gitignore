@@ -23,6 +23,7 @@ admin-next/out/
 *.log
 npm-debug.log*
 backend/test-output*.txt
+.codex-logs/
 
 # OS
 .DS_Store
