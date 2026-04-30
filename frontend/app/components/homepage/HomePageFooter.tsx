@@ -159,7 +159,7 @@ export function HomePageFooter() {
               <GraduationCap size={16} className="text-yellow-300" />
             </div>
             <span className="text-[15px] font-extrabold tracking-[-0.02em] text-white">
-              SarkariExams<span className="text-yellow-300">.me</span>
+              SarkariExam<span className="text-yellow-300">.me</span>
             </span>
           </div>
           <div className="flex items-center gap-6 sm:gap-10">
@@ -188,7 +188,7 @@ export function HomePageFooter() {
 
             <div className="mb-6 space-y-2.5">
               {[
-                { icon: Mail, text: 'info@sarkariexams.me' },
+                { icon: Mail, text: 'info@sarkariexam.me' },
                 { icon: Phone, text: '+91 98765 43210' },
                 { icon: MapPin, text: 'New Delhi, India' },
               ].map(({ icon: Icon, text }) => (
@@ -313,7 +313,7 @@ export function HomePageFooter() {
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
             <p className="text-center text-[11px] text-blue-400 sm:text-left">
-              © 2026 <span className="text-blue-300">SarkariExams.me</span>. All rights reserved. Not affiliated with
+              © 2026 <span className="text-blue-300">SarkariExam.me</span>. All rights reserved. Not affiliated with
               any government body.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">

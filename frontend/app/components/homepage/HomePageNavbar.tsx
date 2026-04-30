@@ -175,7 +175,7 @@ export function HomePageNavbar() {
                       WebkitTextFillColor: 'transparent',
                     }}
                   >
-                    Exams
+                    Exam
                   </span>
                   <span
                     className="text-[14px] font-medium md:text-[16px]"

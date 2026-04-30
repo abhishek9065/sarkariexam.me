@@ -42,7 +42,7 @@ export function HomePageHero() {
 
               <div className="mx-auto max-w-2xl text-center lg:mx-0 lg:max-w-none lg:text-left">
                 <h1 className="text-[24px] font-black tracking-[-0.03em] text-gray-950 sm:text-[30px] lg:text-[34px]">
-                  SarkariExams<span className="text-[#e65100]">.me</span> for Sarkari Results, Online Forms, Admit Cards &amp; Alerts
+                  SarkariExam<span className="text-[#e65100]">.me</span> for Sarkari Results, Online Forms, Admit Cards &amp; Alerts
                 </h1>
                 <p className="mt-2 text-[13px] leading-7 text-gray-600 sm:text-[14px]">
                   One place for verified exam updates, deadline reminders, result notices and official links. Search the

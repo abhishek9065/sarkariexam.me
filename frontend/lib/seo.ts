@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 const siteUrl = "https://sarkariexams.me";
 
 export const siteConfig = {
-  name: "SarkariExams.me",
+  name: "SarkariExam.me",
   description: "Trusted government jobs and exam update platform for latest jobs, results, admit cards, answer keys, syllabus, admissions, scholarships, and official notices.",
   url: siteUrl,
   ogImage: `${siteUrl}/opengraph-image`,
@@ -43,11 +43,11 @@ export const defaultMetadata: Metadata = {
   ],
   authors: [
     {
-      name: "SarkariExams",
+      name: "SarkariExam",
       url: siteConfig.url,
     },
   ],
-  creator: "SarkariExams",
+  creator: "SarkariExam",
   openGraph: {
     type: "website",
     locale: "en_IN",
