@@ -10,12 +10,6 @@ This repository uses a strict deployment model for production delivery to a Digi
 4. Runner uploads and executes `scripts/deploy-live.sh` on droplet.
 5. Droplet validates target SHA, checks out that SHA, and executes `scripts/deploy-fast.sh` (or full mode if requested).
 
-## Staging/Environment Readiness Path
-
-- `Deploy Preflight` workflow (`workflow_dispatch`) runs remote preflight checks without restarting services.
-- It supports GitHub environment selection (`staging` or `production`) so `DO_*` values stay environment-scoped.
-- It is the preferred path for validating new environment wiring, host key rotations, and root `.env` changes before live deploy.
-
 ## Required GitHub Configuration
 
 ### Secrets
@@ -42,10 +36,9 @@ This repository uses a strict deployment model for production delivery to a Digi
 
 - Deployment refuses to run without explicit `DO_REPO_DIR`.
 - Deployment refuses to run if host key fingerprint does not match.
-- Deployment requires `DO_HOST_FINGERPRINT`; trust-on-first-use is not allowed.
 - Deployment refuses non-40-character SHAs.
 - Deployment refuses SHAs not reachable from `origin/main`.
-- Deployment auto-restores allowlisted tracked drift (`backend/package-lock.json` by default) before preflight; any other tracked local modification still aborts deploy.
+- Deployment refuses to proceed when remote working tree has tracked local modifications.
 
 ## Root .env Requirements
 
@@ -53,23 +46,9 @@ Minimum required values:
 
 - `JWT_SECRET`
 - `POSTGRES_PRISMA_URL` or `DATABASE_URL`
-
-Conditionally required values:
-
-- `COSMOS_CONNECTION_STRING` or `MONGODB_URI` only when `LEGACY_MONGO_REQUIRED=true`
-- `COSMOS_DATABASE_NAME` only when legacy bridge variables are configured
+- `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
 
 Optional but recommended values are logged when missing.
-
-## Frontend and Revalidation Wiring
-
-- Browser traffic should continue using the public site origin for API requests.
-- Server-rendered frontend content fetches now prefer the internal Docker network path `http://backend:4000/api`.
-- `docker-compose.yml` and `docker-compose.fast.yml` provide this through `INTERNAL_API_BASE_URL=http://backend:4000/api` on the `frontend` service.
-- This avoids deploy-time dependence on the public `nginx -> backend` path for homepage and listing SSR during container startup.
-- Frontend cache invalidation remains token-protected.
-- If `FRONTEND_REVALIDATE_URL` is unset but `FRONTEND_URL` and `FRONTEND_REVALIDATE_TOKEN` are present, the backend falls back to `${FRONTEND_URL}/api/revalidate`.
-- Production should still set `FRONTEND_REVALIDATE_URL` explicitly when a non-default revalidation endpoint is required.
 
 ## Validation and Health Checks
 
@@ -78,8 +57,6 @@ Deployment validates:
 - Docker Compose config rendering.
 - Backend container health.
 - Public endpoints:
-  - `/api/livez`
-  - `/api/readyz`
   - `/api/health`
   - `/api/health/deep`
   - `/`
@@ -87,13 +64,6 @@ Deployment validates:
   - `/results`
   - `/admin`
 - Optional frontend revalidation smoke check when revalidation token is configured.
-- Optional metrics endpoint verification via `scripts/verify-deployment.sh` when `METRICS_TOKEN` is configured.
-
-## Rollback Metadata
-
-- Successful deploys write `.deploy-state/last-release.env` in the production checkout.
-- This file includes `DEPLOYED_SHA`, `PREVIOUS_SHA`, deploy mode, and timestamp.
-- Use `scripts/rollback-last.sh` for a safer rollback flow based on recorded metadata.
 
 ## Useful Commands
 
@@ -103,22 +73,10 @@ Deployment validates:
 DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha> --preflight-only
 ```
 
-### Workflow preflight only
-
-- Trigger `Deploy Preflight` in GitHub Actions and select `staging` or `production`.
-- Provide a full 40-character SHA and desired mode (`fast` or `full`).
-
 ### Manual deployment
 
 ```bash
 DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha>
-```
-
-### Manual rollback helper
-
-```bash
-bash scripts/rollback-last.sh
-bash scripts/rollback-last.sh --yes
 ```
 
 ### Full verification
@@ -131,7 +89,6 @@ bash scripts/verify-deployment.sh
 
 - Read CI/CD job summary from GitHub Actions first.
 - On droplet, inspect `/tmp/sarkari-result-deploy.log`.
-- Use [docs/deploy-incident-faq.md](./deploy-incident-faq.md) for common failure-mode playbooks.
 - Check service logs:
   - `docker compose --project-name sarkari-result --env-file .env logs --tail 200 backend`
   - `docker compose --project-name sarkari-result --env-file .env logs --tail 200 frontend`
