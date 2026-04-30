@@ -226,6 +226,441 @@ const sectionThemeMap: Record<AnnouncementSection, DetailThemeTokens> = {
   admissions: { accent: '#ad1457', gradientFrom: '#880e4f', gradientTo: '#ad1457', sidebarFrom: '#6a0032', sidebarTo: '#c2185b' },
 };
 
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function titleFromSlug(slug: string) {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function sectionFromType(type: BackendPostRecord['type']): BackendSection {
+  if (type === 'job') return 'jobs';
+  if (type === 'result') return 'results';
+  if (type === 'admit-card') return 'admit-cards';
+  if (type === 'admission') return 'admissions';
+  if (type === 'answer-key') return 'answer-keys';
+  return 'syllabus';
+}
+
+function hrefFromType(type: BackendPostRecord['type'], slug: string) {
+  if (type === 'job') return `/jobs/${slug}`;
+  if (type === 'result') return `/results/${slug}`;
+  if (type === 'admit-card') return `/admit-cards/${slug}`;
+  if (type === 'admission') return `/admissions/${slug}`;
+  if (type === 'answer-key') return `/answer-keys/${slug}`;
+  return '/syllabus';
+}
+
+function createFallbackCard(input: {
+  date: string;
+  org: string;
+  postCount?: string;
+  qualification?: string;
+  slug: string;
+  stateSlugs?: string[];
+  summary: string;
+  tag?: BackendPublicCard['tag'];
+  title: string;
+  type: BackendPostRecord['type'];
+}): BackendPublicCard {
+  const section = sectionFromType(input.type);
+
+  return {
+    id: `fallback-${input.slug}`,
+    legacySlugs: [],
+    title: input.title,
+    slug: input.slug,
+    type: input.type,
+    section,
+    href: hrefFromType(input.type, input.slug),
+    org: input.org,
+    date: input.date,
+    postCount: input.postCount,
+    qualification: input.qualification,
+    tag: input.tag,
+    summary: input.summary,
+    stateSlugs: input.stateSlugs ?? [],
+    publishedAt: '2026-03-28T05:00:00.000Z',
+    updatedAt: '2026-04-29T06:00:00.000Z',
+    indexable: true,
+  };
+}
+
+const fallbackTaxonomies: Record<BackendTaxonomyType, BackendTaxonomyDocument[]> = {
+  states: [
+    'Uttar Pradesh',
+    'Bihar',
+    'Rajasthan',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Delhi',
+    'Gujarat',
+    'Tamil Nadu',
+    'Karnataka',
+    'West Bengal',
+    'Punjab',
+    'Haryana',
+    'Jharkhand',
+    'Chhattisgarh',
+    'Odisha',
+    'Uttarakhand',
+  ].map((name) => ({ id: `fallback-state-${slugify(name)}`, name, slug: slugify(name) })),
+  organizations: ['SSC', 'UPSC', 'IBPS', 'Railway', 'NTA', 'BPSC', 'BSEB', 'CSBC'].map((name) => ({
+    id: `fallback-org-${slugify(name)}`,
+    name,
+    slug: slugify(name),
+  })),
+  categories: ['SSC', 'Railway', 'Banking', 'Teaching', 'Defence', 'State Govt'].map((name) => ({
+    id: `fallback-category-${slugify(name)}`,
+    name,
+    slug: slugify(name),
+  })),
+  institutions: ['NTA', 'CBSE', 'BSEB'].map((name) => ({ id: `fallback-institution-${slugify(name)}`, name, slug: slugify(name) })),
+  exams: ['SSC CGL', 'UPSC CSE', 'IBPS PO', 'RRB Group D', 'CUET UG'].map((name) => ({
+    id: `fallback-exam-${slugify(name)}`,
+    name,
+    slug: slugify(name),
+  })),
+  qualifications: ['10th Pass', '12th Pass', 'Graduate', 'Post Graduate', 'Diploma'].map((name) => ({
+    id: `fallback-qualification-${slugify(name)}`,
+    name,
+    slug: slugify(name),
+  })),
+};
+
+const fallbackCards: BackendPublicCard[] = [
+  createFallbackCard({
+    type: 'job',
+    slug: 'ssc-cgl-2026',
+    title: 'SSC CGL 2026 Combined Graduate Level',
+    org: 'SSC',
+    date: '28 Mar',
+    tag: 'hot',
+    postCount: '14,582',
+    qualification: 'Graduate',
+    stateSlugs: ['delhi', 'uttar-pradesh', 'bihar'],
+    summary: 'Staff Selection Commission has opened a sample public listing for SSC CGL 2026 with official-link style detail content.',
+  }),
+  createFallbackCard({
+    type: 'job',
+    slug: 'ibps-po-2026',
+    title: 'IBPS PO 2026 Probationary Officer',
+    org: 'IBPS',
+    date: '26 Mar',
+    tag: 'new',
+    postCount: '4,500',
+    qualification: 'Graduate',
+    stateSlugs: ['maharashtra', 'delhi', 'karnataka'],
+    summary: 'IBPS PO 2026 fallback listing keeps the jobs page populated when the backend API is not available.',
+  }),
+  createFallbackCard({
+    type: 'job',
+    slug: 'rrb-group-d-level-1-2026',
+    title: 'RRB Group D Level 1 Posts 2026',
+    org: 'Railway',
+    date: '25 Mar',
+    tag: 'new',
+    postCount: '32,438',
+    qualification: '10th Pass',
+    stateSlugs: ['bihar', 'uttar-pradesh', 'rajasthan'],
+    summary: 'Railway Group D sample entry provides a valid detail page and state-wise browsing fallback.',
+  }),
+  createFallbackCard({
+    type: 'job',
+    slug: 'bihar-police-constable-2026',
+    title: 'Bihar Police Constable 2026',
+    org: 'CSBC',
+    date: '22 Mar',
+    tag: 'new',
+    postCount: '21,391',
+    qualification: '12th Pass',
+    stateSlugs: ['bihar'],
+    summary: 'Bihar Police Constable fallback entry supports Bihar state pages and jobs search without API data.',
+  }),
+  createFallbackCard({
+    type: 'result',
+    slug: 'upsc-civil-services-2025-final-result',
+    title: 'UPSC Civil Services 2025 Final Result',
+    org: 'UPSC',
+    date: '27 Mar',
+    tag: 'hot',
+    qualification: 'Graduate',
+    stateSlugs: ['delhi'],
+    summary: 'UPSC Civil Services final result sample entry keeps result routes and search pages available offline.',
+  }),
+  createFallbackCard({
+    type: 'result',
+    slug: 'ssc-chsl-2025-tier-2-result',
+    title: 'SSC CHSL 2025 Tier 2 Result',
+    org: 'SSC',
+    date: '26 Mar',
+    tag: 'new',
+    qualification: '12th Pass',
+    stateSlugs: ['uttar-pradesh', 'bihar', 'delhi'],
+    summary: 'SSC CHSL result fallback provides a valid public result detail route.',
+  }),
+  createFallbackCard({
+    type: 'result',
+    slug: 'bihar-bpsc-69th-cce-final-result',
+    title: 'Bihar BPSC 69th CCE Final Result',
+    org: 'BPSC',
+    date: '21 Mar',
+    tag: 'hot',
+    qualification: 'Graduate',
+    stateSlugs: ['bihar'],
+    summary: 'BPSC result fallback supports organization and Bihar state result pages.',
+  }),
+  createFallbackCard({
+    type: 'admit-card',
+    slug: 'ssc-gd-constable-2026-pet-pst',
+    title: 'SSC GD Constable 2026 PET/PST Admit Card',
+    org: 'SSC',
+    date: '28 Mar',
+    tag: 'hot',
+    qualification: '10th Pass',
+    stateSlugs: ['uttar-pradesh', 'bihar', 'rajasthan'],
+    summary: 'SSC GD PET/PST admit card sample keeps admit-card listing and detail pages working.',
+  }),
+  createFallbackCard({
+    type: 'admit-card',
+    slug: 'upsc-epfo-2026-admit-card',
+    title: 'UPSC EPFO 2026 Admit Card',
+    org: 'UPSC',
+    date: '27 Mar',
+    tag: 'new',
+    qualification: 'Graduate',
+    stateSlugs: ['delhi'],
+    summary: 'UPSC EPFO admit card fallback gives users a valid document-style detail page.',
+  }),
+  createFallbackCard({
+    type: 'admission',
+    slug: 'cuet-ug-admission-online-form-2026',
+    title: 'CUET UG Admission Online Form 2026',
+    org: 'NTA',
+    date: '23 Mar',
+    tag: 'new',
+    qualification: '12th Pass',
+    stateSlugs: ['delhi', 'uttar-pradesh'],
+    summary: 'CUET UG admission fallback keeps admissions pages populated without the backend.',
+  }),
+  createFallbackCard({
+    type: 'answer-key',
+    slug: 'ssc-cgl-tier-1-answer-key-2026',
+    title: 'SSC CGL Tier 1 Answer Key 2026',
+    org: 'SSC',
+    date: '24 Mar',
+    tag: 'update',
+    qualification: 'Graduate',
+    stateSlugs: ['delhi', 'uttar-pradesh'],
+    summary: 'SSC CGL answer key fallback supports answer-key listing and detail pages.',
+  }),
+];
+
+function fallbackSections(): Record<BackendSection, BackendPublicCard[]> {
+  return {
+    jobs: fallbackCards.filter((card) => card.section === 'jobs'),
+    results: fallbackCards.filter((card) => card.section === 'results'),
+    'admit-cards': fallbackCards.filter((card) => card.section === 'admit-cards'),
+    admissions: fallbackCards.filter((card) => card.section === 'admissions'),
+    'answer-keys': fallbackCards.filter((card) => card.section === 'answer-keys'),
+    syllabus: [],
+  };
+}
+
+function officialSourceForOrg(org: string): BackendOfficialSource {
+  const slug = slugify(org);
+  const sourceMap: Record<string, string> = {
+    bpsc: 'https://bpsc.bih.nic.in',
+    bseb: 'https://biharboardonline.bihar.gov.in',
+    csbc: 'https://csbc.bih.nic.in',
+    ibps: 'https://www.ibps.in',
+    nta: 'https://nta.ac.in',
+    railway: 'https://indianrailways.gov.in',
+    ssc: 'https://ssc.nic.in',
+    upsc: 'https://upsc.gov.in',
+  };
+
+  return {
+    label: `${org} Official Website`,
+    url: sourceMap[slug] || 'https://www.india.gov.in',
+    sourceType: 'website',
+    isPrimary: true,
+  };
+}
+
+function fallbackCardToPost(card: BackendPublicCard): BackendPostRecord {
+  const organization = { name: card.org, slug: slugify(card.org) };
+  const categoryName = card.type === 'job' ? 'Recruitment' : announcementCategoryMeta[toSection(card.type)].title;
+  const qualification = card.qualification || 'Refer official notice';
+
+  return {
+    id: card.id,
+    title: card.title,
+    slug: card.slug,
+    legacySlugs: card.legacySlugs,
+    type: card.type,
+    summary: card.summary || card.title,
+    shortInfo: card.summary || card.title,
+    body: `${card.title} is available as a static fallback page so SarkariExams.me can run without a live backend API. Verify all final dates, eligibility, fees, and downloads on the official portal before taking action.`,
+    organization,
+    categories: [{ name: categoryName, slug: slugify(categoryName) }],
+    states: card.stateSlugs.map((slug) => ({ name: titleFromSlug(slug), slug })),
+    qualifications: [{ name: qualification, slug: slugify(qualification) }],
+    importantDates: [
+      { label: 'Notification Date', value: '2026-03-28T05:00:00.000Z', kind: 'notification' },
+      { label: card.type === 'result' ? 'Result Date' : 'Last Date / Next Update', value: '2026-04-30T05:00:00.000Z', kind: 'last_date' },
+    ],
+    eligibility: [
+      { label: 'Qualification', description: qualification },
+      { label: 'Age Limit', description: 'Check the official notification for post-wise age limits and relaxation rules.' },
+    ],
+    feeRules: [
+      { category: 'General / OBC / EWS', amount: 'Check official notice', paymentNote: 'Fee rules vary by category and update type.' },
+      { category: 'SC / ST / PwD', amount: 'Check official notice' },
+    ],
+    vacancyRows: card.type === 'job'
+      ? [
+          {
+            postName: card.title,
+            department: card.org,
+            vacancies: card.postCount || 'Refer official notice',
+            payLevel: 'As per rules',
+            salaryNote: 'See official notification',
+          },
+        ]
+      : [],
+    admissionPrograms: card.type === 'admission'
+      ? [
+          {
+            programName: card.title,
+            level: qualification,
+            department: card.org,
+            intake: card.postCount || 'Refer official notice',
+            eligibilityNote: qualification,
+          },
+        ]
+      : [],
+    officialSources: [officialSourceForOrg(card.org)],
+    trust: {
+      verificationNote: 'Static fallback content is shown because the live API is unavailable. Always verify from the official portal.',
+    },
+    seo: {
+      effectiveTitle: `${card.title} | SarkariExams.me`,
+      effectiveDescription: card.summary || card.title,
+      effectiveCanonicalPath: card.href,
+      indexable: true,
+    },
+    tag: card.tag,
+    location: card.stateSlugs.length ? card.stateSlugs.map(titleFromSlug).join(', ') : 'India',
+    salary: card.type === 'job' ? 'Refer to the official notification' : undefined,
+    postCount: card.postCount,
+    lastDate: '2026-04-30T05:00:00.000Z',
+    resultDate: card.type === 'result' ? '2026-03-27T05:00:00.000Z' : undefined,
+    publishedAt: card.publishedAt,
+    updatedAt: card.updatedAt || '2026-04-29T06:00:00.000Z',
+  };
+}
+
+function fallbackDetailForCard(card: BackendPublicCard): BackendPublicDetail {
+  const relatedCards = fallbackCards
+    .filter((item) => item.slug !== card.slug && item.section === card.section)
+    .slice(0, 4);
+
+  return {
+    post: fallbackCardToPost(card),
+    card,
+    canonicalPath: card.href,
+    section: card.section,
+    relatedCards,
+    breadcrumbs: [
+      { label: 'Home', href: '/' },
+      { label: announcementCategoryMeta[toSection(card.type)].title, href: announcementCategoryMeta[toSection(card.type)].canonicalPath },
+      { label: card.title, href: card.href },
+    ],
+    archiveState: 'active',
+  };
+}
+
+function fallbackDetailBySlug(slug: string): BackendPublicDetail | null {
+  const card = fallbackCards.find((item) => item.slug === slug || item.legacySlugs.includes(slug));
+  return card ? fallbackDetailForCard(card) : null;
+}
+
+function matchesFallbackParams(card: BackendPublicCard, params: {
+  category?: string;
+  organization?: string;
+  qualification?: string;
+  search?: string;
+  state?: string;
+  type?: BackendPostRecord['type'];
+}) {
+  if (params.type && card.type !== params.type) return false;
+  if (params.state && !card.stateSlugs.includes(slugify(params.state))) return false;
+  if (params.organization && slugify(card.org) !== slugify(params.organization)) return false;
+  if (params.qualification && !slugify(card.qualification || '').includes(slugify(params.qualification))) return false;
+  if (params.category && !slugify(card.title).includes(slugify(params.category)) && !slugify(card.org).includes(slugify(params.category))) return false;
+
+  if (params.search) {
+    const search = params.search.trim().toLowerCase();
+    const haystack = [card.title, card.org, card.summary, card.qualification, card.postCount].filter(Boolean).join(' ').toLowerCase();
+    if (!haystack.includes(search)) return false;
+  }
+
+  return true;
+}
+
+function getFallbackCards(params: {
+  category?: string;
+  limit?: number;
+  organization?: string;
+  qualification?: string;
+  search?: string;
+  state?: string;
+  status?: 'active' | 'expired' | 'archived' | 'all';
+  type?: BackendPostRecord['type'];
+}) {
+  void params.status;
+  const limit = params.limit && params.limit > 0 ? params.limit : fallbackCards.length;
+  return fallbackCards.filter((card) => matchesFallbackParams(card, params)).slice(0, limit);
+}
+
+function fallbackTaxonomy(type: BackendTaxonomyType, slug: string): BackendTaxonomyDocument {
+  const normalizedSlug = slugify(slug);
+  const existing = fallbackTaxonomies[type].find((item) => item.slug === normalizedSlug);
+  return existing || {
+    id: `fallback-${type}-${normalizedSlug}`,
+    name: titleFromSlug(normalizedSlug),
+    slug: normalizedSlug,
+  };
+}
+
+function fallbackTaxonomyLanding(type: BackendTaxonomyType, slug: string): BackendTaxonomyLanding {
+  const taxonomy = fallbackTaxonomy(type, slug);
+  const cards = type === 'states'
+    ? getFallbackCards({ state: taxonomy.slug, limit: 30 })
+    : type === 'organizations'
+      ? getFallbackCards({ organization: taxonomy.slug, limit: 30 })
+      : fallbackCards.slice(0, 30);
+
+  return {
+    taxonomy,
+    cards,
+    relatedCounts: cards.reduce<Record<string, number>>((counts, card) => {
+      counts[card.section] = (counts[card.section] || 0) + 1;
+      return counts;
+    }, {}),
+  };
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${CONTENT_BASE}${path}`, {
     next: {
@@ -650,14 +1085,7 @@ export async function getHomepageSections() {
     const response = await fetchJson<{ data: Record<BackendSection, BackendPublicCard[]> }>('/homepage');
     return response.data;
   } catch {
-    return {
-      jobs: [],
-      results: [],
-      'admit-cards': [],
-      admissions: [],
-      'answer-keys': [],
-      syllabus: [],
-    } satisfies Record<BackendSection, BackendPublicCard[]>;
+    return fallbackSections();
   }
 }
 
@@ -680,7 +1108,7 @@ export async function getListingEntries(params: {
     const response = await fetchJson<{ data: BackendPublicCard[]; total: number; count: number }>(`/posts?${searchParams.toString()}`);
     return response.data.map(toPortalEntry);
   } catch {
-    return [];
+    return getFallbackCards(params).map(toPortalEntry);
   }
 }
 
@@ -698,23 +1126,43 @@ export async function getRawListing(params: {
   for (const [key, value] of Object.entries(params)) {
     if (value) searchParams.set(key, String(value));
   }
-  const response = await fetchJson<{ data: BackendPublicCard[]; total: number; count: number }>(`/posts?${searchParams.toString()}`);
-  return response.data;
+  try {
+    const response = await fetchJson<{ data: BackendPublicCard[]; total: number; count: number }>(`/posts?${searchParams.toString()}`);
+    return response.data;
+  } catch {
+    return getFallbackCards(params);
+  }
 }
 
 export async function getDetail(slug: string) {
-  const response = await fetchJson<{ data: BackendPublicDetail }>(`/posts/${encodeURIComponent(slug)}`);
-  return response.data;
+  try {
+    const response = await fetchJson<{ data: BackendPublicDetail }>(`/posts/${encodeURIComponent(slug)}`);
+    return response.data;
+  } catch {
+    const fallbackDetail = fallbackDetailBySlug(slug);
+    if (!fallbackDetail) {
+      throw new Error(`Fallback detail not found: ${slug}`);
+    }
+    return fallbackDetail;
+  }
 }
 
 export async function getTaxonomyList(type: BackendTaxonomyType) {
-  const response = await fetchJson<{ data: BackendTaxonomyDocument[] }>(`/taxonomies/${type}`);
-  return response.data;
+  try {
+    const response = await fetchJson<{ data: BackendTaxonomyDocument[] }>(`/taxonomies/${type}`);
+    return response.data;
+  } catch {
+    return fallbackTaxonomies[type] || [];
+  }
 }
 
 export async function getTaxonomyLanding(type: BackendTaxonomyType, slug: string) {
-  const response = await fetchJson<{ data: BackendTaxonomyLanding }>(`/taxonomies/${type}/${encodeURIComponent(slug)}`);
-  return response.data;
+  try {
+    const response = await fetchJson<{ data: BackendTaxonomyLanding }>(`/taxonomies/${type}/${encodeURIComponent(slug)}`);
+    return response.data;
+  } catch {
+    return fallbackTaxonomyLanding(type, slug);
+  }
 }
 
 export function mapTaxonomyStateToMeta(state: BackendTaxonomyDocument, _counts?: Partial<Record<string, number>>): StatePageMeta {

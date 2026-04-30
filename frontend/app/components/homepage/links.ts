@@ -12,12 +12,13 @@ export const homePageLinks = {
   app: '/app',
   certificates: '/certificates',
   importantPage: '/important',
-  quickLinks: '/#quick-links',
+  quickLinks: '/important',
   importantLinks: '/important',
-  latestJobs: '/#latest-jobs',
-  latestAdmission: '/#latest-admission',
-  stateJobs: '/#state-jobs',
+  latestJobs: '/jobs',
+  latestAdmission: '/admissions',
+  stateJobs: '/states',
   states: '/states',
+  organizations: '/organizations',
   bookmarks: '/bookmarks',
   profile: '/profile',
   about: '/about',
@@ -28,6 +29,37 @@ export const homePageLinks = {
   joinTelegram: '/join/telegram',
   joinWhatsapp: '/join/whatsapp',
 } as const;
+
+const DEFAULT_ADMIN_URL = 'http://localhost:3001/admin';
+const DEFAULT_PUBLIC_API_URL = 'http://localhost:5000/api';
+
+function stripTrailingSlash(value: string) {
+  return value.replace(/\/+$/, '');
+}
+
+function normalizePath(path = '') {
+  if (!path) {
+    return '';
+  }
+
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
+export function getAdminUrl(path = '') {
+  const configured = stripTrailingSlash(process.env.NEXT_PUBLIC_ADMIN_URL || DEFAULT_ADMIN_URL);
+  const base = configured.endsWith('/admin') ? configured : `${configured}/admin`;
+  return `${base}${normalizePath(path)}`;
+}
+
+export function getPublicApiUrl(path = '') {
+  const configured = stripTrailingSlash(
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      DEFAULT_PUBLIC_API_URL,
+  );
+  const base = configured.endsWith('/api') ? configured : `${configured}/api`;
+  return `${base}${normalizePath(path)}`;
+}
 
 export function toOfficialUrl(host: string) {
   return `https://${host}`;

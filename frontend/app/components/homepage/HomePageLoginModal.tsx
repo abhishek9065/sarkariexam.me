@@ -58,9 +58,8 @@ export function HomePageLoginModal({ open, onClose, onLoginSuccess }: HomePageLo
       } else {
         setError(data.error || 'Authentication failed');
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
-      console.error('Auth error:', err);
     } finally {
       setIsLoading(false);
     }

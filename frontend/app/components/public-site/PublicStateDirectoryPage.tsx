@@ -11,13 +11,21 @@ interface StateDirectoryEntry {
 }
 
 interface PublicStateDirectoryPageProps {
+  countLabel?: string;
   entries: StateDirectoryEntry[];
+  listTitle?: string;
   meta: CategoryPageMeta;
+  pathPrefix?: string;
+  sidebarTitle?: string;
 }
 
 export function PublicStateDirectoryPage({
+  countLabel = 'linked job updates',
   entries,
+  listTitle = 'Browse States',
   meta,
+  pathPrefix = '/states',
+  sidebarTitle = 'State Coverage',
 }: PublicStateDirectoryPageProps) {
   return (
     <div className="mx-auto max-w-6xl px-3 py-4">
@@ -30,18 +38,18 @@ export function PublicStateDirectoryPage({
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.65fr_0.95fr]">
-        <PublicPanel title="Browse States" headerColor={meta.headerColor}>
+        <PublicPanel title={listTitle} headerColor={meta.headerColor}>
           <div className="grid gap-3 p-4 sm:grid-cols-2">
             {entries.map((entry) => (
               <Link
                 key={entry.slug}
-                href={`/states/${entry.slug}`}
+                href={`${pathPrefix}/${entry.slug}`}
                 className="rounded-xl border border-gray-100 px-4 py-4 transition-colors hover:border-orange-200 hover:bg-orange-50/60"
               >
                 <div className="text-[13px] font-semibold text-gray-800">{entry.title}</div>
                 <p className="mt-2 text-[12px] leading-6 text-gray-500">{entry.description}</p>
                 <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#e65100]">
-                  {entry.count} linked job updates
+                  {entry.count} {countLabel}
                 </div>
               </Link>
             ))}
@@ -63,7 +71,7 @@ export function PublicStateDirectoryPage({
             </div>
           </PublicPanel>
 
-          <PublicPanel title="State Coverage" headerColor="bg-[#1a237e]">
+          <PublicPanel title={sidebarTitle} headerColor="bg-[#1a237e]">
             <div className="space-y-3 p-4 text-sm leading-7 text-gray-600">
               {meta.highlights.map((highlight) => (
                 <div key={highlight} className="flex items-start gap-2">

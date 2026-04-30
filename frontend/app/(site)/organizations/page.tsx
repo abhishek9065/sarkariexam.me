@@ -37,6 +37,10 @@ export default async function OrganizationsPage() {
     <PublicStateDirectoryPage
       meta={meta}
       entries={entries}
+      listTitle="Browse Organizations"
+      pathPrefix="/organizations"
+      countLabel="linked updates"
+      sidebarTitle="Organization Coverage"
     />
     </>
   );

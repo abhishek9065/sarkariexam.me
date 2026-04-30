@@ -26,7 +26,7 @@ import { useEffect, useState } from 'react';
 import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { buildJobsPath } from '@/app/lib/public-content';
 import { HomePageLoginModal } from './HomePageLoginModal';
-import { homePageLinks } from './links';
+import { getAdminUrl, homePageLinks } from './links';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const navLinks = [
@@ -56,7 +56,7 @@ export function HomePageNavbar() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
+  const ADMIN_URL = getAdminUrl();
 
   // Close dropdowns when clicking outside
   useEffect(() => {

@@ -95,7 +95,7 @@ const legalLinks = [
   { label: 'Privacy Policy', href: homePageLinks.privacy },
   { label: 'Terms of Use', href: homePageLinks.disclaimer },
   { label: 'Disclaimer', href: homePageLinks.disclaimer },
-  { label: 'Sitemap', href: homePageLinks.quickLinks },
+  { label: 'Sitemap', href: '/sitemap.xml' },
   { label: 'Contact Us', href: homePageLinks.contact },
 ] as const;
 
