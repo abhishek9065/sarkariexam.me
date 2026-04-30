@@ -18,9 +18,9 @@ export function HomePageMarqueeTicker() {
   return (
     <div className="border-b border-gray-200 bg-white shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center">
-        <div className="flex shrink-0 items-center gap-1.5 bg-[#e65100] px-3 py-2">
+        <div className="flex shrink-0 items-center gap-1.5 bg-[#e65100] px-2.5 py-2 sm:px-3">
           <Zap size={12} className="fill-yellow-200 text-yellow-200" />
-          <span className="whitespace-nowrap text-[10px] font-extrabold tracking-[0.16em] text-white">
+          <span className="whitespace-nowrap text-[10px] font-extrabold tracking-[0.08em] text-white sm:tracking-[0.16em]">
             LIVE UPDATES
           </span>
         </div>
@@ -30,7 +30,7 @@ export function HomePageMarqueeTicker() {
             {[...updates, ...updates].map((update, index) => (
               <span
                 key={`${update}-${index}`}
-                className="mx-5 cursor-pointer text-[12px] font-medium text-gray-700 transition-colors hover:text-[#e65100]"
+                className="mx-4 cursor-pointer text-[12px] font-semibold text-slate-900 transition-colors hover:text-[#e65100] sm:mx-5"
               >
                 {update}
                 <span className="mx-4 text-orange-300">◆</span>

@@ -122,11 +122,11 @@ export function HomePageNavbar() {
             }}
           />
 
-          <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between gap-3 px-3">
-            <Link href={homePageLinks.home} className="flex shrink-0 items-center gap-3">
+          <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between gap-2 px-3 md:gap-3">
+            <Link href={homePageLinks.home} className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:shrink-0 md:gap-3">
               <div className="relative shrink-0">
                 <div
-                  className="relative flex h-11 w-11 items-center justify-center rounded-2xl"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-2xl md:h-11 md:w-11"
                   style={{
                     background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 100%)',
                     border: '1.5px solid rgba(255,255,255,0.25)',
@@ -157,8 +157,8 @@ export function HomePageNavbar() {
                   style={{ background: 'linear-gradient(135deg, #fdd835, #f57f17)' }}
                 />
               </div>
-              <div className="leading-none">
-                <div className="flex items-baseline gap-0 tracking-tight text-[20px] font-black">
+              <div className="min-w-0 leading-none">
+                <div className="flex items-baseline gap-0 text-[18px] font-black md:text-[20px]">
                   <span
                     style={{
                       background: 'linear-gradient(90deg, #ffffff 0%, #dce8ff 100%)',
@@ -178,7 +178,7 @@ export function HomePageNavbar() {
                     Exams
                   </span>
                   <span
-                    className="text-[16px] font-medium"
+                    className="text-[14px] font-medium md:text-[16px]"
                     style={{
                       background: 'linear-gradient(90deg, #90caf9 0%, #64b5f6 100%)',
                       WebkitBackgroundClip: 'text',
@@ -188,7 +188,7 @@ export function HomePageNavbar() {
                     .me
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-1.5">
+                <div className="mt-1 hidden items-center gap-1.5 sm:flex">
                   <span className="h-px w-3 bg-gradient-to-r from-[#fdd835] to-transparent" />
                   <span className="whitespace-nowrap text-[8.5px] font-semibold uppercase tracking-[0.14em] text-blue-200">
                     Sarkari Results · Latest Online Form
@@ -333,7 +333,7 @@ export function HomePageNavbar() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 md:hidden" data-mobile-menu>
+            <div className="flex shrink-0 items-center gap-1.5 md:hidden" data-mobile-menu>
               {/* Mobile Notification Bell */}
               <div data-notification-menu>
                 <button
@@ -357,25 +357,26 @@ export function HomePageNavbar() {
               {isLoggedIn ? (
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-1 rounded-xl border border-[rgba(100,200,100,0.4)] bg-[rgba(100,200,100,0.2)] px-3 py-1.5 text-[11px] font-bold text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[rgba(100,200,100,0.4)] bg-[rgba(100,200,100,0.2)] text-white"
+                  aria-label={isAdmin ? 'Admin menu' : 'Profile menu'}
                 >
                   {isAdmin ? <Shield size={12} /> : <User size={12} />}
-                  {isAdmin ? 'Admin' : 'Profile'}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsLoginOpen(true)}
-                  className="flex items-center gap-1 rounded-xl border border-[rgba(253,216,53,0.4)] bg-[rgba(253,216,53,0.2)] px-3 py-1.5 text-[11px] font-bold text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[rgba(253,216,53,0.45)] bg-[rgba(253,216,53,0.2)] text-white"
+                  aria-label="Login or register"
                 >
                   <LogIn size={12} />
-                  Login
                 </button>
               )}
               <button
                 type="button"
-                className="rounded-lg p-2 transition-colors hover:bg-white/15"
+                className="flex h-9 w-9 items-center justify-center rounded-[9px] transition-colors hover:bg-white/15"
                 onClick={() => setIsMenuOpen((current) => !current)}
+                aria-label="Toggle menu"
               >
                 {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>

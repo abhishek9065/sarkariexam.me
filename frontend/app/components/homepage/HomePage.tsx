@@ -374,7 +374,7 @@ function HeroSection() {
           </div>
         </div>
 
-        <h1 className="mx-auto max-w-3xl text-center text-[34px] font-extrabold leading-[1.05] tracking-[-0.03em] text-white sm:text-[44px]">
+        <h1 className="mx-auto max-w-3xl text-center text-[34px] font-extrabold leading-[1.05] tracking-normal text-white sm:text-[44px]">
           Your{' '}
           <span
             style={{
@@ -387,7 +387,7 @@ function HeroSection() {
           </span>{' '}
           for every Sarkari exam.
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-center text-[14px] leading-6 text-white/60">
+        <p className="mx-auto mt-4 max-w-xl text-center text-[14px] leading-6 text-white/75">
           Ask in plain Hindi or English. We surface the right form, admit card, result and prep pack in seconds - no more
           digging through PDFs.
         </p>
@@ -405,7 +405,7 @@ function HeroSection() {
               <input
                 name="search"
                 placeholder={searchPrompts[1]}
-                className="min-w-0 flex-1 bg-transparent px-3 text-[14px] text-white outline-none placeholder:text-white/40"
+                className="min-w-0 flex-1 bg-transparent px-3 text-[14px] font-semibold text-white outline-none placeholder:text-white/75"
               />
               <button type="button" className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white sm:flex">
                 <Mic size={15} />
