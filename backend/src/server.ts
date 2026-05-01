@@ -623,6 +623,12 @@ async function startPostgresPrimaryRuntime() {
     return;
   }
 
+  const postgresOk = await postgresHealthCheck({ logFailure: false });
+  if (!postgresOk) {
+    logger.warn('[Server] Postgres primary schedulers disabled because PostgreSQL is unreachable');
+    return;
+  }
+
   await scheduleAnalyticsRollups().catch((error) => {
     logger.error({ err: error }, '[Server] Analytics rollup scheduler init failed');
   });
@@ -647,7 +653,7 @@ export async function startServer() {
   }
 
   try {
-    if (isDatabaseConfigured()) {
+    if (config.legacyMongoEnabled && isDatabaseConfigured()) {
       await connectToDatabase();
       logger.info('[Server] Legacy Mongo/Cosmos bridge connected successfully');
       await startLegacyMongoRuntime({
@@ -655,8 +661,14 @@ export async function startServer() {
       });
     } else {
       logger.info(
-        { guardedApiPrefixes: legacyMongoBackedApiPrefixes },
-        '[Server] Legacy Mongo/Cosmos bridge not configured; compatibility-only bridge features remain unavailable',
+        {
+          configured: isDatabaseConfigured(),
+          enabled: config.legacyMongoEnabled,
+          guardedApiPrefixes: legacyMongoBackedApiPrefixes,
+        },
+        config.legacyMongoEnabled
+          ? '[Server] Legacy Mongo/Cosmos bridge not configured; compatibility-only bridge features remain unavailable'
+          : '[Server] Legacy Mongo/Cosmos bridge disabled; compatibility-only bridge features remain unavailable',
       );
     }
   } catch (error) {

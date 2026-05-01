@@ -141,6 +141,21 @@ interface BackendContentPageRecord {
 
 const CONTENT_BASE = `${resolvePublicApiBase()}/content`;
 const CONTENT_REVALIDATE_SECONDS = Number.parseInt(process.env.CONTENT_CACHE_REVALIDATE_SECONDS ?? '300', 10);
+const CONTENT_API_ENABLED = process.env.CONTENT_API_ENABLED ?? process.env.NEXT_PUBLIC_CONTENT_API_ENABLED;
+
+class ContentApiDisabledError extends Error {
+  constructor() {
+    super('Content API fetching is disabled for this runtime.');
+    this.name = 'ContentApiDisabledError';
+  }
+}
+
+function shouldFetchContentApi() {
+  if (CONTENT_API_ENABLED === 'true') return true;
+  if (CONTENT_API_ENABLED === 'false') return false;
+
+  return process.env.NODE_ENV === 'production';
+}
 
 function sanitizeTagSegment(value?: string) {
   return (value ?? '')
@@ -662,6 +677,10 @@ function fallbackTaxonomyLanding(type: BackendTaxonomyType, slug: string): Backe
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
+  if (!shouldFetchContentApi()) {
+    throw new ContentApiDisabledError();
+  }
+
   const res = await fetch(`${CONTENT_BASE}${path}`, {
     next: {
       revalidate: Number.isFinite(CONTENT_REVALIDATE_SECONDS) ? CONTENT_REVALIDATE_SECONDS : 300,

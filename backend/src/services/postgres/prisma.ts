@@ -135,7 +135,8 @@ if (process.env.NODE_ENV !== 'production') {
   globalRef.__prismaClient = prisma;
 }
 
-export async function postgresHealthCheck(): Promise<boolean> {
+export async function postgresHealthCheck(options: { logFailure?: boolean } = {}): Promise<boolean> {
+  const { logFailure = true } = options;
   const timeoutMs = config.postgresHealthTimeoutMs;
   const safeTimeoutMs = Math.max(500, Math.floor(timeoutMs));
 
@@ -146,7 +147,9 @@ export async function postgresHealthCheck(): Promise<boolean> {
     });
     return true;
   } catch (error) {
-    console.error('Postgres health check failed (migrations might be pending):', error);
+    if (logFailure) {
+      console.error('Postgres health check failed (migrations might be pending):', error);
+    }
     return false;
   }
 }

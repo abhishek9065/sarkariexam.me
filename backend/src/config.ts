@@ -112,6 +112,10 @@ const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABAS
 const postgresDirectUrl = process.env.POSTGRES_DIRECT_URL ?? process.env.DIRECT_URL ?? '';
 const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
 const legacyMongoRequired = parseBoolean(process.env.LEGACY_MONGO_REQUIRED, false);
+const legacyMongoEnabled = parseBoolean(
+  process.env.LEGACY_MONGO_ENABLED,
+  isProduction || legacyMongoRequired,
+);
 const frontendUrl = process.env.FRONTEND_URL ?? 'https://sarkariexams.me';
 const derivedFrontendRevalidateUrl = `${frontendUrl.replace(/\/$/, '')}/api/revalidate`;
 const frontendRevalidateUrl = process.env.FRONTEND_REVALIDATE_URL?.trim() || derivedFrontendRevalidateUrl;
@@ -138,6 +142,10 @@ if (!legacyMongoConfigured) {
   runtimeWarnings.push('Mongo/Cosmos legacy bridge is not configured; compatibility-only legacy surfaces (backup metadata, security audit history, migration scripts) stay unavailable.');
 }
 
+if (legacyMongoConfigured && !legacyMongoEnabled) {
+  runtimeWarnings.push('Mongo/Cosmos legacy bridge is configured but disabled; set LEGACY_MONGO_ENABLED=true to enable compatibility-only legacy surfaces.');
+}
+
 if (process.env.FRONTEND_REVALIDATE_URL && !process.env.FRONTEND_REVALIDATE_TOKEN) {
   runtimeWarnings.push('FRONTEND_REVALIDATE_URL is set without FRONTEND_REVALIDATE_TOKEN; publish-triggered frontend revalidation is disabled.');
 }
@@ -152,6 +160,10 @@ if (isProduction && !metricsToken) {
 
 if (isProduction && legacyMongoRequired && !legacyMongoConfigured) {
   throw new Error('SECURITY ERROR: LEGACY_MONGO_REQUIRED is enabled but COSMOS_CONNECTION_STRING/MONGODB_URI is missing.');
+}
+
+if (legacyMongoRequired && !legacyMongoEnabled) {
+  throw new Error('LEGACY_MONGO_REQUIRED requires LEGACY_MONGO_ENABLED=true.');
 }
 
 export const config = {
@@ -184,6 +196,7 @@ export const config = {
   postgresDirectUrl,
   legacyMongoConfigured,
   legacyMongoRequired,
+  legacyMongoEnabled,
   frontendRevalidationConfigured,
   runtimeWarnings,
   featureFlags,
@@ -217,6 +230,7 @@ if (!isProduction) {
   console.log('[CONFIG] Running in development mode');
   console.log(`[CONFIG] Primary Content DB: PostgreSQL (Neon compatible)`);
   console.log(`[CONFIG] Legacy database bridge required: ${legacyMongoRequired ? 'yes' : 'no'}`);
+  console.log(`[CONFIG] Legacy database bridge enabled: ${legacyMongoEnabled ? 'yes' : 'no'}`);
   console.log(`[CONFIG] Legacy database bridge: ${legacyMongoConfigured ? (databaseUrl.includes('localhost') ? 'local MongoDB' : 'Cosmos DB') : 'not configured'}`);
   if (configuredContentDbMode !== 'postgres') {
     console.log(`[CONFIG] CONTENT_DB_MODE=${configuredContentDbMode} ignored; forcing postgres mode`);
