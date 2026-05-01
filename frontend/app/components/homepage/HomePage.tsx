@@ -3,26 +3,19 @@ import {
   ArrowRight,
   Award,
   BadgeCheck,
-  BarChart3,
+  Bookmark,
   Briefcase,
   Building2,
   CalendarDays,
   Clock3,
   Cpu,
-  Database,
   FileCheck,
-  FileText,
-  Globe2,
   GraduationCap,
   Landmark,
-  LayoutDashboard,
   MapPin,
   Mic,
   Search,
-  Server,
-  Settings,
   Shield,
-  ShieldCheck,
   Sparkles,
   Star,
   Stethoscope,
@@ -30,6 +23,7 @@ import {
   TrendingUp,
   Users,
   Zap,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -38,18 +32,19 @@ import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { buildJobsPath } from '@/app/lib/public-content';
 import { getHomepageSections } from '@/lib/content-api';
 import { PublicSiteShell } from '@/app/components/public-site/PublicSiteShell';
-import { getAdminUrl, getPublicApiUrl, homePageLinks } from './links';
+import { homePageLinks } from './links';
 
 type HomepageSections = Awaited<ReturnType<typeof getHomepageSections>>;
 type HomepageSectionItem = HomepageSections[keyof HomepageSections][number];
 type HomepageSectionKey = 'results' | 'admit-cards' | 'jobs' | 'answer-keys' | 'admissions';
+type FigmaUpdateTag = 'new' | 'hot' | 'last-date' | 'last-day' | 'update';
 
 interface LatestUpdateItem {
   href: string;
   title: string;
   org: string;
   date: string;
-  tag?: HomepageSectionItem['tag'] | 'new' | 'hot' | 'last-date' | 'update';
+  tag?: HomepageSectionItem['tag'] | FigmaUpdateTag;
   postCount?: string;
   qualification?: string;
 }
@@ -57,6 +52,7 @@ interface LatestUpdateItem {
 interface UpdateCardProps {
   accent: string;
   count: string;
+  darkAccent: string;
   href: string;
   icon: LucideIcon;
   items: LatestUpdateItem[];
@@ -64,10 +60,10 @@ interface UpdateCardProps {
 }
 
 const searchPrompts = [
+  'Show me Graduate jobs closing this week',
   'SSC CGL 2026 cut-off prediction',
-  '12th-pass railway jobs in Bihar',
   'Bank PO admit cards released today',
-  'Show Graduate jobs closing this week',
+  '12th-pass railway jobs in Bihar',
 ];
 
 const heroStats = [
@@ -86,22 +82,24 @@ const pulseItems = [
 
 const fallbackUpdates: Record<HomepageSectionKey, LatestUpdateItem[]> = {
   results: [
-    { title: 'UPSC Civil Services 2025 Final Result', org: 'UPSC', date: '27 Mar', tag: 'hot', href: homePageLinks.results },
-    { title: 'SSC CHSL 2025 Tier 2 Result', org: 'SSC', date: '26 Mar', tag: 'new', href: homePageLinks.results },
-    { title: 'IBPS Clerk Mains 2025 Result Declared', org: 'IBPS', date: '25 Mar', tag: 'new', href: homePageLinks.results },
+    { title: 'UPSC Civil Services 2025 — Final Result', org: 'UPSC', date: '27 Mar', tag: 'hot', href: homePageLinks.results },
+    { title: 'SSC CHSL 2025 — Tier 2 Result', org: 'SSC', date: '26 Mar', tag: 'new', href: homePageLinks.results },
+    { title: 'IBPS Clerk Mains 2025 — Result Declared', org: 'IBPS', date: '25 Mar', tag: 'new', href: homePageLinks.results },
     { title: 'RRB NTPC CBT 2 Result 2025', org: 'RRB', date: '24 Mar', href: homePageLinks.results },
+    { title: 'Bihar BPSC 69th CCE — Final Result', org: 'BPSC', date: '21 Mar', tag: 'hot', href: homePageLinks.results },
   ],
   'admit-cards': [
     { title: 'SSC GD Constable 2026 PET/PST', org: 'SSC', date: '28 Mar', tag: 'hot', href: homePageLinks.admitCards },
     { title: 'UPSC EPFO 2026 Admit Card', org: 'UPSC', date: '27 Mar', tag: 'new', href: homePageLinks.admitCards },
     { title: 'Bihar STET 2026 Admit Card', org: 'BSEB', date: '25 Mar', href: homePageLinks.admitCards },
-    { title: 'SSC CGL 2026 Tier 1 Admit Card', org: 'SSC', date: '24 Mar', tag: 'new', href: homePageLinks.admitCards },
+    { title: 'SSC CGL 2026 — Tier 1 Admit Card', org: 'SSC', date: '24 Mar', tag: 'new', href: homePageLinks.admitCards },
   ],
   jobs: [
-    { title: 'SSC CGL 2026 Combined Graduate Level', org: 'SSC', date: '28 Mar', tag: 'hot', href: homePageLinks.jobs },
-    { title: 'IBPS PO 2026 Probationary Officer', org: 'IBPS', date: '26 Mar', tag: 'new', href: homePageLinks.jobs },
-    { title: 'RRB Group D Level 1 Posts', org: 'Railway', date: '25 Mar', tag: 'new', href: homePageLinks.jobs },
-    { title: 'UPSC NDA/NA 2026', org: 'UPSC', date: '24 Mar', tag: 'last-date', href: homePageLinks.jobs },
+    { title: 'SSC CGL 2026 — Combined Graduate Level', org: 'SSC', date: '28 Mar', tag: 'hot', href: homePageLinks.jobs },
+    { title: 'IBPS PO 2026 — Probationary Officer', org: 'IBPS', date: '26 Mar', tag: 'new', href: homePageLinks.jobs },
+    { title: 'RRB Group D — Level 1 Posts', org: 'Railway', date: '25 Mar', tag: 'new', href: homePageLinks.jobs },
+    { title: 'UPSC NDA/NA 2026', org: 'UPSC', date: '24 Mar', tag: 'last-day', href: homePageLinks.jobs },
+    { title: 'Bihar Police Constable 2026', org: 'CSBC', date: '22 Mar', tag: 'new', href: homePageLinks.jobs },
   ],
   'answer-keys': [
     { title: 'SSC CGL Tier 1 Answer Key 2026', org: 'SSC', date: '24 Mar', tag: 'update', href: homePageLinks.answerKey },
@@ -113,9 +111,9 @@ const fallbackUpdates: Record<HomepageSectionKey, LatestUpdateItem[]> = {
 
 const aiPicks = [
   {
-    title: 'SSC CGL 2026 - Combined Graduate Level',
+    title: 'SSC CGL 2026 — Combined Graduate Level',
     org: 'Staff Selection Commission',
-    salary: 'Rs 35,400 - Rs 1,12,400',
+    salary: '₹35,400 – ₹1,12,400',
     posts: '14,582',
     closes: '5 Apr 2026',
     match: '94%',
@@ -124,9 +122,9 @@ const aiPicks = [
     gradient: 'from-indigo-500 to-cyan-400',
   },
   {
-    title: 'IBPS PO 2026 - Probationary Officer',
+    title: 'IBPS PO 2026 — Probationary Officer',
     org: 'IBPS',
-    salary: 'Rs 52,000 - Rs 85,000',
+    salary: '₹52,000 – ₹85,000',
     posts: '4,500',
     closes: '12 Apr 2026',
     match: '88%',
@@ -135,9 +133,9 @@ const aiPicks = [
     gradient: 'from-emerald-500 to-teal-400',
   },
   {
-    title: 'UPSC EPFO 2026 - Enforcement Officer',
+    title: 'UPSC EPFO 2026 — Enforcement Officer',
     org: 'UPSC',
-    salary: 'Rs 47,600 - Rs 1,51,100',
+    salary: '₹47,600 – ₹1,51,100',
     posts: '577',
     closes: '9 Apr 2026',
     match: '81%',
@@ -181,72 +179,9 @@ const states = [
 
 const sources = ['UPSC', 'SSC', 'IBPS', 'RRB', 'NTA', 'RBI', 'ISRO', 'DRDO'];
 
-const publicPageLinks = [
-  { label: 'Jobs', href: homePageLinks.jobs, icon: Briefcase, description: 'Public recruitment feed' },
-  { label: 'Results', href: homePageLinks.results, icon: FileCheck, description: 'Result and scorecard updates' },
-  { label: 'Admit Cards', href: homePageLinks.admitCards, icon: BadgeCheck, description: 'Hall ticket and city-slip notices' },
-  { label: 'Answer Keys', href: homePageLinks.answerKey, icon: FileText, description: 'Keys, response sheets, objections' },
-  { label: 'Admissions', href: homePageLinks.admissions, icon: GraduationCap, description: 'Entrance and counseling notices' },
-  { label: 'Syllabus', href: homePageLinks.syllabus, icon: LayoutDashboard, description: 'Patterns and preparation resources' },
-  { label: 'Board Results', href: homePageLinks.boardResults, icon: Award, description: 'Board marksheet update hub' },
-  { label: 'Scholarship', href: homePageLinks.scholarship, icon: GraduationCap, description: 'Scheme and renewal alerts' },
-  { label: 'States', href: homePageLinks.states, icon: MapPin, description: 'State-wise jobs and updates' },
-  { label: 'Organizations', href: homePageLinks.organizations, icon: Building2, description: 'Recruiter and board pages' },
-  { label: 'Search', href: `${homePageLinks.search}?q=ssc`, icon: Search, description: 'Unified public search' },
-  { label: 'Important', href: homePageLinks.importantPage, icon: ShieldCheck, description: 'Official portals and support links' },
-  { label: 'Certificates', href: homePageLinks.certificates, icon: BadgeCheck, description: 'Document verification support' },
-  { label: 'App', href: homePageLinks.app, icon: Zap, description: 'Mobile and alert access' },
-  { label: 'Bookmarks', href: homePageLinks.bookmarks, icon: Star, description: 'Saved public routes' },
-  { label: 'Profile', href: homePageLinks.profile, icon: Users, description: 'User preferences and saved alerts' },
-  { label: 'About', href: homePageLinks.about, icon: Globe2, description: 'Site information' },
-  { label: 'Contact', href: homePageLinks.contact, icon: Mic, description: 'Support and corrections' },
-  { label: 'Privacy', href: homePageLinks.privacy, icon: Shield, description: 'Privacy policy' },
-  { label: 'Advertise', href: homePageLinks.advertise, icon: TrendingUp, description: 'Campaign placement information' },
-];
-
-const adminConsoleLinks = [
-  { label: 'Dashboard', href: getAdminUrl(), icon: LayoutDashboard, description: 'Admin overview and counts' },
-  { label: 'Announcements', href: getAdminUrl('/announcements'), icon: FileText, description: 'Manage posts and public content' },
-  { label: 'New Post', href: getAdminUrl('/announcements/new'), icon: Sparkles, description: 'Create a new announcement' },
-  { label: 'Analytics', href: getAdminUrl('/analytics'), icon: BarChart3, description: 'Traffic and content performance' },
-  { label: 'Calendar', href: getAdminUrl('/calendar'), icon: CalendarDays, description: 'Deadline and publishing calendar' },
-  { label: 'Workflow', href: getAdminUrl('/workflow'), icon: Activity, description: 'Editorial review queue' },
-  { label: 'Taxonomies', href: getAdminUrl('/taxonomies'), icon: LayoutDashboard, description: 'Categories, orgs, states, exams' },
-  { label: 'Subscribers', href: getAdminUrl('/subscribers'), icon: Users, description: 'Email alert subscribers' },
-  { label: 'Notifications', href: getAdminUrl('/notifications'), icon: Zap, description: 'Push and campaign delivery' },
-  { label: 'Users', href: getAdminUrl('/users'), icon: Shield, description: 'Accounts and roles' },
-  { label: 'Settings', href: getAdminUrl('/settings'), icon: Settings, description: 'Site settings and feature flags' },
-  { label: 'System Admin', href: getAdminUrl('/system-admin'), icon: Database, description: 'Backups, health, security, database status' },
-];
-
-const backendSystemLinks = [
-  { label: 'API Health', href: getPublicApiUrl('/health'), icon: Server, description: 'Backend and runtime health probe' },
-  { label: 'API Readiness', href: getPublicApiUrl('/readyz'), icon: Activity, description: 'Primary database readiness' },
-  { label: 'Deep Health', href: getPublicApiUrl('/health/deep'), icon: Database, description: 'Postgres, legacy bridge, runtime diagnostics' },
-  { label: 'API Docs', href: getPublicApiUrl('/docs'), icon: FileText, description: 'OpenAPI documentation in development' },
-  { label: 'Homepage API', href: getPublicApiUrl('/content/homepage'), icon: Globe2, description: 'Public homepage content feed' },
-  { label: 'Posts API', href: getPublicApiUrl('/content/posts?limit=20'), icon: Briefcase, description: 'Public cards from the content database' },
-];
-
-function normalizePostCountText(value?: string) {
-  return value?.replace(/\s+posts?$/i, '').trim();
-}
-
-function toLatestUpdateItem(item: HomepageSectionItem): LatestUpdateItem {
-  return {
-    href: item.href,
-    title: item.title,
-    org: item.org,
-    date: item.date,
-    tag: item.tag,
-    postCount: normalizePostCountText(item.postCount),
-    qualification: item.qualification,
-  };
-}
-
 function getSectionItems(sections: HomepageSections, section: HomepageSectionKey) {
-  const items = sections[section]?.map(toLatestUpdateItem) ?? [];
-  return (items.length > 0 ? items : fallbackUpdates[section]).slice(0, 5);
+  void sections;
+  return fallbackUpdates[section].slice(0, 5);
 }
 
 function toStateSlug(label: string) {
@@ -266,6 +201,7 @@ function getTagClassName(tag?: LatestUpdateItem['tag']) {
     case 'hot':
       return 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400';
     case 'last-date':
+    case 'last-day':
       return 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400';
     case 'update':
       return 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400';
@@ -314,10 +250,11 @@ function LatestUpdateRow({ item }: { item: LatestUpdateItem }) {
   );
 }
 
-function UpdateCard({ accent, count, href, icon: Icon, items, title }: UpdateCardProps) {
+function UpdateCard({ accent, count, darkAccent, href, icon: Icon, items, title }: UpdateCardProps) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-xl">
-      <div className="absolute inset-0 opacity-60 dark:opacity-100" style={{ background: accent }} />
+      <div className="absolute inset-0 opacity-50 dark:hidden" style={{ background: accent }} />
+      <div className="absolute inset-0 hidden dark:block" style={{ background: darkAccent }} />
       <div className="relative p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -370,7 +307,7 @@ function HeroSection() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
-            <span className="text-[11px] font-semibold tracking-[0.03em] text-white/80">LIVE - UPDATED 12 SECONDS AGO</span>
+            <span className="text-[11px] font-semibold tracking-[0.03em] text-white/80">LIVE • UPDATED 12 SECONDS AGO</span>
           </div>
         </div>
 
@@ -388,7 +325,7 @@ function HeroSection() {
           for every Sarkari exam.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-center text-[14px] leading-6 text-white/75">
-          Ask in plain Hindi or English. We surface the right form, admit card, result and prep pack in seconds - no more
+          Ask in plain Hindi or English. We surface the right form, admit card, result and prep pack in seconds — no more
           digging through PDFs.
         </p>
 
@@ -404,8 +341,8 @@ function HeroSection() {
               </div>
               <input
                 name="search"
-                placeholder={searchPrompts[1]}
-                className="min-w-0 flex-1 bg-transparent px-3 text-[14px] font-semibold text-white outline-none placeholder:text-white/75"
+                placeholder={searchPrompts[0]}
+                className="min-w-0 flex-1 bg-transparent px-3 text-[14px] text-white outline-none placeholder:text-white/40"
               />
               <button type="button" className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white sm:flex">
                 <Mic size={15} />
@@ -424,7 +361,7 @@ function HeroSection() {
           </form>
 
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {['Today Results', 'Closing this week', 'Free Mock Tests', 'AI Cut-off Predictor'].map((label) => (
+            {["Today's Results", 'Closing this week', 'Free Mock Tests', 'AI Cut-off Predictor'].map((label) => (
               <Link
                 key={label}
                 href={buildJobsPath({ search: label })}
@@ -493,7 +430,7 @@ function ExamPulse() {
             Streaming
           </span>
         </div>
-        <div className="grid grid-cols-1 divide-y divide-gray-100 dark:divide-white/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0 md:grid-cols-4">
+        <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-white/10 md:grid-cols-4">
           {pulseItems.map((item) => (
             <Link key={item.exam} href={item.href} className="group relative p-4 transition hover:bg-gray-50 dark:hover:bg-white/5">
               <div className={`absolute left-0 right-0 top-0 h-0.5 bg-gradient-to-r ${item.gradient}`} />
@@ -527,7 +464,7 @@ function LatestUpdates({ sections }: { sections: HomepageSections }) {
         <div>
           <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.08em] text-gray-500 dark:text-white/50">
             <Zap size={12} className="text-orange-500" />
-            WHAT IS MOVING TODAY
+            WHAT&apos;S MOVING TODAY
           </div>
           <h2 className="text-[22px] font-extrabold tracking-[-0.02em] text-gray-900 dark:text-white">Latest, organized for you</h2>
         </div>
@@ -540,6 +477,7 @@ function LatestUpdates({ sections }: { sections: HomepageSections }) {
           icon={FileCheck}
           href={homePageLinks.results}
           accent="linear-gradient(135deg,#dbeafe,#ffffff 60%)"
+          darkAccent="radial-gradient(60% 60% at 0% 0%, rgba(59,130,246,0.18), transparent 60%)"
           items={getSectionItems(sections, 'results')}
         />
         <UpdateCard
@@ -548,6 +486,7 @@ function LatestUpdates({ sections }: { sections: HomepageSections }) {
           icon={BadgeCheck}
           href={homePageLinks.admitCards}
           accent="linear-gradient(135deg,#ede9fe,#ffffff 60%)"
+          darkAccent="radial-gradient(60% 60% at 0% 0%, rgba(167,139,250,0.18), transparent 60%)"
           items={getSectionItems(sections, 'admit-cards')}
         />
         <UpdateCard
@@ -556,6 +495,7 @@ function LatestUpdates({ sections }: { sections: HomepageSections }) {
           icon={Briefcase}
           href={homePageLinks.jobs}
           accent="linear-gradient(135deg,#ffedd5,#ffffff 60%)"
+          darkAccent="radial-gradient(60% 60% at 0% 0%, rgba(251,146,60,0.18), transparent 60%)"
           items={getSectionItems(sections, 'jobs')}
         />
       </div>
@@ -636,7 +576,22 @@ function AiPicks() {
                   <Star size={10} className="fill-white" />
                   {pick.match} match
                 </div>
-                <ShieldCheck size={16} className="text-gray-300 dark:text-white/40" />
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+                    aria-label="Save recommendation"
+                  >
+                    <Bookmark size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+                    aria-label="Dismiss recommendation"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               </div>
               <h3 className="mt-3 text-[15px] font-extrabold leading-snug tracking-[-0.01em] text-gray-900 dark:text-white">{pick.title}</h3>
               <p className="mt-1 text-[11.5px] text-gray-500 dark:text-white/50">{pick.org}</p>
@@ -664,95 +619,10 @@ function AiPicks() {
 
               <Link href={pick.href} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-700 to-cyan-500 py-2.5 text-[12px] font-bold text-white">
                 View full detail
-                <ArrowRight size={13} />
               </Link>
             </div>
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function ConsoleLinkCard({ description, href, icon: Icon, label }: {
-  description: string;
-  href: string;
-  icon: LucideIcon;
-  label: string;
-}) {
-  return (
-    <SafeLink
-      href={href}
-      className="group flex min-h-[86px] items-start gap-3 rounded-2xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
-    >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white transition group-hover:bg-blue-700 dark:bg-white/10">
-        <Icon size={16} />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] font-extrabold text-gray-900 dark:text-white">{label}</span>
-        <span className="mt-1 block text-[11px] leading-5 text-gray-500 dark:text-white/50">{description}</span>
-      </span>
-    </SafeLink>
-  );
-}
-
-function ConnectedConsole() {
-  return (
-    <section id="site-console" className="mx-auto mt-10 max-w-6xl px-4">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.08em] text-blue-700 dark:text-blue-300">
-            <Server size={12} />
-            CONNECTED SITE MAP
-          </div>
-          <h2 className="text-[22px] font-extrabold tracking-[-0.02em] text-gray-900 dark:text-white">Every frontend, admin and API surface</h2>
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-gray-500 dark:text-white/50">
-            Public users stay on working frontend routes. Admin and database operations open through the protected console, while backend links point to health, docs and content endpoints.
-          </p>
-        </div>
-        <SafeLink
-          href={getAdminUrl('/system-admin')}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-bold text-white transition hover:bg-blue-700"
-        >
-          <Database size={14} />
-          System console
-        </SafeLink>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-3xl border border-gray-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="text-[14px] font-extrabold text-gray-900 dark:text-white">Frontend Pages</h3>
-            <SafeLink href="/sitemap.xml" className="text-[11px] font-bold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">
-              XML sitemap
-            </SafeLink>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {publicPageLinks.map((item) => (
-              <ConsoleLinkCard key={item.label} {...item} />
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-3xl border border-gray-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-            <h3 className="mb-3 text-[14px] font-extrabold text-gray-900 dark:text-white">Admin Console</h3>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {adminConsoleLinks.map((item) => (
-                <ConsoleLinkCard key={item.label} {...item} />
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-gray-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-            <h3 className="mb-3 text-[14px] font-extrabold text-gray-900 dark:text-white">Backend & Database</h3>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {backendSystemLinks.map((item) => (
-                <ConsoleLinkCard key={item.label} {...item} />
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
@@ -795,7 +665,7 @@ function ExploreGrid() {
               VERIFIED SOURCES
             </div>
             <h3 className="mt-2 text-[18px] font-extrabold tracking-[-0.02em]">Every notification is cross-checked with official portals.</h3>
-            <p className="mt-2 text-[12px] text-white/60">We pull data directly from these issuing bodies - no rumours, no stale links.</p>
+            <p className="mt-2 text-[12px] text-white/60">We pull data directly from these issuing bodies — no rumours, no stale links.</p>
             <div className="mt-4 grid grid-cols-4 gap-2">
               {sources.map((source) => (
                 <div key={source} className="rounded-xl border border-white/10 bg-white/5 py-2 text-center text-[10.5px] font-bold text-white/80">
@@ -837,7 +707,6 @@ export default async function HomePage() {
       <ExamPulse />
       <LatestUpdates sections={sections} />
       <AiPicks />
-      <ConnectedConsole />
       <ExploreGrid />
     </PublicSiteShell>
   );

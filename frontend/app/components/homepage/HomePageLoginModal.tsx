@@ -88,7 +88,7 @@ export function HomePageLoginModal({ open, onClose, onLoginSuccess }: HomePageLo
             <GraduationCap size={22} className="text-yellow-300" />
           </div>
           <div className="text-[18px] font-extrabold tracking-tight">
-            SarkariExam<span className="text-yellow-300">.me</span>
+            SarkariExams<span className="text-yellow-300">.me</span>
           </div>
           <p className="mt-1 text-[12px] text-blue-200">India&apos;s #1 Government Jobs Portal</p>
 

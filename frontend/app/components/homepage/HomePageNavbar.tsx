@@ -13,10 +13,12 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Moon,
   School,
   Search,
   Settings,
   Shield,
+  Sun,
   User,
   X,
 } from 'lucide-react';
@@ -28,6 +30,7 @@ import { buildJobsPath } from '@/app/lib/public-content';
 import { HomePageLoginModal } from './HomePageLoginModal';
 import { getAdminUrl, homePageLinks } from './links';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useTheme } from '@/components/theme-provider';
 
 const navLinks = [
   { label: 'Home', icon: Home, badge: null, href: homePageLinks.home },
@@ -46,6 +49,57 @@ const notifications = [
   'UPSC CSE Prelims Result Declared',
   'IBPS PO 2026 Apply Now',
 ];
+
+function HomePageThemeToggle() {
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const [visualTheme, setVisualTheme] = useState<'light' | 'dark'>('light');
+  const isDark = visualTheme === 'dark';
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setVisualTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [resolvedTheme]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        toggleTheme();
+        setVisualTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+      }}
+      aria-label="Toggle theme"
+      title="Toggle theme"
+      className="relative h-7 w-14 shrink-0 rounded-full border border-white/18 transition-all"
+      style={{
+        background: isDark ? 'linear-gradient(135deg,#0b1021,#1e293b)' : 'linear-gradient(135deg,#fde68a,#fb923c)',
+        boxShadow: isDark
+          ? 'inset 0 0 12px rgba(99,102,241,0.4), 0 2px 6px rgba(0,0,0,0.3)'
+          : 'inset 0 0 10px rgba(255,180,90,0.5), 0 2px 6px rgba(251,146,60,0.25)',
+      }}
+    >
+      {isDark ? (
+        <>
+          <span className="absolute left-2 top-1.5 h-0.5 w-0.5 rounded-full bg-white/70" />
+          <span className="absolute left-4 top-3.5 h-0.5 w-0.5 rounded-full bg-white/40" />
+          <span className="absolute left-7 top-2 h-0.5 w-0.5 rounded-full bg-white/60" />
+        </>
+      ) : null}
+      <span
+        className="absolute top-1/2 flex h-[22px] w-[22px] items-center justify-center rounded-full transition-all"
+        style={{
+          transform: `translate(${isDark ? 28 : 2}px, -50%)`,
+          background: isDark ? 'linear-gradient(135deg,#e0e7ff,#a5b4fc)' : 'linear-gradient(135deg,#fff7d6,#fdba74)',
+          boxShadow: isDark ? '0 0 8px rgba(165,180,252,0.7)' : '0 0 10px rgba(253,186,116,0.8)',
+        }}
+      >
+        {isDark ? <Moon size={11} className="text-indigo-700" /> : <Sun size={12} className="text-orange-600" />}
+      </span>
+    </button>
+  );
+}
 
 export function HomePageNavbar() {
   const router = useRouter();
@@ -175,7 +229,7 @@ export function HomePageNavbar() {
                       WebkitTextFillColor: 'transparent',
                     }}
                   >
-                    Exam
+                    Exams
                   </span>
                   <span
                     className="text-[14px] font-medium md:text-[16px]"
@@ -212,6 +266,8 @@ export function HomePageNavbar() {
                   className="flex-1 bg-transparent text-[12px] text-white outline-none placeholder:text-blue-300/70"
                 />
               </form>
+
+              <HomePageThemeToggle />
 
               <div className="relative" data-notification-menu>
                 <button
@@ -334,6 +390,8 @@ export function HomePageNavbar() {
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5 md:hidden" data-mobile-menu>
+              <HomePageThemeToggle />
+
               {/* Mobile Notification Bell */}
               <div data-notification-menu>
                 <button

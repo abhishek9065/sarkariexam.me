@@ -31,6 +31,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setThemeState(getStoredTheme());
+      setSystemTheme(getSystemTheme());
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (event: MediaQueryListEvent) => {
       setSystemTheme(event.matches ? 'dark' : 'light');

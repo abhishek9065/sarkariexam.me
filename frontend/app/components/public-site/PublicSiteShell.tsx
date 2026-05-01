@@ -11,7 +11,7 @@ export function PublicSiteShell({ children }: { children: ReactNode }) {
   const isDetailRoute = /^\/(jobs|results|admit-cards|answer-keys|admissions)\/[^/]+$/.test(pathname);
 
   return (
-    <div className="min-h-screen bg-[#f0f2f7] text-gray-900 font-[family-name:var(--font-inter)]">
+    <div className="min-h-screen bg-[#f0f2f7] text-gray-900 font-[family-name:var(--font-inter)] dark:bg-[#070819]">
       <HomePageNavbar />
       {!isDetailRoute ? <HomePageMarqueeTicker /> : null}
       <main className="pb-8">{children}</main>

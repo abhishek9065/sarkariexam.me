@@ -8,7 +8,7 @@ import { organizationJsonLd, websiteJsonLd } from '@/app/lib/structured-data';
 export const metadata: Metadata = buildPageMetadata({
   title: 'Government Jobs, Results, Admit Cards, Answer Keys',
   description:
-    'SarkariExam.me brings official government job forms, exam results, admit cards, answer keys, syllabus, admissions, and important updates in one place.',
+    'SarkariExams.me brings official government job forms, exam results, admit cards, answer keys, syllabus, admissions, and important updates in one place.',
   canonicalPath: '/',
   keywords: ['latest government jobs', 'sarkari result today', 'online form', 'exam notifications'],
 });

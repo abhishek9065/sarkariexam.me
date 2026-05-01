@@ -1,6 +1,6 @@
 {
-  "name": "Sarkari Exam",
-  "short_name": "SarkariExam",
+  "name": "Sarkari Exams",
+  "short_name": "SarkariExams",
   "description": "Get latest Sarkari Result, Government Jobs, Admit Card, Answer Key, Syllabus and Admission updates.",
   "start_url": "/",
   "display": "standalone",
