@@ -174,7 +174,7 @@ describeOrSkip('admin workflow integration', () => {
             .set('X-CSRF-Token', requesterSession.csrfToken)
             .set('X-Admin-Step-Up-Token', requesterStepUpToken)
             .send({});
-        expect(selfApprove.status).toBe(400);
+        expect(selfApprove.status).toBe(403);
         expect(selfApprove.body.reason).toContain('self_approval_forbidden');
 
         const reviewerStepUpToken = await issueStepUp({
