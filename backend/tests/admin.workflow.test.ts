@@ -23,8 +23,9 @@ const normalizeCookies = (setCookies: string[]): string[] => setCookies.map((coo
 const loginAdmin = async (email: string, password: string) => {
     const response = await request(app)
         .post('/api/auth/login')
-        .send({ email, password })
-        .expect(200);
+        .send({ email, password });
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
 
     const setCookies = (response.headers['set-cookie'] as string[] | undefined) ?? [];
     const authToken = extractCookieValue(setCookies, config.adminAuthCookieName);

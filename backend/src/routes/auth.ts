@@ -157,17 +157,18 @@ const getAdminAuthContext = async (req: express.Request, setupToken?: string) =>
 };
 
 const isAdminEmailAllowed = (email: string): boolean => {
-  if (config.adminEmailAllowlist.length > 0 && !config.adminEmailAllowlist.includes(email)) {
-    return false;
+  const normalizedEmail = email.toLowerCase();
+  const emailAllowed = config.adminEmailAllowlist.includes(normalizedEmail);
+  const domainAllowed = config.adminDomainAllowlist.some((domain) => {
+    const normalized = domain.toLowerCase().replace(/^@/, '');
+    return normalizedEmail.endsWith(`@${normalized}`);
+  });
+
+  if (config.adminEmailAllowlist.length === 0 && config.adminDomainAllowlist.length === 0) {
+    return true;
   }
-  if (config.adminDomainAllowlist.length > 0) {
-    const domainAllowed = config.adminDomainAllowlist.some((domain) => {
-      const normalized = domain.startsWith('@') ? domain.slice(1) : domain;
-      return email.endsWith(`@${normalized}`);
-    });
-    if (!domainAllowed) return false;
-  }
-  return true;
+
+  return emailAllowed || domainAllowed;
 };
 
 const getAdminPasswordResetKey = (userId: string) => `auth:admin_password_reset:${userId}`;
