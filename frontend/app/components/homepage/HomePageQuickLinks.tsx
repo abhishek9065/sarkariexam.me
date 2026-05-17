@@ -92,15 +92,15 @@ export function HomePageQuickLinks() {
                   <Link
                     key={category.label}
                     href={category.href}
-                    className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50"
+                    className="group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
                   >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${category.bg}`}>
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${category.bg} dark:bg-white/10`}>
                       <category.icon size={16} className={category.color} />
                     </div>
-                    <span className="flex-1 text-[13px] font-semibold text-gray-700 transition-colors group-hover:text-[#e65100]">
+                    <span className="flex-1 text-[13px] font-semibold text-gray-700 transition-colors group-hover:text-[#e65100] dark:text-gray-200 dark:group-hover:text-orange-400">
                       {category.label}
                     </span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400">
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-400">
                       {category.count}
                     </span>
                   </Link>
@@ -116,15 +116,15 @@ export function HomePageQuickLinks() {
                       key={website.label}
                       href={toOfficialUrl(website.url)}
                       target="_blank"
-                      className="group flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
+                      className="group flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
                     >
                       <div className="flex items-center gap-2">
                         <Globe size={13} className="text-gray-400" />
-                        <span className="text-[12px] font-semibold text-gray-700 transition-colors group-hover:text-blue-700">
+                        <span className="text-[12px] font-semibold text-gray-700 transition-colors group-hover:text-blue-700 dark:text-gray-200 dark:group-hover:text-blue-400">
                           {website.label}
                         </span>
                       </div>
-                      <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                      <span className="flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
                         {website.url}
                         <ExternalLink size={10} />
                       </span>
@@ -142,19 +142,19 @@ export function HomePageQuickLinks() {
                   <Link
                     key={department.label}
                     href={buildJobsPath({ department: department.department })}
-                    className="group flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-3 transition-all hover:border-orange-200 hover:bg-orange-50/50 hover:shadow-sm"
+                    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 transition-all hover:border-orange-200 hover:bg-orange-50/50 hover:shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-orange-800/50 dark:hover:bg-orange-950/20"
                   >
                     <department.icon size={18} className="shrink-0 text-gray-500 transition-colors group-hover:text-[#e65100]" />
                     <div className="flex-1">
-                      <span className="text-[13px] font-semibold text-gray-800 transition-colors group-hover:text-[#e65100]">
+                      <span className="text-[13px] font-semibold text-gray-800 transition-colors group-hover:text-[#e65100] dark:text-gray-100 dark:group-hover:text-orange-400">
                         {department.label}
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="text-[14px] font-bold text-[#e65100]">{department.count}</span>
-                      <div className="text-[9px] text-gray-400">Vacancies</div>
+                      <div className="text-[9px] text-gray-400 dark:text-gray-500">Vacancies</div>
                     </div>
-                    <ArrowUpRight size={14} className="shrink-0 text-gray-300 transition-colors group-hover:text-[#e65100]" />
+                    <ArrowUpRight size={14} className="shrink-0 text-gray-300 transition-colors group-hover:text-[#e65100] dark:text-gray-600 dark:group-hover:text-orange-400" />
                   </Link>
                 ))}
               </div>
@@ -167,7 +167,7 @@ export function HomePageQuickLinks() {
                     <Link
                       key={state}
                       href={`/states/${toStateSlug(state)}`}
-                      className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-gray-600 transition-colors hover:bg-orange-50 hover:text-[#e65100]"
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-gray-600 transition-colors hover:bg-orange-50 hover:text-[#e65100] dark:text-gray-300 dark:hover:bg-orange-950/25 dark:hover:text-orange-400"
                     >
                       <span className="h-1 w-1 shrink-0 rounded-full bg-orange-300" />
                       {state}

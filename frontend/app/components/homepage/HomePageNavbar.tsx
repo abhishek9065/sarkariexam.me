@@ -51,51 +51,56 @@ const notifications = [
 ];
 
 function HomePageThemeToggle() {
-  const { resolvedTheme, toggleTheme } = useTheme();
-  const [visualTheme, setVisualTheme] = useState<'light' | 'dark'>('light');
-  const isDark = visualTheme === 'dark';
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setVisualTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [resolvedTheme]);
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <button
       type="button"
-      onClick={() => {
-        toggleTheme();
-        setVisualTheme((current) => (current === 'dark' ? 'light' : 'dark'));
-      }}
-      aria-label="Toggle theme"
-      title="Toggle theme"
-      className="relative h-7 w-14 shrink-0 rounded-full border border-white/18 transition-all"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+      aria-pressed={isDark}
+      title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+      className="group relative h-9 w-[92px] shrink-0 overflow-hidden rounded-full border border-white/18 p-1 transition-all duration-300 hover:-translate-y-px hover:border-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80"
       style={{
-        background: isDark ? 'linear-gradient(135deg,#0b1021,#1e293b)' : 'linear-gradient(135deg,#fde68a,#fb923c)',
+        background: isDark
+          ? 'linear-gradient(135deg,#070a1f 0%,#101a35 52%,#172554 100%)'
+          : 'linear-gradient(135deg,#fff7d6 0%,#fed7aa 52%,#fb923c 100%)',
         boxShadow: isDark
-          ? 'inset 0 0 12px rgba(99,102,241,0.4), 0 2px 6px rgba(0,0,0,0.3)'
-          : 'inset 0 0 10px rgba(255,180,90,0.5), 0 2px 6px rgba(251,146,60,0.25)',
+          ? 'inset 0 0 18px rgba(99,102,241,0.35), 0 6px 18px rgba(0,0,0,0.28)'
+          : 'inset 0 0 16px rgba(255,180,90,0.55), 0 6px 18px rgba(251,146,60,0.20)',
       }}
     >
-      {isDark ? (
-        <>
-          <span className="absolute left-2 top-1.5 h-0.5 w-0.5 rounded-full bg-white/70" />
-          <span className="absolute left-4 top-3.5 h-0.5 w-0.5 rounded-full bg-white/40" />
-          <span className="absolute left-7 top-2 h-0.5 w-0.5 rounded-full bg-white/60" />
-        </>
-      ) : null}
       <span
-        className="absolute top-1/2 flex h-[22px] w-[22px] items-center justify-center rounded-full transition-all"
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{
-          transform: `translate(${isDark ? 28 : 2}px, -50%)`,
-          background: isDark ? 'linear-gradient(135deg,#e0e7ff,#a5b4fc)' : 'linear-gradient(135deg,#fff7d6,#fdba74)',
-          boxShadow: isDark ? '0 0 8px rgba(165,180,252,0.7)' : '0 0 10px rgba(253,186,116,0.8)',
+          background: isDark
+            ? 'radial-gradient(circle at 74% 38%, rgba(129,140,248,0.38), transparent 34%)'
+            : 'radial-gradient(circle at 26% 45%, rgba(255,255,255,0.55), transparent 34%)',
+        }}
+      />
+      <span className="absolute left-[13px] top-1/2 -translate-y-1/2 text-[10px] font-black tracking-[0.04em] text-orange-800/55 transition-opacity duration-300" style={{ opacity: isDark ? 0.38 : 1 }}>
+        DAY
+      </span>
+      <span className="absolute right-[11px] top-1/2 -translate-y-1/2 text-[10px] font-black tracking-[0.04em] text-blue-100/55 transition-opacity duration-300" style={{ opacity: isDark ? 1 : 0.38 }}>
+        NIGHT
+      </span>
+      <span className="absolute left-[49px] top-2 h-0.5 w-0.5 rounded-full bg-white/80 transition-opacity duration-300" style={{ opacity: isDark ? 1 : 0 }} />
+      <span className="absolute left-[63px] top-5 h-0.5 w-0.5 rounded-full bg-white/50 transition-opacity duration-300" style={{ opacity: isDark ? 1 : 0 }} />
+      <span className="absolute right-4 top-2.5 h-1 w-1 rounded-full bg-indigo-200/60 transition-opacity duration-300" style={{ opacity: isDark ? 1 : 0 }} />
+      <span
+        className="absolute left-1 top-1/2 flex h-7 w-7 items-center justify-center rounded-full transition-all duration-300"
+        style={{
+          transform: `translate(${isDark ? 56 : 0}px, -50%)`,
+          background: isDark
+            ? 'linear-gradient(135deg,#e0e7ff 0%,#a5b4fc 100%)'
+            : 'linear-gradient(135deg,#fff7d6 0%,#fdba74 100%)',
+          boxShadow: isDark
+            ? '0 0 14px rgba(165,180,252,0.85), 0 3px 10px rgba(0,0,0,0.28)'
+            : '0 0 16px rgba(253,186,116,0.9), 0 3px 10px rgba(154,52,18,0.20)',
         }}
       >
-        {isDark ? <Moon size={11} className="text-indigo-700" /> : <Sun size={12} className="text-orange-600" />}
+        {isDark ? <Moon size={14} className="text-indigo-800" /> : <Sun size={15} className="text-orange-600" />}
       </span>
     </button>
   );

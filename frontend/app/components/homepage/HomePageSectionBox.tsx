@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ArrowUpRight, Calendar, ChevronRight, GraduationCap, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SafeLink } from '@/app/components/public-site/SafeLink';
@@ -9,6 +9,9 @@ interface HomePageSectionBoxProps {
   headerColor: string;
   children: ReactNode;
   viewAllLink: string;
+  accent?: string;
+  kicker?: string;
+  count?: number;
 }
 
 interface HomePageLinkItemProps {
@@ -21,72 +24,181 @@ interface HomePageLinkItemProps {
   qualification?: string;
 }
 
-const tagStyles: Record<NonNullable<HomePageLinkItemProps['tag']>, { bg: string; text: string; border: string; label: string }> = {
-  new: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', label: 'NEW' },
-  hot: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', label: 'HOT' },
-  update: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', label: 'UPDATE' },
-  'last-date': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'LAST DATE' },
+const accentFromClass: Record<string, string> = {
+  'bg-[#d32f2f]': '#dc2626',
+  'bg-[#1565c0]': '#1d4ed8',
+  'bg-[#6a1b9a]': '#7c3aed',
+  'bg-[#00695c]': '#0d9488',
+  'bg-[#ad1457]': '#be185d',
+  'bg-[#283593]': '#3730a3',
+  'bg-[#4e342e]': '#78350f',
+  'bg-[#1b5e20]': '#166534',
+  'bg-[#e65100]': '#ea580c',
+  'bg-[#37474f]': '#37474f',
 };
 
-export function HomePageSectionBox({ id, title, headerColor, children, viewAllLink }: HomePageSectionBoxProps) {
+const tagConfig: Record<NonNullable<HomePageLinkItemProps['tag']>, { label: string; className: string; pulse?: boolean }> = {
+  new: {
+    label: 'NEW',
+    className: 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white ring-1 ring-emerald-300/40',
+    pulse: true,
+  },
+  hot: {
+    label: 'HOT',
+    className: 'bg-gradient-to-r from-red-500 to-rose-600 text-white ring-1 ring-red-300/40',
+    pulse: true,
+  },
+  update: {
+    label: 'UPDATE',
+    className: 'bg-gradient-to-r from-sky-500 to-blue-600 text-white ring-1 ring-sky-300/40',
+  },
+  'last-date': {
+    label: 'LAST DATE',
+    className: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white ring-1 ring-amber-300/40',
+    pulse: true,
+  },
+};
+
+const monoPalette: Array<[string, string]> = [
+  ['#fee2e2', '#b91c1c'],
+  ['#dbeafe', '#1d4ed8'],
+  ['#ede9fe', '#6d28d9'],
+  ['#dcfce7', '#15803d'],
+  ['#fef3c7', '#b45309'],
+  ['#ffe4e6', '#be123c'],
+  ['#cffafe', '#0e7490'],
+  ['#fae8ff', '#a21caf'],
+];
+
+function monoColors(org: string): [string, string] {
+  let hash = 0;
+  for (let index = 0; index < org.length; index += 1) {
+    hash = (hash * 31 + org.charCodeAt(index)) >>> 0;
+  }
+  return monoPalette[hash % monoPalette.length];
+}
+
+function initials(org: string): string {
+  const parts = org.replace(/[^A-Za-z\s]/g, '').split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return 'SE';
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+export function HomePageSectionBox({
+  id,
+  title,
+  headerColor,
+  children,
+  viewAllLink,
+  accent,
+  kicker,
+  count,
+}: HomePageSectionBoxProps) {
+  const hex = accent ?? accentFromClass[headerColor] ?? '#1d4ed8';
+
   return (
-    <div id={id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <div className={`${headerColor} flex items-center justify-between gap-3 px-4 py-3`}>
-        <h2 className="flex min-w-0 items-center gap-2 text-white">
-          <span className="h-4 w-1 rounded-full bg-white/50" />
-          <span className="truncate text-[12px] font-bold uppercase tracking-[0.08em]">{title}</span>
-        </h2>
+    <div
+      id={id}
+      className="group/section relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_8px_28px_-12px_rgba(15,23,42,0.12)] transition-all duration-300 hover:shadow-[0_2px_6px_rgba(15,23,42,0.06),0_20px_44px_-12px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#0f172a]"
+    >
+      <div className="absolute inset-x-0 top-0 z-10 h-[3px]" style={{ background: `linear-gradient(90deg, ${hex}, ${hex}cc 60%, transparent)` }} />
+
+      <div className="relative flex items-end justify-between gap-3 border-b border-gray-100 px-4 pb-3 pt-3.5 dark:border-white/10" style={{ background: `linear-gradient(180deg, ${hex}0d 0%, transparent 100%)` }}>
+        <div className="pointer-events-none absolute -top-3 right-2 select-none text-[56px] font-black leading-none tracking-normal opacity-[0.06] dark:opacity-[0.09]" style={{ color: hex }}>
+          {(kicker ?? title).split(' ')[0]}
+        </div>
+
+        <div className="relative z-10 min-w-0">
+          {kicker ? (
+            <div className="mb-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.16em]" style={{ color: hex }}>
+              {kicker}
+            </div>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-4 w-1 rounded-sm" style={{ background: hex }} />
+            <h2 className="truncate text-[14.5px] font-extrabold tracking-normal text-gray-900 dark:text-white">{title}</h2>
+            {count !== undefined ? (
+              <span className="rounded-md px-1.5 py-0.5 text-[9.5px] font-extrabold tabular-nums" style={{ color: hex, background: `${hex}1a` }}>
+                {count}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
         <SafeLink
           href={viewAllLink}
-          className="flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/80 transition-all hover:bg-white/20 hover:text-white"
+          className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold tracking-[0.04em] transition-all hover:gap-1.5"
+          style={{ color: hex, background: `${hex}14` }}
         >
-          View All <ChevronRight size={11} />
+          VIEW ALL <ChevronRight size={11} />
         </SafeLink>
       </div>
-      <div className="divide-y divide-gray-100">{children}</div>
+
+      <div className="divide-y divide-gray-100/80 dark:divide-white/5">{children}</div>
+      <div className="pointer-events-none absolute -bottom-16 -right-16 h-40 w-40 rounded-full opacity-[0.06] blur-2xl dark:opacity-[0.10]" style={{ background: hex }} />
     </div>
   );
 }
 
 export function HomePageLinkItem({ href, title, org, date, tag, postCount, qualification }: HomePageLinkItemProps) {
-  const tagStyle = tag ? tagStyles[tag] : null;
+  const tagStyle = tag ? tagConfig[tag] : null;
+  const [bg, fg] = monoColors(org);
 
   return (
     <SafeLink
       href={href}
-      className="group flex cursor-pointer items-start gap-2.5 px-4 py-3 transition-colors hover:bg-orange-50/60"
+      className="group/item relative flex cursor-pointer items-start gap-3 px-3.5 py-2.5 transition-colors hover:bg-gradient-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/[0.06]"
     >
-      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400 transition-transform group-hover:scale-125" />
+      <span className="absolute bottom-2 left-0 top-2 w-[2px] rounded-r bg-gradient-to-b from-orange-400 to-orange-500 opacity-0 transition-opacity group-hover/item:opacity-100" />
+
+      <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg shadow-sm ring-1 ring-black/5 dark:ring-white/10" style={{ background: bg, color: fg }} aria-hidden>
+        <span className="text-[11px] font-extrabold tracking-normal">{initials(org)}</span>
+      </div>
+
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="leading-snug text-[13px] font-semibold text-gray-800 transition-colors group-hover:text-[#e65100]">
+        <div className="flex flex-wrap items-start gap-1.5">
+          <span className="text-[13px] font-semibold leading-snug text-gray-800 transition-colors group-hover/item:text-[#c2410c] dark:text-gray-100 dark:group-hover/item:text-orange-300">
             {title}
           </span>
-          {tagStyle && (
+          {tagStyle ? (
             <span
-              className={`${tagStyle.bg} ${tagStyle.text} ${tagStyle.border} rounded border px-1.5 py-0.5 text-[9px] font-bold tracking-[0.02em]`}
+              className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-[0.05em] shadow-sm ${tagStyle.className} ${tagStyle.pulse ? 'animate-pulse' : ''}`}
+              style={{ animationDuration: tagStyle.pulse ? '2.4s' : undefined }}
             >
               {tagStyle.label}
             </span>
-          )}
+          ) : null}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-gray-400">
-          <span className="max-w-[12rem] truncate">{org}</span>
-          {postCount && (
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
-              {postCount} Posts
+
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="max-w-[180px] truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">{org}</span>
+          {postCount ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-gray-600 dark:bg-white/5 dark:text-gray-300">
+              <Users size={9} className="shrink-0" />
+              {postCount}
             </span>
-          )}
-          {qualification && (
-            <span className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+          ) : null}
+          {qualification ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold text-gray-600 dark:bg-white/5 dark:text-gray-300">
+              <GraduationCap size={9} />
               {qualification}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
-      <span className="mt-0.5 shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500 transition-colors group-hover:bg-orange-100 group-hover:text-orange-500">
-        {date}
-      </span>
+
+      <div className="mt-0.5 flex shrink-0 flex-col items-end gap-0.5">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10.5px] font-bold tracking-[0.02em] text-gray-500 transition-colors group-hover/item:text-orange-600 dark:text-gray-400 dark:group-hover/item:text-orange-300">
+          <Calendar size={9} />
+          {date}
+        </span>
+        <ArrowUpRight size={12} className="translate-y-0.5 -translate-x-0.5 text-gray-300 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:text-orange-500 group-hover/item:opacity-100 dark:text-gray-600 dark:group-hover/item:text-orange-300" />
+      </div>
     </SafeLink>
   );
 }
