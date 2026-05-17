@@ -34,13 +34,12 @@ This repository uses a strict deployment model for production delivery to a Digi
 
 ## Strict Safety Guarantees
 
-- Deployment refuses to run without explicit `DO_REPO_DIR`.
 - Deployment refuses to run if host key fingerprint does not match.
 - Deployment refuses non-40-character SHAs.
 - Deployment refuses SHAs not reachable from `origin/main`.
 - Deployment refuses to proceed when remote working tree has tracked local modifications.
 
-The SSH deploy wrapper no longer tries to auto-discover a remote checkout path. `DO_REPO_DIR` must point at the exact production repository clone on the droplet, and deploys fail closed if it is missing or wrong.
+The SSH deploy wrapper prefers an explicit `DO_REPO_DIR` when it is provided, but if the value is missing it will try to auto-discover the production checkout from common droplet paths before failing. In either case, deploys still fail if the resolved path is not a valid repository clone.
 
 ## Root .env Requirements
 
@@ -74,6 +73,8 @@ Deployment validates:
 ```bash
 DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha> --preflight-only
 ```
+
+If `DO_REPO_DIR` is omitted, the remote helper will try the same auto-discovery path used by GitHub Actions.
 
 ### Manual deployment
 

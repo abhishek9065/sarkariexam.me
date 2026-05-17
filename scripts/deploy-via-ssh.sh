@@ -90,7 +90,6 @@ validate_config() {
   require_var "DO_HOST"
   require_var "DO_USER"
   require_var "DO_SSH_KEY"
-  require_var "DO_REPO_DIR"
   require_var "TRIGGER_SHA"
 
   if [[ "${#MISSING_CONFIG_KEYS[@]}" -gt 0 ]]; then
@@ -207,6 +206,54 @@ remote_run() {
   "${SSH_CMD[@]}" "$1"
 }
 
+resolve_remote_repo_dir() {
+  if [[ -n "$DO_REPO_DIR" ]]; then
+    return 0
+  fi
+
+  local repo_hint repo_name quoted_repo_name detected
+  repo_hint="${GITHUB_REPOSITORY:-}"
+  repo_name="${repo_hint##*/}"
+  if [[ -z "$repo_name" || "$repo_name" == "$repo_hint" ]]; then
+    repo_name="sarkariexam.me"
+  fi
+  quoted_repo_name="$(quote_for_remote_shell "$repo_name")"
+
+  detected="$(remote_run "bash -se" <<EOF || true
+set -Eeuo pipefail
+repo_name=${quoted_repo_name}
+
+candidates=(
+  "\$HOME/\$repo_name"
+  "\$HOME/sarkari-result-git-clean"
+  "\$HOME/sarkariexam.me"
+  "/opt/\$repo_name"
+  "/opt/sarkari-result-git-clean"
+  "/opt/sarkariexam.me"
+  "/srv/\$repo_name"
+  "/var/www/\$repo_name"
+)
+
+for path in "\${candidates[@]}"; do
+  if [[ -d "\$path/.git" && -f "\$path/docker-compose.yml" && -f "\$path/scripts/deploy-live.sh" ]]; then
+    echo "\$path"
+    exit 0
+  fi
+done
+
+exit 1
+EOF
+)"
+
+  detected="$(printf '%s' "$detected" | tr -d '\r' | tail -n 1)"
+  if [[ -z "$detected" ]]; then
+    fail "DO_REPO_DIR is not set and auto-detection failed. Set DO_REPO_DIR or place the repo in one of the standard droplet locations."
+  fi
+
+  DO_REPO_DIR="$detected"
+  log "Auto-detected DO_REPO_DIR=${DO_REPO_DIR}"
+}
+
 upload_remote_helper() {
   if ! "${SCP_CMD[@]}" "scripts/deploy-live.sh" "${DO_USER}@${DO_HOST}:${REMOTE_HELPER_PATH}"; then
     fail "Failed to upload remote deploy helper."
@@ -303,6 +350,9 @@ set_stage "ssh-preflight"
 if ! remote_run "echo 'SSH preflight connected'; whoami; hostname"; then
   fail "SSH preflight failed. Verify DO_HOST, DO_USER, DO_PORT, firewall rules, and deploy key validity."
 fi
+
+set_stage "resolve-repo-dir"
+resolve_remote_repo_dir
 
 set_stage "upload-helper"
 upload_remote_helper
