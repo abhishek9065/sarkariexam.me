@@ -48,6 +48,36 @@ describeOrSkip('auth/register', () => {
         expect(loginRes.headers['set-cookie']).toBeDefined();
     });
 
+    it('allows login without a CSRF token', async () => {
+        const email = `csrf-free-${Date.now()}@example.com`;
+        const password = `Str0ng!${Date.now()}Bb`;
+        const agent = request.agent(app);
+
+        const csrfRegisterRes = await agent
+            .get('/api/auth/csrf')
+            .expect(200);
+        const registerCsrfToken = csrfRegisterRes.body?.data?.csrfToken;
+        expect(typeof registerCsrfToken).toBe('string');
+
+        await agent
+            .post('/api/auth/register')
+            .set('x-csrf-token', registerCsrfToken)
+            .send({
+                name: 'CSRF Free Login User',
+                email,
+                password,
+            })
+            .expect(201);
+
+        const loginRes = await request(app)
+            .post('/api/auth/login')
+            .send({ email, password })
+            .expect(200);
+
+        expect(loginRes.body?.data?.user?.email).toBe(email);
+        expect(loginRes.headers['set-cookie']).toBeDefined();
+    });
+
     it('resets password with recovery token', async () => {
         const email = `recover-${Date.now()}@example.com`;
         const oldPassword = `Old!${Date.now()}Aa`;
