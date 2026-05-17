@@ -38,6 +38,7 @@ npm run dev
 Runs on `http://localhost:5000`.
 
 The backend expects PostgreSQL for Prisma-backed content, taxonomy, and editorial data. Make sure `backend/.env` includes `POSTGRES_PRISMA_URL` before starting the server or running the test suite.
+The backend scripts run `prisma generate` automatically before `dev`, `build`, and `test`, so a fresh install does not need a manual client generation step.
 
 If you only need the local Mongo-compatible database for migration rehearsal or backend work:
 
