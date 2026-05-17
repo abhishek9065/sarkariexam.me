@@ -32,6 +32,8 @@ import { getAdminUrl, homePageLinks } from './links';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useTheme } from '@/components/theme-provider';
 
+type AuthTab = 'login' | 'register';
+
 const navLinks = [
   { label: 'Home', icon: Home, badge: null, href: homePageLinks.home },
   { label: 'Latest Jobs', icon: Briefcase, badge: 'HOT', href: homePageLinks.jobs },
@@ -106,12 +108,17 @@ function HomePageThemeToggle() {
   );
 }
 
-export function HomePageNavbar() {
+interface HomePageNavbarProps {
+  initialAuthTab?: AuthTab;
+}
+
+export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
   const router = useRouter();
   const { user, isAdmin, isLoggedIn, logout } = useCurrentUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(() => Boolean(initialAuthTab));
+  const [loginTab, setLoginTab] = useState<AuthTab>(initialAuthTab ?? 'login');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
@@ -139,6 +146,26 @@ export function HomePageNavbar() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  function handleCloseLoginModal() {
+    setIsLoginOpen(false);
+
+    if (initialAuthTab) {
+      router.replace(homePageLinks.home);
+    }
+  }
+
+  function handleLoginSuccess() {
+    setIsLoginOpen(false);
+
+    if (initialAuthTab) {
+      window.location.replace(homePageLinks.home);
+      return;
+    }
+
+    // The useCurrentUser hook will automatically re-fetch user data.
+    window.location.reload();
+  }
+
   function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = searchQuery.trim();
@@ -150,12 +177,9 @@ export function HomePageNavbar() {
     <>
       <HomePageLoginModal 
         open={isLoginOpen} 
-        onClose={() => setIsLoginOpen(false)} 
-        onLoginSuccess={() => {
-          setIsLoginOpen(false);
-          // The useCurrentUser hook will automatically re-fetch user data
-          window.location.reload();
-        }}
+        initialTab={loginTab}
+        onClose={handleCloseLoginModal}
+        onLoginSuccess={handleLoginSuccess}
       />
       <header className="sticky top-0 z-50">
         <div
@@ -428,7 +452,10 @@ export function HomePageNavbar() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setIsLoginOpen(true)}
+                  onClick={() => {
+                    setLoginTab('login');
+                    setIsLoginOpen(true);
+                  }}
                   className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[rgba(253,216,53,0.45)] bg-[rgba(253,216,53,0.2)] text-white"
                   aria-label="Login or register"
                 >
