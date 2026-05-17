@@ -43,12 +43,16 @@ describe('server security pipeline', () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalJwtSecret = process.env.JWT_SECRET;
   const originalEnforceApiOrigin = process.env.ENFORCE_API_ORIGIN;
+  const originalCorsOrigins = process.env.CORS_ORIGINS;
+  const originalFrontendUrl = process.env.FRONTEND_URL;
 
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
     process.env.JWT_SECRET = 'unit-prod-secret-2026';
     process.env.POSTGRES_PRISMA_URL = 'postgresql://postgres:postgres@localhost:5432/sarkari_test?schema=public';
     process.env.ENFORCE_API_ORIGIN = 'true';
+    process.env.CORS_ORIGINS = 'https://sarkariexams.me';
+    process.env.FRONTEND_URL = 'https://sarkariexams.me';
     isDatabaseConfigured.mockReturnValue(false);
     healthCheck.mockResolvedValue(true);
     postgresHealthCheck.mockResolvedValue(true);
@@ -59,6 +63,8 @@ describe('server security pipeline', () => {
     process.env.NODE_ENV = originalNodeEnv;
     process.env.JWT_SECRET = originalJwtSecret;
     process.env.ENFORCE_API_ORIGIN = originalEnforceApiOrigin;
+    process.env.CORS_ORIGINS = originalCorsOrigins;
+    process.env.FRONTEND_URL = originalFrontendUrl;
   });
 
   it('blocks mutating /api requests without Origin when strict origin mode is enabled', async () => {
@@ -76,11 +82,11 @@ describe('server security pipeline', () => {
     const { app } = await import('../server.js');
 
     const response = await request(app)
-      .post('/api/nonexistent')
+      .post('/api/admin/announcements')
       .set('Origin', 'https://sarkariexams.me')
       .send({ hello: 'world' });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
     expect(response.body.code).not.toBe('ORIGIN_REQUIRED');
   });
 });
