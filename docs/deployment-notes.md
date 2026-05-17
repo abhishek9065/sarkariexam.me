@@ -40,6 +40,8 @@ This repository uses a strict deployment model for production delivery to a Digi
 - Deployment refuses SHAs not reachable from `origin/main`.
 - Deployment refuses to proceed when remote working tree has tracked local modifications.
 
+The SSH deploy wrapper no longer tries to auto-discover a remote checkout path. `DO_REPO_DIR` must point at the exact production repository clone on the droplet, and deploys fail closed if it is missing or wrong.
+
 ## Root .env Requirements
 
 Minimum required values:
