@@ -5,13 +5,13 @@ import path from 'path';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import csurf from 'csurf';
 import express from 'express';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 
 import { config } from './config.js';
 import { cloudflareMiddleware } from './middleware/cloudflare.js';
+import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimit as distributedRateLimit } from './middleware/rateLimit.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
@@ -203,26 +203,11 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-const apiCsrfProtection = csurf({
-  cookie: {
-    key: '_csrf',
-    httpOnly: true,
-    secure: config.isProduction,
-    sameSite: 'strict',
-    path: '/',
-  },
-  value: (req) => {
-    const headerToken = req.get('x-csrf-token') ?? req.get('x-xsrf-token');
-    if (headerToken) return headerToken;
-
-    const body = req.body as Record<string, unknown> | undefined;
-    if (body && typeof body._csrf === 'string') return body._csrf;
-    if (body && typeof body.csrfToken === 'string') return body.csrfToken;
-    return '';
-  },
-});
-
-app.use('/api', apiCsrfProtection);
+app.use('/api', csrfProtection({
+  exempt: [
+    { method: 'POST', path: '/auth/login' },
+  ],
+}));
 
 // Swagger UI
 try {
