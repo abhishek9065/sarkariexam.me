@@ -28,6 +28,12 @@ import { HomePageLinkItem, HomePageSectionBox } from './HomePageSectionBox';
 import { HomePageQuickLinks } from './HomePageQuickLinks';
 import { homePageLinks } from './links';
 
+type AuthTab = 'login' | 'register';
+
+interface HomePageProps {
+  initialAuthTab?: AuthTab;
+}
+
 const stats = [
   { icon: Briefcase, value: '12,450', label: 'Active Jobs', color: '#fbbf24' },
   { icon: FileCheck, value: '128', label: 'Admit Cards', color: '#7dd3fc' },
@@ -546,9 +552,9 @@ function MainGrid() {
   );
 }
 
-export default function HomePage() {
+export default function HomePage({ initialAuthTab }: HomePageProps) {
   return (
-    <PublicSiteShell>
+    <PublicSiteShell initialAuthTab={initialAuthTab}>
       <Hero />
       <CategoryStrip />
       <FeaturedSpotlight />
