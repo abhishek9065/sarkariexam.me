@@ -503,7 +503,7 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
                 <Link
                   key={label}
                   href={href}
-                  className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-all duration-200 select-none"
+                  className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-all duration-200"
                   style={{ fontSize: '11.5px', fontWeight: index === 0 ? 700 : 500 }}
                 >
                   <span

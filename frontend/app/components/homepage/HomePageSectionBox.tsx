@@ -150,10 +150,7 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
   const [bg, fg] = monoColors(org);
 
   return (
-    <SafeLink
-      href={href}
-      className="group/item relative flex cursor-pointer items-start gap-3 px-3.5 py-2.5 transition-colors hover:bg-gradient-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/[0.06]"
-    >
+    <div className="group/item relative flex items-start gap-3 px-3.5 py-2.5 transition-colors hover:bg-gradient-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/[0.06]">
       <span className="absolute bottom-2 left-0 top-2 w-[2px] rounded-r bg-gradient-to-b from-orange-400 to-orange-500 opacity-0 transition-opacity group-hover/item:opacity-100" />
 
       <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg shadow-sm ring-1 ring-black/5 dark:ring-white/10" style={{ background: bg, color: fg }} aria-hidden>
@@ -162,9 +159,12 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-start gap-1.5">
-          <span className="text-[13px] font-semibold leading-snug text-gray-800 transition-colors group-hover/item:text-[#c2410c] dark:text-gray-100 dark:group-hover/item:text-orange-300">
+          <SafeLink
+            href={href}
+            className="text-[13px] font-semibold leading-snug text-gray-800 transition-colors hover:text-[#c2410c] hover:underline hover:decoration-orange-300 hover:underline-offset-2 dark:text-gray-100 dark:hover:text-orange-300"
+          >
             {title}
-          </span>
+          </SafeLink>
           {tagStyle ? (
             <span
               className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-[0.05em] shadow-sm ${tagStyle.className} ${tagStyle.pulse ? 'animate-pulse' : ''}`}
@@ -197,8 +197,14 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
           <Calendar size={9} />
           {date}
         </span>
-        <ArrowUpRight size={12} className="translate-y-0.5 -translate-x-0.5 text-gray-300 opacity-0 transition-all group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:text-orange-500 group-hover/item:opacity-100 dark:text-gray-600 dark:group-hover/item:text-orange-300" />
+        <SafeLink
+          href={href}
+          aria-label={`Open ${title}`}
+          className="rounded-md p-1 text-gray-300 opacity-0 transition-all hover:bg-orange-50 hover:text-orange-600 group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:opacity-100 dark:text-gray-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+        >
+          <ArrowUpRight size={12} />
+        </SafeLink>
       </div>
-    </SafeLink>
+    </div>
   );
 }

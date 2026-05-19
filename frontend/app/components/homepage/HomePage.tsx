@@ -374,9 +374,8 @@ function FeaturedSpotlight() {
           const isUrgent = item.daysLeft <= 7;
 
           return (
-            <Link
+            <article
               key={item.title}
-              href={item.href}
               className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:ring-2 hover:ring-orange-300 dark:bg-[#0f172a] dark:ring-white/[0.09] dark:hover:ring-orange-500/40"
             >
               <div className="absolute inset-x-0 top-0 h-1.5" style={{ background: `linear-gradient(90deg, ${item.accent}, ${item.accent}55 65%, transparent)` }} />
@@ -403,7 +402,14 @@ function FeaturedSpotlight() {
                   </div>
                 </div>
 
-                <h3 className="text-[19px] font-extrabold tracking-normal text-gray-900 dark:text-white">{item.title}</h3>
+                <h3 className="text-[19px] font-extrabold tracking-normal">
+                  <SafeLink
+                    href={item.href}
+                    className="text-gray-900 transition hover:text-orange-600 hover:underline hover:decoration-orange-300 hover:underline-offset-4 dark:text-white dark:hover:text-orange-300"
+                  >
+                    {item.title}
+                  </SafeLink>
+                </h3>
                 <p className="mt-0.5 text-[12px] font-medium leading-snug text-gray-500 dark:text-gray-400">{item.sub}</p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -419,13 +425,13 @@ function FeaturedSpotlight() {
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/[0.07]">
-                  <span className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-extrabold transition-all group-hover:gap-2" style={{ background: `linear-gradient(135deg,${item.accent}18,${item.accent}08)`, border: `1.5px solid ${item.accent}28`, color: item.accent }}>
+                  <SafeLink href={item.href} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-extrabold transition-all hover:gap-2" style={{ background: `linear-gradient(135deg,${item.accent}18,${item.accent}08)`, border: `1.5px solid ${item.accent}28`, color: item.accent }}>
                     Apply Online <ArrowRight size={12} />
-                  </span>
+                  </SafeLink>
                   <span className="max-w-[110px] truncate text-[10.5px] text-gray-400 dark:text-gray-500">{item.org}</span>
                 </div>
               </div>
-            </Link>
+            </article>
           );
         })}
       </div>
@@ -467,9 +473,8 @@ function NotificationsPanel() {
 
       <div className="divide-y divide-gray-100/80 dark:divide-white/[0.05]">
         {notifications.map((item, index) => (
-          <SafeLink
+          <div
             key={`${item.text}-${index}`}
-            href={homePageLinks.results}
             className="group flex items-start gap-2.5 px-3.5 py-2.5 transition hover:bg-gradient-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/[0.06]"
           >
             <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400 transition group-hover:scale-125" />
@@ -479,7 +484,14 @@ function NotificationsPanel() {
             <span className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold text-white shadow-sm ring-1 ring-white/30 ${tagMap[item.tag]} ${item.tag !== 'update' ? 'animate-pulse' : ''}`}>
               {item.tag === 'hot' ? 'HOT' : item.tag.toUpperCase()}
             </span>
-          </SafeLink>
+            <SafeLink
+              href={homePageLinks.results}
+              aria-label={`Open notification: ${item.text}`}
+              className="mt-0.5 rounded-md p-1 text-gray-300 opacity-0 transition hover:bg-orange-50 hover:text-orange-600 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+            >
+              <ArrowRight size={11} />
+            </SafeLink>
+          </div>
         ))}
       </div>
 
@@ -490,15 +502,17 @@ function NotificationsPanel() {
         </div>
         <div className="space-y-1">
           {upcomingExams.map((exam) => (
-            <Link key={exam.exam} href={buildJobsPath({ search: exam.exam })} className="-mx-2 flex items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/70 dark:hover:bg-white/[0.04]">
-              <span className="truncate text-[12px] font-semibold text-gray-700 dark:text-gray-300">{exam.exam}</span>
+            <div key={exam.exam} className="-mx-2 flex items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/70 dark:hover:bg-white/[0.04]">
+              <SafeLink href={buildJobsPath({ search: exam.exam })} className="min-w-0 truncate text-[12px] font-semibold text-gray-700 transition hover:text-orange-600 hover:underline hover:underline-offset-2 dark:text-gray-300 dark:hover:text-orange-300">
+                {exam.exam}
+              </SafeLink>
               <div className="ml-2 flex shrink-0 items-center gap-1.5">
                 <span className="text-[10.5px] font-bold tabular-nums text-gray-600 dark:text-gray-400">{exam.date}</span>
                 <span className="rounded-md px-1.5 py-0.5 text-[9.5px] font-extrabold tabular-nums" style={{ background: exam.days <= 15 ? '#fef2f2' : '#f0fdf4', color: exam.days <= 15 ? '#dc2626' : '#16a34a' }}>
                   {exam.days}d
                 </span>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       </div>
