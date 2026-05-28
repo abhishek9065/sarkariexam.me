@@ -30,6 +30,21 @@ const parseBoolean = (value: string | undefined, fallback = false): boolean => {
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 };
 
+const deriveNeonDirectUrl = (value?: string): string => {
+  if (!value) return '';
+
+  try {
+    const url = new URL(value);
+    if (!url.hostname.includes('-pooler.')) {
+      return '';
+    }
+    url.hostname = url.hostname.replace('-pooler.', '.');
+    return url.toString();
+  } catch {
+    return '';
+  }
+};
+
 /**
  * Get required environment variable (no fallback allowed in production).
  */
@@ -108,8 +123,12 @@ const readinessCacheTtlMs = Math.max(250, parseNumber(process.env.READINESS_CACH
 const postgresHealthTimeoutMs = Math.max(500, parseNumber(process.env.POSTGRES_HEALTH_TIMEOUT_MS, 1500));
 const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
 const contentDbMode = 'postgres';
-const postgresPrismaUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
-const postgresDirectUrl = process.env.POSTGRES_DIRECT_URL ?? process.env.DIRECT_URL ?? '';
+const postgresConfiguredUrl = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL ?? '';
+const postgresDirectUrl =
+  process.env.POSTGRES_DIRECT_URL ??
+  process.env.DIRECT_URL ??
+  deriveNeonDirectUrl(postgresConfiguredUrl);
+const postgresPrismaUrl = postgresDirectUrl || postgresConfiguredUrl;
 const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
 const legacyMongoRequired = parseBoolean(process.env.LEGACY_MONGO_REQUIRED, false);
 const legacyMongoEnabled = parseBoolean(
