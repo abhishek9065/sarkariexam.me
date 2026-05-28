@@ -308,6 +308,8 @@ run_remote_preflight() {
 
 run_remote_deploy() {
   if ! run_remote_helper 0; then
+    echo "Remote deploy failure markers:" >&2
+    remote_run "grep -nE 'DEPLOY FAILURE SUMMARY|ERROR: deployment stage|>>> stage=|failed_stage:|diagnosis:' '$REMOTE_LOG_FILE' | tail -n 80 || true" || true
     echo "Remote deploy failed. Recent remote log tail:" >&2
     remote_run "tail -n 200 '$REMOTE_LOG_FILE' || true" || true
     fail "Remote deploy failed. See ${REMOTE_LOG_FILE} on the droplet for the full log."

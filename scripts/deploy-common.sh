@@ -257,17 +257,31 @@ tail_core_service_logs() {
 handle_deploy_error() {
   local exit_code="${1:-1}"
   local line_number="${2:-unknown}"
+  local repo_path="${DEPLOY_REPO_DIR:-$ROOT_DIR}"
+  local target_sha="${DEPLOY_TARGET_SHA:-unknown}"
+  local previous_sha="${DEPLOY_PREVIOUS_SHA:-unknown}"
 
   echo
   echo "ERROR: deployment stage '${CURRENT_STAGE}' failed at line ${line_number}."
   echo "Actionable diagnosis: ${LAST_ACTIONABLE_DIAGNOSIS}"
-  echo "Repo path: ${DEPLOY_REPO_DIR:-$ROOT_DIR}"
-  echo "Target SHA: ${DEPLOY_TARGET_SHA:-unknown}"
-  echo "Previous SHA: ${DEPLOY_PREVIOUS_SHA:-unknown}"
+  echo "Repo path: ${repo_path}"
+  echo "Target SHA: ${target_sha}"
+  echo "Previous SHA: ${previous_sha}"
 
   if command -v docker >/dev/null 2>&1; then
+    echo "--- docker compose ps ---"
+    dc ps || true
     tail_core_service_logs 80
   fi
+
+  echo
+  echo "DEPLOY FAILURE SUMMARY"
+  echo "  failed_stage: ${CURRENT_STAGE}"
+  echo "  failed_line: ${line_number}"
+  echo "  diagnosis: ${LAST_ACTIONABLE_DIAGNOSIS}"
+  echo "  repo_path: ${repo_path}"
+  echo "  target_sha: ${target_sha}"
+  echo "  previous_sha: ${previous_sha}"
 
   exit "$exit_code"
 }
