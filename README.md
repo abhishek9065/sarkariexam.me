@@ -90,6 +90,7 @@ Root `.env` is the production source of truth for:
 Important production variables:
 
 - `POSTGRES_PRISMA_URL`
+- `POSTGRES_DIRECT_URL` (recommended for Neon Prisma CLI migrations; `DIRECT_URL` is also supported)
 - `JWT_SECRET`
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
@@ -113,7 +114,7 @@ Recommended production variables:
 
 Local app development uses app-specific env files instead of the server root `.env`:
 
-- `backend`: `backend/.env` with `POSTGRES_PRISMA_URL` for Prisma-backed content data
+- `backend`: `backend/.env` with `POSTGRES_PRISMA_URL` for Prisma-backed content data, plus `POSTGRES_DIRECT_URL` when using a pooled Neon runtime URL
 - `frontend`: `frontend/.env.local`
 - `frontend` local API base: `NEXT_PUBLIC_API_URL=http://localhost:5000`
 - `admin-next`: `admin-next/.env.local` when needed

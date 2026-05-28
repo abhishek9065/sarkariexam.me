@@ -33,6 +33,9 @@ for service in backend frontend admin nginx; do
   dc build --pull "$service"
 done
 
+set_stage "preflight-backend-db"
+verify_backend_database_preflight
+
 set_stage "restart-backend"
 record_diagnosis "Backend restart failed. Inspect backend image, migrations, and environment wiring."
 dc up -d --force-recreate backend

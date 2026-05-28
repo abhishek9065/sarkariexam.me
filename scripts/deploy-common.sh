@@ -92,12 +92,14 @@ is_localhost_url() {
 
 validate_production_env() {
   local missing=()
-  local jwt_secret postgres_prisma_url database_url cosmos_connection_string mongodb_uri legacy_mongo_required
+  local jwt_secret postgres_prisma_url postgres_direct_url database_url direct_url cosmos_connection_string mongodb_uri legacy_mongo_required
   local frontend_revalidate_url frontend_revalidate_token frontend_url primary_postgres_url
 
   jwt_secret="$(read_env_var "JWT_SECRET")"
   postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
+  postgres_direct_url="$(read_env_var "POSTGRES_DIRECT_URL")"
   database_url="$(read_env_var "DATABASE_URL")"
+  direct_url="$(read_env_var "DIRECT_URL")"
   cosmos_connection_string="$(read_env_var "COSMOS_CONNECTION_STRING")"
   mongodb_uri="$(read_env_var "MONGODB_URI")"
   legacy_mongo_required="$(read_env_var "LEGACY_MONGO_REQUIRED")"
@@ -130,6 +132,10 @@ validate_production_env() {
 
   if is_known_placeholder_value "$primary_postgres_url"; then
     die "POSTGRES_PRISMA_URL/DATABASE_URL is still set to a placeholder value. Set a real PostgreSQL URL before deploying."
+  fi
+
+  if [[ "$primary_postgres_url" == *"-pooler."* && -z "$postgres_direct_url" && -z "$direct_url" ]]; then
+    warn "POSTGRES_PRISMA_URL appears to be a pooled Neon URL and POSTGRES_DIRECT_URL/DIRECT_URL is missing. Prisma CLI will derive a direct Neon host for migration/preflight commands."
   fi
 
   frontend_url="$(read_env_var "FRONTEND_URL")"
@@ -203,6 +209,29 @@ resolve_datadog_services() {
   else
     warn "DD_API_KEY not set; Datadog agent will not be started."
   fi
+}
+
+verify_backend_database_preflight() {
+  local attempts="${POSTGRES_PREFLIGHT_ATTEMPTS:-6}"
+  local sleep_seconds="${POSTGRES_PREFLIGHT_SLEEP_SECONDS:-5}"
+  local i
+
+  record_diagnosis "PostgreSQL is unreachable from a backend container. Fix POSTGRES_PRISMA_URL/DATABASE_URL, Neon availability, firewall/IP allowlisting, or outbound network access before retrying deploy."
+
+  for ((i=1; i<=attempts; i++)); do
+    echo "  [$i/$attempts] checking backend PostgreSQL connectivity with Prisma"
+    if dc run --rm --no-deps -T backend sh -lc "printf 'SELECT 1;\n' | npx --yes prisma db execute --stdin"; then
+      echo "Backend PostgreSQL preflight passed after ${i} attempt(s)."
+      return 0
+    fi
+
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$sleep_seconds"
+    fi
+  done
+
+  echo "ERROR: backend PostgreSQL preflight failed after ${attempts} attempt(s). Existing running services were not replaced."
+  return 1
 }
 
 service_container_id() {

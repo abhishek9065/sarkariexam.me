@@ -33,6 +33,9 @@ for service in backend frontend admin nginx; do
   dc build --pull "$service"
 done
 
+set_stage "preflight-backend-db"
+verify_backend_database_preflight
+
 set_stage "restart-all"
 record_diagnosis "Docker Compose failed to restart production services."
 if [[ ${#DATADOG_SERVICES[@]} -gt 0 ]]; then
