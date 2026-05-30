@@ -82,6 +82,7 @@ cp .env.example .env
 ```
 
 Root `.env` is the production source of truth for:
+
 - `scripts/deploy-common.sh`
 - `scripts/deploy-fast.sh`
 - `scripts/deploy-prod.sh`
@@ -155,8 +156,8 @@ The public frontend uses route-level metadata, canonical URL normalization, and 
 - Listing-page metadata policy: `frontend/app/lib/listing-seo.ts`
 - Detail-page metadata policy: `frontend/lib/content-page.ts`
 - Robots policy sources (keep aligned):
-	- `frontend/app/robots.ts`
-	- `frontend/public/robots.txt`
+  - `frontend/app/robots.ts`
+  - `frontend/public/robots.txt`
 - Sitemap source: `frontend/app/sitemap.ts`
 
 Current indexing behavior:
