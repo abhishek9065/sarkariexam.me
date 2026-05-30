@@ -37,7 +37,7 @@ Deploy fails closed when required values are missing.
 
 ## Security Model
 
-- No repository path auto-discovery.
+- The GitHub Actions SSH wrapper prefers an explicit `DO_REPO_DIR`; if it is omitted, it auto-detects common droplet checkout paths before invoking the remote helper.
 - No trust-on-first-use host key behavior.
 - Host key fingerprint must match exactly.
 - Target commit SHA must be a 40-character SHA and reachable from `origin/main`.
@@ -61,6 +61,12 @@ DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha
 ```
 
 After a successful deploy, release metadata is written to `.deploy-state/last-release.env` in the repository checkout.
+
+## Failure Output
+
+When a remote deploy fails, the runner prints remote failure markers before the final log tail. Look for `DEPLOY FAILURE SUMMARY`, `failed_stage`, `failed_line`, `diagnosis`, `target_sha`, and `previous_sha` in the GitHub Actions log or `/tmp/sarkari-result-deploy.log`.
+
+The remote failure handler also prints `docker compose ps` and tails backend, frontend, admin, and nginx logs so the first visible failure includes container state and recent service output.
 
 ## Preflight Only On Droplet
 
