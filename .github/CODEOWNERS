@@ -1,0 +1,3 @@
+# Require owner review for CI/CD and repository automation changes.
+.github/workflows/ @abhishek9065
+.github/CODEOWNERS @abhishek9065
