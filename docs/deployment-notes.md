@@ -49,6 +49,8 @@ Minimum required values:
 - `POSTGRES_PRISMA_URL` or `DATABASE_URL`
 - `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
 
+For DigitalOcean Managed PostgreSQL, use a standard PostgreSQL connection string with `sslmode=require`. `POSTGRES_DIRECT_URL` and `DIRECT_URL` are only needed for providers that require a separate direct migration URL; leave them blank for DigitalOcean unless a separate target URL is intentionally provisioned.
+
 Optional but recommended values are logged when missing.
 
 ## Validation and Health Checks

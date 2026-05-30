@@ -216,7 +216,7 @@ verify_backend_database_preflight() {
   local sleep_seconds="${POSTGRES_PREFLIGHT_SLEEP_SECONDS:-5}"
   local i
 
-  record_diagnosis "PostgreSQL is unreachable from a backend container. Fix POSTGRES_PRISMA_URL/DATABASE_URL, Neon availability, firewall/IP allowlisting, or outbound network access before retrying deploy."
+  record_diagnosis "PostgreSQL is unreachable from a backend container. Fix POSTGRES_PRISMA_URL/DATABASE_URL, database availability, trusted sources/firewall allowlisting, SSL settings, or outbound network access before retrying deploy."
 
   for ((i=1; i<=attempts; i++)); do
     echo "  [$i/$attempts] checking backend PostgreSQL connectivity with Prisma"

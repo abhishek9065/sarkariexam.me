@@ -14,6 +14,7 @@ admin-next/out/
 .env.local
 .env.*.local
 .env.production
+migration.env
 
 # IDE
 .vscode/
@@ -24,6 +25,7 @@ admin-next/out/
 npm-debug.log*
 backend/test-output*.txt
 .codex-logs/
+.data/
 
 # OS
 .DS_Store

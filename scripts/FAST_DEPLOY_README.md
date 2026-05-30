@@ -82,6 +82,16 @@ cd /absolute/path/to/repo
 DO_REPO_DIR=/absolute/path/to/repo bash scripts/deploy-live.sh --mode fast --sha <40-char-sha>
 ```
 
+## PostgreSQL Provider Migration
+
+For a maintenance-window migration from Neon to DigitalOcean Managed PostgreSQL, use:
+
+```bash
+bash scripts/migrate-postgres-neon-to-digitalocean.sh --confirm-maintenance
+```
+
+See [docs/postgres-digitalocean-migration.md](../docs/postgres-digitalocean-migration.md) for the full cutover and rollback procedure.
+
 ## Post-Deploy Verification
 
 Use:

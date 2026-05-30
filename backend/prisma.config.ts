@@ -16,12 +16,17 @@ const deriveNeonDirectUrl = (value?: string) => {
   }
 };
 
+const optionalEnv = (value?: string) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+};
+
 const datasourceUrl =
-  process.env.POSTGRES_DIRECT_URL ??
-  process.env.DIRECT_URL ??
-  deriveNeonDirectUrl(process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL) ??
-  process.env.POSTGRES_PRISMA_URL ??
-  process.env.DATABASE_URL;
+  optionalEnv(process.env.POSTGRES_DIRECT_URL) ??
+  optionalEnv(process.env.DIRECT_URL) ??
+  deriveNeonDirectUrl(optionalEnv(process.env.POSTGRES_PRISMA_URL) ?? optionalEnv(process.env.DATABASE_URL)) ??
+  optionalEnv(process.env.POSTGRES_PRISMA_URL) ??
+  optionalEnv(process.env.DATABASE_URL);
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
