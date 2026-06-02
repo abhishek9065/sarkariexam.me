@@ -68,6 +68,11 @@ Deployment validates:
   - `/admin`
 - Optional frontend revalidation smoke check when revalidation token is configured.
 
+## 2026-06-02
+
+- Deployment preflight now runs a DNS/TCP reachability check from the backend container before Prisma executes. If this fails, verify `POSTGRES_PRISMA_URL`/`DATABASE_URL`, `sslmode=require`, and Neon trusted sources/egress rules.
+- Runtime Prisma connections now prefer the pooler URL when present; direct URLs remain available for migration/CLI usage.
+
 ## Useful Commands
 
 ### Manual preflight only
