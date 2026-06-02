@@ -34,6 +34,7 @@ for service in backend frontend admin nginx; do
 done
 
 set_stage "preflight-backend-db"
+verify_backend_database_network_preflight
 verify_backend_database_preflight
 
 set_stage "restart-all"

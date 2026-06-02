@@ -211,6 +211,29 @@ resolve_datadog_services() {
   fi
 }
 
+verify_backend_database_network_preflight() {
+  local attempts="${POSTGRES_PREFLIGHT_ATTEMPTS:-3}"
+  local sleep_seconds="${POSTGRES_PREFLIGHT_SLEEP_SECONDS:-5}"
+  local i
+
+  record_diagnosis "PostgreSQL hostname/port is unreachable from the backend container. Check POSTGRES_PRISMA_URL/DATABASE_URL, DNS, firewall/egress rules, Neon trusted sources, and sslmode=require."
+
+  for ((i=1; i<=attempts; i++)); do
+    echo "  [$i/$attempts] checking backend PostgreSQL DNS/TCP reachability"
+    if dc run --rm --no-deps -T backend node -e 'const net = require("net"); const raw = process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL; if (!raw) { console.error("Missing POSTGRES_PRISMA_URL/DATABASE_URL"); process.exit(1); } let url; try { url = new URL(raw); } catch (error) { console.error("Invalid PostgreSQL URL"); process.exit(1); } const host = url.hostname; const port = Number(url.port || 5432); if (!host) { console.error("PostgreSQL host missing in URL"); process.exit(1); } const sslmode = url.searchParams.get("sslmode"); if (!sslmode) { console.warn("NOTICE: sslmode not set in PostgreSQL URL (Neon requires sslmode=require)"); } else if (sslmode !== "require") { console.warn("NOTICE: sslmode is " + sslmode + "; Neon requires sslmode=require"); } const socket = net.connect({ host, port, timeout: 4000 }, () => { console.log("PostgreSQL network reachability ok (" + host + ":" + port + ")"); socket.end(); process.exit(0); }); socket.on("error", (error) => { console.error("PostgreSQL network reachability failed (" + host + ":" + port + "): " + (error.code || error.message)); process.exit(1); }); socket.on("timeout", () => { console.error("PostgreSQL network reachability timed out (" + host + ":" + port + ")"); socket.destroy(); process.exit(1); });'; then
+      echo "Backend PostgreSQL network preflight passed after ${i} attempt(s)."
+      return 0
+    fi
+
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$sleep_seconds"
+    fi
+  done
+
+  echo "ERROR: backend PostgreSQL network preflight failed after ${attempts} attempt(s). Existing running services were not replaced."
+  return 1
+}
+
 verify_backend_database_preflight() {
   local attempts="${POSTGRES_PREFLIGHT_ATTEMPTS:-6}"
   local sleep_seconds="${POSTGRES_PREFLIGHT_SLEEP_SECONDS:-5}"

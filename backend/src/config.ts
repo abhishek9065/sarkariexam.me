@@ -1,17 +1,19 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const isProduction = process.env.NODE_ENV === 'production';
-const isTest = process.env.NODE_ENV === 'test';
-
+const isProduction = process.env.NODE_ENV === "production";
+const isTest = process.env.NODE_ENV === "test";
 
 /**
  * Parse comma-separated values.
  */
 const parseCsv = (value?: string): string[] => {
   if (!value) return [];
-  return value.split(',').map(item => item.trim()).filter(Boolean);
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 };
 
 /**
@@ -27,23 +29,23 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
  */
 const parseBoolean = (value: string | undefined, fallback = false): boolean => {
   if (value === undefined) return fallback;
-  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 };
 
-const optionalEnv = (value: string | undefined): string => value?.trim() || '';
+const optionalEnv = (value: string | undefined): string => value?.trim() || "";
 
 const deriveNeonDirectUrl = (value?: string): string => {
-  if (!value) return '';
+  if (!value) return "";
 
   try {
     const url = new URL(value);
-    if (!url.hostname.includes('-pooler.')) {
-      return '';
+    if (!url.hostname.includes("-pooler.")) {
+      return "";
     }
-    url.hostname = url.hostname.replace('-pooler.', '.');
+    url.hostname = url.hostname.replace("-pooler.", ".");
     return url.toString();
   } catch {
-    return '';
+    return "";
   }
 };
 
@@ -55,10 +57,14 @@ const getRequiredEnv = (key: string, devFallback?: string): string => {
 
   if (!value) {
     if (isProduction) {
-      throw new Error(`SECURITY ERROR: Missing required env var "${key}" in production.`);
+      throw new Error(
+        `SECURITY ERROR: Missing required env var "${key}" in production.`,
+      );
     }
     if (devFallback) {
-      console.warn(`[CONFIG] Warning: Using default value for ${key} (development only)`);
+      console.warn(
+        `[CONFIG] Warning: Using default value for ${key} (development only)`,
+      );
       return devFallback;
     }
     throw new Error(`Missing required env var: ${key}`);
@@ -70,9 +76,15 @@ const getRequiredEnv = (key: string, devFallback?: string): string => {
 /**
  * Validate that a secret is not using insecure default values in production.
  */
-const validateSecret = (key: string, value: string, insecureDefaults: string[]): void => {
+const validateSecret = (
+  key: string,
+  value: string,
+  insecureDefaults: string[],
+): void => {
   if (isProduction && insecureDefaults.includes(value)) {
-    throw new Error(`SECURITY ERROR: "${key}" is using an insecure default value in production.`);
+    throw new Error(
+      `SECURITY ERROR: "${key}" is using an insecure default value in production.`,
+    );
   }
 };
 
@@ -83,7 +95,7 @@ const getLegacyDbConnectionString = (): string => {
   const cosmosUrl = process.env.COSMOS_CONNECTION_STRING;
 
   // In tests, prefer explicit test Mongo URI to avoid .env collisions.
-  if (process.env.NODE_ENV === 'test' && mongoUrl) {
+  if (process.env.NODE_ENV === "test" && mongoUrl) {
     return mongoUrl;
   }
 
@@ -91,100 +103,182 @@ const getLegacyDbConnectionString = (): string => {
   if (mongoUrl) return mongoUrl;
   if (cosmosUrl) return cosmosUrl;
 
-  return '';
+  return "";
 };
 
 const databaseUrl = getLegacyDbConnectionString();
-const jwtSecret = getRequiredEnv('JWT_SECRET', isTest ? 'test-secret' : undefined);
+const jwtSecret = getRequiredEnv(
+  "JWT_SECRET",
+  isTest ? "test-secret" : undefined,
+);
 
 const defaultCorsOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://sarkariexams.me',
-  'https://www.sarkariexams.me'
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "https://sarkariexams.me",
+  "https://www.sarkariexams.me",
 ];
 
 const corsOrigins = parseCsv(process.env.CORS_ORIGINS);
 const rateLimitWindowMs = parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60000);
 const rateLimitMax = parseNumber(process.env.RATE_LIMIT_MAX, 200);
 const authRateLimitMax = parseNumber(process.env.AUTH_RATE_LIMIT_MAX, 20);
-const jwtIssuer = process.env.JWT_ISSUER ?? '';
-const jwtAudience = process.env.JWT_AUDIENCE ?? '';
-const jwtExpiry = process.env.JWT_EXPIRY ?? '1d';
-const passwordHistoryLimit = Math.max(1, parseNumber(process.env.PASSWORD_HISTORY_LIMIT, 5));
-const passwordBreachCheckEnabled = parseBoolean(process.env.PASSWORD_BREACH_CHECK_ENABLED, true);
-const passwordBreachCheckTimeoutMs = Math.max(500, parseNumber(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS, 2500));
-const passwordRecoveryTokenTtlSeconds = Math.max(300, parseNumber(process.env.PASSWORD_RECOVERY_TOKEN_TTL_SECONDS, 20 * 60));
-const passwordRecoveryMaxAttempts = Math.max(1, parseNumber(process.env.PASSWORD_RECOVERY_MAX_ATTEMPTS, 5));
-const metricsToken = process.env.METRICS_TOKEN ?? '';
-const securityLogRetentionHours = Math.max(1, parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24));
-const securityLogPersistenceEnabled = parseBoolean(process.env.SECURITY_LOG_PERSISTENCE_ENABLED, true);
-const securityLogDbRetentionDays = Math.max(1, parseNumber(process.env.SECURITY_LOG_DB_RETENTION_DAYS, 30));
-const securityLogCleanupIntervalMinutes = Math.max(5, parseNumber(process.env.SECURITY_LOG_CLEANUP_INTERVAL_MINUTES, 60));
-const readinessCacheTtlMs = Math.max(250, parseNumber(process.env.READINESS_CACHE_TTL_MS, 3000));
-const postgresHealthTimeoutMs = Math.max(500, parseNumber(process.env.POSTGRES_HEALTH_TIMEOUT_MS, 1500));
-const configuredContentDbMode = (process.env.CONTENT_DB_MODE ?? 'postgres').toLowerCase();
-const contentDbMode = 'postgres';
-const postgresConfiguredUrl = optionalEnv(process.env.POSTGRES_PRISMA_URL) || optionalEnv(process.env.DATABASE_URL);
+const jwtIssuer = process.env.JWT_ISSUER ?? "";
+const jwtAudience = process.env.JWT_AUDIENCE ?? "";
+const jwtExpiry = process.env.JWT_EXPIRY ?? "1d";
+const passwordHistoryLimit = Math.max(
+  1,
+  parseNumber(process.env.PASSWORD_HISTORY_LIMIT, 5),
+);
+const passwordBreachCheckEnabled = parseBoolean(
+  process.env.PASSWORD_BREACH_CHECK_ENABLED,
+  true,
+);
+const passwordBreachCheckTimeoutMs = Math.max(
+  500,
+  parseNumber(process.env.PASSWORD_BREACH_CHECK_TIMEOUT_MS, 2500),
+);
+const passwordRecoveryTokenTtlSeconds = Math.max(
+  300,
+  parseNumber(process.env.PASSWORD_RECOVERY_TOKEN_TTL_SECONDS, 20 * 60),
+);
+const passwordRecoveryMaxAttempts = Math.max(
+  1,
+  parseNumber(process.env.PASSWORD_RECOVERY_MAX_ATTEMPTS, 5),
+);
+const metricsToken = process.env.METRICS_TOKEN ?? "";
+const securityLogRetentionHours = Math.max(
+  1,
+  parseNumber(process.env.SECURITY_LOG_RETENTION_HOURS, 24),
+);
+const securityLogPersistenceEnabled = parseBoolean(
+  process.env.SECURITY_LOG_PERSISTENCE_ENABLED,
+  true,
+);
+const securityLogDbRetentionDays = Math.max(
+  1,
+  parseNumber(process.env.SECURITY_LOG_DB_RETENTION_DAYS, 30),
+);
+const securityLogCleanupIntervalMinutes = Math.max(
+  5,
+  parseNumber(process.env.SECURITY_LOG_CLEANUP_INTERVAL_MINUTES, 60),
+);
+const readinessCacheTtlMs = Math.max(
+  250,
+  parseNumber(process.env.READINESS_CACHE_TTL_MS, 3000),
+);
+const postgresHealthTimeoutMs = Math.max(
+  500,
+  parseNumber(process.env.POSTGRES_HEALTH_TIMEOUT_MS, 1500),
+);
+const configuredContentDbMode = (
+  process.env.CONTENT_DB_MODE ?? "postgres"
+).toLowerCase();
+const contentDbMode = "postgres";
+const postgresConfiguredUrl =
+  optionalEnv(process.env.POSTGRES_PRISMA_URL) ||
+  optionalEnv(process.env.DATABASE_URL);
 const postgresDirectUrl =
   optionalEnv(process.env.POSTGRES_DIRECT_URL) ||
   optionalEnv(process.env.DIRECT_URL) ||
   deriveNeonDirectUrl(postgresConfiguredUrl);
-const postgresPrismaUrl = postgresDirectUrl || postgresConfiguredUrl;
-const legacyMongoConfigured = Boolean(process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI);
-const legacyMongoRequired = parseBoolean(process.env.LEGACY_MONGO_REQUIRED, false);
+// Prefer pooler/runtime URL when available; direct is for migrations/CLI.
+const postgresPrismaUrl = postgresConfiguredUrl || postgresDirectUrl;
+const legacyMongoConfigured = Boolean(
+  process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI,
+);
+const legacyMongoRequired = parseBoolean(
+  process.env.LEGACY_MONGO_REQUIRED,
+  false,
+);
 const legacyMongoEnabled = parseBoolean(
   process.env.LEGACY_MONGO_ENABLED,
   isProduction || legacyMongoRequired,
 );
-const frontendUrl = process.env.FRONTEND_URL ?? 'https://sarkariexams.me';
-const derivedFrontendRevalidateUrl = `${frontendUrl.replace(/\/$/, '')}/api/revalidate`;
-const frontendRevalidateUrl = process.env.FRONTEND_REVALIDATE_URL?.trim() || derivedFrontendRevalidateUrl;
-const frontendRevalidationConfigured = Boolean(frontendRevalidateUrl && process.env.FRONTEND_REVALIDATE_TOKEN);
-const adminUrl = process.env.ADMIN_URL ?? process.env.NEXT_PUBLIC_ADMIN_URL ?? `${frontendUrl.replace(/\/$/, '')}/admin`;
-const adminRecoveryConfirmToken = process.env.ADMIN_RECOVERY_CONFIRM_TOKEN ?? '';
+const frontendUrl = process.env.FRONTEND_URL ?? "https://sarkariexams.me";
+const derivedFrontendRevalidateUrl = `${frontendUrl.replace(/\/$/, "")}/api/revalidate`;
+const frontendRevalidateUrl =
+  process.env.FRONTEND_REVALIDATE_URL?.trim() || derivedFrontendRevalidateUrl;
+const frontendRevalidationConfigured = Boolean(
+  frontendRevalidateUrl && process.env.FRONTEND_REVALIDATE_TOKEN,
+);
+const adminUrl =
+  process.env.ADMIN_URL ??
+  process.env.NEXT_PUBLIC_ADMIN_URL ??
+  `${frontendUrl.replace(/\/$/, "")}/admin`;
+const adminRecoveryConfirmToken =
+  process.env.ADMIN_RECOVERY_CONFIRM_TOKEN ?? "";
 const featureFlags = {
   search_overlay_v2: parseBoolean(process.env.FEATURE_SEARCH_OVERLAY_V2, true),
   compare_jobs_v2: parseBoolean(process.env.FEATURE_COMPARE_JOBS_V2, true),
   tracker_api_v2: parseBoolean(process.env.FEATURE_TRACKER_API_V2, true),
-  dashboard_widgets_v2: parseBoolean(process.env.FEATURE_DASHBOARD_WIDGETS_V2, true),
+  dashboard_widgets_v2: parseBoolean(
+    process.env.FEATURE_DASHBOARD_WIDGETS_V2,
+    true,
+  ),
 };
 
 // Validate secrets aren't using known insecure defaults in production
-validateSecret('JWT_SECRET', jwtSecret, ['dev-secret', 'test-secret', 'change-me', 'secret', 'jwt-secret']);
+validateSecret("JWT_SECRET", jwtSecret, [
+  "dev-secret",
+  "test-secret",
+  "change-me",
+  "secret",
+  "jwt-secret",
+]);
 
 const runtimeWarnings: string[] = [];
 
 if (!postgresPrismaUrl) {
-  runtimeWarnings.push('POSTGRES_PRISMA_URL (or DATABASE_URL) is missing; primary content and editorial APIs will be unhealthy.');
+  runtimeWarnings.push(
+    "POSTGRES_PRISMA_URL (or DATABASE_URL) is missing; primary content and editorial APIs will be unhealthy.",
+  );
 }
 
 if (!legacyMongoConfigured) {
-  runtimeWarnings.push('Mongo/Cosmos legacy bridge is not configured; compatibility-only legacy surfaces (backup metadata, security audit history, migration scripts) stay unavailable.');
+  runtimeWarnings.push(
+    "Mongo/Cosmos legacy bridge is not configured; compatibility-only legacy surfaces (backup metadata, security audit history, migration scripts) stay unavailable.",
+  );
 }
 
 if (legacyMongoConfigured && !legacyMongoEnabled) {
-  runtimeWarnings.push('Mongo/Cosmos legacy bridge is configured but disabled; set LEGACY_MONGO_ENABLED=true to enable compatibility-only legacy surfaces.');
+  runtimeWarnings.push(
+    "Mongo/Cosmos legacy bridge is configured but disabled; set LEGACY_MONGO_ENABLED=true to enable compatibility-only legacy surfaces.",
+  );
 }
 
-if (process.env.FRONTEND_REVALIDATE_URL && !process.env.FRONTEND_REVALIDATE_TOKEN) {
-  runtimeWarnings.push('FRONTEND_REVALIDATE_URL is set without FRONTEND_REVALIDATE_TOKEN; publish-triggered frontend revalidation is disabled.');
+if (
+  process.env.FRONTEND_REVALIDATE_URL &&
+  !process.env.FRONTEND_REVALIDATE_TOKEN
+) {
+  runtimeWarnings.push(
+    "FRONTEND_REVALIDATE_URL is set without FRONTEND_REVALIDATE_TOKEN; publish-triggered frontend revalidation is disabled.",
+  );
 }
 
-if (!process.env.FRONTEND_REVALIDATE_URL && process.env.FRONTEND_REVALIDATE_TOKEN) {
-  runtimeWarnings.push(`FRONTEND_REVALIDATE_URL is not set; falling back to ${derivedFrontendRevalidateUrl} for publish-triggered frontend revalidation.`);
+if (
+  !process.env.FRONTEND_REVALIDATE_URL &&
+  process.env.FRONTEND_REVALIDATE_TOKEN
+) {
+  runtimeWarnings.push(
+    `FRONTEND_REVALIDATE_URL is not set; falling back to ${derivedFrontendRevalidateUrl} for publish-triggered frontend revalidation.`,
+  );
 }
 
 if (isProduction && !metricsToken) {
-  runtimeWarnings.push('METRICS_TOKEN is not set in production; /metrics is disabled.');
+  runtimeWarnings.push(
+    "METRICS_TOKEN is not set in production; /metrics is disabled.",
+  );
 }
 
 if (isProduction && legacyMongoRequired && !legacyMongoConfigured) {
-  throw new Error('SECURITY ERROR: LEGACY_MONGO_REQUIRED is enabled but COSMOS_CONNECTION_STRING/MONGODB_URI is missing.');
+  throw new Error(
+    "SECURITY ERROR: LEGACY_MONGO_REQUIRED is enabled but COSMOS_CONNECTION_STRING/MONGODB_URI is missing.",
+  );
 }
 
 if (legacyMongoRequired && !legacyMongoEnabled) {
-  throw new Error('LEGACY_MONGO_REQUIRED requires LEGACY_MONGO_ENABLED=true.');
+  throw new Error("LEGACY_MONGO_REQUIRED requires LEGACY_MONGO_ENABLED=true.");
 }
 
 export const config = {
@@ -195,7 +289,7 @@ export const config = {
   rateLimitWindowMs,
   rateLimitMax,
   authRateLimitMax,
-  nodeEnv: process.env.NODE_ENV ?? 'development',
+  nodeEnv: process.env.NODE_ENV ?? "development",
   isProduction,
   jwtIssuer,
   jwtAudience,
@@ -223,47 +317,70 @@ export const config = {
   featureFlags,
 
   // Cosmos DB specific
-  cosmosDbName: process.env.COSMOS_DATABASE_NAME || 'sarkari_db',
+  cosmosDbName: process.env.COSMOS_DATABASE_NAME || "sarkari_db",
 
   // Telegram bot config (optional)
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
-  telegramChannelId: process.env.TELEGRAM_CHANNEL_ID ?? '',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramChannelId: process.env.TELEGRAM_CHANNEL_ID ?? "",
 
   // SendGrid email config (optional)
-  emailUser: process.env.EMAIL_USER ?? '',
-  emailPass: process.env.SENDGRID_API_KEY ?? process.env.EMAIL_PASS ?? '',
-  emailFrom: process.env.EMAIL_FROM ?? 'Sarkari Result <noreply@sarkariresult.com>',
+  emailUser: process.env.EMAIL_USER ?? "",
+  emailPass: process.env.SENDGRID_API_KEY ?? process.env.EMAIL_PASS ?? "",
+  emailFrom:
+    process.env.EMAIL_FROM ?? "Sarkari Result <noreply@sarkariresult.com>",
 
   // Frontend URL for links in emails
   frontendUrl,
   adminUrl,
   frontendRevalidateUrl,
-  frontendRevalidateToken: process.env.FRONTEND_REVALIDATE_TOKEN ?? '',
+  frontendRevalidateToken: process.env.FRONTEND_REVALIDATE_TOKEN ?? "",
   adminRecoveryConfirmToken,
 
   // VAPID keys for web push notifications (optional)
-  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
-  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
 };
 
 // Log configuration status on startup (without exposing secrets)
 if (!isProduction) {
-  console.log('[CONFIG] Running in development mode');
+  console.log("[CONFIG] Running in development mode");
   console.log(`[CONFIG] Primary Content DB: PostgreSQL (Neon compatible)`);
-  console.log(`[CONFIG] Legacy database bridge required: ${legacyMongoRequired ? 'yes' : 'no'}`);
-  console.log(`[CONFIG] Legacy database bridge enabled: ${legacyMongoEnabled ? 'yes' : 'no'}`);
-  console.log(`[CONFIG] Legacy database bridge: ${legacyMongoConfigured ? (databaseUrl.includes('localhost') ? 'local MongoDB' : 'Cosmos DB') : 'not configured'}`);
-  if (configuredContentDbMode !== 'postgres') {
-    console.log(`[CONFIG] CONTENT_DB_MODE=${configuredContentDbMode} ignored; forcing postgres mode`);
+  console.log(
+    `[CONFIG] Legacy database bridge required: ${legacyMongoRequired ? "yes" : "no"}`,
+  );
+  console.log(
+    `[CONFIG] Legacy database bridge enabled: ${legacyMongoEnabled ? "yes" : "no"}`,
+  );
+  console.log(
+    `[CONFIG] Legacy database bridge: ${legacyMongoConfigured ? (databaseUrl.includes("localhost") ? "local MongoDB" : "Cosmos DB") : "not configured"}`,
+  );
+  if (configuredContentDbMode !== "postgres") {
+    console.log(
+      `[CONFIG] CONTENT_DB_MODE=${configuredContentDbMode} ignored; forcing postgres mode`,
+    );
   }
-  console.log(`[CONFIG] PostgreSQL URLs: Prisma=${postgresPrismaUrl ? 'yes' : 'no'}, Direct=${postgresDirectUrl ? 'yes' : 'no'}`);
-  console.log(`[CONFIG] Frontend revalidation: ${frontendRevalidationConfigured ? 'configured' : 'not fully configured'}`);
+  console.log(
+    `[CONFIG] PostgreSQL URLs: Prisma=${postgresPrismaUrl ? "yes" : "no"}, Direct=${postgresDirectUrl ? "yes" : "no"}`,
+  );
+  console.log(
+    `[CONFIG] Frontend revalidation: ${frontendRevalidationConfigured ? "configured" : "not fully configured"}`,
+  );
   console.log(`[CONFIG] Readiness cache TTL: ${readinessCacheTtlMs}ms`);
-  console.log(`[CONFIG] PostgreSQL health timeout: ${postgresHealthTimeoutMs}ms`);
-  console.log(`[CONFIG] Metrics endpoint protection: ${metricsToken ? 'enabled' : 'disabled'}`);
-  console.log(`[CONFIG] Push notifications: ${config.vapidPublicKey ? 'enabled' : 'disabled'}`);
-  console.log(`[CONFIG] Email notifications: ${config.emailPass ? 'enabled' : 'disabled'}`);
-  console.log(`[CONFIG] Telegram notifications: ${config.telegramBotToken ? 'enabled' : 'disabled'}`);
+  console.log(
+    `[CONFIG] PostgreSQL health timeout: ${postgresHealthTimeoutMs}ms`,
+  );
+  console.log(
+    `[CONFIG] Metrics endpoint protection: ${metricsToken ? "enabled" : "disabled"}`,
+  );
+  console.log(
+    `[CONFIG] Push notifications: ${config.vapidPublicKey ? "enabled" : "disabled"}`,
+  );
+  console.log(
+    `[CONFIG] Email notifications: ${config.emailPass ? "enabled" : "disabled"}`,
+  );
+  console.log(
+    `[CONFIG] Telegram notifications: ${config.telegramBotToken ? "enabled" : "disabled"}`,
+  );
   for (const warning of runtimeWarnings) {
     console.warn(`[CONFIG] Warning: ${warning}`);
   }
