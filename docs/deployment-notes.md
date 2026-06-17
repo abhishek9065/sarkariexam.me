@@ -59,6 +59,8 @@ Minimum required values:
 - `UPSTASH_REDIS_REST_TOKEN`
 - `COSMOS_CONNECTION_STRING` or `MONGODB_URI` only when `LEGACY_MONGO_REQUIRED=true`
 
+Push notification delivery also requires `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`; `docker-compose.yml` passes these through to the backend container from the root `.env` file when configured.
+
 For DigitalOcean Managed PostgreSQL, use a standard PostgreSQL connection string with `sslmode=require`. `POSTGRES_DIRECT_URL` and `DIRECT_URL` are only needed for providers that require a separate direct migration URL; leave them blank for DigitalOcean unless a separate target URL is intentionally provisioned.
 
 Optional but recommended values are logged when missing.
@@ -80,6 +82,11 @@ Deployment validates:
   - `/results`
   - `/admin`
 - Optional frontend revalidation smoke check when revalidation token is configured.
+
+## 2026-06-17
+
+- Backend production containers now receive `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` from the root `.env` so web push sending can use configured VAPID credentials.
+- Frontend production build and runtime public URLs now read `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_ADMIN_URL` from `.env`, with the existing production URLs retained as defaults.
 
 ## 2026-06-02
 
