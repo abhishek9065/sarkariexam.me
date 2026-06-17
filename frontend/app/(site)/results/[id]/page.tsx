@@ -24,20 +24,21 @@ export default async function ResultDetailPage({
   params: Promise<{ id: string }>;
 }) {
   let resolved;
+  let id: string;
 
   try {
-    const { id } = await params;
+    ({ id } = await params);
     resolved = await loadDetailPage('results', id);
-
-    if (!resolved.isCanonicalSection || resolved.item.slug !== id) {
-      const canonicalPath = normalizeInternalHref(resolved.canonicalPath);
-      if (!canonicalPath) {
-        notFound();
-      }
-      redirect(canonicalPath);
-    }
   } catch {
     notFound();
+  }
+
+  if (!resolved.isCanonicalSection || resolved.item.slug !== id) {
+    const canonicalPath = normalizeInternalHref(resolved.canonicalPath);
+    if (!canonicalPath) {
+      notFound();
+    }
+    redirect(canonicalPath);
   }
 
   return (

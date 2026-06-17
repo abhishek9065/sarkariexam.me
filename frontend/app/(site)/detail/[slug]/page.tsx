@@ -18,15 +18,19 @@ export default async function LegacyDetailAliasPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  let canonicalPath: string | null = null;
+
   try {
     const { slug } = await params;
     const resolved = await getDetail(slug);
-    const canonicalPath = normalizeInternalHref(resolved.canonicalPath);
-    if (!canonicalPath) {
-      notFound();
-    }
-    redirect(canonicalPath);
+    canonicalPath = normalizeInternalHref(resolved.canonicalPath);
   } catch {
     notFound();
   }
+
+  if (!canonicalPath) {
+    notFound();
+  }
+
+  redirect(canonicalPath);
 }

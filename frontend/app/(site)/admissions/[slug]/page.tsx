@@ -24,20 +24,21 @@ export default async function AdmissionDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   let resolved;
+  let slug: string;
 
   try {
-    const { slug } = await params;
+    ({ slug } = await params);
     resolved = await loadDetailPage('admissions', slug);
-
-    if (!resolved.isCanonicalSection || resolved.item.slug !== slug) {
-        const canonicalPath = normalizeInternalHref(resolved.canonicalPath);
-        if (!canonicalPath) {
-          notFound();
-        }
-        redirect(canonicalPath);
-    }
   } catch {
     notFound();
+  }
+
+  if (!resolved.isCanonicalSection || resolved.item.slug !== slug) {
+    const canonicalPath = normalizeInternalHref(resolved.canonicalPath);
+    if (!canonicalPath) {
+      notFound();
+    }
+    redirect(canonicalPath);
   }
 
   return (

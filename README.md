@@ -99,6 +99,8 @@ Important production variables:
 - `FRONTEND_REVALIDATE_TOKEN`
 - `METRICS_TOKEN`
 
+Production deploy preflight requires `FRONTEND_REVALIDATE_TOKEN` so admin publish/update actions can invalidate public cached pages. Use `ALLOW_DISABLED_FRONTEND_REVALIDATION=true` only as an intentional temporary opt-out.
+
 Legacy-only production variables:
 
 - `LEGACY_MONGO_REQUIRED` (set `true` only if a release still depends on transitional legacy bridge paths)

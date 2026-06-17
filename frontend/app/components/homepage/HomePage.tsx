@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { PublicSiteShell } from '@/app/components/public-site/PublicSiteShell';
 import { buildJobsPath } from '@/app/lib/public-content';
+import { getHomepageSections } from '@/lib/content-api';
 import { HomePageLinkItem, HomePageSectionBox } from './HomePageSectionBox';
 import { HomePageQuickLinks } from './HomePageQuickLinks';
 import { homePageLinks } from './links';
@@ -69,7 +70,7 @@ const featured = [
     lastDate: '30 May 2026',
     daysLeft: 15,
     urgency: 50,
-    href: buildJobsPath({ search: 'SSC CGL 2026' }),
+    href: '/jobs/ssc-cgl-2026',
   },
   {
     chip: 'BANKING',
@@ -85,7 +86,7 @@ const featured = [
     lastDate: '20 May 2026',
     daysLeft: 5,
     urgency: 12,
-    href: buildJobsPath({ search: 'IBPS PO 2026' }),
+    href: '/jobs/ibps-po-2026',
   },
   {
     chip: 'RAILWAY',
@@ -101,7 +102,7 @@ const featured = [
     lastDate: '20 May 2026',
     daysLeft: 5,
     urgency: 8,
-    href: buildJobsPath({ search: 'RRB Group D' }),
+    href: '/jobs/rrb-group-d-level-1-2026',
   },
 ] as const;
 
@@ -196,6 +197,8 @@ const linkSections = {
 } as const;
 
 type LinkTuple = readonly [string, string, string, ('new' | 'hot' | 'update' | 'last-date')?, string?, string?];
+type HomepageSections = Awaited<ReturnType<typeof getHomepageSections>>;
+type HomepageCard = HomepageSections[keyof HomepageSections][number];
 
 const monoPalette: Array<[string, string]> = [
   ['#fee2e2', '#b91c1c'],
@@ -218,6 +221,21 @@ function orgColors(name: string): [string, string] {
 
 function itemHref(title: string, fallback: string) {
   return `${fallback}?search=${encodeURIComponent(title.split(' - ')[0])}`;
+}
+
+function renderHomepageCards(items: readonly HomepageCard[]) {
+  return items.map((item) => (
+    <HomePageLinkItem
+      key={item.id}
+      href={item.href}
+      title={item.title}
+      org={item.org}
+      date={item.date}
+      tag={item.tag}
+      postCount={item.postCount}
+      qualification={item.qualification}
+    />
+  ));
 }
 
 function renderItems(items: readonly LinkTuple[], href: string) {
@@ -520,29 +538,35 @@ function NotificationsPanel() {
   );
 }
 
-function MainGrid() {
+function MainGrid({ sections }: { sections: HomepageSections }) {
+  const jobs = sections.jobs || [];
+  const results = sections.results || [];
+  const admitCards = sections['admit-cards'] || [];
+  const answerKeys = sections['answer-keys'] || [];
+  const admissions = sections.admissions || [];
+
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <HomePageSectionBox title="Latest Jobs / Online Form" headerColor="bg-[#d32f2f]" kicker="Recruitment" count={42} viewAllLink={homePageLinks.jobs}>
-            {renderItems(linkSections.jobs, homePageLinks.jobs)}
+          <HomePageSectionBox title="Latest Jobs / Online Form" headerColor="bg-[#d32f2f]" kicker="Recruitment" count={jobs.length} viewAllLink={homePageLinks.jobs}>
+            {renderHomepageCards(jobs)}
           </HomePageSectionBox>
-          <HomePageSectionBox title="Latest Result" headerColor="bg-[#1565c0]" kicker="Results" count={28} viewAllLink={homePageLinks.results}>
-            {renderItems(linkSections.results, homePageLinks.results)}
+          <HomePageSectionBox title="Latest Result" headerColor="bg-[#1565c0]" kicker="Results" count={results.length} viewAllLink={homePageLinks.results}>
+            {renderHomepageCards(results)}
           </HomePageSectionBox>
-          <HomePageSectionBox title="Latest Admit Card" headerColor="bg-[#6a1b9a]" kicker="Hall Tickets" count={36} viewAllLink={homePageLinks.admitCards}>
-            {renderItems(linkSections.admitCards, homePageLinks.admitCards)}
+          <HomePageSectionBox title="Latest Admit Card" headerColor="bg-[#6a1b9a]" kicker="Hall Tickets" count={admitCards.length} viewAllLink={homePageLinks.admitCards}>
+            {renderHomepageCards(admitCards)}
           </HomePageSectionBox>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <HomePageSectionBox title="Answer Key" headerColor="bg-[#00695c]" kicker="Answers" count={24} viewAllLink={homePageLinks.answerKey}>
-            {renderItems(linkSections.answerKeys, homePageLinks.answerKey)}
+          <HomePageSectionBox title="Answer Key" headerColor="bg-[#00695c]" kicker="Answers" count={answerKeys.length} viewAllLink={homePageLinks.answerKey}>
+            {renderHomepageCards(answerKeys)}
           </HomePageSectionBox>
           <NotificationsPanel />
-          <HomePageSectionBox title="Latest Admission" headerColor="bg-[#ad1457]" kicker="Admissions" count={18} viewAllLink={homePageLinks.admissions}>
-            {renderItems(linkSections.admissions, homePageLinks.admissions)}
+          <HomePageSectionBox title="Latest Admission" headerColor="bg-[#ad1457]" kicker="Admissions" count={admissions.length} viewAllLink={homePageLinks.admissions}>
+            {renderHomepageCards(admissions)}
           </HomePageSectionBox>
         </div>
       </div>
@@ -566,13 +590,15 @@ function MainGrid() {
   );
 }
 
-export default function HomePage({ initialAuthTab }: HomePageProps) {
+export default async function HomePage({ initialAuthTab }: HomePageProps) {
+  const sections = await getHomepageSections();
+
   return (
     <PublicSiteShell initialAuthTab={initialAuthTab}>
       <Hero />
       <CategoryStrip />
       <FeaturedSpotlight />
-      <MainGrid />
+      <MainGrid sections={sections} />
     </PublicSiteShell>
   );
 }

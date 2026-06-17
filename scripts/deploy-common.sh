@@ -93,7 +93,7 @@ is_localhost_url() {
 validate_production_env() {
   local missing=()
   local jwt_secret postgres_prisma_url postgres_direct_url database_url direct_url cosmos_connection_string mongodb_uri legacy_mongo_required
-  local frontend_revalidate_url frontend_revalidate_token frontend_url primary_postgres_url
+  local frontend_revalidate_url frontend_revalidate_token frontend_url primary_postgres_url allow_disabled_frontend_revalidation
 
   jwt_secret="$(read_env_var "JWT_SECRET")"
   postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
@@ -145,6 +145,7 @@ validate_production_env() {
 
   frontend_revalidate_url="$(read_env_var "FRONTEND_REVALIDATE_URL")"
   frontend_revalidate_token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+  allow_disabled_frontend_revalidation="$(read_env_var "ALLOW_DISABLED_FRONTEND_REVALIDATION")"
 
   if [[ -n "$frontend_revalidate_url" && -z "$frontend_revalidate_token" ]]; then
     die "FRONTEND_REVALIDATE_URL is set but FRONTEND_REVALIDATE_TOKEN is missing."
@@ -158,6 +159,9 @@ validate_production_env() {
     else
       warn "FRONTEND_REVALIDATE_TOKEN is set but FRONTEND_REVALIDATE_URL and FRONTEND_URL are missing. Publish-triggered revalidation stays disabled."
     fi
+  fi
+  if [[ -z "$frontend_revalidate_token" ]] && ! is_truthy "$allow_disabled_frontend_revalidation"; then
+    die "FRONTEND_REVALIDATE_TOKEN is required for production deploys. Set ALLOW_DISABLED_FRONTEND_REVALIDATION=true only for an intentional temporary opt-out."
   fi
 
   if ! is_truthy "$legacy_mongo_required" && [[ -z "$cosmos_connection_string" && -z "$mongodb_uri" ]]; then
@@ -440,8 +444,13 @@ check_public_route_assets() {
 
 verify_public_revalidation_smoke() {
   if [[ -z "$(read_env_var "FRONTEND_REVALIDATE_TOKEN")" ]]; then
-    echo "NOTICE: FRONTEND_REVALIDATE_TOKEN not set; skipping revalidation smoke check."
-    return 0
+    if is_truthy "$(read_env_var "ALLOW_DISABLED_FRONTEND_REVALIDATION")"; then
+      echo "NOTICE: FRONTEND_REVALIDATE_TOKEN not set; skipping revalidation smoke check because ALLOW_DISABLED_FRONTEND_REVALIDATION=true."
+      return 0
+    fi
+    record_diagnosis "FRONTEND_REVALIDATE_TOKEN is missing, so publish-triggered frontend cache invalidation cannot be verified."
+    echo "ERROR: FRONTEND_REVALIDATE_TOKEN not set; frontend revalidation smoke check cannot run."
+    return 1
   fi
 
   if dc exec -T frontend node -e "const token=process.env.REVALIDATE_TOKEN; if (!token) process.exit(2); fetch('http://127.0.0.1:3000/api/revalidate', { method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' }, body: JSON.stringify({ paths: ['/jobs'], tags: ['content:posts', 'content:listings'] }) }).then(async (res) => { if (!res.ok) { console.error('revalidate-status=' + res.status); console.error(await res.text()); process.exit(1); } }).catch((error) => { console.error(error); process.exit(1); });"; then

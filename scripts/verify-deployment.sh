@@ -33,6 +33,15 @@ read_env_var() {
   printf '%s' "$value"
 }
 
+is_truthy() {
+  local value="${1:-}"
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 resolve_public_base_url() {
   if [[ -n "$PUBLIC_BASE_URL" ]]; then
     return 0
@@ -109,11 +118,17 @@ check_metrics() {
 }
 
 check_revalidation_smoke() {
-  local token
+  local token allow_disabled
   token="$(read_env_var "FRONTEND_REVALIDATE_TOKEN")"
+  allow_disabled="$(read_env_var "ALLOW_DISABLED_FRONTEND_REVALIDATION")"
   if [[ -z "$token" ]]; then
-    echo "skip frontend revalidation smoke (FRONTEND_REVALIDATE_TOKEN not set)"
-    return 0
+    if is_truthy "$allow_disabled"; then
+      echo "skip frontend revalidation smoke (ALLOW_DISABLED_FRONTEND_REVALIDATION=true)"
+      return 0
+    fi
+
+    echo "fail frontend revalidation smoke -> FRONTEND_REVALIDATE_TOKEN not set"
+    return 1
   fi
 
   if ! command -v docker >/dev/null 2>&1; then

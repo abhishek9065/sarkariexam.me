@@ -7,7 +7,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'user';
+  role: 'user' | 'editor' | 'reviewer' | 'admin' | 'superadmin';
   isActive: boolean;
   createdAt: string;
   lastLogin?: string;
@@ -34,7 +34,7 @@ export function useCurrentUser() {
   const checkUser = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${apiBase}/auth/me`, {
+      const response = await fetch(`${apiBase}/auth/session`, {
         credentials: 'include',
         headers: {
           'Accept': 'application/json',
@@ -43,7 +43,7 @@ export function useCurrentUser() {
       
       if (response.ok) {
         const { data } = await response.json();
-        setUser(data.user);
+        setUser(data.user ?? null);
         setError(null);
       } else {
         setUser(null);
@@ -103,7 +103,7 @@ export function useCurrentUser() {
     user, 
     isLoading, 
     error, 
-    isAdmin: user?.role === 'admin',
+    isAdmin: user?.role === 'admin' || user?.role === 'superadmin',
     isLoggedIn: !!user,
     logout,
     refetch: checkUser

@@ -4,7 +4,7 @@ import jwt, { type SignOptions } from 'jsonwebtoken';
 import { z } from 'zod';
 
 import { config } from '../config.js';
-import { AUTH_COOKIE_NAME, authenticateToken, blacklistToken } from '../middleware/auth.js';
+import { AUTH_COOKIE_NAME, authenticateToken, blacklistToken, optionalAuth } from '../middleware/auth.js';
 import { clearCsrfCookie, ensureCsrfCookie, setCsrfCookie } from '../middleware/csrf.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
@@ -414,6 +414,38 @@ router.post('/logout', async (req, res) => {
   clearCsrfCookie(res);
 
   return res.json({ message: 'Logged out successfully' });
+});
+
+router.get('/session', rateLimit({ windowMs: 60 * 1000, maxRequests: 120, keyPrefix: 'auth-session' }), optionalAuth, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.json({ data: { user: null } });
+    }
+
+    const user = await UserModelPostgres.findById(req.user.userId);
+    if (!user || !user.isActive) {
+      return res.json({ data: { user: null } });
+    }
+
+    ensureCsrfCookie(req, res);
+
+    return res.json({
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.username,
+          role: user.role,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[Auth] Session error:', error);
+    return res.json({ data: { user: null } });
+  }
 });
 
 router.get('/me', rateLimit({ windowMs: 60 * 1000, maxRequests: 60, keyPrefix: 'auth-me' }), authenticateToken, async (req, res) => {
