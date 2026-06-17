@@ -15,8 +15,16 @@ const notificationCampaignSchema = z.object({
   body: z.string().min(10).max(1000),
   url: z.string().url().optional(),
   segment: z.object({
-    type: z.enum(['all', 'state', 'category', 'organization', 'qualification', 'type', 'language']),
-    value: z.string(),
+    type: z.enum(['all', 'state', 'category', 'organization', 'qualification', 'type']),
+    value: z.string().trim(),
+  }).superRefine((segment, ctx) => {
+    if (segment.type !== 'all' && segment.value.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Segment value is required for targeted campaigns',
+        path: ['value'],
+      });
+    }
   }),
   scheduledAt: z.string().datetime().optional(),
   abTest: z.object({
@@ -297,7 +305,7 @@ export async function getUserSegments(): Promise<{
       categories: categoryRows
         .map((item) => categoryNameById.get(item.categoryId))
         .filter((value): value is string => Boolean(value)),
-      languages: ['Hindi', 'English', 'Tamil', 'Telugu', 'Marathi', 'Bengali'],
+      languages: [],
       totalUsers,
     };
   } catch (error) {
@@ -329,7 +337,7 @@ export async function sendCampaign(campaignId: string): Promise<{
   success: boolean;
   error?: string;
   mode?: 'simulation';
-  sentCount?: number;
+  estimatedCount?: number;
 }> {
   try {
     const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
@@ -337,14 +345,8 @@ export async function sendCampaign(campaignId: string): Promise<{
       return { success: false, error: 'Campaign not found' };
     }
 
-    if (campaign.status === 'sending' || campaign.status === 'sent') {
-      return { success: false, error: 'Campaign already sent' };
-    }
-
-    // Update status to sending
-    const markedSending = await NotificationCampaignModelPostgres.markSending(campaignId);
-    if (!markedSending) {
-      return { success: false, error: 'Campaign not found' };
+    if (campaign.status === 'sending' || campaign.status === 'sent' || campaign.status === 'simulated') {
+      return { success: false, error: 'Campaign already processed' };
     }
 
     const userWhere = buildSegmentWhere(
@@ -359,14 +361,17 @@ export async function sendCampaign(campaignId: string): Promise<{
     ]);
 
     // This records intended reach only; real email/push delivery is not wired here yet.
-    const sentCount = emailUserCount + pushUsers.length;
+    const estimatedCount = emailUserCount + pushUsers.length;
 
-    await NotificationCampaignModelPostgres.markSent(campaignId, sentCount);
+    const markedSimulated = await NotificationCampaignModelPostgres.markSimulated(campaignId, estimatedCount);
+    if (!markedSimulated) {
+      return { success: false, error: 'Campaign not found' };
+    }
 
     console.log('[NotificationService] Campaign simulation completed', {
-      sentCount,
+      estimatedCount,
     });
-    return { success: true, mode: 'simulation', sentCount };
+    return { success: true, mode: 'simulation', estimatedCount };
   } catch (error) {
     console.error('[NotificationService] Error sending campaign:', error);
 

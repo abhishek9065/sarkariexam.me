@@ -126,7 +126,7 @@ describe('admin routes', () => {
     mocks.getUpcomingDeadlines.mockResolvedValue([]);
     mocks.bulkImportAnnouncements.mockResolvedValue({ imported: 1 });
     mocks.createCampaign.mockResolvedValue({ success: true, campaignId: 'campaign-1' });
-    mocks.sendCampaign.mockResolvedValue({ success: true, mode: 'simulation', sentCount: 3 });
+    mocks.sendCampaign.mockResolvedValue({ success: true, mode: 'simulation', estimatedCount: 3 });
     mocks.assignAnnouncement.mockResolvedValue({ success: true });
     mocks.approveAnnouncement.mockResolvedValue({ success: true });
     mocks.rejectAnnouncement.mockResolvedValue({ success: true });
@@ -255,7 +255,7 @@ describe('admin routes', () => {
       message: 'Campaign simulation completed',
       data: {
         mode: 'simulation',
-        sentCount: 3,
+        estimatedCount: 3,
       },
     });
   });

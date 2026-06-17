@@ -1173,7 +1173,7 @@ router.post('/campaigns/:id/send', async (req, res) => {
       message: 'Campaign simulation completed',
       data: {
         mode: result.mode ?? 'simulation',
-        sentCount: result.sentCount ?? 0,
+        estimatedCount: result.estimatedCount ?? 0,
       },
     });
   } catch (error) {

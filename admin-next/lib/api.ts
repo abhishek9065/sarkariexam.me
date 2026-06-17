@@ -440,7 +440,7 @@ export function createCampaign(data: {
 }
 
 export function sendCampaign(id: string) {
-  return apiFetchWithCsrf<{ message: string; data: { mode: 'simulation'; sentCount: number } }>(`/admin/campaigns/${id}/send`, {
+  return apiFetchWithCsrf<{ message: string; data: { mode: 'simulation'; estimatedCount: number } }>(`/admin/campaigns/${id}/send`, {
     method: 'POST',
   });
 }
