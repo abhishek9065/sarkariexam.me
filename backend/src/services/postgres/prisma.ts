@@ -18,7 +18,7 @@ const prismaDatasourceUrl =
   process.env.DATABASE_URL ||
   'postgresql://postgres:postgres@127.0.0.1:5432/postgres?schema=public';
 
-const prismaAdapter = new PrismaPg(prismaDatasourceUrl);
+const prismaAdapter = new PrismaPg({ connectionString: prismaDatasourceUrl });
 
 const prismaClientOptions: Prisma.PrismaClientOptions = {
   log: prismaLogLevels,
