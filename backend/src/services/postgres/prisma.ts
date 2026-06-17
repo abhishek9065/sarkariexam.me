@@ -181,7 +181,7 @@ export async function postgresHealthCheck(options: { logFailure?: boolean } = {}
     });
 
     try {
-      await Promise.race([prisma.$queryRaw`SELECT 1::int AS ok`, timeout]);
+      await Promise.race([prisma.post.findFirst({ select: { id: true } }), timeout]);
     } finally {
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
