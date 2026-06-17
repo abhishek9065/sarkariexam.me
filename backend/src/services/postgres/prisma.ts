@@ -26,7 +26,31 @@ const prismaDatasourceUrl =
   process.env.DATABASE_URL ||
   'postgresql://postgres:postgres@127.0.0.1:5432/postgres?schema=public';
 
-const prismaAdapter = new PrismaPg({ connectionString: prismaDatasourceUrl });
+const createPrismaPgConfig = (connectionString: string) => {
+  try {
+    const url = new URL(connectionString);
+    const sslMode = url.searchParams.get('sslmode')?.toLowerCase();
+    const hasRootCert = Boolean(url.searchParams.get('sslrootcert'));
+
+    // node-postgres treats sslmode=require as strict certificate verification by default.
+    // Managed PostgreSQL URLs commonly use libpq semantics, where require encrypts the
+    // connection without requiring a bundled CA certificate.
+    if ((sslMode === 'require' || sslMode === 'no-verify') && !hasRootCert) {
+      return {
+        connectionString,
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      };
+    }
+  } catch {
+    // Let pg surface the actual connection-string error during connection.
+  }
+
+  return { connectionString };
+};
+
+const prismaAdapter = new PrismaPg(createPrismaPgConfig(prismaDatasourceUrl));
 
 const prismaClientOptions: Prisma.PrismaClientOptions = {
   log: prismaLogLevels,
