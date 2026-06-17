@@ -20,9 +20,11 @@ const mocks = vi.hoisted(() => ({
   getUpcomingDeadlines: vi.fn(),
   bulkImportAnnouncements: vi.fn(),
   createCampaign: vi.fn(),
+  sendCampaign: vi.fn(),
   assignAnnouncement: vi.fn(),
   approveAnnouncement: vi.fn(),
   rejectAnnouncement: vi.fn(),
+  moderateComment: vi.fn(),
 }));
 
 vi.mock('../middleware/auth.js', () => ({
@@ -80,7 +82,7 @@ vi.mock('../services/notifications.js', () => ({
   getCampaigns: vi.fn(),
   getSegmentUserCount: vi.fn(),
   getUserSegments: vi.fn(() => ({ totalUsers: 0, states: [], categories: [] })),
-  sendCampaign: vi.fn(),
+  sendCampaign: mocks.sendCampaign,
 }));
 vi.mock('../services/workflow.js', () => ({
   assignAnnouncement: mocks.assignAnnouncement,
@@ -88,6 +90,12 @@ vi.mock('../services/workflow.js', () => ({
   getPendingApprovals: vi.fn(),
   getWorkflowLogs: vi.fn(),
   rejectAnnouncement: mocks.rejectAnnouncement,
+}));
+vi.mock('../services/engagement.js', () => ({
+  getCommentsPendingReview: vi.fn(),
+  getEngagementMetrics: vi.fn(),
+  getUserFeedback: vi.fn(),
+  moderateComment: mocks.moderateComment,
 }));
 
 const createApp = async () => {
@@ -118,9 +126,11 @@ describe('admin routes', () => {
     mocks.getUpcomingDeadlines.mockResolvedValue([]);
     mocks.bulkImportAnnouncements.mockResolvedValue({ imported: 1 });
     mocks.createCampaign.mockResolvedValue({ success: true, campaignId: 'campaign-1' });
+    mocks.sendCampaign.mockResolvedValue({ success: true, mode: 'simulation', sentCount: 3 });
     mocks.assignAnnouncement.mockResolvedValue({ success: true });
     mocks.approveAnnouncement.mockResolvedValue({ success: true });
     mocks.rejectAnnouncement.mockResolvedValue({ success: true });
+    mocks.moderateComment.mockResolvedValue(true);
   });
 
   it('uses database counts for dashboard users', async () => {
@@ -191,15 +201,63 @@ describe('admin routes', () => {
 
     await request(app).post('/admin/bulk-import').send([]);
     await request(app).post('/admin/campaigns').send({ title: 'Campaign' });
-    await request(app).post('/admin/assign').send({ id: 'post-1' });
+    await request(app).post('/admin/assign').send({
+      announcementId: 'post-1',
+      assigneeUserId: 'reviewer-1',
+      assigneeEmail: 'reviewer@example.com',
+    });
     await request(app).post('/admin/approve/post-1').send({ note: 'ok' });
     await request(app).post('/admin/reject/post-1').send({ reason: 'no' });
 
     expect(mocks.bulkImportAnnouncements).toHaveBeenCalledWith([], 'admin-user');
     expect(mocks.createCampaign).toHaveBeenCalledWith({ title: 'Campaign' }, 'admin-user');
-    expect(mocks.assignAnnouncement).toHaveBeenCalledWith({ id: 'post-1' }, 'admin-user');
+    expect(mocks.assignAnnouncement).toHaveBeenCalledWith({
+      announcementId: 'post-1',
+      assigneeUserId: 'reviewer-1',
+      assigneeEmail: 'reviewer@example.com',
+    }, 'admin-user');
     expect(mocks.approveAnnouncement).toHaveBeenCalledWith('post-1', 'admin-user', 'ok');
     expect(mocks.rejectAnnouncement).toHaveBeenCalledWith('post-1', 'admin-user', 'no');
+  });
+
+  it('validates workflow action bodies before calling services', async () => {
+    const app = await createApp();
+
+    const assignResponse = await request(app).post('/admin/assign').send({ id: 'post-1' });
+    const approveResponse = await request(app).post('/admin/approve/post-1').send({ note: 123 });
+    const rejectResponse = await request(app).post('/admin/reject/post-1').send({});
+
+    expect(assignResponse.status).toBe(400);
+    expect(approveResponse.status).toBe(400);
+    expect(rejectResponse.status).toBe(400);
+    expect(mocks.assignAnnouncement).not.toHaveBeenCalled();
+    expect(mocks.approveAnnouncement).not.toHaveBeenCalled();
+    expect(mocks.rejectAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid comment moderation actions', async () => {
+    const app = await createApp();
+
+    const response = await request(app)
+      .post('/admin/moderate-comment/comment-1')
+      .send({ action: 'anything' });
+
+    expect(response.status).toBe(400);
+    expect(mocks.moderateComment).not.toHaveBeenCalled();
+  });
+
+  it('labels campaign send as simulation', async () => {
+    const app = await createApp();
+    const response = await request(app).post('/admin/campaigns/campaign-1/send');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      message: 'Campaign simulation completed',
+      data: {
+        mode: 'simulation',
+        sentCount: 3,
+      },
+    });
   });
 
   it('rejects invalid content analytics type values', async () => {

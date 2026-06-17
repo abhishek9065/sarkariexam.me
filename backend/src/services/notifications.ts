@@ -325,7 +325,12 @@ export async function getSegmentUserCount(
 /**
  * Send notification campaign
  */
-export async function sendCampaign(campaignId: string): Promise<{ success: boolean; error?: string }> {
+export async function sendCampaign(campaignId: string): Promise<{
+  success: boolean;
+  error?: string;
+  mode?: 'simulation';
+  sentCount?: number;
+}> {
   try {
     const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
     if (!campaign) {
@@ -353,15 +358,15 @@ export async function sendCampaign(campaignId: string): Promise<{ success: boole
       PushSubscriptionModelPostgres.listAll(),
     ]);
 
-    // Simulate sending (in production, this would use actual email/push services)
+    // This records intended reach only; real email/push delivery is not wired here yet.
     const sentCount = emailUserCount + pushUsers.length;
 
     await NotificationCampaignModelPostgres.markSent(campaignId, sentCount);
 
-    console.log('[NotificationService] Campaign sent', {
+    console.log('[NotificationService] Campaign simulation completed', {
       sentCount,
     });
-    return { success: true };
+    return { success: true, mode: 'simulation', sentCount };
   } catch (error) {
     console.error('[NotificationService] Error sending campaign:', error);
 

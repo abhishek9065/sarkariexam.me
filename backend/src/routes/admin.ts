@@ -158,6 +158,25 @@ const securityEventsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(100),
 });
 
+const assignWorkflowSchema = z.object({
+  announcementId: z.string().trim().min(1),
+  assigneeUserId: z.string().trim().min(1),
+  assigneeEmail: z.string().trim().email(),
+  reviewDueAt: z.string().datetime().optional(),
+});
+
+const approveWorkflowSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+});
+
+const rejectWorkflowSchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
+
+const moderateCommentSchema = z.object({
+  action: z.enum(['approve', 'reject']),
+});
+
 function isPrivilegedRole(role: string | undefined) {
   return privilegedRoles.includes(role as (typeof privilegedRoles)[number]);
 }
@@ -1150,7 +1169,13 @@ router.post('/campaigns/:id/send', async (req, res) => {
     const result = await sendCampaign(req.params.id);
     
     if (!result.success) return res.status(400).json({ error: result.error });
-    return res.json({ message: 'Campaign sent' });
+    return res.json({
+      message: 'Campaign simulation completed',
+      data: {
+        mode: result.mode ?? 'simulation',
+        sentCount: result.sentCount ?? 0,
+      },
+    });
   } catch (error) {
     console.error('[Admin] Send campaign error:', error);
     return res.status(500).json({ error: 'Failed to send campaign' });
@@ -1180,8 +1205,13 @@ router.get('/segments', async (req, res) => {
 router.post('/assign', async (req, res) => {
   try {
     const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    const parse = assignWorkflowSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
     const { assignAnnouncement } = await import('../services/workflow.js');
-    const result = await assignAnnouncement(req.body, userId);
+    const result = await assignAnnouncement(parse.data, userId);
     if (!result.success) return res.status(400).json({ error: result.error });
     return res.json({ message: 'Assigned' });
   } catch (error) {
@@ -1193,8 +1223,13 @@ router.post('/assign', async (req, res) => {
 router.post('/approve/:id', async (req, res) => {
   try {
     const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    const parse = approveWorkflowSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
     const { approveAnnouncement } = await import('../services/workflow.js');
-    const result = await approveAnnouncement(req.params.id, userId, req.body.note);
+    const result = await approveAnnouncement(req.params.id, userId, parse.data.note);
     if (!result.success) return res.status(400).json({ error: result.error });
     return res.json({ message: 'Approved' });
   } catch (error) {
@@ -1206,8 +1241,13 @@ router.post('/approve/:id', async (req, res) => {
 router.post('/reject/:id', async (req, res) => {
   try {
     const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+    const parse = rejectWorkflowSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
     const { rejectAnnouncement } = await import('../services/workflow.js');
-    const result = await rejectAnnouncement(req.params.id, userId, req.body.reason);
+    const result = await rejectAnnouncement(req.params.id, userId, parse.data.reason);
     if (!result.success) return res.status(400).json({ error: result.error });
     return res.json({ message: 'Rejected' });
   } catch (error) {
@@ -1287,9 +1327,11 @@ router.get('/comments-pending', async (req, res) => {
 
 router.post('/moderate-comment/:id', async (req, res) => {
   try {
+    const parse = moderateCommentSchema.safeParse(req.body);
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
     const { moderateComment } = await import('../services/engagement.js');
-    const { action } = req.body;
-    const result = await moderateComment(req.params.id, action);
+    const result = await moderateComment(req.params.id, parse.data.action);
     if (!result) return res.status(400).json({ error: 'Failed to moderate' });
     return res.json({ message: 'Moderated' });
   } catch (error) {
