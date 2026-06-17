@@ -45,7 +45,7 @@ import {
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import { getLegacyRuntimeDiagnostics, legacyMongoBackedApiPrefixes, startLegacyMongoRuntime } from './services/legacyRuntime.js';
-import { postgresHealthCheck } from './services/postgres/prisma.js';
+import { getPostgresHealthErrorDiagnostics, postgresHealthCheck } from './services/postgres/prisma.js';
 import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
 import { getSecurityMetricSnapshot } from './services/securityMetrics.js';
 import { scheduleTrackerReminders } from './services/trackerReminders.js';
@@ -440,6 +440,7 @@ function buildRuntimeDiagnostics() {
     postgres: {
       configured: Boolean(config.postgresPrismaUrl),
       readinessCache: buildPostgresReadinessCacheDiagnostics(),
+      lastHealthError: getPostgresHealthErrorDiagnostics(),
     },
     readiness: {
       cacheTtlMs: config.readinessCacheTtlMs,

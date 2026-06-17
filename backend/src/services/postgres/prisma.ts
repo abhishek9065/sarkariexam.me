@@ -7,7 +7,15 @@ type GlobalWithPrisma = typeof globalThis & {
   __prismaClient?: PrismaClient;
 };
 
+type PostgresHealthErrorDiagnostics = {
+  name?: string;
+  code?: string;
+  causeCode?: string;
+  lastFailedAt: string;
+};
+
 const globalRef = globalThis as GlobalWithPrisma;
+let lastPostgresHealthError: PostgresHealthErrorDiagnostics | null = null;
 
 const prismaLogLevels: Prisma.LogLevel[] = config.isProduction
   ? ['error']
@@ -135,6 +143,28 @@ if (process.env.NODE_ENV !== 'production') {
   globalRef.__prismaClient = prisma;
 }
 
+const readStringProperty = (value: unknown, key: string) => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = (value as Record<string, unknown>)[key];
+  return typeof candidate === 'string' && candidate.trim() ? candidate : undefined;
+};
+
+function capturePostgresHealthError(error: unknown) {
+  lastPostgresHealthError = {
+    name: readStringProperty(error, 'name'),
+    code: readStringProperty(error, 'code'),
+    causeCode: readStringProperty((error as { cause?: unknown } | undefined)?.cause, 'code'),
+    lastFailedAt: new Date().toISOString(),
+  };
+}
+
+export function getPostgresHealthErrorDiagnostics() {
+  return lastPostgresHealthError;
+}
+
 export async function postgresHealthCheck(options: { logFailure?: boolean } = {}): Promise<boolean> {
   const { logFailure = true } = options;
   const timeoutMs = config.postgresHealthTimeoutMs;
@@ -144,7 +174,9 @@ export async function postgresHealthCheck(options: { logFailure?: boolean } = {}
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(() => {
-        reject(new Error(`Postgres health check timed out after ${safeTimeoutMs}ms`));
+        const error = new Error(`Postgres health check timed out after ${safeTimeoutMs}ms`);
+        error.name = 'PostgresHealthTimeoutError';
+        reject(error);
       }, safeTimeoutMs);
     });
 
@@ -155,8 +187,10 @@ export async function postgresHealthCheck(options: { logFailure?: boolean } = {}
         clearTimeout(timeoutHandle);
       }
     }
+    lastPostgresHealthError = null;
     return true;
   } catch (error) {
+    capturePostgresHealthError(error);
     if (logFailure) {
       console.error('Postgres health check failed:', error);
     }
