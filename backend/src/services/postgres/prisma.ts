@@ -32,16 +32,12 @@ const createPrismaPgConfig = (connectionString: string) => {
     const sslMode = url.searchParams.get('sslmode')?.toLowerCase();
     const hasRootCert = Boolean(url.searchParams.get('sslrootcert'));
 
-    // node-postgres treats sslmode=require as strict certificate verification by default.
-    // Managed PostgreSQL URLs commonly use libpq semantics, where require encrypts the
-    // connection without requiring a bundled CA certificate.
+    // node-postgres parses connectionString after explicit ssl options, so the
+    // compatibility flag must live in the URL for sslmode=require to use libpq
+    // semantics with managed PostgreSQL certificates.
     if ((sslMode === 'require' || sslMode === 'no-verify') && !hasRootCert) {
-      return {
-        connectionString,
-        ssl: {
-          rejectUnauthorized: false,
-        },
-      };
+      url.searchParams.set('uselibpqcompat', 'true');
+      return { connectionString: url.toString() };
     }
   } catch {
     // Let pg surface the actual connection-string error during connection.
