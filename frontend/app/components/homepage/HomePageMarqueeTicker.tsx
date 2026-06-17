@@ -6,17 +6,17 @@ import Link from 'next/link';
 import { homePageLinks } from './links';
 
 const updates = [
-  'SSC CGL 2026 Notification Out - Apply Before 30 May!',
-  'UPSC CSE Prelims 2026 Admit Card Released',
-  'Railway Group D Admit Card Released - 32,000 Posts',
-  'IBPS PO 2026 Online Form Started - 4,500 Vacancies',
-  'NDA 2026 Written Exam Result Out',
-  'Bihar Police 21,391 Posts - Apply Now',
-  'UPPSC PCS 2026 Application Started',
-  'SBI Clerk 2026 - 8,773 Vacancies Open',
-  'CTET 2026 Registration Begins',
-  'MP Police Constable 2026 - 7,090 Posts',
-];
+  { text: 'SSC CGL 2026 Notification Out - Apply Before 30 May!', href: '/jobs/ssc-cgl-2026' },
+  { text: 'UPSC CSE Prelims 2026 Admit Card Released', href: `${homePageLinks.admitCards}?search=${encodeURIComponent('UPSC CSE Prelims 2026 Admit Card')}` },
+  { text: 'Railway Group D Admit Card Released - 32,000 Posts', href: `${homePageLinks.admitCards}?search=${encodeURIComponent('Railway Group D Admit Card')}` },
+  { text: 'IBPS PO 2026 Online Form Started - 4,500 Vacancies', href: '/jobs/ibps-po-2026' },
+  { text: 'NDA 2026 Written Exam Result Out', href: `${homePageLinks.results}?search=${encodeURIComponent('NDA 2026')}` },
+  { text: 'Bihar Police 21,391 Posts - Apply Now', href: `${homePageLinks.jobs}?search=${encodeURIComponent('Bihar Police')}` },
+  { text: 'UPPSC PCS 2026 Application Started', href: `${homePageLinks.jobs}?search=${encodeURIComponent('UPPSC PCS 2026')}` },
+  { text: 'SBI Clerk 2026 - 8,773 Vacancies Open', href: `${homePageLinks.jobs}?search=${encodeURIComponent('SBI Clerk 2026')}` },
+  { text: 'CTET 2026 Registration Begins', href: `${homePageLinks.jobs}?search=${encodeURIComponent('CTET 2026')}` },
+  { text: 'MP Police Constable 2026 - 7,090 Posts', href: `${homePageLinks.jobs}?search=${encodeURIComponent('MP Police Constable 2026')}` },
+] as const;
 
 export function HomePageMarqueeTicker() {
   return (
@@ -35,11 +35,11 @@ export function HomePageMarqueeTicker() {
           <div className="flex h-9 animate-[homepage-marquee_45s_linear_infinite] items-center whitespace-nowrap">
             {[...updates, ...updates].map((update, index) => (
               <Link
-                key={`${update}-${index}`}
-                href={homePageLinks.jobs}
+                key={`${update.text}-${index}`}
+                href={update.href}
                 className="inline-flex items-center gap-1 px-5 text-[12.5px] font-medium text-gray-600 transition-colors hover:text-[#e65100] dark:text-gray-300 dark:hover:text-orange-400"
               >
-                {update}
+                {update.text}
                 <span className="mx-1 text-[8px] text-orange-200 dark:text-orange-800">◆</span>
               </Link>
             ))}
