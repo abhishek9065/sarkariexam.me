@@ -89,4 +89,17 @@ describe('server security pipeline', () => {
     expect(response.status).toBe(401);
     expect(response.body.code).not.toBe('ORIGIN_REQUIRED');
   });
+
+  it('allows X-Metrics-Token in CORS preflight requests', async () => {
+    const { app } = await import('../server.js');
+
+    const response = await request(app)
+      .options('/api/health/deep')
+      .set('Origin', 'https://sarkariexams.me')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'X-Metrics-Token');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-headers']).toContain('X-Metrics-Token');
+  });
 });

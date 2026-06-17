@@ -130,6 +130,7 @@ app.use(cors({
     'X-Requested-With',
     'X-CSRF-Token',
     'X-XSRF-Token',
+    'X-Metrics-Token',
     'Idempotency-Key',
   ]
 }));
@@ -244,11 +245,11 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/health', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
-  return buildHealthResponse(res);
+  return buildReadinessResponse(res);
 });
 
 app.get('/api/healthz', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health' }), async (_req, res) => {
-  return buildHealthResponse(res);
+  return buildReadinessResponse(res);
 });
 
 app.get('/api/livez', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 30, keyPrefix: 'health-live' }), (_req, res) => {
@@ -476,16 +477,13 @@ function buildRuntimeDiagnostics() {
   };
 }
 
-async function buildHealthResponse(res: express.Response) {
+async function buildReadinessResponse(res: express.Response) {
   const readiness = await buildReadinessPayload();
 
   return res
     .status(readiness.status === 'error' ? 503 : 200)
     .set('Cache-Control', 'no-store')
-    .json({
-      ...readiness,
-      runtime: buildRuntimeDiagnostics(),
-    });
+    .json(readiness);
 }
 
 app.get('/metrics', (req, res) => {

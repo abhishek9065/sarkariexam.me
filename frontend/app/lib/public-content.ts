@@ -7,7 +7,8 @@ export type AnnouncementSection =
   | 'results'
   | 'admit-cards'
   | 'answer-keys'
-  | 'admissions';
+  | 'admissions'
+  | 'syllabus';
 
 export type ResourceCategorySlug = 'syllabus' | 'board-results' | 'scholarship';
 export type InfoPageSlug =
@@ -357,6 +358,7 @@ const sectionPathMap: Record<AnnouncementSection, string> = {
   'admit-cards': '/admit-cards',
   'answer-keys': '/answer-keys',
   admissions: '/admissions',
+  syllabus: '/syllabus',
 };
 
 const defaultCommunityUrls: Partial<Record<CommunityChannel, string>> = {
@@ -502,6 +504,33 @@ export const announcementCategoryMeta: Record<AnnouncementSection, CategoryPageM
       'Admission notices keep important dates, fees, and official links visible.',
       'Users can move between forms, counseling updates, and detail pages without losing context.',
       'University and exam actions stay grouped with clear next steps and quick navigation.',
+    ],
+  },
+  syllabus: {
+    slug: 'syllabus',
+    canonicalPath: '/syllabus',
+    title: 'Syllabus',
+    eyebrow: 'Exam Pattern + Topics',
+    description:
+      'Review syllabus outlines, exam pattern snapshots, topic coverage, and preparation links in one compact public portal.',
+    headerColor: 'bg-[#5d4037]',
+    listingTitle: 'Latest Syllabus',
+    stats: [
+      { label: 'Exam Patterns', value: '200+' },
+      { label: 'Top Exams', value: '47' },
+      { label: 'Prep Guides', value: '31' },
+      { label: 'Updated Weekly', value: 'Yes' },
+    ],
+    quickLinks: [
+      { label: 'Answer Keys', href: '/answer-keys' },
+      { label: 'Latest Jobs', href: '/jobs' },
+      { label: 'Admissions', href: '/admissions' },
+      { label: 'Homepage', href: '/' },
+    ],
+    highlights: [
+      'Syllabus detail pages keep exam pattern, topic coverage, and official source links easy to review.',
+      'Users can jump from syllabus notices to jobs, answer keys, or admissions quickly.',
+      'Official links and verification notes remain visible before users open external portals.',
     ],
   },
 };

@@ -197,6 +197,19 @@ const trackedApplicationImportSchema = z.object({
     items: z.array(trackedApplicationImportItemSchema).max(300),
 });
 
+const profileAlertQuerySchema = z.object({
+    windowDays: z.coerce.number().int().min(1).max(30).optional(),
+    limit: z.coerce.number().int().min(1).max(20).optional(),
+});
+
+const profileWindowQuerySchema = z.object({
+    windowDays: z.coerce.number().int().min(1).max(30).optional(),
+});
+
+const profileLimitQuerySchema = (maxLimit: number) => z.object({
+    limit: z.coerce.number().int().min(1).max(maxLimit).optional(),
+});
+
 const QUALIFICATIONS = [
     '10th Pass',
     '12th Pass',
@@ -613,14 +626,13 @@ router.delete('/saved-searches/:id', authenticateToken, async (req, res) => {
 router.get('/alerts', authenticateToken, async (req, res) => {
     try {
         const profile = await getOrCreateProfile(req.user!.userId);
-        const windowDays = Math.min(
-            30,
-            parseInt(req.query.windowDays as string) || profile.alertWindowDays || 7
-        );
-        const limit = Math.min(
-            20,
-            parseInt(req.query.limit as string) || profile.alertMaxItems || 5
-        );
+        const parseResult = profileAlertQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const windowDays = parseResult.data.windowDays ?? profile.alertWindowDays ?? 7;
+        const limit = parseResult.data.limit ?? profile.alertMaxItems ?? 5;
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
         const since = new Date(sinceMs);
 
@@ -665,14 +677,13 @@ router.get('/alerts', authenticateToken, async (req, res) => {
 router.get('/digest-preview', authenticateToken, async (req, res) => {
     try {
         const profile = await getOrCreateProfile(req.user!.userId);
-        const windowDays = Math.min(
-            30,
-            parseInt(req.query.windowDays as string) || profile.alertWindowDays || 7
-        );
-        const limit = Math.min(
-            20,
-            parseInt(req.query.limit as string) || profile.alertMaxItems || 8
-        );
+        const parseResult = profileAlertQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const windowDays = parseResult.data.windowDays ?? profile.alertWindowDays ?? 7;
+        const limit = parseResult.data.limit ?? profile.alertMaxItems ?? 8;
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
         const since = new Date(sinceMs);
 
@@ -744,7 +755,12 @@ router.get('/digest-preview', authenticateToken, async (req, res) => {
 // Notification history (persisted)
 router.get('/notifications', authenticateToken, async (req, res) => {
     try {
-        const limit = Math.min(50, parseInt(req.query.limit as string) || 12);
+        const parseResult = profileLimitQuerySchema(50).safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const limit = parseResult.data.limit ?? 12;
         const docs = await ProfileModelPostgres.listNotifications(req.user!.userId, limit);
         const unreadCount = await ProfileModelPostgres.countUnreadNotifications(req.user!.userId);
 
@@ -997,7 +1013,12 @@ router.post('/tracked-applications/import', authenticateToken, async (req, res) 
 router.get('/widgets', authenticateToken, async (req, res) => {
     try {
         const profile = await getOrCreateProfile(req.user!.userId);
-        const windowDays = Math.min(30, Math.max(1, parseInt(req.query.windowDays as string, 10) || profile.alertWindowDays || 7));
+        const parseResult = profileWindowQuerySchema.safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const windowDays = parseResult.data.windowDays ?? profile.alertWindowDays ?? 7;
         const sinceMs = Date.now() - windowDays * 24 * 60 * 60 * 1000;
 
         const [trackedItems, searches, preferenceAlerts] = await Promise.all([
@@ -1055,7 +1076,12 @@ router.get('/widgets', authenticateToken, async (req, res) => {
 // Recommendations
 router.get('/recommendations', authenticateToken, async (req, res) => {
     try {
-        const limit = Math.min(50, parseInt(req.query.limit as string) || 10);
+        const parseResult = profileLimitQuerySchema(50).safeParse(req.query);
+        if (!parseResult.success) {
+            return res.status(400).json({ error: parseResult.error.flatten() });
+        }
+
+        const limit = parseResult.data.limit ?? 10;
         const profile = await getOrCreateProfile(req.user!.userId);
         const announcements = await AnnouncementModelPostgres.findAll({ limit: 200 });
 

@@ -119,6 +119,45 @@ const analyticsQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(90).default(30),
 });
 
+const contentAnalyticsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
+});
+
+const calendarQuerySchema = z.object({
+  start: z.string().min(1),
+  end: z.string().min(1),
+  status: z.string().trim().optional(),
+  type: z.string().trim().optional(),
+}).superRefine((value, ctx) => {
+  const startDate = new Date(value.start);
+  const endDate = new Date(value.end);
+
+  if (Number.isNaN(startDate.getTime())) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid start date', path: ['start'] });
+  }
+  if (Number.isNaN(endDate.getTime())) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid end date', path: ['end'] });
+  }
+  if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime()) && startDate > endDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'start must be before end', path: ['start'] });
+  }
+});
+
+const limitQuerySchema = (defaultLimit: number, maxLimit: number) => z.object({
+  limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+});
+
+const daysQuerySchema = (defaultDays: number, maxDays: number) => z.object({
+  days: z.coerce.number().int().min(1).max(maxDays).default(defaultDays),
+});
+
+const securityEventsQuerySchema = z.object({
+  type: z.string().trim().optional(),
+  severity: z.string().trim().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(100),
+});
+
 function isPrivilegedRole(role: string | undefined) {
   return privilegedRoles.includes(role as (typeof privilegedRoles)[number]);
 }
@@ -509,8 +548,12 @@ router.get('/analytics/overview', async (req, res) => {
 // Content performance — top announcements by views
 router.get('/analytics/content', async (req, res) => {
   try {
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
-    const type = req.query.type as ContentType | undefined;
+    const parseResult = contentAnalyticsQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    const { limit, type } = parseResult.data;
 
     const announcements = await AnnouncementModel.getTrending({ type, limit });
 
@@ -1017,16 +1060,17 @@ router.get('/analytics/live', async (req, res) => {
 
 router.get('/calendar', async (req, res) => {
   try {
-    const { start, end, status, type } = req.query;
-    if (!start || !end) {
-      return res.status(400).json({ error: 'start and end dates required' });
+    const parseResult = calendarQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
     }
 
+    const { start, end, status, type } = parseResult.data;
     const { getCalendarAnnouncements } = await import('../services/calendar.js');
     const announcements = await getCalendarAnnouncements(
-      new Date(start as string),
-      new Date(end as string),
-      { status: status as string, type: type as string }
+      new Date(start),
+      new Date(end),
+      { status, type }
     );
 
     return res.json({ data: announcements });
@@ -1055,9 +1099,13 @@ router.post('/bulk-import', async (req, res) => {
 
 router.get('/upcoming-deadlines', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
+    const parseResult = limitQuerySchema(10, 100).safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
     const { getUpcomingDeadlines } = await import('../services/calendar.js');
-    const deadlines = await getUpcomingDeadlines(limit);
+    const deadlines = await getUpcomingDeadlines(parseResult.data.limit);
     return res.json({ data: deadlines });
   } catch (error) {
     console.error('[Admin] Upcoming deadlines error:', error);
@@ -1207,8 +1255,13 @@ router.get('/sla-violations', async (req, res) => {
 
 router.get('/feedback', async (req, res) => {
   try {
+    const parseResult = limitQuerySchema(50, 100).safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
     const { getUserFeedback } = await import('../services/engagement.js');
-    const feedback = await getUserFeedback(parseInt(req.query.limit as string) || 50);
+    const feedback = await getUserFeedback(parseResult.data.limit);
     return res.json({ data: feedback });
   } catch (error) {
     console.error('[Admin] Feedback error:', error);
@@ -1218,8 +1271,13 @@ router.get('/feedback', async (req, res) => {
 
 router.get('/comments-pending', async (req, res) => {
   try {
+    const parseResult = limitQuerySchema(50, 100).safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
     const { getCommentsPendingReview } = await import('../services/engagement.js');
-    const comments = await getCommentsPendingReview(parseInt(req.query.limit as string) || 50);
+    const comments = await getCommentsPendingReview(parseResult.data.limit);
     return res.json({ data: comments });
   } catch (error) {
     console.error('[Admin] Comments error:', error);
@@ -1242,8 +1300,13 @@ router.post('/moderate-comment/:id', async (req, res) => {
 
 router.get('/engagement-metrics', async (req, res) => {
   try {
+    const parseResult = daysQuerySchema(30, 365).safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
     const { getEngagementMetrics } = await import('../services/engagement.js');
-    const metrics = await getEngagementMetrics(parseInt(req.query.days as string) || 30);
+    const metrics = await getEngagementMetrics(parseResult.data.days);
     return res.json({ data: metrics });
   } catch (error) {
     console.error('[Admin] Engagement metrics error:', error);
@@ -1277,8 +1340,13 @@ router.get('/seo-metrics', async (req, res) => {
 // Backups
 router.get('/backups', async (req, res) => {
   try {
+    const parseResult = limitQuerySchema(20, 100).safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
     const { getBackups } = await import('../services/backup.js');
-    const backups = await getBackups(parseInt(req.query.limit as string) || 20);
+    const backups = await getBackups(parseResult.data.limit);
     return res.json({ data: backups });
   } catch (error) {
     console.error('[Admin] Backups error:', error);
@@ -1302,11 +1370,17 @@ router.post('/export/announcements', async (req, res) => {
 // Security Audit
 router.get('/security/events', async (req, res) => {
   try {
+    const parseResult = securityEventsQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: parseResult.error.flatten() });
+    }
+
+    const { type, severity, limit } = parseResult.data;
     const { getSecurityEvents } = await import('../services/security-audit.js');
     const events = await getSecurityEvents({
-      type: req.query.type as string,
-      severity: req.query.severity as string,
-    }, parseInt(req.query.limit as string) || 100);
+      type,
+      severity,
+    }, limit);
     return res.json({ data: events });
   } catch (error) {
     console.error('[Admin] Security events error:', error);

@@ -106,6 +106,12 @@ const sectionVisualTheme: Record<AnnouncementItem['section'], SectionVisualTheme
     bullet: 'bg-pink-500',
     surfaceGlow: 'from-[#fff4fb] to-white',
   },
+  syllabus: {
+    activePill: 'border-stone-200 bg-stone-50 text-[#4e342e]',
+    accentSoft: 'border-stone-200 bg-stone-50 text-[#5d4037]',
+    bullet: 'bg-stone-500',
+    surfaceGlow: 'from-[#faf7f5] to-white',
+  },
 };
 
 const tagConfig = {
@@ -121,6 +127,7 @@ const sectionCategoryLabel: Record<AnnouncementItem['section'], string> = {
   'admit-cards': 'Latest Admit Card',
   'answer-keys': 'Answer Key',
   admissions: 'Latest Admission',
+  syllabus: 'Syllabus',
 };
 
 const shortInfoText: Record<
@@ -179,6 +186,15 @@ const shortInfoText: Record<
     feeLabel: 'Application Fee:',
     locationLabel: 'Institute / Location:',
     statLabel: 'SEATS',
+  },
+  syllabus: {
+    primaryLabel: 'Syllabus:',
+    countLabel: 'Update Type:',
+    salaryLabel: 'Pattern Note:',
+    startDateLabel: 'Published:',
+    feeLabel: 'Fee / Charge:',
+    locationLabel: 'Exam / Region:',
+    statLabel: 'SYLLABUS',
   },
 };
 
@@ -570,6 +586,7 @@ function PublicAnnouncementDetailPageInner({
         'admit-cards': 'admit-card',
         admissions: 'admission',
         'answer-keys': 'answer-key',
+        syllabus: 'syllabus',
       } as const;
 
       const response = await subscribeToAlerts({

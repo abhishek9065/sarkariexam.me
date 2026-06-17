@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   getQaCounts: vi.fn(),
   getSlaSummary: vi.fn(),
   findAllAdmin: vi.fn(),
+  getTrending: vi.fn(),
+  getCalendarAnnouncements: vi.fn(),
+  getUpcomingDeadlines: vi.fn(),
   bulkImportAnnouncements: vi.fn(),
   createCampaign: vi.fn(),
   assignAnnouncement: vi.fn(),
@@ -51,6 +54,7 @@ vi.mock('../models/announcements.postgres.js', () => ({
     getAdminQaCounts: mocks.getQaCounts,
     getPendingSlaSummary: mocks.getSlaSummary,
     findAllAdmin: mocks.findAllAdmin,
+    getTrending: mocks.getTrending,
   },
 }));
 
@@ -68,8 +72,8 @@ vi.mock('../models/siteSettings.postgres.js', () => ({ default: {} }));
 vi.mock('../services/analyticsOverview.js', () => ({ getAnalyticsOverview: vi.fn() }));
 vi.mock('../services/calendar.js', () => ({
   bulkImportAnnouncements: mocks.bulkImportAnnouncements,
-  getCalendarAnnouncements: vi.fn(),
-  getUpcomingDeadlines: vi.fn(),
+  getCalendarAnnouncements: mocks.getCalendarAnnouncements,
+  getUpcomingDeadlines: mocks.getUpcomingDeadlines,
 }));
 vi.mock('../services/notifications.js', () => ({
   createCampaign: mocks.createCampaign,
@@ -109,6 +113,9 @@ describe('admin routes', () => {
     mocks.getQaCounts.mockResolvedValue({});
     mocks.getSlaSummary.mockResolvedValue({});
     mocks.findAllAdmin.mockResolvedValue([]);
+    mocks.getTrending.mockResolvedValue([]);
+    mocks.getCalendarAnnouncements.mockResolvedValue([]);
+    mocks.getUpcomingDeadlines.mockResolvedValue([]);
     mocks.bulkImportAnnouncements.mockResolvedValue({ imported: 1 });
     mocks.createCampaign.mockResolvedValue({ success: true, campaignId: 'campaign-1' });
     mocks.assignAnnouncement.mockResolvedValue({ success: true });
@@ -193,6 +200,32 @@ describe('admin routes', () => {
     expect(mocks.assignAnnouncement).toHaveBeenCalledWith({ id: 'post-1' }, 'admin-user');
     expect(mocks.approveAnnouncement).toHaveBeenCalledWith('post-1', 'admin-user', 'ok');
     expect(mocks.rejectAnnouncement).toHaveBeenCalledWith('post-1', 'admin-user', 'no');
+  });
+
+  it('rejects invalid content analytics type values', async () => {
+    const app = await createApp();
+    const response = await request(app).get('/admin/analytics/content?type=bad&limit=10');
+
+    expect(response.status).toBe(400);
+    expect(mocks.getTrending).not.toHaveBeenCalled();
+  });
+
+  it('validates calendar date query parameters before calling the service', async () => {
+    const app = await createApp();
+    const invalidDateResponse = await request(app).get('/admin/calendar?start=abc&end=xyz');
+    const reversedRangeResponse = await request(app).get('/admin/calendar?start=2026-02-01&end=2026-01-01');
+
+    expect(invalidDateResponse.status).toBe(400);
+    expect(reversedRangeResponse.status).toBe(400);
+    expect(mocks.getCalendarAnnouncements).not.toHaveBeenCalled();
+  });
+
+  it('rejects negative upcoming deadline limits', async () => {
+    const app = await createApp();
+    const response = await request(app).get('/admin/upcoming-deadlines?limit=-5');
+
+    expect(response.status).toBe(400);
+    expect(mocks.getUpcomingDeadlines).not.toHaveBeenCalled();
   });
 
   it('keeps push send endpoint available when VAPID keys are missing', async () => {

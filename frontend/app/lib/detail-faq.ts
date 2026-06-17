@@ -31,6 +31,11 @@ const sectionActionCopy: Record<AnnouncementItem['section'], { answer: string; q
     answer:
       'Open the official admission link, read the prospectus or notice, complete the form with accurate academic details, and keep a copy of the confirmation page.',
   },
+  syllabus: {
+    question: 'How do I use this syllabus update?',
+    answer:
+      'Review the exam pattern and subject coverage on this page, then open the official source link to verify the latest syllabus, marking scheme, and preparation instructions.',
+  },
 };
 
 function buildLastDateAnswer(item: AnnouncementItem) {

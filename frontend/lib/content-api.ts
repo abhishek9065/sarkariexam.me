@@ -244,6 +244,7 @@ const sectionThemeMap: Record<AnnouncementSection, DetailThemeTokens> = {
   'admit-cards': { accent: '#6a1b9a', gradientFrom: '#4a148c', gradientTo: '#6a1b9a', sidebarFrom: '#3f007d', sidebarTo: '#8e24aa' },
   'answer-keys': { accent: '#00695c', gradientFrom: '#004d40', gradientTo: '#00695c', sidebarFrom: '#00332d', sidebarTo: '#00796b' },
   admissions: { accent: '#ad1457', gradientFrom: '#880e4f', gradientTo: '#ad1457', sidebarFrom: '#6a0032', sidebarTo: '#c2185b' },
+  syllabus: { accent: '#5d4037', gradientFrom: '#3e2723', gradientTo: '#5d4037', sidebarFrom: '#2a1713', sidebarTo: '#6d4c41' },
 };
 
 function slugify(value: string) {
@@ -277,7 +278,7 @@ function hrefFromType(type: BackendPostRecord['type'], slug: string) {
   if (type === 'admit-card') return `/admit-cards/${slug}`;
   if (type === 'admission') return `/admissions/${slug}`;
   if (type === 'answer-key') return `/answer-keys/${slug}`;
-  return '/syllabus';
+  return `/syllabus/${slug}`;
 }
 
 function reportFallbackActivation(surface: string, error: unknown) {
@@ -955,7 +956,8 @@ function toSection(type: BackendPostRecord['type']): AnnouncementSection {
   if (type === 'result') return 'results';
   if (type === 'admit-card') return 'admit-cards';
   if (type === 'admission') return 'admissions';
-  return 'answer-keys';
+  if (type === 'answer-key') return 'answer-keys';
+  return 'syllabus';
 }
 
 function sourceLinks(sources: BackendOfficialSource[]): DetailImportantLink[] {

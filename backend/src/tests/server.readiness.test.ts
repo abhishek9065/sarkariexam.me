@@ -158,6 +158,17 @@ describe('server readiness', () => {
     expect(response.body.code).toBe('METRICS_TOKEN_REQUIRED');
   });
 
+  it('does not expose runtime diagnostics from public health endpoints', async () => {
+    isDatabaseConfigured.mockReturnValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe('ok');
+    expect(response.body.runtime).toBeUndefined();
+  });
+
   it('returns deep health diagnostics when metrics token is valid', async () => {
     isDatabaseConfigured.mockReturnValue(false);
 
