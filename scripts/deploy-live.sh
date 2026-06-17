@@ -392,6 +392,13 @@ set_stage "write-release-state"
 record_diagnosis "Failed to persist deploy release metadata. Check write permissions in the repository directory."
 write_release_state
 
+set_stage "cleanup"
+record_diagnosis "Failed to clean up Docker cache. This is non-fatal."
+echo "Cleaning up dangling Docker images and old builder cache..."
+# Prune unused images and build cache older than 24 hours to prevent disk exhaustion
+docker image prune -f --filter "until=24h" >/dev/null 2>&1 || true
+docker builder prune -f --filter "until=24h" >/dev/null 2>&1 || true
+
 echo "REMOTE DEPLOY COMPLETE"
 echo "  previous_sha: ${PREVIOUS_SHA}"
 echo "  deployed_sha: ${TARGET_SHA}"

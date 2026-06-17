@@ -1365,11 +1365,11 @@ export function getCategoryMetaBySlug(slug: string) {
     } satisfies CategoryPageMeta;
   }
 
-  if (slug in announcementCategoryMeta) {
+  if (Object.hasOwn(announcementCategoryMeta, slug)) {
     return announcementCategoryMeta[slug as AnnouncementSection];
   }
 
-  if (slug in resourceCategoryMeta) {
+  if (Object.hasOwn(resourceCategoryMeta, slug)) {
     return resourceCategoryMeta[slug as ResourceCategorySlug];
   }
 
@@ -1377,15 +1377,15 @@ export function getCategoryMetaBySlug(slug: string) {
 }
 
 export function getInfoPageBySlug(slug: string) {
-  return slug in infoPageMeta ? infoPageMeta[slug as InfoPageSlug] : null;
+  return Object.hasOwn(infoPageMeta, slug) ? infoPageMeta[slug as InfoPageSlug] : null;
 }
 
 export function getAuxiliaryPageBySlug(slug: string) {
-  return slug in auxiliaryPageMeta ? auxiliaryPageMeta[slug as AuxiliaryPageSlug] : null;
+  return Object.hasOwn(auxiliaryPageMeta, slug) ? auxiliaryPageMeta[slug as AuxiliaryPageSlug] : null;
 }
 
 export function getCommunityPageBySlug(slug: string) {
-  return slug in communityPageMeta ? communityPageMeta[slug as CommunityChannel] : null;
+  return Object.hasOwn(communityPageMeta, slug) ? communityPageMeta[slug as CommunityChannel] : null;
 }
 
 export function getResourceCardsBySlug(slug: ResourceCategorySlug) {
