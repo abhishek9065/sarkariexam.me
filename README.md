@@ -93,6 +93,8 @@ Important production variables:
 - `POSTGRES_PRISMA_URL`
 - `POSTGRES_DIRECT_URL` (only required when the runtime URL is pooled, e.g. Neon; `DIRECT_URL` is also supported)
 - `JWT_SECRET`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
 - `FRONTEND_REVALIDATE_URL`
@@ -197,11 +199,12 @@ Manual reliability validation is also available via:
 
 - `Deploy Preflight` (`workflow_dispatch`, no service restart)
 
-Production deploys are GitHub Actions driven. The production deploy gate is the `CI` workflow only.
+Production deploys are GitHub Actions driven. The production deploy gate is the `CI` workflow, which includes production dependency audit jobs for backend, frontend, and admin packages.
 `Deploy to Production` runs as a `workflow_run` after `CI` succeeds for a `push` to `main`, checks out the exact triggering commit SHA on the runner, SSHes into the droplet, runs a remote preflight, and then deploys that exact SHA.
 This is the current production topology, not the long-term target. The platform is being moved toward safer staging and promotion controls while retaining the existing release automation.
-Security and CodeQL remain important validation workflows, but they do not currently gate the production deployment chain.
-The backend health endpoints also expose non-secret runtime diagnostics for PostgreSQL readiness, legacy Mongo bridge presence, metrics endpoint protection, and frontend revalidation wiring.
+The separate `Security` and CodeQL workflows remain important scheduled/manual validation workflows; production dependency audits also run inside `CI` so failed audits block production deployment.
+The `production` GitHub environment must require manual reviewer approval before the deploy job can access production secrets and run.
+The backend health endpoints expose public liveness/readiness checks, while `/api/health/deep` requires `METRICS_TOKEN` via `Authorization: Bearer <token>` or `X-Metrics-Token`.
 
 ## Deployment
 
@@ -222,6 +225,7 @@ Production deploy entrypoint:
 - GitHub Actions `Deploy to Production`
 - runner-side SSH validation and remote preflight
 - droplet-side rebuild from `docker-compose.yml` at the triggering commit SHA
+- Redis, PostgreSQL, and Prisma migration preflight before backend replacement
 - live health verification
 
 There is no supported manual production deploy trigger in the repository workflows.
@@ -256,9 +260,11 @@ Before `push to main` can deploy successfully, production must already have:
 - a DigitalOcean droplet reachable at `DO_HOST`
 - the deploy user from `DO_USER` able to SSH with `DO_SSH_KEY`
 - the SSH host fingerprint stored in `DO_HOST_FINGERPRINT`
+- the GitHub `production` environment configured with required reviewers
 - the repository checked out on the droplet at `DO_REPO_DIR`
 - `bash`, `git`, `docker`, Docker Compose plugin, `flock`, `curl`, `mktemp`, and `tee`
 - a root `.env` file on the droplet checkout derived from `.env.example`
+- valid `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` values reachable from the deploy host
 - a clean production checkout with no local modifications or untracked files
 
 ## Production Verification
@@ -271,7 +277,7 @@ After a successful deploy, the expected health checks are:
 - `/api/livez`
 - `/api/readyz`
 - `/api/health`
-- `/api/health/deep`
+- `/api/health/deep` with `METRICS_TOKEN`
 
 If a deploy fails, start with:
 
@@ -279,7 +285,7 @@ If a deploy fails, start with:
 - `/tmp/sarkari-result-deploy.log` on the droplet
 - `.deploy-state/last-release.env` on the droplet checkout (latest deploy/rollback metadata)
 - `docker compose -f docker-compose.yml logs` on the droplet
-- `/api/livez`, `/api/readyz`, `/api/health`, and `/api/health/deep` for non-secret runtime diagnostics after the rollout
+- `/api/livez`, `/api/readyz`, `/api/health`, and token-protected `/api/health/deep` for runtime diagnostics after the rollout
 - [docs/production-deploy-checklist.md](./docs/production-deploy-checklist.md)
 
 ## Repository Layout

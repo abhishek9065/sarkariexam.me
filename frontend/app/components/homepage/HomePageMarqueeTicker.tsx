@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { homePageLinks } from './links';
 
 const updates = [
-  { text: 'SSC CGL 2026 Notification Out - Apply Before 30 May!', href: '/jobs/ssc-cgl-2026' },
+  { text: 'SSC CGL 2026 Notification - Verify Official Deadline', href: '/jobs/ssc-cgl-2026' },
   { text: 'UPSC CSE Prelims 2026 Admit Card Released', href: `${homePageLinks.admitCards}?search=${encodeURIComponent('UPSC CSE Prelims 2026 Admit Card')}` },
   { text: 'Railway Group D Admit Card Released - 32,000 Posts', href: `${homePageLinks.admitCards}?search=${encodeURIComponent('Railway Group D Admit Card')}` },
   { text: 'IBPS PO 2026 Online Form Started - 4,500 Vacancies', href: '/jobs/ibps-po-2026' },

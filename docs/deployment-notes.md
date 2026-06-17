@@ -8,7 +8,8 @@ This repository uses a strict deployment model for production delivery to a Digi
 2. `Deploy to Production` workflow runs only from `workflow_run` when CI succeeds for a `push` on `main`.
 3. Runner executes `scripts/deploy-via-ssh.sh`.
 4. Runner uploads and executes `scripts/deploy-live.sh` on droplet.
-5. Droplet validates target SHA, checks out that SHA, and executes `scripts/deploy-fast.sh` (or full mode if requested).
+5. Droplet validates target SHA, checks out that SHA, runs remote preflight, and executes `scripts/deploy-fast.sh` (or full mode if requested).
+6. Deploy scripts validate Redis/PostgreSQL reachability, run Prisma migrations, then replace the backend container.
 
 ## Required GitHub Configuration
 
@@ -24,6 +25,10 @@ This repository uses a strict deployment model for production delivery to a Digi
 - `DO_REPO_DIR`: Absolute path to production repository checkout on droplet.
 - `DO_HOST_FINGERPRINT`: Expected SSH host key fingerprint in `SHA256:<base64>` format.
 
+### Environment Approval
+
+The GitHub `production` environment must require manual reviewers. The deploy job uses `environment: production`; without reviewer protection, a successful push to `main` can still proceed directly to the droplet.
+
 ## Required Droplet State
 
 - Docker Engine with Compose plugin (`docker compose`).
@@ -31,6 +36,7 @@ This repository uses a strict deployment model for production delivery to a Digi
 - Repository exists at `DO_REPO_DIR` with a valid `.git` folder.
 - Root `.env` file exists in the repository checkout.
 - Deployment user can run Docker and Git commands.
+- Origin firewall should allow public HTTP/HTTPS traffic only from Cloudflare edge ranges; Nginx trusts `CF-Connecting-IP` only for configured Cloudflare CIDRs.
 
 ## Strict Safety Guarantees
 
@@ -38,6 +44,8 @@ This repository uses a strict deployment model for production delivery to a Digi
 - Deployment refuses non-40-character SHAs.
 - Deployment refuses SHAs not reachable from `origin/main`.
 - Deployment refuses to proceed when remote working tree has tracked local modifications.
+- Deployment refuses missing or unreachable Upstash Redis in production preflight.
+- Production dependency audits run inside `CI`, so audit failures block the `workflow_run` deploy gate.
 
 The SSH deploy wrapper prefers an explicit `DO_REPO_DIR` when it is provided, but if the value is missing it will try to auto-discover the production checkout from common droplet paths before failing. In either case, deploys still fail if the resolved path is not a valid repository clone.
 
@@ -47,7 +55,9 @@ Minimum required values:
 
 - `JWT_SECRET`
 - `POSTGRES_PRISMA_URL` or `DATABASE_URL`
-- `COSMOS_CONNECTION_STRING` or `MONGODB_URI`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `COSMOS_CONNECTION_STRING` or `MONGODB_URI` only when `LEGACY_MONGO_REQUIRED=true`
 
 For DigitalOcean Managed PostgreSQL, use a standard PostgreSQL connection string with `sslmode=require`. `POSTGRES_DIRECT_URL` and `DIRECT_URL` are only needed for providers that require a separate direct migration URL; leave them blank for DigitalOcean unless a separate target URL is intentionally provisioned.
 
@@ -58,10 +68,13 @@ Optional but recommended values are logged when missing.
 Deployment validates:
 
 - Docker Compose config rendering.
+- Upstash Redis REST `PING` from the deploy host.
+- PostgreSQL network and Prisma connectivity from the backend image.
+- Prisma migrations before backend replacement.
 - Backend container health.
 - Public endpoints:
   - `/api/health`
-  - `/api/health/deep`
+  - `/api/health/deep` with `METRICS_TOKEN` when configured
   - `/`
   - `/jobs`
   - `/results`
@@ -72,6 +85,8 @@ Deployment validates:
 
 - Deployment preflight now runs a DNS/TCP reachability check from the backend container before Prisma executes. If this fails, verify `POSTGRES_PRISMA_URL`/`DATABASE_URL`, `sslmode=require`, and Neon trusted sources/egress rules.
 - Runtime Prisma connections now prefer the pooler URL when present; direct URLs remain available for migration/CLI usage.
+- Backend containers no longer run `prisma migrate deploy` during process startup. Deploy scripts run migrations explicitly before replacing the backend service.
+- `/api/health/deep` is protected by `METRICS_TOKEN`; use `/api/livez`, `/api/readyz`, and `/api/health` for unauthenticated health checks.
 
 ## Useful Commands
 

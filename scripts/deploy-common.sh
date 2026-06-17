@@ -94,6 +94,7 @@ validate_production_env() {
   local missing=()
   local jwt_secret postgres_prisma_url postgres_direct_url database_url direct_url cosmos_connection_string mongodb_uri legacy_mongo_required
   local frontend_revalidate_url frontend_revalidate_token frontend_url primary_postgres_url allow_disabled_frontend_revalidation
+  local upstash_redis_rest_url upstash_redis_rest_token
 
   jwt_secret="$(read_env_var "JWT_SECRET")"
   postgres_prisma_url="$(read_env_var "POSTGRES_PRISMA_URL")"
@@ -103,9 +104,13 @@ validate_production_env() {
   cosmos_connection_string="$(read_env_var "COSMOS_CONNECTION_STRING")"
   mongodb_uri="$(read_env_var "MONGODB_URI")"
   legacy_mongo_required="$(read_env_var "LEGACY_MONGO_REQUIRED")"
+  upstash_redis_rest_url="$(read_env_var "UPSTASH_REDIS_REST_URL")"
+  upstash_redis_rest_token="$(read_env_var "UPSTASH_REDIS_REST_TOKEN")"
 
   [[ -n "$jwt_secret" ]] || missing+=("JWT_SECRET")
   [[ -n "$postgres_prisma_url" || -n "$database_url" ]] || missing+=("POSTGRES_PRISMA_URL or DATABASE_URL")
+  [[ -n "$upstash_redis_rest_url" ]] || missing+=("UPSTASH_REDIS_REST_URL")
+  [[ -n "$upstash_redis_rest_token" ]] || missing+=("UPSTASH_REDIS_REST_TOKEN")
 
   if is_truthy "$legacy_mongo_required"; then
     [[ -n "$cosmos_connection_string" || -n "$mongodb_uri" ]] || missing+=("COSMOS_CONNECTION_STRING or MONGODB_URI (required when LEGACY_MONGO_REQUIRED=true)")
@@ -132,6 +137,12 @@ validate_production_env() {
 
   if is_known_placeholder_value "$primary_postgres_url"; then
     die "POSTGRES_PRISMA_URL/DATABASE_URL is still set to a placeholder value. Set a real PostgreSQL URL before deploying."
+  fi
+  if is_known_placeholder_value "$upstash_redis_rest_url" || is_localhost_url "$upstash_redis_rest_url"; then
+    die "UPSTASH_REDIS_REST_URL must be a real Upstash Redis REST endpoint for production deploys."
+  fi
+  if is_known_placeholder_value "$upstash_redis_rest_token"; then
+    die "UPSTASH_REDIS_REST_TOKEN is still set to a placeholder value. Set a real token before deploying."
   fi
 
   if [[ "$primary_postgres_url" == *"-pooler."* && -z "$postgres_direct_url" && -z "$direct_url" ]]; then
@@ -183,6 +194,8 @@ warn_if_missing_production_runtime_vars() {
     "FRONTEND_REVALIDATE_URL"
     "FRONTEND_REVALIDATE_TOKEN"
     "METRICS_TOKEN"
+    "UPSTASH_REDIS_REST_URL"
+    "UPSTASH_REDIS_REST_TOKEN"
     "SENDGRID_API_KEY"
     "SENTRY_DSN"
   )
@@ -204,6 +217,32 @@ warn_if_missing_production_runtime_vars() {
     echo "NOTICE: recommended production env var(s) missing from $ROOT_DIR/.env:"
     printf '  - %s\n' "${missing[@]}"
   fi
+}
+
+verify_redis_preflight() {
+  local redis_url redis_token response
+
+  redis_url="$(read_env_var "UPSTASH_REDIS_REST_URL")"
+  redis_token="$(read_env_var "UPSTASH_REDIS_REST_TOKEN")"
+
+  record_diagnosis "Upstash Redis is unreachable from the deploy host. Verify UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, and outbound network access."
+
+  response="$(curl -sS --fail --max-time 10 \
+    -X POST "$redis_url" \
+    -H "Authorization: Bearer ${redis_token}" \
+    -H "Content-Type: application/json" \
+    --data '["PING"]' || true)"
+
+  if [[ -n "$response" ]] && printf '%s' "$response" | grep -Eq '"result"[[:space:]]*:[[:space:]]*"PONG"'; then
+    echo "Upstash Redis preflight passed."
+    return 0
+  fi
+
+  echo "ERROR: Upstash Redis preflight failed."
+  if [[ -n "$response" ]]; then
+    echo "Redis preflight response: ${response}"
+  fi
+  return 1
 }
 
 resolve_datadog_services() {
@@ -247,7 +286,7 @@ verify_backend_database_preflight() {
 
   for ((i=1; i<=attempts; i++)); do
     echo "  [$i/$attempts] checking backend PostgreSQL connectivity with Prisma"
-    if dc run --rm --no-deps -T backend sh -lc "printf 'SELECT 1;\n' | npx --yes prisma db execute --stdin"; then
+    if dc run --rm --no-deps -T backend sh -lc "printf 'SELECT 1;\n' | ./node_modules/.bin/prisma db execute --stdin"; then
       echo "Backend PostgreSQL preflight passed after ${i} attempt(s)."
       return 0
     fi
@@ -258,6 +297,29 @@ verify_backend_database_preflight() {
   done
 
   echo "ERROR: backend PostgreSQL preflight failed after ${attempts} attempt(s). Existing running services were not replaced."
+  return 1
+}
+
+run_backend_prisma_migrations() {
+  local attempts="${POSTGRES_MIGRATION_ATTEMPTS:-5}"
+  local sleep_seconds="${POSTGRES_MIGRATION_SLEEP_SECONDS:-5}"
+  local i
+
+  record_diagnosis "Prisma migration deploy failed. Inspect backend Prisma migration logs and database permissions."
+
+  for ((i=1; i<=attempts; i++)); do
+    echo "  [$i/$attempts] running Prisma migrations"
+    if dc run --rm --no-deps -T backend ./node_modules/.bin/prisma migrate deploy; then
+      echo "Prisma migrations completed after ${i} attempt(s)."
+      return 0
+    fi
+
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$sleep_seconds"
+    fi
+  done
+
+  echo "ERROR: Prisma migrations failed after ${attempts} attempt(s). Existing running services were not replaced."
   return 1
 }
 
@@ -404,6 +466,43 @@ verify_public_endpoint() {
   done
 
   record_diagnosis "Public check '${label}' failed for ${url}. Inspect ingress, nginx, backend, frontend, and admin logs."
+  echo "ERROR: ${label} failed for ${url} (status=${status:-none}, expected=${expected_pattern})"
+  return 1
+}
+
+verify_protected_public_endpoint() {
+  local path="$1"
+  local label="$2"
+  local token_key="${3:-METRICS_TOKEN}"
+  local expected_pattern="${4:-^(2|3)}"
+  local attempts="${5:-20}"
+  local sleep_seconds="${6:-3}"
+  local token url status i
+
+  token="$(read_env_var "$token_key")"
+  if [[ -z "$token" ]]; then
+    echo "NOTICE: ${token_key} not set; skipping protected public check for ${label}."
+    return 0
+  fi
+
+  url="${PUBLIC_BASE_URL%/}${path}"
+
+  for ((i=1; i<=attempts; i++)); do
+    status="$(curl -sS -L -o /dev/null -w "%{http_code}" \
+      -H "Authorization: Bearer ${token}" \
+      --connect-timeout 5 --max-time 15 "$url" || true)"
+    if [[ "$status" =~ $expected_pattern ]]; then
+      echo "ok (${label} -> ${url}, status=${status}, attempts=${i})"
+      return 0
+    fi
+
+    echo "  [$i/$attempts] ${label} not ready (status=${status:-none}, expected=${expected_pattern})"
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$sleep_seconds"
+    fi
+  done
+
+  record_diagnosis "Protected public check '${label}' failed for ${url}. Inspect ingress, token wiring, nginx, and backend logs."
   echo "ERROR: ${label} failed for ${url} (status=${status:-none}, expected=${expected_pattern})"
   return 1
 }

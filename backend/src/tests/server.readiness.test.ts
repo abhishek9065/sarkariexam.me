@@ -42,6 +42,7 @@ vi.mock('../services/postgres/prisma.js', async (importOriginal) => {
 describe('server readiness', () => {
   beforeEach(() => {
     process.env.POSTGRES_PRISMA_URL = 'postgresql://postgres:postgres@localhost:5432/sarkari_test?schema=public';
+    process.env.METRICS_TOKEN = 'test-metrics-token';
     delete process.env.LEGACY_MONGO_REQUIRED;
     vi.resetModules();
     connectToDatabase.mockReset();
@@ -145,6 +146,28 @@ describe('server readiness', () => {
         },
       },
     });
+  });
+
+  it('requires a metrics token for /api/health/deep', async () => {
+    isDatabaseConfigured.mockReturnValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app).get('/api/health/deep');
+
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('METRICS_TOKEN_REQUIRED');
+  });
+
+  it('returns deep health diagnostics when metrics token is valid', async () => {
+    isDatabaseConfigured.mockReturnValue(false);
+
+    const { app } = await import('../server.js');
+    const response = await request(app)
+      .get('/api/health/deep')
+      .set('Authorization', 'Bearer test-metrics-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.runtime).toBeDefined();
   });
 
   it('does not block /api/admin routes on legacy bridge readiness anymore', async () => {

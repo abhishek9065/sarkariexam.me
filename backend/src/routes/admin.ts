@@ -1,5 +1,6 @@
 import express from 'express';
 import { rateLimit as expressRateLimit } from 'express-rate-limit';
+import webpush from 'web-push';
 import { z } from 'zod';
 
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
@@ -33,6 +34,9 @@ const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
+
+const adminRoleValues = ['user', 'editor', 'reviewer', 'admin', 'superadmin'] as const;
+const privilegedRoles = ['admin', 'superadmin'] as const;
 
 const adminAnnouncementListSchema = paginationSchema.extend({
   type: z.enum(['job', 'result', 'admit-card', 'syllabus', 'answer-key', 'admission'] as [ContentType, ...ContentType[]]).optional(),
@@ -100,13 +104,13 @@ const bulkStatusSchema = z.object({
 });
 
 const userListSchema = paginationSchema.extend({
-  role: z.string().optional(),
+  role: z.enum(adminRoleValues).optional(),
   isActive: z.coerce.boolean().optional(),
   search: z.string().trim().max(100).optional(),
 });
 
 const updateUserSchema = z.object({
-  role: z.string().optional(),
+  role: z.enum(adminRoleValues).optional(),
   isActive: z.boolean().optional(),
   username: z.string().trim().min(1).max(100).optional(),
 });
@@ -114,6 +118,39 @@ const updateUserSchema = z.object({
 const analyticsQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(90).default(30),
 });
+
+function isPrivilegedRole(role: string | undefined) {
+  return privilegedRoles.includes(role as (typeof privilegedRoles)[number]);
+}
+
+async function wouldRemoveLastActivePrivilegedUser(
+  userId: string,
+  update: { role?: string; isActive?: boolean; delete?: boolean },
+) {
+  const user = await UserModelPostgres.findById(userId);
+  if (!user) {
+    return { missing: true, blocked: false };
+  }
+
+  const currentlyPrivileged = user.isActive && isPrivilegedRole(user.role);
+  if (!currentlyPrivileged) {
+    return { missing: false, blocked: false };
+  }
+
+  const nextActive = update.delete ? false : update.isActive ?? user.isActive;
+  const nextRole = update.delete ? user.role : update.role ?? user.role;
+  const remainsPrivileged = nextActive && isPrivilegedRole(nextRole);
+  if (remainsPrivileged) {
+    return { missing: false, blocked: false };
+  }
+
+  const activePrivilegedCount = await UserModelPostgres.count({
+    role: [...privilegedRoles],
+    isActive: true,
+  });
+
+  return { missing: false, blocked: activePrivilegedCount <= 1 };
+}
 
 // ═══════════════════════════════════════════
 // DASHBOARD
@@ -135,11 +172,11 @@ router.get('/dashboard', async (_req, res) => {
       AnnouncementModel.findAllAdmin({ sort: 'newest', limit: 10, includeInactive: true }),
     ]);
 
-    // Get total user count
-    const allUsers = await UserModelPostgres.findAll({ limit: 10000 });
-    const totalUsers = allUsers.length;
-    const activeUsers = allUsers.filter(u => u.isActive).length;
-    const adminUsers = allUsers.filter(u => u.role === 'admin').length;
+    const [totalUsers, activeUsers, adminUsers] = await Promise.all([
+      UserModelPostgres.count(),
+      UserModelPostgres.count({ isActive: true }),
+      UserModelPostgres.count({ role: [...privilegedRoles], isActive: true }),
+    ]);
 
     return res.json({
       data: {
@@ -350,14 +387,15 @@ router.get('/users', async (req, res) => {
       return res.status(400).json({ error: parseResult.error.flatten() });
     }
 
-    const { role, isActive, limit, offset } = parseResult.data;
+    const { role, isActive, search, limit, offset } = parseResult.data;
     const users = await UserModelPostgres.findAll({
       role,
       isActive,
+      search,
       skip: offset,
       limit,
     });
-    const total = await UserModelPostgres.count({ role, isActive });
+    const total = await UserModelPostgres.count({ role, isActive, search });
 
     return res.json({
       data: users,
@@ -399,6 +437,14 @@ router.patch('/users/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot deactivate your own account' });
     }
 
+    const lastPrivilegedCheck = await wouldRemoveLastActivePrivilegedUser(id, parseResult.data);
+    if (lastPrivilegedCheck.missing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (lastPrivilegedCheck.blocked) {
+      return res.status(400).json({ error: 'At least one active admin or superadmin account must remain' });
+    }
+
     const user = await UserModelPostgres.update(id, parseResult.data);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -418,6 +464,14 @@ router.delete('/users/:id', async (req, res) => {
     // Prevent admin from deleting themselves
     if (id === req.user!.userId) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    const lastPrivilegedCheck = await wouldRemoveLastActivePrivilegedUser(id, { delete: true });
+    if (lastPrivilegedCheck.missing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (lastPrivilegedCheck.blocked) {
+      return res.status(400).json({ error: 'At least one active admin or superadmin account must remain' });
     }
 
     const deleted = await UserModelPostgres.delete(id);
@@ -574,22 +628,22 @@ router.post('/push/send', async (req, res) => {
     let failed = 0;
 
     try {
-      const webpush = await import('web-push');
       const { config } = await import('../config.js');
       if (config.vapidPublicKey && config.vapidPrivateKey) {
-        webpush.default.setVapidDetails('mailto:admin@sarkariexams.me', config.vapidPublicKey, config.vapidPrivateKey);
+        webpush.setVapidDetails('mailto:admin@sarkariexams.me', config.vapidPublicKey, config.vapidPrivateKey);
         const payload = JSON.stringify({ title: parse.data.title, body: parse.data.body, url: parse.data.url });
         for (const sub of subs) {
           try {
-            await webpush.default.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload);
+            await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload);
             sent++;
           } catch { failed++; }
         }
       } else {
         return res.json({ data: { sent: 0, failed: 0, total: subs.length, message: 'VAPID keys not configured' } });
       }
-    } catch {
-      return res.json({ data: { sent: 0, failed: 0, total: subs.length, message: 'web-push not available' } });
+    } catch (error) {
+      console.error('[Admin] Push notification setup failed:', error);
+      return res.json({ data: { sent: 0, failed: subs.length, total: subs.length, message: 'Push notification setup failed' } });
     }
 
     return res.json({ data: { sent, failed, total: subs.length } });
@@ -984,7 +1038,7 @@ router.get('/calendar', async (req, res) => {
 
 router.post('/bulk-import', async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
@@ -1028,7 +1082,7 @@ router.get('/campaigns', async (req, res) => {
 
 router.post('/campaigns', async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Authentication required' });
 
     const { createCampaign } = await import('../services/notifications.js');
@@ -1077,7 +1131,7 @@ router.get('/segments', async (req, res) => {
 
 router.post('/assign', async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.userId;
     const { assignAnnouncement } = await import('../services/workflow.js');
     const result = await assignAnnouncement(req.body, userId);
     if (!result.success) return res.status(400).json({ error: result.error });
@@ -1090,7 +1144,7 @@ router.post('/assign', async (req, res) => {
 
 router.post('/approve/:id', async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.userId;
     const { approveAnnouncement } = await import('../services/workflow.js');
     const result = await approveAnnouncement(req.params.id, userId, req.body.note);
     if (!result.success) return res.status(400).json({ error: result.error });
@@ -1103,7 +1157,7 @@ router.post('/approve/:id', async (req, res) => {
 
 router.post('/reject/:id', async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.userId;
     const { rejectAnnouncement } = await import('../services/workflow.js');
     const result = await rejectAnnouncement(req.params.id, userId, req.body.reason);
     if (!result.success) return res.status(400).json({ error: result.error });

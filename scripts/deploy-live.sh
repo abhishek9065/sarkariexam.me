@@ -286,7 +286,7 @@ run_preflight_checks() {
   record_diagnosis "Review ${REPO_DIR}/.env, Docker Compose availability, and compose rendering on the droplet."
   (
     cd "$REPO_DIR"
-    docker compose -f docker-compose.yml --project-name "${COMPOSE_PROJECT_NAME:-sarkari-result}" --env-file .env config >/dev/null
+    bash -lc 'source scripts/deploy-common.sh; require_env_file; validate_production_env; verify_redis_preflight; dc config >/dev/null'
   )
 }
 

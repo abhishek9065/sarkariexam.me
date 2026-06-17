@@ -270,7 +270,26 @@ app.get('/api/readyz', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 
     .json(readiness);
 });
 
-app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), async (_req, res) => {
+function hasMetricsToken(req: express.Request) {
+  const providedToken = req.get('Authorization')?.replace(/^Bearer\s+/i, '') || req.get('X-Metrics-Token');
+  return Boolean(config.metricsToken && providedToken && config.metricsToken === providedToken);
+}
+
+function requireMetricsToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasMetricsToken(req)) {
+    res.status(401).json({
+      error: 'Unauthorized',
+      code: 'METRICS_TOKEN_REQUIRED',
+      message: 'A valid diagnostics token is required.',
+      requestId: req.requestId,
+    });
+    return;
+  }
+
+  next();
+}
+
+app.get('/api/health/deep', distributedRateLimit({ windowMs: 60 * 1000, maxRequests: 20, keyPrefix: 'health-deep' }), requireMetricsToken, async (_req, res) => {
   const readiness = await buildReadinessPayload();
 
   res
@@ -475,8 +494,7 @@ app.get('/metrics', (req, res) => {
     res.status(404).type('text/plain').send('not found');
     return;
   }
-  const providedToken = req.get('Authorization')?.replace(/^Bearer\s+/i, '') || req.get('X-Metrics-Token');
-  if (token && token !== providedToken) {
+  if (token && !hasMetricsToken(req)) {
     res.status(401).type('text/plain').send('unauthorized');
     return;
   }

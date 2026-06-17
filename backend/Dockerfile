@@ -67,5 +67,5 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD node -e "const http=require('http');const req=http.get('http://127.0.0.1:4000/api/health',(res)=>{res.resume();process.exit(res.statusCode===200?0:1);});req.on('error',()=>process.exit(1));req.setTimeout(2000,()=>{req.destroy();process.exit(1);});"
 
-# Start server (use npx --yes to prevent hanging if prisma is not locally installed due to pruning)
-CMD ["sh", "-c", "for attempt in 1 2 3 4 5; do npx --yes prisma migrate deploy && exec node dist/server.js; echo \"prisma migrate deploy failed (attempt ${attempt}/5)\" >&2; sleep 5; done; exit 1"]
+# Start server. Production migrations are run by the deploy scripts before the backend is restarted.
+CMD ["node", "dist/server.js"]

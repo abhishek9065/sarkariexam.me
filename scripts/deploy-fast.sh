@@ -20,6 +20,7 @@ record_diagnosis "Fix the root .env in the production checkout before retrying d
 require_env_file
 validate_production_env
 warn_if_missing_production_runtime_vars
+verify_redis_preflight
 resolve_datadog_services
 
 set_stage "validate-compose"
@@ -36,6 +37,9 @@ done
 set_stage "preflight-backend-db"
 verify_backend_database_network_preflight
 verify_backend_database_preflight
+
+set_stage "migrate-backend-db"
+run_backend_prisma_migrations
 
 set_stage "restart-backend"
 record_diagnosis "Backend restart failed. Inspect backend image, migrations, and environment wiring."
@@ -66,7 +70,7 @@ set_stage "public-checks"
 verify_public_endpoint "/api/livez" "backend liveness" "^200$"
 verify_public_endpoint "/api/readyz" "backend readiness" "^200$"
 verify_public_endpoint "/api/health" "backend health" "^200$"
-verify_public_endpoint "/api/health/deep" "backend deep health" "^200$"
+verify_protected_public_endpoint "/api/health/deep" "backend deep health" "METRICS_TOKEN" "^200$"
 verify_public_endpoint "/" "homepage"
 verify_public_endpoint "/jobs" "jobs listing"
 verify_public_endpoint "/results" "results listing"

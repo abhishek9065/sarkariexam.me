@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { cacheKeys, cacheMiddleware } from '../middleware/cache.js';
 import { bumpCacheVersion } from '../services/cacheVersion.js';
@@ -14,8 +14,14 @@ const extractCacheVersion = (cacheKey: string): number => {
 };
 
 describeOrSkip('cache middleware key and version behavior', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+
     beforeEach(() => {
         invalidateCache();
+    });
+
+    afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv;
     });
 
     it('normalizes query parameter order for default cache keys', async () => {
@@ -108,6 +114,25 @@ describeOrSkip('cache middleware key and version behavior', () => {
             extractCacheVersion(first.headers['x-cache-key'] as string) + 1
         );
         expect(third.body.counter).toBeGreaterThan(first.body.counter);
+    });
+
+    it('does not expose cache keys in production responses', async () => {
+        process.env.NODE_ENV = 'production';
+        const app = express();
+        let counter = 0;
+
+        app.get('/production-cache', cacheMiddleware({ ttl: 300 }), (_req, res) => {
+            counter += 1;
+            res.json({ counter });
+        });
+
+        const first = await request(app).get('/production-cache');
+        const second = await request(app).get('/production-cache');
+
+        expect(first.headers['x-cache']).toBe('MISS');
+        expect(second.headers['x-cache']).toContain('HIT');
+        expect(first.headers['x-cache-key']).toBeUndefined();
+        expect(second.headers['x-cache-key']).toBeUndefined();
     });
 
     it('includes location and salary filters in announcements cache keys', () => {

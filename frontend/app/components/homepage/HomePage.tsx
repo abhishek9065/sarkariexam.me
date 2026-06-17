@@ -67,8 +67,8 @@ const featured = [
     orgShort: 'SSC',
     posts: '14,582',
     qual: 'Graduate',
-    lastDate: '30 May 2026',
-    daysLeft: 15,
+    lastDate: 'Check official notice',
+    deadlineLabel: 'Verify deadline',
     urgency: 50,
     href: '/jobs/ssc-cgl-2026',
   },
@@ -83,8 +83,8 @@ const featured = [
     orgShort: 'IBPS',
     posts: '4,500',
     qual: 'Graduate',
-    lastDate: '20 May 2026',
-    daysLeft: 5,
+    lastDate: 'Check official notice',
+    deadlineLabel: 'Verify deadline',
     urgency: 12,
     href: '/jobs/ibps-po-2026',
   },
@@ -99,28 +99,28 @@ const featured = [
     orgShort: 'RRB',
     posts: '32,000',
     qual: '10th Pass',
-    lastDate: '20 May 2026',
-    daysLeft: 5,
+    lastDate: 'Check official notice',
+    deadlineLabel: 'Verify deadline',
     urgency: 8,
     href: '/jobs/rrb-group-d-level-1-2026',
   },
 ] as const;
 
 const notifications = [
-  { text: 'SSC CGL 2026 Notification Released - Apply before 15 May 2026', tag: 'new' },
+  { text: 'SSC CGL 2026 Notification Released - Verify official deadline', tag: 'new' },
   { text: 'UPSC CSE Prelims 2026 - Admit Card Available Now', tag: 'hot' },
-  { text: 'RRB Group D 2026 - Last Date Extended to 20 May', tag: 'update' },
-  { text: 'IBPS PO 2026 - Online Application Starts 10 May', tag: 'new' },
+  { text: 'RRB Group D 2026 - Deadline update available on official notice', tag: 'update' },
+  { text: 'IBPS PO 2026 - Online application notice available', tag: 'new' },
   { text: 'Bihar BPSC 70th CCE Result Declared - Check Now', tag: 'hot' },
   { text: 'SBI Clerk 2026 - 8,773 Vacancies Open Now', tag: 'new' },
 ] as const;
 
 const upcomingExams = [
-  { exam: 'UPSC CSE Prelims 2026', date: '25 May 2026', days: 10 },
-  { exam: 'SSC CGL Tier 1 2026', date: '01 Jun 2026', days: 17 },
-  { exam: 'IBPS PO Prelims 2026', date: '14 Jun 2026', days: 30 },
-  { exam: 'NDA 2026 (II) Exam', date: '06 Sep 2026', days: 114 },
-  { exam: 'RRB Group D CBT 2026', date: 'Jul 2026', days: 47 },
+  { exam: 'UPSC CSE Prelims 2026', date: 'Official schedule', status: 'Verify' },
+  { exam: 'SSC CGL Tier 1 2026', date: 'Official schedule', status: 'Verify' },
+  { exam: 'IBPS PO Prelims 2026', date: 'Official schedule', status: 'Verify' },
+  { exam: 'NDA 2026 (II) Exam', date: 'Official schedule', status: 'Verify' },
+  { exam: 'RRB Group D CBT 2026', date: 'Official schedule', status: 'Verify' },
 ] as const;
 
 const linkSections = {
@@ -239,13 +239,13 @@ function renderHomepageCards(items: readonly HomepageCard[]) {
 }
 
 function renderItems(items: readonly LinkTuple[], href: string) {
-  return items.map(([title, org, date, tag, postCount, qualification]) => (
+  return items.map(([title, org, , tag, postCount, qualification]) => (
     <HomePageLinkItem
       key={`${title}-${org}`}
       href={itemHref(title, href)}
       title={title}
       org={org}
-      date={date}
+      date="Verify"
       tag={tag}
       postCount={postCount}
       qualification={qualification}
@@ -389,7 +389,7 @@ function FeaturedSpotlight() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {featured.map((item) => {
           const [orgBg, orgFg] = orgColors(item.org);
-          const isUrgent = item.daysLeft <= 7;
+          const isUrgent = item.urgency <= 15;
 
           return (
             <article
@@ -412,7 +412,7 @@ function FeaturedSpotlight() {
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold" style={{ color: isUrgent ? '#dc2626' : '#d97706', background: isUrgent ? '#fef2f2' : '#fffbeb' }}>
                       <Clock size={9} />
-                      {item.daysLeft}d left
+                      {item.deadlineLabel}
                     </span>
                     <div className="grid h-7 w-7 place-items-center rounded-xl ring-1 ring-black/[0.05] dark:ring-white/[0.10]" style={{ background: orgBg }} title={item.org}>
                       <span className="text-[8.5px] font-black tracking-normal" style={{ color: orgFg }}>{item.orgShort}</span>
@@ -525,9 +525,9 @@ function NotificationsPanel() {
                 {exam.exam}
               </SafeLink>
               <div className="ml-2 flex shrink-0 items-center gap-1.5">
-                <span className="text-[10.5px] font-bold tabular-nums text-gray-600 dark:text-gray-400">{exam.date}</span>
-                <span className="rounded-md px-1.5 py-0.5 text-[9.5px] font-extrabold tabular-nums" style={{ background: exam.days <= 15 ? '#fef2f2' : '#f0fdf4', color: exam.days <= 15 ? '#dc2626' : '#16a34a' }}>
-                  {exam.days}d
+                <span className="text-[10.5px] font-bold text-gray-600 dark:text-gray-400">{exam.date}</span>
+                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-extrabold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                  {exam.status}
                 </span>
               </div>
             </div>

@@ -9,6 +9,8 @@ const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 const isRedisConfigured = !!(UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN);
+let lastRedisCommandSucceeded: boolean | null = null;
+let lastRedisCommandCheckedAt: string | null = null;
 
 if (!isRedisConfigured) {
     console.log('⚠️ Redis not configured. Using in-memory cache fallback.');
@@ -32,13 +34,19 @@ async function redisCommand(command: string[]): Promise<any> {
 
         if (!response.ok) {
             console.error('Redis error:', response.statusText);
+            lastRedisCommandSucceeded = false;
+            lastRedisCommandCheckedAt = new Date().toISOString();
             return null;
         }
 
         const data = await response.json() as { result: any };
+        lastRedisCommandSucceeded = true;
+        lastRedisCommandCheckedAt = new Date().toISOString();
         return data.result;
     } catch (error) {
         console.error('Redis connection error:', error);
+        lastRedisCommandSucceeded = false;
+        lastRedisCommandCheckedAt = new Date().toISOString();
         return null;
     }
 }
@@ -173,7 +181,24 @@ export async function invalidatePattern(pattern: string): Promise<void> {
  * Check if Redis is available
  */
 export function isAvailable(): boolean {
+    return isRedisConfigured && lastRedisCommandSucceeded !== false;
+}
+
+export function isConfigured(): boolean {
     return isRedisConfigured;
+}
+
+export function hasSuccessfulConnection(): boolean {
+    return lastRedisCommandSucceeded === true;
+}
+
+export function getStatus() {
+    return {
+        configured: isRedisConfigured,
+        available: isAvailable(),
+        lastCommandSucceeded: lastRedisCommandSucceeded,
+        lastCheckedAt: lastRedisCommandCheckedAt,
+    };
 }
 
 /**
@@ -226,6 +251,9 @@ export const RedisCache = {
     expire,
     invalidatePattern,
     isAvailable,
+    isConfigured,
+    hasSuccessfulConnection,
+    getStatus,
     getOrFetch,
     invalidate,
 };

@@ -21,6 +21,8 @@ const normalizeUrlKey = (urlValue: string): string => {
     return `${url.pathname}?${sortedParams}`;
 };
 
+const exposeCacheKeyHeader = () => process.env.NODE_ENV !== 'production';
+
 /**
  * Cache middleware - caches GET responses
  * Uses Redis as primary cache, falls back to in-memory
@@ -58,7 +60,9 @@ export function cacheMiddleware(options: CacheOptions = {}) {
                 });
             }
             res.set('X-Cache', RedisCache.isAvailable() ? 'HIT-REDIS' : 'HIT-MEMORY');
-            res.set('X-Cache-Key', cacheKey);
+            if (exposeCacheKeyHeader()) {
+                res.set('X-Cache-Key', cacheKey);
+            }
             return res.json(cachedData);
         }
 
@@ -77,7 +81,9 @@ export function cacheMiddleware(options: CacheOptions = {}) {
                 setCache(cacheKey, data, ttl);
             }
             res.set('X-Cache', 'MISS');
-            res.set('X-Cache-Key', cacheKey);
+            if (exposeCacheKeyHeader()) {
+                res.set('X-Cache-Key', cacheKey);
+            }
             return originalJson(data);
         };
 

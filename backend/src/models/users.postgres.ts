@@ -43,6 +43,7 @@ export interface UserAuth extends User {
   twoFactorBackupCodesUpdatedAt?: string | null;
 }
 
+type UserRoleFilter = string | string[];
 type PasswordHistoryEntry = { hash: string; changedAt: string };
 type BackupCodeEntry = { codeHash: string; usedAt?: string | null };
 
@@ -267,17 +268,27 @@ export class UserModelPostgres {
   }
 
   static async findAll(filters?: {
-    role?: string;
+    role?: UserRoleFilter;
     isActive?: boolean;
+    search?: string;
     skip?: number;
     limit?: number;
   }): Promise<User[]> {
     try {
-      const { role, isActive, skip = 0, limit = 20 } = filters || {};
+      const { role, isActive, search, skip = 0, limit = 20 } = filters || {};
+      const normalizedSearch = search?.trim();
       const rows = await prismaApp.userAccountEntry.findMany({
         where: {
-          ...(role ? { role } : {}),
+          ...(role ? { role: Array.isArray(role) ? { in: role } : role } : {}),
           ...(isActive !== undefined ? { isActive } : {}),
+          ...(normalizedSearch
+            ? {
+                OR: [
+                  { email: { contains: normalizedSearch, mode: 'insensitive' } },
+                  { username: { contains: normalizedSearch, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -292,15 +303,25 @@ export class UserModelPostgres {
   }
 
   static async count(filters?: {
-    role?: string;
+    role?: UserRoleFilter;
     isActive?: boolean;
+    search?: string;
   }): Promise<number> {
     try {
-      const { role, isActive } = filters || {};
+      const { role, isActive, search } = filters || {};
+      const normalizedSearch = search?.trim();
       return await prismaApp.userAccountEntry.count({
         where: {
-          ...(role ? { role } : {}),
+          ...(role ? { role: Array.isArray(role) ? { in: role } : role } : {}),
           ...(isActive !== undefined ? { isActive } : {}),
+          ...(normalizedSearch
+            ? {
+                OR: [
+                  { email: { contains: normalizedSearch, mode: 'insensitive' } },
+                  { username: { contains: normalizedSearch, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
         },
       });
     } catch (error) {

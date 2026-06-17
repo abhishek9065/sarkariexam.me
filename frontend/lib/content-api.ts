@@ -127,6 +127,11 @@ type BackendTaxonomyType = 'states' | 'organizations' | 'categories' | 'institut
 
 type BackendContentPageType = 'auxiliary' | 'info' | 'community' | 'category_meta' | 'resource_meta' | 'state_directory';
 
+const FALLBACK_UPDATED_LABEL = 'Fallback mode';
+const FALLBACK_CARD_DATE_LABEL = 'Verify';
+const FALLBACK_DATE_VALUE = 'Check official notice';
+const reportedFallbackSurfaces = new Set<string>();
+
 interface BackendContentPageRecord {
   id: string;
   slug: string;
@@ -275,6 +280,15 @@ function hrefFromType(type: BackendPostRecord['type'], slug: string) {
   return '/syllabus';
 }
 
+function reportFallbackActivation(surface: string, error: unknown) {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (reportedFallbackSurfaces.has(surface)) return;
+  reportedFallbackSurfaces.add(surface);
+
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[PublicContentFallback] ${surface}: ${message}`);
+}
+
 function createFallbackCard(input: {
   date: string;
   org: string;
@@ -298,15 +312,13 @@ function createFallbackCard(input: {
     section,
     href: hrefFromType(input.type, input.slug),
     org: input.org,
-    date: input.date,
+    date: FALLBACK_CARD_DATE_LABEL,
     postCount: input.postCount,
     qualification: input.qualification,
     tag: input.tag,
     summary: input.summary,
     stateSlugs: input.stateSlugs ?? [],
-    publishedAt: '2026-03-28T05:00:00.000Z',
-    updatedAt: '2026-04-29T06:00:00.000Z',
-    indexable: true,
+    indexable: false,
   };
 }
 
@@ -525,14 +537,14 @@ function fallbackCardToPost(card: BackendPublicCard): BackendPostRecord {
     type: card.type,
     summary: card.summary || card.title,
     shortInfo: card.summary || card.title,
-    body: `${card.title} is available as a static fallback page so SarkariExams.me can run without a live backend API. Verify all final dates, eligibility, fees, and downloads on the official portal before taking action.`,
+    body: `${card.title} is available as degraded fallback content because the live backend API is unavailable. Verify all final dates, eligibility, fees, and downloads on the official portal before taking action.`,
     organization,
     categories: [{ name: categoryName, slug: slugify(categoryName) }],
     states: card.stateSlugs.map((slug) => ({ name: titleFromSlug(slug), slug })),
     qualifications: [{ name: qualification, slug: slugify(qualification) }],
     importantDates: [
-      { label: 'Notification Date', value: '2026-03-28T05:00:00.000Z', kind: 'notification' },
-      { label: card.type === 'result' ? 'Result Date' : 'Last Date / Next Update', value: '2026-04-30T05:00:00.000Z', kind: 'last_date' },
+      { label: 'Notification Date', value: FALLBACK_DATE_VALUE, kind: 'notification' },
+      { label: card.type === 'result' ? 'Result Date' : 'Last Date / Next Update', value: FALLBACK_DATE_VALUE, kind: 'last_date' },
     ],
     eligibility: [
       { label: 'Qualification', description: qualification },
@@ -566,22 +578,22 @@ function fallbackCardToPost(card: BackendPublicCard): BackendPostRecord {
       : [],
     officialSources: [officialSourceForOrg(card.org)],
     trust: {
-      verificationNote: 'Static fallback content is shown because the live API is unavailable. Always verify from the official portal.',
+      verificationNote: 'Fallback content is shown because the live API is unavailable. It is not a current official notice. Always verify from the official portal.',
     },
     seo: {
       effectiveTitle: `${card.title} | SarkariExams.me`,
       effectiveDescription: card.summary || card.title,
       effectiveCanonicalPath: card.href,
-      indexable: true,
+      indexable: false,
     },
     tag: card.tag,
     location: card.stateSlugs.length ? card.stateSlugs.map(titleFromSlug).join(', ') : 'India',
     salary: card.type === 'job' ? 'Refer to the official notification' : undefined,
     postCount: card.postCount,
-    lastDate: '2026-04-30T05:00:00.000Z',
-    resultDate: card.type === 'result' ? '2026-03-27T05:00:00.000Z' : undefined,
+    lastDate: undefined,
+    resultDate: undefined,
     publishedAt: card.publishedAt,
-    updatedAt: card.updatedAt || '2026-04-29T06:00:00.000Z',
+    updatedAt: card.updatedAt || FALLBACK_UPDATED_LABEL,
   };
 }
 
@@ -803,7 +815,8 @@ export async function getContentPageBySlug(slug: string): Promise<BackendContent
   try {
     const response = await fetchJson<{ data: BackendContentPageRecord }>(`/pages/${encodeURIComponent(slug)}`);
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation(`content-page:${slug}`, error);
     return null;
   }
 }
@@ -813,7 +826,8 @@ export async function getContentPagesByType(type: BackendContentPageType, limit 
   try {
     const response = await fetchJson<{ data: BackendContentPageRecord[] }>(`/pages?${params.toString()}`);
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation(`content-pages:${type}`, error);
     return [];
   }
 }
@@ -1103,7 +1117,8 @@ export async function getHomepageSections() {
   try {
     const response = await fetchJson<{ data: Record<BackendSection, BackendPublicCard[]> }>('/homepage');
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation('homepage', error);
     return fallbackSections();
   }
 }
@@ -1126,7 +1141,8 @@ export async function getListingEntries(params: {
   try {
     const response = await fetchJson<{ data: BackendPublicCard[]; total: number; count: number }>(`/posts?${searchParams.toString()}`);
     return response.data.map(toPortalEntry);
-  } catch {
+  } catch (error) {
+    reportFallbackActivation('listing', error);
     return getFallbackCards(params).map(toPortalEntry);
   }
 }
@@ -1148,7 +1164,8 @@ export async function getRawListing(params: {
   try {
     const response = await fetchJson<{ data: BackendPublicCard[]; total: number; count: number }>(`/posts?${searchParams.toString()}`);
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation('raw-listing', error);
     return getFallbackCards(params);
   }
 }
@@ -1157,7 +1174,8 @@ export async function getDetail(slug: string) {
   try {
     const response = await fetchJson<{ data: BackendPublicDetail }>(`/posts/${encodeURIComponent(slug)}`);
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation(`detail:${slug}`, error);
     const fallbackDetail = fallbackDetailBySlug(slug);
     if (!fallbackDetail) {
       throw new Error(`Fallback detail not found: ${slug}`);
@@ -1170,7 +1188,8 @@ export async function getTaxonomyList(type: BackendTaxonomyType) {
   try {
     const response = await fetchJson<{ data: BackendTaxonomyDocument[] }>(`/taxonomies/${type}`);
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation(`taxonomy-list:${type}`, error);
     return fallbackTaxonomies[type] || [];
   }
 }
@@ -1179,7 +1198,8 @@ export async function getTaxonomyLanding(type: BackendTaxonomyType, slug: string
   try {
     const response = await fetchJson<{ data: BackendTaxonomyLanding }>(`/taxonomies/${type}/${encodeURIComponent(slug)}`);
     return response.data;
-  } catch {
+  } catch (error) {
+    reportFallbackActivation(`taxonomy-landing:${type}:${slug}`, error);
     return fallbackTaxonomyLanding(type, slug);
   }
 }

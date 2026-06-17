@@ -70,7 +70,10 @@ export function UsersPage() {
               <SelectTrigger className="w-[140px]"><SelectValue placeholder="Role" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="superadmin">Superadmin</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="reviewer">Reviewer</SelectItem>
+                <SelectItem value="editor">Editor</SelectItem>
                 <SelectItem value="user">User</SelectItem>
               </SelectContent>
             </Select>
