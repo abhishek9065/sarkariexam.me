@@ -141,10 +141,20 @@ export async function postgresHealthCheck(options: { logFailure?: boolean } = {}
   const safeTimeoutMs = Math.max(500, Math.floor(timeoutMs));
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${safeTimeoutMs}`);
-      await tx.$queryRaw`SELECT 1`;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error(`Postgres health check timed out after ${safeTimeoutMs}ms`));
+      }, safeTimeoutMs);
     });
+
+    try {
+      await Promise.race([prisma.$queryRaw`SELECT 1`, timeout]);
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    }
     return true;
   } catch (error) {
     if (logFailure) {
