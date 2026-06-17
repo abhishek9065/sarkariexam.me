@@ -29,6 +29,7 @@ export interface NotificationCampaignRecord {
     value: string;
   };
   status: NotificationCampaignStatus;
+  unsupportedSegment: boolean;
   sentCount: number;
   failedCount: number;
   openCount: number;
@@ -137,6 +138,7 @@ function toRecord(row: NotificationCampaignRow): NotificationCampaignRecord {
       value: row.segmentValue,
     },
     status: asStatus(row.status),
+    unsupportedSegment: row.segmentType === 'language',
     sentCount: row.sentCount,
     failedCount: row.failedCount,
     openCount: row.openCount,

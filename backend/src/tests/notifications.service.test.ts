@@ -68,6 +68,7 @@ describe('notification service', () => {
       id: 'campaign-1',
       status: 'draft',
       segment: { type: 'all', value: '' },
+      unsupportedSegment: false,
     });
     mocks.campaignMarkFailed.mockResolvedValue(true);
     mocks.campaignMarkSending.mockResolvedValue(true);
@@ -107,19 +108,19 @@ describe('notification service', () => {
     expect(mocks.campaignCreate).not.toHaveBeenCalled();
   });
 
-  it('allows empty segment values for all-user campaigns', async () => {
+  it('normalizes all-user campaign segment values', async () => {
     const { createCampaign } = await import('../services/notifications.js');
 
     const result = await createCampaign({
       title: 'All users campaign',
       body: 'This should be accepted.',
-      segment: { type: 'all', value: '' },
+      segment: { type: 'all', value: '   ' },
     }, 'admin-user');
 
     expect(result.success).toBe(true);
     expect(mocks.campaignCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        segment: { type: 'all', value: '' },
+        segment: { type: 'all', value: 'all' },
       }),
       'admin-user',
     );
@@ -134,6 +135,22 @@ describe('notification service', () => {
     expect(mocks.campaignMarkSimulated).toHaveBeenCalledWith('campaign-1', 3);
     expect(mocks.campaignMarkSent).not.toHaveBeenCalled();
     expect(mocks.campaignMarkSending).not.toHaveBeenCalled();
+  });
+
+  it('fails legacy unsupported campaign segments instead of simulating zero recipients', async () => {
+    mocks.campaignFindById.mockResolvedValue({
+      id: 'campaign-1',
+      status: 'draft',
+      segment: { type: 'language', value: 'Hindi' },
+      unsupportedSegment: true,
+    });
+    const { sendCampaign } = await import('../services/notifications.js');
+
+    const result = await sendCampaign('campaign-1');
+
+    expect(result).toEqual({ success: false, error: 'Campaign segment is no longer supported' });
+    expect(mocks.campaignMarkFailed).toHaveBeenCalledWith('campaign-1');
+    expect(mocks.campaignMarkSimulated).not.toHaveBeenCalled();
   });
 
   it('does not advertise language segments', async () => {

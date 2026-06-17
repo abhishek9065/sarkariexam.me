@@ -423,6 +423,7 @@ export function getCampaigns() {
     sentCount: number;
     createdAt: string;
     segment: { type: string; value: string };
+    unsupportedSegment: boolean;
   }> }>('/admin/campaigns');
 }
 

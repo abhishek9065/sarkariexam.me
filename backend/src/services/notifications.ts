@@ -187,15 +187,17 @@ export async function createCampaign(
   }
 
   try {
+    const normalizedSegment = {
+      type: parse.data.segment.type,
+      value: parse.data.segment.type === 'all' ? 'all' : parse.data.segment.value,
+    };
+
     const campaign = await NotificationCampaignModelPostgres.create(
       {
         title: parse.data.title,
         body: parse.data.body,
         url: parse.data.url,
-        segment: {
-          type: parse.data.segment.type,
-          value: parse.data.segment.value,
-        },
+        segment: normalizedSegment,
         scheduledAt: parse.data.scheduledAt ? new Date(parse.data.scheduledAt) : undefined,
         abTest: normalizeAbTest(parse.data.abTest),
       },
@@ -347,6 +349,11 @@ export async function sendCampaign(campaignId: string): Promise<{
 
     if (campaign.status === 'sending' || campaign.status === 'sent' || campaign.status === 'simulated') {
       return { success: false, error: 'Campaign already processed' };
+    }
+
+    if (campaign.unsupportedSegment) {
+      await NotificationCampaignModelPostgres.markFailed(campaignId);
+      return { success: false, error: 'Campaign segment is no longer supported' };
     }
 
     const userWhere = buildSegmentWhere(
