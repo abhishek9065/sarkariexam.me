@@ -143,12 +143,12 @@ export async function postgresHealthCheck(options: { logFailure?: boolean } = {}
   try {
     await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${safeTimeoutMs}`);
-      await tx.$queryRaw`SELECT 1 FROM _prisma_migrations LIMIT 1`;
+      await tx.$queryRaw`SELECT 1`;
     });
     return true;
   } catch (error) {
     if (logFailure) {
-      console.error('Postgres health check failed (migrations might be pending):', error);
+      console.error('Postgres health check failed:', error);
     }
     return false;
   }
