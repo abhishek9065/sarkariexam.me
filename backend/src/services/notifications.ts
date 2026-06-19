@@ -10,6 +10,7 @@ import CampaignDispatchLogModelPostgres, {
 import NotificationCampaignModelPostgres, {
   type NotificationCampaignRecord,
   type NotificationCampaignSegmentType,
+  type NotificationCampaignStatus,
 } from '../models/notificationCampaigns.postgres.js';
 import PushSubscriptionModelPostgres, { type PushSubscriptionRecord } from '../models/pushSubscriptions.postgres.js';
 import { slugify } from '../utils/slugify.js';
@@ -64,6 +65,13 @@ const DEFAULT_CAMPAIGN_SCHEDULER_INTERVAL_MS = 60_000;
 
 let campaignSchedulerInterval: NodeJS.Timeout | null = null;
 let campaignSchedulerRunning = false;
+let campaignWorkerRunning = false;
+
+type CampaignJob =
+  | { kind: 'send'; campaign: NotificationCampaignRecord }
+  | { kind: 'retry'; campaign: NotificationCampaignRecord };
+
+const campaignJobQueue: CampaignJob[] = [];
 
 const parseBoundedInt = (value: string | undefined, fallback: number, min: number, max: number): number => {
   const parsed = Number(value);
@@ -606,39 +614,51 @@ export async function estimateCampaignRecipients(campaignId: string): Promise<{
 /**
  * Send notification campaign
  */
-export async function sendCampaign(campaignId: string): Promise<{
+type CampaignDeliveryResult = {
   success: boolean;
   error?: string;
   mode?: 'delivery';
   sentCount?: number;
   failedCount?: number;
   totals?: CampaignEstimate;
-}> {
+};
+
+type CampaignQueueResult = {
+  success: boolean;
+  error?: string;
+  mode?: 'delivery';
+  status?: 'sending';
+};
+
+async function claimCampaign(
+  campaignId: string,
+  allowedStatuses: NotificationCampaignStatus[],
+): Promise<{ campaign?: NotificationCampaignRecord; error?: string }> {
+  const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
+  if (!campaign) {
+    return { error: 'Campaign not found' };
+  }
+
+  if (campaign.unsupportedSegment) {
+    await NotificationCampaignModelPostgres.markFailed(campaignId);
+    return { error: 'Campaign segment is no longer supported' };
+  }
+
+  if (!allowedStatuses.includes(campaign.status)) {
+    return { error: 'Campaign already processed' };
+  }
+
+  const claimed = await NotificationCampaignModelPostgres.markSending(campaignId, [campaign.status]);
+  if (!claimed) {
+    return { error: 'Campaign is already being processed' };
+  }
+
+  return { campaign };
+}
+
+async function deliverClaimedCampaign(campaign: NotificationCampaignRecord): Promise<CampaignDeliveryResult> {
+  const campaignId = campaign.id;
   try {
-    const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
-    if (!campaign) {
-      return { success: false, error: 'Campaign not found' };
-    }
-
-    if (
-      campaign.status === 'sending' ||
-      campaign.status === 'sent' ||
-      campaign.status === 'partial_failed' ||
-      campaign.status === 'simulated'
-    ) {
-      return { success: false, error: 'Campaign already processed' };
-    }
-
-    if (campaign.unsupportedSegment) {
-      await NotificationCampaignModelPostgres.markFailed(campaignId);
-      return { success: false, error: 'Campaign segment is no longer supported' };
-    }
-
-    const markedSending = await NotificationCampaignModelPostgres.markSending(campaignId);
-    if (!markedSending) {
-      return { success: false, error: 'Campaign not found' };
-    }
-
     const { emailRecipients, pushRecipients } = await resolveCampaignRecipients(campaign);
 
     const vapidConfigured = configureWebPush();
@@ -688,10 +708,65 @@ export async function sendCampaign(campaignId: string): Promise<{
     };
   } catch (error) {
     console.error('[NotificationService] Error sending campaign:', error);
-
     await NotificationCampaignModelPostgres.markFailed(campaignId).catch(() => undefined);
-    
     return { success: false, error: 'Failed to send campaign' };
+  }
+}
+
+export async function sendCampaign(campaignId: string): Promise<CampaignDeliveryResult> {
+  try {
+    const claim = await claimCampaign(campaignId, ['draft', 'scheduled', 'failed']);
+    if (!claim.campaign) {
+      return { success: false, error: claim.error };
+    }
+
+    return await deliverClaimedCampaign(claim.campaign);
+  } catch (error) {
+    console.error('[NotificationService] Error claiming campaign:', error);
+    return { success: false, error: 'Failed to send campaign' };
+  }
+}
+
+function enqueueCampaignJob(job: CampaignJob): void {
+  campaignJobQueue.push(job);
+  void runCampaignWorker();
+}
+
+async function runCampaignWorker(): Promise<void> {
+  if (campaignWorkerRunning) return;
+  campaignWorkerRunning = true;
+
+  try {
+    let job = campaignJobQueue.shift();
+    while (job) {
+      const result = job.kind === 'send'
+        ? await deliverClaimedCampaign(job.campaign)
+        : await retryClaimedCampaign(job.campaign);
+      if (!result.success) {
+        console.error('[NotificationService] Background campaign job failed', {
+          campaignId: job.campaign.id,
+          kind: job.kind,
+          error: result.error,
+        });
+      }
+      job = campaignJobQueue.shift();
+    }
+  } finally {
+    campaignWorkerRunning = false;
+    if (campaignJobQueue.length > 0) void runCampaignWorker();
+  }
+}
+
+export async function queueCampaignDelivery(campaignId: string): Promise<CampaignQueueResult> {
+  try {
+    const claim = await claimCampaign(campaignId, ['draft', 'scheduled', 'failed']);
+    if (!claim.campaign) return { success: false, error: claim.error };
+
+    enqueueCampaignJob({ kind: 'send', campaign: claim.campaign });
+    return { success: true, mode: 'delivery', status: 'sending' };
+  } catch (error) {
+    console.error('[NotificationService] Error queueing campaign:', error);
+    return { success: false, error: 'Failed to queue campaign' };
   }
 }
 
@@ -749,38 +824,34 @@ async function retryPushLog(campaign: NotificationCampaignRecord, log: CampaignD
   };
 }
 
-export async function retryFailedCampaign(campaignId: string): Promise<{
+type CampaignRetryResult = {
   success: boolean;
   error?: string;
   mode?: 'delivery';
   retried?: number;
   sentCount?: number;
   failedCount?: number;
-}> {
-  try {
-    const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
-    if (!campaign) {
-      return { success: false, error: 'Campaign not found' };
-    }
-    if (campaign.unsupportedSegment) {
-      await NotificationCampaignModelPostgres.markFailed(campaignId);
-      return { success: false, error: 'Campaign segment is no longer supported' };
-    }
+};
 
+async function retryClaimedCampaign(campaign: NotificationCampaignRecord): Promise<CampaignRetryResult> {
+  const campaignId = campaign.id;
+  try {
     const failedLogs = await CampaignDispatchLogModelPostgres.listFailed(campaignId);
     if (failedLogs.length === 0) {
+      const stats = await CampaignDispatchLogModelPostgres.stats(campaignId);
+      if (stats.sent > 0) {
+        await NotificationCampaignModelPostgres.markSent(campaignId, stats.sent, 0);
+      } else {
+        await NotificationCampaignModelPostgres.markFailed(campaignId, { sentCount: 0, failedCount: 0 });
+      }
       return { success: true, mode: 'delivery', retried: 0, sentCount: 0, failedCount: 0 };
     }
 
-    await NotificationCampaignModelPostgres.markSending(campaignId);
-    const retryLogs: CampaignDispatchLogInput[] = [];
-    for (const log of failedLogs) {
-      if (log.channel === 'email') {
-        retryLogs.push(await retryEmailLog(campaign, log));
-      } else {
-        retryLogs.push(await retryPushLog(campaign, log));
-      }
-    }
+    const retryLogs = await mapWithConcurrency(
+      failedLogs,
+      campaignRuntimeConfig.deliveryConcurrency,
+      (log) => log.channel === 'email' ? retryEmailLog(campaign, log) : retryPushLog(campaign, log),
+    );
 
     await CampaignDispatchLogModelPostgres.createMany(retryLogs);
     const summary = summarizeDispatch(retryLogs);
@@ -808,6 +879,31 @@ export async function retryFailedCampaign(campaignId: string): Promise<{
     console.error('[NotificationService] Error retrying campaign:', error);
     await NotificationCampaignModelPostgres.markFailed(campaignId).catch(() => undefined);
     return { success: false, error: 'Failed to retry campaign' };
+  }
+}
+
+export async function retryFailedCampaign(campaignId: string): Promise<CampaignRetryResult> {
+  try {
+    const claim = await claimCampaign(campaignId, ['failed', 'partial_failed']);
+    if (!claim.campaign) return { success: false, error: claim.error };
+
+    return await retryClaimedCampaign(claim.campaign);
+  } catch (error) {
+    console.error('[NotificationService] Error claiming campaign retry:', error);
+    return { success: false, error: 'Failed to retry campaign' };
+  }
+}
+
+export async function queueFailedCampaignRetry(campaignId: string): Promise<CampaignQueueResult> {
+  try {
+    const claim = await claimCampaign(campaignId, ['failed', 'partial_failed']);
+    if (!claim.campaign) return { success: false, error: claim.error };
+
+    enqueueCampaignJob({ kind: 'retry', campaign: claim.campaign });
+    return { success: true, mode: 'delivery', status: 'sending' };
+  } catch (error) {
+    console.error('[NotificationService] Error queueing campaign retry:', error);
+    return { success: false, error: 'Failed to queue campaign retry' };
   }
 }
 
@@ -847,11 +943,13 @@ export async function processScheduledCampaigns(): Promise<number> {
 
     const scheduled = await NotificationCampaignModelPostgres.listScheduledDue(now);
 
+    let queued = 0;
     for (const campaign of scheduled) {
-      await sendCampaign(campaign.id);
+      const result = await queueCampaignDelivery(campaign.id);
+      if (result.success) queued += 1;
     }
 
-    return scheduled.length;
+    return queued;
   } catch (error) {
     console.error('[NotificationService] Error processing scheduled campaigns:', error);
     return 0;
@@ -903,6 +1001,8 @@ export const notificationService = {
   scheduleCampaign,
   deleteCampaign,
   processScheduledCampaigns,
+  queueCampaignDelivery,
+  queueFailedCampaignRetry,
   scheduleCampaignProcessor,
   stopCampaignProcessor,
 };

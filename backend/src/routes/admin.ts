@@ -1165,17 +1165,15 @@ router.post('/campaigns', async (req, res) => {
 
 router.post('/campaigns/:id/send', async (req, res) => {
   try {
-    const { sendCampaign } = await import('../services/notifications.js');
-    const result = await sendCampaign(req.params.id);
+    const { queueCampaignDelivery } = await import('../services/notifications.js');
+    const result = await queueCampaignDelivery(req.params.id);
     
     if (!result.success) return res.status(400).json({ error: result.error });
-    return res.json({
-      message: 'Campaign delivery completed',
+    return res.status(202).json({
+      message: 'Campaign delivery queued',
       data: {
         mode: result.mode ?? 'delivery',
-        sentCount: result.sentCount ?? 0,
-        failedCount: result.failedCount ?? 0,
-        totals: result.totals ?? { email: 0, push: 0, total: 0 },
+        status: result.status ?? 'sending',
       },
     });
   } catch (error) {
@@ -1212,17 +1210,15 @@ router.get('/campaigns/:id/stats', async (req, res) => {
 
 router.post('/campaigns/:id/retry-failed', async (req, res) => {
   try {
-    const { retryFailedCampaign } = await import('../services/notifications.js');
-    const result = await retryFailedCampaign(req.params.id);
+    const { queueFailedCampaignRetry } = await import('../services/notifications.js');
+    const result = await queueFailedCampaignRetry(req.params.id);
 
     if (!result.success) return res.status(400).json({ error: result.error });
-    return res.json({
-      message: 'Failed campaign deliveries retried',
+    return res.status(202).json({
+      message: 'Failed campaign deliveries queued for retry',
       data: {
         mode: result.mode ?? 'delivery',
-        retried: result.retried ?? 0,
-        sentCount: result.sentCount ?? 0,
-        failedCount: result.failedCount ?? 0,
+        status: result.status ?? 'sending',
       },
     });
   } catch (error) {

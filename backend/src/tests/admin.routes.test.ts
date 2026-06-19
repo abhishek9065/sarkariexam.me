@@ -22,8 +22,8 @@ const mocks = vi.hoisted(() => ({
   createCampaign: vi.fn(),
   estimateCampaignRecipients: vi.fn(),
   getCampaignStats: vi.fn(),
-  retryFailedCampaign: vi.fn(),
-  sendCampaign: vi.fn(),
+  queueFailedCampaignRetry: vi.fn(),
+  queueCampaignDelivery: vi.fn(),
   assignAnnouncement: vi.fn(),
   approveAnnouncement: vi.fn(),
   rejectAnnouncement: vi.fn(),
@@ -87,8 +87,8 @@ vi.mock('../services/notifications.js', () => ({
   getCampaignStats: mocks.getCampaignStats,
   getSegmentUserCount: vi.fn(),
   getUserSegments: vi.fn(() => ({ totalUsers: 0, states: [], categories: [] })),
-  retryFailedCampaign: mocks.retryFailedCampaign,
-  sendCampaign: mocks.sendCampaign,
+  queueFailedCampaignRetry: mocks.queueFailedCampaignRetry,
+  queueCampaignDelivery: mocks.queueCampaignDelivery,
 }));
 vi.mock('../services/workflow.js', () => ({
   assignAnnouncement: mocks.assignAnnouncement,
@@ -155,13 +155,11 @@ describe('admin routes', () => {
         recentFailures: [],
       },
     });
-    mocks.retryFailedCampaign.mockResolvedValue({ success: true, mode: 'delivery', retried: 1, sentCount: 1, failedCount: 0 });
-    mocks.sendCampaign.mockResolvedValue({
+    mocks.queueFailedCampaignRetry.mockResolvedValue({ success: true, mode: 'delivery', status: 'sending' });
+    mocks.queueCampaignDelivery.mockResolvedValue({
       success: true,
       mode: 'delivery',
-      sentCount: 2,
-      failedCount: 1,
-      totals: { email: 2, push: 1, total: 3 },
+      status: 'sending',
     });
     mocks.assignAnnouncement.mockResolvedValue({ success: true });
     mocks.approveAnnouncement.mockResolvedValue({ success: true });
@@ -282,18 +280,16 @@ describe('admin routes', () => {
     expect(mocks.moderateComment).not.toHaveBeenCalled();
   });
 
-  it('returns campaign delivery result from send endpoint', async () => {
+  it('queues campaign delivery from the send endpoint', async () => {
     const app = await createApp();
     const response = await request(app).post('/admin/campaigns/campaign-1/send');
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     expect(response.body).toEqual({
-      message: 'Campaign delivery completed',
+      message: 'Campaign delivery queued',
       data: {
         mode: 'delivery',
-        sentCount: 2,
-        failedCount: 1,
-        totals: { email: 2, push: 1, total: 3 },
+        status: 'sending',
       },
     });
   });
@@ -309,8 +305,8 @@ describe('admin routes', () => {
     expect(estimateResponse.body.data).toEqual({ email: 2, push: 1, total: 3 });
     expect(statsResponse.status).toBe(200);
     expect(statsResponse.body.data).toMatchObject({ total: 3, sent: 2, failed: 1 });
-    expect(retryResponse.status).toBe(200);
-    expect(retryResponse.body.data).toEqual({ mode: 'delivery', retried: 1, sentCount: 1, failedCount: 0 });
+    expect(retryResponse.status).toBe(202);
+    expect(retryResponse.body.data).toEqual({ mode: 'delivery', status: 'sending' });
   });
 
   it('rejects invalid content analytics type values', async () => {

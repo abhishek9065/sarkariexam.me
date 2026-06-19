@@ -206,9 +206,15 @@ export class NotificationCampaignModelPostgres {
     return row ? toRecord(row) : null;
   }
 
-  static async markSending(id: string): Promise<boolean> {
+  static async markSending(
+    id: string,
+    expectedStatuses: NotificationCampaignStatus[],
+  ): Promise<boolean> {
     const updated = await prismaApp.notificationCampaignEntry.updateMany({
-      where: { id },
+      where: {
+        id,
+        status: { in: expectedStatuses },
+      },
       data: { status: 'sending' },
     });
     return updated.count > 0;

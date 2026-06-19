@@ -470,7 +470,7 @@ export function createCampaign(data: {
 }
 
 export function sendCampaign(id: string) {
-  return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; sentCount: number; failedCount: number; totals: CampaignRecipientEstimate } }>(`/admin/campaigns/${id}/send`, {
+  return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; status: 'sending' } }>(`/admin/campaigns/${id}/send`, {
     method: 'POST',
   });
 }
@@ -484,7 +484,7 @@ export function getCampaignStats(id: string) {
 }
 
 export function retryFailedCampaign(id: string) {
-  return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; retried: number; sentCount: number; failedCount: number } }>(`/admin/campaigns/${id}/retry-failed`, {
+  return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; status: 'sending' } }>(`/admin/campaigns/${id}/retry-failed`, {
     method: 'POST',
   });
 }

@@ -113,6 +113,20 @@ export function NotificationsPage() {
     }
   }, [selectedCampaign?.id]);
 
+  useEffect(() => {
+    if (!selectedCampaign?.id || selectedCampaign.status !== 'sending') return;
+
+    const campaignId = selectedCampaign.id;
+    const interval = window.setInterval(() => {
+      void Promise.all([getCampaigns(), getCampaignStats(campaignId)]).then(([campaignResponse, statsResponse]) => {
+        setCampaigns(campaignResponse.data);
+        setStats(statsResponse.data);
+      }).catch(() => undefined);
+    }, 3_000);
+
+    return () => window.clearInterval(interval);
+  }, [selectedCampaign?.id, selectedCampaign?.status]);
+
   async function runEstimate() {
     if (!selectedCampaign) return;
     setBusyAction('estimate');
@@ -133,8 +147,8 @@ export function NotificationsPage() {
     if (!confirmed) return;
     setBusyAction('send');
     try {
-      const response = await sendCampaign(selectedCampaign.id);
-      toast.success(`Campaign sent: ${response.data.sentCount} delivered, ${response.data.failedCount} failed.`);
+      await sendCampaign(selectedCampaign.id);
+      toast.success('Campaign delivery queued.');
       await loadCampaigns();
       await loadStats(selectedCampaign.id);
     } catch (error) {
@@ -150,8 +164,8 @@ export function NotificationsPage() {
     if (!confirmed) return;
     setBusyAction('retry');
     try {
-      const response = await retryFailedCampaign(selectedCampaign.id);
-      toast.success(`Retried ${response.data.retried}: ${response.data.sentCount} delivered, ${response.data.failedCount} failed.`);
+      await retryFailedCampaign(selectedCampaign.id);
+      toast.success('Failed deliveries queued for retry.');
       await loadCampaigns();
       await loadStats(selectedCampaign.id);
     } catch (error) {
@@ -254,7 +268,7 @@ export function NotificationsPage() {
                     {busyAction === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     Send now
                   </Button>
-                  <Button type="button" variant="outline" onClick={runRetry} disabled={busyAction !== null || selectedCampaign.unsupportedSegment || (stats?.failed ?? selectedCampaign.failedCount) === 0}>
+                  <Button type="button" variant="outline" onClick={runRetry} disabled={busyAction !== null || selectedCampaign.status === 'sending' || selectedCampaign.unsupportedSegment || (stats?.failed ?? selectedCampaign.failedCount) === 0}>
                     {busyAction === 'retry' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                     Retry failed
                   </Button>

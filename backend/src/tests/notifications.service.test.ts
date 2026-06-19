@@ -209,7 +209,7 @@ describe('notification service', () => {
       failedCount: 1,
       totals: { email: 2, push: 1, total: 3 },
     });
-    expect(mocks.campaignMarkSending).toHaveBeenCalledWith('campaign-1');
+    expect(mocks.campaignMarkSending).toHaveBeenCalledWith('campaign-1', ['draft']);
     expect(mocks.sendCampaignEmail).toHaveBeenCalledTimes(2);
     expect(mocks.dispatchCreateMany).toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ channel: 'email', status: 'sent', recipient: 'one@example.com' }),
@@ -235,6 +235,18 @@ describe('notification service', () => {
       totals: { email: 2, push: 0, total: 2 },
     });
     expect(mocks.campaignMarkFailed).toHaveBeenCalledWith('campaign-1', { sentCount: 0, failedCount: 2 });
+  });
+
+  it('does not deliver when another worker wins the atomic campaign claim', async () => {
+    mocks.campaignMarkSending.mockResolvedValue(false);
+    const { sendCampaign } = await import('../services/notifications.js');
+
+    const result = await sendCampaign('campaign-1');
+
+    expect(result).toEqual({ success: false, error: 'Campaign is already being processed' });
+    expect(mocks.sendCampaignEmail).not.toHaveBeenCalled();
+    expect(mocks.webPushSendNotification).not.toHaveBeenCalled();
+    expect(mocks.dispatchCreateMany).not.toHaveBeenCalled();
   });
 
   it('estimates campaign recipients by channel', async () => {
@@ -290,6 +302,12 @@ describe('notification service', () => {
   });
 
   it('retries only failed campaign dispatches', async () => {
+    mocks.campaignFindById.mockResolvedValue({
+      id: 'campaign-1',
+      status: 'partial_failed',
+      segment: { type: 'all', value: '' },
+      unsupportedSegment: false,
+    });
     mocks.dispatchListFailed.mockResolvedValue([
       {
         id: 'failed-email',
@@ -313,6 +331,7 @@ describe('notification service', () => {
       sentCount: 1,
       failedCount: 0,
     });
+    expect(mocks.campaignMarkSending).toHaveBeenCalledWith('campaign-1', ['partial_failed']);
     expect(mocks.sendCampaignEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'retry@example.com' }));
     expect(mocks.dispatchCreateMany).toHaveBeenCalledWith([
       expect.objectContaining({ channel: 'email', status: 'sent', metadata: { retryOf: 'failed-email' }, attemptCount: 2 }),
