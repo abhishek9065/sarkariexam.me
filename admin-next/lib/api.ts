@@ -414,7 +414,7 @@ export function getUpcomingDeadlines(limit = 10) {
 }
 
 // ─── Notification Campaigns ───
-export type CampaignDeliveryStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'simulated' | 'failed';
+export type CampaignDeliveryStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'partial_failed' | 'simulated' | 'failed';
 
 export type CampaignDeliveryStats = {
   total: number;

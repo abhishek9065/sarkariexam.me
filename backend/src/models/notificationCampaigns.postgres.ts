@@ -16,6 +16,7 @@ export type NotificationCampaignStatus =
   | 'scheduled'
   | 'sending'
   | 'sent'
+  | 'partial_failed'
   | 'simulated'
   | 'failed';
 
@@ -85,6 +86,7 @@ function asStatus(value: string): NotificationCampaignStatus {
     value === 'scheduled' ||
     value === 'sending' ||
     value === 'sent' ||
+    value === 'partial_failed' ||
     value === 'simulated' ||
     value === 'failed'
   ) {
@@ -217,6 +219,19 @@ export class NotificationCampaignModelPostgres {
       where: { id },
       data: {
         status: 'sent',
+        sentAt: new Date(),
+        sentCount,
+        failedCount,
+      },
+    });
+    return updated.count > 0;
+  }
+
+  static async markPartialFailed(id: string, sentCount: number, failedCount: number): Promise<boolean> {
+    const updated = await prismaApp.notificationCampaignEntry.updateMany({
+      where: { id },
+      data: {
+        status: 'partial_failed',
         sentAt: new Date(),
         sentCount,
         failedCount,

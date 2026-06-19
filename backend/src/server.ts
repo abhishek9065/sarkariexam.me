@@ -45,6 +45,7 @@ import {
 import { scheduleDigestSender } from './services/digestScheduler.js';
 import { ErrorTracking } from './services/errorTracking.js';
 import { getLegacyRuntimeDiagnostics, legacyMongoBackedApiPrefixes, startLegacyMongoRuntime } from './services/legacyRuntime.js';
+import { scheduleCampaignProcessor } from './services/notifications.js';
 import { getPostgresHealthErrorDiagnostics, postgresHealthCheck } from './services/postgres/prisma.js';
 import { scheduleSavedSearchAlerts } from './services/savedSearchAlerts.js';
 import { getSecurityMetricSnapshot } from './services/securityMetrics.js';
@@ -642,6 +643,7 @@ async function startPostgresPrimaryRuntime() {
   }
 
   scheduleDigestSender();
+  scheduleCampaignProcessor();
   scheduleSavedSearchAlerts();
   scheduleTrackerReminders();
 

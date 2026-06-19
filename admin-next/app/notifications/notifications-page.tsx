@@ -33,6 +33,7 @@ const statusClass: Record<string, string> = {
   scheduled: 'border-blue-200 bg-blue-50 text-blue-700',
   sending: 'border-amber-200 bg-amber-50 text-amber-700',
   sent: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  partial_failed: 'border-amber-200 bg-amber-50 text-amber-700',
   simulated: 'border-purple-200 bg-purple-50 text-purple-700',
   failed: 'border-red-200 bg-red-50 text-red-700',
   unsupported: 'border-red-200 bg-red-50 text-red-700',
@@ -162,7 +163,11 @@ export function NotificationsPage() {
 
   const emailStats = stats?.byChannel.find((item) => item.channel === 'email');
   const pushStats = stats?.byChannel.find((item) => item.channel === 'push');
-  const actionDisabled = !selectedCampaign || selectedCampaign.unsupportedSegment || selectedCampaign.status === 'sending' || selectedCampaign.status === 'sent';
+  const actionDisabled = !selectedCampaign ||
+    selectedCampaign.unsupportedSegment ||
+    selectedCampaign.status === 'sending' ||
+    selectedCampaign.status === 'sent' ||
+    selectedCampaign.status === 'partial_failed';
 
   if (loading) {
     return (

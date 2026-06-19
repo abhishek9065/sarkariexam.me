@@ -15,7 +15,7 @@ import PushSubscriptionModelPostgres, { type PushSubscriptionRecord } from '../m
 import { slugify } from '../utils/slugify.js';
 
 import { sendCampaignEmail } from './email.js';
-import { prisma } from './postgres/prisma.js';
+import { prisma, prismaApp } from './postgres/prisma.js';
 
 const notificationCampaignSchema = z.object({
   title: z.string().min(5).max(200),
@@ -53,6 +53,39 @@ interface CampaignEstimate {
   push: number;
   total: number;
 }
+
+interface CampaignRecipients {
+  emailRecipients: EmailRecipient[];
+  pushRecipients: PushSubscriptionRecord[];
+}
+
+const DEFAULT_CAMPAIGN_DELIVERY_CONCURRENCY = 10;
+const DEFAULT_CAMPAIGN_SCHEDULER_INTERVAL_MS = 60_000;
+
+let campaignSchedulerInterval: NodeJS.Timeout | null = null;
+let campaignSchedulerRunning = false;
+
+const parseBoundedInt = (value: string | undefined, fallback: number, min: number, max: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const rounded = Math.round(parsed);
+  return Math.min(max, Math.max(min, rounded));
+};
+
+const campaignRuntimeConfig = {
+  deliveryConcurrency: parseBoundedInt(
+    process.env.CAMPAIGN_DELIVERY_CONCURRENCY,
+    DEFAULT_CAMPAIGN_DELIVERY_CONCURRENCY,
+    1,
+    50,
+  ),
+  schedulerIntervalMs: parseBoundedInt(
+    process.env.CAMPAIGN_SCHEDULER_INTERVAL_MS,
+    DEFAULT_CAMPAIGN_SCHEDULER_INTERVAL_MS,
+    10_000,
+    86_400_000,
+  ),
+};
 
 function normalizeVariant(value?: { title?: string; body?: string }): { title: string; body: string } | undefined {
   if (!value?.title || !value.body) {
@@ -367,8 +400,56 @@ async function resolveEmailRecipients(campaign: NotificationCampaignRecord): Pro
   });
 }
 
-async function resolvePushRecipients(): Promise<PushSubscriptionRecord[]> {
-  return PushSubscriptionModelPostgres.listAll();
+async function resolveUserIdsForEmails(emails: string[]): Promise<string[]> {
+  const uniqueEmails = Array.from(new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean)));
+  if (uniqueEmails.length === 0) {
+    return [];
+  }
+
+  const users = await prismaApp.userAccountEntry.findMany({
+    where: {
+      email: { in: uniqueEmails, mode: 'insensitive' },
+      isActive: true,
+    },
+    select: { id: true },
+  });
+
+  return users.map((user: { id: string }) => user.id);
+}
+
+async function resolveCampaignRecipients(campaign: NotificationCampaignRecord): Promise<CampaignRecipients> {
+  const emailRecipients = await resolveEmailRecipients(campaign);
+  const userIds = await resolveUserIdsForEmails(emailRecipients.map((recipient) => recipient.email));
+
+  const pushRecipients = campaign.segment.type === 'all'
+    ? await PushSubscriptionModelPostgres.listAll()
+    : await PushSubscriptionModelPostgres.listForUserIds(userIds);
+
+  return { emailRecipients, pushRecipients };
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await handler(items[currentIndex]);
+    }
+  }));
+
+  return results;
 }
 
 function campaignPushPayload(campaign: NotificationCampaignRecord): string {
@@ -457,6 +538,13 @@ async function dispatchPush(
       deliveredAt: new Date(),
     };
   } catch (error) {
+    const statusCode = typeof (error as { statusCode?: unknown }).statusCode === 'number'
+      ? (error as { statusCode: number }).statusCode
+      : undefined;
+    if (statusCode === 404 || statusCode === 410) {
+      await PushSubscriptionModelPostgres.deleteByEndpoint(subscription.endpoint).catch(() => undefined);
+    }
+
     return {
       campaignId: campaign.id,
       channel: 'push',
@@ -465,7 +553,7 @@ async function dispatchPush(
       pushEndpoint: subscription.endpoint,
       status: 'failed',
       error: error instanceof Error ? error.message : 'Failed to send push notification',
-      metadata: { source: 'campaign' },
+      metadata: { source: 'campaign', statusCode },
     };
   }
 }
@@ -499,10 +587,7 @@ export async function estimateCampaignRecipients(campaignId: string): Promise<{
       return { success: false, error: 'Campaign segment is no longer supported' };
     }
 
-    const [emailRecipients, pushRecipients] = await Promise.all([
-      resolveEmailRecipients(campaign),
-      resolvePushRecipients(),
-    ]);
+    const { emailRecipients, pushRecipients } = await resolveCampaignRecipients(campaign);
 
     return {
       success: true,
@@ -535,7 +620,12 @@ export async function sendCampaign(campaignId: string): Promise<{
       return { success: false, error: 'Campaign not found' };
     }
 
-    if (campaign.status === 'sending' || campaign.status === 'sent' || campaign.status === 'simulated') {
+    if (
+      campaign.status === 'sending' ||
+      campaign.status === 'sent' ||
+      campaign.status === 'partial_failed' ||
+      campaign.status === 'simulated'
+    ) {
       return { success: false, error: 'Campaign already processed' };
     }
 
@@ -549,21 +639,20 @@ export async function sendCampaign(campaignId: string): Promise<{
       return { success: false, error: 'Campaign not found' };
     }
 
-    const [emailRecipients, pushRecipients] = await Promise.all([
-      resolveEmailRecipients(campaign),
-      resolvePushRecipients(),
-    ]);
+    const { emailRecipients, pushRecipients } = await resolveCampaignRecipients(campaign);
 
     const vapidConfigured = configureWebPush();
-    const dispatchLogs: CampaignDispatchLogInput[] = [];
-
-    for (const recipient of emailRecipients) {
-      dispatchLogs.push(await dispatchEmail(campaign, recipient));
-    }
-
-    for (const subscription of pushRecipients) {
-      dispatchLogs.push(await dispatchPush(campaign, subscription, { vapidConfigured }));
-    }
+    const emailLogs = await mapWithConcurrency(
+      emailRecipients,
+      campaignRuntimeConfig.deliveryConcurrency,
+      (recipient) => dispatchEmail(campaign, recipient),
+    );
+    const pushLogs = await mapWithConcurrency(
+      pushRecipients,
+      campaignRuntimeConfig.deliveryConcurrency,
+      (subscription) => dispatchPush(campaign, subscription, { vapidConfigured }),
+    );
+    const dispatchLogs: CampaignDispatchLogInput[] = [...emailLogs, ...pushLogs];
 
     await CampaignDispatchLogModelPostgres.createMany(dispatchLogs);
     const summary = summarizeDispatch(dispatchLogs);
@@ -573,8 +662,10 @@ export async function sendCampaign(campaignId: string): Promise<{
       total: emailRecipients.length + pushRecipients.length,
     };
 
-    if (summary.sent > 0) {
-      await NotificationCampaignModelPostgres.markSent(campaignId, summary.sent, summary.failed);
+    if (summary.sent > 0 && summary.failed > 0) {
+      await NotificationCampaignModelPostgres.markPartialFailed(campaignId, summary.sent, summary.failed);
+    } else if (summary.sent > 0) {
+      await NotificationCampaignModelPostgres.markSent(campaignId, summary.sent, 0);
     } else {
       await NotificationCampaignModelPostgres.markFailed(campaignId, {
         sentCount: 0,
@@ -695,8 +786,10 @@ export async function retryFailedCampaign(campaignId: string): Promise<{
     const summary = summarizeDispatch(retryLogs);
     const allStats = await CampaignDispatchLogModelPostgres.stats(campaignId);
 
-    if (allStats.sent > 0) {
-      await NotificationCampaignModelPostgres.markSent(campaignId, allStats.sent, allStats.failed);
+    if (allStats.sent > 0 && allStats.failed > 0) {
+      await NotificationCampaignModelPostgres.markPartialFailed(campaignId, allStats.sent, allStats.failed);
+    } else if (allStats.sent > 0) {
+      await NotificationCampaignModelPostgres.markSent(campaignId, allStats.sent, 0);
     } else {
       await NotificationCampaignModelPostgres.markFailed(campaignId, {
         sentCount: 0,
@@ -765,6 +858,39 @@ export async function processScheduledCampaigns(): Promise<number> {
   }
 }
 
+async function runScheduledCampaignCycle(): Promise<void> {
+  if (campaignSchedulerRunning) return;
+  campaignSchedulerRunning = true;
+  try {
+    const processed = await processScheduledCampaigns();
+    if (processed > 0) {
+      console.log(`[NotificationService] Scheduled campaign run complete: processed=${processed}`);
+    }
+  } catch (error) {
+    console.error('[NotificationService] Scheduled campaign cycle failed:', error);
+  } finally {
+    campaignSchedulerRunning = false;
+  }
+}
+
+export function scheduleCampaignProcessor(): void {
+  if (campaignSchedulerInterval) return;
+  runScheduledCampaignCycle().catch((error) => {
+    console.error('[NotificationService] Initial scheduled campaign run failed:', error);
+  });
+  campaignSchedulerInterval = setInterval(() => {
+    runScheduledCampaignCycle().catch((error) => {
+      console.error('[NotificationService] Scheduled campaign run failed:', error);
+    });
+  }, campaignRuntimeConfig.schedulerIntervalMs);
+}
+
+export function stopCampaignProcessor(): void {
+  if (!campaignSchedulerInterval) return;
+  clearInterval(campaignSchedulerInterval);
+  campaignSchedulerInterval = null;
+}
+
 export const notificationService = {
   createCampaign,
   estimateCampaignRecipients,
@@ -777,6 +903,8 @@ export const notificationService = {
   scheduleCampaign,
   deleteCampaign,
   processScheduledCampaigns,
+  scheduleCampaignProcessor,
+  stopCampaignProcessor,
 };
 
 export default notificationService;

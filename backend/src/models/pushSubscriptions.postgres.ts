@@ -88,11 +88,31 @@ export class PushSubscriptionModelPostgres {
     return rows.map((row: PushSubscriptionRow) => toRecord(row));
   }
 
+  static async listForUserIds(userIds: string[]): Promise<PushSubscriptionRecord[]> {
+    const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+    if (uniqueUserIds.length === 0) {
+      return [];
+    }
+
+    const rows = await prismaApp.pushSubscriptionEntry.findMany({
+      where: { userId: { in: uniqueUserIds } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((row: PushSubscriptionRow) => toRecord(row));
+  }
+
   static async findByEndpoint(endpoint: string): Promise<PushSubscriptionRecord | null> {
     const row = await prismaApp.pushSubscriptionEntry.findUnique({
       where: { endpoint },
     });
     return row ? toRecord(row) : null;
+  }
+
+  static async deleteByEndpoint(endpoint: string): Promise<boolean> {
+    const result = await prismaApp.pushSubscriptionEntry.deleteMany({
+      where: { endpoint },
+    });
+    return result.count > 0;
   }
 }
 

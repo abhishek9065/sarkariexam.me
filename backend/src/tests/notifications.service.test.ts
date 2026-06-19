@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   campaignFindById: vi.fn(),
   campaignList: vi.fn(),
   campaignMarkFailed: vi.fn(),
+  campaignMarkPartialFailed: vi.fn(),
   campaignMarkSending: vi.fn(),
   campaignMarkSent: vi.fn(),
   campaignMarkSimulated: vi.fn(),
@@ -18,9 +19,14 @@ const mocks = vi.hoisted(() => ({
   webPushSendNotification: vi.fn(),
   webPushSetVapidDetails: vi.fn(),
   pushListAll: vi.fn(),
+  pushListForUserIds: vi.fn(),
   pushFindByEndpoint: vi.fn(),
+  pushDeleteByEndpoint: vi.fn(),
   subscriptionCount: vi.fn(),
   subscriptionFindMany: vi.fn(),
+  userAccountFindMany: vi.fn(),
+  vapidPublicKey: '',
+  vapidPrivateKey: '',
   subscriptionStateGroupBy: vi.fn(),
   subscriptionCategoryGroupBy: vi.fn(),
   stateFindMany: vi.fn(),
@@ -33,6 +39,7 @@ vi.mock('../models/notificationCampaigns.postgres.js', () => ({
     findById: mocks.campaignFindById,
     list: mocks.campaignList,
     markFailed: mocks.campaignMarkFailed,
+    markPartialFailed: mocks.campaignMarkPartialFailed,
     markSending: mocks.campaignMarkSending,
     markSent: mocks.campaignMarkSent,
     markSimulated: mocks.campaignMarkSimulated,
@@ -45,7 +52,9 @@ vi.mock('../models/notificationCampaigns.postgres.js', () => ({
 vi.mock('../models/pushSubscriptions.postgres.js', () => ({
   default: {
     listAll: mocks.pushListAll,
+    listForUserIds: mocks.pushListForUserIds,
     findByEndpoint: mocks.pushFindByEndpoint,
+    deleteByEndpoint: mocks.pushDeleteByEndpoint,
   },
 }));
 
@@ -71,8 +80,12 @@ vi.mock('web-push', () => ({
 vi.mock('../config.js', () => ({
   config: {
     frontendUrl: 'https://sarkariexams.me',
-    vapidPublicKey: '',
-    vapidPrivateKey: '',
+    get vapidPublicKey() {
+      return mocks.vapidPublicKey;
+    },
+    get vapidPrivateKey() {
+      return mocks.vapidPrivateKey;
+    },
   },
 }));
 
@@ -95,11 +108,18 @@ vi.mock('../services/postgres/prisma.js', () => ({
       findMany: mocks.categoryFindMany,
     },
   },
+  prismaApp: {
+    userAccountEntry: {
+      findMany: mocks.userAccountFindMany,
+    },
+  },
 }));
 
 describe('notification service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.vapidPublicKey = '';
+    mocks.vapidPrivateKey = '';
     mocks.campaignCreate.mockResolvedValue({ id: 'campaign-1' });
     mocks.campaignFindById.mockResolvedValue({
       id: 'campaign-1',
@@ -108,6 +128,7 @@ describe('notification service', () => {
       unsupportedSegment: false,
     });
     mocks.campaignMarkFailed.mockResolvedValue(true);
+    mocks.campaignMarkPartialFailed.mockResolvedValue(true);
     mocks.campaignMarkSending.mockResolvedValue(true);
     mocks.campaignMarkSent.mockResolvedValue(true);
     mocks.campaignMarkSimulated.mockResolvedValue(true);
@@ -117,12 +138,15 @@ describe('notification service', () => {
     mocks.sendCampaignEmail.mockResolvedValue({ success: true, messageId: 'msg-1' });
     mocks.webPushSendNotification.mockResolvedValue(undefined);
     mocks.pushListAll.mockResolvedValue([{ id: 'push-1', endpoint: 'https://push.example/sub', keys: { p256dh: 'p', auth: 'a' } }]);
+    mocks.pushListForUserIds.mockResolvedValue([{ id: 'push-user-1', endpoint: 'https://push.example/user-1', keys: { p256dh: 'p', auth: 'a' }, userId: 'user-1' }]);
     mocks.pushFindByEndpoint.mockResolvedValue({ id: 'push-1', endpoint: 'https://push.example/sub', keys: { p256dh: 'p', auth: 'a' } });
+    mocks.pushDeleteByEndpoint.mockResolvedValue(true);
     mocks.subscriptionCount.mockResolvedValue(2);
     mocks.subscriptionFindMany.mockResolvedValue([
       { id: 'sub-1', email: 'one@example.com' },
       { id: 'sub-2', email: 'two@example.com' },
     ]);
+    mocks.userAccountFindMany.mockResolvedValue([{ id: 'user-1' }, { id: 'user-2' }]);
     mocks.subscriptionStateGroupBy.mockResolvedValue([]);
     mocks.subscriptionCategoryGroupBy.mockResolvedValue([]);
     mocks.stateFindMany.mockResolvedValue([]);
@@ -191,7 +215,8 @@ describe('notification service', () => {
       expect.objectContaining({ channel: 'email', status: 'sent', recipient: 'one@example.com' }),
       expect.objectContaining({ channel: 'push', status: 'failed', error: 'VAPID keys are not configured' }),
     ]));
-    expect(mocks.campaignMarkSent).toHaveBeenCalledWith('campaign-1', 2, 1);
+    expect(mocks.campaignMarkPartialFailed).toHaveBeenCalledWith('campaign-1', 2, 1);
+    expect(mocks.campaignMarkSent).not.toHaveBeenCalled();
     expect(mocks.campaignMarkSimulated).not.toHaveBeenCalled();
   });
 
@@ -221,6 +246,47 @@ describe('notification service', () => {
       success: true,
       data: { email: 2, push: 1, total: 3 },
     });
+  });
+
+  it('targets push recipients through users matched by the same campaign segment', async () => {
+    mocks.campaignFindById.mockResolvedValue({
+      id: 'campaign-1',
+      status: 'draft',
+      segment: { type: 'state', value: 'Uttar Pradesh' },
+      unsupportedSegment: false,
+    });
+    const { sendCampaign } = await import('../services/notifications.js');
+
+    await sendCampaign('campaign-1');
+
+    expect(mocks.userAccountFindMany).toHaveBeenCalledWith({
+      where: {
+        email: { in: ['one@example.com', 'two@example.com'], mode: 'insensitive' },
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    expect(mocks.pushListForUserIds).toHaveBeenCalledWith(['user-1', 'user-2']);
+    expect(mocks.pushListAll).not.toHaveBeenCalled();
+  });
+
+  it('deletes expired push subscriptions on 404 or 410 delivery failures', async () => {
+    mocks.vapidPublicKey = 'public-key';
+    mocks.vapidPrivateKey = 'private-key';
+    const goneError = Object.assign(new Error('Gone'), { statusCode: 410 });
+    mocks.webPushSendNotification.mockRejectedValue(goneError);
+    const { sendCampaign } = await import('../services/notifications.js');
+
+    await sendCampaign('campaign-1');
+
+    expect(mocks.pushDeleteByEndpoint).toHaveBeenCalledWith('https://push.example/sub');
+    expect(mocks.dispatchCreateMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        channel: 'push',
+        status: 'failed',
+        metadata: { source: 'campaign', statusCode: 410 },
+      }),
+    ]));
   });
 
   it('retries only failed campaign dispatches', async () => {
