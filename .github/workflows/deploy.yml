@@ -3,7 +3,7 @@ name: Deploy to Production
 on:
   workflow_run:
     workflows:
-      - CI
+      - Main CI
     types:
       - completed
 
@@ -33,7 +33,7 @@ jobs:
           set -euo pipefail
           should_deploy=false
 
-          if [[ "${TRIGGER_WORKFLOW}" == "CI" \
+          if [[ "${TRIGGER_WORKFLOW}" == "Main CI" \
              && "${TRIGGER_CONCLUSION}" == "success" \
              && "${TRIGGER_EVENT}" == "push" \
              && "${TRIGGER_BRANCH}" == "main" \
@@ -62,7 +62,7 @@ jobs:
             echo "- Target SHA: ${TRIGGER_SHA}"
             echo "- Allowed to deploy: ${SHOULD_DEPLOY}"
             if [[ "${SHOULD_DEPLOY}" != "true" ]]; then
-              echo "- Reason: deploy runs only for successful CI workflow_run events from pushes to main with a valid 40-character SHA."
+              echo "- Reason: deploy runs only for successful Main CI workflow_run events from pushes to main with a valid 40-character SHA."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -72,7 +72,7 @@ jobs:
       - gate
     if: needs.gate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     environment: production
     steps:
       - name: Checkout target commit
@@ -93,7 +93,9 @@ jobs:
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
           TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          DEPLOY_MODE: fast
+          DEPLOY_MODE: image-pull
+          DEPLOY_IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          LOCK_WAIT_SECONDS: '120'
           DEPLOY_AUTOCLEAN_TRACKED: '1'
           DEPLOY_AUTOCLEAN_TRACKED_PATHS: backend/package-lock.json
         run: bash scripts/deploy-via-ssh.sh

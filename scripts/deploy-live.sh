@@ -4,13 +4,14 @@ set -Eeuo pipefail
 
 LOCK_FILE="/tmp/sarkari-result-deploy.lock"
 LOG_FILE="/tmp/sarkari-result-deploy.log"
-LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-900}"
+LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-120}"
 
 CURRENT_STAGE="init"
 LAST_ACTIONABLE_DIAGNOSIS="Inspect the remote deploy log and deployment helper output."
 
 DO_PREFLIGHT_ONLY=0
 DEPLOY_MODE="fast"
+DEPLOY_IMAGE_TAG="${DEPLOY_IMAGE_TAG:-}"
 TARGET_SHA=""
 REPO_DIR="${DO_REPO_DIR:-${REPO_DIR_OVERRIDE:-}}"
 PREVIOUS_SHA=""
@@ -38,14 +39,14 @@ die() {
 
 usage() {
   cat <<'EOF'
-Usage: deploy-live.sh --sha <commit> [--mode fast|full] [--preflight-only]
+Usage: deploy-live.sh --sha <commit> [--mode image-pull|fast|full] [--preflight-only]
 
 Required environment:
   DO_REPO_DIR   Absolute path to the checked-out production repository on the droplet.
 
 Options:
   --sha <commit>       Commit SHA to deploy.
-  --mode <fast|full>   Deploy mode. Default: fast
+  --mode <mode>        image-pull, fast, or full. Default: fast
   --preflight-only     Validate prerequisites without restarting services.
 EOF
 }
@@ -106,7 +107,7 @@ require_file() {
 
 validate_mode() {
   case "$DEPLOY_MODE" in
-    fast|full)
+    image-pull|fast|full)
       ;;
     *)
       die "Unsupported deploy mode: ${DEPLOY_MODE}"
@@ -233,6 +234,7 @@ validate_target_tree_files() {
     "scripts/deploy-common.sh"
     "scripts/deploy-fast.sh"
     "scripts/deploy-prod.sh"
+    "scripts/deploy-pull-images.sh"
   )
   local missing_paths=()
   local path
@@ -299,13 +301,14 @@ run_deploy() {
   export DEPLOY_REPO_DIR="$REPO_DIR"
   export DEPLOY_RELEASE_STATE_FILE_PATH="$RELEASE_STATE_FILE"
   export DEPLOY_MODE
+  export DEPLOY_IMAGE_TAG
 
   cd "$REPO_DIR"
-  if [[ "$DEPLOY_MODE" == "fast" ]]; then
-    bash scripts/deploy-fast.sh
-  else
-    bash scripts/deploy-prod.sh
-  fi
+  case "$DEPLOY_MODE" in
+    image-pull) bash scripts/deploy-pull-images.sh ;;
+    fast) bash scripts/deploy-fast.sh ;;
+    full) bash scripts/deploy-prod.sh ;;
+  esac
 }
 
 write_release_state() {

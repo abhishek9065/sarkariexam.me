@@ -18,11 +18,11 @@ enum PostType {
 }
 
 enum WorkflowStatus {
-  DRAFT      @map("draft")
-  IN_REVIEW  @map("in_review")
-  APPROVED   @map("approved")
-  PUBLISHED  @map("published")
-  ARCHIVED   @map("archived")
+  DRAFT     @map("draft")
+  IN_REVIEW @map("in_review")
+  APPROVED  @map("approved")
+  PUBLISHED @map("published")
+  ARCHIVED  @map("archived")
 }
 
 enum ImportantDateKind {
@@ -58,19 +58,19 @@ enum ContentPageType {
 }
 
 model Organization {
-  id               String   @id @default(cuid())
-  name             String
-  slug             String   @unique
-  kind             String?
-  shortName        String?
-  officialWebsite  String?
-  description      String?
-  priority         Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  kind            String?
+  shortName       String?
+  officialWebsite String?
+  description     String?
+  priority        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  exams            Exam[]
-  posts            Post[]
+  exams             Exam[]
+  posts             Post[]
   subscriptionPrefs SubscriptionOrganization[]
 
   @@index([name])
@@ -79,14 +79,14 @@ model Organization {
 }
 
 model State {
-  id                String   @id @default(cuid())
-  name              String
-  slug              String   @unique
-  code              String?
-  region            String?
-  priority          Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  code      String?
+  region    String?
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   postStates        PostState[]
   subscriptionPrefs SubscriptionState[]
@@ -97,13 +97,13 @@ model State {
 }
 
 model Category {
-  id                String   @id @default(cuid())
-  name              String
-  slug              String   @unique
-  description       String?
-  priority          Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   postCategories    PostCategory[]
   subscriptionPrefs SubscriptionCategory[]
@@ -114,14 +114,14 @@ model Category {
 }
 
 model Qualification {
-  id                String   @id @default(cuid())
-  name              String
-  slug              String   @unique
-  description       String?
-  level             String?
-  priority          Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  level       String?
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   postQualifications PostQualification[]
   eligibilityRules   EligibilityRule[]
@@ -143,8 +143,8 @@ model Exam {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  posts          Post[]
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  posts        Post[]
 
   @@index([name])
   @@index([organizationId, name])
@@ -164,8 +164,8 @@ model College {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  posts           Post[]
-  programs        Program[]
+  posts            Post[]
+  programs         Program[]
   admissionDetails AdmissionDetail[]
 
   @@index([name])
@@ -174,20 +174,20 @@ model College {
 }
 
 model Program {
-  id               String   @id @default(cuid())
-  name             String
-  slug             String   @unique
-  level            String?
-  department       String?
-  durationLabel    String?
-  mode             String?
-  intake           String?
-  description      String?
-  collegeId        String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  level         String?
+  department    String?
+  durationLabel String?
+  mode          String?
+  intake        String?
+  description   String?
+  collegeId     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  college          College? @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  college          College?          @relation(fields: [collegeId], references: [id], onDelete: SetNull)
   posts            Post[]
   admissionDetails AdmissionDetail[]
 
@@ -203,7 +203,7 @@ model Tag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  postTags  PostTag[]
+  postTags PostTag[]
 
   @@index([name])
   @@map("tags")
@@ -223,10 +223,10 @@ model Post {
   body                 String?
   contentJson          Json?
 
-  organizationId       String?
-  institutionId        String?
-  examId               String?
-  programId            String?
+  organizationId String?
+  institutionId  String?
+  examId         String?
+  programId      String?
 
   location             String?
   salary               String?
@@ -236,62 +236,62 @@ model Post {
   examDate             String?
   resultDate           String?
 
-  expiresAt            DateTime?
-  archivedAt           DateTime?
-  publishedAt          DateTime?
+  expiresAt   DateTime?
+  archivedAt  DateTime?
+  publishedAt DateTime?
 
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  createdBy            String?
-  updatedBy            String?
-  approvedBy           String?
-  publishedBy          String?
-  currentVersion       Int            @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  approvedBy     String?
+  publishedBy    String?
+  currentVersion Int      @default(1)
 
-  searchText           String         @default("")
-  sourceNote           String?
-  verificationNote     String?
-  updatedLabel         String?
-  correctionNote       String?
+  searchText       String  @default("")
+  sourceNote       String?
+  verificationNote String?
+  updatedLabel     String?
+  correctionNote   String?
 
-  tag                  TrustTag?
-  isUrgent             Boolean        @default(false)
-  isNew                Boolean        @default(false)
-  isLastDate           Boolean        @default(false)
-  isFeatured           Boolean        @default(false)
+  tag        TrustTag?
+  isUrgent   Boolean   @default(false)
+  isNew      Boolean   @default(false)
+  isLastDate Boolean   @default(false)
+  isFeatured Boolean   @default(false)
 
-  homeSection          String?
-  stickyRank           Int?
-  highlight            Boolean        @default(false)
-  trendingScore        Int?
+  homeSection   String?
+  stickyRank    Int?
+  highlight     Boolean @default(false)
+  trendingScore Int?
 
-  seoTitle             String?
-  seoDescription       String?
-  seoCanonicalPath     String?
-  seoIndexable         Boolean        @default(true)
-  seoOgImage           String?
+  seoTitle         String?
+  seoDescription   String?
+  seoCanonicalPath String?
+  seoIndexable     Boolean @default(true)
+  seoOgImage       String?
 
-  organization         Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  institution          College?       @relation(fields: [institutionId], references: [id], onDelete: SetNull)
-  exam                 Exam?          @relation(fields: [examId], references: [id], onDelete: SetNull)
-  program              Program?       @relation(fields: [programId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  institution  College?      @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  exam         Exam?         @relation(fields: [examId], references: [id], onDelete: SetNull)
+  program      Program?      @relation(fields: [programId], references: [id], onDelete: SetNull)
 
-  postCategories       PostCategory[]
-  postStates           PostState[]
-  postQualifications   PostQualification[]
-  postTags             PostTag[]
+  postCategories     PostCategory[]
+  postStates         PostState[]
+  postQualifications PostQualification[]
+  postTags           PostTag[]
 
-  officialSources      OfficialSource[]
-  importantDates       ImportantDate[]
-  eligibilityRules     EligibilityRule[]
-  feeRules             FeeRule[]
-  vacancyRows          VacancyRow[]
-  admissionDetails     AdmissionDetail?
+  officialSources  OfficialSource[]
+  importantDates   ImportantDate[]
+  eligibilityRules EligibilityRule[]
+  feeRules         FeeRule[]
+  vacancyRows      VacancyRow[]
+  admissionDetails AdmissionDetail?
 
-  versions             PostVersion[]
-  auditLogs            AuditLog[]
-  slugAliases          SlugAlias[]
-  alertDispatchLogs    AlertDispatchLog[]
+  versions          PostVersion[]
+  auditLogs         AuditLog[]
+  slugAliases       SlugAlias[]
+  alertDispatchLogs AlertDispatchLog[]
 
   @@index([status, publishedAt(sort: Desc)])
   @@index([type, status, publishedAt(sort: Desc)])
@@ -313,8 +313,8 @@ model PostCategory {
   categoryId String
   createdAt  DateTime @default(now())
 
-  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([postId, categoryId])
   @@index([categoryId, postId])
@@ -327,8 +327,8 @@ model PostState {
   stateId   String
   createdAt DateTime @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  post  Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  state State @relation(fields: [stateId], references: [id], onDelete: Cascade)
 
   @@unique([postId, stateId])
   @@index([stateId, postId])
@@ -336,13 +336,13 @@ model PostState {
 }
 
 model PostQualification {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   postId          String
   qualificationId String
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime @default(now())
 
-  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+  post          Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  qualification Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
 
   @@unique([postId, qualificationId])
   @@index([qualificationId, postId])
@@ -355,8 +355,8 @@ model PostTag {
   tagId     String
   createdAt DateTime @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([postId, tagId])
   @@index([tagId, postId])
@@ -364,18 +364,18 @@ model PostTag {
 }
 
 model OfficialSource {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   postId     String
   label      String
   url        String
   sourceType String?
-  isPrimary  Boolean  @default(false)
+  isPrimary  Boolean   @default(false)
   capturedAt DateTime?
-  position   Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  position   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, isPrimary, position])
   @@index([url])
@@ -383,19 +383,19 @@ model OfficialSource {
 }
 
 model ImportantDate {
-  id         String            @id @default(cuid())
-  postId     String
-  kind       ImportantDateKind?
-  label      String
-  value      String
-  sortDate   DateTime?
-  isPrimary  Boolean           @default(false)
-  note       String?
-  position   Int               @default(0)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id        String             @id @default(cuid())
+  postId    String
+  kind      ImportantDateKind?
+  label     String
+  value     String
+  sortDate  DateTime?
+  isPrimary Boolean            @default(false)
+  note      String?
+  position  Int                @default(0)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
-  post       Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, kind, sortDate])
   @@index([sortDate])
@@ -403,7 +403,7 @@ model ImportantDate {
 }
 
 model EligibilityRule {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   postId          String
   qualificationId String?
   label           String
@@ -411,12 +411,12 @@ model EligibilityRule {
   minAge          Int?
   maxAge          Int?
   relaxationNote  String?
-  position        Int           @default(0)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  position        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
-  qualification   Qualification? @relation(fields: [qualificationId], references: [id], onDelete: SetNull)
+  post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  qualification Qualification? @relation(fields: [qualificationId], references: [id], onDelete: SetNull)
 
   @@index([postId, position])
   @@index([qualificationId])
@@ -434,26 +434,26 @@ model FeeRule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, position])
   @@map("fee_rules")
 }
 
 model VacancyRow {
-  id          String   @id @default(cuid())
-  postId      String
-  postName    String
-  department  String?
-  category    String?
-  vacancies   String
-  payLevel    String?
-  salaryNote  String?
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  postId     String
+  postName   String
+  department String?
+  category   String?
+  vacancies  String
+  payLevel   String?
+  salaryNote String?
+  position   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, position])
   @@map("vacancy_rows")
@@ -476,9 +476,9 @@ model AdmissionDetail {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  post              Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  college           College? @relation(fields: [collegeId], references: [id], onDelete: SetNull)
-  program           Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  post    Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  college College? @relation(fields: [collegeId], references: [id], onDelete: SetNull)
+  program Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
 
   @@index([collegeId])
   @@index([programId])
@@ -495,7 +495,7 @@ model PostVersion {
   snapshot  Json
   createdAt DateTime @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([postId, version])
   @@index([postId, createdAt])
@@ -514,7 +514,7 @@ model AuditLog {
   metadata   Json?
   createdAt  DateTime @default(now())
 
-  post       Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
 
   @@index([postId, createdAt])
   @@index([entityType, entityId, createdAt])
@@ -569,74 +569,97 @@ model BookmarkEntry {
 }
 
 model ErrorReportEntry {
-  id             String   @id
-  errorId        String   @map("error_id")
+  id             String    @id
+  errorId        String    @map("error_id")
   message        String
-  pageUrl        String?  @map("page_url")
-  userAgent      String?  @map("user_agent")
+  pageUrl        String?   @map("page_url")
+  userAgent      String?   @map("user_agent")
   note           String?
   stack          String?
-  componentStack String?  @map("component_stack")
-  createdAt      DateTime @default(now()) @map("created_at")
+  componentStack String?   @map("component_stack")
+  createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime? @map("updated_at")
-  userId         String?  @map("user_id")
-  userEmail      String?  @map("user_email")
-  status         String   @default("new")
-  reviewNote     String?  @map("review_note")
-  assigneeEmail  String?  @map("assignee_email")
+  userId         String?   @map("user_id")
+  userEmail      String?   @map("user_email")
+  status         String    @default("new")
+  reviewNote     String?   @map("review_note")
+  assigneeEmail  String?   @map("assignee_email")
   release        String?
-  requestId      String?  @map("request_id")
-  sentryEventUrl String?  @map("sentry_event_url")
+  requestId      String?   @map("request_id")
+  sentryEventUrl String?   @map("sentry_event_url")
   resolvedAt     DateTime? @map("resolved_at")
-  resolvedBy     String?  @map("resolved_by")
+  resolvedBy     String?   @map("resolved_by")
 
   @@index([status, createdAt], map: "app_error_reports_status_created_idx")
   @@map("app_error_reports")
 }
 
 model NotificationCampaignEntry {
-  id           String   @id
+  id           String    @id
   title        String
   body         String
   url          String?
-  segmentType  String   @map("segment_type")
-  segmentValue String   @map("segment_value")
-  status       String   @default("draft")
-  sentCount    Int      @default(0) @map("sent_count")
-  failedCount  Int      @default(0) @map("failed_count")
-  openCount    Int      @default(0) @map("open_count")
-  clickCount   Int      @default(0) @map("click_count")
+  segmentType  String    @map("segment_type")
+  segmentValue String    @map("segment_value")
+  status       String    @default("draft")
+  sentCount    Int       @default(0) @map("sent_count")
+  failedCount  Int       @default(0) @map("failed_count")
+  openCount    Int       @default(0) @map("open_count")
+  clickCount   Int       @default(0) @map("click_count")
   scheduledAt  DateTime? @map("scheduled_at")
   sentAt       DateTime? @map("sent_at")
-  createdBy    String   @map("created_by")
-  createdAt    DateTime @default(now()) @map("created_at")
-  abTest       Json?    @map("ab_test")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  abTest       Json?     @map("ab_test")
 
   dispatchLogs CampaignDispatchLogEntry[]
+  jobs         CampaignJobEntry[]
 
   @@index([status, scheduledAt], map: "app_notification_campaigns_status_scheduled_idx")
   @@index([createdAt], map: "app_notification_campaigns_created_idx")
   @@map("app_notification_campaigns")
 }
 
+model CampaignJobEntry {
+  id          String    @id
+  campaignId  String    @map("campaign_id")
+  jobType     String    @map("job_type")
+  status      String    @default("queued")
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  availableAt DateTime  @default(now()) @map("available_at")
+  lockedAt    DateTime? @map("locked_at")
+  lockedBy    String?   @map("locked_by")
+  lastError   String?   @map("last_error")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  campaign NotificationCampaignEntry @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt], map: "app_campaign_jobs_status_available_idx")
+  @@index([campaignId, createdAt], map: "app_campaign_jobs_campaign_created_idx")
+  @@map("app_campaign_jobs")
+}
+
 model CampaignDispatchLogEntry {
-  id              String   @id
-  campaignId      String   @map("campaign_id")
+  id              String    @id
+  campaignId      String    @map("campaign_id")
   channel         String
   recipient       String
-  recipientUserId String?  @map("recipient_user_id")
-  subscriptionId  String?  @map("subscription_id")
-  pushEndpoint    String?  @map("push_endpoint")
+  recipientUserId String?   @map("recipient_user_id")
+  subscriptionId  String?   @map("subscription_id")
+  pushEndpoint    String?   @map("push_endpoint")
   status          String
-  messageId       String?  @map("message_id")
+  messageId       String?   @map("message_id")
   error           String?
   metadata        Json?
-  attemptCount    Int      @default(1) @map("attempt_count")
-  lastAttemptAt   DateTime @default(now()) @map("last_attempt_at")
+  attemptCount    Int       @default(1) @map("attempt_count")
+  lastAttemptAt   DateTime  @default(now()) @map("last_attempt_at")
   deliveredAt     DateTime? @map("delivered_at")
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
 
-  campaign        NotificationCampaignEntry @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign NotificationCampaignEntry @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId, status], map: "app_campaign_dispatch_logs_campaign_status_idx")
   @@index([campaignId, channel], map: "app_campaign_dispatch_logs_campaign_channel_idx")
@@ -645,15 +668,15 @@ model CampaignDispatchLogEntry {
 }
 
 model UserNotificationEntry {
-  id             String   @id
-  userId         String   @map("user_id")
-  announcementId String   @map("announcement_id")
+  id             String    @id
+  userId         String    @map("user_id")
+  announcementId String    @map("announcement_id")
   title          String
   type           String
   slug           String?
   organization   String?
   source         String
-  createdAt      DateTime @default(now()) @map("created_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
   readAt         DateTime? @map("read_at")
 
   @@unique([userId, announcementId, source])
@@ -663,25 +686,25 @@ model UserNotificationEntry {
 }
 
 model SavedSearchEntry {
-  id                   String   @id
-  userId               String   @map("user_id")
+  id                   String    @id
+  userId               String    @map("user_id")
   name                 String
-  query                String   @default("")
+  query                String    @default("")
   filters              Json?
-  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
-  frequency            String   @default("daily")
+  notificationsEnabled Boolean   @default(true) @map("notifications_enabled")
+  frequency            String    @default("daily")
   lastNotifiedAt       DateTime? @map("last_notified_at")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@index([userId, updatedAt], map: "app_saved_searches_user_updated_idx")
   @@map("app_saved_searches")
 }
 
 model TrackedApplicationEntry {
-  id             String   @id
-  userId         String   @map("user_id")
-  announcementId String?  @map("announcement_id")
+  id             String    @id
+  userId         String    @map("user_id")
+  announcementId String?   @map("announcement_id")
   slug           String
   type           String
   title          String
@@ -690,8 +713,8 @@ model TrackedApplicationEntry {
   status         String
   notes          String?
   reminderAt     DateTime? @map("reminder_at")
-  trackedAt      DateTime @default(now()) @map("tracked_at")
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+  trackedAt      DateTime  @default(now()) @map("tracked_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@unique([userId, slug])
   @@index([userId, updatedAt], map: "app_tracked_applications_user_updated_idx")
@@ -699,44 +722,44 @@ model TrackedApplicationEntry {
 }
 
 model UserProfileEntry {
-  id                       String   @id
-  userId                   String   @unique @map("user_id")
-  preferredCategories      String[] @default([]) @map("preferred_categories")
-  preferredQualifications   String[] @default([]) @map("preferred_qualifications")
-  preferredLocations       String[] @default([]) @map("preferred_locations")
-  preferredOrganizations   String[] @default([]) @map("preferred_organizations")
-  ageGroup                 String?  @map("age_group")
-  educationLevel           String?  @map("education_level")
-  experienceYears          Int      @default(0) @map("experience_years")
-  emailNotifications       Boolean  @default(true) @map("email_notifications")
-  pushNotifications        Boolean  @default(false) @map("push_notifications")
-  notificationFrequency    String   @default("daily") @map("notification_frequency")
-  alertWindowDays          Int      @default(7) @map("alert_window_days")
-  alertMaxItems            Int      @default(6) @map("alert_max_items")
-  profileComplete          Boolean  @default(false) @map("profile_complete")
-  onboardingCompleted      Boolean  @default(false) @map("onboarding_completed")
-  createdAt                DateTime @default(now()) @map("created_at")
-  updatedAt                DateTime @default(now()) @updatedAt @map("updated_at")
+  id                      String   @id
+  userId                  String   @unique @map("user_id")
+  preferredCategories     String[] @default([]) @map("preferred_categories")
+  preferredQualifications String[] @default([]) @map("preferred_qualifications")
+  preferredLocations      String[] @default([]) @map("preferred_locations")
+  preferredOrganizations  String[] @default([]) @map("preferred_organizations")
+  ageGroup                String?  @map("age_group")
+  educationLevel          String?  @map("education_level")
+  experienceYears         Int      @default(0) @map("experience_years")
+  emailNotifications      Boolean  @default(true) @map("email_notifications")
+  pushNotifications       Boolean  @default(false) @map("push_notifications")
+  notificationFrequency   String   @default("daily") @map("notification_frequency")
+  alertWindowDays         Int      @default(7) @map("alert_window_days")
+  alertMaxItems           Int      @default(6) @map("alert_max_items")
+  profileComplete         Boolean  @default(false) @map("profile_complete")
+  onboardingCompleted     Boolean  @default(false) @map("onboarding_completed")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("app_user_profiles")
 }
 
 model UserAccountEntry {
-  id                            String   @id
-  email                         String   @unique
+  id                            String    @id
+  email                         String    @unique
   username                      String
-  passwordHash                  String   @map("password_hash")
-  passwordHistory               Json     @default("[]") @map("password_history")
-  role                          String   @default("user")
-  isActive                      Boolean  @default(true) @map("is_active")
-  createdAt                     DateTime @default(now()) @map("created_at")
-  updatedAt                     DateTime @default(now()) @updatedAt @map("updated_at")
+  passwordHash                  String    @map("password_hash")
+  passwordHistory               Json      @default("[]") @map("password_history")
+  role                          String    @default("user")
+  isActive                      Boolean   @default(true) @map("is_active")
+  createdAt                     DateTime  @default(now()) @map("created_at")
+  updatedAt                     DateTime  @default(now()) @updatedAt @map("updated_at")
   lastLogin                     DateTime? @map("last_login")
-  twoFactorEnabled              Boolean  @default(false) @map("two_factor_enabled")
-  twoFactorSecret               String?  @map("two_factor_secret")
-  twoFactorTempSecret           String?  @map("two_factor_temp_secret")
+  twoFactorEnabled              Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret               String?   @map("two_factor_secret")
+  twoFactorTempSecret           String?   @map("two_factor_temp_secret")
   twoFactorVerifiedAt           DateTime? @map("two_factor_verified_at")
-  twoFactorBackupCodes          Json     @default("[]") @map("two_factor_backup_codes")
+  twoFactorBackupCodes          Json      @default("[]") @map("two_factor_backup_codes")
   twoFactorBackupCodesUpdatedAt DateTime? @map("two_factor_backup_codes_updated_at")
 
   @@index([role, isActive], map: "app_users_role_active_idx")
@@ -759,21 +782,21 @@ model ReminderDispatchLogEntry {
 }
 
 model SlugAlias {
-  id         String   @id @default(cuid())
-  postId     String
-  slug       String   @unique
-  isLegacy   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  postId    String
+  slug      String   @unique
+  isLegacy  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId, createdAt])
   @@map("slug_aliases")
 }
 
 model ContentPage {
-  id               String         @id @default(cuid())
-  slug             String         @unique
+  id               String          @id @default(cuid())
+  slug             String          @unique
   pageType         ContentPageType
   title            String
   eyebrow          String?
@@ -781,15 +804,15 @@ model ContentPage {
   headerColor      String?
   layoutVariant    String?
   payload          Json
-  status           WorkflowStatus @default(DRAFT)
+  status           WorkflowStatus  @default(DRAFT)
   seoTitle         String?
   seoDescription   String?
   seoCanonicalPath String?
-  seoIndexable     Boolean        @default(true)
+  seoIndexable     Boolean         @default(true)
   publishedAt      DateTime?
   expiresAt        DateTime?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   createdBy        String?
   updatedBy        String?
 
@@ -799,20 +822,20 @@ model ContentPage {
 }
 
 model Subscription {
-  id                 String                @id @default(cuid())
-  email              String                @unique
-  verified           Boolean               @default(false)
-  isActive           Boolean               @default(true)
-  frequency          SubscriptionFrequency @default(DAILY)
-  verificationToken  String?
-  unsubscribeToken   String                @unique
-  source             String?
-  alertCount         Int                   @default(0)
+  id                     String                @id @default(cuid())
+  email                  String                @unique
+  verified               Boolean               @default(false)
+  isActive               Boolean               @default(true)
+  frequency              SubscriptionFrequency @default(DAILY)
+  verificationToken      String?
+  unsubscribeToken       String                @unique
+  source                 String?
+  alertCount             Int                   @default(0)
   lastAlertedAt          DateTime?
-  lastDigestDailySentAt  DateTime?              @map("last_digest_daily_sent_at")
-  lastDigestWeeklySentAt DateTime?              @map("last_digest_weekly_sent_at")
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  lastDigestDailySentAt  DateTime?             @map("last_digest_daily_sent_at")
+  lastDigestWeeklySentAt DateTime?             @map("last_digest_weekly_sent_at")
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   categoryPrefs      SubscriptionCategory[]
   statePrefs         SubscriptionState[]
@@ -828,12 +851,12 @@ model Subscription {
 }
 
 model SubscriptionCategory {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   subscriptionId String
   categoryId     String
 
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  category       Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, categoryId])
   @@index([categoryId, subscriptionId])
@@ -841,12 +864,12 @@ model SubscriptionCategory {
 }
 
 model SubscriptionState {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   subscriptionId String
   stateId        String
 
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  state          State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  state        State        @relation(fields: [stateId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, stateId])
   @@index([stateId, subscriptionId])
@@ -854,12 +877,12 @@ model SubscriptionState {
 }
 
 model SubscriptionOrganization {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   subscriptionId String
   organizationId String
 
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, organizationId])
   @@index([organizationId, subscriptionId])
@@ -867,12 +890,12 @@ model SubscriptionOrganization {
 }
 
 model SubscriptionQualification {
-  id              String        @id @default(cuid())
+  id              String @id @default(cuid())
   subscriptionId  String
   qualificationId String
 
-  subscription    Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+  subscription  Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  qualification Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, qualificationId])
   @@index([qualificationId, subscriptionId])
@@ -884,7 +907,7 @@ model SubscriptionPostType {
   subscriptionId String
   postType       PostType
 
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@unique([subscriptionId, postType])
   @@index([postType, subscriptionId])
@@ -902,8 +925,8 @@ model AlertDispatchLog {
   dispatchedAt   DateTime @default(now())
   createdAt      DateTime @default(now())
 
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  post           Post?        @relation(fields: [postId], references: [id], onDelete: SetNull)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  post         Post?        @relation(fields: [postId], references: [id], onDelete: SetNull)
 
   @@index([subscriptionId, dispatchedAt])
   @@index([postId, dispatchedAt])
@@ -982,15 +1005,15 @@ model UserFeedback {
 }
 
 model CommunityComment {
-  id             String    @id @default(cuid())
-  postId         String?   @map("post_id")
-  userId         String?   @map("user_id")
-  username       String?
-  body           String
-  status         String    @default("pending")
-  moderatedAt    DateTime? @map("moderated_at")
-  moderatedBy    String?   @map("moderated_by")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  id          String    @id @default(cuid())
+  postId      String?   @map("post_id")
+  userId      String?   @map("user_id")
+  username    String?
+  body        String
+  status      String    @default("pending")
+  moderatedAt DateTime? @map("moderated_at")
+  moderatedBy String?   @map("moderated_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@index([status, createdAt])
   @@index([postId, status])

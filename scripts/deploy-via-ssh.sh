@@ -266,12 +266,13 @@ upload_remote_helper() {
 
 run_remote_helper() {
   local preflight_only="${1:-0}"
-  local quoted_repo_dir quoted_project_name quoted_helper_path quoted_deploy_mode quoted_target_sha quoted_lock_wait quoted_autoclean_enabled quoted_autoclean_paths
+  local quoted_repo_dir quoted_project_name quoted_helper_path quoted_deploy_mode quoted_image_tag quoted_target_sha quoted_lock_wait quoted_autoclean_enabled quoted_autoclean_paths
 
   quoted_repo_dir="$(quote_for_remote_shell "$DO_REPO_DIR")"
   quoted_project_name="$(quote_for_remote_shell "${COMPOSE_PROJECT_NAME:-sarkari-result}")"
   quoted_helper_path="$(quote_for_remote_shell "$REMOTE_HELPER_PATH")"
   quoted_deploy_mode="$(quote_for_remote_shell "${DEPLOY_MODE:-fast}")"
+  quoted_image_tag="$(quote_for_remote_shell "${DEPLOY_IMAGE_TAG:-}")"
   quoted_target_sha="$(quote_for_remote_shell "$TRIGGER_SHA")"
   quoted_lock_wait="$(quote_for_remote_shell "${LOCK_WAIT_SECONDS:-}")"
   quoted_autoclean_enabled="$(quote_for_remote_shell "${DEPLOY_AUTOCLEAN_TRACKED:-1}")"
@@ -283,6 +284,7 @@ DO_REPO_DIR=${quoted_repo_dir}
 COMPOSE_PROJECT_NAME=${quoted_project_name}
 REMOTE_HELPER_PATH=${quoted_helper_path}
 DEPLOY_MODE=${quoted_deploy_mode}
+DEPLOY_IMAGE_TAG=${quoted_image_tag}
 TRIGGER_SHA=${quoted_target_sha}
 LOCK_WAIT_SECONDS=${quoted_lock_wait}
 DEPLOY_AUTOCLEAN_TRACKED=${quoted_autoclean_enabled}
@@ -294,7 +296,7 @@ if [[ "\${PRECHECK_ONLY}" == "1" ]]; then
   cmd+=(--preflight-only)
 fi
 
-DO_REPO_DIR="\${DO_REPO_DIR}" COMPOSE_PROJECT_NAME="\${COMPOSE_PROJECT_NAME}" LOCK_WAIT_SECONDS="\${LOCK_WAIT_SECONDS}" DEPLOY_AUTOCLEAN_TRACKED="\${DEPLOY_AUTOCLEAN_TRACKED}" DEPLOY_AUTOCLEAN_TRACKED_PATHS="\${DEPLOY_AUTOCLEAN_TRACKED_PATHS}" "\${cmd[@]}"
+DO_REPO_DIR="\${DO_REPO_DIR}" COMPOSE_PROJECT_NAME="\${COMPOSE_PROJECT_NAME}" DEPLOY_IMAGE_TAG="\${DEPLOY_IMAGE_TAG}" LOCK_WAIT_SECONDS="\${LOCK_WAIT_SECONDS}" DEPLOY_AUTOCLEAN_TRACKED="\${DEPLOY_AUTOCLEAN_TRACKED}" DEPLOY_AUTOCLEAN_TRACKED_PATHS="\${DEPLOY_AUTOCLEAN_TRACKED_PATHS}" "\${cmd[@]}"
 EOF
 }
 

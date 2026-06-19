@@ -3,6 +3,7 @@ name: sarkari-result
 services:
   # Nginx Reverse Proxy with SSL
   nginx:
+    image: ghcr.io/${GHCR_OWNER:-abhishek9065}/sarkariexam-nginx:${DEPLOY_IMAGE_TAG:-main}
     build:
       context: ./nginx
       dockerfile: Dockerfile
@@ -33,6 +34,7 @@ services:
 
   # Backend API
   backend:
+    image: ghcr.io/${GHCR_OWNER:-abhishek9065}/sarkariexam-backend:${DEPLOY_IMAGE_TAG:-main}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -62,6 +64,7 @@ services:
       - METRICS_TOKEN=${METRICS_TOKEN:-}
       - READINESS_CACHE_TTL_MS=${READINESS_CACHE_TTL_MS:-3000}
       - POSTGRES_HEALTH_TIMEOUT_MS=${POSTGRES_HEALTH_TIMEOUT_MS:-1500}
+      - CAMPAIGN_WORKER_ENABLED=false
     expose:
       - "4000"
     init: true
@@ -81,8 +84,46 @@ services:
       timeout: 10s
       retries: 3
 
+  # Durable campaign delivery worker
+  campaign-worker:
+    image: ghcr.io/${GHCR_OWNER:-abhishek9065}/sarkariexam-backend:${DEPLOY_IMAGE_TAG:-main}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sarkari-campaign-worker
+    command: [ "node", "dist/campaignWorker.js" ]
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_PRISMA_URL=${POSTGRES_PRISMA_URL:-}
+      - POSTGRES_DIRECT_URL=${POSTGRES_DIRECT_URL:-}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - DIRECT_URL=${DIRECT_URL:-}
+      - JWT_SECRET=${JWT_SECRET}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - FRONTEND_URL=${FRONTEND_URL:-https://sarkariexams.me}
+      - CAMPAIGN_JOB_POLL_INTERVAL_MS=${CAMPAIGN_JOB_POLL_INTERVAL_MS:-1000}
+      - CAMPAIGN_JOB_LEASE_MS=${CAMPAIGN_JOB_LEASE_MS:-900000}
+      - CAMPAIGN_JOB_HEARTBEAT_MS=${CAMPAIGN_JOB_HEARTBEAT_MS:-30000}
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - sarkari-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      disable: true
+
   # Admin Console (Next.js)
   admin:
+    image: ghcr.io/${GHCR_OWNER:-abhishek9065}/sarkariexam-admin:${DEPLOY_IMAGE_TAG:-main}
     build:
       context: ./admin-next
       dockerfile: Dockerfile
@@ -108,6 +149,7 @@ services:
 
   # Frontend (Next.js runtime)
   frontend:
+    image: ghcr.io/${GHCR_OWNER:-abhishek9065}/sarkariexam-frontend:${DEPLOY_IMAGE_TAG:-main}
     build:
       context: ./frontend
       dockerfile: Dockerfile

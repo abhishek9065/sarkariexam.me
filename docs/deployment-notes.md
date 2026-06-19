@@ -4,11 +4,27 @@ This repository uses a strict deployment model for production delivery to a Digi
 
 ## Current Deployment Flow
 
-1. `CI` workflow runs on pushes and pull requests.
-2. `Deploy to Production` workflow runs only from `workflow_run` when CI succeeds for a `push` on `main`.
+1. `PR CI` runs path-filtered checks on pull requests; `Main CI` runs the full suite on pushes to `main` and publishes commit-tagged images to GHCR.
+2. `Deploy to Production` runs only from `workflow_run` when Main CI succeeds for a `push` on `main`.
 3. Runner executes `scripts/deploy-via-ssh.sh`.
 4. Runner uploads and executes `scripts/deploy-live.sh` on droplet.
-5. Droplet validates target SHA, checks out that SHA, runs remote preflight, and executes `scripts/deploy-fast.sh` (or full mode if requested).
+5. Droplet validates and checks out the target SHA, pulls its prebuilt images, runs migrations, restarts the API and campaign worker together, then verifies service health.
+
+## CI/CD Performance Baseline
+
+Measured from successful GitHub Actions runs immediately before the image-pull change on 2026-06-19:
+
+| Area | Observed duration |
+| --- | ---: |
+| CI end-to-end | 81–87 seconds |
+| Backend checks | 78–84 seconds |
+| Admin checks | 70–76 seconds |
+| Frontend checks | 41–48 seconds |
+| Separate audit jobs | 17–26 seconds each |
+| Production deploy end-to-end | 7 minutes 50 seconds–9 minutes |
+| Sample deploy job | 8 minutes 52 seconds |
+
+Use these values to compare the first three successful `Main CI` and image-pull deploy runs. The primary success criterion is a materially shorter production deploy; main CI may grow because it now builds and publishes images that were previously built on the droplet.
 6. Deploy scripts validate Redis/PostgreSQL reachability, run Prisma migrations, then replace the backend container.
 
 ## Required GitHub Configuration
@@ -45,7 +61,11 @@ The GitHub `production` environment must require manual reviewers. The deploy jo
 - Deployment refuses SHAs not reachable from `origin/main`.
 - Deployment refuses to proceed when remote working tree has tracked local modifications.
 - Deployment refuses missing or unreachable Upstash Redis in production preflight.
-- Production dependency audits run inside `CI`, so audit failures block the `workflow_run` deploy gate.
+- Production dependency audits run inside `Main CI`, so audit failures block the `workflow_run` deploy gate. The separate Security workflow is weekly/manual only.
+
+Production deploys default to `image-pull`: the droplet pulls the four images tagged with the triggering commit SHA, runs migrations, restarts services, and verifies health. The `fast` and `full` rebuild-on-droplet modes remain available as manual fallbacks. Normal deploy lock wait is 120 seconds.
+
+The GHCR packages must be public, or the droplet must already be authenticated to `ghcr.io` with read-package access. Set `GHCR_OWNER` in the production `.env` only if images are published under a different owner.
 
 The SSH deploy wrapper prefers an explicit `DO_REPO_DIR` when it is provided, but if the value is missing it will try to auto-discover the production checkout from common droplet paths before failing. In either case, deploys still fail if the resolved path is not a valid repository clone.
 
@@ -82,6 +102,14 @@ Deployment validates:
   - `/results`
   - `/admin`
 - Optional frontend revalidation smoke check when revalidation token is configured.
+
+## 2026-06-19
+
+- Campaign send and retry requests are persisted in PostgreSQL before the API returns `202 Accepted`.
+- The campaign worker uses database leases and `FOR UPDATE SKIP LOCKED`, so multiple backend instances can poll safely and interrupted jobs can be reclaimed.
+- Production Compose runs campaign scheduling and delivery in the dedicated `campaign-worker` service; the API container sets `CAMPAIGN_WORKER_ENABLED=false` and only enqueues jobs.
+- Optional tuning variables are `CAMPAIGN_JOB_POLL_INTERVAL_MS`, `CAMPAIGN_JOB_LEASE_MS`, and `CAMPAIGN_JOB_HEARTBEAT_MS`. Defaults are 1 second, 15 minutes, and 30 seconds respectively.
+- Deploy migration `202606190002_campaign_jobs` before accepting campaign send requests from the updated backend.
 
 ## 2026-06-17
 

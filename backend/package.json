@@ -10,6 +10,7 @@
     "build": "tsc",
     "typecheck:strict": "tsc -p tsconfig.strict.json --noEmit",
     "start": "node dist/server.js",
+    "start:campaign-worker": "node dist/campaignWorker.js",
     "lint": "eslint . --max-warnings=0",
     "pretest": "npm run prisma:generate",
     "test": "vitest run",

@@ -44,14 +44,15 @@ run_backend_prisma_migrations
 set_stage "restart-all"
 record_diagnosis "Docker Compose failed to restart production services."
 if [[ ${#DATADOG_SERVICES[@]} -gt 0 ]]; then
-  dc up -d --force-recreate --remove-orphans nginx backend admin frontend "${DATADOG_SERVICES[@]}"
+  dc up -d --force-recreate --remove-orphans nginx backend campaign-worker admin frontend "${DATADOG_SERVICES[@]}"
 else
-  dc up -d --force-recreate --remove-orphans nginx backend admin frontend
+  dc up -d --force-recreate --remove-orphans nginx backend campaign-worker admin frontend
 fi
 dc ps
 
 set_stage "wait-backend"
 wait_for_service_health backend 60 2
+wait_for_service_health campaign-worker 60 2
 BACKEND_HEALTH_RESULT="container healthcheck ok"
 
 set_stage "wait-web-services"

@@ -1,0 +1,129 @@
+name: PR CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      admin: ${{ steps.filter.outputs.admin }}
+      deploy: ${{ steps.filter.outputs.deploy }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'openapi.json'
+            frontend:
+              - 'frontend/**'
+            admin:
+              - 'admin-next/**'
+            deploy:
+              - 'scripts/**'
+              - 'docker-compose*.yml'
+              - '.github/workflows/**'
+            workflows:
+              - '.github/workflows/**'
+
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - run: |
+          test -z "$(git ls-files | grep -E '^(frontend|admin-next)/\.next/|^\.copilot-artifacts/' || true)"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults: { run: { working-directory: backend } }
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sarkari_test?schema=public
+      POSTGRES_PRISMA_URL: postgresql://postgres:postgres@localhost:5432/sarkari_test?schema=public
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: sarkari_test }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres -d sarkari_test" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 22, cache: npm, cache-dependency-path: backend/package-lock.json }
+      - run: npm ci
+      - run: npx prisma generate && npx prisma migrate deploy
+      - run: diff -u ../openapi.json openapi.json
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test:ci
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: frontend/.next/cache
+          key: ${{ runner.os }}-next-frontend-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/**/*.[jt]s', 'frontend/**/*.[jt]sx') }}
+          restore-keys: ${{ runner.os }}-next-frontend-${{ hashFiles('frontend/package-lock.json') }}-
+      - run: npm run lint
+      - run: npm run build
+
+  admin:
+    needs: changes
+    if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults: { run: { working-directory: admin-next } }
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 22, cache: npm, cache-dependency-path: admin-next/package-lock.json }
+      - run: npm ci
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: admin-next/.next/cache
+          key: ${{ runner.os }}-next-admin-${{ hashFiles('admin-next/package-lock.json') }}-${{ hashFiles('admin-next/**/*.[jt]s', 'admin-next/**/*.[jt]sx') }}
+          restore-keys: ${{ runner.os }}-next-admin-${{ hashFiles('admin-next/package-lock.json') }}-
+      - run: npm run lint
+      - run: npm run build
+
+  deploy-checks:
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { persist-credentials: false }
+      - run: bash -n scripts/*.sh
+      - run: docker compose -f docker-compose.yml config >/dev/null
+      - run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config >/dev/null

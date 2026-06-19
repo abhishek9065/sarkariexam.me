@@ -12,6 +12,12 @@ const mocks = vi.hoisted(() => ({
   campaignSchedule: vi.fn(),
   campaignRemove: vi.fn(),
   campaignListScheduledDue: vi.fn(),
+  campaignJobEnqueue: vi.fn(),
+  campaignJobClaimNext: vi.fn(),
+  campaignJobFailExhausted: vi.fn(),
+  campaignJobHeartbeat: vi.fn(),
+  campaignJobMarkCompleted: vi.fn(),
+  campaignJobMarkFailed: vi.fn(),
   dispatchCreateMany: vi.fn(),
   dispatchListFailed: vi.fn(),
   dispatchStats: vi.fn(),
@@ -31,6 +37,17 @@ const mocks = vi.hoisted(() => ({
   subscriptionCategoryGroupBy: vi.fn(),
   stateFindMany: vi.fn(),
   categoryFindMany: vi.fn(),
+}));
+
+vi.mock('../models/campaignJobs.postgres.js', () => ({
+  default: {
+    enqueue: mocks.campaignJobEnqueue,
+    claimNext: mocks.campaignJobClaimNext,
+    failExhausted: mocks.campaignJobFailExhausted,
+    heartbeat: mocks.campaignJobHeartbeat,
+    markCompleted: mocks.campaignJobMarkCompleted,
+    markFailed: mocks.campaignJobMarkFailed,
+  },
 }));
 
 vi.mock('../models/notificationCampaigns.postgres.js', () => ({
@@ -132,6 +149,12 @@ describe('notification service', () => {
     mocks.campaignMarkSending.mockResolvedValue(true);
     mocks.campaignMarkSent.mockResolvedValue(true);
     mocks.campaignMarkSimulated.mockResolvedValue(true);
+    mocks.campaignJobEnqueue.mockResolvedValue(true);
+    mocks.campaignJobClaimNext.mockResolvedValue(null);
+    mocks.campaignJobFailExhausted.mockResolvedValue([]);
+    mocks.campaignJobHeartbeat.mockResolvedValue(true);
+    mocks.campaignJobMarkCompleted.mockResolvedValue(true);
+    mocks.campaignJobMarkFailed.mockResolvedValue(true);
     mocks.dispatchCreateMany.mockResolvedValue(1);
     mocks.dispatchListFailed.mockResolvedValue([]);
     mocks.dispatchStats.mockResolvedValue({ total: 1, sent: 1, failed: 0, byChannel: [], recentFailures: [] });
@@ -247,6 +270,27 @@ describe('notification service', () => {
     expect(mocks.sendCampaignEmail).not.toHaveBeenCalled();
     expect(mocks.webPushSendNotification).not.toHaveBeenCalled();
     expect(mocks.dispatchCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('durably queues campaign delivery without calling providers in the request', async () => {
+    const { queueCampaignDelivery } = await import('../services/notifications.js');
+
+    const result = await queueCampaignDelivery('campaign-1');
+
+    expect(result).toEqual({ success: true, mode: 'delivery', status: 'sending' });
+    expect(mocks.campaignJobEnqueue).toHaveBeenCalledWith('campaign-1', 'send', 'draft');
+    expect(mocks.sendCampaignEmail).not.toHaveBeenCalled();
+    expect(mocks.webPushSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('rejects a durable queue race when the transactional enqueue loses', async () => {
+    mocks.campaignJobEnqueue.mockResolvedValue(false);
+    const { queueCampaignDelivery } = await import('../services/notifications.js');
+
+    const result = await queueCampaignDelivery('campaign-1');
+
+    expect(result).toEqual({ success: false, error: 'Campaign is already being processed' });
+    expect(mocks.sendCampaignEmail).not.toHaveBeenCalled();
   });
 
   it('estimates campaign recipients by channel', async () => {

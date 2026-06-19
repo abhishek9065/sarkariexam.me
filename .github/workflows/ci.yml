@@ -1,12 +1,10 @@
-name: CI
+name: Main CI
 
 on:
   push:
     branches:
       - main
-  pull_request:
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: read
@@ -66,6 +64,7 @@ jobs:
           bash -n scripts/deploy-live.sh
           bash -n scripts/deploy-via-ssh.sh
           bash -n scripts/deploy-fast.sh
+          bash -n scripts/deploy-pull-images.sh
           bash -n scripts/deploy-prod.sh
           bash -n scripts/verify-deployment.sh
           bash -n scripts/rollback-last.sh
@@ -78,6 +77,7 @@ jobs:
             scripts/deploy-live.sh \
             scripts/deploy-via-ssh.sh \
             scripts/deploy-fast.sh \
+            scripts/deploy-pull-images.sh \
             scripts/deploy-prod.sh \
             scripts/verify-deployment.sh \
             scripts/rollback-last.sh
@@ -128,7 +128,7 @@ jobs:
 
           changed_files="$(git diff --name-only "${BASE_SHA}" HEAD)"
 
-          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(scripts/deploy-(common|live|via-ssh|fast|prod)\.sh|scripts/verify-deployment\.sh|scripts/rollback-last\.sh|docker-compose\.yml|\.github/workflows/deploy\.yml|\.github/workflows/deploy-preflight\.yml)$'; then
+          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(scripts/deploy-(common|live|via-ssh|fast|prod|pull-images)\.sh|scripts/verify-deployment\.sh|scripts/rollback-last\.sh|docker-compose\.yml|\.github/workflows/deploy\.yml|\.github/workflows/deploy-preflight\.yml)$'; then
             echo "No deploy-control changes detected; docs consistency check skipped."
             exit 0
           fi
@@ -157,86 +157,8 @@ jobs:
       - name: Validate dev compose overlay rendering
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config >/dev/null
 
-  security-audit-backend:
-    name: Security Audit Backend
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit prod dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-  security-audit-frontend:
-    name: Security Audit Frontend
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit prod dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-  security-audit-admin:
-    name: Security Audit Admin
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: admin-next
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: admin-next/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit prod dependencies
-        run: npm audit --omit=dev --audit-level=high
-
   backend:
-    name: Backend Lint + Build + Tests
+    name: Backend Audit + Lint + Build + Tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -275,6 +197,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit prod dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Prepare PostgreSQL schema
         run: |
           npx prisma generate
@@ -297,7 +222,7 @@ jobs:
         run: npm run test:ci
 
   frontend:
-    name: Public Frontend Lint + Build
+    name: Public Frontend Audit + Lint + Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -319,6 +244,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit prod dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Cache Next.js frontend build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: frontend/.next/cache
+          key: ${{ runner.os }}-next-frontend-${{ hashFiles('frontend/package-lock.json') }}-${{ hashFiles('frontend/**/*.[jt]s', 'frontend/**/*.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-next-frontend-${{ hashFiles('frontend/package-lock.json') }}-
+
       - name: Lint frontend
         run: npm run lint
 
@@ -326,7 +262,7 @@ jobs:
         run: npm run build
 
   admin:
-    name: Admin App Lint + Build
+    name: Admin App Audit + Lint + Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -348,8 +284,62 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit prod dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Cache Next.js admin build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: admin-next/.next/cache
+          key: ${{ runner.os }}-next-admin-${{ hashFiles('admin-next/package-lock.json') }}-${{ hashFiles('admin-next/**/*.[jt]s', 'admin-next/**/*.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-next-admin-${{ hashFiles('admin-next/package-lock.json') }}-
+
       - name: Lint admin app
         run: npm run lint
 
       - name: Build admin app
         run: npm run build
+
+  build-images:
+    name: Build and Push ${{ matrix.service }} Image
+    needs: [backend, frontend, admin, compose-validation]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            context: backend
+          - service: frontend
+            context: frontend
+          - service: admin
+            context: admin-next
+          - service: nginx
+            context: nginx
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://sarkariexams.me/api
+            NEXT_PUBLIC_ADMIN_URL=https://sarkariexams.me/admin
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/sarkariexam-${{ matrix.service }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/sarkariexam-${{ matrix.service }}:main
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

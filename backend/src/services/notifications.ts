@@ -1,3 +1,6 @@
+import { randomUUID } from 'crypto';
+import { hostname } from 'os';
+
 import { PostType as PrismaPostType, type Prisma } from '@prisma/client';
 import webpush from 'web-push';
 import { z } from 'zod';
@@ -7,6 +10,7 @@ import CampaignDispatchLogModelPostgres, {
   type CampaignDispatchLogInput,
   type CampaignDispatchLogRecord,
 } from '../models/campaignDispatchLogs.postgres.js';
+import CampaignJobModelPostgres, { type CampaignJobRecord } from '../models/campaignJobs.postgres.js';
 import NotificationCampaignModelPostgres, {
   type NotificationCampaignRecord,
   type NotificationCampaignSegmentType,
@@ -62,16 +66,15 @@ interface CampaignRecipients {
 
 const DEFAULT_CAMPAIGN_DELIVERY_CONCURRENCY = 10;
 const DEFAULT_CAMPAIGN_SCHEDULER_INTERVAL_MS = 60_000;
+const DEFAULT_CAMPAIGN_JOB_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_CAMPAIGN_JOB_LEASE_MS = 15 * 60_000;
+const DEFAULT_CAMPAIGN_JOB_HEARTBEAT_MS = 30_000;
 
 let campaignSchedulerInterval: NodeJS.Timeout | null = null;
 let campaignSchedulerRunning = false;
+let campaignWorkerInterval: NodeJS.Timeout | null = null;
 let campaignWorkerRunning = false;
-
-type CampaignJob =
-  | { kind: 'send'; campaign: NotificationCampaignRecord }
-  | { kind: 'retry'; campaign: NotificationCampaignRecord };
-
-const campaignJobQueue: CampaignJob[] = [];
+const campaignWorkerId = `${hostname()}:${process.pid}:${randomUUID()}`;
 
 const parseBoundedInt = (value: string | undefined, fallback: number, min: number, max: number): number => {
   const parsed = Number(value);
@@ -92,6 +95,24 @@ const campaignRuntimeConfig = {
     DEFAULT_CAMPAIGN_SCHEDULER_INTERVAL_MS,
     10_000,
     86_400_000,
+  ),
+  jobPollIntervalMs: parseBoundedInt(
+    process.env.CAMPAIGN_JOB_POLL_INTERVAL_MS,
+    DEFAULT_CAMPAIGN_JOB_POLL_INTERVAL_MS,
+    250,
+    60_000,
+  ),
+  jobLeaseMs: parseBoundedInt(
+    process.env.CAMPAIGN_JOB_LEASE_MS,
+    DEFAULT_CAMPAIGN_JOB_LEASE_MS,
+    60_000,
+    86_400_000,
+  ),
+  jobHeartbeatMs: parseBoundedInt(
+    process.env.CAMPAIGN_JOB_HEARTBEAT_MS,
+    DEFAULT_CAMPAIGN_JOB_HEARTBEAT_MS,
+    5_000,
+    300_000,
   ),
 };
 
@@ -656,6 +677,25 @@ async function claimCampaign(
   return { campaign };
 }
 
+async function validateCampaignForQueue(
+  campaignId: string,
+  allowedStatuses: NotificationCampaignStatus[],
+): Promise<{ campaign?: NotificationCampaignRecord; error?: string }> {
+  const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
+  if (!campaign) return { error: 'Campaign not found' };
+
+  if (campaign.unsupportedSegment) {
+    await NotificationCampaignModelPostgres.markFailed(campaignId);
+    return { error: 'Campaign segment is no longer supported' };
+  }
+
+  if (!allowedStatuses.includes(campaign.status)) {
+    return { error: 'Campaign already processed' };
+  }
+
+  return { campaign };
+}
+
 async function deliverClaimedCampaign(campaign: NotificationCampaignRecord): Promise<CampaignDeliveryResult> {
   const campaignId = campaign.id;
   try {
@@ -727,42 +767,13 @@ export async function sendCampaign(campaignId: string): Promise<CampaignDelivery
   }
 }
 
-function enqueueCampaignJob(job: CampaignJob): void {
-  campaignJobQueue.push(job);
-  void runCampaignWorker();
-}
-
-async function runCampaignWorker(): Promise<void> {
-  if (campaignWorkerRunning) return;
-  campaignWorkerRunning = true;
-
-  try {
-    let job = campaignJobQueue.shift();
-    while (job) {
-      const result = job.kind === 'send'
-        ? await deliverClaimedCampaign(job.campaign)
-        : await retryClaimedCampaign(job.campaign);
-      if (!result.success) {
-        console.error('[NotificationService] Background campaign job failed', {
-          campaignId: job.campaign.id,
-          kind: job.kind,
-          error: result.error,
-        });
-      }
-      job = campaignJobQueue.shift();
-    }
-  } finally {
-    campaignWorkerRunning = false;
-    if (campaignJobQueue.length > 0) void runCampaignWorker();
-  }
-}
-
 export async function queueCampaignDelivery(campaignId: string): Promise<CampaignQueueResult> {
   try {
-    const claim = await claimCampaign(campaignId, ['draft', 'scheduled', 'failed']);
-    if (!claim.campaign) return { success: false, error: claim.error };
+    const validation = await validateCampaignForQueue(campaignId, ['draft', 'scheduled', 'failed']);
+    if (!validation.campaign) return { success: false, error: validation.error };
 
-    enqueueCampaignJob({ kind: 'send', campaign: claim.campaign });
+    const queued = await CampaignJobModelPostgres.enqueue(campaignId, 'send', validation.campaign.status);
+    if (!queued) return { success: false, error: 'Campaign is already being processed' };
     return { success: true, mode: 'delivery', status: 'sending' };
   } catch (error) {
     console.error('[NotificationService] Error queueing campaign:', error);
@@ -896,10 +907,11 @@ export async function retryFailedCampaign(campaignId: string): Promise<CampaignR
 
 export async function queueFailedCampaignRetry(campaignId: string): Promise<CampaignQueueResult> {
   try {
-    const claim = await claimCampaign(campaignId, ['failed', 'partial_failed']);
-    if (!claim.campaign) return { success: false, error: claim.error };
+    const validation = await validateCampaignForQueue(campaignId, ['failed', 'partial_failed']);
+    if (!validation.campaign) return { success: false, error: validation.error };
 
-    enqueueCampaignJob({ kind: 'retry', campaign: claim.campaign });
+    const queued = await CampaignJobModelPostgres.enqueue(campaignId, 'retry', validation.campaign.status);
+    if (!queued) return { success: false, error: 'Campaign is already being processed' };
     return { success: true, mode: 'delivery', status: 'sending' };
   } catch (error) {
     console.error('[NotificationService] Error queueing campaign retry:', error);
@@ -956,6 +968,101 @@ export async function processScheduledCampaigns(): Promise<number> {
   }
 }
 
+async function processClaimedCampaignJob(job: CampaignJobRecord): Promise<void> {
+  const campaign = await NotificationCampaignModelPostgres.findById(job.campaignId);
+  if (!campaign) {
+    await CampaignJobModelPostgres.markFailed(job.id, campaignWorkerId, 'Campaign not found');
+    return;
+  }
+  if (campaign.status !== 'sending') {
+    if (campaign.status === 'sent' || campaign.status === 'partial_failed') {
+      await CampaignJobModelPostgres.markCompleted(job.id, campaignWorkerId);
+    } else {
+      await CampaignJobModelPostgres.markFailed(
+        job.id,
+        campaignWorkerId,
+        `Campaign has terminal status ${campaign.status}`,
+      );
+    }
+    return;
+  }
+
+  const heartbeatMs = Math.min(campaignRuntimeConfig.jobHeartbeatMs, Math.floor(campaignRuntimeConfig.jobLeaseMs / 3));
+  const heartbeat = setInterval(() => {
+    CampaignJobModelPostgres.heartbeat(job.id, campaignWorkerId).catch((error) => {
+      console.error('[NotificationService] Campaign job heartbeat failed', {
+        campaignId: job.campaignId,
+        jobId: job.id,
+        error,
+      });
+    });
+  }, heartbeatMs);
+
+  try {
+    const result = job.jobType === 'retry'
+      ? await retryClaimedCampaign(campaign)
+      : await deliverClaimedCampaign(campaign);
+
+    if (result.success) {
+      await CampaignJobModelPostgres.markCompleted(job.id, campaignWorkerId);
+      return;
+    }
+
+    await CampaignJobModelPostgres.markFailed(
+      job.id,
+      campaignWorkerId,
+      result.error ?? 'Campaign job failed',
+    );
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+
+async function runCampaignWorkerCycle(): Promise<void> {
+  if (campaignWorkerRunning) return;
+  campaignWorkerRunning = true;
+
+  try {
+    const staleBefore = new Date(Date.now() - campaignRuntimeConfig.jobLeaseMs);
+    const exhaustedCampaignIds = await CampaignJobModelPostgres.failExhausted(staleBefore);
+    await Promise.all(exhaustedCampaignIds.map((campaignId) =>
+      NotificationCampaignModelPostgres.markFailed(campaignId),
+    ));
+
+    let job = await CampaignJobModelPostgres.claimNext(campaignWorkerId, staleBefore);
+    while (job) {
+      try {
+        await processClaimedCampaignJob(job);
+      } catch (error) {
+        console.error('[NotificationService] Campaign worker job failed', {
+          campaignId: job.campaignId,
+          jobId: job.id,
+          error,
+        });
+        await CampaignJobModelPostgres.markFailed(
+          job.id,
+          campaignWorkerId,
+          error instanceof Error ? error.message : 'Unexpected campaign worker error',
+        ).catch(() => undefined);
+        await NotificationCampaignModelPostgres.markFailed(job.campaignId).catch(() => undefined);
+      }
+      job = await CampaignJobModelPostgres.claimNext(campaignWorkerId, staleBefore);
+    }
+  } catch (error) {
+    console.error('[NotificationService] Campaign worker cycle failed:', error);
+  } finally {
+    campaignWorkerRunning = false;
+  }
+}
+
+export function startCampaignJobWorker(): void {
+  if (campaignWorkerInterval) return;
+  void runCampaignWorkerCycle();
+  campaignWorkerInterval = setInterval(() => {
+    void runCampaignWorkerCycle();
+  }, campaignRuntimeConfig.jobPollIntervalMs);
+}
+
 async function runScheduledCampaignCycle(): Promise<void> {
   if (campaignSchedulerRunning) return;
   campaignSchedulerRunning = true;
@@ -973,6 +1080,7 @@ async function runScheduledCampaignCycle(): Promise<void> {
 
 export function scheduleCampaignProcessor(): void {
   if (campaignSchedulerInterval) return;
+  startCampaignJobWorker();
   runScheduledCampaignCycle().catch((error) => {
     console.error('[NotificationService] Initial scheduled campaign run failed:', error);
   });
@@ -983,10 +1091,18 @@ export function scheduleCampaignProcessor(): void {
   }, campaignRuntimeConfig.schedulerIntervalMs);
 }
 
-export function stopCampaignProcessor(): void {
-  if (!campaignSchedulerInterval) return;
-  clearInterval(campaignSchedulerInterval);
-  campaignSchedulerInterval = null;
+export async function stopCampaignProcessor(): Promise<void> {
+  if (campaignSchedulerInterval) {
+    clearInterval(campaignSchedulerInterval);
+    campaignSchedulerInterval = null;
+  }
+  if (campaignWorkerInterval) {
+    clearInterval(campaignWorkerInterval);
+    campaignWorkerInterval = null;
+  }
+  while (campaignSchedulerRunning || campaignWorkerRunning) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 }
 
 export const notificationService = {
@@ -1004,6 +1120,7 @@ export const notificationService = {
   queueCampaignDelivery,
   queueFailedCampaignRetry,
   scheduleCampaignProcessor,
+  startCampaignJobWorker,
   stopCampaignProcessor,
 };
 

@@ -191,7 +191,7 @@ Then verify crawler-facing outputs:
 
 Main branch pushes trigger:
 
-- `CI`
+- `PR CI` and `Main CI`
 - `Security`
 - `Deploy to Production`
 
@@ -199,10 +199,10 @@ Manual reliability validation is also available via:
 
 - `Deploy Preflight` (`workflow_dispatch`, no service restart)
 
-Production deploys are GitHub Actions driven. The production deploy gate is the `CI` workflow, which includes production dependency audit jobs for backend, frontend, and admin packages.
-`Deploy to Production` runs as a `workflow_run` after `CI` succeeds for a `push` to `main`, checks out the exact triggering commit SHA on the runner, SSHes into the droplet, runs a remote preflight, and then deploys that exact SHA.
+Production deploys are GitHub Actions driven. The production deploy gate is `Main CI`, which includes production dependency audits and publishes commit-tagged images for backend, frontend, admin, and nginx.
+`Deploy to Production` runs as a `workflow_run` after `Main CI` succeeds for a `push` to `main`, checks out the exact triggering commit SHA on the runner, SSHes into the droplet, and pulls and deploys that SHA's images.
 This is the current production topology, not the long-term target. The platform is being moved toward safer staging and promotion controls while retaining the existing release automation.
-The separate `Security` and CodeQL workflows remain important scheduled/manual validation workflows; production dependency audits also run inside `CI` so failed audits block production deployment.
+The separate `Security` and CodeQL workflows provide scheduled/manual validation; production dependency audits also run inside `Main CI` so failed audits block production deployment.
 The `production` GitHub environment must require manual reviewer approval before the deploy job can access production secrets and run.
 The backend health endpoints expose public liveness/readiness checks, while `/api/health/deep` requires `METRICS_TOKEN` via `Authorization: Bearer <token>` or `X-Metrics-Token`.
 
@@ -221,7 +221,7 @@ Production deploy entrypoint:
 
 - local code change
 - `git push origin main`
-- GitHub Actions `CI`
+- GitHub Actions `PR CI` / `Main CI`
 - GitHub Actions `Deploy to Production`
 - runner-side SSH validation and remote preflight
 - droplet-side rebuild from `docker-compose.yml` at the triggering commit SHA

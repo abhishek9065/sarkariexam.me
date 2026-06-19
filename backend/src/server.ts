@@ -643,7 +643,9 @@ async function startPostgresPrimaryRuntime() {
   }
 
   scheduleDigestSender();
-  scheduleCampaignProcessor();
+  if (process.env.CAMPAIGN_WORKER_ENABLED !== 'false') {
+    scheduleCampaignProcessor();
+  }
   scheduleSavedSearchAlerts();
   scheduleTrackerReminders();
 

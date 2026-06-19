@@ -20,6 +20,7 @@ on:
         required: true
         type: choice
         options:
+          - image-pull
           - fast
           - full
         default: fast
@@ -67,6 +68,7 @@ jobs:
           TRIGGER_EVENT: workflow_dispatch
           TRIGGER_CONCLUSION: preflight-only
           DEPLOY_MODE: ${{ inputs.deploy_mode }}
+          DEPLOY_IMAGE_TAG: ${{ inputs.target_sha }}
           DEPLOY_PREFLIGHT_ONLY: '1'
           DEPLOY_AUTOCLEAN_TRACKED: '1'
           DEPLOY_AUTOCLEAN_TRACKED_PATHS: backend/package-lock.json
