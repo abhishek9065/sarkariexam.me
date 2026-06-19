@@ -414,13 +414,42 @@ export function getUpcomingDeadlines(limit = 10) {
 }
 
 // ─── Notification Campaigns ───
+export type CampaignDeliveryStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'simulated' | 'failed';
+
+export type CampaignDeliveryStats = {
+  total: number;
+  sent: number;
+  failed: number;
+  byChannel: Array<{ channel: 'email' | 'push'; sent: number; failed: number; total: number }>;
+  recentFailures: Array<{
+    id: string;
+    channel: 'email' | 'push';
+    recipient: string;
+    status: string;
+    error?: string;
+    attemptCount: number;
+    lastAttemptAt: string;
+    createdAt: string;
+  }>;
+};
+
+export type CampaignRecipientEstimate = {
+  email: number;
+  push: number;
+  total: number;
+};
+
 export function getCampaigns() {
   return apiFetch<{ data: Array<{
     id: string;
     title: string;
     body: string;
-    status: string;
+    url?: string;
+    status: CampaignDeliveryStatus;
     sentCount: number;
+    failedCount: number;
+    scheduledAt?: string;
+    sentAt?: string;
     createdAt: string;
     segment: { type: string; value: string };
     unsupportedSegment: boolean;
@@ -441,7 +470,21 @@ export function createCampaign(data: {
 }
 
 export function sendCampaign(id: string) {
-  return apiFetchWithCsrf<{ message: string; data: { mode: 'simulation'; estimatedCount: number } }>(`/admin/campaigns/${id}/send`, {
+  return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; sentCount: number; failedCount: number; totals: CampaignRecipientEstimate } }>(`/admin/campaigns/${id}/send`, {
+    method: 'POST',
+  });
+}
+
+export function estimateCampaign(id: string) {
+  return apiFetch<{ data: CampaignRecipientEstimate }>(`/admin/campaigns/${id}/estimate`);
+}
+
+export function getCampaignStats(id: string) {
+  return apiFetch<{ data: CampaignDeliveryStats }>(`/admin/campaigns/${id}/stats`);
+}
+
+export function retryFailedCampaign(id: string) {
+  return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; retried: number; sentCount: number; failedCount: number } }>(`/admin/campaigns/${id}/retry-failed`, {
     method: 'POST',
   });
 }

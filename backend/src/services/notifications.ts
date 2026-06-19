@@ -1,13 +1,20 @@
 import { PostType as PrismaPostType, type Prisma } from '@prisma/client';
+import webpush from 'web-push';
 import { z } from 'zod';
 
+import CampaignDispatchLogModelPostgres, {
+  type CampaignDispatchLogInput,
+  type CampaignDispatchLogRecord,
+} from '../models/campaignDispatchLogs.postgres.js';
 import NotificationCampaignModelPostgres, {
   type NotificationCampaignRecord,
   type NotificationCampaignSegmentType,
 } from '../models/notificationCampaigns.postgres.js';
-import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
+import PushSubscriptionModelPostgres, { type PushSubscriptionRecord } from '../models/pushSubscriptions.postgres.js';
 import { slugify } from '../utils/slugify.js';
 
+import { config } from '../config.js';
+import { sendCampaignEmail } from './email.js';
 import { prisma } from './postgres/prisma.js';
 
 const notificationCampaignSchema = z.object({
@@ -35,6 +42,17 @@ const notificationCampaignSchema = z.object({
 });
 
 type NotificationCampaign = NotificationCampaignRecord;
+
+interface EmailRecipient {
+  id: string;
+  email: string;
+}
+
+interface CampaignEstimate {
+  email: number;
+  push: number;
+  total: number;
+}
 
 function normalizeVariant(value?: { title?: string; body?: string }): { title: string; body: string } | undefined {
   if (!value?.title || !value.body) {
@@ -332,14 +350,184 @@ export async function getSegmentUserCount(
   }
 }
 
+async function resolveEmailRecipients(campaign: NotificationCampaignRecord): Promise<EmailRecipient[]> {
+  const where = buildSegmentWhere(
+    mapSegmentType(campaign.segment.type),
+    campaign.segment.value,
+    { verified: true },
+  );
+
+  return prisma.subscription.findMany({
+    where,
+    select: {
+      id: true,
+      email: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+async function resolvePushRecipients(): Promise<PushSubscriptionRecord[]> {
+  return PushSubscriptionModelPostgres.listAll();
+}
+
+function campaignPushPayload(campaign: NotificationCampaignRecord): string {
+  const url = campaign.url
+    ? (() => {
+        const trackedUrl = new URL(campaign.url, config.frontendUrl);
+        trackedUrl.searchParams.set('source', 'campaign');
+        trackedUrl.searchParams.set('medium', 'push');
+        trackedUrl.searchParams.set('campaign', campaign.id);
+        return trackedUrl.toString();
+      })()
+    : config.frontendUrl;
+
+  return JSON.stringify({
+    title: campaign.title,
+    body: campaign.body,
+    url,
+    campaignId: campaign.id,
+  });
+}
+
+function configureWebPush(): boolean {
+  if (!config.vapidPublicKey || !config.vapidPrivateKey) {
+    return false;
+  }
+
+  webpush.setVapidDetails('mailto:admin@sarkariexams.me', config.vapidPublicKey, config.vapidPrivateKey);
+  return true;
+}
+
+async function dispatchEmail(campaign: NotificationCampaignRecord, recipient: EmailRecipient): Promise<CampaignDispatchLogInput> {
+  const result = await sendCampaignEmail({
+    to: recipient.email,
+    title: campaign.title,
+    body: campaign.body,
+    url: campaign.url,
+    campaignId: campaign.id,
+  });
+
+  const deliveredAt = result.success ? new Date() : undefined;
+  return {
+    campaignId: campaign.id,
+    channel: 'email',
+    recipient: recipient.email,
+    subscriptionId: recipient.id,
+    status: result.success ? 'sent' : 'failed',
+    messageId: result.messageId,
+    error: result.error,
+    metadata: { source: 'campaign' },
+    deliveredAt,
+  };
+}
+
+async function dispatchPush(
+  campaign: NotificationCampaignRecord,
+  subscription: PushSubscriptionRecord,
+  options?: { vapidConfigured?: boolean },
+): Promise<CampaignDispatchLogInput> {
+  if (options?.vapidConfigured === false) {
+    return {
+      campaignId: campaign.id,
+      channel: 'push',
+      recipient: subscription.endpoint,
+      recipientUserId: subscription.userId,
+      pushEndpoint: subscription.endpoint,
+      status: 'failed',
+      error: 'VAPID keys are not configured',
+      metadata: { source: 'campaign' },
+    };
+  }
+
+  try {
+    await webpush.sendNotification(
+      { endpoint: subscription.endpoint, keys: subscription.keys },
+      campaignPushPayload(campaign),
+    );
+
+    return {
+      campaignId: campaign.id,
+      channel: 'push',
+      recipient: subscription.endpoint,
+      recipientUserId: subscription.userId,
+      pushEndpoint: subscription.endpoint,
+      status: 'sent',
+      metadata: { source: 'campaign' },
+      deliveredAt: new Date(),
+    };
+  } catch (error) {
+    return {
+      campaignId: campaign.id,
+      channel: 'push',
+      recipient: subscription.endpoint,
+      recipientUserId: subscription.userId,
+      pushEndpoint: subscription.endpoint,
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Failed to send push notification',
+      metadata: { source: 'campaign' },
+    };
+  }
+}
+
+function summarizeDispatch(logs: CampaignDispatchLogInput[]): { sent: number; failed: number } {
+  return logs.reduce(
+    (summary, log) => {
+      if (log.status === 'sent') {
+        summary.sent++;
+      }
+      if (log.status === 'failed') {
+        summary.failed++;
+      }
+      return summary;
+    },
+    { sent: 0, failed: 0 },
+  );
+}
+
+export async function estimateCampaignRecipients(campaignId: string): Promise<{
+  success: boolean;
+  error?: string;
+  data?: CampaignEstimate;
+}> {
+  try {
+    const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
+    if (!campaign) {
+      return { success: false, error: 'Campaign not found' };
+    }
+    if (campaign.unsupportedSegment) {
+      return { success: false, error: 'Campaign segment is no longer supported' };
+    }
+
+    const [emailRecipients, pushRecipients] = await Promise.all([
+      resolveEmailRecipients(campaign),
+      resolvePushRecipients(),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        email: emailRecipients.length,
+        push: pushRecipients.length,
+        total: emailRecipients.length + pushRecipients.length,
+      },
+    };
+  } catch (error) {
+    console.error('[NotificationService] Error estimating campaign recipients:', error);
+    return { success: false, error: 'Failed to estimate campaign recipients' };
+  }
+}
+
 /**
  * Send notification campaign
  */
 export async function sendCampaign(campaignId: string): Promise<{
   success: boolean;
   error?: string;
-  mode?: 'simulation';
-  estimatedCount?: number;
+  mode?: 'delivery';
+  sentCount?: number;
+  failedCount?: number;
+  totals?: CampaignEstimate;
 }> {
   try {
     const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
@@ -356,35 +544,177 @@ export async function sendCampaign(campaignId: string): Promise<{
       return { success: false, error: 'Campaign segment is no longer supported' };
     }
 
-    const userWhere = buildSegmentWhere(
-      mapSegmentType(campaign.segment.type),
-      campaign.segment.value,
-      { verified: true },
-    );
-
-    const [emailUserCount, pushUsers] = await Promise.all([
-      prisma.subscription.count({ where: userWhere }),
-      PushSubscriptionModelPostgres.listAll(),
-    ]);
-
-    // This records intended reach only; real email/push delivery is not wired here yet.
-    const estimatedCount = emailUserCount + pushUsers.length;
-
-    const markedSimulated = await NotificationCampaignModelPostgres.markSimulated(campaignId, estimatedCount);
-    if (!markedSimulated) {
+    const markedSending = await NotificationCampaignModelPostgres.markSending(campaignId);
+    if (!markedSending) {
       return { success: false, error: 'Campaign not found' };
     }
 
-    console.log('[NotificationService] Campaign simulation completed', {
-      estimatedCount,
+    const [emailRecipients, pushRecipients] = await Promise.all([
+      resolveEmailRecipients(campaign),
+      resolvePushRecipients(),
+    ]);
+
+    const vapidConfigured = configureWebPush();
+    const dispatchLogs: CampaignDispatchLogInput[] = [];
+
+    for (const recipient of emailRecipients) {
+      dispatchLogs.push(await dispatchEmail(campaign, recipient));
+    }
+
+    for (const subscription of pushRecipients) {
+      dispatchLogs.push(await dispatchPush(campaign, subscription, { vapidConfigured }));
+    }
+
+    await CampaignDispatchLogModelPostgres.createMany(dispatchLogs);
+    const summary = summarizeDispatch(dispatchLogs);
+    const totals = {
+      email: emailRecipients.length,
+      push: pushRecipients.length,
+      total: emailRecipients.length + pushRecipients.length,
+    };
+
+    if (summary.sent > 0) {
+      await NotificationCampaignModelPostgres.markSent(campaignId, summary.sent, summary.failed);
+    } else {
+      await NotificationCampaignModelPostgres.markFailed(campaignId, {
+        sentCount: 0,
+        failedCount: summary.failed,
+      });
+    }
+
+    console.log('[NotificationService] Campaign delivery completed', {
+      campaignId,
+      sentCount: summary.sent,
+      failedCount: summary.failed,
+      totals,
     });
-    return { success: true, mode: 'simulation', estimatedCount };
+    return {
+      success: true,
+      mode: 'delivery',
+      sentCount: summary.sent,
+      failedCount: summary.failed,
+      totals,
+    };
   } catch (error) {
     console.error('[NotificationService] Error sending campaign:', error);
 
     await NotificationCampaignModelPostgres.markFailed(campaignId).catch(() => undefined);
     
     return { success: false, error: 'Failed to send campaign' };
+  }
+}
+
+export async function getCampaignStats(campaignId: string): Promise<{
+  success: boolean;
+  error?: string;
+  data?: Awaited<ReturnType<typeof CampaignDispatchLogModelPostgres.stats>>;
+}> {
+  try {
+    const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
+    if (!campaign) {
+      return { success: false, error: 'Campaign not found' };
+    }
+    const stats = await CampaignDispatchLogModelPostgres.stats(campaignId);
+    return { success: true, data: stats };
+  } catch (error) {
+    console.error('[NotificationService] Error fetching campaign stats:', error);
+    return { success: false, error: 'Failed to fetch campaign stats' };
+  }
+}
+
+async function retryEmailLog(campaign: NotificationCampaignRecord, log: CampaignDispatchLogRecord): Promise<CampaignDispatchLogInput> {
+  const retryResult = await dispatchEmail(campaign, {
+    id: log.subscriptionId ?? log.id,
+    email: log.recipient,
+  });
+  return {
+    ...retryResult,
+    metadata: { retryOf: log.id },
+    attemptCount: log.attemptCount + 1,
+  };
+}
+
+async function retryPushLog(campaign: NotificationCampaignRecord, log: CampaignDispatchLogRecord): Promise<CampaignDispatchLogInput> {
+  const endpoint = log.pushEndpoint ?? log.recipient;
+  const subscription = await PushSubscriptionModelPostgres.findByEndpoint(endpoint);
+  if (!subscription) {
+    return {
+      campaignId: campaign.id,
+      channel: 'push',
+      recipient: endpoint,
+      recipientUserId: log.recipientUserId,
+      pushEndpoint: endpoint,
+      status: 'failed',
+      error: 'Push subscription no longer exists',
+      metadata: { retryOf: log.id },
+      attemptCount: log.attemptCount + 1,
+    };
+  }
+  const retryResult = await dispatchPush(campaign, subscription, { vapidConfigured: configureWebPush() });
+  return {
+    ...retryResult,
+    metadata: { retryOf: log.id },
+    attemptCount: log.attemptCount + 1,
+  };
+}
+
+export async function retryFailedCampaign(campaignId: string): Promise<{
+  success: boolean;
+  error?: string;
+  mode?: 'delivery';
+  retried?: number;
+  sentCount?: number;
+  failedCount?: number;
+}> {
+  try {
+    const campaign = await NotificationCampaignModelPostgres.findById(campaignId);
+    if (!campaign) {
+      return { success: false, error: 'Campaign not found' };
+    }
+    if (campaign.unsupportedSegment) {
+      await NotificationCampaignModelPostgres.markFailed(campaignId);
+      return { success: false, error: 'Campaign segment is no longer supported' };
+    }
+
+    const failedLogs = await CampaignDispatchLogModelPostgres.listFailed(campaignId);
+    if (failedLogs.length === 0) {
+      return { success: true, mode: 'delivery', retried: 0, sentCount: 0, failedCount: 0 };
+    }
+
+    await NotificationCampaignModelPostgres.markSending(campaignId);
+    const retryLogs: CampaignDispatchLogInput[] = [];
+    for (const log of failedLogs) {
+      if (log.channel === 'email') {
+        retryLogs.push(await retryEmailLog(campaign, log));
+      } else {
+        retryLogs.push(await retryPushLog(campaign, log));
+      }
+    }
+
+    await CampaignDispatchLogModelPostgres.createMany(retryLogs);
+    const summary = summarizeDispatch(retryLogs);
+    const allStats = await CampaignDispatchLogModelPostgres.stats(campaignId);
+
+    if (allStats.sent > 0) {
+      await NotificationCampaignModelPostgres.markSent(campaignId, allStats.sent, allStats.failed);
+    } else {
+      await NotificationCampaignModelPostgres.markFailed(campaignId, {
+        sentCount: 0,
+        failedCount: allStats.failed,
+      });
+    }
+
+    return {
+      success: true,
+      mode: 'delivery',
+      retried: failedLogs.length,
+      sentCount: summary.sent,
+      failedCount: summary.failed,
+    };
+  } catch (error) {
+    console.error('[NotificationService] Error retrying campaign:', error);
+    await NotificationCampaignModelPostgres.markFailed(campaignId).catch(() => undefined);
+    return { success: false, error: 'Failed to retry campaign' };
   }
 }
 
@@ -437,9 +767,12 @@ export async function processScheduledCampaigns(): Promise<number> {
 
 export const notificationService = {
   createCampaign,
+  estimateCampaignRecipients,
+  getCampaignStats,
   getCampaigns,
   getUserSegments,
   getSegmentUserCount,
+  retryFailedCampaign,
   sendCampaign,
   scheduleCampaign,
   deleteCampaign,

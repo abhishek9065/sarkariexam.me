@@ -212,13 +212,14 @@ export class NotificationCampaignModelPostgres {
     return updated.count > 0;
   }
 
-  static async markSent(id: string, sentCount: number): Promise<boolean> {
+  static async markSent(id: string, sentCount: number, failedCount = 0): Promise<boolean> {
     const updated = await prismaApp.notificationCampaignEntry.updateMany({
       where: { id },
       data: {
         status: 'sent',
         sentAt: new Date(),
         sentCount,
+        failedCount,
       },
     });
     return updated.count > 0;
@@ -236,10 +237,14 @@ export class NotificationCampaignModelPostgres {
     return updated.count > 0;
   }
 
-  static async markFailed(id: string): Promise<boolean> {
+  static async markFailed(id: string, counts?: { sentCount?: number; failedCount?: number }): Promise<boolean> {
     const updated = await prismaApp.notificationCampaignEntry.updateMany({
       where: { id },
-      data: { status: 'failed' },
+      data: {
+        status: 'failed',
+        ...(typeof counts?.sentCount === 'number' ? { sentCount: counts.sentCount } : {}),
+        ...(typeof counts?.failedCount === 'number' ? { failedCount: counts.failedCount } : {}),
+      },
     });
     return updated.count > 0;
   }

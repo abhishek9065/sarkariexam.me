@@ -1170,15 +1170,64 @@ router.post('/campaigns/:id/send', async (req, res) => {
     
     if (!result.success) return res.status(400).json({ error: result.error });
     return res.json({
-      message: 'Campaign simulation completed',
+      message: 'Campaign delivery completed',
       data: {
-        mode: result.mode ?? 'simulation',
-        estimatedCount: result.estimatedCount ?? 0,
+        mode: result.mode ?? 'delivery',
+        sentCount: result.sentCount ?? 0,
+        failedCount: result.failedCount ?? 0,
+        totals: result.totals ?? { email: 0, push: 0, total: 0 },
       },
     });
   } catch (error) {
     console.error('[Admin] Send campaign error:', error);
     return res.status(500).json({ error: 'Failed to send campaign' });
+  }
+});
+
+router.get('/campaigns/:id/estimate', async (req, res) => {
+  try {
+    const { estimateCampaignRecipients } = await import('../services/notifications.js');
+    const result = await estimateCampaignRecipients(req.params.id);
+
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ data: result.data });
+  } catch (error) {
+    console.error('[Admin] Campaign estimate error:', error);
+    return res.status(500).json({ error: 'Failed to estimate campaign recipients' });
+  }
+});
+
+router.get('/campaigns/:id/stats', async (req, res) => {
+  try {
+    const { getCampaignStats } = await import('../services/notifications.js');
+    const result = await getCampaignStats(req.params.id);
+
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({ data: result.data });
+  } catch (error) {
+    console.error('[Admin] Campaign stats error:', error);
+    return res.status(500).json({ error: 'Failed to fetch campaign stats' });
+  }
+});
+
+router.post('/campaigns/:id/retry-failed', async (req, res) => {
+  try {
+    const { retryFailedCampaign } = await import('../services/notifications.js');
+    const result = await retryFailedCampaign(req.params.id);
+
+    if (!result.success) return res.status(400).json({ error: result.error });
+    return res.json({
+      message: 'Failed campaign deliveries retried',
+      data: {
+        mode: result.mode ?? 'delivery',
+        retried: result.retried ?? 0,
+        sentCount: result.sentCount ?? 0,
+        failedCount: result.failedCount ?? 0,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin] Campaign retry error:', error);
+    return res.status(500).json({ error: 'Failed to retry campaign' });
   }
 });
 

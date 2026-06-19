@@ -22,6 +22,83 @@ export const isEmailConfigured = (): boolean => {
   return isConfigured;
 };
 
+const escapeHtml = (value: string): string => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+/**
+ * Send a free-form admin notification campaign email.
+ */
+export const sendCampaignEmail = async (options: {
+  to: string;
+  title: string;
+  body: string;
+  url?: string;
+  campaignId: string;
+}): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+  if (!isConfigured) {
+    return { success: false, error: 'SendGrid is not configured' };
+  }
+
+  const campaignUrl = options.url
+    ? (() => {
+        const url = new URL(options.url, config.frontendUrl);
+        url.searchParams.set('source', 'campaign');
+        url.searchParams.set('medium', 'email');
+        url.searchParams.set('campaign', options.campaignId);
+        return url.toString();
+      })()
+    : config.frontendUrl;
+
+  try {
+    const [response] = await sgMail.send({
+      to: options.to,
+      from: config.emailFrom || 'noreply@sarkariresult.com',
+      subject: options.title,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #111827; }
+            .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+            .header { background: #1a365d; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f8fafc; }
+            .card { background: white; padding: 18px; border-radius: 8px; }
+            .button { display: inline-block; background: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
+            .footer { padding: 16px; text-align: center; font-size: 12px; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>${escapeHtml(options.title)}</h1>
+            </div>
+            <div class="content">
+              <div class="card">
+                <p>${escapeHtml(options.body).replace(/\n/g, '<br>')}</p>
+                <p><a href="${campaignUrl}" class="button">View details</a></p>
+              </div>
+            </div>
+            <div class="footer">
+              <p>You are receiving this email because you subscribed to SarkariExams updates.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    const messageId = response.headers?.['x-message-id'];
+    return { success: true, messageId: Array.isArray(messageId) ? messageId[0] : messageId };
+  } catch (error) {
+    console.error('Failed to send campaign email:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to send campaign email' };
+  }
+};
+
 /**
  * Send password recovery email.
  */

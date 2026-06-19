@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   getUpcomingDeadlines: vi.fn(),
   bulkImportAnnouncements: vi.fn(),
   createCampaign: vi.fn(),
+  estimateCampaignRecipients: vi.fn(),
+  getCampaignStats: vi.fn(),
+  retryFailedCampaign: vi.fn(),
   sendCampaign: vi.fn(),
   assignAnnouncement: vi.fn(),
   approveAnnouncement: vi.fn(),
@@ -79,9 +82,12 @@ vi.mock('../services/calendar.js', () => ({
 }));
 vi.mock('../services/notifications.js', () => ({
   createCampaign: mocks.createCampaign,
+  estimateCampaignRecipients: mocks.estimateCampaignRecipients,
   getCampaigns: vi.fn(),
+  getCampaignStats: mocks.getCampaignStats,
   getSegmentUserCount: vi.fn(),
   getUserSegments: vi.fn(() => ({ totalUsers: 0, states: [], categories: [] })),
+  retryFailedCampaign: mocks.retryFailedCampaign,
   sendCampaign: mocks.sendCampaign,
 }));
 vi.mock('../services/workflow.js', () => ({
@@ -97,6 +103,18 @@ vi.mock('../services/engagement.js', () => ({
   getUserFeedback: vi.fn(),
   moderateComment: mocks.moderateComment,
 }));
+
+vi.mock('../config.js', async () => {
+  const actual = await vi.importActual<typeof import('../config.js')>('../config.js');
+  return {
+    ...actual,
+    config: {
+      ...actual.config,
+      vapidPublicKey: '',
+      vapidPrivateKey: '',
+    },
+  };
+});
 
 const createApp = async () => {
   const { default: adminRouter } = await import('../routes/admin.js');
@@ -126,7 +144,25 @@ describe('admin routes', () => {
     mocks.getUpcomingDeadlines.mockResolvedValue([]);
     mocks.bulkImportAnnouncements.mockResolvedValue({ imported: 1 });
     mocks.createCampaign.mockResolvedValue({ success: true, campaignId: 'campaign-1' });
-    mocks.sendCampaign.mockResolvedValue({ success: true, mode: 'simulation', estimatedCount: 3 });
+    mocks.estimateCampaignRecipients.mockResolvedValue({ success: true, data: { email: 2, push: 1, total: 3 } });
+    mocks.getCampaignStats.mockResolvedValue({
+      success: true,
+      data: {
+        total: 3,
+        sent: 2,
+        failed: 1,
+        byChannel: [{ channel: 'email', sent: 2, failed: 0, total: 2 }],
+        recentFailures: [],
+      },
+    });
+    mocks.retryFailedCampaign.mockResolvedValue({ success: true, mode: 'delivery', retried: 1, sentCount: 1, failedCount: 0 });
+    mocks.sendCampaign.mockResolvedValue({
+      success: true,
+      mode: 'delivery',
+      sentCount: 2,
+      failedCount: 1,
+      totals: { email: 2, push: 1, total: 3 },
+    });
     mocks.assignAnnouncement.mockResolvedValue({ success: true });
     mocks.approveAnnouncement.mockResolvedValue({ success: true });
     mocks.rejectAnnouncement.mockResolvedValue({ success: true });
@@ -246,18 +282,35 @@ describe('admin routes', () => {
     expect(mocks.moderateComment).not.toHaveBeenCalled();
   });
 
-  it('labels campaign send as simulation', async () => {
+  it('returns campaign delivery result from send endpoint', async () => {
     const app = await createApp();
     const response = await request(app).post('/admin/campaigns/campaign-1/send');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      message: 'Campaign simulation completed',
+      message: 'Campaign delivery completed',
       data: {
-        mode: 'simulation',
-        estimatedCount: 3,
+        mode: 'delivery',
+        sentCount: 2,
+        failedCount: 1,
+        totals: { email: 2, push: 1, total: 3 },
       },
     });
+  });
+
+  it('exposes campaign estimate, stats, and failed retry endpoints', async () => {
+    const app = await createApp();
+
+    const estimateResponse = await request(app).get('/admin/campaigns/campaign-1/estimate');
+    const statsResponse = await request(app).get('/admin/campaigns/campaign-1/stats');
+    const retryResponse = await request(app).post('/admin/campaigns/campaign-1/retry-failed');
+
+    expect(estimateResponse.status).toBe(200);
+    expect(estimateResponse.body.data).toEqual({ email: 2, push: 1, total: 3 });
+    expect(statsResponse.status).toBe(200);
+    expect(statsResponse.body.data).toMatchObject({ total: 3, sent: 2, failed: 1 });
+    expect(retryResponse.status).toBe(200);
+    expect(retryResponse.body.data).toEqual({ mode: 'delivery', retried: 1, sentCount: 1, failedCount: 0 });
   });
 
   it('rejects invalid content analytics type values', async () => {

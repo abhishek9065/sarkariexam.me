@@ -87,6 +87,13 @@ export class PushSubscriptionModelPostgres {
     });
     return rows.map((row: PushSubscriptionRow) => toRecord(row));
   }
+
+  static async findByEndpoint(endpoint: string): Promise<PushSubscriptionRecord | null> {
+    const row = await prismaApp.pushSubscriptionEntry.findUnique({
+      where: { endpoint },
+    });
+    return row ? toRecord(row) : null;
+  }
 }
 
 export default PushSubscriptionModelPostgres;

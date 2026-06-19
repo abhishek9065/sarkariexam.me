@@ -1,453 +1,356 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Edit2,
-  ExternalLink,
-  GripVertical,
-  Link2,
-  Plus,
-  Radio,
-  Save,
-  ToggleLeft,
-  ToggleRight,
-  Trash2,
-  X,
+  AlertTriangle,
+  BarChart3,
+  Eye,
+  Loader2,
+  Mail,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Smartphone,
 } from 'lucide-react';
 
-type TickerItem = {
-  id: string;
-  text: string;
-  emoji: string;
-  active: boolean;
-  url: string;
+import {
+  estimateCampaign,
+  getCampaigns,
+  getCampaignStats,
+  retryFailedCampaign,
+  sendCampaign,
+  type CampaignDeliveryStats,
+  type CampaignRecipientEstimate,
+} from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+
+type Campaign = Awaited<ReturnType<typeof getCampaigns>>['data'][number];
+
+const statusClass: Record<string, string> = {
+  draft: 'border-slate-200 bg-slate-50 text-slate-700',
+  scheduled: 'border-blue-200 bg-blue-50 text-blue-700',
+  sending: 'border-amber-200 bg-amber-50 text-amber-700',
+  sent: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  simulated: 'border-purple-200 bg-purple-50 text-purple-700',
+  failed: 'border-red-200 bg-red-50 text-red-700',
+  unsupported: 'border-red-200 bg-red-50 text-red-700',
 };
 
-type QuickLink = {
-  id: string;
-  label: string;
-  url: string;
-  category: string;
-  active: boolean;
-};
+function formatDate(value?: string) {
+  if (!value) return 'Not set';
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
 
-const INITIAL_TICKER: TickerItem[] = [
-  { id: '1', text: 'SSC CGL 2026 Notification Out — Apply Before 30 April!', emoji: '🔥', active: true, url: '/detail/ssc-cgl-2026' },
-  { id: '2', text: 'UPSC CSE Prelims 2026 Result Declared!', emoji: '📢', active: true, url: '#' },
-  { id: '3', text: 'Railway Group D Admit Card Released', emoji: '📋', active: true, url: '#' },
-  { id: '4', text: 'IBPS PO 2026 Online Form Started', emoji: '🏦', active: true, url: '#' },
-  { id: '5', text: 'CTET 2026 Registration Begins', emoji: '🏫', active: true, url: '#' },
-];
+function statusLabel(campaign: Campaign) {
+  return campaign.unsupportedSegment ? 'unsupported' : campaign.status;
+}
 
-const INITIAL_LINKS: QuickLink[] = [
-  { id: '1', label: 'UPSC', url: 'https://upsc.gov.in', category: 'PSC', active: true },
-  { id: '2', label: 'SSC', url: 'https://ssc.nic.in', category: 'Central', active: true },
-  { id: '3', label: 'IBPS', url: 'https://ibps.in', category: 'Banking', active: true },
-  { id: '4', label: 'RRB', url: 'https://indianrailways.gov.in', category: 'Railway', active: true },
-  { id: '5', label: 'NTA', url: 'https://nta.ac.in', category: 'Education', active: true },
-  { id: '6', label: 'UPPSC', url: 'https://uppsc.up.nic.in', category: 'State PSC', active: true },
-];
-
-const EMOJIS = ['🔥', '📢', '📋', '🏦', '⚔️', '👮', '📝', '🎯', '🏫', '🔔', '⭐', '🆕', '🏆', '✅', '⚡', '📌'];
+function ChannelStat({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Mail }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
+      <Icon className="h-4 w-4 text-muted-foreground" />
+      <div>
+        <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
+        <p className="text-sm font-bold text-foreground">{value.toLocaleString('en-IN')}</p>
+      </div>
+    </div>
+  );
+}
 
 export function NotificationsPage() {
-  const [tab, setTab] = useState<'ticker' | 'links'>('ticker');
-  const [ticker, setTicker] = useState<TickerItem[]>(INITIAL_TICKER);
-  const [links, setLinks] = useState<QuickLink[]>(INITIAL_LINKS);
-  const [modal, setModal] = useState<'add-ticker' | 'edit-ticker' | 'add-link' | 'edit-link' | 'delete-ticker' | 'delete-link' | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [tickerForm, setTickerForm] = useState({ text: '', emoji: '🔥', url: '', active: true });
-  const [linkForm, setLinkForm] = useState({ label: '', url: '', category: '', active: true });
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [estimate, setEstimate] = useState<CampaignRecipientEstimate | null>(null);
+  const [stats, setStats] = useState<CampaignDeliveryStats | null>(null);
 
-  function openAddTicker() {
-    setTickerForm({ text: '', emoji: '🔥', url: '', active: true });
-    setModal('add-ticker');
-  }
+  const selectedCampaign = useMemo(
+    () => campaigns.find((campaign) => campaign.id === selectedId) ?? campaigns[0],
+    [campaigns, selectedId],
+  );
 
-  function openEditTicker(item: TickerItem) {
-    setEditingId(item.id);
-    setTickerForm({ text: item.text, emoji: item.emoji, url: item.url, active: item.active });
-    setModal('edit-ticker');
-  }
-
-  function saveTicker() {
-    if (!tickerForm.text.trim()) {
-      toast.error('Ticker text is required.');
-      return;
+  async function loadCampaigns() {
+    setLoading(true);
+    try {
+      const response = await getCampaigns();
+      setCampaigns(response.data);
+      setSelectedId((current) => current ?? response.data[0]?.id ?? null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load campaigns.');
+    } finally {
+      setLoading(false);
     }
+  }
 
-    if (modal === 'add-ticker') {
-      setTicker(current => [...current, { id: Date.now().toString(), ...tickerForm }]);
-      toast.success('Ticker item added.');
-    } else {
-      setTicker(current => current.map(item => item.id === editingId ? { ...item, ...tickerForm } : item));
-      toast.success('Ticker item updated.');
+  async function loadStats(campaignId: string) {
+    try {
+      const response = await getCampaignStats(campaignId);
+      setStats(response.data);
+    } catch {
+      setStats(null);
     }
-
-    setModal(null);
   }
 
-  function deleteTicker() {
-    setTicker(current => current.filter(item => item.id !== editingId));
-    setModal(null);
-    toast.success('Ticker item deleted.');
-  }
+  useEffect(() => {
+    void loadCampaigns();
+  }, []);
 
-  function openAddLink() {
-    setLinkForm({ label: '', url: '', category: '', active: true });
-    setModal('add-link');
-  }
-
-  function openEditLink(item: QuickLink) {
-    setEditingId(item.id);
-    setLinkForm({ label: item.label, url: item.url, category: item.category, active: item.active });
-    setModal('edit-link');
-  }
-
-  function saveLink() {
-    if (!linkForm.label.trim() || !linkForm.url.trim()) {
-      toast.error('Label and URL are required.');
-      return;
+  useEffect(() => {
+    setEstimate(null);
+    setStats(null);
+    if (selectedCampaign?.id) {
+      void loadStats(selectedCampaign.id);
     }
+  }, [selectedCampaign?.id]);
 
-    if (modal === 'add-link') {
-      setLinks(current => [...current, { id: Date.now().toString(), ...linkForm }]);
-      toast.success('Quick link added.');
-    } else {
-      setLinks(current => current.map(item => item.id === editingId ? { ...item, ...linkForm } : item));
-      toast.success('Quick link updated.');
+  async function runEstimate() {
+    if (!selectedCampaign) return;
+    setBusyAction('estimate');
+    try {
+      const response = await estimateCampaign(selectedCampaign.id);
+      setEstimate(response.data);
+      toast.success('Recipient estimate loaded.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to estimate recipients.');
+    } finally {
+      setBusyAction(null);
     }
-
-    setModal(null);
   }
 
-  function deleteLink() {
-    setLinks(current => current.filter(item => item.id !== editingId));
-    setModal(null);
-    toast.success('Quick link deleted.');
+  async function runSend() {
+    if (!selectedCampaign) return;
+    const confirmed = window.confirm(`Send campaign "${selectedCampaign.title}" now?`);
+    if (!confirmed) return;
+    setBusyAction('send');
+    try {
+      const response = await sendCampaign(selectedCampaign.id);
+      toast.success(`Campaign sent: ${response.data.sentCount} delivered, ${response.data.failedCount} failed.`);
+      await loadCampaigns();
+      await loadStats(selectedCampaign.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send campaign.');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function runRetry() {
+    if (!selectedCampaign) return;
+    const confirmed = window.confirm(`Retry failed deliveries for "${selectedCampaign.title}"?`);
+    if (!confirmed) return;
+    setBusyAction('retry');
+    try {
+      const response = await retryFailedCampaign(selectedCampaign.id);
+      toast.success(`Retried ${response.data.retried}: ${response.data.sentCount} delivered, ${response.data.failedCount} failed.`);
+      await loadCampaigns();
+      await loadStats(selectedCampaign.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to retry campaign.');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  const emailStats = stats?.byChannel.find((item) => item.channel === 'email');
+  const pushStats = stats?.byChannel.find((item) => item.channel === 'push');
+  const actionDisabled = !selectedCampaign || selectedCampaign.unsupportedSegment || selectedCampaign.status === 'sending' || selectedCampaign.status === 'sent';
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[420px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-[18px] font-extrabold text-gray-800">Ticker & Quick Links</h2>
-          <p className="text-[11px] text-gray-400">Manage the scrolling ticker bar and important website links</p>
+          <h2 className="text-[18px] font-extrabold text-foreground">Campaign Delivery</h2>
+          <p className="text-[12px] text-muted-foreground">Preview, estimate, send, and retry notification campaigns.</p>
         </div>
-        <button
-          type="button"
-          onClick={tab === 'ticker' ? openAddTicker : openAddLink}
-          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-bold text-white shadow-md transition-all hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.3)' }}
-        >
-          <Plus className="h-4 w-4" />
-          Add New
-        </button>
+        <Button type="button" variant="outline" onClick={loadCampaigns}>
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </Button>
       </div>
 
-      <div className="flex w-fit gap-1 rounded-xl bg-gray-100 p-1">
-        <button
-          type="button"
-          onClick={() => setTab('ticker')}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${tab === 'ticker' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          <Radio className="h-3.5 w-3.5" />
-          Ticker Items ({ticker.filter(item => item.active).length} active)
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('links')}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${tab === 'links' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          <Link2 className="h-3.5 w-3.5" />
-          Quick Links ({links.filter(item => item.active).length} active)
-        </button>
-      </div>
-
-      {tab === 'ticker' ? (
-        <div className="space-y-2">
-          <div className="overflow-hidden rounded-[22px] border border-border bg-card shadow-sm">
-            <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
-              <Radio className="h-3 w-3 text-blue-500 animate-pulse" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Live Preview</span>
-            </div>
-            <div className="overflow-hidden bg-accent/10 py-3 pause-on-hover flex whitespace-nowrap">
-              {ticker.filter(item => item.active).length > 0 ? (
-                <>
-                  <div className="animate-marquee flex gap-8 shrink-0 pr-8">
-                    {ticker.filter(item => item.active).map(item => (
-                      <a key={`1-${item.id}`} href={item.url || '#'} className="text-[13px] font-semibold text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors flex items-center gap-1.5" onClick={e => e.preventDefault()}>
-                        <span>{item.emoji}</span>
-                        <span>{item.text}</span>
-                      </a>
-                    ))}
-                  </div>
-                  <div className="animate-marquee flex gap-8 shrink-0 pr-8" aria-hidden="true">
-                    {ticker.filter(item => item.active).map(item => (
-                      <a key={`2-${item.id}`} href={item.url || '#'} className="text-[13px] font-semibold text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors flex items-center gap-1.5" onClick={e => e.preventDefault()}>
-                        <span>{item.emoji}</span>
-                        <span>{item.text}</span>
-                      </a>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="px-4 text-[12px] text-muted-foreground">No active ticker items</p>
-              )}
-            </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(340px,0.9fr)_minmax(520px,1.1fr)]">
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <p className="text-[11px] font-bold uppercase text-muted-foreground">Campaigns</p>
           </div>
+          <div className="max-h-[680px] overflow-y-auto">
+            {campaigns.length === 0 ? (
+              <p className="px-4 py-8 text-sm text-muted-foreground">No campaigns found.</p>
+            ) : campaigns.map((campaign) => {
+              const label = statusLabel(campaign);
+              return (
+                <button
+                  key={campaign.id}
+                  type="button"
+                  onClick={() => setSelectedId(campaign.id)}
+                  className={`w-full border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted/60 ${selectedCampaign?.id === campaign.id ? 'bg-muted' : 'bg-card'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-foreground">{campaign.title}</p>
+                      <p className="mt-1 text-[12px] text-muted-foreground">
+                        {campaign.segment.type}: {campaign.segment.value || 'all'}
+                      </p>
+                    </div>
+                    <Badge className={statusClass[label] ?? statusClass.draft} variant="outline">{label}</Badge>
+                  </div>
+                  <div className="mt-3 flex gap-3 text-[11px] text-muted-foreground">
+                    <span>{campaign.sentCount.toLocaleString('en-IN')} sent</span>
+                    <span>{campaign.failedCount.toLocaleString('en-IN')} failed</span>
+                    <span>{formatDate(campaign.createdAt)}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-          <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
-            <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-gray-100 bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">#</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Ticker Text</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Status</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Actions</span>
-            </div>
-
-            {ticker.map((item, index) => (
-              <div
-                key={item.id}
-                className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-orange-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
-              >
-                <div className="flex items-center gap-2">
-                  <GripVertical className="h-3.5 w-3.5 text-gray-300" />
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 text-[14px]">{item.emoji}</span>
-                </div>
+        {selectedCampaign ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-gray-700">{item.text}</p>
-                  {item.url && <p className="truncate text-[10px] text-gray-400">{item.url}</p>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-extrabold text-foreground">{selectedCampaign.title}</h3>
+                    <Badge className={statusClass[statusLabel(selectedCampaign)] ?? statusClass.draft} variant="outline">
+                      {statusLabel(selectedCampaign)}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 max-w-2xl whitespace-pre-wrap text-sm text-muted-foreground">{selectedCampaign.body}</p>
+                  {selectedCampaign.url ? (
+                    <a href={selectedCampaign.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline">
+                      {selectedCampaign.url}
+                    </a>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setTicker(current => current.map(entry => entry.id === item.id ? { ...entry, active: !entry.active } : entry))}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${item.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                >
-                  {item.active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
-                  {item.active ? 'Active' : 'Inactive'}
-                </button>
-                <div className="flex items-center gap-1.5">
-                  <button type="button" onClick={() => openEditTicker(item)} className="rounded-lg bg-blue-50 p-2 text-blue-600 transition-colors hover:bg-blue-100">
-                    <Edit2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button type="button" onClick={() => { setEditingId(item.id); setModal('delete-ticker'); }} className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
-          <div className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-gray-100 bg-gradient-to-r from-[#f8f9ff] to-[#f0f4ff] px-4 py-3">
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Label / Name</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">URL</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Status</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Actions</span>
-          </div>
-
-          {links.map((item, index) => (
-            <div
-              key={item.id}
-              className={`grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
-            >
-              <div>
-                <p className="text-[13px] font-bold text-gray-800">{item.label}</p>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-600">{item.category}</span>
-              </div>
-              <div className="flex min-w-0 items-center gap-1.5">
-                <ExternalLink className="h-3 w-3 shrink-0 text-gray-400" />
-                <a href={item.url} target="_blank" rel="noopener noreferrer" className="truncate text-[11px] text-blue-600 hover:underline">{item.url}</a>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLinks(current => current.map(entry => entry.id === item.id ? { ...entry, active: !entry.active } : entry))}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${item.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-              >
-                {item.active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
-                {item.active ? 'Active' : 'Inactive'}
-              </button>
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={() => openEditLink(item)} className="rounded-lg bg-blue-50 p-2 text-blue-600 transition-colors hover:bg-blue-100">
-                  <Edit2 className="h-3.5 w-3.5" />
-                </button>
-                <button type="button" onClick={() => { setEditingId(item.id); setModal('delete-link'); }} className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(modal === 'add-ticker' || modal === 'edit-ticker') && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
-          <div className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4" style={{ background: 'linear-gradient(90deg, #060d2e, #1a237e)' }}>
-              <div className="flex items-center gap-2.5">
-                <Radio className="h-4 w-4 text-white" />
-                <span className="text-[14px] font-extrabold text-white">{modal === 'add-ticker' ? 'Add Ticker Item' : 'Edit Ticker Item'}</span>
-              </div>
-              <button type="button" onClick={() => setModal(null)} className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Emoji Icon</label>
                 <div className="flex flex-wrap gap-2">
-                  {EMOJIS.map(emoji => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setTickerForm(current => ({ ...current, emoji }))}
-                      className={`flex h-9 w-9 items-center justify-center rounded-lg text-xl transition-all ${tickerForm.emoji === emoji ? 'scale-110 bg-orange-50 ring-2 ring-orange-400' : 'bg-gray-100 hover:bg-gray-200'}`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+                  <Button type="button" variant="outline" onClick={runEstimate} disabled={busyAction !== null || selectedCampaign.unsupportedSegment}>
+                    {busyAction === 'estimate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                    Estimate
+                  </Button>
+                  <Button type="button" onClick={runSend} disabled={busyAction !== null || actionDisabled || selectedCampaign.status === 'simulated'}>
+                    {busyAction === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    Send now
+                  </Button>
+                  <Button type="button" variant="outline" onClick={runRetry} disabled={busyAction !== null || selectedCampaign.unsupportedSegment || (stats?.failed ?? selectedCampaign.failedCount) === 0}>
+                    {busyAction === 'retry' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                    Retry failed
+                  </Button>
                 </div>
               </div>
-              <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Ticker Text</label>
-                <textarea
-                  value={tickerForm.text}
-                  onChange={event => setTickerForm(current => ({ ...current, text: event.target.value }))}
-                  rows={2}
-                  className="w-full resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-orange-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Link URL</label>
-                <input
-                  value={tickerForm.url}
-                  onChange={event => setTickerForm(current => ({ ...current, url: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-orange-400"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-[13px] font-semibold text-gray-700">Active / Visible</label>
-                <button
-                  type="button"
-                  onClick={() => setTickerForm(current => ({ ...current, active: !current.active }))}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${tickerForm.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                >
-                  {tickerForm.active ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                  {tickerForm.active ? 'Active' : 'Inactive'}
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4">
-              <button type="button" onClick={() => setModal(null)} className="rounded-xl border border-gray-200 px-5 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-100">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveTicker}
-                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)' }}
-              >
-                <Save className="h-3.5 w-3.5" />
-                Save Item
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {(modal === 'add-link' || modal === 'edit-link') && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
-          <div className="w-full max-w-md overflow-hidden rounded-[22px] bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4" style={{ background: 'linear-gradient(90deg, #060d2e, #1a237e)' }}>
-              <div className="flex items-center gap-2.5">
-                <Link2 className="h-4 w-4 text-white" />
-                <span className="text-[14px] font-extrabold text-white">{modal === 'add-link' ? 'Add Quick Link' : 'Edit Quick Link'}</span>
-              </div>
-              <button type="button" onClick={() => setModal(null)} className="rounded-full p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white">
-                <X className="h-4 w-4" />
-              </button>
+              {selectedCampaign.unsupportedSegment ? (
+                <div className="mt-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <AlertTriangle className="mt-0.5 h-4 w-4" />
+                  This legacy segment is unsupported and cannot be sent.
+                </div>
+              ) : null}
             </div>
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Display Label</label>
-                <input
-                  value={linkForm.label}
-                  onChange={event => setLinkForm(current => ({ ...current, label: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Website URL</label>
-                <input
-                  value={linkForm.url}
-                  onChange={event => setLinkForm(current => ({ ...current, url: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[11px] font-bold uppercase text-gray-600">Category</label>
-                <input
-                  value={linkForm.category}
-                  onChange={event => setLinkForm(current => ({ ...current, category: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-400"
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-[13px] font-semibold text-gray-700">Active</label>
-                <button
-                  type="button"
-                  onClick={() => setLinkForm(current => ({ ...current, active: !current.active }))}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${linkForm.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                >
-                  {linkForm.active ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                  {linkForm.active ? 'Active' : 'Inactive'}
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-5 py-4">
-              <button type="button" onClick={() => setModal(null)} className="rounded-xl border border-gray-200 px-5 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-100">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveLink}
-                className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, #1565c0, #1a237e)' }}
-              >
-                <Save className="h-3.5 w-3.5" />
-                Save Link
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {(modal === 'delete-ticker' || modal === 'delete-link') && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
-          <div className="w-full max-w-sm rounded-[22px] bg-white p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-red-100">
-              <Trash2 className="h-6 w-6 text-red-500" />
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-sm font-bold text-foreground">Recipient Estimate</h4>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <ChannelStat label="Email" value={estimate?.email ?? 0} icon={Mail} />
+                  <ChannelStat label="Push" value={estimate?.push ?? 0} icon={Smartphone} />
+                  <ChannelStat label="Total" value={estimate?.total ?? 0} icon={BarChart3} />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-sm font-bold text-foreground">Delivery Stats</h4>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <ChannelStat label="Delivered" value={stats?.sent ?? selectedCampaign.sentCount} icon={Send} />
+                  <ChannelStat label="Failed" value={stats?.failed ?? selectedCampaign.failedCount} icon={AlertTriangle} />
+                  <ChannelStat label="Attempts" value={stats?.total ?? selectedCampaign.sentCount + selectedCampaign.failedCount} icon={BarChart3} />
+                </div>
+              </div>
             </div>
-            <h3 className="mb-2 text-[16px] font-extrabold text-gray-800">Delete Item?</h3>
-            <p className="mb-5 text-[13px] text-gray-500">This will permanently remove the selected item.</p>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setModal(null)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-50">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={modal === 'delete-ticker' ? deleteTicker : deleteLink}
-                className="flex-1 rounded-xl py-2.5 text-[13px] font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, #c62828, #b71c1c)' }}
-              >
-                Delete
-              </button>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-border bg-card p-4">
+                <h4 className="mb-3 text-sm font-bold text-foreground">Channel Breakdown</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between rounded-lg bg-muted px-3 py-2">
+                    <span>Email</span>
+                    <span>{emailStats?.sent ?? 0} sent / {emailStats?.failed ?? 0} failed</span>
+                  </div>
+                  <div className="flex justify-between rounded-lg bg-muted px-3 py-2">
+                    <span>Push</span>
+                    <span>{pushStats?.sent ?? 0} sent / {pushStats?.failed ?? 0} failed</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-4">
+                <h4 className="mb-3 text-sm font-bold text-foreground">Schedule</h4>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>Created: {formatDate(selectedCampaign.createdAt)}</p>
+                  <p>Scheduled: {formatDate(selectedCampaign.scheduledAt)}</p>
+                  <p>Sent: {formatDate(selectedCampaign.sentAt)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="border-b border-border px-4 py-3">
+                <h4 className="text-sm font-bold text-foreground">Recent Failed Deliveries</h4>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="bg-muted text-left text-[11px] uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2">Channel</th>
+                      <th className="px-4 py-2">Recipient</th>
+                      <th className="px-4 py-2">Attempts</th>
+                      <th className="px-4 py-2">Error</th>
+                      <th className="px-4 py-2">Last attempt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(stats?.recentFailures ?? []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No failed deliveries recorded.</td>
+                      </tr>
+                    ) : stats?.recentFailures.map((failure) => (
+                      <tr key={failure.id} className="border-t border-border">
+                        <td className="px-4 py-2 font-semibold">{failure.channel}</td>
+                        <td className="max-w-[260px] truncate px-4 py-2">{failure.recipient}</td>
+                        <td className="px-4 py-2">{failure.attemptCount}</td>
+                        <td className="max-w-[280px] truncate px-4 py-2 text-red-600">{failure.error || 'Unknown failure'}</td>
+                        <td className="px-4 py-2">{formatDate(failure.lastAttemptAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 }

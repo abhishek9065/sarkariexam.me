@@ -612,9 +612,36 @@ model NotificationCampaignEntry {
   createdAt    DateTime @default(now()) @map("created_at")
   abTest       Json?    @map("ab_test")
 
+  dispatchLogs CampaignDispatchLogEntry[]
+
   @@index([status, scheduledAt], map: "app_notification_campaigns_status_scheduled_idx")
   @@index([createdAt], map: "app_notification_campaigns_created_idx")
   @@map("app_notification_campaigns")
+}
+
+model CampaignDispatchLogEntry {
+  id              String   @id
+  campaignId      String   @map("campaign_id")
+  channel         String
+  recipient       String
+  recipientUserId String?  @map("recipient_user_id")
+  subscriptionId  String?  @map("subscription_id")
+  pushEndpoint    String?  @map("push_endpoint")
+  status          String
+  messageId       String?  @map("message_id")
+  error           String?
+  metadata        Json?
+  attemptCount    Int      @default(1) @map("attempt_count")
+  lastAttemptAt   DateTime @default(now()) @map("last_attempt_at")
+  deliveredAt     DateTime? @map("delivered_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  campaign        NotificationCampaignEntry @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status], map: "app_campaign_dispatch_logs_campaign_status_idx")
+  @@index([campaignId, channel], map: "app_campaign_dispatch_logs_campaign_channel_idx")
+  @@index([channel, recipient], map: "app_campaign_dispatch_logs_channel_recipient_idx")
+  @@map("app_campaign_dispatch_logs")
 }
 
 model UserNotificationEntry {

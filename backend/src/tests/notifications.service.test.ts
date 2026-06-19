@@ -11,8 +11,16 @@ const mocks = vi.hoisted(() => ({
   campaignSchedule: vi.fn(),
   campaignRemove: vi.fn(),
   campaignListScheduledDue: vi.fn(),
+  dispatchCreateMany: vi.fn(),
+  dispatchListFailed: vi.fn(),
+  dispatchStats: vi.fn(),
+  sendCampaignEmail: vi.fn(),
+  webPushSendNotification: vi.fn(),
+  webPushSetVapidDetails: vi.fn(),
   pushListAll: vi.fn(),
+  pushFindByEndpoint: vi.fn(),
   subscriptionCount: vi.fn(),
+  subscriptionFindMany: vi.fn(),
   subscriptionStateGroupBy: vi.fn(),
   subscriptionCategoryGroupBy: vi.fn(),
   stateFindMany: vi.fn(),
@@ -37,6 +45,34 @@ vi.mock('../models/notificationCampaigns.postgres.js', () => ({
 vi.mock('../models/pushSubscriptions.postgres.js', () => ({
   default: {
     listAll: mocks.pushListAll,
+    findByEndpoint: mocks.pushFindByEndpoint,
+  },
+}));
+
+vi.mock('../models/campaignDispatchLogs.postgres.js', () => ({
+  default: {
+    createMany: mocks.dispatchCreateMany,
+    listFailed: mocks.dispatchListFailed,
+    stats: mocks.dispatchStats,
+  },
+}));
+
+vi.mock('../services/email.js', () => ({
+  sendCampaignEmail: mocks.sendCampaignEmail,
+}));
+
+vi.mock('web-push', () => ({
+  default: {
+    sendNotification: mocks.webPushSendNotification,
+    setVapidDetails: mocks.webPushSetVapidDetails,
+  },
+}));
+
+vi.mock('../config.js', () => ({
+  config: {
+    frontendUrl: 'https://sarkariexams.me',
+    vapidPublicKey: '',
+    vapidPrivateKey: '',
   },
 }));
 
@@ -44,6 +80,7 @@ vi.mock('../services/postgres/prisma.js', () => ({
   prisma: {
     subscription: {
       count: mocks.subscriptionCount,
+      findMany: mocks.subscriptionFindMany,
     },
     subscriptionState: {
       groupBy: mocks.subscriptionStateGroupBy,
@@ -74,8 +111,18 @@ describe('notification service', () => {
     mocks.campaignMarkSending.mockResolvedValue(true);
     mocks.campaignMarkSent.mockResolvedValue(true);
     mocks.campaignMarkSimulated.mockResolvedValue(true);
-    mocks.pushListAll.mockResolvedValue([{ id: 'push-1' }]);
+    mocks.dispatchCreateMany.mockResolvedValue(1);
+    mocks.dispatchListFailed.mockResolvedValue([]);
+    mocks.dispatchStats.mockResolvedValue({ total: 1, sent: 1, failed: 0, byChannel: [], recentFailures: [] });
+    mocks.sendCampaignEmail.mockResolvedValue({ success: true, messageId: 'msg-1' });
+    mocks.webPushSendNotification.mockResolvedValue(undefined);
+    mocks.pushListAll.mockResolvedValue([{ id: 'push-1', endpoint: 'https://push.example/sub', keys: { p256dh: 'p', auth: 'a' } }]);
+    mocks.pushFindByEndpoint.mockResolvedValue({ id: 'push-1', endpoint: 'https://push.example/sub', keys: { p256dh: 'p', auth: 'a' } });
     mocks.subscriptionCount.mockResolvedValue(2);
+    mocks.subscriptionFindMany.mockResolvedValue([
+      { id: 'sub-1', email: 'one@example.com' },
+      { id: 'sub-2', email: 'two@example.com' },
+    ]);
     mocks.subscriptionStateGroupBy.mockResolvedValue([]);
     mocks.subscriptionCategoryGroupBy.mockResolvedValue([]);
     mocks.stateFindMany.mockResolvedValue([]);
@@ -126,15 +173,84 @@ describe('notification service', () => {
     );
   });
 
-  it('marks campaign send attempts as simulated, not sent', async () => {
+  it('delivers campaign recipients and records dispatch logs', async () => {
     const { sendCampaign } = await import('../services/notifications.js');
 
     const result = await sendCampaign('campaign-1');
 
-    expect(result).toEqual({ success: true, mode: 'simulation', estimatedCount: 3 });
-    expect(mocks.campaignMarkSimulated).toHaveBeenCalledWith('campaign-1', 3);
-    expect(mocks.campaignMarkSent).not.toHaveBeenCalled();
-    expect(mocks.campaignMarkSending).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: true,
+      mode: 'delivery',
+      sentCount: 2,
+      failedCount: 1,
+      totals: { email: 2, push: 1, total: 3 },
+    });
+    expect(mocks.campaignMarkSending).toHaveBeenCalledWith('campaign-1');
+    expect(mocks.sendCampaignEmail).toHaveBeenCalledTimes(2);
+    expect(mocks.dispatchCreateMany).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ channel: 'email', status: 'sent', recipient: 'one@example.com' }),
+      expect.objectContaining({ channel: 'push', status: 'failed', error: 'VAPID keys are not configured' }),
+    ]));
+    expect(mocks.campaignMarkSent).toHaveBeenCalledWith('campaign-1', 2, 1);
+    expect(mocks.campaignMarkSimulated).not.toHaveBeenCalled();
+  });
+
+  it('marks campaign failed when all deliveries fail', async () => {
+    mocks.sendCampaignEmail.mockResolvedValue({ success: false, error: 'SendGrid is not configured' });
+    mocks.pushListAll.mockResolvedValue([]);
+    const { sendCampaign } = await import('../services/notifications.js');
+
+    const result = await sendCampaign('campaign-1');
+
+    expect(result).toEqual({
+      success: true,
+      mode: 'delivery',
+      sentCount: 0,
+      failedCount: 2,
+      totals: { email: 2, push: 0, total: 2 },
+    });
+    expect(mocks.campaignMarkFailed).toHaveBeenCalledWith('campaign-1', { sentCount: 0, failedCount: 2 });
+  });
+
+  it('estimates campaign recipients by channel', async () => {
+    const { estimateCampaignRecipients } = await import('../services/notifications.js');
+
+    const result = await estimateCampaignRecipients('campaign-1');
+
+    expect(result).toEqual({
+      success: true,
+      data: { email: 2, push: 1, total: 3 },
+    });
+  });
+
+  it('retries only failed campaign dispatches', async () => {
+    mocks.dispatchListFailed.mockResolvedValue([
+      {
+        id: 'failed-email',
+        campaignId: 'campaign-1',
+        channel: 'email',
+        recipient: 'retry@example.com',
+        subscriptionId: 'sub-retry',
+        status: 'failed',
+        attemptCount: 1,
+      },
+    ]);
+    mocks.dispatchStats.mockResolvedValue({ total: 2, sent: 1, failed: 1, byChannel: [], recentFailures: [] });
+    const { retryFailedCampaign } = await import('../services/notifications.js');
+
+    const result = await retryFailedCampaign('campaign-1');
+
+    expect(result).toEqual({
+      success: true,
+      mode: 'delivery',
+      retried: 1,
+      sentCount: 1,
+      failedCount: 0,
+    });
+    expect(mocks.sendCampaignEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'retry@example.com' }));
+    expect(mocks.dispatchCreateMany).toHaveBeenCalledWith([
+      expect.objectContaining({ channel: 'email', status: 'sent', metadata: { retryOf: 'failed-email' }, attemptCount: 2 }),
+    ]);
   });
 
   it('fails legacy unsupported campaign segments instead of simulating zero recipients', async () => {
