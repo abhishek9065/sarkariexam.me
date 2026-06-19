@@ -2,6 +2,7 @@ import { PostType as PrismaPostType, type Prisma } from '@prisma/client';
 import webpush from 'web-push';
 import { z } from 'zod';
 
+import { config } from '../config.js';
 import CampaignDispatchLogModelPostgres, {
   type CampaignDispatchLogInput,
   type CampaignDispatchLogRecord,
@@ -13,7 +14,6 @@ import NotificationCampaignModelPostgres, {
 import PushSubscriptionModelPostgres, { type PushSubscriptionRecord } from '../models/pushSubscriptions.postgres.js';
 import { slugify } from '../utils/slugify.js';
 
-import { config } from '../config.js';
 import { sendCampaignEmail } from './email.js';
 import { prisma } from './postgres/prisma.js';
 

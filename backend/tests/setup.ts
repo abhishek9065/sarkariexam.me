@@ -1,6 +1,7 @@
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import net from 'node:net';
+
 import dotenv from 'dotenv';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 
 import { closeConnection, connectToDatabase, getDatabase } from '../src/services/cosmosdb.js';

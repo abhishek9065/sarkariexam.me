@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+
 import type { Prisma } from '@prisma/client';
 
 import { prismaApp } from '../services/postgres/prisma.js';
