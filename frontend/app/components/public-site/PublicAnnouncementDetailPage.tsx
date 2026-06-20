@@ -51,7 +51,10 @@ import type {
   PortalListEntry,
 } from '@/app/lib/public-content';
 import { subscribeToAlerts } from '@/lib/alert-subscriptions';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { addBookmark, listBookmarkIds, listTrackedApplications, removeBookmark, trackApplication, type ContentType } from '@/lib/user-api';
 import { cn } from '@/lib/utils';
+import { PushNotificationOptIn } from './PushNotificationOptIn';
 import { SafeLink } from './SafeLink';
 
 interface PublicAnnouncementDetailPageProps {
@@ -254,6 +257,26 @@ function formatPostCountLabel(value?: string | number) {
   return `${text} ${suffix}`;
 }
 
+function parsePublicDate(value: string): Date | null {
+  const normalized = value.trim();
+  if (!normalized || /check|notice|not available|to be announced|tba/i.test(normalized)) return null;
+  const indianDate = normalized.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (indianDate) {
+    const months: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const month = months[indianDate[2].slice(0, 3).toLowerCase()];
+    const day = Number(indianDate[1]);
+    const year = Number(indianDate[3]);
+    if (month !== undefined) {
+      const parsed = new Date(year, month, day, 23, 59, 59);
+      if (parsed.getFullYear() === year && parsed.getMonth() === month && parsed.getDate() === day) return parsed;
+    }
+    return null;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(normalized)) return null;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function buildFallbackRelatedPosts(meta: CategoryPageMeta, relatedEntries: PortalListEntry[]): DetailRelatedPost[] {
   return relatedEntries.slice(0, 5).map((entry) => ({
     title: entry.title,
@@ -304,12 +327,19 @@ function PublicAnnouncementDetailPageInner({
   relatedEntries,
 }: PublicAnnouncementDetailPageProps) {
   const detail = item.detail;
+  const { isLoggedIn, isLoading: isAuthLoading } = useCurrentUser();
   const visualTheme = sectionVisualTheme[item.section];
   const sidebarGradient = `linear-gradient(145deg, ${detail.theme?.sidebarFrom ?? detail.theme?.gradientFrom ?? '#1a237e'} 0%, ${detail.theme?.sidebarTo ?? detail.theme?.gradientTo ?? '#bf360c'} 100%)`;
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [activeSection, setActiveSection] = useState('shortinfo');
   const [readProgress, setReadProgress] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [tracked, setTracked] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+  const [bookmarkStateReady, setBookmarkStateReady] = useState(false);
+  const [trackedStateReady, setTrackedStateReady] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(() => Number(detail.engagement.likes.replace(/,/g, '')));
   const [copied, setCopied] = useState(false);
@@ -370,6 +400,23 @@ function PublicAnnouncementDetailPageInner({
     { id: 'faq', label: 'FAQ', icon: MessageSquare },
   ];
   const navKey = navSections.map((section) => section.id).join('|');
+  useEffect(() => {
+    if (isAuthLoading || !isLoggedIn) return;
+    let active = true;
+    Promise.allSettled([listBookmarkIds(), listTrackedApplications()]).then(([bookmarkResult, trackedResult]) => {
+      if (!active) return;
+      if (bookmarkResult.status === 'fulfilled') {
+        setSaved(Boolean(item.id && bookmarkResult.value.includes(item.id)));
+        setBookmarkStateReady(true);
+      }
+      if (trackedResult.status === 'fulfilled') {
+        setTracked(trackedResult.value.some((entry) => entry.slug === item.slug));
+        setTrackedStateReady(true);
+      }
+      if (bookmarkResult.status === 'rejected' || trackedResult.status === 'rejected') setActionMessage('Some saved account state could not be loaded. Refresh the page to retry.');
+    });
+    return () => { active = false; };
+  }, [isAuthLoading, isLoggedIn, item.id, item.slug]);
   useEffect(() => {
     const sectionIds = navKey ? navKey.split('|') : [];
 
@@ -466,6 +513,32 @@ function PublicAnnouncementDetailPageInner({
       setLikeCount((count) => (current ? count - 1 : count + 1));
       return !current;
     });
+  }
+
+  async function handleSave() {
+    if (!isLoggedIn) { setActionMessage('Please sign in to save this update.'); return; }
+    if (!item.id || item.id.startsWith('fallback-')) { setActionMessage('Saving is unavailable while this page is in offline preview mode.'); return; }
+    try {
+      setIsSaving(true); setActionMessage('');
+      if (saved) await removeBookmark(item.id); else await addBookmark(item.id);
+      setSaved(!saved);
+      setActionMessage(saved ? 'Removed from saved updates.' : 'Saved to your dashboard.');
+    } catch (error) { setActionMessage(error instanceof Error ? error.message : 'Could not update saved status.'); }
+    finally { setIsSaving(false); }
+  }
+
+  async function handleTrack() {
+    if (!isLoggedIn) { setActionMessage('Please sign in to track this deadline.'); return; }
+    const parsedDeadline = parsePublicDate(detail.summaryMeta.lastDate);
+    if (!parsedDeadline) { setActionMessage('A valid deadline is not available for this update.'); return; }
+    try {
+      setIsTracking(true); setActionMessage('');
+      const reminder = new Date(parsedDeadline); reminder.setDate(reminder.getDate() - 3);
+      const typeBySection: Record<AnnouncementItem['section'], ContentType> = { jobs: 'job', results: 'result', 'admit-cards': 'admit-card', admissions: 'admission', 'answer-keys': 'answer-key', syllabus: 'syllabus' };
+      await trackApplication({ announcementId: item.id, slug: item.slug, type: typeBySection[item.section], title: item.title, organization: item.org, deadline: parsedDeadline.toISOString(), reminderAt: reminder > new Date() ? reminder.toISOString() : null, status: 'saved' });
+      setTracked(true); setActionMessage('Deadline added to your dashboard.');
+    } catch (error) { setActionMessage(error instanceof Error ? error.message : 'Could not track this deadline.'); }
+    finally { setIsTracking(false); }
   }
 
   function toggleQuestion(questionId: number) {
@@ -698,11 +771,15 @@ function PublicAnnouncementDetailPageInner({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setSaved((current) => !current)}
+                  onClick={handleSave}
+                  disabled={isSaving || isAuthLoading || (isLoggedIn && !bookmarkStateReady)}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-white/25"
                 >
                   {saved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-                  Save
+                  {isSaving ? 'Saving…' : saved ? 'Saved' : 'Save'}
+                </button>
+                <button type="button" onClick={handleTrack} disabled={isTracking || isAuthLoading || (isLoggedIn && !trackedStateReady) || tracked} className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/15 px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-white/25 disabled:opacity-75">
+                  <Clock size={14} />{isTracking ? 'Tracking…' : tracked ? 'Deadline tracked' : 'Track Deadline'}
                 </button>
                 <button
                   type="button"
@@ -732,6 +809,7 @@ function PublicAnnouncementDetailPageInner({
                   Print
                 </button>
               </div>
+              {actionMessage ? <p className="mt-3 text-xs font-medium text-yellow-200">{actionMessage} {!isLoggedIn ? <Link href="/login" className="underline">Sign in</Link> : null}</p> : null}
             </div>
           </div>
         </div>
@@ -1470,6 +1548,9 @@ function PublicAnnouncementDetailPageInner({
                 </div>
                 <div className="border-t border-gray-100 px-4 py-2.5" style={{ background: '#fafafa' }}>
                   <p className="text-[10px] text-gray-400">Dates may change. Confirm the latest schedule on the official portal.</p>
+                  <button type="button" onClick={handleTrack} disabled={isTracking || (isLoggedIn && !trackedStateReady) || tracked} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-50 px-3 py-2 text-xs font-bold text-[#bf360c] disabled:text-emerald-700">
+                    <Clock size={13} />{tracked ? 'Deadline tracked' : isTracking ? 'Tracking…' : 'Remind me before the deadline'}
+                  </button>
                 </div>
               </div>
             ) : null}
@@ -1561,6 +1642,7 @@ function PublicAnnouncementDetailPageInner({
                 <p className={`mt-2 text-[11px] ${isSubscribed ? 'text-green-600' : 'text-amber-700'}`}>{subscriptionMessage}</p>
               ) : null}
             </div>
+            <PushNotificationOptIn compact />
 
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
               <div className="flex items-start gap-3">
@@ -1646,7 +1728,8 @@ function PublicAnnouncementDetailPageInner({
             <div className="mx-auto flex max-w-6xl gap-3">
               <button
                 type="button"
-                onClick={() => setSaved((current) => !current)}
+                onClick={handleSave}
+                disabled={isSaving || isAuthLoading || (isLoggedIn && !bookmarkStateReady)}
                 className={cn(
                   'inline-flex items-center justify-center rounded-xl border px-4 py-3 transition-colors',
                   saved ? 'border-yellow-300 bg-yellow-50 text-yellow-700' : 'border-gray-200 bg-gray-50 text-gray-600',

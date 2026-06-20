@@ -20,12 +20,14 @@ COPY . .
 # Accept build arguments for Next.js environment variables
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_ADMIN_URL
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # Set environment to production
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_ADMIN_URL=$NEXT_PUBLIC_ADMIN_URL
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # Build Next.js application
 RUN --mount=type=cache,target=/app/.next/cache npm run build

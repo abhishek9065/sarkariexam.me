@@ -41,3 +41,17 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+self.addEventListener('push', (event) => {
+  let payload = { title: 'Sarkari Exams Update', body: 'A new update is available.', url: '/' };
+  try { payload = { ...payload, ...event.data.json() }; } catch {}
+  event.waitUntil(self.registration.showNotification(payload.title, {
+    body: payload.body,
+    data: { url: payload.url || '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data?.url || '/'));
+});

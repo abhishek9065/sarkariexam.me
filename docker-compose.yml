@@ -156,12 +156,14 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://sarkariexams.me/api}
         - NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL:-https://sarkariexams.me/admin}
+        - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     container_name: sarkari-frontend
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://sarkariexams.me/api}
       - INTERNAL_API_BASE_URL=http://backend:4000/api
       - NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL:-https://sarkariexams.me/admin}
+      - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
       - REVALIDATE_TOKEN=${FRONTEND_REVALIDATE_TOKEN:-}
       - CONTENT_CACHE_REVALIDATE_SECONDS=${CONTENT_CACHE_REVALIDATE_SECONDS:-300}
     expose:

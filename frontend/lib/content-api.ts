@@ -981,6 +981,7 @@ export function mapDetailToAnnouncementItem(detail: BackendPublicDetail): Announ
   }));
 
   return {
+    id: detail.post.id,
     departments: detail.post.categories.map((item) => item.name),
     date: detail.card.date,
     detail: {

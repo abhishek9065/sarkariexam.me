@@ -253,6 +253,7 @@ export interface AnnouncementDetailContent {
 }
 
 export interface AnnouncementItem {
+  id?: string;
   departments: string[];
   date: string;
   detail: AnnouncementDetailContent;
