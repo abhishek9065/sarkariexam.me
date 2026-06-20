@@ -81,7 +81,7 @@ Minimum required values:
 - `UPSTASH_REDIS_REST_TOKEN`
 - `COSMOS_CONNECTION_STRING` or `MONGODB_URI` only when `LEGACY_MONGO_REQUIRED=true`
 
-Push notification delivery also requires `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`; `docker-compose.yml` passes these through to the backend container from the root `.env` file when configured.
+Push notification delivery also requires `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`; `docker-compose.yml` passes these through to the backend container from the root `.env` file when configured. Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the same public-key value when rebuilding the frontend image on the droplet or with Compose. The frontend Dockerfile consumes it as a build argument because `NEXT_PUBLIC_*` values are compiled into the browser bundle. Prebuilt Main CI frontend images may leave it empty; the browser push opt-in then loads the public key from `/api/push/vapid-public-key`, so the backend VAPID values remain the production source of truth.
 
 For DigitalOcean Managed PostgreSQL, use a standard PostgreSQL connection string with `sslmode=require`. `POSTGRES_DIRECT_URL` and `DIRECT_URL` are only needed for providers that require a separate direct migration URL; leave them blank for DigitalOcean unless a separate target URL is intentionally provisioned.
 
@@ -104,6 +104,13 @@ Deployment validates:
   - `/results`
   - `/admin`
 - Optional frontend revalidation smoke check when revalidation token is configured.
+
+## 2026-06-20
+
+- Public browser push opt-in is available on announcement detail pages and the user dashboard.
+- Frontend Compose builds accept `NEXT_PUBLIC_VAPID_PUBLIC_KEY`; when set, it must equal the backend `VAPID_PUBLIC_KEY`.
+- The opt-in falls back to the backend `/api/push/vapid-public-key` endpoint when the public build variable is absent, including immutable frontend images published by Main CI.
+- After deployment, verify that the VAPID endpoint returns `200`, then enable notifications from a supported browser and confirm that `POST /api/push/subscribe` succeeds. Permission prompts are user-initiated and cannot be exercised by an unauthenticated health check.
 
 ## 2026-06-19
 
