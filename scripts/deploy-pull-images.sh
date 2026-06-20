@@ -34,7 +34,7 @@ run_backend_prisma_migrations
 set_stage "restart-backend"
 dc up -d --force-recreate backend campaign-worker
 wait_for_service_health backend 60 2
-wait_for_service_health campaign-worker 60 2
+# campaign-worker has healthcheck disabled in docker-compose.yml; backend health confirms the shared image/runtime is viable.
 
 set_stage "restart-web"
 if [[ ${#DATADOG_SERVICES[@]} -gt 0 ]]; then
