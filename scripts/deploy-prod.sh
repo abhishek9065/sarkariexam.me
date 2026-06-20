@@ -52,7 +52,8 @@ dc ps
 
 set_stage "wait-backend"
 wait_for_service_health backend 60 2
-wait_for_service_health campaign-worker 60 2
+# campaign-worker has healthcheck disabled in docker-compose.yml; verify bounded process stability instead.
+verify_service_running_stable campaign-worker 8
 BACKEND_HEALTH_RESULT="container healthcheck ok"
 
 set_stage "wait-web-services"

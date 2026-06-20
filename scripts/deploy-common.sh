@@ -414,6 +414,52 @@ wait_for_service_health() {
   return 1
 }
 
+verify_service_running_stable() {
+  local service="$1"
+  local stability_seconds="${2:-8}"
+  local container_id current_container_id inspect_output running restart_count
+
+  container_id="$(service_container_id "$service")"
+  if [[ -z "$container_id" ]]; then
+    record_diagnosis "Service '${service}' was not created by Docker Compose. Inspect compose output and service definitions."
+    return 1
+  fi
+
+  if ! inspect_output="$(docker inspect -f '{{.State.Running}} {{.RestartCount}}' "$container_id" 2>/dev/null)"; then
+    record_diagnosis "Unable to inspect service '${service}' container '${container_id}'."
+    return 1
+  fi
+  read -r running restart_count <<< "$inspect_output"
+  if [[ "$running" != "true" || ! "$restart_count" =~ ^[0-9]+$ || "$restart_count" -ne 0 ]]; then
+    record_diagnosis "Service '${service}' is not stable (running=${running:-unknown}, restarts=${restart_count:-unknown})."
+    tail_service_logs "$service" 120
+    return 1
+  fi
+
+  echo "Verifying ${service} remains running for ${stability_seconds}s without restarting."
+  sleep "$stability_seconds"
+
+  current_container_id="$(service_container_id "$service")"
+  if [[ -z "$current_container_id" || "$current_container_id" != "$container_id" ]]; then
+    record_diagnosis "Service '${service}' container disappeared or was replaced during the stability check."
+    tail_service_logs "$service" 120
+    return 1
+  fi
+
+  if ! inspect_output="$(docker inspect -f '{{.State.Running}} {{.RestartCount}}' "$container_id" 2>/dev/null)"; then
+    record_diagnosis "Unable to re-inspect service '${service}' container '${container_id}'."
+    return 1
+  fi
+  read -r running restart_count <<< "$inspect_output"
+  if [[ "$running" != "true" || ! "$restart_count" =~ ^[0-9]+$ || "$restart_count" -ne 0 ]]; then
+    record_diagnosis "Service '${service}' did not remain stable (running=${running:-unknown}, restarts=${restart_count:-unknown})."
+    tail_service_logs "$service" 120
+    return 1
+  fi
+
+  echo "${service} remained running for ${stability_seconds}s with no restarts."
+}
+
 purge_cloudflare_cache() {
   local cf_zone_id cf_api_token response
   cf_zone_id="$(read_env_var "CF_ZONE_ID")"

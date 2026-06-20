@@ -303,7 +303,7 @@ jobs:
 
   build-images:
     name: Build and Push ${{ matrix.service }} Image
-    needs: [backend, frontend, admin, compose-validation]
+    needs: [repository-hygiene, shell-safety, deploy-doc-consistency, compose-validation, backend, frontend, admin]
     runs-on: ubuntu-latest
     permissions:
       contents: read

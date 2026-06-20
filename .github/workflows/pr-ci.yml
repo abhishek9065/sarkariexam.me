@@ -36,6 +36,7 @@ jobs:
               - 'admin-next/**'
             deploy:
               - 'scripts/**'
+              - 'nginx/**'
               - 'docker-compose*.yml'
               - '.github/workflows/**'
             workflows:

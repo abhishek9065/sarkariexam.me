@@ -63,7 +63,9 @@ The GitHub `production` environment must require manual reviewers. The deploy jo
 - Deployment refuses missing or unreachable Upstash Redis in production preflight.
 - Production dependency audits run inside `Main CI`, so audit failures block the `workflow_run` deploy gate. The separate Security workflow is weekly/manual only.
 
-Production deploys default to `image-pull`: the droplet pulls the four images tagged with the triggering commit SHA, runs migrations, restarts services, and verifies health. The `fast` and `full` rebuild-on-droplet modes remain available as manual fallbacks. Normal deploy lock wait is 120 seconds.
+Production deploys default to `image-pull`: the droplet pulls the four images tagged with the triggering commit SHA, runs migrations, restarts services, and verifies health. Because `campaign-worker` has no Docker healthcheck, all deploy modes instead require its container to remain running for a bounded eight-second window with zero restarts. The `fast` and `full` rebuild-on-droplet modes remain available as manual fallbacks. Normal deploy lock wait is 120 seconds.
+
+Main CI publishes the immutable commit-SHA and mutable `main` GHCR tags only after repository hygiene, shell safety, deploy documentation, Compose, backend, frontend, and admin validation jobs succeed.
 
 The GHCR packages must be public, or the droplet must already be authenticated to `ghcr.io` with read-package access. Set `GHCR_OWNER` in the production `.env` only if images are published under a different owner.
 
