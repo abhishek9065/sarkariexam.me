@@ -14,6 +14,7 @@ import {
   Bell,
   BookOpen,
   Briefcase,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Command,
@@ -26,11 +27,13 @@ import {
   Menu,
   MessageSquare,
   Plus,
-  Radio,
   Search,
+  SearchCheck,
   Settings,
   Shield,
+  SquareKanban,
   Trophy,
+  UserCog,
   Users,
   X,
   Zap,
@@ -60,8 +63,12 @@ type NavSection = {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    label: '',
-    items: [{ href: '/', label: 'Dashboard', icon: LayoutDashboard, match: pathname => pathname === '/' }],
+    label: 'Command',
+    items: [
+      { href: '/', label: 'Dashboard', icon: LayoutDashboard, match: pathname => pathname === '/' },
+      { href: '/workflow', label: 'Tasks / Workflow', icon: SquareKanban },
+      { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+    ],
   },
   {
     label: 'Content',
@@ -101,6 +108,13 @@ const NAV_SECTIONS: NavSection[] = [
         match: (pathname, searchParams) => pathname === '/announcements' && searchParams.get('type') === 'answer-key',
       },
       {
+        href: '/announcements?type=admission',
+        label: 'Admissions',
+        icon: BookOpen,
+        sub: true,
+        match: (pathname, searchParams) => pathname === '/announcements' && searchParams.get('type') === 'admission',
+      },
+      {
         href: '/announcements?type=syllabus',
         label: 'Syllabus',
         icon: BookOpen,
@@ -115,28 +129,32 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'Community',
+    label: 'Growth',
     items: [
-      { href: '/community', label: 'Q&A Moderation', icon: MessageSquare, badge: 'Planned' },
+      { href: '/subscribers', label: 'Subscribers', icon: Users, roles: ['superadmin', 'admin'] },
+      { href: '/notifications', label: 'Campaigns / Notifications', icon: Bell, roles: ['superadmin', 'admin'] },
+    ],
+  },
+  {
+    label: 'Moderation',
+    items: [
+      { href: '/community', label: 'Community Moderation', icon: MessageSquare, badge: 'Planned' },
+      { href: '/error-reports', label: 'Error Reports / User Reports', icon: FileText, roles: ['superadmin', 'admin'] },
     ],
   },
   {
     label: 'Insights',
     items: [
       { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['superadmin', 'admin'] },
+      { href: '/seo', label: 'SEO', icon: SearchCheck, roles: ['superadmin', 'admin'] },
     ],
   },
   {
-    label: 'Site',
+    label: 'Operations',
     items: [
-      { href: '/notifications', label: 'Ticker & Links', icon: Radio, badge: 'Planned' },
-      { href: '/subscribers', label: 'Subscribers', icon: Users, roles: ['superadmin', 'admin'] },
+      { href: '/users', label: 'Users', icon: UserCog, roles: ['superadmin', 'admin'] },
       { href: '/audit-log', label: 'Activity Log', icon: Activity, roles: ['superadmin', 'admin'] },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
+      { href: '/system-admin', label: 'System Admin', icon: Shield, roles: ['superadmin', 'admin'] },
       { href: '/settings', label: 'Settings', icon: Settings, roles: ['superadmin', 'admin'] },
     ],
   },
@@ -220,20 +238,20 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const commandItems = useMemo(
     () => [
-      { id: 'new-post', label: 'New Post', icon: Plus, description: 'Create a new job / result post', run: () => router.push('/announcements/new') },
-      { id: 'dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, description: 'Overview & metrics', run: () => router.push('/') },
-      { id: 'all-posts', label: 'All Posts', icon: Hash, description: 'Browse all content', run: () => router.push('/announcements') },
-      { id: 'taxonomies', label: 'Taxonomies', icon: BookOpen, description: 'Manage states, organizations, and filters', run: () => router.push('/taxonomies') },
-      { id: 'analytics', label: 'Analytics', icon: BarChart3, description: 'Live traffic and engagement signals', run: () => router.push('/analytics') },
-      { id: 'qa', label: 'Q&A Moderation', icon: MessageSquare, description: 'Planned moderation workflow notice', run: () => router.push('/community') },
-      { id: 'ticker', label: 'Ticker & Links', icon: Radio, description: 'Planned site operations workflow notice', run: () => router.push('/notifications') },
-      { id: 'users', label: 'Subscribers', icon: Users, description: 'Manage subscriber list', run: () => router.push('/subscribers') },
-      { id: 'activity', label: 'Activity Log', icon: Activity, description: 'Audit trail', run: () => router.push('/audit-log') },
-      { id: 'settings', label: 'Settings', icon: Settings, description: 'Site configuration', run: () => router.push('/settings') },
+      { id: 'new-post', label: 'New Post', icon: Plus, description: 'Action', run: () => router.push('/announcements/new') },
+      ...NAV_SECTIONS.flatMap(section => section.items
+        .filter(item => !item.roles || (user ? item.roles.includes(user.role) : false))
+        .map(item => ({
+          id: item.href,
+          label: item.label,
+          icon: item.icon,
+          description: `${section.label}${item.badge ? ` · ${item.badge}` : ''}`,
+          run: () => router.push(item.href),
+        }))),
       { id: 'view-site', label: 'View Live Site', icon: ExternalLink, description: 'Open homepage', run: () => openLiveSite() },
       { id: 'logout', label: 'Logout', icon: LogOut, description: 'End admin session', run: () => void handleLogout() },
     ],
-    [handleLogout, openLiveSite, router]
+    [handleLogout, openLiveSite, router, user]
   );
 
   const filteredCommands = useMemo(() => {
