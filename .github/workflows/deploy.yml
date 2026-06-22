@@ -86,9 +86,7 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USER: ${{ secrets.DO_USER }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
-          DO_PORT: ${{ vars.DO_PORT || secrets.DO_PORT || '22' }}
-          DO_HOST_FINGERPRINT: ${{ vars.DO_HOST_FINGERPRINT || secrets.DO_HOST_FINGERPRINT }}
-          DO_REPO_DIR: ${{ vars.DO_REPO_DIR || secrets.DO_REPO_DIR }}
+          DEPLOY_VARS_JSON: ${{ toJSON(vars) }}
           TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
           TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
@@ -98,4 +96,10 @@ jobs:
           LOCK_WAIT_SECONDS: '120'
           DEPLOY_AUTOCLEAN_TRACKED: '1'
           DEPLOY_AUTOCLEAN_TRACKED_PATHS: backend/package-lock.json
-        run: bash scripts/deploy-via-ssh.sh
+        run: |
+          set -euo pipefail
+          DO_PORT="$(jq -r 'if .DO_PORT == null or .DO_PORT == "" then "22" else .DO_PORT end' <<<"${DEPLOY_VARS_JSON}")"
+          DO_HOST_FINGERPRINT="$(jq -r '.DO_HOST_FINGERPRINT // ""' <<<"${DEPLOY_VARS_JSON}")"
+          DO_REPO_DIR="$(jq -r '.DO_REPO_DIR // ""' <<<"${DEPLOY_VARS_JSON}")"
+          export DO_PORT DO_HOST_FINGERPRINT DO_REPO_DIR
+          bash scripts/deploy-via-ssh.sh

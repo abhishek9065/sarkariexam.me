@@ -34,10 +34,9 @@ Use these values to compare the first three successful `Main CI` and image-pull 
 - `DO_HOST`: Droplet hostname or IP.
 - `DO_USER`: SSH user.
 - `DO_SSH_KEY`: Private key for deployment user.
-- `DO_PORT`: SSH port (optional, defaults to `22`).
-
 ### Repository Variables
 
+- `DO_PORT`: SSH port (optional, defaults to `22`).
 - `DO_REPO_DIR`: Absolute path to production repository checkout on droplet.
 - `DO_HOST_FINGERPRINT`: Expected SSH host key fingerprint in `SHA256:<base64>` format.
 

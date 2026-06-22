@@ -63,7 +63,7 @@ export function ErrorReportsPage() {
 
       <div className="flex gap-3">
         <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(0); }}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-37.5"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="new">New</SelectItem>
@@ -98,10 +98,10 @@ export function ErrorReportsPage() {
                   {items.map((r) => (
                     <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-xs">{r.errorId || r.id?.slice(0, 8)}</td>
-                      <td className="px-4 py-3 max-w-[300px]">
+                      <td className="px-4 py-3 max-w-75">
                         <p className="line-clamp-1">{r.message}</p>
                       </td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground text-xs max-w-[200px] truncate">
+                      <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground text-xs max-w-50 truncate">
                         {r.pageUrl || '—'}
                       </td>
                       <td className="px-4 py-3">

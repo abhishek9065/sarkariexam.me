@@ -101,7 +101,7 @@ export function CalendarPage() {
         </div>
         <div className="flex items-center gap-3">
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-35">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -114,7 +114,7 @@ export function CalendarPage() {
             </SelectContent>
           </Select>
           <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-35">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -139,7 +139,7 @@ export function CalendarPage() {
                 <Button variant="ghost" size="icon" onClick={() => navigateMonth('prev')}>
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
-                <h2 className="text-xl font-semibold min-w-[200px] text-center">
+                <h2 className="text-xl font-semibold min-w-50 text-center">
                   {format(currentDate, 'MMMM yyyy')}
                 </h2>
                 <Button variant="ghost" size="icon" onClick={() => navigateMonth('next')}>
@@ -170,7 +170,7 @@ export function CalendarPage() {
                 return (
                   <div
                     key={day.toISOString()}
-                    className={`bg-background min-h-[100px] p-2 ${
+                    className={`bg-background min-h-25 p-2 ${
                       !isCurrentMonth ? 'bg-muted/30 text-muted-foreground' : ''
                     } ${isTodayDate ? 'bg-blue-50' : ''}`}
                   >
