@@ -97,15 +97,12 @@ jobs:
         id: base
         env:
           EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
           base_sha=""
-          if [[ "${EVENT_NAME}" == "pull_request" && -n "${PR_BASE_SHA:-}" ]]; then
-            base_sha="${PR_BASE_SHA}"
-          elif [[ "${EVENT_NAME}" == "push" && -n "${PUSH_BEFORE_SHA:-}" && "${PUSH_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+          if [[ "${EVENT_NAME}" == "push" && -n "${PUSH_BEFORE_SHA:-}" && "${PUSH_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
             base_sha="${PUSH_BEFORE_SHA}"
           elif git rev-parse HEAD~1 >/dev/null 2>&1; then
             base_sha="$(git rev-parse HEAD~1)"
