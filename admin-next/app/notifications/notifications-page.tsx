@@ -5,9 +5,12 @@ import { toast } from 'sonner';
 import {
   AlertTriangle,
   BarChart3,
+  Copy,
+  Download,
   Eye,
   Loader2,
   Mail,
+  Plus,
   RefreshCw,
   RotateCcw,
   Send,
@@ -15,9 +18,11 @@ import {
 } from 'lucide-react';
 
 import {
+  createCampaign,
   estimateCampaign,
   getCampaigns,
   getCampaignStats,
+  getSegments,
   retryFailedCampaign,
   sendCampaign,
   type CampaignDeliveryStats,
@@ -25,8 +30,50 @@ import {
 } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 type Campaign = Awaited<ReturnType<typeof getCampaigns>>['data'][number];
+type SegmentData = Awaited<ReturnType<typeof getSegments>>['data'];
+type CampaignForm = {
+  title: string;
+  body: string;
+  url: string;
+  segmentType: string;
+  segmentValue: string;
+  scheduledAt: string;
+};
+type FormErrors = Partial<Record<keyof CampaignForm, string>>;
+
+const emptyForm: CampaignForm = {
+  title: '',
+  body: '',
+  url: '',
+  segmentType: 'all',
+  segmentValue: 'all',
+  scheduledAt: '',
+};
+
+const segmentTypes = [
+  { value: 'all', label: 'All subscribers' },
+  { value: 'state', label: 'State' },
+  { value: 'category', label: 'Category' },
+  { value: 'organization', label: 'Organization' },
+  { value: 'qualification', label: 'Qualification' },
+  { value: 'type', label: 'Content type' },
+];
+
+const contentTypes = ['job', 'result', 'admit-card', 'answer-key', 'admission', 'syllabus'];
 
 const statusClass: Record<string, string> = {
   draft: 'border-slate-200 bg-slate-50 text-slate-700',
@@ -50,8 +97,21 @@ function formatDate(value?: string) {
   }).format(new Date(value));
 }
 
+function toLocalDateTime(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function statusLabel(campaign: Campaign) {
   return campaign.unsupportedSegment ? 'unsupported' : campaign.status;
+}
+
+function segmentLabel(segment: Campaign['segment']) {
+  const type = segmentTypes.find((item) => item.value === segment.type)?.label ?? segment.type;
+  return segment.type === 'all' ? type : `${type}: ${segment.value}`;
 }
 
 function ChannelStat({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Mail }) {
@@ -73,18 +133,25 @@ export function NotificationsPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<CampaignRecipientEstimate | null>(null);
   const [stats, setStats] = useState<CampaignDeliveryStats | null>(null);
+  const [segments, setSegments] = useState<SegmentData | null>(null);
+  const [segmentsLoading, setSegmentsLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'duplicate'>('create');
+  const [form, setForm] = useState<CampaignForm>(emptyForm);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
 
   const selectedCampaign = useMemo(
     () => campaigns.find((campaign) => campaign.id === selectedId) ?? campaigns[0],
     [campaigns, selectedId],
   );
 
-  async function loadCampaigns() {
+  async function loadCampaigns(preferredId?: string) {
     setLoading(true);
     try {
       const response = await getCampaigns();
       setCampaigns(response.data);
-      setSelectedId((current) => current ?? response.data[0]?.id ?? null);
+      setSelectedId((current) => preferredId ?? current ?? response.data[0]?.id ?? null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load campaigns.');
     } finally {
@@ -103,14 +170,16 @@ export function NotificationsPage() {
 
   useEffect(() => {
     void loadCampaigns();
+    void getSegments()
+      .then((response) => setSegments(response.data))
+      .catch((error) => toast.error(error instanceof Error ? error.message : 'Failed to load segments.'))
+      .finally(() => setSegmentsLoading(false));
   }, []);
 
   useEffect(() => {
     setEstimate(null);
     setStats(null);
-    if (selectedCampaign?.id) {
-      void loadStats(selectedCampaign.id);
-    }
+    if (selectedCampaign?.id) void loadStats(selectedCampaign.id);
   }, [selectedCampaign?.id]);
 
   useEffect(() => {
@@ -118,14 +187,94 @@ export function NotificationsPage() {
 
     const campaignId = selectedCampaign.id;
     const interval = window.setInterval(() => {
-      void Promise.all([getCampaigns(), getCampaignStats(campaignId)]).then(([campaignResponse, statsResponse]) => {
-        setCampaigns(campaignResponse.data);
-        setStats(statsResponse.data);
-      }).catch(() => undefined);
+      void Promise.all([getCampaigns(), getCampaignStats(campaignId)])
+        .then(([campaignResponse, statsResponse]) => {
+          setCampaigns(campaignResponse.data);
+          setStats(statsResponse.data);
+        })
+        .catch(() => undefined);
     }, 3_000);
 
     return () => window.clearInterval(interval);
   }, [selectedCampaign?.id, selectedCampaign?.status]);
+
+  function openCreateForm() {
+    setFormMode('create');
+    setForm(emptyForm);
+    setFormErrors({});
+    setFormOpen(true);
+  }
+
+  function openDuplicateForm() {
+    if (!selectedCampaign) return;
+    setFormMode('duplicate');
+    setForm({
+      title: `${selectedCampaign.title} (copy)`,
+      body: selectedCampaign.body,
+      url: selectedCampaign.url ?? '',
+      segmentType: selectedCampaign.unsupportedSegment ? 'all' : selectedCampaign.segment.type,
+      segmentValue: selectedCampaign.unsupportedSegment ? 'all' : selectedCampaign.segment.value,
+      scheduledAt: toLocalDateTime(selectedCampaign.scheduledAt),
+    });
+    setFormErrors({});
+    setFormOpen(true);
+  }
+
+  function updateForm<K extends keyof CampaignForm>(key: K, value: CampaignForm[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setFormErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
+  function validateForm(mode: 'draft' | 'scheduled') {
+    const errors: FormErrors = {};
+    if (!form.title.trim()) errors.title = 'Title is required.';
+    else if (form.title.trim().length < 5) errors.title = 'Title must be at least 5 characters.';
+    if (!form.body.trim()) errors.body = 'Body is required.';
+    else if (form.body.trim().length < 10) errors.body = 'Body must be at least 10 characters.';
+    if (!form.segmentType) errors.segmentType = 'Segment is required.';
+    if (form.segmentType !== 'all' && !form.segmentValue.trim()) {
+      errors.segmentValue = 'Segment value is required.';
+    }
+    if (form.url.trim()) {
+      try {
+        new URL(form.url.trim());
+      } catch {
+        errors.url = 'Enter a valid absolute URL.';
+      }
+    }
+    if (form.scheduledAt && new Date(form.scheduledAt).getTime() <= Date.now()) {
+      errors.scheduledAt = 'Scheduled date must be in the future.';
+    }
+    if (mode === 'scheduled' && !form.scheduledAt) {
+      errors.scheduledAt = 'Choose a future date to schedule this campaign.';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  async function submitCampaign(mode: 'draft' | 'scheduled') {
+    if (!validateForm(mode)) return;
+    setBusyAction(`create-${mode}`);
+    try {
+      const response = await createCampaign({
+        title: form.title.trim(),
+        body: form.body.trim(),
+        url: form.url.trim() || undefined,
+        segment: {
+          type: form.segmentType,
+          value: form.segmentType === 'all' ? 'all' : form.segmentValue.trim(),
+        },
+        scheduledAt: mode === 'scheduled' ? new Date(form.scheduledAt).toISOString() : undefined,
+      });
+      toast.success(mode === 'scheduled' ? 'Campaign scheduled.' : 'Campaign saved as draft.');
+      setFormOpen(false);
+      await loadCampaigns(response.data.id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create campaign.');
+    } finally {
+      setBusyAction(null);
+    }
+  }
 
   async function runEstimate() {
     if (!selectedCampaign) return;
@@ -143,13 +292,12 @@ export function NotificationsPage() {
 
   async function runSend() {
     if (!selectedCampaign) return;
-    const confirmed = window.confirm(`Send campaign "${selectedCampaign.title}" now?`);
-    if (!confirmed) return;
     setBusyAction('send');
     try {
       await sendCampaign(selectedCampaign.id);
+      setSendConfirmOpen(false);
       toast.success('Campaign delivery queued.');
-      await loadCampaigns();
+      await loadCampaigns(selectedCampaign.id);
       await loadStats(selectedCampaign.id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to send campaign.');
@@ -160,13 +308,13 @@ export function NotificationsPage() {
 
   async function runRetry() {
     if (!selectedCampaign) return;
-    const confirmed = window.confirm(`Retry failed deliveries for "${selectedCampaign.title}"?`);
+    const confirmed = window.confirm(`Retry all failed deliveries for "${selectedCampaign.title}"?`);
     if (!confirmed) return;
     setBusyAction('retry');
     try {
       await retryFailedCampaign(selectedCampaign.id);
-      toast.success('Failed deliveries queued for retry.');
-      await loadCampaigns();
+      toast.success('All failed deliveries queued for retry.');
+      await loadCampaigns(selectedCampaign.id);
       await loadStats(selectedCampaign.id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to retry campaign.');
@@ -175,15 +323,29 @@ export function NotificationsPage() {
     }
   }
 
+  const segmentValues = form.segmentType === 'state'
+    ? segments?.segments.states ?? []
+    : form.segmentType === 'category'
+      ? segments?.segments.categories ?? []
+      : form.segmentType === 'type'
+        ? contentTypes
+        : [];
+  const segmentCount = segments?.counts.find(
+    (item) => item.type === form.segmentType && item.value === (form.segmentType === 'all' ? 'all' : form.segmentValue),
+  )?.count;
   const emailStats = stats?.byChannel.find((item) => item.channel === 'email');
   const pushStats = stats?.byChannel.find((item) => item.channel === 'push');
-  const actionDisabled = !selectedCampaign ||
-    selectedCampaign.unsupportedSegment ||
-    selectedCampaign.status === 'sending' ||
-    selectedCampaign.status === 'sent' ||
-    selectedCampaign.status === 'partial_failed';
+  const attempts = stats?.total ?? (selectedCampaign ? selectedCampaign.sentCount + selectedCampaign.failedCount : 0);
+  const progressPercentage = estimate && estimate.total > 0
+    ? Math.min(100, Math.round((attempts / estimate.total) * 100))
+    : null;
+  const actionDisabled = !selectedCampaign
+    || selectedCampaign.unsupportedSegment
+    || selectedCampaign.status === 'sending'
+    || selectedCampaign.status === 'sent'
+    || selectedCampaign.status === 'partial_failed';
 
-  if (loading) {
+  if (loading && campaigns.length === 0) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -195,13 +357,19 @@ export function NotificationsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-[18px] font-extrabold text-foreground">Campaign Delivery</h2>
-          <p className="text-[12px] text-muted-foreground">Preview, estimate, send, and retry notification campaigns.</p>
+          <h2 className="text-[18px] font-extrabold text-foreground">Campaign Management</h2>
+          <p className="text-[12px] text-muted-foreground">Create, schedule, estimate, send, and monitor notification campaigns.</p>
         </div>
-        <Button type="button" variant="outline" onClick={loadCampaigns}>
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" onClick={openCreateForm}>
+            <Plus className="h-4 w-4" />
+            Create Campaign
+          </Button>
+          <Button type="button" variant="outline" onClick={() => void loadCampaigns()} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(340px,0.9fr)_minmax(520px,1.1fr)]">
@@ -211,7 +379,7 @@ export function NotificationsPage() {
           </div>
           <div className="max-h-[680px] overflow-y-auto">
             {campaigns.length === 0 ? (
-              <p className="px-4 py-8 text-sm text-muted-foreground">No campaigns found.</p>
+              <p className="px-4 py-8 text-sm text-muted-foreground">No campaigns found. Create the first campaign to get started.</p>
             ) : campaigns.map((campaign) => {
               const label = statusLabel(campaign);
               return (
@@ -224,9 +392,7 @@ export function NotificationsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-foreground">{campaign.title}</p>
-                      <p className="mt-1 text-[12px] text-muted-foreground">
-                        {campaign.segment.type}: {campaign.segment.value || 'all'}
-                      </p>
+                      <p className="mt-1 text-[12px] text-muted-foreground">{segmentLabel(campaign.segment)}</p>
                     </div>
                     <Badge className={statusClass[label] ?? statusClass.draft} variant="outline">{label}</Badge>
                   </div>
@@ -260,27 +426,55 @@ export function NotificationsPage() {
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={openDuplicateForm} disabled={busyAction !== null}>
+                    <Copy className="h-4 w-4" />
+                    Duplicate
+                  </Button>
                   <Button type="button" variant="outline" onClick={runEstimate} disabled={busyAction !== null || selectedCampaign.unsupportedSegment}>
                     {busyAction === 'estimate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                     Estimate
                   </Button>
-                  <Button type="button" onClick={runSend} disabled={busyAction !== null || actionDisabled || selectedCampaign.status === 'simulated'}>
-                    {busyAction === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <Button type="button" onClick={() => setSendConfirmOpen(true)} disabled={busyAction !== null || actionDisabled || selectedCampaign.status === 'simulated'}>
+                    <Send className="h-4 w-4" />
                     Send now
                   </Button>
                   <Button type="button" variant="outline" onClick={runRetry} disabled={busyAction !== null || selectedCampaign.status === 'sending' || selectedCampaign.unsupportedSegment || (stats?.failed ?? selectedCampaign.failedCount) === 0}>
                     {busyAction === 'retry' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                    Retry failed
+                    Retry all failed
                   </Button>
                 </div>
               </div>
 
               {selectedCampaign.unsupportedSegment ? (
                 <div className="mt-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  <AlertTriangle className="mt-0.5 h-4 w-4" />
-                  This legacy segment is unsupported and cannot be sent.
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  This legacy segment is unsupported and cannot be estimated or sent. Duplicate it to retarget a supported segment.
                 </div>
               ) : null}
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-sm font-bold text-foreground">Live Delivery Progress</h4>
+                </div>
+                <Badge className={statusClass[statusLabel(selectedCampaign)] ?? statusClass.draft} variant="outline">
+                  {statusLabel(selectedCampaign)}
+                </Badge>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <ChannelStat label="Sent" value={stats?.sent ?? selectedCampaign.sentCount} icon={Send} />
+                <ChannelStat label="Failed" value={stats?.failed ?? selectedCampaign.failedCount} icon={AlertTriangle} />
+                <ChannelStat label="Total attempts" value={attempts} icon={BarChart3} />
+              </div>
+              <div className="mt-4">
+                <div className="mb-1.5 flex justify-between text-xs text-muted-foreground">
+                  <span>{progressPercentage === null ? 'Estimate required to calculate progress' : 'Delivery progress'}</span>
+                  <span>{progressPercentage === null ? '—' : `${progressPercentage}%`}</span>
+                </div>
+                <Progress value={progressPercentage ?? 0} aria-label="Campaign delivery progress" />
+              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -297,20 +491,6 @@ export function NotificationsPage() {
               </div>
 
               <div className="rounded-lg border border-border bg-card p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                  <h4 className="text-sm font-bold text-foreground">Delivery Stats</h4>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <ChannelStat label="Delivered" value={stats?.sent ?? selectedCampaign.sentCount} icon={Send} />
-                  <ChannelStat label="Failed" value={stats?.failed ?? selectedCampaign.failedCount} icon={AlertTriangle} />
-                  <ChannelStat label="Attempts" value={stats?.total ?? selectedCampaign.sentCount + selectedCampaign.failedCount} icon={BarChart3} />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-border bg-card p-4">
                 <h4 className="mb-3 text-sm font-bold text-foreground">Channel Breakdown</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between rounded-lg bg-muted px-3 py-2">
@@ -323,20 +503,24 @@ export function NotificationsPage() {
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div className="rounded-lg border border-border bg-card p-4">
-                <h4 className="mb-3 text-sm font-bold text-foreground">Schedule</h4>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>Created: {formatDate(selectedCampaign.createdAt)}</p>
-                  <p>Scheduled: {formatDate(selectedCampaign.scheduledAt)}</p>
-                  <p>Sent: {formatDate(selectedCampaign.sentAt)}</p>
-                </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h4 className="mb-3 text-sm font-bold text-foreground">Schedule</h4>
+              <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                <p>Created: {formatDate(selectedCampaign.createdAt)}</p>
+                <p>Scheduled: {formatDate(selectedCampaign.scheduledAt)}</p>
+                <p>Sent: {formatDate(selectedCampaign.sentAt)}</p>
               </div>
             </div>
 
             <div className="overflow-hidden rounded-lg border border-border bg-card">
-              <div className="border-b border-border px-4 py-3">
+              <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                 <h4 className="text-sm font-bold text-foreground">Recent Failed Deliveries</h4>
+                <Button type="button" size="sm" variant="outline" disabled title="Failed-recipient export is not available from the backend yet.">
+                  <Download className="h-4 w-4" />
+                  Export not available yet
+                </Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
@@ -370,6 +554,121 @@ export function NotificationsPage() {
           </div>
         ) : null}
       </div>
+
+      <Dialog open={formOpen} onOpenChange={(open) => busyAction?.startsWith('create-') ? undefined : setFormOpen(open)}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{formMode === 'duplicate' ? 'Duplicate Campaign' : 'Create Campaign'}</DialogTitle>
+            <DialogDescription>
+              {formMode === 'duplicate'
+                ? 'Review the copied content and choose whether to save it as a draft or schedule it.'
+                : 'Create a draft now or provide a future date and schedule it.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submitCampaign('draft'); }}>
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-title" className="text-sm font-semibold">Title</label>
+              <Input id="campaign-title" value={form.title} onChange={(event) => updateForm('title', event.target.value)} maxLength={200} aria-invalid={Boolean(formErrors.title)} />
+              {formErrors.title ? <p className="text-xs text-red-600">{formErrors.title}</p> : null}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-body" className="text-sm font-semibold">Body</label>
+              <Textarea id="campaign-body" value={form.body} onChange={(event) => updateForm('body', event.target.value)} maxLength={1000} rows={5} aria-invalid={Boolean(formErrors.body)} />
+              {formErrors.body ? <p className="text-xs text-red-600">{formErrors.body}</p> : null}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-url" className="text-sm font-semibold">URL</label>
+              <Input id="campaign-url" type="url" value={form.url} onChange={(event) => updateForm('url', event.target.value)} placeholder="https://sarkariexam.me/..." aria-invalid={Boolean(formErrors.url)} />
+              {formErrors.url ? <p className="text-xs text-red-600">{formErrors.url}</p> : null}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Segment type</label>
+                <Select
+                  value={form.segmentType}
+                  onValueChange={(value) => {
+                    updateForm('segmentType', value);
+                    updateForm('segmentValue', value === 'all' ? 'all' : '');
+                  }}
+                >
+                  <SelectTrigger aria-invalid={Boolean(formErrors.segmentType)}><SelectValue placeholder="Choose segment" /></SelectTrigger>
+                  <SelectContent>
+                    {segmentTypes.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {formErrors.segmentType ? <p className="text-xs text-red-600">{formErrors.segmentType}</p> : null}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Segment value</label>
+                {form.segmentType === 'all' ? (
+                  <Input value="All active subscribers" disabled />
+                ) : segmentValues.length > 0 ? (
+                  <Select value={form.segmentValue} onValueChange={(value) => updateForm('segmentValue', value)}>
+                    <SelectTrigger aria-invalid={Boolean(formErrors.segmentValue)}><SelectValue placeholder={segmentsLoading ? 'Loading segments…' : 'Choose value'} /></SelectTrigger>
+                    <SelectContent>
+                      {segmentValues.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={form.segmentValue} onChange={(event) => updateForm('segmentValue', event.target.value)} placeholder={`Enter ${form.segmentType}`} aria-invalid={Boolean(formErrors.segmentValue)} />
+                )}
+                {formErrors.segmentValue ? <p className="text-xs text-red-600">{formErrors.segmentValue}</p> : null}
+                {segmentCount !== undefined ? <p className="text-xs text-muted-foreground">{segmentCount.toLocaleString('en-IN')} matching subscribers</p> : null}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-scheduled-at" className="text-sm font-semibold">Scheduled date</label>
+              <Input id="campaign-scheduled-at" type="datetime-local" value={form.scheduledAt} min={toLocalDateTime(new Date(Date.now() + 60_000).toISOString())} onChange={(event) => updateForm('scheduledAt', event.target.value)} aria-invalid={Boolean(formErrors.scheduledAt)} />
+              {formErrors.scheduledAt ? <p className="text-xs text-red-600">{formErrors.scheduledAt}</p> : <p className="text-xs text-muted-foreground">Required only when scheduling.</p>}
+            </div>
+            <DialogFooter className="sticky -bottom-4">
+              <Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={busyAction?.startsWith('create-')}>Cancel</Button>
+              <Button type="submit" variant="outline" disabled={busyAction?.startsWith('create-')}>
+                {busyAction === 'create-draft' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save as draft
+              </Button>
+              <Button type="button" onClick={() => void submitCampaign('scheduled')} disabled={busyAction?.startsWith('create-')}>
+                {busyAction === 'create-scheduled' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Schedule campaign
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sendConfirmOpen} onOpenChange={(open) => busyAction === 'send' ? undefined : setSendConfirmOpen(open)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm campaign delivery</DialogTitle>
+            <DialogDescription>This action queues real email and push deliveries and cannot be undone.</DialogDescription>
+          </DialogHeader>
+          {selectedCampaign ? (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <div><span className="text-muted-foreground">Campaign:</span> <strong>{selectedCampaign.title}</strong></div>
+              <div><span className="text-muted-foreground">Segment:</span> <strong>{segmentLabel(selectedCampaign.segment)}</strong></div>
+              {estimate ? (
+                <div>
+                  <span className="text-muted-foreground">Latest estimate:</span>{' '}
+                  <strong>{estimate.total.toLocaleString('en-IN')} attempts</strong>
+                  <span className="text-muted-foreground"> ({estimate.email.toLocaleString('en-IN')} email, {estimate.push.toLocaleString('en-IN')} push)</span>
+                </div>
+              ) : (
+                <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  No recipient estimate is loaded. Estimate the campaign before sending if you need to verify audience size.
+                </div>
+              )}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setSendConfirmOpen(false)} disabled={busyAction === 'send'}>Cancel</Button>
+            <Button type="button" onClick={runSend} disabled={busyAction === 'send'}>
+              {busyAction === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Confirm and send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

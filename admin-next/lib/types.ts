@@ -144,6 +144,18 @@ export interface WorkflowViolation {
   hoursOverdue: number;
 }
 
+export interface EditorialAuditEntry {
+  id: string;
+  entityType: 'post' | 'workflow' | 'auth' | 'subscription';
+  entityId: string;
+  action: string;
+  actorId?: string;
+  actorRole?: string;
+  summary: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface AlertMatchPreview {
   total: number;
   instant: number;

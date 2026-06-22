@@ -144,7 +144,9 @@ export function TaxonomiesPage() {
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Actions</span>
         </div>
 
-        {filtered.map((item, index) => (
+        {taxonomyQuery.isLoading ? <div className="px-4 py-10 text-center text-[13px] text-gray-500">Loading taxonomies…</div> : null}
+        {taxonomyQuery.isError ? <div className="px-4 py-10 text-center text-[13px] text-red-600">Taxonomies could not be loaded. <button type="button" className="font-semibold underline" onClick={() => void taxonomyQuery.refetch()}>Retry</button></div> : null}
+        {!taxonomyQuery.isLoading && !taxonomyQuery.isError ? filtered.map((item, index) => (
           <div
             key={item.id}
             className={`grid grid-cols-[1.1fr_auto_1.2fr_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
@@ -182,16 +184,20 @@ export function TaxonomiesPage() {
               <button
                 type="button"
                 disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate(item.id)}
+                onClick={() => {
+                  if (window.confirm(`Delete taxonomy "${item.name}"? This cannot be undone.`)) deleteMutation.mutate(item.id);
+                }}
+                aria-label={`Delete ${item.name}`}
+                title={`Delete ${item.name}`}
                 className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5" /><span className="sr-only">Delete {item.name}</span>
               </button>
             </div>
           </div>
-        ))}
+        )) : null}
 
-        {filtered.length === 0 ? (
+        {!taxonomyQuery.isLoading && !taxonomyQuery.isError && filtered.length === 0 ? (
           <div className="px-4 py-10 text-center text-[13px] text-gray-500">No taxonomies found for the current filter.</div>
         ) : null}
       </div>

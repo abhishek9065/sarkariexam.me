@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export function SystemAdminPage() {
-  const { data: backups, isLoading: loadingBackups } = useQuery({
+  const { data: backups, isLoading: loadingBackups, isError: backupsError } = useQuery({
     queryKey: ['admin-backups'],
     queryFn: async () => {
       const res = await getBackups();
@@ -21,7 +21,7 @@ export function SystemAdminPage() {
     },
   });
 
-  const { data: security } = useQuery({
+  const { data: security, isError: securityError } = useQuery({
     queryKey: ['admin-security'],
     queryFn: async () => {
       const res = await getSecurityStats();
@@ -29,7 +29,7 @@ export function SystemAdminPage() {
     },
   });
 
-  const { data: performance } = useQuery({
+  const { data: performance, isError: performanceError } = useQuery({
     queryKey: ['admin-performance'],
     queryFn: async () => {
       const res = await getPerformanceSummary();
@@ -37,7 +37,7 @@ export function SystemAdminPage() {
     },
   });
 
-  const { data: rateLimits } = useQuery({
+  const { data: rateLimits, isError: rateLimitsError } = useQuery({
     queryKey: ['admin-rate-limits'],
     queryFn: async () => {
       const res = await getRateLimitStats();
@@ -45,7 +45,7 @@ export function SystemAdminPage() {
     },
   });
 
-  const { data: health } = useQuery({
+  const { data: health, isError: healthError } = useQuery({
     queryKey: ['admin-health'],
     queryFn: async () => {
       const res = await getSystemHealth();
@@ -77,6 +77,9 @@ export function SystemAdminPage() {
 
   return (
     <div className="space-y-6">
+      {backupsError || securityError || performanceError || rateLimitsError || healthError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Some system data is unavailable. Values from failed requests must not be treated as current production metrics.</div>
+      ) : null}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">System Administration</h1>
@@ -149,7 +152,7 @@ export function SystemAdminPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {health?.services?.services?.filter((s: any) => s.status === 'up').length || 0}
+                  {health?.services?.services?.filter((service) => service.status === 'up').length || 0}
                   /{health?.services?.services?.length || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">Running</p>
@@ -166,7 +169,7 @@ export function SystemAdminPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {health.errors.map((err: any, i: number) => (
+                {health.errors.map((err, i) => (
                   <div key={i} className="flex items-center justify-between p-2 bg-red-50 rounded text-sm">
                     <span className="truncate">{err.message}</span>
                     <Badge variant="destructive">{err.count}x</Badge>
@@ -228,7 +231,7 @@ export function SystemAdminPage() {
                 <CardTitle className="text-base">Slowest Endpoints</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {performance.slowEndpoints.map((ep: any, i: number) => (
+                {performance.slowEndpoints.map((ep, i) => (
                   <div key={i} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
                     <span className="font-mono">{ep.route}</span>
                     <div className="flex items-center gap-3">
@@ -289,7 +292,7 @@ export function SystemAdminPage() {
                 <CardTitle className="text-base">Failed Login Attempts by IP</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {security.failedLoginsList.map((ip: any, i: number) => (
+                {security.failedLoginsList.map((ip, i) => (
                   <div key={i} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
                     <span className="font-mono">{ip.ip}</span>
                     <Badge variant="destructive">{ip.count} attempts</Badge>
@@ -326,7 +329,7 @@ export function SystemAdminPage() {
                 <p className="text-muted-foreground text-center py-8">No backups found</p>
               ) : (
                 <div className="space-y-2">
-                  {backups?.map((backup: any) => (
+                  {backups?.map((backup) => (
                     <div key={backup.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div>
                         <p className="font-medium">{backup.id}</p>
@@ -384,7 +387,7 @@ export function SystemAdminPage() {
                 <CardTitle className="text-base">Rate Limit Hits by Endpoint</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {rateLimits.byEndpoint.map((ep: any, i: number) => (
+                {rateLimits.byEndpoint.map((ep, i) => (
                   <div key={i} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
                     <span className="font-mono truncate">{ep.endpoint}</span>
                     <Badge>{ep.hits} hits</Badge>

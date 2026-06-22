@@ -48,7 +48,7 @@ export function CalendarPage() {
   const calendarStart = startOfWeek(monthStart);
   const calendarEnd = endOfWeek(monthEnd);
 
-  const { data: events } = useQuery({
+  const eventsQuery = useQuery({
     queryKey: ['calendar', monthStart.toISOString(), monthEnd.toISOString(), filterStatus, filterType],
     queryFn: async () => {
       const res = await getCalendarAnnouncements({
@@ -61,7 +61,7 @@ export function CalendarPage() {
     },
   });
 
-  const { data: upcomingDeadlines } = useQuery({
+  const deadlinesQuery = useQuery({
     queryKey: ['upcoming-deadlines'],
     queryFn: async () => {
       const res = await getUpcomingDeadlines(5);
@@ -74,8 +74,8 @@ export function CalendarPage() {
   }, [calendarStart, calendarEnd]);
 
   const getEventsForDay = (day: Date): CalendarEvent[] => {
-    if (!events) return [];
-    return events.filter(event => {
+    if (!eventsQuery.data) return [];
+    return eventsQuery.data.filter(event => {
       const dates = [
         event.deadline && parseISO(event.deadline),
         event.publishAt && parseISO(event.publishAt),
@@ -91,6 +91,9 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-6">
+      {eventsQuery.isError || deadlinesQuery.isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Calendar data could not be fully loaded. <button type="button" className="font-semibold underline" onClick={() => { void eventsQuery.refetch(); void deadlinesQuery.refetch(); }}>Retry</button></div>
+      ) : null}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Content Calendar</h1>
@@ -211,10 +214,12 @@ export function CalendarPage() {
               <CardDescription>Next 30 days</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {upcomingDeadlines?.length === 0 ? (
+              {deadlinesQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading deadlines…</p>
+              ) : deadlinesQuery.data?.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No upcoming deadlines</p>
               ) : (
-                upcomingDeadlines?.map(deadline => (
+                deadlinesQuery.data?.map(deadline => (
                   <Link
                     key={deadline.id}
                     href={`/announcements/${deadline.id}`}

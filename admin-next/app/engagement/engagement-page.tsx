@@ -6,16 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { MessageSquare, ThumbsUp, Flag, CheckCircle, XCircle, Loader2, Users, Bookmark } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Flag, CheckCircle, XCircle, Loader2, Users, Bookmark, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 export function EngagementPage() {
-  const [rejectionReason, setRejectionReason] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
-  const { data: metrics } = useQuery({
+  const metricsQuery = useQuery({
     queryKey: ['engagement-metrics'],
     queryFn: async () => {
       const res = await getEngagementMetrics(30);
@@ -23,7 +21,7 @@ export function EngagementPage() {
     },
   });
 
-  const { data: feedback, isLoading: loadingFeedback } = useQuery({
+  const feedbackQuery = useQuery({
     queryKey: ['user-feedback'],
     queryFn: async () => {
       const res = await getUserFeedback(50);
@@ -31,7 +29,7 @@ export function EngagementPage() {
     },
   });
 
-  const { data: comments, isLoading: loadingComments, refetch: refetchComments } = useQuery({
+  const commentsQuery = useQuery({
     queryKey: ['comments-pending'],
     queryFn: async () => {
       const res = await getCommentsPending(50);
@@ -43,12 +41,15 @@ export function EngagementPage() {
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => moderateComment(id, action),
     onSuccess: () => {
       toast.success('Comment moderated');
-      refetchComments();
+      commentsQuery.refetch();
       setRejectingId(null);
-      setRejectionReason('');
     },
     onError: () => toast.error('Failed to moderate'),
   });
+
+  const metrics = metricsQuery.data;
+  const feedback = feedbackQuery.data;
+  const comments = commentsQuery.data;
 
   return (
     <div className="space-y-6">
@@ -65,7 +66,7 @@ export function EngagementPage() {
             <ThumbsUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.feedbackCount || 0}</div>
+            <div className="text-2xl font-bold">{metricsQuery.isError ? 'Unavailable' : metricsQuery.isLoading ? '—' : (metrics?.feedbackCount ?? 0)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -74,7 +75,7 @@ export function EngagementPage() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.commentsCount || 0}</div>
+            <div className="text-2xl font-bold">{metricsQuery.isError ? 'Unavailable' : metricsQuery.isLoading ? '—' : (metrics?.commentsCount ?? 0)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -83,7 +84,7 @@ export function EngagementPage() {
             <Bookmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.bookmarksCount || 0}</div>
+            <div className="text-2xl font-bold">{metricsQuery.isError ? 'Unavailable' : metricsQuery.isLoading ? '—' : (metrics?.bookmarksCount ?? 0)}</div>
           </CardContent>
         </Card>
       </div>
@@ -108,39 +109,36 @@ export function EngagementPage() {
               <CardDescription>Review and approve or reject user comments</CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingComments ? (
+              {commentsQuery.isLoading ? (
                 <Loader2 className="h-8 w-8 animate-spin" />
+              ) : commentsQuery.isError ? (
+                <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground"><AlertTriangle /><p>Comments could not be loaded.</p><Button variant="outline" onClick={() => void commentsQuery.refetch()}><RefreshCw />Retry</Button></div>
               ) : !comments || comments.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No pending comments</p>
               ) : (
                 <div className="space-y-4">
-                  {comments?.map((comment: any) => (
-                    <div key={comment._id} className="border rounded-lg p-4 space-y-3">
+                  {comments?.map((comment) => (
+                    <div key={comment.id} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{comment.authorName || 'Anonymous'}</span>
+                          <span className="font-medium">{comment.username || 'Anonymous'}</span>
                           <span className="text-sm text-muted-foreground">
                             {new Date(comment.createdAt).toLocaleString()}
                           </span>
                         </div>
-                        <Badge variant="secondary">{comment.type || 'comment'}</Badge>
+                        <Badge variant="secondary">Comment</Badge>
                       </div>
-                      <p className="text-sm">{comment.content}</p>
+                      <p className="text-sm">{comment.body}</p>
                       
-                      {rejectingId === comment._id ? (
+                      {rejectingId === comment.id ? (
                         <div className="space-y-2">
-                          <Textarea
-                            placeholder="Reason for rejection (optional)..."
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            rows={2}
-                          />
+                          <p className="text-sm text-muted-foreground">Reject this comment? The moderation API does not accept a rejection note.</p>
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => moderateMutation.mutate({ id: comment._id, action: 'reject' })}
+                              onClick={() => moderateMutation.mutate({ id: comment.id, action: 'reject' })}
                               disabled={moderateMutation.isPending}
                             >
                               <XCircle className="h-4 w-4 mr-1" />
@@ -160,7 +158,7 @@ export function EngagementPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => moderateMutation.mutate({ id: comment._id, action: 'approve' })}
+                            onClick={() => moderateMutation.mutate({ id: comment.id, action: 'approve' })}
                             disabled={moderateMutation.isPending}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -169,7 +167,7 @@ export function EngagementPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => setRejectingId(comment._id)}
+                            onClick={() => setRejectingId(comment.id)}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
                             Reject
@@ -192,24 +190,24 @@ export function EngagementPage() {
               <CardDescription>Recent user submissions and feedback</CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingFeedback ? (
+              {feedbackQuery.isLoading ? (
                 <Loader2 className="h-8 w-8 animate-spin" />
+              ) : feedbackQuery.isError ? (
+                <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground"><AlertTriangle /><p>Feedback could not be loaded.</p><Button variant="outline" onClick={() => void feedbackQuery.refetch()}><RefreshCw />Retry</Button></div>
               ) : !feedback || feedback.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No feedback yet</p>
               ) : (
                 <div className="space-y-3">
-                  {feedback?.map((item: any) => (
-                    <div key={item._id} className="flex items-start justify-between p-3 border rounded-lg">
+                  {feedback?.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between p-3 border rounded-lg">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant={item.type === 'bug' ? 'destructive' : item.type === 'feature' ? 'default' : 'secondary'}>
-                            {item.type}
-                          </Badge>
+                          <Badge variant="secondary">Feedback</Badge>
                           <span className="text-sm text-muted-foreground">
                             {new Date(item.createdAt).toLocaleString()}
                           </span>
                         </div>
-                        <p className="font-medium">{item.title || 'Untitled'}</p>
+                        <p className="font-medium">{item.subject || 'No subject'}</p>
                         <p className="text-sm text-muted-foreground">{item.message}</p>
                         {item.email && (
                           <p className="text-xs text-muted-foreground">From: {item.email}</p>

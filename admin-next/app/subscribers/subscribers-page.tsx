@@ -105,6 +105,12 @@ export function SubscribersPage() {
 
   return (
     <div className="space-y-4">
+      {subscribersQuery.isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Subscribers could not be loaded. <button type="button" className="font-semibold underline" onClick={() => void subscribersQuery.refetch()}>Retry</button></div>
+      ) : null}
+      {statsQuery.isError || coverageQuery.isError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Some subscriber metrics are unavailable.</div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#ffd0d0] bg-[#fff0f0]">
@@ -290,7 +296,8 @@ export function SubscribersPage() {
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">Action</span>
         </div>
 
-        {subscribers.map((subscriber, index) => (
+        {subscribersQuery.isLoading ? <div className="px-4 py-10 text-center text-[13px] text-gray-500">Loading subscribers…</div> : null}
+        {!subscribersQuery.isLoading && !subscribersQuery.isError ? subscribers.map((subscriber, index) => (
           <div
             key={subscriber.id}
             className={`grid grid-cols-[1.2fr_1fr_auto_auto_auto] items-center gap-3 border-b border-gray-50 px-4 py-3.5 transition-colors hover:bg-blue-50/20 ${index % 2 === 1 ? 'bg-gray-50/20' : ''}`}
@@ -329,16 +336,20 @@ export function SubscribersPage() {
               <button
                 type="button"
                 disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate(subscriber.id)}
+                onClick={() => {
+                  if (window.confirm(`Delete subscriber "${subscriber.email}"? This cannot be undone.`)) deleteMutation.mutate(subscriber.id);
+                }}
+                aria-label={`Delete subscriber ${subscriber.email}`}
+                title={`Delete subscriber ${subscriber.email}`}
                 className="rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5" /><span className="sr-only">Delete subscriber {subscriber.email}</span>
               </button>
             </div>
           </div>
-        ))}
+        )) : null}
 
-        {subscribers.length === 0 ? (
+        {!subscribersQuery.isLoading && !subscribersQuery.isError && subscribers.length === 0 ? (
           <div className="px-4 py-10 text-center text-[13px] text-gray-500">No alert subscribers found for the current filters.</div>
         ) : null}
       </div>

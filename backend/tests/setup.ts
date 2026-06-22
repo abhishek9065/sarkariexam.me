@@ -9,7 +9,7 @@ import { closeConnection, connectToDatabase, getDatabase } from '../src/services
 dotenv.config();
 
 let mongoServer: MongoMemoryServer | null = null;
-let skipMongoTests = false;
+let skipMongoTests = process.env.SKIP_MONGO_TESTS === 'true';
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
@@ -40,11 +40,11 @@ async function canConnect(port: number, host: string): Promise<boolean> {
     });
 }
 
-if (!process.env.MONGODB_URI && await canConnect(27017, '127.0.0.1')) {
+if (!skipMongoTests && !process.env.MONGODB_URI && await canConnect(27017, '127.0.0.1')) {
     process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/sarkari_test';
 }
 
-if (!process.env.MONGODB_URI) {
+if (!skipMongoTests && !process.env.MONGODB_URI) {
     try {
         mongoServer = await MongoMemoryServer.create();
         process.env.MONGODB_URI = mongoServer.getUri();

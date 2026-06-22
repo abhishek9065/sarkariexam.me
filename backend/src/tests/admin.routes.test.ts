@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   findUserById: vi.fn(),
   updateUser: vi.fn(),
   deleteUser: vi.fn(),
+  createAuditLog: vi.fn(),
   listPushSubscriptions: vi.fn(),
   listAllPushSubscriptions: vi.fn(),
   getAdminCounts: vi.fn(),
@@ -50,6 +51,10 @@ vi.mock('../models/users.postgres.js', () => ({
     update: mocks.updateUser,
     delete: mocks.deleteUser,
   },
+}));
+
+vi.mock('../models/auditLogs.postgres.js', () => ({
+  default: { create: mocks.createAuditLog },
 }));
 
 vi.mock('../models/announcements.postgres.js', () => ({
@@ -132,6 +137,7 @@ describe('admin routes', () => {
     mocks.findUserById.mockResolvedValue(null);
     mocks.updateUser.mockResolvedValue(null);
     mocks.deleteUser.mockResolvedValue(false);
+    mocks.createAuditLog.mockResolvedValue({ id: 'audit-1' });
     mocks.listPushSubscriptions.mockResolvedValue({ data: [], total: 0, count: 0 });
     mocks.listAllPushSubscriptions.mockResolvedValue([]);
     mocks.getAdminCounts.mockResolvedValue({ total: 0, byStatus: {}, byType: {} });
@@ -219,14 +225,63 @@ describe('admin routes', () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
+  it('blocks an admin from demoting their own account', async () => {
+    const app = await createApp();
+    const response = await request(app).patch('/admin/users/admin-user').send({ role: 'editor' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Cannot demote your own admin account');
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('records the supplied audit reason for a role change', async () => {
+    mocks.findUserById.mockResolvedValue({ id: 'editor-1', role: 'editor', isActive: true });
+    mocks.updateUser.mockResolvedValue({ id: 'editor-1', email: 'editor@example.com', role: 'admin', isActive: true });
+
+    const app = await createApp();
+    const response = await request(app).patch('/admin/users/editor-1').send({
+      role: 'admin',
+      auditReason: 'Approved access escalation',
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateUser).toHaveBeenCalledWith('editor-1', { role: 'admin' });
+    expect(mocks.createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'admin_user_role_changed',
+      actorId: 'admin-user',
+      metadata: { auditReason: 'Approved access escalation' },
+    }));
+  });
+
+  it('blocks demoting the last active superadmin even when another admin exists', async () => {
+    mocks.findUserById.mockResolvedValue({ id: 'super-1', role: 'superadmin', isActive: true });
+    mocks.countUsers.mockResolvedValueOnce(1);
+
+    const app = await createApp();
+    const response = await request(app).patch('/admin/users/super-1').send({ role: 'user' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('At least one superadmin');
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
   it('blocks deleting the last active privileged user', async () => {
-    mocks.findUserById.mockResolvedValue({ id: 'user-1', role: 'superadmin', isActive: true });
+    mocks.findUserById.mockResolvedValue({ id: 'user-1', role: 'admin', isActive: true });
     mocks.countUsers.mockResolvedValue(1);
 
     const app = await createApp();
     const response = await request(app).delete('/admin/users/user-1');
 
     expect(response.status).toBe(400);
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it('blocks an admin from deleting their own account', async () => {
+    const app = await createApp();
+    const response = await request(app).delete('/admin/users/admin-user');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Cannot delete your own account');
     expect(mocks.deleteUser).not.toHaveBeenCalled();
   });
 

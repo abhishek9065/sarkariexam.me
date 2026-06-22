@@ -138,7 +138,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Moderation',
     items: [
-      { href: '/community', label: 'Community Moderation', icon: MessageSquare, badge: 'Planned' },
+      { href: '/community', label: 'Community Moderation', icon: MessageSquare },
+      { href: '/engagement', label: 'Engagement', icon: Users },
       { href: '/error-reports', label: 'Error Reports / User Reports', icon: FileText, roles: ['superadmin', 'admin'] },
     ],
   },
@@ -229,9 +230,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   }, [logout, router]);
 
   const openLiveSite = useCallback(() => {
-    const liveSiteUrl = typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.host}`
-      : process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+    const configuredUrl = process.env.NEXT_PUBLIC_FRONTEND_URL?.trim();
+    const currentOrigin = window.location.origin;
+    const liveSiteUrl = configuredUrl || (/^https?:\/\/(localhost|127\.0\.0\.1):3001$/i.test(currentOrigin)
+      ? currentOrigin.replace(/:3001$/, ':3000')
+      : currentOrigin);
 
     window.open(liveSiteUrl, '_blank', 'noopener,noreferrer');
   }, []);

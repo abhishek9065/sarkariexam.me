@@ -1,468 +1,353 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  BadgeCheck,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  CornerDownRight,
+  CheckCircle2,
+  CircleCheck,
+  Flag,
+  Loader2,
   MessageCircle,
-  Search,
-  Shield,
-  ThumbsUp,
-  Trash2,
+  RefreshCw,
+  Reply,
+  ShieldCheck,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type QAAnswer = {
-  id: number;
-  author: string;
-  initials: string;
-  avatarColor: string;
-  text: string;
-  time: string;
-  likes: number;
-  isBest: boolean;
-  approved: boolean;
-};
+import {
+  answerCommunityQA,
+  getCommentsPending,
+  getCommunityFlags,
+  getCommunityQA,
+  moderateComment,
+  updateCommunityFlag,
+  type CommunityFlagItem,
+  type CommunityQAItem,
+  type PendingCommunityComment,
+} from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
-type QAQuestion = {
-  id: number;
-  author: string;
-  initials: string;
-  avatarColor: string;
-  text: string;
-  time: string;
-  likes: number;
-  approved: boolean;
-  postTitle: string;
-  answers: QAAnswer[];
-};
+const PAGE_SIZE = 50;
 
-const INITIAL_QA: QAQuestion[] = [
-  {
-    id: 1,
-    author: 'Rahul Sharma',
-    initials: 'RS',
-    avatarColor: '#1565c0',
-    text: "Can final year students apply for SSC CGL 2026? I'm currently in my last semester and haven't received my degree yet.",
-    time: '2 days ago',
-    likes: 24,
-    approved: true,
-    postTitle: 'SSC CGL 2026',
-    answers: [
-      {
-        id: 1,
-        author: 'SarkariExams Team',
-        initials: 'SE',
-        avatarColor: '#e65100',
-        text: 'Yes. Final year students can apply provisionally. You must submit the degree certificate during document verification.',
-        time: '2 days ago',
-        likes: 18,
-        isBest: true,
-        approved: true,
-      },
-      {
-        id: 2,
-        author: 'Neha Gupta',
-        initials: 'NG',
-        avatarColor: '#00695c',
-        text: 'I applied in the last cycle as a final year student. Keep a provisional certificate ready.',
-        time: '1 day ago',
-        likes: 9,
-        isBest: false,
-        approved: true,
-      },
-    ],
-  },
-  {
-    id: 2,
-    author: 'Priya Verma',
-    initials: 'PV',
-    avatarColor: '#2e7d32',
-    text: 'Is there any application fee waiver for female candidates in General category for SSC CGL?',
-    time: '1 day ago',
-    likes: 15,
-    approved: true,
-    postTitle: 'SSC CGL 2026',
-    answers: [
-      {
-        id: 1,
-        author: 'Amit Kumar',
-        initials: 'AK',
-        avatarColor: '#6a1b9a',
-        text: 'Yes. Female candidates are exempted from the application fee regardless of category.',
-        time: '1 day ago',
-        likes: 12,
-        isBest: true,
-        approved: true,
-      },
-    ],
-  },
-  {
-    id: 3,
-    author: 'Anjali Mishra',
-    initials: 'AM',
-    avatarColor: '#37474f',
-    text: 'What documents are required for UP Police Constable document verification?',
-    time: '5 hours ago',
-    likes: 3,
-    approved: false,
-    postTitle: 'UP Police Constable 2026',
-    answers: [],
-  },
-  {
-    id: 4,
-    author: 'Suresh Kumar',
-    initials: 'SK',
-    avatarColor: '#00695c',
-    text: 'Can I apply for IBPS PO 2026 if I have a gap year after graduation?',
-    time: '3 hours ago',
-    likes: 1,
-    approved: false,
-    postTitle: 'IBPS PO 2026',
-    answers: [
-      {
-        id: 1,
-        author: 'Anonymous',
-        initials: 'AN',
-        avatarColor: '#9e9e9e',
-        text: "Yes. A gap year doesn't affect eligibility if you meet the qualification and age criteria.",
-        time: '2 hours ago',
-        likes: 0,
-        isBest: false,
-        approved: false,
-      },
-    ],
-  },
-];
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-52 items-center justify-center">
+      <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <div className="py-14 text-center text-sm text-muted-foreground">{message}</div>;
+}
+
+function ErrorState({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center">
+      <AlertTriangle className="h-7 w-7 text-destructive" />
+      <p className="text-sm text-muted-foreground">{message}</p>
+      <Button type="button" variant="outline" onClick={retry}>
+        <RefreshCw className="h-4 w-4" />
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function CommentCard({
+  comment,
+  busy,
+  onModerate,
+}: {
+  comment: PendingCommunityComment;
+  busy: boolean;
+  onModerate: (comment: PendingCommunityComment, action: 'approve' | 'reject') => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold">{comment.username || 'Anonymous'}</p>
+          <p className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</p>
+        </div>
+        <Badge variant="secondary">Pending</Badge>
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-6">{comment.body}</p>
+      {comment.postId ? <p className="text-xs text-muted-foreground">Post ID: {comment.postId}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onModerate(comment, 'approve')}>
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          Approve
+        </Button>
+        <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => onModerate(comment, 'reject')}>
+          <XCircle className="h-4 w-4" />
+          Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FlagCard({
+  item,
+  busy,
+  resolved = false,
+  onUpdate,
+}: {
+  item: CommunityFlagItem;
+  busy: boolean;
+  resolved?: boolean;
+  onUpdate: (id: string, status: 'reviewed' | 'resolved') => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold capitalize">{item.entityType} report</p>
+          <p className="text-xs text-muted-foreground">Entity: {item.entityId} · {formatDate(item.createdAt)}</p>
+        </div>
+        <Badge variant={item.status === 'resolved' ? 'default' : 'secondary'}>{item.status}</Badge>
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-6">{item.reason}</p>
+      <p className="text-xs text-muted-foreground">Reporter: {item.reporter || 'Anonymous'}</p>
+      {!resolved ? (
+        <div className="flex flex-wrap gap-2">
+          {item.status === 'open' ? (
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onUpdate(item.id, 'reviewed')}>
+              <ShieldCheck className="h-4 w-4" />
+              Mark reviewed
+            </Button>
+          ) : null}
+          <Button type="button" size="sm" disabled={busy} onClick={() => onUpdate(item.id, 'resolved')}>
+            <CircleCheck className="h-4 w-4" />
+            Resolve
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function CommunityPage() {
-  const [questions, setQuestions] = useState<QAQuestion[]>(INITIAL_QA);
-  const [expanded, setExpanded] = useState<number[]>([1, 2]);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'question' | 'answer'; qId: number; aId?: number } | null>(null);
+  const queryClient = useQueryClient();
+  const [answerTarget, setAnswerTarget] = useState<CommunityQAItem | null>(null);
+  const [answer, setAnswer] = useState('');
+  const [rejectTarget, setRejectTarget] = useState<PendingCommunityComment | null>(null);
 
-  const filtered = useMemo(() => questions.filter(question => {
-    const matchSearch =
-      question.text.toLowerCase().includes(search.toLowerCase()) ||
-      question.postTitle.toLowerCase().includes(search.toLowerCase()) ||
-      question.author.toLowerCase().includes(search.toLowerCase());
-    const matchFilter =
-      filter === 'all' ||
-      (filter === 'pending' && !question.approved) ||
-      (filter === 'approved' && question.approved);
-    return matchSearch && matchFilter;
-  }), [filter, questions, search]);
+  const commentsQuery = useQuery({
+    queryKey: ['community-moderation', 'comments'],
+    queryFn: () => getCommentsPending(PAGE_SIZE),
+  });
+  const qaQuery = useQuery({
+    queryKey: ['community-moderation', 'qa'],
+    queryFn: () => getCommunityQA({ limit: PAGE_SIZE }),
+  });
+  const openFlagsQuery = useQuery({
+    queryKey: ['community-moderation', 'flags', 'open'],
+    queryFn: () => getCommunityFlags({ status: 'open', limit: PAGE_SIZE }),
+  });
+  const reviewedFlagsQuery = useQuery({
+    queryKey: ['community-moderation', 'flags', 'reviewed'],
+    queryFn: () => getCommunityFlags({ status: 'reviewed', limit: PAGE_SIZE }),
+  });
+  const resolvedFlagsQuery = useQuery({
+    queryKey: ['community-moderation', 'flags', 'resolved'],
+    queryFn: () => getCommunityFlags({ status: 'resolved', limit: PAGE_SIZE }),
+  });
 
-  const pendingCount =
-    questions.filter(question => !question.approved).length +
-    questions.flatMap(question => question.answers).filter(answer => !answer.approved).length;
+  const moderateMutation = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => moderateComment(id, action),
+    onSuccess: (_response, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['community-moderation', 'comments'] });
+      setRejectTarget(null);
+      toast.success(variables.action === 'approve' ? 'Comment approved.' : 'Comment rejected.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
-  function toggleExpand(id: number) {
-    setExpanded(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
-  }
+  const answerMutation = useMutation({
+    mutationFn: ({ id, response }: { id: string; response: string }) => answerCommunityQA(id, response),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['community-moderation', 'qa'] });
+      setAnswerTarget(null);
+      setAnswer('');
+      toast.success('Answer saved.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
-  function approveQuestion(id: number) {
-    setQuestions(current => current.map(question => question.id === id ? { ...question, approved: true } : question));
-    toast.success('Question approved and published.');
-  }
+  const flagMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'reviewed' | 'resolved' }) => updateCommunityFlag(id, status),
+    onSuccess: (_response, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['community-moderation', 'flags'] });
+      toast.success(variables.status === 'resolved' ? 'Report resolved.' : 'Report marked reviewed.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
-  function approveAnswer(qId: number, aId: number) {
-    setQuestions(current => current.map(question => (
-      question.id === qId
-        ? { ...question, answers: question.answers.map(answer => answer.id === aId ? { ...answer, approved: true } : answer) }
-        : question
-    )));
-    toast.success('Answer approved.');
-  }
+  const comments = commentsQuery.data?.data ?? [];
+  const questions = qaQuery.data?.data ?? [];
+  const activeFlags = [...(openFlagsQuery.data?.data ?? []), ...(reviewedFlagsQuery.data?.data ?? [])];
+  const resolvedFlags = resolvedFlagsQuery.data?.data ?? [];
+  const activeFlagsLoading = openFlagsQuery.isLoading || reviewedFlagsQuery.isLoading;
+  const activeFlagsError = openFlagsQuery.isError || reviewedFlagsQuery.isError;
 
-  function markBestAnswer(qId: number, aId: number) {
-    setQuestions(current => current.map(question => (
-      question.id === qId
-        ? { ...question, answers: question.answers.map(answer => ({ ...answer, isBest: answer.id === aId })) }
-        : question
-    )));
-    toast.success('Marked as best answer.');
-  }
-
-  function handleDelete() {
-    if (!deleteTarget) return;
-    if (deleteTarget.type === 'question') {
-      setQuestions(current => current.filter(question => question.id !== deleteTarget.qId));
-      toast.success('Question deleted.');
-    } else {
-      setQuestions(current => current.map(question => (
-        question.id === deleteTarget.qId
-          ? { ...question, answers: question.answers.filter(answer => answer.id !== deleteTarget.aId) }
-          : question
-      )));
-      toast.success('Answer deleted.');
+  function requestModeration(comment: PendingCommunityComment, action: 'approve' | 'reject') {
+    if (action === 'reject') {
+      setRejectTarget(comment);
+      return;
     }
-    setDeleteTarget(null);
+    moderateMutation.mutate({ id: comment.id, action });
+  }
+
+  function openAnswerDialog(question: CommunityQAItem) {
+    setAnswerTarget(question);
+    setAnswer(question.answer ?? '');
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c2d9ff] bg-[#eff4ff]">
-            <MessageCircle className="h-4.5 w-4.5 text-blue-700" />
-          </div>
-          <div>
-            <h2 className="text-[18px] font-extrabold text-gray-800">Q&A Moderation</h2>
-            <p className="text-[11px] text-gray-400">{pendingCount} items pending review</p>
-          </div>
-        </div>
-
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-            <span className="text-[12px] font-bold text-amber-700">{pendingCount} pending moderation</span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: 'Total Questions', value: '156', color: '#1565c0' },
-          { label: 'Approved', value: '139', color: '#2e7d32' },
-          { label: 'Pending Review', value: '17', color: '#f57f17' },
-          { label: 'Best Answers', value: '98', color: '#e65100' },
-        ].map(item => (
-          <div key={item.label} className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
-            <div className="text-[20px] font-extrabold" style={{ color: item.color }}>{item.value}</div>
-            <div className="mt-0.5 text-[11px] text-gray-500">{item.label}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap gap-3">
-          <div className="flex min-w-48 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
-            <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-            <input
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search questions, posts, authors..."
-              className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400"
-            />
-          </div>
-          <div className="flex rounded-xl bg-gray-100 p-1">
-            {(['all', 'pending', 'approved'] as const).map(item => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setFilter(item)}
-                className={cn(
-                  'rounded-lg px-3 py-1.5 text-[12px] font-semibold capitalize transition-all',
-                  filter === item ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                )}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {filtered.length === 0 ? (
-          <div className="rounded-[22px] border border-gray-100 bg-white py-12 text-center text-[13px] text-gray-400 shadow-sm">
-            No questions found matching your filters.
-          </div>
-        ) : (
-          filtered.map(question => {
-            const isExpanded = expanded.includes(question.id);
-
-            return (
-              <div key={question.id} className="overflow-hidden rounded-[22px] border border-gray-100 bg-white shadow-sm">
-                <div className={cn('border-l-4 p-4', question.approved ? 'border-green-400' : 'border-amber-400')}>
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white"
-                      style={{ background: `linear-gradient(135deg, ${question.avatarColor}cc, ${question.avatarColor})` }}
-                    >
-                      {question.initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <span className="text-[12px] font-bold text-gray-800">{question.author}</span>
-                        <span className="text-[10px] text-gray-400">· {question.time}</span>
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700">📌 {question.postTitle}</span>
-                        <span
-                          className={cn(
-                            'flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold',
-                            question.approved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                          )}
-                        >
-                          {question.approved ? <CheckCircle className="h-2 w-2" /> : <Clock className="h-2 w-2" />}
-                          {question.approved ? 'Approved' : 'Pending'}
-                        </span>
-                      </div>
-                      <p className="text-[13px] text-gray-700">{question.text}</p>
-                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                        <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                          <ThumbsUp className="h-2.5 w-2.5" />
-                          {question.likes}
-                        </span>
-                        <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                          <MessageCircle className="h-2.5 w-2.5" />
-                          {question.answers.length} answers
-                        </span>
-                        {!question.approved && (
-                          <button
-                            type="button"
-                            onClick={() => approveQuestion(question.id)}
-                            className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1 text-[10px] font-bold text-green-700 transition-colors hover:bg-green-100"
-                          >
-                            <CheckCircle className="h-2.5 w-2.5" />
-                            Approve
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget({ type: 'question', qId: question.id })}
-                          className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-600 transition-colors hover:bg-red-100"
-                        >
-                          <Trash2 className="h-2.5 w-2.5" />
-                          Delete
-                        </button>
-                        {question.answers.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(question.id)}
-                            className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-blue-600 transition-colors hover:text-blue-800"
-                          >
-                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                            {isExpanded ? 'Hide Answers' : 'View Answers'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="divide-y divide-gray-50 border-t border-gray-100">
-                    {question.answers.map(answer => (
-                      <div key={answer.id} className={cn('flex items-start gap-3 pl-10 pr-4 py-3.5', !answer.approved ? 'bg-amber-50/40' : 'bg-gray-50/30')}>
-                        <CornerDownRight className="mt-2 h-3 w-3 shrink-0 text-gray-300" />
-                        <div
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white"
-                          style={{ background: `linear-gradient(135deg, ${answer.avatarColor}cc, ${answer.avatarColor})` }}
-                        >
-                          {answer.initials}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 flex flex-wrap items-center gap-2">
-                            <span className="text-[12px] font-bold text-gray-800">{answer.author}</span>
-                            {answer.isBest && (
-                              <span className="flex items-center gap-1 rounded-full bg-gradient-to-r from-green-700 to-green-500 px-2 py-0.5 text-[9px] font-extrabold text-white">
-                                <BadgeCheck className="h-2.5 w-2.5" />
-                                Best Answer
-                              </span>
-                            )}
-                            {!answer.approved && (
-                              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700">
-                                <Clock className="h-2 w-2" />
-                                Pending
-                              </span>
-                            )}
-                            <span className="text-[10px] text-gray-400">· {answer.time}</span>
-                          </div>
-                          <p className="text-[12.5px] text-gray-700">{answer.text}</p>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                              <ThumbsUp className="h-2.5 w-2.5" />
-                              {answer.likes}
-                            </span>
-                            {!answer.approved && (
-                              <button
-                                type="button"
-                                onClick={() => approveAnswer(question.id, answer.id)}
-                                className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-[10px] font-bold text-green-700 transition-colors hover:bg-green-100"
-                              >
-                                <CheckCircle className="h-2.5 w-2.5" />
-                                Approve
-                              </button>
-                            )}
-                            {!answer.isBest && answer.approved && (
-                              <button
-                                type="button"
-                                onClick={() => markBestAnswer(question.id, answer.id)}
-                                className="flex items-center gap-1 rounded-lg border border-yellow-200 bg-yellow-50 px-2 py-1 text-[10px] font-bold text-yellow-700 transition-colors hover:bg-yellow-100"
-                              >
-                                <BadgeCheck className="h-2.5 w-2.5" />
-                                Mark Best
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTarget({ type: 'answer', qId: question.id, aId: answer.id })}
-                              className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 transition-colors hover:bg-red-100"
-                            >
-                              <Trash2 className="h-2.5 w-2.5" />
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <div className="flex items-start gap-2.5 rounded-[22px] border border-blue-100 bg-blue-50 p-4">
-        <Shield className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[12px] font-bold text-blue-800">Moderation Guidelines</div>
-          <p className="mt-1 text-[11px] leading-6 text-blue-700">
-            Approve questions and answers that are relevant, helpful, and follow community guidelines. Delete spam,
-            offensive content, or irrelevant posts. Mark the most accurate response as the best answer.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Community Moderation</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Review comments, answer community questions, and process user reports.</p>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+          <ShieldCheck className="h-4 w-4" />
+          Live API-backed queue
         </div>
       </div>
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[rgba(10,20,60,0.55)] p-4 backdrop-blur-[4px]">
-          <div className="w-full max-w-sm rounded-[22px] bg-white p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-red-100">
-              <Trash2 className="h-6 w-6 text-red-500" />
-            </div>
-            <h3 className="mb-2 text-[16px] font-extrabold text-gray-800">
-              Delete {deleteTarget.type === 'question' ? 'Question' : 'Answer'}?
-            </h3>
-            <p className="mb-5 text-[13px] text-gray-500">This will permanently remove the selected item.</p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="flex-1 rounded-xl py-2.5 text-[13px] font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, #c62828, #b71c1c)' }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">Pending comments</p><p className="text-2xl font-bold">{comments.length}</p></div><MessageCircle className="h-5 w-5 text-blue-600" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">Unanswered Q&amp;A</p><p className="text-2xl font-bold">{questions.filter((item) => !item.answer).length}</p></div><Reply className="h-5 w-5 text-amber-600" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">Active reports</p><p className="text-2xl font-bold">{activeFlags.length}</p></div><Flag className="h-5 w-5 text-red-600" /></CardContent></Card>
+      </div>
+
+      <Tabs defaultValue="comments" className="space-y-4">
+        <TabsList className="h-auto max-w-full flex-wrap justify-start">
+          <TabsTrigger value="comments">Pending Comments ({comments.length})</TabsTrigger>
+          <TabsTrigger value="qa">Q&amp;A ({questions.length})</TabsTrigger>
+          <TabsTrigger value="flags">Flags / Reports ({activeFlags.length})</TabsTrigger>
+          <TabsTrigger value="resolved">Resolved ({resolvedFlags.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="comments">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Pending Comments</CardTitle><CardDescription>Approve relevant comments or reject content that violates moderation policy.</CardDescription></CardHeader>
+            <CardContent>
+              {commentsQuery.isLoading ? <LoadingState /> : commentsQuery.isError ? (
+                <ErrorState message="Pending comments could not be loaded." retry={() => void commentsQuery.refetch()} />
+              ) : comments.length === 0 ? <EmptyState message="No comments are waiting for moderation." /> : (
+                <div className="space-y-3">{comments.map((comment) => <CommentCard key={comment.id} comment={comment} busy={moderateMutation.isPending} onModerate={requestModeration} />)}</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="qa">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Community Q&amp;A</CardTitle><CardDescription>Answers are saved directly to the PostgreSQL-backed Q&amp;A record.</CardDescription></CardHeader>
+            <CardContent>
+              {qaQuery.isLoading ? <LoadingState /> : qaQuery.isError ? (
+                <ErrorState message="Community questions could not be loaded." retry={() => void qaQuery.refetch()} />
+              ) : questions.length === 0 ? <EmptyState message="No community questions found." /> : (
+                <div className="space-y-3">
+                  {questions.map((item) => (
+                    <div key={item.id} className="space-y-3 rounded-lg border border-border p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div><p className="text-sm font-semibold">{item.author}</p><p className="text-xs text-muted-foreground">{formatDate(item.createdAt)}</p></div>
+                        <Badge variant={item.answer ? 'default' : 'secondary'}>{item.answer ? 'Answered' : 'Unanswered'}</Badge>
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm leading-6">{item.question}</p>
+                      {item.answer ? <div className="rounded-lg bg-muted p-3"><p className="text-xs font-semibold text-muted-foreground">Answer by {item.answeredBy || 'admin'}</p><p className="mt-1 whitespace-pre-wrap text-sm">{item.answer}</p></div> : null}
+                      <Button type="button" size="sm" variant="outline" onClick={() => openAnswerDialog(item)}>
+                        <Reply className="h-4 w-4" />
+                        {item.answer ? 'Edit answer' : 'Answer'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="flags">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Flags / Reports</CardTitle><CardDescription>Review open reports and move completed investigations to resolved.</CardDescription></CardHeader>
+            <CardContent>
+              {activeFlagsLoading ? <LoadingState /> : activeFlagsError ? (
+                <ErrorState message="Active reports could not be loaded." retry={() => { void openFlagsQuery.refetch(); void reviewedFlagsQuery.refetch(); }} />
+              ) : activeFlags.length === 0 ? <EmptyState message="No active community reports." /> : (
+                <div className="space-y-3">{activeFlags.map((item) => <FlagCard key={item.id} item={item} busy={flagMutation.isPending} onUpdate={(id, status) => flagMutation.mutate({ id, status })} />)}</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="resolved">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Resolved Reports</CardTitle><CardDescription>Read-only history of reports marked resolved through the backend.</CardDescription></CardHeader>
+            <CardContent>
+              {resolvedFlagsQuery.isLoading ? <LoadingState /> : resolvedFlagsQuery.isError ? (
+                <ErrorState message="Resolved reports could not be loaded." retry={() => void resolvedFlagsQuery.refetch()} />
+              ) : resolvedFlags.length === 0 ? <EmptyState message="No resolved community reports." /> : (
+                <div className="space-y-3">{resolvedFlags.map((item) => <FlagCard key={item.id} item={item} busy={false} resolved onUpdate={() => undefined} />)}</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={Boolean(answerTarget)} onOpenChange={(open) => { if (!open && !answerMutation.isPending) setAnswerTarget(null); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>{answerTarget?.answer ? 'Edit answer' : 'Answer question'}</DialogTitle><DialogDescription>{answerTarget?.question}</DialogDescription></DialogHeader>
+          <Textarea value={answer} onChange={(event) => setAnswer(event.target.value)} rows={7} maxLength={2000} placeholder="Write an accurate response…" />
+          <div className="text-right text-xs text-muted-foreground">{answer.length}/2000</div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={answerMutation.isPending} onClick={() => setAnswerTarget(null)}>Cancel</Button>
+            <Button type="button" disabled={answerMutation.isPending || !answer.trim() || !answerTarget} onClick={() => { if (answerTarget) answerMutation.mutate({ id: answerTarget.id, response: answer.trim() }); }}>
+              {answerMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Reply className="h-4 w-4" />}
+              Save answer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => { if (!open && !moderateMutation.isPending) setRejectTarget(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reject comment?</DialogTitle><DialogDescription>The backend will mark this comment rejected and remove it from the pending queue. Rejection reasons are not supported by the current API.</DialogDescription></DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={moderateMutation.isPending} onClick={() => setRejectTarget(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={moderateMutation.isPending || !rejectTarget} onClick={() => { if (rejectTarget) moderateMutation.mutate({ id: rejectTarget.id, action: 'reject' }); }}>
+              {moderateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+              Confirm reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

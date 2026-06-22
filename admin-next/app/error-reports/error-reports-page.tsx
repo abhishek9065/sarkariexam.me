@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getErrorReports, updateErrorReport } from '@/lib/api';
+import { getErrorReports, updateErrorReport, type ErrorReportItem } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -28,10 +28,10 @@ export function ErrorReportsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [detailItem, setDetailItem] = useState<any | null>(null);
+  const [detailItem, setDetailItem] = useState<ErrorReportItem | null>(null);
   const [reviewNote, setReviewNote] = useState('');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-error-reports', page, statusFilter],
     queryFn: () => getErrorReports({
       status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -75,6 +75,8 @@ export function ErrorReportsPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+      ) : isError ? (
+        <Card><CardContent className="flex flex-col items-center gap-3 py-12 text-muted-foreground"><p>Error reports could not be loaded.</p><Button variant="outline" onClick={() => void refetch()}>Retry</Button></CardContent></Card>
       ) : items.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">No error reports found.</CardContent></Card>
       ) : (
@@ -93,7 +95,7 @@ export function ErrorReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((r: any) => (
+                  {items.map((r) => (
                     <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-xs">{r.errorId || r.id?.slice(0, 8)}</td>
                       <td className="px-4 py-3 max-w-[300px]">

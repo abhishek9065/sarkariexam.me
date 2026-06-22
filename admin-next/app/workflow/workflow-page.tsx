@@ -102,6 +102,9 @@ export function WorkflowPage() {
 
   return (
     <div className="space-y-6">
+      {[pendingQuery, slaQuery, freshnessQuery, trustQuery, searchReadinessQuery, seoQuery, alertImpactQuery].some((query) => query.isError) ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Some workflow queues are unavailable. Empty sections may not represent the current backend state. <button type="button" className="font-semibold underline" onClick={() => void refreshWorkflowQueries()}>Retry</button></div>
+      ) : null}
       <div>
         <h1 className="text-[24px] font-black text-gray-900">Editorial Workflow</h1>
         <p className="text-[12px] text-gray-500">Review, approve, and continuously maintain trust, freshness, search quality, and SEO readiness.</p>

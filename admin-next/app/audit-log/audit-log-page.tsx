@@ -20,6 +20,8 @@ export function AuditLogPage() {
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         {auditQuery.isLoading ? (
           <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading audit log…</div>
+        ) : auditQuery.isError ? (
+          <div className="flex items-center justify-between gap-3 text-sm text-red-600"><span>Audit activity could not be loaded.</span><button type="button" onClick={() => void auditQuery.refetch()} className="rounded-lg border px-3 py-1.5 font-semibold">Retry</button></div>
         ) : auditQuery.data && auditQuery.data.length > 0 ? (
           <div className="space-y-3">
             {auditQuery.data.map((item) => (

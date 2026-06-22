@@ -10,6 +10,7 @@ import type {
   CmsPost,
   CmsTaxonomy,
   DashboardData,
+  EditorialAuditEntry,
   EditorialBulkTransitionResult,
   PaginatedResponse,
   SiteSettings,
@@ -219,16 +220,17 @@ export function getAdminUser(id: string) {
   return apiFetch<{ data: User }>(`/admin/users/${id}`);
 }
 
-export function updateUser(id: string, data: Partial<User>) {
+export function updateUser(id: string, data: Partial<User> & { auditReason?: string }) {
   return apiFetchWithCsrf<{ data: User }>(`/admin/users/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
 }
 
-export function deleteUser(id: string) {
+export function deleteUser(id: string, auditReason?: string) {
   return apiFetchWithCsrf<{ message: string }>(`/admin/users/${id}`, {
     method: 'DELETE',
+    body: JSON.stringify({ auditReason }),
   });
 }
 
@@ -273,6 +275,60 @@ export function sendPushNotification(data: { title: string; body: string; url?: 
 }
 
 // ─── Community ───
+export type CommunityQAItem = {
+  id: string;
+  question: string;
+  answer?: string | null;
+  answeredBy?: string | null;
+  author: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CommunityFlagItem = {
+  id: string;
+  entityType: 'forum' | 'qa' | 'group';
+  entityId: string;
+  reason: string;
+  reporter?: string | null;
+  status: 'open' | 'reviewed' | 'resolved';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PendingCommunityComment = {
+  id: string;
+  postId?: string | null;
+  userId?: string | null;
+  username?: string | null;
+  body: string;
+  status: 'pending';
+  moderatedAt?: string | null;
+  moderatedBy?: string | null;
+  createdAt: string;
+};
+
+export type UserFeedbackItem = {
+  id: string;
+  subject: string;
+  message: string;
+  email?: string | null;
+  createdAt: string;
+};
+
+export type ErrorReportItem = {
+  id: string;
+  errorId?: string | null;
+  message: string;
+  pageUrl?: string | null;
+  userAgent?: string | null;
+  stack?: string | null;
+  componentStack?: string | null;
+  status: 'new' | 'triaged' | 'resolved';
+  reviewNote?: string | null;
+  createdAt: string;
+};
+
 export function getCommunityForums(filters: { limit?: number; offset?: number } = {}) {
   return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/forums${qs(filters as Record<string, string | number | undefined>)}`);
 }
@@ -282,7 +338,7 @@ export function deleteCommunityForum(id: string) {
 }
 
 export function getCommunityQA(filters: { limit?: number; offset?: number } = {}) {
-  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/qa${qs(filters as Record<string, string | number | undefined>)}`);
+  return apiFetch<{ data: CommunityQAItem[]; total: number; count: number }>(`/admin/community/qa${qs(filters as Record<string, string | number | undefined>)}`);
 }
 
 export function deleteCommunityQA(id: string) {
@@ -304,8 +360,8 @@ export function deleteCommunityGroup(id: string) {
   return apiFetchWithCsrf<{ message: string }>(`/admin/community/groups/${id}`, { method: 'DELETE' });
 }
 
-export function getCommunityFlags(filters: { status?: string; limit?: number; offset?: number } = {}) {
-  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/community/flags${qs(filters as Record<string, string | number | undefined>)}`);
+export function getCommunityFlags(filters: { status?: CommunityFlagItem['status']; limit?: number; offset?: number } = {}) {
+  return apiFetch<{ data: CommunityFlagItem[]; total: number; count: number }>(`/admin/community/flags${qs(filters as Record<string, string | number | undefined>)}`);
 }
 
 export function updateCommunityFlag(id: string, status: 'reviewed' | 'resolved') {
@@ -317,7 +373,7 @@ export function updateCommunityFlag(id: string, status: 'reviewed' | 'resolved')
 
 // ─── Error Reports ───
 export function getErrorReports(filters: { status?: string; limit?: number; offset?: number } = {}) {
-  return apiFetch<{ data: any[]; total: number; count: number }>(`/admin/error-reports${qs(filters as Record<string, string | number | undefined>)}`);
+  return apiFetch<{ data: ErrorReportItem[]; total: number; count: number }>(`/admin/error-reports${qs(filters as Record<string, string | number | undefined>)}`);
 }
 
 export function updateErrorReport(id: string, data: { status: 'triaged' | 'resolved'; reviewNote?: string }) {
@@ -537,11 +593,11 @@ export function getSLAViolations() {
 
 // ─── User Engagement ───
 export function getUserFeedback(limit = 50) {
-  return apiFetch<{ data: any[] }>(`/admin/feedback${qs({ limit })}`);
+  return apiFetch<{ data: UserFeedbackItem[] }>(`/admin/feedback${qs({ limit })}`);
 }
 
 export function getCommentsPending(limit = 50) {
-  return apiFetch<{ data: any[] }>(`/admin/comments-pending${qs({ limit })}`);
+  return apiFetch<{ data: PendingCommunityComment[] }>(`/admin/comments-pending${qs({ limit })}`);
 }
 
 export function moderateComment(id: string, action: 'approve' | 'reject') {
@@ -565,8 +621,15 @@ export function getSEOMetrics() {
 }
 
 // ─── Low Priority: Backup & System ───
+export type BackupRecord = {
+  id: string;
+  status: 'pending' | 'completed' | 'failed';
+  collections: string[];
+  createdAt: string;
+};
+
 export function getBackups(limit = 20) {
-  return apiFetch<{ data: any[] }>(`/admin/backups${qs({ limit })}`);
+  return apiFetch<{ data: BackupRecord[] }>(`/admin/backups${qs({ limit })}`);
 }
 
 export async function exportAnnouncementsToCSV(): Promise<Response> {
@@ -610,7 +673,11 @@ export function getRateLimitStats() {
 
 export function getSystemHealth() {
   return apiFetch<{ data: {
-    health: { status: string; checks: any };
+    health: { status: string; checks: {
+      database?: { status?: string; latency?: number };
+      memory?: { status?: string; usage?: number };
+      uptime?: { seconds?: number };
+    } };
     services: { services: Array<{ name: string; status: string; lastChecked: string }> };
     errors: Array<{ message: string; count: number; timestamp: string }>;
   } }>('/admin/health');
@@ -736,7 +803,7 @@ export function deleteEditorialTaxonomy(
 }
 
 export function getEditorialAuditLog(filters: { limit?: number; offset?: number } = {}) {
-  return apiFetch<{ data: any[]; total: number; count: number }>(`/editorial/audit-log${qs(filters as Record<string, string | number | undefined>)}`);
+  return apiFetch<{ data: EditorialAuditEntry[]; total: number; count: number }>(`/editorial/audit-log${qs(filters as Record<string, string | number | undefined>)}`);
 }
 
 export function getEditorialWorkflowQueue() {

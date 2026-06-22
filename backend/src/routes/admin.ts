@@ -7,6 +7,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
 import AnnouncementModel from '../models/announcements.postgres.js';
+import AuditLogModelPostgres from '../models/auditLogs.postgres.js';
 import CommunityModelPostgres from '../models/community.postgres.js';
 import ErrorReportModelPostgres from '../models/errorReports.postgres.js';
 import PushSubscriptionModelPostgres from '../models/pushSubscriptions.postgres.js';
@@ -113,6 +114,11 @@ const updateUserSchema = z.object({
   role: z.enum(adminRoleValues).optional(),
   isActive: z.boolean().optional(),
   username: z.string().trim().min(1).max(100).optional(),
+  auditReason: z.string().trim().min(3).max(500).optional(),
+});
+
+const userActionReasonSchema = z.object({
+  auditReason: z.string().trim().min(3).max(500).optional(),
 });
 
 const analyticsQuerySchema = z.object({
@@ -190,15 +196,27 @@ async function wouldRemoveLastActivePrivilegedUser(
     return { missing: true, blocked: false };
   }
 
-  const currentlyPrivileged = user.isActive && isPrivilegedRole(user.role);
-  if (!currentlyPrivileged) {
-    return { missing: false, blocked: false };
-  }
-
   const nextActive = update.delete ? false : update.isActive ?? user.isActive;
   const nextRole = update.delete ? user.role : update.role ?? user.role;
+  const removesSuperadminRole = user.role === 'superadmin' && (update.delete || nextRole !== 'superadmin');
+
+  if (removesSuperadminRole) {
+    const superadminCount = await UserModelPostgres.count({ role: 'superadmin' });
+    if (superadminCount <= 1) {
+      return { missing: false, blocked: true, reason: 'At least one superadmin account must remain' };
+    }
+  }
+
+  if (user.role === 'superadmin' && user.isActive && (!nextActive || removesSuperadminRole)) {
+    const activeSuperadminCount = await UserModelPostgres.count({ role: 'superadmin', isActive: true });
+    if (activeSuperadminCount <= 1) {
+      return { missing: false, blocked: true, reason: 'At least one active superadmin account must remain' };
+    }
+  }
+
+  const currentlyPrivileged = user.isActive && isPrivilegedRole(user.role);
   const remainsPrivileged = nextActive && isPrivilegedRole(nextRole);
-  if (remainsPrivileged) {
+  if (!currentlyPrivileged || remainsPrivileged) {
     return { missing: false, blocked: false };
   }
 
@@ -207,7 +225,11 @@ async function wouldRemoveLastActivePrivilegedUser(
     isActive: true,
   });
 
-  return { missing: false, blocked: activePrivilegedCount <= 1 };
+  return {
+    missing: false,
+    blocked: activePrivilegedCount <= 1,
+    reason: 'At least one active admin or superadmin account must remain',
+  };
 }
 
 // ═══════════════════════════════════════════
@@ -495,18 +517,36 @@ router.patch('/users/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot deactivate your own account' });
     }
 
+    // Prevent an authenticated admin from removing their own console access.
+    if (id === req.user!.userId && parseResult.data.role && !isPrivilegedRole(parseResult.data.role)) {
+      return res.status(400).json({ error: 'Cannot demote your own admin account' });
+    }
+
     const lastPrivilegedCheck = await wouldRemoveLastActivePrivilegedUser(id, parseResult.data);
     if (lastPrivilegedCheck.missing) {
       return res.status(404).json({ error: 'User not found' });
     }
     if (lastPrivilegedCheck.blocked) {
-      return res.status(400).json({ error: 'At least one active admin or superadmin account must remain' });
+      return res.status(400).json({ error: lastPrivilegedCheck.reason });
     }
 
-    const user = await UserModelPostgres.update(id, parseResult.data);
+    const { auditReason, ...updates } = parseResult.data;
+    const user = await UserModelPostgres.update(id, updates);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    await AuditLogModelPostgres.create({
+      entityType: 'auth',
+      entityId: id,
+      action: parseResult.data.role ? 'admin_user_role_changed' : 'admin_user_status_changed',
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      summary: parseResult.data.role
+        ? `Changed ${user.email} role to ${parseResult.data.role}`
+        : `${parseResult.data.isActive ? 'Activated' : 'Deactivated'} ${user.email}`,
+      metadata: auditReason ? { auditReason } : {},
+    });
     return res.json({ data: user });
   } catch (error) {
     console.error('[Admin] Update user error:', error);
@@ -518,6 +558,10 @@ router.patch('/users/:id', async (req, res) => {
 router.delete('/users/:id', async (req, res) => {
   try {
     const id = req.params.id as string;
+    const reasonResult = userActionReasonSchema.safeParse(req.body || {});
+    if (!reasonResult.success) {
+      return res.status(400).json({ error: reasonResult.error.flatten() });
+    }
 
     // Prevent admin from deleting themselves
     if (id === req.user!.userId) {
@@ -529,13 +573,23 @@ router.delete('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     if (lastPrivilegedCheck.blocked) {
-      return res.status(400).json({ error: 'At least one active admin or superadmin account must remain' });
+      return res.status(400).json({ error: lastPrivilegedCheck.reason });
     }
 
+    const user = await UserModelPostgres.findById(id);
     const deleted = await UserModelPostgres.delete(id);
     if (!deleted) {
       return res.status(404).json({ error: 'User not found' });
     }
+    await AuditLogModelPostgres.create({
+      entityType: 'auth',
+      entityId: id,
+      action: 'admin_user_deleted',
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      summary: `Deleted ${user?.email || id}`,
+      metadata: reasonResult.data.auditReason ? { auditReason: reasonResult.data.auditReason } : {},
+    });
     return res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('[Admin] Delete user error:', error);

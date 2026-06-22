@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Bell, Eye, EyeOff, Globe, Lock, Save, Search, Shield, ToggleLeft, ToggleRight } from 'lucide-react';
+import { AlertCircle, Bell, Globe, Lock, Save, Search, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { getSettings, updateSettings } from '@/lib/api';
 import type { SiteSettings } from '@/lib/types';
@@ -29,24 +29,24 @@ interface SettingsState {
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
-  siteName: 'SarkariExams.me',
-  tagline: "India's #1 Government Jobs Portal",
-  contactEmail: 'contact@sarkariexams.me',
-  footerText: '© 2026 SarkariExams.me - All Rights Reserved. This is not a government website.',
-  metaTitle: 'SarkariExams.me - Sarkari Result, Latest Jobs, Admit Card 2026',
-  metaDesc: "Get latest Sarkari Jobs, Results, Admit Cards, Answer Keys and Syllabus updates at SarkariExams.me. India's most trusted government job portal.",
-  metaKeywords: 'sarkari result, sarkari job, government jobs, admit card 2026, ssc cgl, upsc 2026',
+  siteName: '',
+  tagline: '',
+  contactEmail: '',
+  footerText: '',
+  metaTitle: '',
+  metaDesc: '',
+  metaKeywords: '',
   maintenanceMode: false,
   qaEnabled: true,
   commentsEnabled: true,
   alertsEnabled: true,
   tickerEnabled: true,
   loginEnabled: true,
-  fbUrl: 'https://facebook.com/sarkariexams',
-  twUrl: 'https://twitter.com/sarkariexams',
-  ytUrl: 'https://youtube.com/@sarkariexams',
-  igUrl: 'https://instagram.com/sarkariexams',
-  tgUrl: 'https://t.me/sarkariexams',
+  fbUrl: '',
+  twUrl: '',
+  ytUrl: '',
+  igUrl: '',
+  tgUrl: '',
 };
 
 function mapApiToForm(data?: SiteSettings): SettingsState {
@@ -134,13 +134,8 @@ function SectionCard({
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<SettingsState>(DEFAULT_SETTINGS);
-  const [oldPass, setOldPass] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-  const [showOld, setShowOld] = useState(false);
-  const [showNew, setShowNew] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: async () => {
       const response = await getSettings();
@@ -153,9 +148,10 @@ export function SettingsPage() {
   }, [data]);
 
   const saveMutation = useMutation({
-    mutationFn: (payload: Partial<SiteSettings>) => updateSettings(payload),
-    onSuccess: () => {
+    mutationFn: ({ payload }: { payload: Partial<SiteSettings>; successMessage: string }) => updateSettings(payload),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
+      toast.success(variables.successMessage);
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to save settings');
@@ -179,7 +175,7 @@ export function SettingsPage() {
       return;
     }
 
-    saveMutation.mutate({
+    saveMutation.mutate({ payload: {
       siteName: form.siteName,
       siteDescription: form.tagline,
       contactEmail: form.contactEmail,
@@ -191,63 +187,47 @@ export function SettingsPage() {
       telegramUrl: form.tgUrl,
       youtubeUrl: form.ytUrl,
       featureFlags: baseFeatureFlags,
-    });
-
-    toast.success('Site settings saved successfully!');
+    }, successMessage: 'Site settings saved.' });
   }
 
   function handleSaveSEO() {
-    saveMutation.mutate({
+    saveMutation.mutate({ payload: {
       defaultMetaTitle: form.metaTitle,
       defaultMetaDescription: form.metaDesc,
       featureFlags: baseFeatureFlags,
-    });
-    toast.success('SEO settings updated!');
+    }, successMessage: 'SEO settings updated.' });
   }
 
   function handleSaveSocial() {
-    saveMutation.mutate({
+    saveMutation.mutate({ payload: {
       twitterUrl: form.twUrl,
       telegramUrl: form.tgUrl,
       youtubeUrl: form.ytUrl,
       featureFlags: baseFeatureFlags,
-    });
-    toast.success('Social links updated!');
+    }, successMessage: 'Social links updated.' });
   }
 
   function handleSaveFeatures() {
-    saveMutation.mutate({
+    saveMutation.mutate({ payload: {
       maintenanceMode: form.maintenanceMode,
       registrationEnabled: form.loginEnabled,
       featureFlags: baseFeatureFlags,
-    });
-    toast.success('Feature toggles updated!');
-  }
-
-  function handleChangePassword() {
-    if (!oldPass || !newPass || !confirmPass) {
-      toast.error('Please fill in all password fields.');
-      return;
-    }
-    if (newPass !== confirmPass) {
-      toast.error('New passwords do not match.');
-      return;
-    }
-    if (newPass.length < 8) {
-      toast.error('Password must be at least 8 characters.');
-      return;
-    }
-
-    toast.success('Password changed successfully!');
-    setOldPass('');
-    setNewPass('');
-    setConfirmPass('');
+    }, successMessage: 'Feature toggles updated.' });
   }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#e65100]/30 border-t-[#e65100]" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
+        <p>Settings could not be loaded. No fallback values are being shown.</p>
+        <button type="button" onClick={() => void refetch()} className="mt-3 rounded-lg border border-red-300 px-3 py-2 font-semibold">Retry</button>
       </div>
     );
   }
@@ -300,15 +280,17 @@ export function SettingsPage() {
             <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.06em] text-gray-600">Footer Text</label>
             <textarea
               value={form.footerText}
-              onChange={event => updateField('footerText', event.target.value)}
+              disabled
               rows={2}
               className="w-full resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
+            <p className="mt-1 text-[10px] text-gray-500">Unavailable: the settings API does not expose footer text.</p>
           </div>
           <div className="flex justify-end">
             <button
               type="button"
               onClick={handleSaveIdentity}
+              disabled={saveMutation.isPending}
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:opacity-90"
               style={{ background: 'linear-gradient(135deg, #1565c0, #1a237e)', boxShadow: '0 3px 12px rgba(21,101,192,0.3)' }}
             >
@@ -343,15 +325,17 @@ export function SettingsPage() {
             <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.06em] text-gray-600">Keywords</label>
             <input
               value={form.metaKeywords}
-              onChange={event => updateField('metaKeywords', event.target.value)}
+              disabled
               placeholder="comma separated keywords"
               className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 outline-none transition-all focus:border-green-400"
             />
+            <p className="mt-1 text-[10px] text-gray-500">Unavailable: the settings API does not expose meta keywords.</p>
           </div>
           <div className="flex justify-end">
             <button
               type="button"
               onClick={handleSaveSEO}
+              disabled={saveMutation.isPending}
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:opacity-90"
               style={{ background: 'linear-gradient(135deg, #2e7d32, #388e3c)', boxShadow: '0 3px 12px rgba(46,125,50,0.3)' }}
             >
@@ -373,6 +357,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={handleSaveFeatures}
+              disabled={saveMutation.isPending}
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:opacity-90"
               style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 12px rgba(230,81,0,0.3)' }}
             >
@@ -398,9 +383,11 @@ export function SettingsPage() {
                 <input
                   value={item.value}
                   onChange={event => updateField(item.key, event.target.value)}
+                  disabled={item.key === 'fbUrl' || item.key === 'igUrl'}
                   placeholder={item.placeholder}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-[12px] text-gray-800 outline-none transition-all placeholder:text-gray-300 focus:border-purple-400"
                 />
+                {item.key === 'fbUrl' || item.key === 'igUrl' ? <p className="mt-1 text-[10px] text-gray-500">Unavailable in the settings API.</p> : null}
               </div>
             </div>
           ))}
@@ -408,6 +395,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={handleSaveSocial}
+              disabled={saveMutation.isPending}
               className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:opacity-90"
               style={{ background: 'linear-gradient(135deg, #6a1b9a, #7b1fa2)', boxShadow: '0 3px 12px rgba(106,27,154,0.3)' }}
             >
@@ -418,48 +406,9 @@ export function SettingsPage() {
       </SectionCard>
 
       <SectionCard title="Admin Password" accent="#c62828" icon={<Lock size={16} style={{ color: '#c62828' }} />}>
-        <div className="space-y-4">
-          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-            <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-600" />
-            <p className="text-[12px] text-amber-700">Choose a strong password with at least 8 characters, including numbers and special characters.</p>
-          </div>
-
-          {[
-            { label: 'Current Password', value: oldPass, setValue: setOldPass, show: showOld, setShow: setShowOld },
-            { label: 'New Password', value: newPass, setValue: setNewPass, show: showNew, setShow: setShowNew },
-            { label: 'Confirm New Password', value: confirmPass, setValue: setConfirmPass, show: showNew, setShow: setShowNew },
-          ].map(field => (
-            <div key={field.label}>
-              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.06em] text-gray-600">{field.label}</label>
-              <div className="relative">
-                <input
-                  type={field.show ? 'text' : 'password'}
-                  value={field.value}
-                  onChange={event => field.setValue(event.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 pr-10 text-[13px] text-gray-800 outline-none transition-all focus:border-red-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => field.setShow(!field.show)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {field.show ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleChangePassword}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #c62828, #b71c1c)', boxShadow: '0 3px 12px rgba(198,40,40,0.3)' }}
-            >
-              <Shield size={14} /> Change Password
-            </button>
-          </div>
+        <div className="flex items-start gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <AlertCircle size={14} className="mt-0.5 shrink-0 text-gray-500" />
+          <p className="text-[12px] text-gray-600">Password changes are not available from this console yet.</p>
         </div>
       </SectionCard>
     </div>
