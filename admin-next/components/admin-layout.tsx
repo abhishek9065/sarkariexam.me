@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type CSSProperties, type ComponentType, type ReactNode } from 'react';
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
   BookOpen,
@@ -42,6 +43,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import type { AdminRole } from '@/lib/types';
+import {
+  ADMINISTRATOR_ROLES,
+  CONTENT_WRITE_ROLES,
+  MODERATION_ROLES,
+  REVIEW_WORKFLOW_ROLES,
+  roleIsAllowed,
+} from '@/lib/admin-roles';
 import { RoleGuard } from './role-guard';
 import { ThemeToggle } from './theme-toggle';
 import { useTheme } from 'next-themes';
@@ -53,7 +61,7 @@ type NavItem = {
   badge?: string | number;
   sub?: boolean;
   match?: (pathname: string, searchParams: ReadonlyURLSearchParams) => boolean;
-  roles?: AdminRole[];
+  roles?: readonly AdminRole[];
 };
 
 type NavSection = {
@@ -66,7 +74,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Command',
     items: [
       { href: '/', label: 'Dashboard', icon: LayoutDashboard, match: pathname => pathname === '/' },
-      { href: '/workflow', label: 'Tasks / Workflow', icon: SquareKanban },
+      { href: '/workflow', label: 'Tasks / Workflow', icon: SquareKanban, roles: REVIEW_WORKFLOW_ROLES },
       { href: '/calendar', label: 'Calendar', icon: CalendarDays },
     ],
   },
@@ -125,38 +133,45 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/taxonomies',
         label: 'Taxonomies',
         icon: BookOpen,
+        roles: CONTENT_WRITE_ROLES,
+      },
+      {
+        href: '/data-quality',
+        label: 'Data Quality',
+        icon: AlertTriangle,
+        roles: CONTENT_WRITE_ROLES,
       },
     ],
   },
   {
     label: 'Growth',
     items: [
-      { href: '/subscribers', label: 'Subscribers', icon: Users, roles: ['superadmin', 'admin'] },
-      { href: '/notifications', label: 'Campaigns / Notifications', icon: Bell, roles: ['superadmin', 'admin'] },
+      { href: '/subscribers', label: 'Subscribers', icon: Users, roles: ADMINISTRATOR_ROLES },
+      { href: '/notifications', label: 'Campaigns / Notifications', icon: Bell, roles: ADMINISTRATOR_ROLES },
     ],
   },
   {
     label: 'Moderation',
     items: [
-      { href: '/community', label: 'Community Moderation', icon: MessageSquare },
-      { href: '/engagement', label: 'Engagement', icon: Users },
-      { href: '/error-reports', label: 'Error Reports / User Reports', icon: FileText, roles: ['superadmin', 'admin'] },
+      { href: '/community', label: 'Community Moderation', icon: MessageSquare, roles: MODERATION_ROLES },
+      { href: '/engagement', label: 'Engagement', icon: Users, roles: ADMINISTRATOR_ROLES },
+      { href: '/error-reports', label: 'Error Reports / User Reports', icon: FileText, roles: ADMINISTRATOR_ROLES },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['superadmin', 'admin'] },
-      { href: '/seo', label: 'SEO', icon: SearchCheck, roles: ['superadmin', 'admin'] },
+      { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ADMINISTRATOR_ROLES },
+      { href: '/seo', label: 'SEO', icon: SearchCheck, roles: ADMINISTRATOR_ROLES },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { href: '/users', label: 'Users', icon: UserCog, roles: ['superadmin', 'admin'] },
-      { href: '/audit-log', label: 'Activity Log', icon: Activity, roles: ['superadmin', 'admin'] },
-      { href: '/system-admin', label: 'System Admin', icon: Shield, roles: ['superadmin', 'admin'] },
-      { href: '/settings', label: 'Settings', icon: Settings, roles: ['superadmin', 'admin'] },
+      { href: '/users', label: 'Users', icon: UserCog, roles: ADMINISTRATOR_ROLES },
+      { href: '/audit-log', label: 'Activity Log', icon: Activity, roles: ADMINISTRATOR_ROLES },
+      { href: '/system-admin', label: 'System Admin', icon: Shield, roles: ADMINISTRATOR_ROLES },
+      { href: '/settings', label: 'Settings', icon: Settings, roles: ADMINISTRATOR_ROLES },
     ],
   },
 ];
@@ -241,9 +256,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const commandItems = useMemo(
     () => [
-      { id: 'new-post', label: 'New Post', icon: Plus, description: 'Action', run: () => router.push('/announcements/new') },
+      ...(roleIsAllowed(CONTENT_WRITE_ROLES, user?.role)
+        ? [{ id: 'new-post', label: 'New Post', icon: Plus, description: 'Action', run: () => router.push('/announcements/new') }]
+        : []),
       ...NAV_SECTIONS.flatMap(section => section.items
-        .filter(item => !item.roles || (user ? item.roles.includes(user.role) : false))
+        .filter(item => !item.roles || roleIsAllowed(item.roles, user?.role))
         .map(item => ({
           id: item.href,
           label: item.label,
@@ -445,18 +462,17 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        {!collapsed && (
+        {!collapsed && roleIsAllowed(CONTENT_WRITE_ROLES, user?.role) && (
           <div className="px-3 pb-2">
-            <button
-              type="button"
-              onClick={() => router.push('/announcements/new')}
+            <Link
+              href="/announcements/new"
               className="flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-white transition-transform hover:opacity-95 active:scale-[0.99]"
               style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)', boxShadow: '0 3px 14px rgba(230,81,0,0.35)' }}
             >
               <Plus className="h-4 w-4" />
               <span className="text-[12.5px] font-bold">New Post</span>
               <Zap className="ml-auto h-3 w-3 text-yellow-300" />
-            </button>
+            </Link>
           </div>
         )}
 
@@ -671,20 +687,22 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               </button>
 
               <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
-                <Link
-                  href="/system-admin"
-                  className="flex items-center gap-2 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 px-2.5 py-1.5 transition-colors hover:bg-orange-100/60"
-                  title="Open system admin"
-                >
-                  <div
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-extrabold text-white"
-                    style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)' }}
+                <RoleGuard allowedRoles={ADMINISTRATOR_ROLES}>
+                  <Link
+                    href="/system-admin"
+                    className="flex items-center gap-2 rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 px-2.5 py-1.5 transition-colors hover:bg-orange-100/60"
+                    title="Open system admin"
                   >
-                    {getInitials(userLabel)}
-                  </div>
-                  <span className="hidden text-xs font-bold text-gray-700 sm:block">{userLabel}</span>
-                  <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[7px] font-black tracking-[0.08em] text-white">ADMIN</span>
-                </Link>
+                    <div
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-extrabold text-white"
+                      style={{ background: 'linear-gradient(135deg, #e65100, #bf360c)' }}
+                    >
+                      {getInitials(userLabel)}
+                    </div>
+                    <span className="hidden text-xs font-bold text-gray-700 sm:block">{userLabel}</span>
+                    <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[7px] font-black tracking-[0.08em] text-white">{userRoleLabel}</span>
+                  </Link>
+                </RoleGuard>
                 <button
                   type="button"
                   onClick={() => void handleLogout()}

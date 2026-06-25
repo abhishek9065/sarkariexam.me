@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 export function EngagementPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const metricsQuery = useQuery({
     queryKey: ['engagement-metrics'],
@@ -38,11 +39,12 @@ export function EngagementPage() {
   });
 
   const moderateMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => moderateComment(id, action),
-    onSuccess: () => {
-      toast.success('Comment moderated');
+    mutationFn: ({ id, action, auditReason }: { id: string; action: 'approve' | 'reject'; auditReason?: string }) => moderateComment(id, action, auditReason),
+    onSuccess: (_response, variables) => {
+      toast.success(variables.action === 'approve' ? 'Comment approved.' : 'Comment rejected.');
       commentsQuery.refetch();
       setRejectingId(null);
+      setRejectReason('');
     },
     onError: () => toast.error('Failed to moderate'),
   });
@@ -133,13 +135,24 @@ export function EngagementPage() {
                       
                       {rejectingId === comment.id ? (
                         <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Reject this comment? The moderation API does not accept a rejection note.</p>
+                          <p className="text-sm text-muted-foreground">Reject this comment? The backend will mark it rejected and record this reason in the audit log.</p>
+                          <label htmlFor={`reject-reason-${comment.id}`} className="text-sm font-medium">Audit reason</label>
+                          <textarea
+                            id={`reject-reason-${comment.id}`}
+                            value={rejectReason}
+                            onChange={(event) => setRejectReason(event.target.value)}
+                            maxLength={500}
+                            rows={3}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            placeholder="Policy violation, spam, duplicate, or other moderation reason"
+                          />
+                          <div className="text-right text-xs text-muted-foreground">{rejectReason.trim().length}/500</div>
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => moderateMutation.mutate({ id: comment.id, action: 'reject' })}
-                              disabled={moderateMutation.isPending}
+                              onClick={() => moderateMutation.mutate({ id: comment.id, action: 'reject', auditReason: rejectReason.trim() })}
+                              disabled={moderateMutation.isPending || rejectReason.trim().length < 3}
                             >
                               <XCircle className="h-4 w-4 mr-1" />
                               Confirm Reject
@@ -147,7 +160,7 @@ export function EngagementPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => setRejectingId(null)}
+                              onClick={() => { setRejectingId(null); setRejectReason(''); }}
                             >
                               Cancel
                             </Button>
@@ -167,7 +180,7 @@ export function EngagementPage() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => setRejectingId(comment.id)}
+                            onClick={() => { setRejectingId(comment.id); setRejectReason(''); }}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
                             Reject

@@ -51,6 +51,18 @@ test.describe('authenticated admin shell', () => {
       await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
     }
   });
+
+  test('admin-only routes show access denied for editorial roles', async ({ page }) => {
+    await mockAdminApi(page, {
+      user: { ...MOCK_ADMIN, id: 'e2e-editor', email: 'editor-e2e@example.test', username: 'E2E Editor', role: 'editor' },
+    });
+
+    await page.goto('/admin/users');
+
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
+    await expect(page.getByText('Your role does not have access to this admin page.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0);
+  });
 });
 
 test('analytics renders API values instead of fake or demo numbers', async ({ page }) => {

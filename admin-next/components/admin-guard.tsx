@@ -5,7 +5,7 @@ import { LoginPage } from '@/app/login/login-page';
 import type { AdminRole } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 
-export function AdminGuard({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: AdminRole[] }) {
+export function AdminGuard({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: readonly AdminRole[] }) {
   const { user, loading } = useAuth();
 
   if (loading) {

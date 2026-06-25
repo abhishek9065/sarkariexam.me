@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 
 interface RoleGuardProps {
   children: ReactNode;
-  allowedRoles: AdminRole[];
+  allowedRoles: readonly AdminRole[];
   fallback?: ReactNode;
 }
 

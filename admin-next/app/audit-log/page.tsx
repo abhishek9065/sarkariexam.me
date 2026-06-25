@@ -1,13 +1,11 @@
-import { AdminLayout } from '@/components/admin-layout';
-import { AdminGuard } from '@/components/admin-guard';
+import { AdminPageShell } from '@/components/admin-page-shell';
+import { ADMINISTRATOR_ROLES } from '@/lib/admin-roles';
 import { AuditLogPage } from './audit-log-page';
 
 export default function Page() {
   return (
-    <AdminGuard>
-      <AdminLayout>
-        <AuditLogPage />
-      </AdminLayout>
-    </AdminGuard>
+    <AdminPageShell allowedRoles={ADMINISTRATOR_ROLES}>
+      <AuditLogPage />
+    </AdminPageShell>
   );
 }

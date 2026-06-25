@@ -1,14 +1,11 @@
-import { AdminLayout } from '@/components/admin-layout';
-import { AdminGuard } from '@/components/admin-guard';
-
+import { AdminPageShell } from '@/components/admin-page-shell';
+import { CONTENT_WRITE_ROLES } from '@/lib/admin-roles';
 import { TaxonomiesPage } from './taxonomies-page';
 
 export default function Page() {
   return (
-    <AdminGuard>
-      <AdminLayout>
-        <TaxonomiesPage />
-      </AdminLayout>
-    </AdminGuard>
+    <AdminPageShell allowedRoles={CONTENT_WRITE_ROLES}>
+      <TaxonomiesPage />
+    </AdminPageShell>
   );
 }

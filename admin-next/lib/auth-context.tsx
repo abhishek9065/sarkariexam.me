@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { getMe, login as apiLogin, logout as apiLogout, clearCsrfCache, ApiError } from './api';
 import type { User } from './types';
+import { isAdminConsoleRole } from './admin-roles';
 
 interface AuthState {
   user: User | null;
@@ -17,8 +18,6 @@ interface AuthContextValue extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const ADMIN_ROLES = new Set(['admin', 'superadmin']);
-
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
@@ -35,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await getMe();
         const user = res.data.user;
         if (cancelled) return;
-        if (!ADMIN_ROLES.has(user.role)) {
+        if (!isAdminConsoleRole(user.role)) {
           setState({ user: null, loading: false, error: 'Admin access required' });
           return;
         }
@@ -54,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await apiLogin(email, password);
       const user = res.data.user;
-      if (!ADMIN_ROLES.has(user.role)) {
+      if (!isAdminConsoleRole(user.role)) {
         clearCsrfCache();
         setState({ user: null, loading: false, error: 'Admin access required. Your account does not have admin console privileges.' });
         return;

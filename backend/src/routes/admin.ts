@@ -3,6 +3,7 @@ import { rateLimit as expressRateLimit } from 'express-rate-limit';
 import webpush from 'web-push';
 import { z } from 'zod';
 
+import type { AuditLogRecord } from '../content/types.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import AlertSubscriptionModelPostgres from '../models/alertSubscriptions.postgres.js';
@@ -181,10 +182,50 @@ const rejectWorkflowSchema = z.object({
 
 const moderateCommentSchema = z.object({
   action: z.enum(['approve', 'reject']),
+  auditReason: z.string().trim().min(3).max(500).optional(),
+});
+
+const campaignActionSchema = z.object({
+  auditReason: z.string().trim().min(3).max(500).optional(),
 });
 
 function isPrivilegedRole(role: string | undefined) {
   return privilegedRoles.includes(role as (typeof privilegedRoles)[number]);
+}
+
+function cleanAuditMetadata(metadata: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(metadata).filter(([, value]) => value !== undefined),
+  );
+}
+
+async function recordAdminAudit(
+  req: express.Request,
+  entry: {
+    entityType: AuditLogRecord['entityType'];
+    entityId: string;
+    targetType: string;
+    action: string;
+    summary: string;
+    metadata?: Record<string, unknown>;
+    auditReason?: string;
+  },
+) {
+  await AuditLogModelPostgres.create({
+    entityType: entry.entityType,
+    entityId: entry.entityId,
+    action: entry.action,
+    actorId: req.user?.userId,
+    actorRole: req.user?.role,
+    summary: entry.summary,
+    metadata: cleanAuditMetadata({
+      actorEmail: req.user?.email,
+      targetType: entry.targetType,
+      targetId: entry.entityId,
+      auditReason: entry.auditReason,
+      ...(entry.metadata || {}),
+    }),
+  });
 }
 
 async function wouldRemoveLastActivePrivilegedUser(
@@ -397,7 +438,8 @@ router.patch('/announcements/:id/status', async (req, res) => {
 
     const { status, note } = parseResult.data;
     const updatedBy = req.user!.userId;
-    const announcement = await AnnouncementModel.update(id, { status, ...(note ? { note } as any : {}) }, updatedBy);
+    const auditNote = note || `Admin status changed to ${status}`;
+    const announcement = await AnnouncementModel.update(id, { status, note: auditNote } as any, updatedBy);
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
@@ -412,7 +454,7 @@ router.patch('/announcements/:id/status', async (req, res) => {
 router.delete('/announcements/:id', async (req, res) => {
   try {
     const id = req.params.id as string;
-    const deleted = await AnnouncementModel.softDelete(id);
+    const deleted = await AnnouncementModel.softDelete(id, req.user!.userId);
     if (!deleted) {
       return res.status(404).json({ error: 'Announcement not found' });
     }
@@ -536,16 +578,21 @@ router.patch('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await AuditLogModelPostgres.create({
+    await recordAdminAudit(req, {
       entityType: 'auth',
       entityId: id,
+      targetType: 'user',
       action: parseResult.data.role ? 'admin_user_role_changed' : 'admin_user_status_changed',
-      actorId: req.user!.userId,
-      actorRole: req.user!.role,
       summary: parseResult.data.role
         ? `Changed ${user.email} role to ${parseResult.data.role}`
         : `${parseResult.data.isActive ? 'Activated' : 'Deactivated'} ${user.email}`,
-      metadata: auditReason ? { auditReason } : {},
+      auditReason,
+      metadata: {
+        targetEmail: user.email,
+        changedFields: Object.keys(updates),
+        newRole: parseResult.data.role,
+        newIsActive: parseResult.data.isActive,
+      },
     });
     return res.json({ data: user });
   } catch (error) {
@@ -581,14 +628,16 @@ router.delete('/users/:id', async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: 'User not found' });
     }
-    await AuditLogModelPostgres.create({
+    await recordAdminAudit(req, {
       entityType: 'auth',
       entityId: id,
+      targetType: 'user',
       action: 'admin_user_deleted',
-      actorId: req.user!.userId,
-      actorRole: req.user!.role,
       summary: `Deleted ${user?.email || id}`,
-      metadata: reasonResult.data.auditReason ? { auditReason: reasonResult.data.auditReason } : {},
+      auditReason: reasonResult.data.auditReason,
+      metadata: {
+        targetEmail: user?.email,
+      },
     });
     return res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -787,8 +836,16 @@ router.get('/community/forums', async (req, res) => {
 
 router.delete('/community/forums/:id', async (req, res) => {
   try {
-    const deleted = await CommunityModelPostgres.deleteForum(String(req.params.id));
+    const id = String(req.params.id);
+    const deleted = await CommunityModelPostgres.deleteForum(id);
     if (!deleted) return res.status(404).json({ error: 'Item not found' });
+    await recordAdminAudit(req, {
+      entityType: 'community',
+      entityId: id,
+      targetType: 'community_forum',
+      action: 'admin_community_forum_deleted',
+      summary: `Deleted community forum ${id}`,
+    });
     return res.json({ message: 'Deleted' });
   } catch (error) {
     console.error('[Admin] community forums delete error:', error);
@@ -810,8 +867,16 @@ router.get('/community/qa', async (req, res) => {
 
 router.delete('/community/qa/:id', async (req, res) => {
   try {
-    const deleted = await CommunityModelPostgres.deleteQa(String(req.params.id));
+    const id = String(req.params.id);
+    const deleted = await CommunityModelPostgres.deleteQa(id);
     if (!deleted) return res.status(404).json({ error: 'Item not found' });
+    await recordAdminAudit(req, {
+      entityType: 'community',
+      entityId: id,
+      targetType: 'community_question',
+      action: 'admin_community_qa_deleted',
+      summary: `Deleted community question ${id}`,
+    });
     return res.json({ message: 'Deleted' });
   } catch (error) {
     console.error('[Admin] community qa delete error:', error);
@@ -825,12 +890,23 @@ router.patch('/community/qa/:id', async (req, res) => {
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
+    const id = String(req.params.id);
     const updated = await CommunityModelPostgres.answerQa(
-      String(req.params.id),
+      id,
       parse.data.answer,
       (req as any).user?.email || 'admin',
     );
     if (!updated) return res.status(404).json({ error: 'Not found' });
+    await recordAdminAudit(req, {
+      entityType: 'community',
+      entityId: id,
+      targetType: 'community_question',
+      action: 'admin_community_qa_answered',
+      summary: `Answered community question ${id}`,
+      metadata: {
+        answerLength: parse.data.answer.length,
+      },
+    });
     return res.json({ message: 'Answer updated' });
   } catch (error) {
     console.error('[Admin] QA answer error:', error);
@@ -883,8 +959,19 @@ router.patch('/community/flags/:id', async (req, res) => {
     const parse = schema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
-    const updated = await CommunityModelPostgres.updateFlagStatus(String(req.params.id), parse.data.status);
+    const id = String(req.params.id);
+    const updated = await CommunityModelPostgres.updateFlagStatus(id, parse.data.status);
     if (!updated) return res.status(404).json({ error: 'Not found' });
+    await recordAdminAudit(req, {
+      entityType: 'community',
+      entityId: id,
+      targetType: 'community_flag',
+      action: `admin_community_flag_${parse.data.status}`,
+      summary: `Marked community flag ${id} as ${parse.data.status}`,
+      metadata: {
+        status: parse.data.status,
+      },
+    });
     return res.json({ message: 'Flag updated' });
   } catch (error) {
     console.error('[Admin] Flag update error:', error);
@@ -1023,6 +1110,17 @@ router.put('/settings', async (req, res) => {
     if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
 
     const updated = await SiteSettingsModelPostgres.updateMain(parse.data);
+
+    await recordAdminAudit(req, {
+      entityType: 'settings',
+      entityId: 'site-settings',
+      targetType: 'site_settings',
+      action: 'admin_settings_updated',
+      summary: 'Updated site settings',
+      metadata: {
+        changedFields: Object.keys(parse.data),
+      },
+    });
 
     return res.json({ data: updated, message: 'Settings saved' });
   } catch (error) {
@@ -1210,6 +1308,19 @@ router.post('/campaigns', async (req, res) => {
     const result = await createCampaign(req.body, userId);
     
     if (!result.success) return res.status(400).json({ error: result.error });
+    await recordAdminAudit(req, {
+      entityType: 'campaign',
+      entityId: result.campaignId,
+      targetType: 'notification_campaign',
+      action: 'admin_campaign_created',
+      summary: `Created campaign ${result.campaignId}`,
+      metadata: {
+        titleLength: typeof req.body?.title === 'string' ? req.body.title.length : undefined,
+        segmentType: req.body?.segmentType,
+        channel: req.body?.channel,
+        scheduledAt: req.body?.scheduledAt,
+      },
+    });
     return res.json({ data: { id: result.campaignId }, message: 'Campaign created' });
   } catch (error) {
     console.error('[Admin] Create campaign error:', error);
@@ -1219,10 +1330,25 @@ router.post('/campaigns', async (req, res) => {
 
 router.post('/campaigns/:id/send', async (req, res) => {
   try {
+    const parse = campaignActionSchema.safeParse(req.body || {});
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
     const { queueCampaignDelivery } = await import('../services/notifications.js');
     const result = await queueCampaignDelivery(req.params.id);
     
     if (!result.success) return res.status(400).json({ error: result.error });
+    await recordAdminAudit(req, {
+      entityType: 'campaign',
+      entityId: req.params.id,
+      targetType: 'notification_campaign',
+      action: 'admin_campaign_send_queued',
+      summary: `Queued campaign ${req.params.id} for delivery`,
+      auditReason: parse.data.auditReason,
+      metadata: {
+        mode: result.mode ?? 'delivery',
+        status: result.status ?? 'sending',
+      },
+    });
     return res.status(202).json({
       message: 'Campaign delivery queued',
       data: {
@@ -1264,10 +1390,25 @@ router.get('/campaigns/:id/stats', async (req, res) => {
 
 router.post('/campaigns/:id/retry-failed', async (req, res) => {
   try {
+    const parse = campaignActionSchema.safeParse(req.body || {});
+    if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
     const { queueFailedCampaignRetry } = await import('../services/notifications.js');
     const result = await queueFailedCampaignRetry(req.params.id);
 
     if (!result.success) return res.status(400).json({ error: result.error });
+    await recordAdminAudit(req, {
+      entityType: 'campaign',
+      entityId: req.params.id,
+      targetType: 'notification_campaign',
+      action: 'admin_campaign_retry_queued',
+      summary: `Queued failed deliveries for campaign ${req.params.id}`,
+      auditReason: parse.data.auditReason,
+      metadata: {
+        mode: result.mode ?? 'delivery',
+        status: result.status ?? 'sending',
+      },
+    });
     return res.status(202).json({
       message: 'Failed campaign deliveries queued for retry',
       data: {
@@ -1432,6 +1573,20 @@ router.post('/moderate-comment/:id', async (req, res) => {
     const { moderateComment } = await import('../services/engagement.js');
     const result = await moderateComment(req.params.id, parse.data.action);
     if (!result) return res.status(400).json({ error: 'Failed to moderate' });
+    const moderationAction = parse.data.action === 'approve'
+      ? 'admin_comment_approved'
+      : 'admin_comment_rejected';
+    await recordAdminAudit(req, {
+      entityType: 'community',
+      entityId: req.params.id,
+      targetType: 'comment',
+      action: moderationAction,
+      summary: `${parse.data.action === 'approve' ? 'Approved' : 'Rejected'} comment ${req.params.id}`,
+      auditReason: parse.data.auditReason,
+      metadata: {
+        moderationAction: parse.data.action,
+      },
+    });
     return res.json({ message: 'Moderated' });
   } catch (error) {
     console.error('[Admin] Moderate error:', error);

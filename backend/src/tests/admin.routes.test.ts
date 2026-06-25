@@ -29,6 +29,11 @@ const mocks = vi.hoisted(() => ({
   approveAnnouncement: vi.fn(),
   rejectAnnouncement: vi.fn(),
   moderateComment: vi.fn(),
+  deleteForum: vi.fn(),
+  deleteQa: vi.fn(),
+  answerQa: vi.fn(),
+  updateFlagStatus: vi.fn(),
+  updateSettings: vi.fn(),
 }));
 
 vi.mock('../middleware/auth.js', () => ({
@@ -76,9 +81,21 @@ vi.mock('../models/pushSubscriptions.postgres.js', () => ({
 }));
 
 vi.mock('../models/alertSubscriptions.postgres.js', () => ({ default: {} }));
-vi.mock('../models/community.postgres.js', () => ({ default: {} }));
+vi.mock('../models/community.postgres.js', () => ({
+  default: {
+    deleteForum: mocks.deleteForum,
+    deleteQa: mocks.deleteQa,
+    answerQa: mocks.answerQa,
+    updateFlagStatus: mocks.updateFlagStatus,
+  },
+}));
 vi.mock('../models/errorReports.postgres.js', () => ({ default: {} }));
-vi.mock('../models/siteSettings.postgres.js', () => ({ default: {} }));
+vi.mock('../models/siteSettings.postgres.js', () => ({
+  default: {
+    updateMain: mocks.updateSettings,
+    getMain: vi.fn(),
+  },
+}));
 vi.mock('../services/analyticsOverview.js', () => ({ getAnalyticsOverview: vi.fn() }));
 vi.mock('../services/calendar.js', () => ({
   bulkImportAnnouncements: mocks.bulkImportAnnouncements,
@@ -171,6 +188,11 @@ describe('admin routes', () => {
     mocks.approveAnnouncement.mockResolvedValue({ success: true });
     mocks.rejectAnnouncement.mockResolvedValue({ success: true });
     mocks.moderateComment.mockResolvedValue(true);
+    mocks.deleteForum.mockResolvedValue(true);
+    mocks.deleteQa.mockResolvedValue(true);
+    mocks.answerQa.mockResolvedValue(true);
+    mocks.updateFlagStatus.mockResolvedValue(true);
+    mocks.updateSettings.mockResolvedValue({ siteName: 'SarkariExams.me' });
   });
 
   it('uses database counts for dashboard users', async () => {
@@ -249,7 +271,12 @@ describe('admin routes', () => {
     expect(mocks.createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       action: 'admin_user_role_changed',
       actorId: 'admin-user',
-      metadata: { auditReason: 'Approved access escalation' },
+      metadata: expect.objectContaining({
+        actorEmail: 'admin@example.com',
+        auditReason: 'Approved access escalation',
+        targetEmail: 'editor@example.com',
+        targetType: 'user',
+      }),
     }));
   });
 
@@ -335,9 +362,11 @@ describe('admin routes', () => {
     expect(mocks.moderateComment).not.toHaveBeenCalled();
   });
 
-  it('queues campaign delivery from the send endpoint', async () => {
+  it('queues campaign delivery from the send endpoint and records the audit reason', async () => {
     const app = await createApp();
-    const response = await request(app).post('/admin/campaigns/campaign-1/send');
+    const response = await request(app)
+      .post('/admin/campaigns/campaign-1/send')
+      .send({ auditReason: 'Manual send after recipient review' });
 
     expect(response.status).toBe(202);
     expect(response.body).toEqual({
@@ -347,6 +376,15 @@ describe('admin routes', () => {
         status: 'sending',
       },
     });
+    expect(mocks.createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'admin_campaign_send_queued',
+      entityType: 'campaign',
+      entityId: 'campaign-1',
+      metadata: expect.objectContaining({
+        auditReason: 'Manual send after recipient review',
+        targetType: 'notification_campaign',
+      }),
+    }));
   });
 
   it('exposes campaign estimate, stats, and failed retry endpoints', async () => {
@@ -354,7 +392,9 @@ describe('admin routes', () => {
 
     const estimateResponse = await request(app).get('/admin/campaigns/campaign-1/estimate');
     const statsResponse = await request(app).get('/admin/campaigns/campaign-1/stats');
-    const retryResponse = await request(app).post('/admin/campaigns/campaign-1/retry-failed');
+    const retryResponse = await request(app)
+      .post('/admin/campaigns/campaign-1/retry-failed')
+      .send({ auditReason: 'Retry transient provider failures' });
 
     expect(estimateResponse.status).toBe(200);
     expect(estimateResponse.body.data).toEqual({ email: 2, push: 1, total: 3 });
@@ -362,6 +402,54 @@ describe('admin routes', () => {
     expect(statsResponse.body.data).toMatchObject({ total: 3, sent: 2, failed: 1 });
     expect(retryResponse.status).toBe(202);
     expect(retryResponse.body.data).toEqual({ mode: 'delivery', status: 'sending' });
+    expect(mocks.createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'admin_campaign_retry_queued',
+      entityType: 'campaign',
+      entityId: 'campaign-1',
+      metadata: expect.objectContaining({
+        auditReason: 'Retry transient provider failures',
+        targetType: 'notification_campaign',
+      }),
+    }));
+  });
+
+  it('records moderation rejection reasons in audit metadata', async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .post('/admin/moderate-comment/comment-1')
+      .send({ action: 'reject', auditReason: 'Spam link in body' });
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderateComment).toHaveBeenCalledWith('comment-1', 'reject');
+    expect(mocks.createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'admin_comment_rejected',
+      entityType: 'community',
+      entityId: 'comment-1',
+      metadata: expect.objectContaining({
+        auditReason: 'Spam link in body',
+        moderationAction: 'reject',
+        targetType: 'comment',
+      }),
+    }));
+  });
+
+  it('records settings changes without storing setting values', async () => {
+    const app = await createApp();
+    const response = await request(app)
+      .put('/admin/settings')
+      .send({ siteName: 'Sarkari Exams', maintenanceMode: true });
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateSettings).toHaveBeenCalledWith({ siteName: 'Sarkari Exams', maintenanceMode: true });
+    expect(mocks.createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'admin_settings_updated',
+      entityType: 'settings',
+      entityId: 'site-settings',
+      metadata: expect.objectContaining({
+        changedFields: ['siteName', 'maintenanceMode'],
+        targetType: 'site_settings',
+      }),
+    }));
   });
 
   it('rejects invalid content analytics type values', async () => {

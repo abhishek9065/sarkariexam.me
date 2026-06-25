@@ -30,6 +30,7 @@ import {
 } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,8 @@ const segmentTypes = [
 ];
 
 const contentTypes = ['job', 'result', 'admit-card', 'answer-key', 'admission', 'syllabus'];
+const LARGE_SEND_WARN_THRESHOLD = 1_000;
+const VERY_LARGE_SEND_WARN_THRESHOLD = 10_000;
 
 const statusClass: Record<string, string> = {
   draft: 'border-slate-200 bg-slate-50 text-slate-700',
@@ -114,6 +117,22 @@ function segmentLabel(segment: Campaign['segment']) {
   return segment.type === 'all' ? type : `${type}: ${segment.value}`;
 }
 
+function segmentParts(segment: Campaign['segment']) {
+  return {
+    type: segmentTypes.find((item) => item.value === segment.type)?.label ?? segment.type,
+    value: segment.type === 'all' ? 'All active subscribers' : segment.value,
+  };
+}
+
+function sendBlockReason(campaign: Campaign) {
+  if (campaign.unsupportedSegment) return 'Unsupported legacy segment cannot be sent.';
+  if (campaign.status === 'sent') return 'Campaign has already been sent.';
+  if (campaign.status === 'sending') return 'Campaign is already sending.';
+  if (campaign.status === 'partial_failed') return 'Use Retry all failed for partial failures.';
+  if (campaign.status === 'simulated') return 'Simulated campaigns cannot be sent.';
+  return null;
+}
+
 function ChannelStat({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Mail }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
@@ -140,6 +159,9 @@ export function NotificationsPage() {
   const [form, setForm] = useState<CampaignForm>(emptyForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const [sendAuditReason, setSendAuditReason] = useState('');
+  const [missingEstimateConfirmed, setMissingEstimateConfirmed] = useState(false);
+  const [sendConfirmationText, setSendConfirmationText] = useState('');
 
   const selectedCampaign = useMemo(
     () => campaigns.find((campaign) => campaign.id === selectedId) ?? campaigns[0],
@@ -179,6 +201,9 @@ export function NotificationsPage() {
   useEffect(() => {
     setEstimate(null);
     setStats(null);
+    setSendAuditReason('');
+    setMissingEstimateConfirmed(false);
+    setSendConfirmationText('');
     if (selectedCampaign?.id) void loadStats(selectedCampaign.id);
   }, [selectedCampaign?.id]);
 
@@ -223,6 +248,12 @@ export function NotificationsPage() {
   function updateForm<K extends keyof CampaignForm>(key: K, value: CampaignForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
     setFormErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
+  function resetSendSafetyState() {
+    setSendAuditReason('');
+    setMissingEstimateConfirmed(false);
+    setSendConfirmationText('');
   }
 
   function validateForm(mode: 'draft' | 'scheduled') {
@@ -292,10 +323,29 @@ export function NotificationsPage() {
 
   async function runSend() {
     if (!selectedCampaign) return;
+    const blocked = sendBlockReason(selectedCampaign);
+    if (blocked) {
+      toast.error(blocked);
+      return;
+    }
+    if (!estimate && !missingEstimateConfirmed) {
+      toast.error('Load a recipient estimate or explicitly confirm sending without one.');
+      return;
+    }
+    if (!sendConfirmationSatisfied) {
+      toast.error('Enter the required confirmation phrase before sending.');
+      return;
+    }
+    const auditReason = sendAuditReason.trim();
+    if (auditReason.length < 3) {
+      toast.error('Audit reason is required before sending a campaign.');
+      return;
+    }
     setBusyAction('send');
     try {
-      await sendCampaign(selectedCampaign.id);
+      await sendCampaign(selectedCampaign.id, buildSendAuditNote(auditReason));
       setSendConfirmOpen(false);
+      resetSendSafetyState();
       toast.success('Campaign delivery queued.');
       await loadCampaigns(selectedCampaign.id);
       await loadStats(selectedCampaign.id);
@@ -308,11 +358,15 @@ export function NotificationsPage() {
 
   async function runRetry() {
     if (!selectedCampaign) return;
-    const confirmed = window.confirm(`Retry all failed deliveries for "${selectedCampaign.title}"?`);
-    if (!confirmed) return;
+    const auditReason = window.prompt(`Audit reason for retrying failed deliveries for "${selectedCampaign.title}"`);
+    if (auditReason === null) return;
+    if (auditReason.trim().length < 3) {
+      toast.error('Audit reason is required before retrying failed deliveries.');
+      return;
+    }
     setBusyAction('retry');
     try {
-      await retryFailedCampaign(selectedCampaign.id);
+      await retryFailedCampaign(selectedCampaign.id, auditReason.trim());
       toast.success('All failed deliveries queued for retry.');
       await loadCampaigns(selectedCampaign.id);
       await loadStats(selectedCampaign.id);
@@ -321,6 +375,18 @@ export function NotificationsPage() {
     } finally {
       setBusyAction(null);
     }
+  }
+
+  function buildSendAuditNote(reason: string) {
+    if (!selectedCampaign) return reason;
+    const context = [
+      estimate
+        ? `estimate=${estimate.total} total/${estimate.email} email/${estimate.push} push`
+        : 'estimate=missing-confirmed',
+      `segment=${segmentLabel(selectedCampaign.segment)}`,
+      selectedCampaign.scheduledAt ? `scheduledAt=${formatDate(selectedCampaign.scheduledAt)}` : undefined,
+    ].filter(Boolean);
+    return `${reason} | ${context.join(' | ')}`.slice(0, 500);
   }
 
   const segmentValues = form.segmentType === 'state'
@@ -339,15 +405,33 @@ export function NotificationsPage() {
   const progressPercentage = estimate && estimate.total > 0
     ? Math.min(100, Math.round((attempts / estimate.total) * 100))
     : null;
-  const actionDisabled = !selectedCampaign
-    || selectedCampaign.unsupportedSegment
-    || selectedCampaign.status === 'sending'
-    || selectedCampaign.status === 'sent'
-    || selectedCampaign.status === 'partial_failed';
+  const selectedSegment = selectedCampaign ? segmentParts(selectedCampaign.segment) : null;
+  const currentSendBlockReason = selectedCampaign ? sendBlockReason(selectedCampaign) : 'Select a campaign before sending.';
+  const hasRecipientEstimate = Boolean(estimate);
+  const estimateTotal = estimate?.total ?? 0;
+  const isLargeSend = hasRecipientEstimate && estimateTotal > LARGE_SEND_WARN_THRESHOLD;
+  const isVeryLargeSend = hasRecipientEstimate && estimateTotal > VERY_LARGE_SEND_WARN_THRESHOLD;
+  const requiredConfirmationPhrases = isVeryLargeSend && selectedCampaign
+    ? [selectedCampaign.title.trim(), 'SEND TO ALL'].filter(Boolean)
+    : isLargeSend
+      ? ['SEND']
+      : [];
+  const sendConfirmationSatisfied = requiredConfirmationPhrases.length === 0
+    || requiredConfirmationPhrases.some((phrase) => sendConfirmationText.trim() === phrase);
+  const estimateGateSatisfied = hasRecipientEstimate || missingEstimateConfirmed;
+  const sendReady = !currentSendBlockReason
+    && estimateGateSatisfied
+    && sendAuditReason.trim().length >= 3
+    && sendConfirmationSatisfied;
+  const estimateWarningClass = isVeryLargeSend
+    ? 'border-red-300 bg-red-50 text-red-800'
+    : isLargeSend
+      ? 'border-amber-300 bg-amber-50 text-amber-800'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-800';
 
   if (loading && campaigns.length === 0) {
     return (
-      <div className="flex min-h-105 items-center justify-center">
+      <div className="flex min-h-[420px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -377,7 +461,7 @@ export function NotificationsPage() {
           <div className="border-b border-border px-4 py-3">
             <p className="text-[11px] font-bold uppercase text-muted-foreground">Campaigns</p>
           </div>
-          <div className="max-h-170 overflow-y-auto">
+          <div className="max-h-[680px] overflow-y-auto">
             {campaigns.length === 0 ? (
               <p className="px-4 py-8 text-sm text-muted-foreground">No campaigns found. Create the first campaign to get started.</p>
             ) : campaigns.map((campaign) => {
@@ -434,7 +518,12 @@ export function NotificationsPage() {
                     {busyAction === 'estimate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                     Estimate
                   </Button>
-                  <Button type="button" onClick={() => setSendConfirmOpen(true)} disabled={busyAction !== null || actionDisabled || selectedCampaign.status === 'simulated'}>
+                  <Button
+                    type="button"
+                    onClick={() => { resetSendSafetyState(); setSendConfirmOpen(true); }}
+                    disabled={busyAction !== null || Boolean(currentSendBlockReason)}
+                    title={currentSendBlockReason || undefined}
+                  >
                     <Send className="h-4 w-4" />
                     Send now
                   </Button>
@@ -523,7 +612,7 @@ export function NotificationsPage() {
                 </Button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-160 text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead className="bg-muted text-left text-[11px] uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-2">Channel</th>
@@ -541,9 +630,9 @@ export function NotificationsPage() {
                     ) : stats?.recentFailures.map((failure) => (
                       <tr key={failure.id} className="border-t border-border">
                         <td className="px-4 py-2 font-semibold">{failure.channel}</td>
-                        <td className="max-w-65 truncate px-4 py-2">{failure.recipient}</td>
+                        <td className="max-w-[260px] truncate px-4 py-2">{failure.recipient}</td>
                         <td className="px-4 py-2">{failure.attemptCount}</td>
-                        <td className="max-w-70 truncate px-4 py-2 text-red-600">{failure.error || 'Unknown failure'}</td>
+                        <td className="max-w-[280px] truncate px-4 py-2 text-red-600">{failure.error || 'Unknown failure'}</td>
                         <td className="px-4 py-2">{formatDate(failure.lastAttemptAt)}</td>
                       </tr>
                     ))}
@@ -636,33 +725,124 @@ export function NotificationsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={sendConfirmOpen} onOpenChange={(open) => busyAction === 'send' ? undefined : setSendConfirmOpen(open)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={sendConfirmOpen} onOpenChange={(open) => { if (busyAction !== 'send') { setSendConfirmOpen(open); if (!open) resetSendSafetyState(); } }}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Confirm campaign delivery</DialogTitle>
             <DialogDescription>This action queues real email and push deliveries and cannot be undone.</DialogDescription>
           </DialogHeader>
           {selectedCampaign ? (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-4 text-sm">
-              <div><span className="text-muted-foreground">Campaign:</span> <strong>{selectedCampaign.title}</strong></div>
-              <div><span className="text-muted-foreground">Segment:</span> <strong>{segmentLabel(selectedCampaign.segment)}</strong></div>
-              {estimate ? (
+            <div className="space-y-4">
+              {currentSendBlockReason ? (
+                <div className="flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {currentSendBlockReason}
+                </div>
+              ) : null}
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm sm:grid-cols-2">
                 <div>
-                  <span className="text-muted-foreground">Latest estimate:</span>{' '}
-                  <strong>{estimate.total.toLocaleString('en-IN')} attempts</strong>
-                  <span className="text-muted-foreground"> ({estimate.email.toLocaleString('en-IN')} email, {estimate.push.toLocaleString('en-IN')} push)</span>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Campaign</p>
+                  <p className="mt-1 font-bold text-foreground">{selectedCampaign.title}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Status</p>
+                  <p className="mt-1 font-bold text-foreground">{statusLabel(selectedCampaign)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Segment type</p>
+                  <p className="mt-1 font-bold text-foreground">{selectedSegment?.type}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Segment value</p>
+                  <p className="mt-1 font-bold text-foreground">{selectedSegment?.value}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Scheduled</p>
+                  <p className="mt-1 font-bold text-foreground">{formatDate(selectedCampaign.scheduledAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Created</p>
+                  <p className="mt-1 font-bold text-foreground">{formatDate(selectedCampaign.createdAt)}</p>
+                </div>
+              </div>
+              {estimate ? (
+                <div className={`rounded-lg border p-4 ${estimateWarningClass}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase">Recipient estimate</p>
+                      <p className="mt-1 text-2xl font-extrabold">{estimate.total.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="text-right text-sm font-semibold">
+                      <p>{estimate.email.toLocaleString('en-IN')} email</p>
+                      <p>{estimate.push.toLocaleString('en-IN')} push</p>
+                    </div>
+                  </div>
+                  {isVeryLargeSend ? (
+                    <div className="mt-3 flex gap-2 rounded-md border border-red-300 bg-white/60 p-3 text-sm">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      Very large send: more than {VERY_LARGE_SEND_WARN_THRESHOLD.toLocaleString('en-IN')} recipients. Confirm the campaign title or type SEND TO ALL.
+                    </div>
+                  ) : isLargeSend ? (
+                    <div className="mt-3 flex gap-2 rounded-md border border-amber-300 bg-white/60 p-3 text-sm">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      Large send: more than {LARGE_SEND_WARN_THRESHOLD.toLocaleString('en-IN')} recipients. Type SEND to continue.
+                    </div>
+                  ) : null}
                 </div>
               ) : (
-                <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  No recipient estimate is loaded. Estimate the campaign before sending if you need to verify audience size.
+                <div className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <p className="font-bold">No recipient estimate is loaded.</p>
+                      <p className="mt-1">Load an estimate before sending, or explicitly confirm that this campaign must be sent without one.</p>
+                    </div>
+                  </div>
+                  <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-white/60 p-3">
+                    <Checkbox
+                      checked={missingEstimateConfirmed}
+                      onCheckedChange={(checked) => setMissingEstimateConfirmed(checked === true)}
+                      aria-label="Confirm sending without recipient estimate"
+                    />
+                    <span>I understand no recipient estimate is loaded and want to continue.</span>
+                  </label>
                 </div>
               )}
+              {requiredConfirmationPhrases.length > 0 ? (
+                <div className="space-y-1.5">
+                  <label htmlFor="campaign-send-confirmation" className="text-sm font-semibold">
+                    Type {isVeryLargeSend ? 'the campaign title or SEND TO ALL' : 'SEND'} to confirm
+                  </label>
+                  <Input
+                    id="campaign-send-confirmation"
+                    value={sendConfirmationText}
+                    onChange={(event) => setSendConfirmationText(event.target.value)}
+                    autoComplete="off"
+                    aria-invalid={sendConfirmationText.length > 0 && !sendConfirmationSatisfied}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
+          <div className="space-y-1.5">
+            <label htmlFor="campaign-send-reason" className="text-sm font-semibold">Audit reason</label>
+            <Textarea
+              id="campaign-send-reason"
+              value={sendAuditReason}
+              onChange={(event) => setSendAuditReason(event.target.value)}
+              maxLength={500}
+              rows={4}
+              placeholder="Operational reason for sending this campaign now"
+              aria-invalid={sendAuditReason.trim().length > 0 && sendAuditReason.trim().length < 3}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Required before delivery is queued.</span>
+              <span>{sendAuditReason.length}/500</span>
+            </div>
+          </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setSendConfirmOpen(false)} disabled={busyAction === 'send'}>Cancel</Button>
-            <Button type="button" onClick={runSend} disabled={busyAction === 'send'}>
+            <Button type="button" variant="outline" onClick={() => { setSendConfirmOpen(false); resetSendSafetyState(); }} disabled={busyAction === 'send'}>Cancel</Button>
+            <Button type="button" onClick={runSend} disabled={busyAction === 'send' || !sendReady}>
               {busyAction === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Confirm and send
             </Button>

@@ -261,17 +261,18 @@ With an authenticated admin session and the backend available, open each route d
 | `/system-admin` | [ ] | [ ] | [ ] | |
 | `/settings` | [ ] | [ ] | [ ] | |
 
-## Automated route smoke-test TODO
+## Automated route smoke tests
 
-The `admin-next` package currently has no frontend test framework, test script, browser harness, or API-mocking utilities. Do not add an isolated test file that cannot run, and do not fake API responses solely for this smoke suite.
+The `admin-next` package has Playwright coverage in `admin-next/e2e` and exposes `npm run test:e2e:admin`. The current suite uses browser API interception for deterministic auth/session and data fixtures, so it can run in pull-request and main CI without production credentials or secrets.
 
-- [ ] Add Playwright as the admin app's browser test framework and add documented `test:smoke` and CI commands.
-- [ ] Start a production build with Playwright's `webServer`, or target a dedicated QA deployment.
-- [ ] Authenticate through a dedicated non-production admin account or a backend-supported saved session; keep credentials in environment/CI secrets.
-- [ ] Parameterize the 15 routes in the table above and assert that each page reaches its intended authenticated shell without `pageerror`, hydration errors, redirect loops, or HTTP 5xx document responses.
-- [ ] Use the real QA API and seeded disposable records. Add API interception only if the repository later adopts shared, contract-aligned mock utilities.
-- [ ] Run the suite with at least admin access; add editor, reviewer, and superadmin authorization cases separately.
-- [ ] Capture trace/screenshot artifacts on failure and run the smoke project in Main CI before deployment.
+- [ ] Run `npm run test:e2e:admin` from `admin-next` before release, or confirm the CI Admin E2E Smoke job passed for the target commit.
+- [ ] Confirm unauthenticated admin access shows the login screen and authenticated mocked admin access renders the dashboard shell.
+- [ ] Confirm sidebar links for critical routes are visible to an authorized mocked admin session.
+- [ ] Confirm role-denied paths show a clear access-denied state.
+- [ ] Confirm high-risk mocked workflows do not send writes outside `/api-e2e`.
+- [ ] Review Playwright trace/screenshot artifacts for any failing run.
+
+Remaining automation gap: real credential login against a deployed QA backend is not automated. If that coverage is required, add a separate Playwright setup project using a disposable non-production admin account and `storageState`; keep credentials and generated state files out of Git.
 
 ## Release validation
 

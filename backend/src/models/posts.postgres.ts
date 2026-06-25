@@ -2152,7 +2152,7 @@ export class PostModelPostgres {
             reason === 'create'
               ? `Created ${record.type} draft "${record.title}"`
               : `Updated ${record.type} "${record.title}"`,
-          metadata: toJsonValue({ status: record.status }),
+          metadata: toJsonValue({ status: record.status, note: note || undefined }),
         },
       });
 

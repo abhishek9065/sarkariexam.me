@@ -525,9 +525,10 @@ export function createCampaign(data: {
   });
 }
 
-export function sendCampaign(id: string) {
+export function sendCampaign(id: string, auditReason?: string) {
   return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; status: 'sending' } }>(`/admin/campaigns/${id}/send`, {
     method: 'POST',
+    body: JSON.stringify(auditReason ? { auditReason } : {}),
   });
 }
 
@@ -539,9 +540,10 @@ export function getCampaignStats(id: string) {
   return apiFetch<{ data: CampaignDeliveryStats }>(`/admin/campaigns/${id}/stats`);
 }
 
-export function retryFailedCampaign(id: string) {
+export function retryFailedCampaign(id: string, auditReason?: string) {
   return apiFetchWithCsrf<{ message: string; data: { mode: 'delivery'; status: 'sending' } }>(`/admin/campaigns/${id}/retry-failed`, {
     method: 'POST',
+    body: JSON.stringify(auditReason ? { auditReason } : {}),
   });
 }
 
@@ -600,10 +602,10 @@ export function getCommentsPending(limit = 50) {
   return apiFetch<{ data: PendingCommunityComment[] }>(`/admin/comments-pending${qs({ limit })}`);
 }
 
-export function moderateComment(id: string, action: 'approve' | 'reject') {
+export function moderateComment(id: string, action: 'approve' | 'reject', auditReason?: string) {
   return apiFetchWithCsrf<{ message: string }>(`/admin/moderate-comment/${id}`, {
     method: 'POST',
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, ...(auditReason ? { auditReason } : {}) }),
   });
 }
 

@@ -14,6 +14,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  diff-check:
+    name: Git Diff Whitespace Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine diff base
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          base_sha=""
+          if [[ "${EVENT_NAME}" == "push" && -n "${PUSH_BEFORE_SHA:-}" && "${PUSH_BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+            base_sha="${PUSH_BEFORE_SHA}"
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+            base_sha="$(git rev-parse HEAD~1)"
+          fi
+
+          if [[ -z "${base_sha}" ]]; then
+            echo "has_base=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_base=true" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${base_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Run git diff --check
+        if: steps.base.outputs.has_base == 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.base_sha }}
+        run: git diff --check "${BASE_SHA}" HEAD
+
   repository-hygiene:
     name: Repository Hygiene
     runs-on: ubuntu-latest
@@ -130,12 +170,12 @@ jobs:
             exit 0
           fi
 
-          if printf '%s\n' "${changed_files}" | grep -Eq '^(README\.md|docs/deployment-notes\.md|docs/production-deploy-checklist\.md|scripts/FAST_DEPLOY_README\.md|docs/phase4-reliability-hardening\.md|docs/deploy-incident-faq\.md)$'; then
+          if printf '%s\n' "${changed_files}" | grep -Eq '^(README\.md|docs/deployment-notes\.md|docs/production-deploy-checklist\.md|docs/ci-admin-console-gates\.md|scripts/FAST_DEPLOY_README\.md|docs/phase4-reliability-hardening\.md|docs/deploy-incident-faq\.md)$'; then
             echo "Deploy controls changed and operational docs were updated."
             exit 0
           fi
 
-          echo "::error::Deploy controls changed without matching docs updates. Update at least one of: README.md, docs/deployment-notes.md, docs/production-deploy-checklist.md, scripts/FAST_DEPLOY_README.md, docs/phase4-reliability-hardening.md, docs/deploy-incident-faq.md"
+          echo "::error::Deploy controls changed without matching docs updates. Update at least one of: README.md, docs/deployment-notes.md, docs/production-deploy-checklist.md, docs/ci-admin-console-gates.md, scripts/FAST_DEPLOY_README.md, docs/phase4-reliability-hardening.md, docs/deploy-incident-faq.md"
           exit 1
 
   compose-validation:
@@ -214,6 +254,9 @@ jobs:
 
       - name: Build backend
         run: npm run build
+
+      - name: Verify campaign worker build artifact
+        run: test -f dist/campaignWorker.js
 
       - name: Run backend tests
         run: npm run test:ci
@@ -298,9 +341,39 @@ jobs:
       - name: Build admin app
         run: npm run build
 
+  admin-e2e:
+    name: Admin E2E Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: admin
+    defaults:
+      run:
+        working-directory: admin-next
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-next/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run admin Playwright smoke tests
+        run: npm run test:e2e:admin
+
   build-images:
     name: Build and Push ${{ matrix.service }} Image
-    needs: [repository-hygiene, shell-safety, deploy-doc-consistency, compose-validation, backend, frontend, admin]
+    needs: [diff-check, repository-hygiene, shell-safety, deploy-doc-consistency, compose-validation, backend, frontend, admin, admin-e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read

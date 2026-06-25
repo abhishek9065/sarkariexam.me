@@ -139,7 +139,7 @@ export function CalendarPage() {
                 <Button variant="ghost" size="icon" onClick={() => navigateMonth('prev')}>
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
-                <h2 className="text-xl font-semibold min-w-50 text-center">
+                <h2 className="min-w-[200px] text-center text-xl font-semibold">
                   {format(currentDate, 'MMMM yyyy')}
                 </h2>
                 <Button variant="ghost" size="icon" onClick={() => navigateMonth('next')}>
@@ -170,7 +170,7 @@ export function CalendarPage() {
                 return (
                   <div
                     key={day.toISOString()}
-                    className={`bg-background min-h-25 p-2 ${
+                    className={`min-h-[100px] bg-background p-2 ${
                       !isCurrentMonth ? 'bg-muted/30 text-muted-foreground' : ''
                     } ${isTodayDate ? 'bg-blue-50' : ''}`}
                   >

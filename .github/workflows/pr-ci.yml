@@ -42,6 +42,20 @@ jobs:
             workflows:
               - '.github/workflows/**'
 
+  diff-check:
+    name: Git Diff Whitespace Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run git diff --check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git diff --check "origin/${BASE_REF}...HEAD"
+
   hygiene:
     runs-on: ubuntu-latest
     steps:
@@ -72,10 +86,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version: 22, cache: npm, cache-dependency-path: backend/package-lock.json }
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npx prisma generate && npx prisma migrate deploy
       - run: diff -u ../openapi.json openapi.json
       - run: npm run lint
       - run: npm run build
+      - run: test -f dist/campaignWorker.js
       - run: npm run test:ci
 
   frontend:
@@ -90,6 +106,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: frontend/.next/cache
@@ -110,6 +127,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version: 22, cache: npm, cache-dependency-path: admin-next/package-lock.json }
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: admin-next/.next/cache
@@ -117,6 +135,23 @@ jobs:
           restore-keys: ${{ runner.os }}-next-admin-${{ hashFiles('admin-next/package-lock.json') }}-
       - run: npm run lint
       - run: npm run build
+
+  admin-e2e:
+    needs:
+      - changes
+      - admin
+    if: needs.changes.outputs.admin == 'true' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults: { run: { working-directory: admin-next } }
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with: { node-version: 22, cache: npm, cache-dependency-path: admin-next/package-lock.json }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:admin
 
   deploy-checks:
     needs: changes

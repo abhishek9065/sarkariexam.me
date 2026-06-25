@@ -154,6 +154,7 @@ export function CommunityPage() {
   const [answerTarget, setAnswerTarget] = useState<CommunityQAItem | null>(null);
   const [answer, setAnswer] = useState('');
   const [rejectTarget, setRejectTarget] = useState<PendingCommunityComment | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const commentsQuery = useQuery({
     queryKey: ['community-moderation', 'comments'],
@@ -177,10 +178,11 @@ export function CommunityPage() {
   });
 
   const moderateMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => moderateComment(id, action),
+    mutationFn: ({ id, action, auditReason }: { id: string; action: 'approve' | 'reject'; auditReason?: string }) => moderateComment(id, action, auditReason),
     onSuccess: (_response, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['community-moderation', 'comments'] });
       setRejectTarget(null);
+      setRejectReason('');
       toast.success(variables.action === 'approve' ? 'Comment approved.' : 'Comment rejected.');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -216,6 +218,7 @@ export function CommunityPage() {
   function requestModeration(comment: PendingCommunityComment, action: 'approve' | 'reject') {
     if (action === 'reject') {
       setRejectTarget(comment);
+      setRejectReason('');
       return;
     }
     moderateMutation.mutate({ id: comment.id, action });
@@ -336,12 +339,28 @@ export function CommunityPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => { if (!open && !moderateMutation.isPending) setRejectTarget(null); }}>
+      <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => { if (!open && !moderateMutation.isPending) { setRejectTarget(null); setRejectReason(''); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Reject comment?</DialogTitle><DialogDescription>The backend will mark this comment rejected and remove it from the pending queue. Rejection reasons are not supported by the current API.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Reject comment?</DialogTitle><DialogDescription>The backend will mark this comment rejected and record the moderation reason in the audit log.</DialogDescription></DialogHeader>
+          <div className="space-y-1.5">
+            <label htmlFor="comment-reject-reason" className="text-sm font-semibold">Audit reason</label>
+            <Textarea
+              id="comment-reject-reason"
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              maxLength={500}
+              rows={4}
+              placeholder="Policy violation, spam, duplicate, or other moderation reason"
+              aria-invalid={rejectReason.trim().length > 0 && rejectReason.trim().length < 3}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Required before rejection.</span>
+              <span>{rejectReason.length}/500</span>
+            </div>
+          </div>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={moderateMutation.isPending} onClick={() => setRejectTarget(null)}>Cancel</Button>
-            <Button type="button" variant="destructive" disabled={moderateMutation.isPending || !rejectTarget} onClick={() => { if (rejectTarget) moderateMutation.mutate({ id: rejectTarget.id, action: 'reject' }); }}>
+            <Button type="button" variant="outline" disabled={moderateMutation.isPending} onClick={() => { setRejectTarget(null); setRejectReason(''); }}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={moderateMutation.isPending || !rejectTarget || rejectReason.trim().length < 3} onClick={() => { if (rejectTarget) moderateMutation.mutate({ id: rejectTarget.id, action: 'reject', auditReason: rejectReason.trim() }); }}>
               {moderateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
               Confirm reject
             </Button>

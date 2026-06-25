@@ -1,18 +1,11 @@
-'use client';
-
-import { useAuth } from '@/lib/auth-context';
-import { AdminLayout } from '@/components/admin-layout';
-import { LoginPage } from '../login/login-page';
-import { Loader2 } from 'lucide-react';
+import { AdminPageShell } from '@/components/admin-page-shell';
+import { ADMINISTRATOR_ROLES } from '@/lib/admin-roles';
 import { NotificationsPage } from './notifications-page';
 
 export default function Page() {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
-  if (!user) return <LoginPage />;
   return (
-    <AdminLayout>
+    <AdminPageShell allowedRoles={ADMINISTRATOR_ROLES}>
       <NotificationsPage />
-    </AdminLayout>
+    </AdminPageShell>
   );
 }

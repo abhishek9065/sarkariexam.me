@@ -211,7 +211,7 @@ export interface PostVersionRecord {
 
 export interface AuditLogRecord {
   id: string;
-  entityType: 'post' | 'workflow' | 'auth' | 'subscription';
+  entityType: 'post' | 'workflow' | 'auth' | 'subscription' | 'campaign' | 'community' | 'settings';
   entityId: string;
   action: string;
   actorId?: string;

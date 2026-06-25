@@ -98,10 +98,10 @@ export function ErrorReportsPage() {
                   {items.map((r) => (
                     <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-4 py-3 font-mono text-xs">{r.errorId || r.id?.slice(0, 8)}</td>
-                      <td className="px-4 py-3 max-w-75">
+                      <td className="max-w-[300px] px-4 py-3">
                         <p className="line-clamp-1">{r.message}</p>
                       </td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground text-xs max-w-50 truncate">
+                      <td className="hidden max-w-[200px] truncate px-4 py-3 text-xs text-muted-foreground sm:table-cell">
                         {r.pageUrl || '—'}
                       </td>
                       <td className="px-4 py-3">

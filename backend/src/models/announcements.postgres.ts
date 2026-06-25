@@ -876,14 +876,14 @@ export class AnnouncementModelPostgres {
     return updated ? announcementFromPost(updated) : null;
   }
 
-  static async softDelete(id: string): Promise<boolean> {
+  static async softDelete(id: string, updatedBy = 'system'): Promise<boolean> {
     const updated = await PostModelPostgres.update(
       id,
       {
         status: 'archived',
         archivedAt: new Date().toISOString(),
       } as any,
-      'system',
+      updatedBy,
       'admin',
       'Archived via admin endpoint',
     );
