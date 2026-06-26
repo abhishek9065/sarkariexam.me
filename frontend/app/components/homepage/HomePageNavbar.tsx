@@ -183,29 +183,31 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
       />
       <header className="sticky top-0 z-50">
         <div
-          className="relative overflow-x-hidden text-white shadow-2xl"
+          className="relative z-20 overflow-visible text-white shadow-2xl"
           style={{ background: 'linear-gradient(120deg, #060d2e 0%, #0d1b6e 30%, #1a237e 60%, #0a3880 100%)' }}
         >
-          <div
-            className="pointer-events-none absolute left-0 top-0 h-full w-64 opacity-20"
-            style={{ background: 'radial-gradient(ellipse at 20% 50%, #4f8ef7 0%, transparent 70%)' }}
-          />
-          <div
-            className="absolute inset-x-0 top-0 h-px"
-            style={{
-              background:
-                'linear-gradient(90deg, transparent, rgba(255,255,255,0.35) 40%, rgba(253,216,53,0.5) 60%, transparent)',
-            }}
-          />
-          <div
-            className="absolute inset-x-0 bottom-0 h-px"
-            style={{
-              background:
-                'linear-gradient(90deg, transparent, rgba(253,216,53,0.4) 40%, rgba(255,255,255,0.15) 70%, transparent)',
-            }}
-          />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div
+              className="absolute left-0 top-0 h-full w-64 opacity-20"
+              style={{ background: 'radial-gradient(ellipse at 20% 50%, #4f8ef7 0%, transparent 70%)' }}
+            />
+            <div
+              className="absolute inset-x-0 top-0 h-px"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.35) 40%, rgba(253,216,53,0.5) 60%, transparent)',
+              }}
+            />
+            <div
+              className="absolute inset-x-0 bottom-0 h-px"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent, rgba(253,216,53,0.4) 40%, rgba(255,255,255,0.15) 70%, transparent)',
+              }}
+            />
+          </div>
 
-          <div className="mx-auto flex h-[60px] max-w-6xl items-center justify-between gap-2 px-3 md:gap-3">
+          <div className="relative z-10 mx-auto flex h-[60px] max-w-6xl items-center justify-between gap-2 px-3 md:gap-3">
             <Link href={homePageLinks.home} className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:shrink-0 md:gap-3">
               <div className="relative shrink-0">
                 <div
@@ -303,7 +305,12 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    setIsNotificationOpen((current) => !current);
+                    setIsNotificationOpen((current) => {
+                      if (!current) {
+                        setIsUserMenuOpen(false);
+                      }
+                      return !current;
+                    });
                   }}
                   className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14 hover:scale-105 active:scale-95"
                   aria-label="Toggle notifications"
@@ -359,7 +366,15 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
                 <div className="relative" data-user-menu>
                   <button
                     type="button"
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setIsUserMenuOpen((current) => {
+                        if (!current) {
+                          setIsNotificationOpen(false);
+                        }
+                        return !current;
+                      });
+                    }}
                     className="flex items-center gap-2 rounded-[10px] border border-[rgba(100,200,100,0.45)] bg-[linear-gradient(135deg,rgba(100,200,100,0.18)_0%,rgba(150,200,100,0.1)_100%)] px-4 py-[7px] text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(100,200,100,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:-translate-y-px hover:bg-[linear-gradient(135deg,#64c864_0%,#96c864_100%)] hover:text-[#0d1b6e] hover:shadow-[0_4px_20px_rgba(100,200,100,0.35)]"
                   >
                     {isAdmin ? <Shield size={13} /> : <User size={13} />}
@@ -427,7 +442,12 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    setIsNotificationOpen((current) => !current);
+                    setIsNotificationOpen((current) => {
+                      if (!current) {
+                        setIsUserMenuOpen(false);
+                      }
+                      return !current;
+                    });
                   }}
                   className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/16 bg-white/9 transition-all hover:bg-white/14"
                   aria-label="Toggle notifications"
@@ -443,7 +463,16 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
 
               {isLoggedIn ? (
                 <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsUserMenuOpen((current) => {
+                      if (!current) {
+                        setIsNotificationOpen(false);
+                      }
+                      return !current;
+                    });
+                  }}
                   className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[rgba(100,200,100,0.4)] bg-[rgba(100,200,100,0.2)] text-white"
                   aria-label={isAdmin ? 'Admin menu' : 'Profile menu'}
                 >
@@ -475,7 +504,7 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
         </div>
 
         <div
-          className="relative hidden md:block"
+          className="relative z-10 hidden md:block"
           style={{
             background: 'linear-gradient(90deg, #060d1f 0%, #0a1428 40%, #0d1a30 60%, #060d1f 100%)',
             boxShadow: '0 6px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)',
@@ -737,7 +766,11 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
 
         {/* Mobile User Dropdown - positioned outside hamburger menu */}
         {isUserMenuOpen && isLoggedIn && (
-          <div className="absolute right-4 top-20 z-[9999] w-[200px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 md:hidden">
+          <div
+            className="absolute right-4 top-20 z-[9999] w-[220px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 md:hidden"
+            data-user-menu
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="border-b border-gray-100 px-4 py-3">
               <p className="text-sm font-medium text-gray-900">{user?.name}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
@@ -748,6 +781,18 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
                 </span>
               )}
             </div>
+
+            <Link
+              href={homePageLinks.profile}
+              className="flex items-center gap-2 border-b border-gray-100 px-4 py-3 text-sm text-gray-700 hover:bg-blue-50"
+              onClick={() => {
+                setIsUserMenuOpen(false);
+                setIsMenuOpen(false);
+              }}
+            >
+              <User size={16} />
+              Profile
+            </Link>
             
             {isAdmin && (
               <>
@@ -755,7 +800,10 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
                   href={ADMIN_URL}
                   target="_blank"
                   className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 border-b border-gray-100"
-                  onClick={() => setIsUserMenuOpen(false)}
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    setIsMenuOpen(false);
+                  }}
                 >
                   <Settings size={16} />
                   Admin Dashboard
