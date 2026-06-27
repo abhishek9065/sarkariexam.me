@@ -184,6 +184,9 @@ const postgresDirectUrl =
   deriveNeonDirectUrl(postgresConfiguredUrl);
 // Prefer pooler/runtime URL when available; direct is for migrations/CLI.
 const postgresPrismaUrl = postgresConfiguredUrl || postgresDirectUrl;
+const redisConfigured = Boolean(
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+);
 const legacyMongoConfigured = Boolean(
   process.env.COSMOS_CONNECTION_STRING || process.env.MONGODB_URI,
 );
@@ -271,6 +274,12 @@ if (isProduction && !metricsToken) {
   );
 }
 
+if (isProduction && !redisConfigured) {
+  runtimeWarnings.push(
+    "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not both set; API cache, rate limit, idempotency, and auth-token state will use process-local memory fallback.",
+  );
+}
+
 if (isProduction && legacyMongoRequired && !legacyMongoConfigured) {
   throw new Error(
     "SECURITY ERROR: LEGACY_MONGO_REQUIRED is enabled but COSMOS_CONNECTION_STRING/MONGODB_URI is missing.",
@@ -309,6 +318,7 @@ export const config = {
   contentDbMode,
   postgresPrismaUrl,
   postgresDirectUrl,
+  redisConfigured,
   legacyMongoConfigured,
   legacyMongoRequired,
   legacyMongoEnabled,
@@ -361,6 +371,9 @@ if (!isProduction) {
   }
   console.log(
     `[CONFIG] PostgreSQL URLs: Prisma=${postgresPrismaUrl ? "yes" : "no"}, Direct=${postgresDirectUrl ? "yes" : "no"}`,
+  );
+  console.log(
+    `[CONFIG] Redis cache: ${redisConfigured ? "configured" : "not configured"}`,
   );
   console.log(
     `[CONFIG] Frontend revalidation: ${frontendRevalidationConfigured ? "configured" : "not fully configured"}`,
