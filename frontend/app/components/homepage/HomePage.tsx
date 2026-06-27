@@ -1,18 +1,14 @@
 import {
   ArrowRight,
-  Award,
   BadgeCheck,
   Bell,
-  BookOpen,
   Briefcase,
   CalendarDays,
   ChevronRight,
   Clock,
   ClipboardList,
   FileCheck,
-  FileText,
   GraduationCap,
-  LayoutGrid,
   Search,
   ShieldCheck,
   TrendingUp,
@@ -40,17 +36,6 @@ const stats = [
   { icon: FileCheck, value: '128', label: 'Admit Cards', color: '#7dd3fc' },
   { icon: ClipboardList, value: '89', label: 'New Results', color: '#86efac' },
   { icon: TrendingUp, value: '342', label: 'Added Today', color: '#f9a8d4' },
-] as const;
-
-const categories = [
-  { icon: Briefcase, label: 'Latest Jobs', count: '12,450', color: '#dc2626', bg: '#fee2e2', href: homePageLinks.jobs },
-  { icon: ClipboardList, label: 'Results', count: '89', color: '#1d4ed8', bg: '#dbeafe', href: homePageLinks.results },
-  { icon: FileCheck, label: 'Admit Card', count: '128', color: '#7c3aed', bg: '#ede9fe', href: homePageLinks.admitCards },
-  { icon: BookOpen, label: 'Answer Key', count: '24', color: '#0d9488', bg: '#ccfbf1', href: homePageLinks.answerKey },
-  { icon: LayoutGrid, label: 'Syllabus', count: '22+', color: '#ea580c', bg: '#ffedd5', href: homePageLinks.syllabus },
-  { icon: GraduationCap, label: 'Admission', count: '18', color: '#be185d', bg: '#fce7f3', href: homePageLinks.admissions },
-  { icon: Award, label: 'Board Result', count: '16', color: '#b45309', bg: '#fef3c7', href: homePageLinks.boardResults },
-  { icon: FileText, label: 'Scholarship', count: '14', color: '#166534', bg: '#dcfce7', href: homePageLinks.scholarship },
 ] as const;
 
 const popular = ['SSC CGL 2026', 'UPSC CSE', 'IBPS PO', 'RRB Group D', 'SBI Clerk'];
@@ -349,30 +334,6 @@ function Hero() {
   );
 }
 
-function CategoryStrip() {
-  return (
-    <div className="border-b border-gray-200 bg-white shadow-sm dark:border-white/[0.07] dark:bg-[#0c1120]">
-      <div className="mx-auto max-w-6xl px-4 py-4">
-        <div className="grid grid-cols-4 gap-1 sm:grid-cols-8">
-          {categories.map(({ icon: Icon, label, count, color, bg, href }) => (
-            <Link key={label} href={href} className="group flex flex-col items-center gap-1.5 rounded-xl px-1 py-3 transition hover:bg-gray-50 dark:hover:bg-white/[0.04]">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl ring-1 ring-black/[0.05] transition group-hover:scale-110 group-hover:shadow-lg dark:ring-white/[0.07]" style={{ background: bg }}>
-                <Icon size={19} style={{ color }} />
-              </div>
-              <span className="text-center text-[10.5px] font-bold leading-snug text-gray-700 transition group-hover:text-orange-600 dark:text-gray-300 dark:group-hover:text-orange-400">
-                {label}
-              </span>
-              <span className="rounded-full px-1.5 py-0.5 text-[8.5px] font-extrabold tabular-nums" style={{ background: `${color}14`, color }}>
-                {count}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function FeaturedSpotlight() {
   return (
     <section className="mx-auto max-w-6xl px-4 pt-6">
@@ -596,7 +557,6 @@ export default async function HomePage({ initialAuthTab }: HomePageProps) {
   return (
     <PublicSiteShell initialAuthTab={initialAuthTab}>
       <Hero />
-      <CategoryStrip />
       <FeaturedSpotlight />
       <MainGrid sections={sections} />
     </PublicSiteShell>
