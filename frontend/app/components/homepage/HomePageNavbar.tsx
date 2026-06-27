@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { buildJobsPath } from '@/app/lib/public-content';
@@ -51,6 +51,16 @@ const notifications = [
   'UPSC CSE Prelims Result Declared',
   'IBPS PO 2026 Apply Now',
 ];
+
+function isNavLinkActive(pathname: string, href: string) {
+  const currentPath = pathname.split('?')[0] || '/';
+
+  if (href === '/') {
+    return currentPath === '/';
+  }
+
+  return currentPath === href || currentPath.startsWith(`${href}/`);
+}
 
 function HomePageThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -114,6 +124,7 @@ interface HomePageNavbarProps {
 
 export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isAdmin, isLoggedIn, logout } = useCurrentUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -528,110 +539,114 @@ export function HomePageNavbar({ initialAuthTab }: HomePageNavbarProps) {
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-black/50" />
           <div className="mx-auto max-w-6xl px-3">
             <div className="flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {navLinks.map(({ label, icon: Icon, badge, href }, index) => (
-                <Link
-                  key={label}
-                  href={href}
-                  className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-all duration-200"
-                  style={{ fontSize: '11.5px', fontWeight: index === 0 ? 700 : 500 }}
-                >
-                  <span
-                    className="absolute inset-x-1 inset-y-1.5 rounded-lg opacity-0 transition-all duration-200 group-hover:opacity-100"
-                    style={
-                      index === 0
-                        ? {
-                            opacity: 1,
-                            background: 'linear-gradient(160deg, rgba(230,81,0,0.22) 0%, rgba(230,81,0,0.09) 100%)',
-                            border: '1px solid rgba(230,81,0,0.25)',
-                          }
-                        : {
-                            background: 'linear-gradient(160deg, rgba(230,81,0,0.18) 0%, rgba(230,81,0,0.07) 100%)',
-                            border: '1px solid rgba(230,81,0,0.15)',
-                          }
-                    }
-                  />
-                  {index < navLinks.length - 1 ? (
-                    <span
-                      className="pointer-events-none absolute right-0 top-3 bottom-3 w-px"
-                      style={{ background: 'rgba(255,255,255,0.05)' }}
-                    />
-                  ) : null}
-                  <Icon
-                    size={13}
-                    className="relative z-10 shrink-0 transition-all duration-200 group-hover:scale-110 group-hover:rotate-[-4deg]"
-                    style={
-                      index === 0
-                        ? { color: '#ff7043', filter: 'drop-shadow(0 0 4px rgba(230,81,0,0.6))' }
-                        : { color: 'rgba(255,255,255,0.38)' }
-                    }
-                  />
-                  <span
-                    className="relative z-10 transition-colors duration-200 group-hover:text-white"
-                    style={
-                      index === 0
-                        ? { color: '#ffffff', textShadow: '0 0 12px rgba(230,81,0,0.4)' }
-                        : { color: 'rgba(255,255,255,0.5)' }
-                    }
+              {navLinks.map(({ label, icon: Icon, badge, href }, index) => {
+                const active = isNavLinkActive(pathname, href);
+
+                return (
+                  <Link
+                    key={label}
+                    href={href}
+                    className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-all duration-200"
+                    style={{ fontSize: '11.5px', fontWeight: active ? 700 : 500 }}
                   >
-                    {label}
-                  </span>
-                  {badge && (
                     <span
-                      className="relative z-10 shrink-0 rounded-full animate-pulse text-white"
-                      style={{
-                        fontSize: '7.5px',
-                        fontWeight: 800,
-                        letterSpacing: '0.08em',
-                        padding: '1.5px 5px',
-                        background:
-                          badge === 'HOT'
-                            ? 'linear-gradient(135deg, #c62828, #e53935)'
-                            : 'linear-gradient(135deg, #1b5e20, #2e7d32)',
-                        boxShadow:
-                          badge === 'HOT'
-                            ? '0 0 8px rgba(198,40,40,0.6), inset 0 1px 0 rgba(255,255,255,0.15)'
-                            : '0 0 8px rgba(27,94,32,0.6), inset 0 1px 0 rgba(255,255,255,0.15)',
-                      }}
-                    >
-                      {badge}
-                    </span>
-                  )}
-                  <span
-                    className="absolute bottom-0 left-2 right-2 rounded-t-full transition-all duration-300"
-                    style={
-                      index === 0
-                        ? {
-                            height: '2.5px',
-                            background: 'linear-gradient(90deg, #e65100, #fdd835, #e65100)',
-                            boxShadow: '0 0 10px rgba(230,81,0,0.8), 0 0 20px rgba(230,81,0,0.3)',
-                            opacity: 1,
-                            transform: 'scaleX(1)',
-                            transformOrigin: 'center',
-                          }
-                        : {
-                            height: '2.5px',
-                            background: 'linear-gradient(90deg, #e65100, #fdd835, #e65100)',
-                            boxShadow: '0 0 10px rgba(230,81,0,0.8), 0 0 20px rgba(230,81,0,0.3)',
-                            opacity: 0,
-                            transform: 'scaleX(0.3)',
-                            transformOrigin: 'center',
-                          }
-                    }
-                  />
-                  {index !== 0 ? (
-                    <span
-                      className="absolute bottom-0 left-2 right-2 rounded-t-full opacity-0 transition-all duration-200 group-hover:opacity-100"
-                      style={{
-                        height: '2px',
-                        background: 'linear-gradient(90deg, #e65100, #ff7043)',
-                        boxShadow: '0 0 6px rgba(230,81,0,0.5)',
-                        transform: 'scaleX(0.6)',
-                        transformOrigin: 'center',
-                      }}
+                      className="absolute inset-x-1 inset-y-1.5 rounded-lg opacity-0 transition-all duration-200 group-hover:opacity-100"
+                      style={
+                        active
+                          ? {
+                              opacity: 1,
+                              background: 'linear-gradient(160deg, rgba(230,81,0,0.22) 0%, rgba(230,81,0,0.09) 100%)',
+                              border: '1px solid rgba(230,81,0,0.25)',
+                            }
+                          : {
+                              background: 'linear-gradient(160deg, rgba(230,81,0,0.18) 0%, rgba(230,81,0,0.07) 100%)',
+                              border: '1px solid rgba(230,81,0,0.15)',
+                            }
+                      }
                     />
-                  ) : null}
-                </Link>
-              ))}
+                    {index < navLinks.length - 1 ? (
+                      <span
+                        className="pointer-events-none absolute right-0 top-3 bottom-3 w-px"
+                        style={{ background: 'rgba(255,255,255,0.05)' }}
+                      />
+                    ) : null}
+                    <Icon
+                      size={13}
+                      className="relative z-10 shrink-0 transition-all duration-200 group-hover:scale-110 group-hover:rotate-[-4deg]"
+                      style={
+                        active
+                          ? { color: '#ff7043', filter: 'drop-shadow(0 0 4px rgba(230,81,0,0.6))' }
+                          : { color: 'rgba(255,255,255,0.38)' }
+                      }
+                    />
+                    <span
+                      className="relative z-10 transition-colors duration-200 group-hover:text-white"
+                      style={
+                        active
+                          ? { color: '#ffffff', textShadow: '0 0 12px rgba(230,81,0,0.4)' }
+                          : { color: 'rgba(255,255,255,0.5)' }
+                      }
+                    >
+                      {label}
+                    </span>
+                    {badge && (
+                      <span
+                        className="relative z-10 shrink-0 rounded-full animate-pulse text-white"
+                        style={{
+                          fontSize: '7.5px',
+                          fontWeight: 800,
+                          letterSpacing: '0.08em',
+                          padding: '1.5px 5px',
+                          background:
+                            badge === 'HOT'
+                              ? 'linear-gradient(135deg, #c62828, #e53935)'
+                              : 'linear-gradient(135deg, #1b5e20, #2e7d32)',
+                          boxShadow:
+                            badge === 'HOT'
+                              ? '0 0 8px rgba(198,40,40,0.6), inset 0 1px 0 rgba(255,255,255,0.15)'
+                              : '0 0 8px rgba(27,94,32,0.6), inset 0 1px 0 rgba(255,255,255,0.15)',
+                        }}
+                      >
+                        {badge}
+                      </span>
+                    )}
+                    <span
+                      className="absolute bottom-0 left-2 right-2 rounded-t-full transition-all duration-300"
+                      style={
+                        active
+                          ? {
+                              height: '2.5px',
+                              background: 'linear-gradient(90deg, #e65100, #fdd835, #e65100)',
+                              boxShadow: '0 0 10px rgba(230,81,0,0.8), 0 0 20px rgba(230,81,0,0.3)',
+                              opacity: 1,
+                              transform: 'scaleX(1)',
+                              transformOrigin: 'center',
+                            }
+                          : {
+                              height: '2.5px',
+                              background: 'linear-gradient(90deg, #e65100, #fdd835, #e65100)',
+                              boxShadow: '0 0 10px rgba(230,81,0,0.8), 0 0 20px rgba(230,81,0,0.3)',
+                              opacity: 0,
+                              transform: 'scaleX(0.3)',
+                              transformOrigin: 'center',
+                            }
+                      }
+                    />
+                    {!active ? (
+                      <span
+                        className="absolute bottom-0 left-2 right-2 rounded-t-full opacity-0 transition-all duration-200 group-hover:opacity-100"
+                        style={{
+                          height: '2px',
+                          background: 'linear-gradient(90deg, #e65100, #ff7043)',
+                          boxShadow: '0 0 6px rgba(230,81,0,0.5)',
+                          transform: 'scaleX(0.6)',
+                          transformOrigin: 'center',
+                        }}
+                      />
+                    ) : null}
+                  </Link>
+                );
+              })}
               <div className="flex-1" />
               <div className="flex h-11 shrink-0 items-center gap-2 border-l border-white/5 px-4">
                 <span className="relative flex h-2 w-2 items-center justify-center">

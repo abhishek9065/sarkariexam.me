@@ -262,10 +262,10 @@ function Hero() {
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(135deg,#fde68a,#fbbf24)] px-2.5 py-1 text-[9.5px] font-extrabold tracking-[0.08em] text-[#0b1437]">
             <Zap size={9} fill="currentColor" /> #1 GOVT JOBS PORTAL
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.09] px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 backdrop-blur">
             <ShieldCheck size={10} className="text-emerald-300" /> Verified Daily
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.09] px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 backdrop-blur">
             <BadgeCheck size={10} className="text-sky-300" /> All India - 28 States
           </span>
         </div>
@@ -285,15 +285,15 @@ function Hero() {
             </p>
           </div>
 
-          <div className="hidden shrink-0 grid-cols-2 gap-2 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-3 ring-1 ring-white/[0.14] backdrop-blur lg:grid">
+          <div className="hidden shrink-0 grid-cols-2 gap-2 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-3 ring-1 ring-white/14 backdrop-blur lg:grid">
             {stats.map(({ icon: Icon, value, label, color }) => (
-              <div key={label} className="flex items-center gap-2.5 rounded-xl bg-white/[0.04] px-2.5 py-2 ring-1 ring-white/[0.08]">
+              <div key={label} className="flex items-center gap-2.5 rounded-xl bg-white/4 px-2.5 py-2 ring-1 ring-white/8">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl" style={{ background: `${color}20` }}>
                   <Icon size={14} style={{ color }} />
                 </div>
                 <div className="leading-tight">
                   <div className="text-[15px] font-extrabold tabular-nums text-white">{value}</div>
-                  <div className="text-[9px] font-bold uppercase tracking-[0.05em] text-white/40">{label}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-white/40">{label}</div>
                 </div>
               </div>
             ))}
@@ -301,7 +301,7 @@ function Hero() {
         </div>
 
         <form action={homePageLinks.jobs} className="mt-6 flex max-w-2xl gap-2">
-          <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/[0.09] px-4 py-3.5 shadow-[0_4px_28px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur transition focus-within:ring-2 focus-within:ring-yellow-400/60">
+          <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/9 px-4 py-3.5 shadow-[0_4px_28px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur transition focus-within:ring-2 focus-within:ring-yellow-400/60">
             <Search size={16} className="shrink-0 text-blue-200/70" />
             <input
               name="search"
@@ -323,7 +323,7 @@ function Hero() {
             <Link
               key={label}
               href={buildJobsPath({ search: label })}
-              className="shrink-0 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/65 ring-1 ring-white/[0.14] transition hover:bg-white/[0.14] hover:text-white"
+              className="shrink-0 rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-semibold text-white/65 ring-1 ring-white/14 transition hover:bg-white/14 hover:text-white"
             >
               {label}
             </Link>
@@ -355,10 +355,10 @@ function FeaturedSpotlight() {
           return (
             <article
               key={item.title}
-              className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:ring-2 hover:ring-orange-300 dark:bg-[#0f172a] dark:ring-white/[0.09] dark:hover:ring-orange-500/40"
+              className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:ring-2 hover:ring-orange-300 dark:bg-[#0f172a] dark:ring-white/9 dark:hover:ring-orange-500/40"
             >
               <div className="absolute inset-x-0 top-0 h-1.5" style={{ background: `linear-gradient(90deg, ${item.accent}, ${item.accent}55 65%, transparent)` }} />
-              <div className="absolute inset-x-0 top-1.5 h-0.5 bg-gray-100 dark:bg-white/[0.04]">
+              <div className="absolute inset-x-0 top-1.5 h-0.5 bg-gray-100 dark:bg-white/4">
                 <div className="h-full" style={{ width: `${item.urgency}%`, background: isUrgent ? 'linear-gradient(90deg,#ef4444,#f97316)' : `linear-gradient(90deg,${item.accent}cc,${item.accent}44)` }} />
               </div>
               <div className="pointer-events-none absolute -bottom-5 -right-3 select-none text-[100px] font-black leading-none tracking-normal opacity-[0.055] dark:opacity-[0.10]" style={{ color: item.accent }}>
@@ -375,7 +375,7 @@ function FeaturedSpotlight() {
                       <Clock size={9} />
                       {item.deadlineLabel}
                     </span>
-                    <div className="grid h-7 w-7 place-items-center rounded-xl ring-1 ring-black/[0.05] dark:ring-white/[0.10]" style={{ background: orgBg }} title={item.org}>
+                    <div className="grid h-7 w-7 place-items-center rounded-xl ring-1 ring-black/5 dark:ring-white/10" style={{ background: orgBg }} title={item.org}>
                       <span className="text-[8.5px] font-black tracking-normal" style={{ color: orgFg }}>{item.orgShort}</span>
                     </div>
                   </div>
@@ -392,22 +392,22 @@ function FeaturedSpotlight() {
                 <p className="mt-0.5 text-[12px] font-medium leading-snug text-gray-500 dark:text-gray-400">{item.sub}</p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/[0.06] dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
                     <Users size={10} /> {item.posts} Posts
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/[0.06] dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
                     <GraduationCap size={10} /> {item.qual}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/[0.06] dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
                     <CalendarDays size={10} /> {item.lastDate}
                   </span>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/[0.07]">
+                <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/7">
                   <SafeLink href={item.href} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-extrabold transition-all hover:gap-2" style={{ background: `linear-gradient(135deg,${item.accent}18,${item.accent}08)`, border: `1.5px solid ${item.accent}28`, color: item.accent }}>
                     Apply Online <ArrowRight size={12} />
                   </SafeLink>
-                  <span className="max-w-[110px] truncate text-[10.5px] text-gray-400 dark:text-gray-500">{item.org}</span>
+                  <span className="max-w-27.5 truncate text-[10.5px] text-gray-400 dark:text-gray-500">{item.org}</span>
                 </div>
               </div>
             </article>
@@ -426,9 +426,9 @@ function NotificationsPanel() {
   } as const;
 
   return (
-    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition-shadow hover:shadow-md dark:bg-[#0f172a] dark:ring-white/[0.09]">
-      <div className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#ea580c,#f59e0b_60%,transparent)]" />
-      <div className="relative flex items-end justify-between gap-3 border-b border-gray-100 px-4 pb-3 pt-3.5 dark:border-white/[0.07]">
+    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition-shadow hover:shadow-md dark:bg-[#0f172a] dark:ring-white/9">
+      <div className="absolute inset-x-0 top-0 h-0.75 bg-[linear-gradient(90deg,#ea580c,#f59e0b_60%,transparent)]" />
+      <div className="relative flex items-end justify-between gap-3 border-b border-gray-100 px-4 pb-3 pt-3.5 dark:border-white/7">
         <div className="pointer-events-none absolute -top-3 right-2 select-none text-[56px] font-black leading-none tracking-normal text-[#ea580c] opacity-[0.065] dark:opacity-[0.10]">
           Alerts
         </div>
@@ -450,13 +450,13 @@ function NotificationsPanel() {
         </Link>
       </div>
 
-      <div className="divide-y divide-gray-100/80 dark:divide-white/[0.05]">
+      <div className="divide-y divide-gray-100/80 dark:divide-white/5">
         {notifications.map((item, index) => (
           <div
             key={`${item.text}-${index}`}
-            className="group flex items-start gap-2.5 px-3.5 py-2.5 transition hover:bg-gradient-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/[0.06]"
+            className="group flex items-start gap-2.5 px-3.5 py-2.5 transition hover:bg-linear-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/6"
           >
-            <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400 transition group-hover:scale-125" />
+            <span className="mt-1.75 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400 transition group-hover:scale-125" />
             <p className="flex-1 text-[12.5px] font-semibold leading-snug text-gray-800 transition group-hover:text-[#c2410c] dark:text-gray-100 dark:group-hover:text-orange-300">
               {item.text}
             </p>
@@ -474,14 +474,14 @@ function NotificationsPanel() {
         ))}
       </div>
 
-      <div className="mt-auto border-t border-gray-100 bg-gradient-to-br from-orange-50/70 to-amber-50/40 px-3.5 py-3 dark:border-white/[0.07] dark:from-orange-950/15 dark:to-amber-950/10">
+      <div className="mt-auto border-t border-gray-100 bg-linear-to-br from-orange-50/70 to-amber-50/40 px-3.5 py-3 dark:border-white/7 dark:from-orange-950/15 dark:to-amber-950/10">
         <div className="mb-2.5 flex items-center gap-1.5">
           <Clock size={11} className="text-orange-500" />
           <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-400">Upcoming Exam Dates</span>
         </div>
         <div className="space-y-1">
           {upcomingExams.map((exam) => (
-            <div key={exam.exam} className="-mx-2 flex items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/70 dark:hover:bg-white/[0.04]">
+            <div key={exam.exam} className="-mx-2 flex items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/70 dark:hover:bg-white/4">
               <SafeLink href={buildJobsPath({ search: exam.exam })} className="min-w-0 truncate text-[12px] font-semibold text-gray-700 transition hover:text-orange-600 hover:underline hover:underline-offset-2 dark:text-gray-300 dark:hover:text-orange-300">
                 {exam.exam}
               </SafeLink>

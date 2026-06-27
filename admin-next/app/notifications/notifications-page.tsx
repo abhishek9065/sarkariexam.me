@@ -431,7 +431,7 @@ export function NotificationsPage() {
 
   if (loading && campaigns.length === 0) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center">
+      <div className="flex min-h-105 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -461,7 +461,7 @@ export function NotificationsPage() {
           <div className="border-b border-border px-4 py-3">
             <p className="text-[11px] font-bold uppercase text-muted-foreground">Campaigns</p>
           </div>
-          <div className="max-h-[680px] overflow-y-auto">
+          <div className="max-h-170 overflow-y-auto">
             {campaigns.length === 0 ? (
               <p className="px-4 py-8 text-sm text-muted-foreground">No campaigns found. Create the first campaign to get started.</p>
             ) : campaigns.map((campaign) => {
@@ -612,7 +612,7 @@ export function NotificationsPage() {
                 </Button>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="w-full min-w-160 text-sm">
                   <thead className="bg-muted text-left text-[11px] uppercase text-muted-foreground">
                     <tr>
                       <th className="px-4 py-2">Channel</th>
@@ -630,9 +630,9 @@ export function NotificationsPage() {
                     ) : stats?.recentFailures.map((failure) => (
                       <tr key={failure.id} className="border-t border-border">
                         <td className="px-4 py-2 font-semibold">{failure.channel}</td>
-                        <td className="max-w-[260px] truncate px-4 py-2">{failure.recipient}</td>
+                        <td className="max-w-65 truncate px-4 py-2">{failure.recipient}</td>
                         <td className="px-4 py-2">{failure.attemptCount}</td>
-                        <td className="max-w-[280px] truncate px-4 py-2 text-red-600">{failure.error || 'Unknown failure'}</td>
+                        <td className="max-w-70 truncate px-4 py-2 text-red-600">{failure.error || 'Unknown failure'}</td>
                         <td className="px-4 py-2">{formatDate(failure.lastAttemptAt)}</td>
                       </tr>
                     ))}
