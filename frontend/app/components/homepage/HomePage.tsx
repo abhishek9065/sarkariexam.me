@@ -555,7 +555,7 @@ export default async function HomePage({ initialAuthTab }: HomePageProps) {
   const sections = await getHomepageSections();
 
   return (
-    <PublicSiteShell initialAuthTab={initialAuthTab}>
+    <PublicSiteShell initialAuthTab={initialAuthTab} activeHref={homePageLinks.home}>
       <Hero />
       <FeaturedSpotlight />
       <MainGrid sections={sections} />
