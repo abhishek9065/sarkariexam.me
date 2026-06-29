@@ -106,7 +106,7 @@ export function HomePageSectionBox({
       id={id}
       className="group/section relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_8px_28px_-12px_rgba(15,23,42,0.12)] transition-all duration-300 hover:shadow-[0_2px_6px_rgba(15,23,42,0.06),0_20px_44px_-12px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#0f172a]"
     >
-      <div className="absolute inset-x-0 top-0 z-10 h-[3px]" style={{ background: `linear-gradient(90deg, ${hex}, ${hex}cc 60%, transparent)` }} />
+      <div className="absolute inset-x-0 top-0 z-10 h-0.75" style={{ background: `linear-gradient(90deg, ${hex}, ${hex}cc 60%, transparent)` }} />
 
       <div className="relative flex items-end justify-between gap-3 border-b border-gray-100 px-4 pb-3 pt-3.5 dark:border-white/10" style={{ background: `linear-gradient(180deg, ${hex}0d 0%, transparent 100%)` }}>
         <div className="pointer-events-none absolute -top-3 right-2 select-none text-[56px] font-black leading-none tracking-normal opacity-[0.06] dark:opacity-[0.09]" style={{ color: hex }}>
@@ -150,8 +150,8 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
   const [bg, fg] = monoColors(org);
 
   return (
-    <div className="group/item relative flex items-start gap-3 px-3.5 py-2.5 transition-colors hover:bg-gradient-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/[0.06]">
-      <span className="absolute bottom-2 left-0 top-2 w-[2px] rounded-r bg-gradient-to-b from-orange-400 to-orange-500 opacity-0 transition-opacity group-hover/item:opacity-100" />
+    <div className="group/item relative flex items-start gap-3 px-3.5 py-2.5 transition-colors hover:bg-linear-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/6">
+      <span className="absolute bottom-2 left-0 top-2 w-0.5 rounded-r bg-linear-to-b from-orange-400 to-orange-500 opacity-0 transition-opacity group-hover/item:opacity-100" />
 
       <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg shadow-sm ring-1 ring-black/5 dark:ring-white/10" style={{ background: bg, color: fg }} aria-hidden>
         <span className="text-[11px] font-extrabold tracking-normal">{initials(org)}</span>
@@ -167,7 +167,7 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
           </SafeLink>
           {tagStyle ? (
             <span
-              className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-[0.05em] shadow-sm ${tagStyle.className} ${tagStyle.pulse ? 'animate-pulse' : ''}`}
+              className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-wider shadow-sm ${tagStyle.className} ${tagStyle.pulse ? 'animate-pulse' : ''}`}
               style={{ animationDuration: tagStyle.pulse ? '2.4s' : undefined }}
             >
               {tagStyle.label}
@@ -176,7 +176,7 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="max-w-[180px] truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">{org}</span>
+          <span className="max-w-45 truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">{org}</span>
           {postCount ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-gray-600 dark:bg-white/5 dark:text-gray-300">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-55" aria-hidden />

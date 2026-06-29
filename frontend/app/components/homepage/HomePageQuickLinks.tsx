@@ -142,7 +142,7 @@ export function HomePageQuickLinks() {
                   <Link
                     key={department.label}
                     href={buildJobsPath({ department: department.department })}
-                    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 transition-all hover:border-orange-200 hover:bg-orange-50/50 hover:shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-orange-800/50 dark:hover:bg-orange-950/20"
+                    className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-3 transition-all hover:border-orange-200 hover:bg-orange-50/50 hover:shadow-sm dark:border-white/10 dark:bg-white/3 dark:hover:border-orange-800/50 dark:hover:bg-orange-950/20"
                   >
                     <department.icon size={18} className="shrink-0 text-gray-500 transition-colors group-hover:text-[#e65100]" />
                     <div className="flex-1">

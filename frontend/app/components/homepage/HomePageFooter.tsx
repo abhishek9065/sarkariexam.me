@@ -235,7 +235,7 @@ export function HomePageFooter() {
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e65100]">
                   <Send size={10} className="text-white" />
                 </span>
-                <span className="text-[10px] font-extrabold tracking-[0.1em] text-[#e65100]">JOB ALERTS</span>
+                <span className="text-[10px] font-extrabold tracking-widest text-[#e65100]">JOB ALERTS</span>
               </div>
               <p className="mb-0.5 text-[16px] font-extrabold tracking-[-0.02em] text-white">Get Instant Job Alerts</p>
               <p className="text-[12px] text-blue-300">
@@ -245,7 +245,7 @@ export function HomePageFooter() {
 
             <Link
               href="/register"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-linear-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
             >
               Get Job Alerts <span aria-hidden>→</span>
             </Link>

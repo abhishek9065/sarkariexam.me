@@ -91,7 +91,7 @@ function NavbarActions() {
             <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
           </svg>
         </summary>
-        <div className="fixed left-0 right-0 top-[60px] z-40 border-b bg-white p-3 shadow-xl">
+        <div className="fixed left-0 right-0 top-15 z-40 border-b bg-white p-3 shadow-xl">
           <form action={homePageLinks.jobs} method="get" className="mb-3 flex items-center rounded-xl border border-gray-200 bg-gray-100 px-3 py-2">
             <SearchIcon className="mr-2 h-3.5 w-3.5 text-gray-400" />
             <input
