@@ -1,8 +1,4 @@
-'use client';
-
 import {
-  ArrowRight,
-  ChevronRight,
   Clock,
   GraduationCap,
   Heart,
@@ -14,9 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
 import { buildCommunityPath } from '@/app/lib/public-content';
-import { subscribeToAlerts } from '@/lib/alert-subscriptions';
 import { homePageLinks } from './links';
 
 const footerColumns = {
@@ -99,36 +93,13 @@ const legalLinks = [
   { label: 'Contact Us', href: homePageLinks.contact },
 ] as const;
 
+const footerColumnLimits: Record<keyof typeof footerColumns, number> = {
+  'Quick Links': 5,
+  'Top Exams': 4,
+  'State Jobs': 4,
+};
+
 export function HomePageFooter() {
-  const [email, setEmail] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [subscriptionMessage, setSubscriptionMessage] = useState('');
-
-  async function handleSubscribe(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!email.trim()) {
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const response = await subscribeToAlerts({
-        email,
-        frequency: 'daily',
-        source: 'homepage-footer',
-      });
-      setIsSubscribed(true);
-      setSubscriptionMessage(response.message || 'Subscription saved.');
-      setEmail('');
-    } catch (error) {
-      setIsSubscribed(false);
-      setSubscriptionMessage(error instanceof Error ? error.message : 'Failed to subscribe.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   return (
     <footer
       id="footer-links"
@@ -222,14 +193,16 @@ export function HomePageFooter() {
                 {title.toUpperCase()}
               </h4>
               <ul className="space-y-2">
-                {links.map((link) => (
+                {links.slice(0, footerColumnLimits[title as keyof typeof footerColumns]).map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
                       className="group flex items-center justify-between text-[12px] text-blue-300 transition-colors hover:text-white"
                     >
                       <span className="flex items-center gap-1.5 transition-transform group-hover:translate-x-0.5">
-                        <ChevronRight size={11} className="text-blue-600 transition-colors group-hover:text-[#e65100]" />
+                        <span className="text-[12px] font-bold text-blue-600 transition-colors group-hover:text-[#e65100]" aria-hidden>
+                          ›
+                        </span>
                         {link.label}
                       </span>
                       {'badge' in link && link.badge && (
@@ -270,41 +243,12 @@ export function HomePageFooter() {
               </p>
             </div>
 
-            <form onSubmit={handleSubscribe} className="flex w-full items-center gap-2 sm:w-auto">
-              {isSubscribed ? (
-                <div className="flex items-center gap-2 rounded-xl border border-green-400/30 bg-green-500/20 px-4 py-3">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
-                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <span className="text-[13px] font-semibold text-green-300">{subscriptionMessage || 'You’re subscribed!'}</span>
-                </div>
-              ) : (
-                <>
-                  <div className="relative flex-1 sm:w-56">
-                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      placeholder="your@email.com"
-                      className="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-8 pr-3 text-[12px] text-white outline-none transition-all placeholder:text-blue-400 focus:border-white/35 focus:bg-white/15"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg"
-                  >
-                    {isSubmitting ? 'Saving...' : 'Subscribe'}
-                    <ArrowRight size={13} />
-                  </button>
-                </>
-              )}
-            </form>
-            {!isSubscribed && subscriptionMessage ? <p className="text-[11px] text-amber-300">{subscriptionMessage}</p> : null}
+            <Link
+              href="/register"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
+            >
+              Get Job Alerts <span aria-hidden>→</span>
+            </Link>
           </div>
         </div>
       </div>

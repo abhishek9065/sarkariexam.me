@@ -180,7 +180,7 @@ function NotificationDropdown({ mobile, onClose }: { mobile?: boolean; onClose: 
 
 export function HomePageNavbarClient({ initialAuthTab }: HomePageNavbarClientProps) {
   const router = useRouter();
-  const { user, isAdmin, isLoggedIn, logout } = useCurrentUser();
+  const { user, isAdmin, isLoggedIn, logout } = useCurrentUser({ defer: true });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(() => Boolean(initialAuthTab));
   const [loginTab, setLoginTab] = useState<AuthTab>(initialAuthTab ?? 'login');

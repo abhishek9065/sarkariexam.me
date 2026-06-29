@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { HomePageNavbarClient } from './HomePageNavbarClient';
 import type { AuthTab } from './HomePageNavbarData';
 import { navLinks } from './HomePageNavbarData';
 import { homePageLinks } from './links';
@@ -59,6 +58,69 @@ function NavIcon({ icon, active }: { icon: (typeof navLinks)[number]['icon']; ac
     >
       {paths[icon]}
     </svg>
+  );
+}
+
+function NavbarActions() {
+  return (
+    <>
+      <div className="hidden items-center gap-2 md:flex">
+        <Link
+          href={homePageLinks.results}
+          className="relative flex h-9 items-center rounded-[9px] border border-white/15 bg-white/10 px-3 text-[12px] font-bold text-white transition-all hover:bg-white/15"
+        >
+          Alerts
+          <span
+            className="ml-2 h-2 w-2 rounded-full border border-[#0d1b6e]"
+            style={{ background: 'linear-gradient(135deg,#ff5252,#c62828)' }}
+            aria-hidden
+          />
+        </Link>
+        <Link
+          href="/login"
+          className="flex items-center rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-2 text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(253,216,53,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e]"
+        >
+          Login / Register
+        </Link>
+      </div>
+
+      <details className="relative md:hidden">
+        <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-[9px] text-white transition-colors hover:bg-white/15 [&::-webkit-details-marker]:hidden">
+          <span className="sr-only">Toggle menu</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+            <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          </svg>
+        </summary>
+        <div className="fixed left-0 right-0 top-[60px] z-40 border-b bg-white p-3 shadow-xl">
+          <form action={homePageLinks.jobs} method="get" className="mb-3 flex items-center rounded-xl border border-gray-200 bg-gray-100 px-3 py-2">
+            <SearchIcon className="mr-2 h-3.5 w-3.5 text-gray-400" />
+            <input
+              name="search"
+              placeholder="Search jobs, results..."
+              className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400"
+            />
+          </form>
+          <div className="grid grid-cols-2 gap-1">
+            {navLinks.map(({ label, href }) => (
+              <Link
+                key={label}
+                href={href}
+                className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:border-orange-100 hover:bg-orange-50 hover:text-orange-700"
+              >
+                <span className="h-1 w-1 shrink-0 rounded-full bg-orange-400" aria-hidden />
+                {label}
+              </Link>
+            ))}
+            <Link
+              href="/login"
+              className="col-span-2 mt-1 rounded-lg border border-orange-200 px-3 py-2.5 text-center text-[13px] font-bold text-orange-700 transition-colors hover:bg-orange-50"
+            >
+              Login / Register
+            </Link>
+          </div>
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -181,7 +243,7 @@ export function HomePageNavbar({ initialAuthTab, activeHref }: HomePageNavbarPro
             </form>
           </div>
 
-          <HomePageNavbarClient initialAuthTab={initialAuthTab} />
+          <NavbarActions />
         </div>
       </div>
 

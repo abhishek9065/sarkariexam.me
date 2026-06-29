@@ -74,10 +74,6 @@ const states = [
   'Uttarakhand',
 ];
 
-const IMPORTANT_WEBSITE_LIMIT = 4;
-const DEPARTMENT_JOB_LIMIT = 6;
-const STATE_LINK_LIMIT = 8;
-
 function toStateSlug(label: string) {
   return label.toLowerCase().replace(/\s+/g, '-');
 }
@@ -113,7 +109,7 @@ export function HomePageQuickLinks() {
             <div className="mt-4">
               <HomePageSectionBox title="Important Websites" headerColor="bg-[#37474f]" viewAllLink={homePageLinks.importantLinks}>
                 <div className="space-y-1 p-3">
-                  {importantWebsites.slice(0, IMPORTANT_WEBSITE_LIMIT).map((website) => (
+                  {importantWebsites.map((website) => (
                     <SafeLink
                       key={website.label}
                       href={toOfficialUrl(website.url)}
@@ -142,7 +138,7 @@ export function HomePageQuickLinks() {
           <div className="lg:col-span-2">
             <HomePageSectionBox title="Jobs by Department" headerColor="bg-[#283593]" viewAllLink={homePageLinks.jobs}>
               <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2">
-                {departmentJobs.slice(0, DEPARTMENT_JOB_LIMIT).map((department) => (
+                {departmentJobs.map((department) => (
                   <Link
                     key={department.label}
                     href={buildJobsPath({ department: department.department })}
@@ -169,7 +165,7 @@ export function HomePageQuickLinks() {
             <div className="mt-4">
               <HomePageSectionBox id="state-jobs" title="State Wise Jobs" headerColor="bg-[#4e342e]" viewAllLink={homePageLinks.states}>
                 <div className="grid grid-cols-2 gap-1.5 p-3 sm:grid-cols-3 md:grid-cols-4">
-                  {states.slice(0, STATE_LINK_LIMIT).map((state) => (
+                  {states.map((state) => (
                     <Link
                       key={state}
                       href={`/states/${toStateSlug(state)}`}

@@ -1,20 +1,20 @@
-'use client';
-import { useEffect } from 'react';
-
 export function PwaRegister() {
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(
-          function(registration) {
-            console.log('Service Worker registration successful with scope: ', registration.scope);
-          },
-          function(err) {
-            console.log('Service Worker registration failed: ', err);
-          }
-        );
-      });
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    var register = function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); };
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(register, { timeout: 3000 });
+    } else {
+      window.setTimeout(register, 3000);
     }
-  }, []);
-  return null;
+  });
+}
+        `.trim(),
+      }}
+    />
+  );
 }

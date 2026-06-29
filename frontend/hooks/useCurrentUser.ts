@@ -25,11 +25,16 @@ function readCookieValue(name: string) {
   return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : null;
 }
 
-export function useCurrentUser() {
+interface UseCurrentUserOptions {
+  defer?: boolean;
+}
+
+export function useCurrentUser(options: UseCurrentUserOptions = {}) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const apiBase = resolvePublicApiBase();
+  const defer = Boolean(options.defer);
 
   const checkUser = useCallback(async () => {
     try {
@@ -61,8 +66,23 @@ export function useCurrentUser() {
   }, [apiBase]);
 
   useEffect(() => {
-    checkUser();
-  }, [checkUser]);
+    if (!defer) {
+      checkUser();
+      return;
+    }
+
+    const runCheck = () => {
+      checkUser();
+    };
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(runCheck, { timeout: 3000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timeout = globalThis.setTimeout(runCheck, 2500);
+    return () => globalThis.clearTimeout(timeout);
+  }, [checkUser, defer]);
 
   const logout = async () => {
     try {

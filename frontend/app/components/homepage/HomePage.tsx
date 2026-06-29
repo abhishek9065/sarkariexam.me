@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   BadgeCheck,
-  Bell,
   Briefcase,
   ChevronRight,
   Clock,
@@ -19,7 +18,6 @@ import { PublicSiteShell } from '@/app/components/public-site/PublicSiteShell';
 import { buildJobsPath } from '@/app/lib/public-content';
 import { getHomepageSections } from '@/lib/content-api';
 import { HomePageLinkItem, HomePageSectionBox } from './HomePageSectionBox';
-import { HomePageQuickLinks } from './HomePageQuickLinks';
 import { homePageLinks } from './links';
 
 type AuthTab = 'login' | 'register';
@@ -88,28 +86,10 @@ const featured = [
   },
 ] as const;
 
-const notifications = [
-  { text: 'SSC CGL 2026 Notification Released - Verify official deadline', tag: 'new' },
-  { text: 'UPSC CSE Prelims 2026 - Admit Card Available Now', tag: 'hot' },
-  { text: 'RRB Group D 2026 - Deadline update available on official notice', tag: 'update' },
-  { text: 'IBPS PO 2026 - Online application notice available', tag: 'new' },
-  { text: 'Bihar BPSC 70th CCE Result Declared - Check Now', tag: 'hot' },
-  { text: 'SBI Clerk 2026 - 8,773 Vacancies Open Now', tag: 'new' },
-] as const;
-
-const upcomingExams = [
-  { exam: 'UPSC CSE Prelims 2026', date: 'Official schedule', status: 'Verify' },
-  { exam: 'SSC CGL Tier 1 2026', date: 'Official schedule', status: 'Verify' },
-  { exam: 'IBPS PO Prelims 2026', date: 'Official schedule', status: 'Verify' },
-  { exam: 'NDA 2026 (II) Exam', date: 'Official schedule', status: 'Verify' },
-  { exam: 'RRB Group D CBT 2026', date: 'Official schedule', status: 'Verify' },
-] as const;
-
-const PRIMARY_SECTION_ITEM_LIMIT = 6;
-const PRIORITY_SECTION_ITEM_LIMIT = 5;
-const SECONDARY_SECTION_ITEM_LIMIT = 4;
-const LOW_PRIORITY_SECTION_ITEM_LIMIT = 3;
-const NOTIFICATION_ITEM_LIMIT = 3;
+const PRIMARY_SECTION_ITEM_LIMIT = 4;
+const PRIORITY_SECTION_ITEM_LIMIT = 4;
+const SECONDARY_SECTION_ITEM_LIMIT = 2;
+const LOW_PRIORITY_SECTION_ITEM_LIMIT = 2;
 
 const linkSections = {
   jobs: [
@@ -425,87 +405,6 @@ function FeaturedSpotlight() {
   );
 }
 
-function NotificationsPanel() {
-  const tagMap = {
-    new: 'bg-gradient-to-r from-emerald-500 to-emerald-600',
-    hot: 'bg-gradient-to-r from-red-500 to-rose-600',
-    update: 'bg-gradient-to-r from-sky-500 to-blue-600',
-  } as const;
-
-  return (
-    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition-shadow hover:shadow-md dark:bg-[#0f172a] dark:ring-white/9">
-      <div className="absolute inset-x-0 top-0 h-0.75 bg-[linear-gradient(90deg,#ea580c,#f59e0b_60%,transparent)]" />
-      <div className="relative flex items-end justify-between gap-3 border-b border-gray-100 px-4 pb-3 pt-3.5 dark:border-white/7">
-        <div className="pointer-events-none absolute -top-3 right-2 select-none text-[56px] font-black leading-none tracking-normal text-[#ea580c] opacity-[0.065] dark:opacity-[0.10]">
-          Alerts
-        </div>
-        <div className="relative z-10">
-          <div className="mb-0.5 flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
-            </span>
-            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.14em] text-[#ea580c]">Live Feed</div>
-          </div>
-          <h2 className="flex items-center gap-1.5 text-[14.5px] font-extrabold tracking-normal text-gray-900 dark:text-white">
-            <Bell size={13} className="text-orange-500" />
-            Important Notifications
-          </h2>
-        </div>
-        <Link href={homePageLinks.results} className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-[10.5px] font-extrabold tracking-[0.04em] text-[#ea580c] transition-all hover:gap-1.5">
-          VIEW ALL <ChevronRight size={11} />
-        </Link>
-      </div>
-
-      <div className="divide-y divide-gray-100/80 dark:divide-white/5">
-        {notifications.slice(0, NOTIFICATION_ITEM_LIMIT).map((item, index) => (
-          <div
-            key={`${item.text}-${index}`}
-            className="group flex items-start gap-2.5 px-3.5 py-2.5 transition hover:bg-linear-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/6"
-          >
-            <span className="mt-1.75 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400 transition group-hover:scale-125" />
-            <p className="flex-1 text-[12.5px] font-semibold leading-snug text-gray-800 transition group-hover:text-[#c2410c] dark:text-gray-100 dark:group-hover:text-orange-300">
-              {item.text}
-            </p>
-            <span className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold text-white shadow-sm ring-1 ring-white/30 ${tagMap[item.tag]} ${item.tag !== 'update' ? 'animate-pulse' : ''}`}>
-              {item.tag === 'hot' ? 'HOT' : item.tag.toUpperCase()}
-            </span>
-            <SafeLink
-              href={homePageLinks.results}
-              aria-label={`Open notification: ${item.text}`}
-              className="mt-0.5 rounded-md p-1 text-gray-300 opacity-0 transition hover:bg-orange-50 hover:text-orange-600 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
-            >
-              <ArrowRight size={11} />
-            </SafeLink>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-auto border-t border-gray-100 bg-linear-to-br from-orange-50/70 to-amber-50/40 px-3.5 py-3 dark:border-white/7 dark:from-orange-950/15 dark:to-amber-950/10">
-        <div className="mb-2.5 flex items-center gap-1.5">
-          <Clock size={11} className="text-orange-500" />
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-400">Upcoming Exam Dates</span>
-        </div>
-        <div className="space-y-1">
-          {upcomingExams.slice(0, NOTIFICATION_ITEM_LIMIT).map((exam) => (
-            <div key={exam.exam} className="-mx-2 flex items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/70 dark:hover:bg-white/4">
-              <SafeLink href={buildJobsPath({ search: exam.exam })} className="min-w-0 truncate text-[12px] font-semibold text-gray-700 transition hover:text-orange-600 hover:underline hover:underline-offset-2 dark:text-gray-300 dark:hover:text-orange-300">
-                {exam.exam}
-              </SafeLink>
-              <div className="ml-2 flex shrink-0 items-center gap-1.5">
-                <span className="text-[10.5px] font-bold text-gray-600 dark:text-gray-400">{exam.date}</span>
-                <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-extrabold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                  {exam.status}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function MainGrid({ sections }: { sections: HomepageSections }) {
   const jobs = sections.jobs || [];
   const results = sections.results || [];
@@ -541,17 +440,14 @@ function MainGrid({ sections }: { sections: HomepageSections }) {
         </div>
       </div>
 
-      <HomePageQuickLinks />
-
       <div className="mx-auto max-w-6xl px-4 pb-8">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <HomePageSectionBox title="Board Results" headerColor="bg-[#4e342e]" kicker="Boards" count={16} viewAllLink={homePageLinks.boardResults}>
             {renderItems(linkSections.board, homePageLinks.boardResults, LOW_PRIORITY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
           <HomePageSectionBox title="Scholarship / Yojana" headerColor="bg-[#1b5e20]" kicker="Schemes" count={14} viewAllLink={homePageLinks.scholarship}>
             {renderItems(linkSections.scholarship, homePageLinks.scholarship, LOW_PRIORITY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
-          <NotificationsPanel />
         </div>
       </div>
     </>
