@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { AuthTab } from './HomePageNavbarData';
 import { navLinks } from './HomePageNavbarData';
 import { homePageLinks } from './links';
@@ -75,12 +76,12 @@ function NavbarActions() {
             aria-hidden
           />
         </a>
-        <a
+        <Link
           href="/login"
           className="flex items-center rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-2 text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(253,216,53,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e]"
         >
           Login / Register
-        </a>
+        </Link>
       </div>
 
       <details className="relative md:hidden">
@@ -110,12 +111,12 @@ function NavbarActions() {
                 {label}
               </a>
             ))}
-            <a
+            <Link
               href="/login"
               className="col-span-2 mt-1 rounded-lg border border-orange-200 px-3 py-2.5 text-center text-[13px] font-bold text-orange-700 transition-colors hover:bg-orange-50"
             >
               Login / Register
-            </a>
+            </Link>
           </div>
         </div>
       </details>
@@ -123,7 +124,7 @@ function NavbarActions() {
   );
 }
 
-export function HomePageNavbar({ initialAuthTab, activeHref }: HomePageNavbarProps) {
+export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
   return (
     <header className="sticky top-0 z-50">
       <div

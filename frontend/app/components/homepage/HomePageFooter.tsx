@@ -9,6 +9,7 @@ import {
   Shield,
   Users,
 } from 'lucide-react';
+import Link from 'next/link';
 import { buildCommunityPath } from '@/app/lib/public-content';
 import { homePageLinks } from './links';
 
@@ -242,12 +243,12 @@ export function HomePageFooter() {
               </p>
             </div>
 
-            <a
+            <Link
               href="/register"
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
             >
               Get Job Alerts <span aria-hidden>→</span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>
