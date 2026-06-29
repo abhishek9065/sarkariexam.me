@@ -105,6 +105,12 @@ const upcomingExams = [
   { exam: 'RRB Group D CBT 2026', date: 'Official schedule', status: 'Verify' },
 ] as const;
 
+const PRIMARY_SECTION_ITEM_LIMIT = 6;
+const PRIORITY_SECTION_ITEM_LIMIT = 5;
+const SECONDARY_SECTION_ITEM_LIMIT = 4;
+const LOW_PRIORITY_SECTION_ITEM_LIMIT = 3;
+const NOTIFICATION_ITEM_LIMIT = 3;
+
 const linkSections = {
   jobs: [
     ['SSC CGL 2026 - Combined Graduate Level Exam', 'Staff Selection Commission', '15 May', 'hot', '14,582', 'Graduate'],
@@ -205,8 +211,8 @@ function itemHref(title: string, fallback: string) {
   return `${fallback}?search=${encodeURIComponent(title.split(' - ')[0])}`;
 }
 
-function renderHomepageCards(items: readonly HomepageCard[]) {
-  return items.map((item) => (
+function renderHomepageCards(items: readonly HomepageCard[], limit: number) {
+  return items.slice(0, limit).map((item) => (
     <HomePageLinkItem
       key={item.id}
       href={item.href}
@@ -220,8 +226,8 @@ function renderHomepageCards(items: readonly HomepageCard[]) {
   ));
 }
 
-function renderItems(items: readonly LinkTuple[], href: string) {
-  return items.map(([title, org, , tag, postCount, qualification]) => (
+function renderItems(items: readonly LinkTuple[], href: string, limit: number) {
+  return items.slice(0, limit).map(([title, org, , tag, postCount, qualification]) => (
     <HomePageLinkItem
       key={`${title}-${org}`}
       href={itemHref(title, href)}
@@ -452,7 +458,7 @@ function NotificationsPanel() {
       </div>
 
       <div className="divide-y divide-gray-100/80 dark:divide-white/5">
-        {notifications.map((item, index) => (
+        {notifications.slice(0, NOTIFICATION_ITEM_LIMIT).map((item, index) => (
           <div
             key={`${item.text}-${index}`}
             className="group flex items-start gap-2.5 px-3.5 py-2.5 transition hover:bg-linear-to-r hover:from-orange-50/60 hover:to-transparent dark:hover:from-orange-500/6"
@@ -481,7 +487,7 @@ function NotificationsPanel() {
           <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-400">Upcoming Exam Dates</span>
         </div>
         <div className="space-y-1">
-          {upcomingExams.map((exam) => (
+          {upcomingExams.slice(0, NOTIFICATION_ITEM_LIMIT).map((exam) => (
             <div key={exam.exam} className="-mx-2 flex items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/70 dark:hover:bg-white/4">
               <SafeLink href={buildJobsPath({ search: exam.exam })} className="min-w-0 truncate text-[12px] font-semibold text-gray-700 transition hover:text-orange-600 hover:underline hover:underline-offset-2 dark:text-gray-300 dark:hover:text-orange-300">
                 {exam.exam}
@@ -512,23 +518,25 @@ function MainGrid({ sections }: { sections: HomepageSections }) {
       <div className="mx-auto max-w-6xl space-y-4 px-4 py-5">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <HomePageSectionBox title="Latest Jobs / Online Form" headerColor="bg-[#d32f2f]" kicker="Recruitment" count={jobs.length} viewAllLink={homePageLinks.jobs}>
-            {renderHomepageCards(jobs)}
+            {renderHomepageCards(jobs, PRIMARY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
           <HomePageSectionBox title="Latest Result" headerColor="bg-[#1565c0]" kicker="Results" count={results.length} viewAllLink={homePageLinks.results}>
-            {renderHomepageCards(results)}
+            {renderHomepageCards(results, PRIMARY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
           <HomePageSectionBox title="Latest Admit Card" headerColor="bg-[#6a1b9a]" kicker="Hall Tickets" count={admitCards.length} viewAllLink={homePageLinks.admitCards}>
-            {renderHomepageCards(admitCards)}
+            {renderHomepageCards(admitCards, PRIMARY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <HomePageSectionBox title="Answer Key" headerColor="bg-[#00695c]" kicker="Answers" count={answerKeys.length} viewAllLink={homePageLinks.answerKey}>
-            {renderHomepageCards(answerKeys)}
+            {renderHomepageCards(answerKeys, PRIORITY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
-          <NotificationsPanel />
+          <HomePageSectionBox title="Latest Syllabus" headerColor="bg-[#283593]" kicker="Study Material" count={22} viewAllLink={homePageLinks.syllabus}>
+            {renderItems(linkSections.syllabus, homePageLinks.syllabus, PRIORITY_SECTION_ITEM_LIMIT)}
+          </HomePageSectionBox>
           <HomePageSectionBox title="Latest Admission" headerColor="bg-[#ad1457]" kicker="Admissions" count={admissions.length} viewAllLink={homePageLinks.admissions}>
-            {renderHomepageCards(admissions)}
+            {renderHomepageCards(admissions, SECONDARY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
         </div>
       </div>
@@ -537,15 +545,13 @@ function MainGrid({ sections }: { sections: HomepageSections }) {
 
       <div className="mx-auto max-w-6xl px-4 pb-8">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <HomePageSectionBox title="Latest Syllabus" headerColor="bg-[#283593]" kicker="Study Material" count={22} viewAllLink={homePageLinks.syllabus}>
-            {renderItems(linkSections.syllabus, homePageLinks.syllabus)}
-          </HomePageSectionBox>
           <HomePageSectionBox title="Board Results" headerColor="bg-[#4e342e]" kicker="Boards" count={16} viewAllLink={homePageLinks.boardResults}>
-            {renderItems(linkSections.board, homePageLinks.boardResults)}
+            {renderItems(linkSections.board, homePageLinks.boardResults, LOW_PRIORITY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
           <HomePageSectionBox title="Scholarship / Yojana" headerColor="bg-[#1b5e20]" kicker="Schemes" count={14} viewAllLink={homePageLinks.scholarship}>
-            {renderItems(linkSections.scholarship, homePageLinks.scholarship)}
+            {renderItems(linkSections.scholarship, homePageLinks.scholarship, LOW_PRIORITY_SECTION_ITEM_LIMIT)}
           </HomePageSectionBox>
+          <NotificationsPanel />
         </div>
       </div>
     </>
