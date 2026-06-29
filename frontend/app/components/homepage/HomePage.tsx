@@ -3,16 +3,13 @@ import {
   BadgeCheck,
   Bell,
   Briefcase,
-  CalendarDays,
   ChevronRight,
   Clock,
   ClipboardList,
   FileCheck,
-  GraduationCap,
   Search,
   ShieldCheck,
   TrendingUp,
-  Users,
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -394,13 +391,16 @@ function FeaturedSpotlight() {
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
-                    <Users size={10} /> {item.posts} Posts
+                    <span className="h-1.5 w-1.5 rounded-full bg-current opacity-55" aria-hidden /> {item.posts} Posts
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
-                    <GraduationCap size={10} /> {item.qual}
+                    <span className="text-[9px] font-black leading-none opacity-65" aria-hidden>
+                      Q
+                    </span>{' '}
+                    {item.qual}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
-                    <CalendarDays size={10} /> {item.lastDate}
+                    <span className="h-1.5 w-1.5 rounded-full bg-current opacity-55" aria-hidden /> {item.lastDate}
                   </span>
                 </div>
 

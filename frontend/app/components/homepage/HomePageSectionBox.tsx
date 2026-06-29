@@ -1,4 +1,4 @@
-import { ArrowUpRight, Calendar, ChevronRight, GraduationCap, Users } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SafeLink } from '@/app/components/public-site/SafeLink';
@@ -179,13 +179,15 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
           <span className="max-w-[180px] truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">{org}</span>
           {postCount ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-gray-600 dark:bg-white/5 dark:text-gray-300">
-              <Users size={9} className="shrink-0" />
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-55" aria-hidden />
               {postCount}
             </span>
           ) : null}
           {qualification ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold text-gray-600 dark:bg-white/5 dark:text-gray-300">
-              <GraduationCap size={9} />
+              <span className="text-[9px] font-black leading-none opacity-65" aria-hidden>
+                Q
+              </span>
               {qualification}
             </span>
           ) : null}
@@ -194,15 +196,15 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
 
       <div className="mt-0.5 flex shrink-0 flex-col items-end gap-0.5">
         <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10.5px] font-bold tracking-[0.02em] text-gray-500 transition-colors group-hover/item:text-orange-600 dark:text-gray-400 dark:group-hover/item:text-orange-300">
-          <Calendar size={9} />
+          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-55" aria-hidden />
           {date}
         </span>
         <SafeLink
           href={href}
           aria-label={`Open ${title}`}
-          className="rounded-md p-1 text-gray-300 opacity-0 transition-all hover:bg-orange-50 hover:text-orange-600 group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:opacity-100 dark:text-gray-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+          className="rounded-md px-1.5 py-0.5 text-[12px] font-extrabold leading-none text-gray-300 opacity-0 transition-all hover:bg-orange-50 hover:text-orange-600 group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:opacity-100 dark:text-gray-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
         >
-          <ArrowUpRight size={12} />
+          <span aria-hidden>↗</span>
         </SafeLink>
       </div>
     </div>
