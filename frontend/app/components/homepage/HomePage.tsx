@@ -240,15 +240,16 @@ function renderItems(items: readonly LinkTuple[], href: string) {
 
 function Hero() {
   return (
-    <section
-      className="relative overflow-hidden"
-      style={{
-        background:
-          'radial-gradient(1100px 520px at 8% -10%, #1e3a8a 0%, transparent 55%),radial-gradient(900px 440px at 92% 0%, #6d28d9 0%, transparent 55%),radial-gradient(700px 400px at 50% 120%, #0ea5e9 0%, transparent 50%),linear-gradient(135deg, #0b1437 0%, #0a1230 55%, #0b1024 100%)',
-      }}
-    >
+    <section className="relative overflow-hidden bg-[linear-gradient(135deg,#0b1437_0%,#0a1230_58%,#0b1024_100%)]">
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.045]"
+        className="pointer-events-none absolute inset-0 hidden sm:block"
+        style={{
+          background:
+            'radial-gradient(1100px 520px at 8% -10%, #1e3a8a 0%, transparent 55%),radial-gradient(900px 440px at 92% 0%, #6d28d9 0%, transparent 55%),radial-gradient(700px 400px at 50% 120%, #0ea5e9 0%, transparent 50%)',
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 hidden opacity-[0.045] sm:block"
         style={{
           backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)',
           backgroundSize: '32px 32px',
@@ -262,10 +263,10 @@ function Hero() {
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(135deg,#fde68a,#fbbf24)] px-2.5 py-1 text-[9.5px] font-extrabold tracking-[0.08em] text-[#0b1437]">
             <Zap size={9} fill="currentColor" /> #1 GOVT JOBS PORTAL
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 sm:backdrop-blur">
             <ShieldCheck size={10} className="text-emerald-300" /> Verified Daily
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 sm:backdrop-blur">
             <BadgeCheck size={10} className="text-sky-300" /> All India - 28 States
           </span>
         </div>
@@ -301,7 +302,7 @@ function Hero() {
         </div>
 
         <form action={homePageLinks.jobs} className="mt-6 flex max-w-2xl gap-2">
-          <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/9 px-4 py-3.5 shadow-[0_4px_28px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur transition focus-within:ring-2 focus-within:ring-yellow-400/60">
+          <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/9 px-4 py-3.5 shadow-[0_1px_10px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] transition focus-within:ring-2 focus-within:ring-yellow-400/60 sm:shadow-[0_4px_28px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] sm:backdrop-blur">
             <Search size={16} className="shrink-0 text-blue-200/70" />
             <input
               name="search"
@@ -311,7 +312,7 @@ function Hero() {
           </div>
           <button
             type="submit"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[linear-gradient(135deg,#fde68a,#f59e0b)] px-5 py-3.5 text-[13px] font-extrabold text-[#0b1437] shadow-[0_8px_28px_rgba(245,158,11,0.42),0_2px_8px_rgba(245,158,11,0.22)] transition hover:brightness-110 active:scale-95"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[linear-gradient(135deg,#fde68a,#f59e0b)] px-5 py-3.5 text-[13px] font-extrabold text-[#0b1437] shadow-[0_2px_10px_rgba(245,158,11,0.26)] transition hover:brightness-110 active:scale-95 sm:shadow-[0_8px_28px_rgba(245,158,11,0.42),0_2px_8px_rgba(245,158,11,0.22)]"
           >
             Search <ArrowRight size={14} />
           </button>
