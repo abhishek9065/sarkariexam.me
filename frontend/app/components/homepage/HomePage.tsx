@@ -304,10 +304,10 @@ function Hero() {
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(135deg,#fde68a,#fbbf24)] px-2.5 py-1 text-[9.5px] font-extrabold tracking-[0.08em] text-[#0b1437]">
             <SvgIcon name="zap" size={9} fill="currentColor" /> #1 GOVT JOBS PORTAL
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/90 ring-1 ring-white/20">
             <SvgIcon name="shield-check" size={10} className="text-emerald-300" /> Verified Daily
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/90 ring-1 ring-white/20">
             <SvgIcon name="badge-check" size={10} className="text-sky-300" /> All India - 28 States
           </span>
         </div>
@@ -322,7 +322,7 @@ function Hero() {
               <br />
               <span className="text-white/85">portal - updated daily.</span>
             </h1>
-            <p className="mt-3 max-w-lg text-[13.5px] font-medium leading-6 text-blue-100/60">
+            <p className="mt-3 max-w-lg text-[13.5px] font-medium leading-6 text-blue-100/85">
               Govt job notifications, admit cards, results, answer keys & syllabi - all in one place, always fresh.
             </p>
           </div>
@@ -335,7 +335,7 @@ function Hero() {
                 </div>
                 <div className="leading-tight">
                   <div className="text-[15px] font-extrabold tabular-nums text-white">{value}</div>
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-white/55">{label}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-white/75">{label}</div>
                 </div>
               </div>
             ))}
@@ -344,11 +344,11 @@ function Hero() {
 
         <form action={homePageLinks.jobs} className="mt-6 flex max-w-2xl gap-2">
           <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/9 px-4 py-3.5 transition focus-within:ring-2 focus-within:ring-yellow-400/60 lg:shadow-[0_4px_20px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <SvgIcon name="search" size={16} className="shrink-0 text-blue-200/70" />
+            <SvgIcon name="search" size={16} className="shrink-0 text-blue-100/85" />
             <input
               name="search"
               placeholder="Search jobs, exams, results, admit cards..."
-              className="min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-blue-200/35"
+              className="min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-blue-100/75"
             />
           </div>
           <button
@@ -360,12 +360,12 @@ function Hero() {
         </form>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="shrink-0 text-[11px] font-bold text-white/60">Popular:</span>
+          <span className="shrink-0 text-[11px] font-bold text-white/80">Popular:</span>
           {popular.map((label) => (
             <a
               key={label}
               href={buildJobsPath({ search: label })}
-              className="shrink-0 rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-semibold text-white/65 ring-1 ring-white/14 transition hover:bg-white/14 hover:text-white"
+              className="shrink-0 rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-semibold text-white/85 ring-1 ring-white/14 transition-colors hover:bg-white/14 hover:text-white"
             >
               {label}
             </a>
@@ -384,7 +384,7 @@ function FeaturedSpotlight() {
           <div className="mb-0.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-orange-600 dark:text-orange-400">Closing Soon</div>
           <h2 className="text-[19px] font-extrabold tracking-normal text-gray-900 dark:text-white">Top recruitments this week</h2>
         </div>
-        <a href={homePageLinks.jobs} className="hidden items-center gap-1 text-[12px] font-bold text-gray-500 transition hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-300 sm:inline-flex">
+        <a href={homePageLinks.jobs} className="hidden items-center gap-1 text-[12px] font-bold text-gray-700 transition-colors hover:text-orange-600 dark:text-gray-200 dark:hover:text-orange-300 sm:inline-flex">
           View all <SvgIcon name="chevron-right" size={12} />
         </a>
       </div>
@@ -431,7 +431,7 @@ function FeaturedSpotlight() {
                     {item.title}
                   </SafeLink>
                 </h3>
-                <p className="mt-0.5 text-[12px] font-medium leading-snug text-gray-500 dark:text-gray-400">{item.sub}</p>
+                <p className="mt-0.5 text-[12px] font-medium leading-snug text-gray-700 dark:text-gray-300">{item.sub}</p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
@@ -449,10 +449,15 @@ function FeaturedSpotlight() {
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/7">
-                  <SafeLink href={item.href} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-extrabold transition-all hover:gap-2" style={{ background: `linear-gradient(135deg,${item.accent}18,${item.accent}08)`, border: `1.5px solid ${item.accent}28`, color: item.accent }}>
+                  <SafeLink
+                    href={item.href}
+                    aria-label={`Apply online for ${item.title}`}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-extrabold transition-colors"
+                    style={{ background: `linear-gradient(135deg,${item.accent}18,${item.accent}08)`, border: `1.5px solid ${item.accent}28`, color: item.accent }}
+                  >
                     Apply Online <SvgIcon name="arrow-right" size={12} />
                   </SafeLink>
-                  <span className="max-w-27.5 truncate text-[10.5px] text-gray-400 dark:text-gray-500">{item.org}</span>
+                  <span className="max-w-27.5 truncate text-[10.5px] text-gray-600 dark:text-gray-300">{item.org}</span>
                 </div>
               </div>
             </article>

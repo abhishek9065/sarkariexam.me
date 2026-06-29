@@ -128,7 +128,8 @@ export function HomePageSectionBox({
 
         <SafeLink
           href={viewAllLink}
-          className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold tracking-[0.04em] transition-all hover:gap-1.5"
+          aria-label={`View all ${title}`}
+          className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold tracking-[0.04em] transition-colors"
           style={{ color: hex, background: `${hex}14` }}
         >
           VIEW ALL <span aria-hidden>›</span>
@@ -168,7 +169,7 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="max-w-45 truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">{org}</span>
+          <span className="max-w-45 truncate text-[11px] font-medium text-gray-700 dark:text-gray-300">{org}</span>
           {postCount ? (
             <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-gray-600 dark:bg-white/5 dark:text-gray-300">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-55" aria-hidden />
@@ -187,14 +188,14 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
       </div>
 
       <div className="mt-0.5 flex shrink-0 flex-col items-end gap-0.5">
-        <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10.5px] font-bold tracking-[0.02em] text-gray-500 transition-colors group-hover/item:text-orange-600 dark:text-gray-400 dark:group-hover/item:text-orange-300">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10.5px] font-bold tracking-[0.02em] text-gray-700 transition-colors group-hover/item:text-orange-600 dark:text-gray-300 dark:group-hover/item:text-orange-300">
           <span className="h-1.5 w-1.5 rounded-full bg-current opacity-55" aria-hidden />
           {date}
         </span>
         <SafeLink
           href={href}
           aria-label={`Open ${title}`}
-          className="rounded-md px-1.5 py-0.5 text-[12px] font-extrabold leading-none text-gray-300 opacity-0 transition-all hover:bg-orange-50 hover:text-orange-600 group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:opacity-100 dark:text-gray-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+          className="rounded-md px-1.5 py-0.5 text-[12px] font-extrabold leading-none text-gray-500 opacity-0 transition-[background-color,color,opacity,transform] hover:bg-orange-50 hover:text-orange-600 group-hover/item:translate-x-0 group-hover/item:translate-y-0 group-hover/item:opacity-100 dark:text-gray-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
         >
           <span aria-hidden>↗</span>
         </SafeLink>

@@ -52,7 +52,7 @@ function NavIcon({ icon, active }: { icon: (typeof navLinks)[number]['icon']; ac
       style={
         active
           ? { color: '#ff7043', filter: 'drop-shadow(0 0 4px rgba(230,81,0,0.6))' }
-          : { color: 'rgba(255,255,255,0.65)' }
+          : { color: 'rgba(255,255,255,0.78)' }
       }
     >
       {paths[icon]}
@@ -60,13 +60,13 @@ function NavIcon({ icon, active }: { icon: (typeof navLinks)[number]['icon']; ac
   );
 }
 
-function NavbarActions() {
+function NavbarActions({ activeHref }: { activeHref?: string }) {
   return (
     <>
       <div className="hidden items-center gap-2 md:flex">
         <a
           href={homePageLinks.results}
-          className="relative flex h-9 items-center rounded-[9px] border border-white/15 bg-white/10 px-3 text-[12px] font-bold text-white transition-all hover:bg-white/15"
+          className="relative flex h-9 items-center rounded-[9px] border border-white/15 bg-white/10 px-3 text-[12px] font-bold text-white transition-colors hover:bg-white/15"
         >
           Alerts
           <span
@@ -93,11 +93,11 @@ function NavbarActions() {
         </summary>
         <div className="fixed left-0 right-0 top-15 z-40 border-b bg-white p-3 shadow-xl">
           <form action={homePageLinks.jobs} method="get" className="mb-3 flex items-center rounded-xl border border-gray-200 bg-gray-100 px-3 py-2">
-            <SearchIcon className="mr-2 h-3.5 w-3.5 text-gray-400" />
+            <SearchIcon className="mr-2 h-3.5 w-3.5 text-gray-600" />
             <input
               name="search"
               placeholder="Search jobs, results..."
-              className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400"
+              className="flex-1 bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-600"
             />
           </form>
           <div className="grid grid-cols-2 gap-1">
@@ -105,6 +105,7 @@ function NavbarActions() {
               <a
                 key={label}
                 href={href}
+                aria-current={href === activeHref ? 'page' : undefined}
                 className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:border-orange-100 hover:bg-orange-50 hover:text-orange-700"
               >
                 <span className="h-1 w-1 shrink-0 rounded-full bg-orange-400" aria-hidden />
@@ -224,18 +225,18 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
             <form
               action={homePageLinks.jobs}
               method="get"
-              className="flex w-56 items-center rounded-[10px] border border-white/15 bg-white/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-all focus-within:border-white/30"
+              className="flex w-56 items-center rounded-[10px] border border-white/15 bg-white/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors focus-within:border-white/30"
             >
               <SearchIcon className="mr-2 h-3.5 w-3.5 shrink-0 text-blue-300" />
               <input
                 name="search"
                 placeholder="Search jobs, results..."
-                className="flex-1 bg-transparent text-[12px] text-white outline-none placeholder:text-blue-300/70"
+                className="flex-1 bg-transparent text-[12px] text-white outline-none placeholder:text-blue-100/85"
               />
             </form>
           </div>
 
-          <NavbarActions />
+          <NavbarActions activeHref={activeHref} />
         </div>
       </div>
 
@@ -271,11 +272,12 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                 <a
                   key={label}
                   href={href}
+                  aria-current={active ? 'page' : undefined}
                   className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-colors duration-200"
                   style={{ fontSize: '11.5px', fontWeight: active ? 700 : 500 }}
                 >
                   <span
-                    className="absolute inset-x-1 inset-y-1.5 rounded-lg opacity-0 transition-all duration-200 group-hover:opacity-100"
+                    className="absolute inset-x-1 inset-y-1.5 rounded-lg opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                     style={
                       active
                         ? {
@@ -301,7 +303,7 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                     style={
                       active
                         ? { color: '#ffffff', textShadow: '0 0 12px rgba(230,81,0,0.4)' }
-                        : { color: 'rgba(255,255,255,0.72)' }
+                        : { color: 'rgba(255,255,255,0.82)' }
                     }
                   >
                     {label}
@@ -328,7 +330,7 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                     </span>
                   )}
                   <span
-                    className="absolute bottom-0 left-2 right-2 rounded-t-full transition-all duration-300"
+                    className="absolute bottom-0 left-2 right-2 rounded-t-full transition-[opacity,transform] duration-300"
                     style={
                       active
                         ? {
@@ -351,7 +353,7 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                   />
                   {!active ? (
                     <span
-                      className="absolute bottom-0 left-2 right-2 rounded-t-full opacity-0 transition-all duration-200 group-hover:opacity-100"
+                      className="absolute bottom-0 left-2 right-2 rounded-t-full opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                       style={{
                         height: '2px',
                         background: 'linear-gradient(90deg, #e65100, #ff7043)',
@@ -371,7 +373,7 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
               </span>
               <span
                 className="text-[9.5px] font-bold tracking-widest"
-                style={{ color: 'rgba(255,255,255,0.65)' }}
+                style={{ color: 'rgba(255,255,255,0.78)' }}
               >
                 LIVE
               </span>

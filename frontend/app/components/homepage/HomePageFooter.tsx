@@ -186,7 +186,7 @@ export function HomePageFooter() {
                 </div>
                 <div>
                   <div className="text-[13px] font-extrabold leading-none text-white">{stat.value}</div>
-                  <div className="text-[10px] leading-tight text-blue-300">{stat.label}</div>
+                  <div className="text-[10px] leading-tight text-blue-100">{stat.label}</div>
                 </div>
               </div>
             ))}
@@ -237,16 +237,16 @@ export function HomePageFooter() {
 
           {Object.entries(footerColumns).map(([title, links]) => (
             <div key={title} className="lg:col-span-1">
-              <h2 className="mb-4 flex items-center gap-2 text-[12px] font-bold tracking-[0.08em] text-white">
+              <h3 className="mb-4 flex items-center gap-2 text-[12px] font-bold tracking-[0.08em] text-white">
                 <span className="h-0.5 w-4 rounded-full bg-[#e65100]" />
                 {title.toUpperCase()}
-              </h2>
+              </h3>
               <ul className="space-y-2">
                 {links.slice(0, footerColumnLimits[title as keyof typeof footerColumns]).map((link) => (
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="group flex items-center justify-between text-[12px] text-blue-300 transition-colors hover:text-white"
+                      className="group flex items-center justify-between text-[12px] text-blue-100 transition-colors hover:text-white"
                     >
                       <span className="flex items-center gap-1.5 transition-transform group-hover:translate-x-0.5">
                         <span className="text-[12px] font-bold text-yellow-300 transition-colors group-hover:text-white" aria-hidden>
@@ -284,10 +284,10 @@ export function HomePageFooter() {
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e65100]">
                   <SvgIcon name="send" size={10} className="text-white" />
                 </span>
-                <span className="text-[10px] font-extrabold tracking-widest text-[#e65100]">JOB ALERTS</span>
+                <span className="text-[10px] font-extrabold tracking-widest text-orange-200">JOB ALERTS</span>
               </div>
               <p className="mb-0.5 text-[16px] font-extrabold tracking-[-0.02em] text-white">Get Instant Job Alerts</p>
-              <p className="text-[12px] text-blue-300">
+              <p className="text-[12px] text-blue-100">
                 Daily digest with new jobs, results, and admit cards in your inbox.
               </p>
             </div>
@@ -295,7 +295,7 @@ export function HomePageFooter() {
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Avoid pulling next/link into the static homepage shell. */}
             <a
               href="/register"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-linear-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-linear-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-[opacity,transform,box-shadow] hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
             >
               Get Job Alerts <span aria-hidden>→</span>
             </a>
@@ -306,19 +306,19 @@ export function HomePageFooter() {
       <div className="relative border-t border-white/8">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <p className="text-center text-[11px] text-blue-300 sm:text-left">
-              © 2026 <span className="text-blue-300">SarkariExams.me</span>. All rights reserved. Not affiliated with
+            <p className="text-center text-[11px] text-blue-100 sm:text-left">
+              © 2026 <span className="text-blue-100">SarkariExams.me</span>. All rights reserved. Not affiliated with
               any government body.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
               {legalLinks.map((link) => (
-                <a key={link.label} href={link.href} className="text-[11px] text-blue-300 transition-colors hover:text-white">
+                <a key={link.label} href={link.href} className="text-[11px] text-blue-100 transition-colors hover:text-white">
                   {link.label}
                 </a>
               ))}
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-center gap-1 text-[10px] text-blue-300">
+          <div className="mt-2 flex items-center justify-center gap-1 text-[10px] text-blue-100">
             Made with <SvgIcon name="heart" size={10} className="fill-red-400 text-red-400" /> in India · Serving job seekers since 2018
           </div>
         </div>
