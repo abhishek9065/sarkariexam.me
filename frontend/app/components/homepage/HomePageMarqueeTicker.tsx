@@ -1,3 +1,6 @@
+'use client';
+
+import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { homePageLinks } from './links';
@@ -20,7 +23,10 @@ export function HomePageMarqueeTicker() {
     <div className="overflow-hidden border-b border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#0d1321]">
       <div className="mx-auto flex h-9 max-w-6xl items-center">
         <div className="flex self-stretch shrink-0 items-center gap-1.5 bg-[linear-gradient(135deg,#e65100,#bf360c)] px-3">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-yellow-200 shadow-[0_0_8px_rgba(254,240,138,0.7)]" />
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-300 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-200" />
+          </span>
           <span className="whitespace-nowrap text-[9.5px] font-extrabold tracking-[0.12em] text-white">LIVE</span>
         </div>
 
@@ -45,7 +51,7 @@ export function HomePageMarqueeTicker() {
           href={homePageLinks.jobs}
           className="hidden self-stretch shrink-0 items-center gap-0.5 border-l border-gray-100 px-3 text-[11px] font-bold tracking-normal text-orange-600 transition hover:bg-orange-50 dark:border-white/10 dark:text-orange-400 dark:hover:bg-orange-950/30 sm:flex"
         >
-          All Updates <span aria-hidden>›</span>
+          All Updates <ChevronRight size={11} />
         </Link>
       </div>
       <style jsx>{`

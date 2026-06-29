@@ -1,8 +1,21 @@
+import {
+  ArrowRight,
+  BadgeCheck,
+  Briefcase,
+  ChevronRight,
+  Clock,
+  ClipboardList,
+  FileCheck,
+  Search,
+  ShieldCheck,
+  TrendingUp,
+  Zap,
+} from 'lucide-react';
+
 import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { PublicSiteShell } from '@/app/components/public-site/PublicSiteShell';
 import { buildJobsPath } from '@/app/lib/public-content';
 import { getHomepageSections } from '@/lib/content-api';
-import type { CSSProperties, ReactNode } from 'react';
 import { HomePageLinkItem, HomePageSectionBox } from './HomePageSectionBox';
 import { homePageLinks } from './links';
 
@@ -12,91 +25,11 @@ interface HomePageProps {
   initialAuthTab?: AuthTab;
 }
 
-type IconName =
-  | 'arrow-right'
-  | 'badge-check'
-  | 'briefcase'
-  | 'chevron-right'
-  | 'clipboard-list'
-  | 'clock'
-  | 'file-check'
-  | 'search'
-  | 'shield-check'
-  | 'trending-up'
-  | 'zap';
-
-function SvgIcon({
-  name,
-  size = 16,
-  className,
-  style,
-  fill = 'none',
-}: {
-  name: IconName;
-  size?: number;
-  className?: string;
-  style?: CSSProperties;
-  fill?: string;
-}) {
-  const commonProps = {
-    fill,
-    stroke: 'currentColor',
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    strokeWidth: '2',
-  };
-
-  const paths: Record<IconName, ReactNode> = {
-    'arrow-right': <path {...commonProps} d="M5 12h14m-6-6 6 6-6 6" />,
-    'badge-check': (
-      <>
-        <path {...commonProps} d="M8.8 3.3 12 2l3.2 1.3 3.4.3 1.8 2.9 1.3 3.2L20.4 13l-.3 3.4-2.9 1.8-3.2 1.3-3.2-1.3-3.4-.3-1.8-2.9-1.3-3.2L5.6 8.5l.3-3.4 2.9-1.8Z" />
-        <path {...commonProps} d="m9 12 2 2 4-5" />
-      </>
-    ),
-    briefcase: <path {...commonProps} d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-9 0h12v12H4V7h4Zm0 5h8" />,
-    'chevron-right': <path {...commonProps} d="m9 18 6-6-6-6" />,
-    'clipboard-list': (
-      <>
-        <path {...commonProps} d="M9 4h6l1 2h3v15H5V6h3l1-2Z" />
-        <path {...commonProps} d="M9 11h6M9 15h6" />
-      </>
-    ),
-    clock: (
-      <>
-        <circle {...commonProps} cx="12" cy="12" r="9" />
-        <path {...commonProps} d="M12 7v5l3 2" />
-      </>
-    ),
-    'file-check': (
-      <>
-        <path {...commonProps} d="M6 3h8l4 4v14H6V3Zm8 0v5h5" />
-        <path {...commonProps} d="m9 15 2 2 4-5" />
-      </>
-    ),
-    search: <path {...commonProps} d="m21 21-4.35-4.35m1.35-5.15a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />,
-    'shield-check': (
-      <>
-        <path {...commonProps} d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6l-7-3Z" />
-        <path {...commonProps} d="m9 12 2 2 4-5" />
-      </>
-    ),
-    'trending-up': <path {...commonProps} d="m3 17 6-6 4 4 7-7m-5 0h5v5" />,
-    zap: <path {...commonProps} d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z" />,
-  };
-
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" width={size} height={size} className={className} style={style}>
-      {paths[name]}
-    </svg>
-  );
-}
-
 const stats = [
-  { icon: 'briefcase', value: '12,450', label: 'Active Jobs', color: '#fbbf24' },
-  { icon: 'file-check', value: '128', label: 'Admit Cards', color: '#7dd3fc' },
-  { icon: 'clipboard-list', value: '89', label: 'New Results', color: '#86efac' },
-  { icon: 'trending-up', value: '342', label: 'Added Today', color: '#f9a8d4' },
+  { icon: Briefcase, value: '12,450', label: 'Active Jobs', color: '#fbbf24' },
+  { icon: FileCheck, value: '128', label: 'Admit Cards', color: '#7dd3fc' },
+  { icon: ClipboardList, value: '89', label: 'New Results', color: '#86efac' },
+  { icon: TrendingUp, value: '342', label: 'Added Today', color: '#f9a8d4' },
 ] as const;
 
 const popular = ['SSC CGL 2026', 'UPSC CSE', 'IBPS PO', 'RRB Group D', 'SBI Clerk'];
@@ -310,13 +243,13 @@ function Hero() {
       <div className="relative mx-auto max-w-6xl px-4 pb-8 pt-8">
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(135deg,#fde68a,#fbbf24)] px-2.5 py-1 text-[9.5px] font-extrabold tracking-[0.08em] text-[#0b1437]">
-            <SvgIcon name="zap" size={9} fill="currentColor" /> #1 GOVT JOBS PORTAL
+            <Zap size={9} fill="currentColor" /> #1 GOVT JOBS PORTAL
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20">
-            <SvgIcon name="shield-check" size={10} className="text-emerald-300" /> Verified Daily
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 sm:backdrop-blur">
+            <ShieldCheck size={10} className="text-emerald-300" /> Verified Daily
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20">
-            <SvgIcon name="badge-check" size={10} className="text-sky-300" /> All India - 28 States
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/9 px-2.5 py-1 text-[9.5px] font-bold text-white/80 ring-1 ring-white/20 sm:backdrop-blur">
+            <BadgeCheck size={10} className="text-sky-300" /> All India - 28 States
           </span>
         </div>
 
@@ -335,15 +268,15 @@ function Hero() {
             </p>
           </div>
 
-          <div className="hidden shrink-0 grid-cols-2 gap-2 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-3 ring-1 ring-white/14 lg:grid">
-            {stats.map(({ icon, value, label, color }) => (
+          <div className="hidden shrink-0 grid-cols-2 gap-2 rounded-2xl bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.03))] p-3 ring-1 ring-white/14 backdrop-blur lg:grid">
+            {stats.map(({ icon: Icon, value, label, color }) => (
               <div key={label} className="flex items-center gap-2.5 rounded-xl bg-white/4 px-2.5 py-2 ring-1 ring-white/8">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl" style={{ background: `${color}20` }}>
-                  <SvgIcon name={icon} size={14} style={{ color }} />
+                  <Icon size={14} style={{ color }} />
                 </div>
                 <div className="leading-tight">
                   <div className="text-[15px] font-extrabold tabular-nums text-white">{value}</div>
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-white/55">{label}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-white/40">{label}</div>
                 </div>
               </div>
             ))}
@@ -351,8 +284,8 @@ function Hero() {
         </div>
 
         <form action={homePageLinks.jobs} className="mt-6 flex max-w-2xl gap-2">
-          <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/9 px-4 py-3.5 shadow-[0_1px_10px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] transition focus-within:ring-2 focus-within:ring-yellow-400/60 sm:shadow-[0_4px_28px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <SvgIcon name="search" size={16} className="shrink-0 text-blue-200/70" />
+          <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/20 bg-white/9 px-4 py-3.5 shadow-[0_1px_10px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.06)] transition focus-within:ring-2 focus-within:ring-yellow-400/60 sm:shadow-[0_4px_28px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)] sm:backdrop-blur">
+            <Search size={16} className="shrink-0 text-blue-200/70" />
             <input
               name="search"
               placeholder="Search jobs, exams, results, admit cards..."
@@ -363,12 +296,12 @@ function Hero() {
             type="submit"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[linear-gradient(135deg,#fde68a,#f59e0b)] px-5 py-3.5 text-[13px] font-extrabold text-[#0b1437] shadow-[0_2px_10px_rgba(245,158,11,0.26)] transition hover:brightness-110 active:scale-95 sm:shadow-[0_8px_28px_rgba(245,158,11,0.42),0_2px_8px_rgba(245,158,11,0.22)]"
           >
-            Search <SvgIcon name="arrow-right" size={14} />
+            Search <ArrowRight size={14} />
           </button>
         </form>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="shrink-0 text-[11px] font-bold text-white/60">Popular:</span>
+          <span className="shrink-0 text-[11px] font-bold text-white/40">Popular:</span>
           {popular.map((label) => (
             <a
               key={label}
@@ -393,7 +326,7 @@ function FeaturedSpotlight() {
           <h2 className="text-[19px] font-extrabold tracking-normal text-gray-900 dark:text-white">Top recruitments this week</h2>
         </div>
         <a href={homePageLinks.jobs} className="hidden items-center gap-1 text-[12px] font-bold text-gray-500 transition hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-300 sm:inline-flex">
-          View all <SvgIcon name="chevron-right" size={12} />
+          View all <ChevronRight size={12} />
         </a>
       </div>
 
@@ -405,7 +338,7 @@ function FeaturedSpotlight() {
           return (
             <article
               key={item.title}
-              className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/80 transition-shadow duration-300 hover:shadow-2xl hover:ring-2 hover:ring-orange-300 dark:bg-[#0f172a] dark:ring-white/9 dark:hover:ring-orange-500/40"
+              className="group relative overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:ring-2 hover:ring-orange-300 dark:bg-[#0f172a] dark:ring-white/9 dark:hover:ring-orange-500/40"
             >
               <div className="absolute inset-x-0 top-0 h-1.5" style={{ background: `linear-gradient(90deg, ${item.accent}, ${item.accent}55 65%, transparent)` }} />
               <div className="absolute inset-x-0 top-1.5 h-0.5 bg-gray-100 dark:bg-white/4">
@@ -422,7 +355,7 @@ function FeaturedSpotlight() {
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold" style={{ color: isUrgent ? '#dc2626' : '#d97706', background: isUrgent ? '#fef2f2' : '#fffbeb' }}>
-                      <SvgIcon name="clock" size={9} />
+                      <Clock size={9} />
                       {item.deadlineLabel}
                     </span>
                     <div className="grid h-7 w-7 place-items-center rounded-xl ring-1 ring-black/5 dark:ring-white/10" style={{ background: orgBg }} title={item.org}>
@@ -458,7 +391,7 @@ function FeaturedSpotlight() {
 
                 <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/7">
                   <SafeLink href={item.href} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-extrabold transition-all hover:gap-2" style={{ background: `linear-gradient(135deg,${item.accent}18,${item.accent}08)`, border: `1.5px solid ${item.accent}28`, color: item.accent }}>
-                    Apply Online <SvgIcon name="arrow-right" size={12} />
+                    Apply Online <ArrowRight size={12} />
                   </SafeLink>
                   <span className="max-w-27.5 truncate text-[10.5px] text-gray-400 dark:text-gray-500">{item.org}</span>
                 </div>

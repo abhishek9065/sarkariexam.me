@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SafeLink } from '@/app/components/public-site/SafeLink';
@@ -36,14 +37,16 @@ const accentFromClass: Record<string, string> = {
   'bg-[#37474f]': '#37474f',
 };
 
-const tagConfig: Record<NonNullable<HomePageLinkItemProps['tag']>, { label: string; className: string }> = {
+const tagConfig: Record<NonNullable<HomePageLinkItemProps['tag']>, { label: string; className: string; pulse?: boolean }> = {
   new: {
     label: 'NEW',
     className: 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white ring-1 ring-emerald-300/40',
+    pulse: true,
   },
   hot: {
     label: 'HOT',
     className: 'bg-gradient-to-r from-red-500 to-rose-600 text-white ring-1 ring-red-300/40',
+    pulse: true,
   },
   update: {
     label: 'UPDATE',
@@ -52,6 +55,7 @@ const tagConfig: Record<NonNullable<HomePageLinkItemProps['tag']>, { label: stri
   'last-date': {
     label: 'LAST DATE',
     className: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white ring-1 ring-amber-300/40',
+    pulse: true,
   },
 };
 
@@ -100,7 +104,7 @@ export function HomePageSectionBox({
   return (
     <div
       id={id}
-      className="group/section relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_8px_28px_-12px_rgba(15,23,42,0.12)] transition-shadow duration-300 hover:shadow-[0_2px_6px_rgba(15,23,42,0.06),0_20px_44px_-12px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#0f172a]"
+      className="group/section relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_8px_28px_-12px_rgba(15,23,42,0.12)] transition-all duration-300 hover:shadow-[0_2px_6px_rgba(15,23,42,0.06),0_20px_44px_-12px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#0f172a]"
     >
       <div className="absolute inset-x-0 top-0 z-10 h-0.75" style={{ background: `linear-gradient(90deg, ${hex}, ${hex}cc 60%, transparent)` }} />
 
@@ -131,7 +135,7 @@ export function HomePageSectionBox({
           className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-extrabold tracking-[0.04em] transition-all hover:gap-1.5"
           style={{ color: hex, background: `${hex}14` }}
         >
-          VIEW ALL <span aria-hidden>›</span>
+          VIEW ALL <ChevronRight size={11} />
         </SafeLink>
       </div>
 
@@ -162,7 +166,10 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
             {title}
           </SafeLink>
           {tagStyle ? (
-            <span className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-wider shadow-sm ${tagStyle.className}`}>
+            <span
+              className={`inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[8.5px] font-extrabold tracking-wider shadow-sm ${tagStyle.className} ${tagStyle.pulse ? 'animate-pulse' : ''}`}
+              style={{ animationDuration: tagStyle.pulse ? '2.4s' : undefined }}
+            >
               {tagStyle.label}
             </span>
           ) : null}
