@@ -11,7 +11,6 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
-import Link from 'next/link';
 
 import { SafeLink } from '@/app/components/public-site/SafeLink';
 import { PublicSiteShell } from '@/app/components/public-site/PublicSiteShell';
@@ -304,13 +303,13 @@ function Hero() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="shrink-0 text-[11px] font-bold text-white/40">Popular:</span>
           {popular.map((label) => (
-            <Link
+            <a
               key={label}
               href={buildJobsPath({ search: label })}
               className="shrink-0 rounded-full bg-white/6 px-2.5 py-1 text-[11px] font-semibold text-white/65 ring-1 ring-white/14 transition hover:bg-white/14 hover:text-white"
             >
               {label}
-            </Link>
+            </a>
           ))}
         </div>
       </div>
@@ -326,9 +325,9 @@ function FeaturedSpotlight() {
           <div className="mb-0.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-orange-600 dark:text-orange-400">Closing Soon</div>
           <h2 className="text-[19px] font-extrabold tracking-normal text-gray-900 dark:text-white">Top recruitments this week</h2>
         </div>
-        <Link href={homePageLinks.jobs} className="hidden items-center gap-1 text-[12px] font-bold text-gray-500 transition hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-300 sm:inline-flex">
+        <a href={homePageLinks.jobs} className="hidden items-center gap-1 text-[12px] font-bold text-gray-500 transition hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-300 sm:inline-flex">
           View all <ChevronRight size={12} />
-        </Link>
+        </a>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

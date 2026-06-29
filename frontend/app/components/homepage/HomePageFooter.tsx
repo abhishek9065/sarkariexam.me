@@ -9,7 +9,6 @@ import {
   Shield,
   Users,
 } from 'lucide-react';
-import Link from 'next/link';
 import { buildCommunityPath } from '@/app/lib/public-content';
 import { homePageLinks } from './links';
 
@@ -195,7 +194,7 @@ export function HomePageFooter() {
               <ul className="space-y-2">
                 {links.slice(0, footerColumnLimits[title as keyof typeof footerColumns]).map((link) => (
                   <li key={link.label}>
-                    <Link
+                    <a
                       href={link.href}
                       className="group flex items-center justify-between text-[12px] text-blue-300 transition-colors hover:text-white"
                     >
@@ -214,7 +213,7 @@ export function HomePageFooter() {
                           {link.badge}
                         </span>
                       )}
-                    </Link>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -243,12 +242,12 @@ export function HomePageFooter() {
               </p>
             </div>
 
-            <Link
+            <a
               href="/register"
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
             >
               Get Job Alerts <span aria-hidden>→</span>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -262,9 +261,9 @@ export function HomePageFooter() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
               {legalLinks.map((link) => (
-                <Link key={link.label} href={link.href} className="text-[11px] text-blue-400 transition-colors hover:text-white">
+                <a key={link.label} href={link.href} className="text-[11px] text-blue-400 transition-colors hover:text-white">
                   {link.label}
-                </Link>
+                </a>
               ))}
             </div>
           </div>

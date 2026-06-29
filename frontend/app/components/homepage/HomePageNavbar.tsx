@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { AuthTab } from './HomePageNavbarData';
 import { navLinks } from './HomePageNavbarData';
 import { homePageLinks } from './links';
@@ -65,7 +64,7 @@ function NavbarActions() {
   return (
     <>
       <div className="hidden items-center gap-2 md:flex">
-        <Link
+        <a
           href={homePageLinks.results}
           className="relative flex h-9 items-center rounded-[9px] border border-white/15 bg-white/10 px-3 text-[12px] font-bold text-white transition-all hover:bg-white/15"
         >
@@ -75,13 +74,13 @@ function NavbarActions() {
             style={{ background: 'linear-gradient(135deg,#ff5252,#c62828)' }}
             aria-hidden
           />
-        </Link>
-        <Link
+        </a>
+        <a
           href="/login"
           className="flex items-center rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-2 text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(253,216,53,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e]"
         >
           Login / Register
-        </Link>
+        </a>
       </div>
 
       <details className="relative md:hidden">
@@ -102,21 +101,21 @@ function NavbarActions() {
           </form>
           <div className="grid grid-cols-2 gap-1">
             {navLinks.map(({ label, href }) => (
-              <Link
+              <a
                 key={label}
                 href={href}
                 className="flex items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-[13px] font-medium text-gray-700 transition-colors hover:border-orange-100 hover:bg-orange-50 hover:text-orange-700"
               >
                 <span className="h-1 w-1 shrink-0 rounded-full bg-orange-400" aria-hidden />
                 {label}
-              </Link>
+              </a>
             ))}
-            <Link
+            <a
               href="/login"
               className="col-span-2 mt-1 rounded-lg border border-orange-200 px-3 py-2.5 text-center text-[13px] font-bold text-orange-700 transition-colors hover:bg-orange-50"
             >
               Login / Register
-            </Link>
+            </a>
           </div>
         </div>
       </details>
@@ -153,7 +152,7 @@ export function HomePageNavbar({ initialAuthTab, activeHref }: HomePageNavbarPro
         </div>
 
         <div className="relative z-10 mx-auto flex h-15 max-w-6xl items-center justify-between gap-2 px-3 md:gap-3">
-          <Link href={homePageLinks.home} className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:shrink-0 md:gap-3">
+          <a href={homePageLinks.home} className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:shrink-0 md:gap-3">
             <div className="relative shrink-0">
               <div
                 className="relative flex h-10 w-10 items-center justify-center rounded-2xl md:h-11 md:w-11"
@@ -226,7 +225,7 @@ export function HomePageNavbar({ initialAuthTab, activeHref }: HomePageNavbarPro
                 <span className="h-px w-3 bg-linear-to-r from-transparent to-[#fdd835]" />
               </div>
             </div>
-          </Link>
+          </a>
 
           <div className="hidden flex-1 items-center justify-end md:flex">
             <form
@@ -276,7 +275,7 @@ export function HomePageNavbar({ initialAuthTab, activeHref }: HomePageNavbarPro
               const active = href === activeHref;
 
               return (
-                <Link
+                <a
                   key={label}
                   href={href}
                   className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-all duration-200"
@@ -369,7 +368,7 @@ export function HomePageNavbar({ initialAuthTab, activeHref }: HomePageNavbarPro
                       }}
                     />
                   ) : null}
-                </Link>
+                </a>
               );
             })}
             <div className="flex-1" />

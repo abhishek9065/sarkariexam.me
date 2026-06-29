@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { AnchorHTMLAttributes, CSSProperties, ReactNode } from 'react';
 
 import { normalizeHref } from '@/app/lib/public-content';
@@ -35,8 +34,8 @@ export function SafeLink({ href, className, children, style, target, rel, ...res
   }
 
   return (
-    <Link {...rest} href={normalizedHref} className={className} style={style} target={target} rel={rel}>
+    <a {...rest} href={normalizedHref} className={className} style={style} target={target} rel={rel}>
       {children}
-    </Link>
+    </a>
   );
 }
