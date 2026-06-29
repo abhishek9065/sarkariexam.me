@@ -1,17 +1,62 @@
-import {
-  Clock,
-  GraduationCap,
-  Heart,
-  Mail,
-  MapPin,
-  Phone,
-  Send,
-  Shield,
-  Users,
-} from 'lucide-react';
-import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { buildCommunityPath } from '@/app/lib/public-content';
 import { homePageLinks } from './links';
+
+type IconName = 'clock' | 'graduation-cap' | 'heart' | 'mail' | 'map-pin' | 'phone' | 'send' | 'shield' | 'users';
+
+function SvgIcon({ name, size = 16, className }: { name: IconName; size?: number; className?: string }) {
+  const commonProps = {
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: '2',
+  };
+
+  const paths: Record<IconName, ReactNode> = {
+    clock: (
+      <>
+        <circle {...commonProps} cx="12" cy="12" r="9" />
+        <path {...commonProps} d="M12 7v5l3 2" />
+      </>
+    ),
+    'graduation-cap': (
+      <>
+        <path {...commonProps} d="m3 9 9-5 9 5-9 5-9-5Z" />
+        <path {...commonProps} d="M7 12v4c0 1.5 2.5 3 5 3s5-1.5 5-3v-4" />
+      </>
+    ),
+    heart: <path {...commonProps} d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1Z" />,
+    mail: (
+      <>
+        <rect {...commonProps} x="3" y="5" width="18" height="14" rx="2" />
+        <path {...commonProps} d="m3 7 9 6 9-6" />
+      </>
+    ),
+    'map-pin': (
+      <>
+        <path {...commonProps} d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z" />
+        <circle {...commonProps} cx="12" cy="9" r="2.5" />
+      </>
+    ),
+    phone: <path {...commonProps} d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />,
+    send: <path {...commonProps} d="m22 2-7 20-4-9-9-4 20-7Zm-11 11 4-4" />,
+    shield: <path {...commonProps} d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6l-7-3Z" />,
+    users: (
+      <>
+        <path {...commonProps} d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle {...commonProps} cx="9" cy="7" r="4" />
+        <path {...commonProps} d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
+      </>
+    ),
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" width={size} height={size} className={className}>
+      {paths[name]}
+    </svg>
+  );
+}
 
 const footerColumns = {
   'Quick Links': [
@@ -76,13 +121,13 @@ const socials = [
   { icon: TwitterGlyph, label: 'Twitter', href: buildCommunityPath('twitter'), color: 'hover:bg-sky-500 hover:border-sky-400' },
   { icon: YouTubeGlyph, label: 'YouTube', href: buildCommunityPath('youtube'), color: 'hover:bg-red-600 hover:border-red-500' },
   { icon: InstagramGlyph, label: 'Instagram', href: buildCommunityPath('instagram'), color: 'hover:bg-pink-600 hover:border-pink-500' },
-  { icon: Send, label: 'Telegram', href: buildCommunityPath('telegram'), color: 'hover:bg-blue-500 hover:border-blue-400' },
+  { icon: 'send', label: 'Telegram', href: buildCommunityPath('telegram'), color: 'hover:bg-blue-500 hover:border-blue-400' },
 ] as const;
 
 const trustStats = [
-  { icon: Users, value: '14L+', label: 'Active Users' },
-  { icon: Shield, value: '100%', label: 'Verified Info' },
-  { icon: Clock, value: '5 Min', label: 'Update Cycle' },
+  { icon: 'users', value: '14L+', label: 'Active Users' },
+  { icon: 'shield', value: '100%', label: 'Verified Info' },
+  { icon: 'clock', value: '5 Min', label: 'Update Cycle' },
 ] as const;
 
 const legalLinks = [
@@ -127,7 +172,7 @@ export function HomePageFooter() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-4 sm:flex-row">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-yellow-400/25 bg-yellow-400/15">
-              <GraduationCap size={16} className="text-yellow-300" />
+              <SvgIcon name="graduation-cap" size={16} className="text-yellow-300" />
             </div>
             <span className="text-[15px] font-extrabold tracking-[-0.02em] text-white">
               SarkariExams<span className="text-yellow-300">.me</span>
@@ -137,7 +182,7 @@ export function HomePageFooter() {
             {trustStats.map((stat) => (
               <div key={stat.label} className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/8">
-                  <stat.icon size={13} className="text-yellow-300" />
+                  <SvgIcon name={stat.icon} size={13} className="text-yellow-300" />
                 </div>
                 <div>
                   <div className="text-[13px] font-extrabold leading-none text-white">{stat.value}</div>
@@ -159,13 +204,13 @@ export function HomePageFooter() {
 
             <div className="mb-6 space-y-2.5">
               {[
-                { icon: Mail, text: 'info@sarkariexams.me' },
-                { icon: Phone, text: '+91 98765 43210' },
-                { icon: MapPin, text: 'New Delhi, India' },
+                { icon: 'mail', text: 'info@sarkariexams.me' },
+                { icon: 'phone', text: '+91 98765 43210' },
+                { icon: 'map-pin', text: 'New Delhi, India' },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} className="flex items-center gap-3">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/8">
-                    <Icon size={12} className="text-yellow-300" />
+                    <SvgIcon name={Icon as IconName} size={12} className="text-yellow-300" />
                   </div>
                   <span className="text-[12px] text-blue-200">{text}</span>
                 </div>
@@ -178,9 +223,13 @@ export function HomePageFooter() {
                   key={social.label}
                   href={social.href}
                   aria-label={social.label}
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl border border-white/12 bg-white/8 transition-all duration-200 hover:scale-110 hover:shadow-lg ${social.color}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl border border-white/12 bg-white/8 transition-colors duration-200 hover:shadow-lg ${social.color}`}
                 >
-                  <social.icon size={14} className="text-white" />
+                  {typeof social.icon === 'string' ? (
+                    <SvgIcon name={social.icon} size={14} className="text-white" />
+                  ) : (
+                    <social.icon className="h-3.5 w-3.5 text-white" />
+                  )}
                 </a>
               ))}
             </div>
@@ -188,10 +237,10 @@ export function HomePageFooter() {
 
           {Object.entries(footerColumns).map(([title, links]) => (
             <div key={title} className="lg:col-span-1">
-              <h4 className="mb-4 flex items-center gap-2 text-[12px] font-bold tracking-[0.08em] text-white">
+              <h2 className="mb-4 flex items-center gap-2 text-[12px] font-bold tracking-[0.08em] text-white">
                 <span className="h-0.5 w-4 rounded-full bg-[#e65100]" />
                 {title.toUpperCase()}
-              </h4>
+              </h2>
               <ul className="space-y-2">
                 {links.slice(0, footerColumnLimits[title as keyof typeof footerColumns]).map((link) => (
                   <li key={link.label}>
@@ -200,7 +249,7 @@ export function HomePageFooter() {
                       className="group flex items-center justify-between text-[12px] text-blue-300 transition-colors hover:text-white"
                     >
                       <span className="flex items-center gap-1.5 transition-transform group-hover:translate-x-0.5">
-                        <span className="text-[12px] font-bold text-blue-600 transition-colors group-hover:text-[#e65100]" aria-hidden>
+                        <span className="text-[12px] font-bold text-yellow-300 transition-colors group-hover:text-white" aria-hidden>
                           ›
                         </span>
                         {link.label}
@@ -233,7 +282,7 @@ export function HomePageFooter() {
             <div className="flex-1 text-center sm:text-left">
               <div className="mb-1 flex items-center justify-center gap-2 sm:justify-start">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#e65100]">
-                  <Send size={10} className="text-white" />
+                  <SvgIcon name="send" size={10} className="text-white" />
                 </span>
                 <span className="text-[10px] font-extrabold tracking-widest text-[#e65100]">JOB ALERTS</span>
               </div>
@@ -243,12 +292,13 @@ export function HomePageFooter() {
               </p>
             </div>
 
-            <Link
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Avoid pulling next/link into the static homepage shell. */}
+            <a
               href="/register"
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-linear-to-br from-[#e65100] to-[#bf360c] px-4 py-2.5 text-[12px] font-bold text-white transition-all hover:-translate-y-px hover:opacity-90 hover:shadow-lg sm:w-auto"
             >
               Get Job Alerts <span aria-hidden>→</span>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -256,20 +306,20 @@ export function HomePageFooter() {
       <div className="relative border-t border-white/8">
         <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <p className="text-center text-[11px] text-blue-400 sm:text-left">
+            <p className="text-center text-[11px] text-blue-300 sm:text-left">
               © 2026 <span className="text-blue-300">SarkariExams.me</span>. All rights reserved. Not affiliated with
               any government body.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
               {legalLinks.map((link) => (
-                <a key={link.label} href={link.href} className="text-[11px] text-blue-400 transition-colors hover:text-white">
+                <a key={link.label} href={link.href} className="text-[11px] text-blue-300 transition-colors hover:text-white">
                   {link.label}
                 </a>
               ))}
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-center gap-1 text-[10px] text-blue-500">
-            Made with <Heart size={10} className="fill-red-400 text-red-400" /> in India · Serving job seekers since 2018
+          <div className="mt-2 flex items-center justify-center gap-1 text-[10px] text-blue-300">
+            Made with <SvgIcon name="heart" size={10} className="fill-red-400 text-red-400" /> in India · Serving job seekers since 2018
           </div>
         </div>
       </div>

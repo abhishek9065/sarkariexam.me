@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { AuthTab } from './HomePageNavbarData';
 import { navLinks } from './HomePageNavbarData';
 import { homePageLinks } from './links';
@@ -49,11 +48,11 @@ function NavIcon({ icon, active }: { icon: (typeof navLinks)[number]['icon']; ac
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="relative z-10 h-3.5 w-3.5 shrink-0 transition-all duration-200 group-hover:scale-110 group-hover:rotate-[-4deg]"
+      className="relative z-10 h-3.5 w-3.5 shrink-0 transition-colors duration-200"
       style={
         active
           ? { color: '#ff7043', filter: 'drop-shadow(0 0 4px rgba(230,81,0,0.6))' }
-          : { color: 'rgba(255,255,255,0.38)' }
+          : { color: 'rgba(255,255,255,0.65)' }
       }
     >
       {paths[icon]}
@@ -76,12 +75,13 @@ function NavbarActions() {
             aria-hidden
           />
         </a>
-        <Link
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Avoid pulling next/link into the static homepage shell. */}
+        <a
           href="/login"
-          className="flex items-center rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-2 text-[12px] font-bold text-white shadow-[0_2px_12px_rgba(253,216,53,0.1),inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e]"
+          className="flex items-center rounded-[10px] border border-[rgba(253,216,53,0.45)] bg-[linear-gradient(135deg,rgba(253,216,53,0.18)_0%,rgba(255,179,0,0.1)_100%)] px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[linear-gradient(135deg,#fdd835_0%,#ffb300_100%)] hover:text-[#0d1b6e]"
         >
           Login / Register
-        </Link>
+        </a>
       </div>
 
       <details className="relative md:hidden">
@@ -111,12 +111,13 @@ function NavbarActions() {
                 {label}
               </a>
             ))}
-            <Link
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Avoid pulling next/link into the static homepage shell. */}
+            <a
               href="/login"
               className="col-span-2 mt-1 rounded-lg border border-orange-200 px-3 py-2.5 text-center text-[13px] font-bold text-orange-700 transition-colors hover:bg-orange-50"
             >
               Login / Register
-            </Link>
+            </a>
           </div>
         </div>
       </details>
@@ -128,14 +129,10 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
   return (
     <header className="sticky top-0 z-50">
       <div
-        className="relative z-20 overflow-visible text-white shadow-2xl"
+        className="relative z-20 overflow-visible text-white shadow-md"
         style={{ background: 'linear-gradient(120deg, #060d2e 0%, #0d1b6e 30%, #1a237e 60%, #0a3880 100%)' }}
       >
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div
-            className="absolute left-0 top-0 h-full w-64 opacity-20"
-            style={{ background: 'radial-gradient(ellipse at 20% 50%, #4f8ef7 0%, transparent 70%)' }}
-          />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden md:block">
           <div
             className="absolute inset-x-0 top-0 h-px"
             style={{
@@ -160,14 +157,9 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                 style={{
                   background: 'linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 100%)',
                   border: '1.5px solid rgba(255,255,255,0.25)',
-                  boxShadow:
-                    '0 0 0 3px rgba(253,216,53,0.15), inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 16px rgba(0,0,0,0.4)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px rgba(0,0,0,0.22)',
                 }}
               >
-                <div
-                  className="absolute inset-0 rounded-2xl opacity-60"
-                  style={{ background: 'radial-gradient(circle at 35% 35%, rgba(253,216,53,0.25), transparent 65%)' }}
-                />
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="relative z-10" aria-hidden="true">
                   <path d="M12 2L4 6v5c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V6L12 2z" fill="url(#shieldGrad)" opacity="0.9" />
                   <path d="M12 8l-5 2.5 5 2.5 5-2.5L12 8z" fill="#fdd835" />
@@ -279,7 +271,7 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                 <a
                   key={label}
                   href={href}
-                  className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-all duration-200"
+                  className="group relative flex h-11 items-center gap-1.5 whitespace-nowrap px-3.5 py-0 transition-colors duration-200"
                   style={{ fontSize: '11.5px', fontWeight: active ? 700 : 500 }}
                 >
                   <span
@@ -309,14 +301,14 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
                     style={
                       active
                         ? { color: '#ffffff', textShadow: '0 0 12px rgba(230,81,0,0.4)' }
-                        : { color: 'rgba(255,255,255,0.5)' }
+                        : { color: 'rgba(255,255,255,0.72)' }
                     }
                   >
                     {label}
                   </span>
                   {badge && (
                     <span
-                      className="relative z-10 shrink-0 animate-pulse rounded-full text-white"
+                      className="relative z-10 shrink-0 rounded-full text-white"
                       style={{
                         fontSize: '7.5px',
                         fontWeight: 800,
@@ -375,12 +367,11 @@ export function HomePageNavbar({ activeHref }: HomePageNavbarProps) {
             <div className="flex-1" />
             <div className="flex h-11 shrink-0 items-center gap-2 border-l border-white/5 px-4">
               <span className="relative flex h-2 w-2 items-center justify-center">
-                <span className="absolute h-full w-full animate-ping rounded-full bg-green-400 opacity-40" />
-                <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.65)]" />
               </span>
               <span
                 className="text-[9.5px] font-bold tracking-widest"
-                style={{ color: 'rgba(255,255,255,0.3)' }}
+                style={{ color: 'rgba(255,255,255,0.65)' }}
               >
                 LIVE
               </span>
