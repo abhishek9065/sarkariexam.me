@@ -293,7 +293,7 @@ export function HomePageNavbarClient({ initialAuthTab }: HomePageNavbarClientPro
             type="button"
             onClick={toggleNotifications}
             className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/15 bg-white/10 transition-all hover:scale-105 hover:bg-white/15 active:scale-95"
-            aria-label="Toggle notifications"
+            aria-label="Toggle desktop notifications"
             title="Notifications"
           >
             <Icon name="bell" className="h-4 w-4" />
@@ -375,7 +375,7 @@ export function HomePageNavbarClient({ initialAuthTab }: HomePageNavbarClientPro
             type="button"
             onClick={toggleNotifications}
             className="relative flex h-9 w-9 items-center justify-center rounded-[9px] border border-white/15 bg-white/10 transition-all hover:bg-white/15"
-            aria-label="Toggle notifications"
+            aria-label="Toggle mobile notifications"
             title="Notifications"
           >
             <Icon name="bell" className="h-3.5 w-3.5" />
