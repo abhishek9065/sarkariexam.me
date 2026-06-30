@@ -381,7 +381,7 @@ function FeaturedSpotlight() {
     <section className="mx-auto max-w-6xl px-4 pt-6">
       <div className="mb-4 flex items-end justify-between">
         <div>
-          <div className="mb-0.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-orange-600 dark:text-orange-400">Closing Soon</div>
+          <div className="mb-0.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#9a3412] dark:text-orange-300">Closing Soon</div>
           <h2 className="text-[19px] font-extrabold tracking-normal text-gray-900 dark:text-white">Top recruitments this week</h2>
         </div>
         <a href={homePageLinks.jobs} className="hidden items-center gap-1 text-[12px] font-bold text-gray-700 transition-colors hover:text-orange-600 dark:text-gray-200 dark:hover:text-orange-300 sm:inline-flex">
@@ -403,17 +403,13 @@ function FeaturedSpotlight() {
               <div className="absolute inset-x-0 top-1.5 h-0.5 bg-gray-100 dark:bg-white/4">
                 <div className="h-full" style={{ width: `${item.urgency}%`, background: isUrgent ? 'linear-gradient(90deg,#ef4444,#f97316)' : `linear-gradient(90deg,${item.accent}cc,${item.accent}44)` }} />
               </div>
-              <div className="pointer-events-none absolute -bottom-5 -right-3 select-none text-[100px] font-black leading-none tracking-normal opacity-[0.055] dark:opacity-[0.10]" style={{ color: item.accent }}>
-                {item.title.split(' ')[0]}
-              </div>
-
               <div className="relative p-4 pt-4">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="rounded-lg px-2 py-0.5 text-[9px] font-extrabold tracking-[0.07em]" style={{ background: item.chipBg, color: item.chipFg }}>
                     {item.chip}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold" style={{ color: isUrgent ? '#dc2626' : '#d97706', background: isUrgent ? '#fef2f2' : '#fffbeb' }}>
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold" style={{ color: isUrgent ? '#991b1b' : '#92400e', background: isUrgent ? '#fee2e2' : '#fef3c7' }}>
                       <SvgIcon name="clock" size={9} />
                       {item.deadlineLabel}
                     </span>
@@ -434,16 +430,16 @@ function FeaturedSpotlight() {
                 <p className="mt-0.5 text-[12px] font-medium leading-snug text-gray-700 dark:text-gray-300">{item.sub}</p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-800 dark:bg-white/10 dark:text-gray-100">
                     <span className="h-1.5 w-1.5 rounded-full bg-current opacity-55" aria-hidden /> {item.posts} Posts
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-800 dark:bg-white/10 dark:text-gray-100">
                     <span className="text-[9px] font-black leading-none opacity-65" aria-hidden>
                       Q
                     </span>{' '}
                     {item.qual}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700 dark:bg-white/6 dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-800 dark:bg-white/10 dark:text-gray-100">
                     <span className="h-1.5 w-1.5 rounded-full bg-current opacity-55" aria-hidden /> {item.lastDate}
                   </span>
                 </div>
@@ -457,7 +453,7 @@ function FeaturedSpotlight() {
                   >
                     Apply Online <SvgIcon name="arrow-right" size={12} />
                   </SafeLink>
-                  <span className="max-w-27.5 truncate text-[10.5px] text-gray-600 dark:text-gray-300">{item.org}</span>
+                  <span className="max-w-27.5 truncate text-[10.5px] font-medium text-gray-700 dark:text-gray-200">{item.org}</span>
                 </div>
               </div>
             </article>

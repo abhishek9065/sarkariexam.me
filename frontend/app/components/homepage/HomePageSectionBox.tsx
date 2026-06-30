@@ -105,10 +105,6 @@ export function HomePageSectionBox({
       <div className="absolute inset-x-0 top-0 z-10 h-0.75" style={{ background: `linear-gradient(90deg, ${hex}, ${hex}cc 60%, transparent)` }} />
 
       <div className="relative flex items-end justify-between gap-3 border-b border-gray-100 px-4 pb-3 pt-3.5 dark:border-white/10" style={{ background: `linear-gradient(180deg, ${hex}0d 0%, transparent 100%)` }}>
-        <div className="pointer-events-none absolute -top-3 right-2 select-none text-[56px] font-black leading-none tracking-normal opacity-[0.06] dark:opacity-[0.09]" style={{ color: hex }}>
-          {(kicker ?? title).split(' ')[0]}
-        </div>
-
         <div className="relative z-10 min-w-0">
           {kicker ? (
             <div className="mb-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.16em]" style={{ color: hex }}>
@@ -169,15 +165,15 @@ export function HomePageLinkItem({ href, title, org, date, tag, postCount, quali
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="max-w-45 truncate text-[11px] font-medium text-gray-700 dark:text-gray-300">{org}</span>
+          <span className="max-w-45 truncate text-[11px] font-semibold text-gray-800 dark:text-gray-200">{org}</span>
           {postCount ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-gray-600 dark:bg-white/5 dark:text-gray-300">
+            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums text-gray-800 dark:bg-white/10 dark:text-gray-200">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-55" aria-hidden />
               {postCount}
             </span>
           ) : null}
           {qualification ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold text-gray-600 dark:bg-white/5 dark:text-gray-300">
+            <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10.5px] font-bold text-gray-800 dark:bg-white/10 dark:text-gray-200">
               <span className="text-[9px] font-black leading-none opacity-65" aria-hidden>
                 Q
               </span>

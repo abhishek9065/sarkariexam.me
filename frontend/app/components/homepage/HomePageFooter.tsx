@@ -204,15 +204,21 @@ export function HomePageFooter() {
 
             <div className="mb-6 space-y-2.5">
               {[
-                { icon: 'mail', text: 'info@sarkariexams.me' },
+                { icon: 'mail', text: 'Contact support', href: homePageLinks.contact },
                 { icon: 'phone', text: '+91 98765 43210' },
                 { icon: 'map-pin', text: 'New Delhi, India' },
-              ].map(({ icon: Icon, text }) => (
+              ].map(({ icon: Icon, text, href }) => (
                 <div key={text} className="flex items-center gap-3">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/8">
                     <SvgIcon name={Icon as IconName} size={12} className="text-yellow-300" />
                   </div>
-                  <span className="text-[12px] text-blue-200">{text}</span>
+                  {href ? (
+                    <a href={href} className="text-[12px] font-semibold text-blue-100 transition-colors hover:text-white">
+                      {text}
+                    </a>
+                  ) : (
+                    <span className="text-[12px] text-blue-100">{text}</span>
+                  )}
                 </div>
               ))}
             </div>
