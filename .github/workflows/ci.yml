@@ -374,7 +374,18 @@ jobs:
 
   build-images:
     name: Build and Push ${{ matrix.service }} Image
-    needs: [diff-check, repository-hygiene, shell-safety, deploy-doc-consistency, compose-validation, backend, frontend, admin, admin-e2e]
+    needs:
+      [
+        diff-check,
+        repository-hygiene,
+        shell-safety,
+        deploy-doc-consistency,
+        compose-validation,
+        backend,
+        frontend,
+        admin,
+        admin-e2e,
+      ]
     runs-on: ubuntu-latest
     permissions:
       contents: read

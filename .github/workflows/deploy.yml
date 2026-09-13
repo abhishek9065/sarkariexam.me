@@ -90,8 +90,8 @@ jobs:
           TRIGGER_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           DEPLOY_MODE: image-pull
           DEPLOY_IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
-          LOCK_WAIT_SECONDS: '120'
-          DEPLOY_AUTOCLEAN_TRACKED: '1'
+          LOCK_WAIT_SECONDS: "120"
+          DEPLOY_AUTOCLEAN_TRACKED: "1"
           DEPLOY_AUTOCLEAN_TRACKED_PATHS: backend/package-lock.json
         run: |
           set -euo pipefail

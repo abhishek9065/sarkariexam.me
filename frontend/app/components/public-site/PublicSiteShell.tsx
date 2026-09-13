@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
-import { HomePageFooter } from '@/app/components/homepage/HomePageFooter';
-import { HomePageNavbar } from '@/app/components/homepage/HomePageNavbar';
+import { HomePageFooter } from "@/app/components/homepage/HomePageFooter";
+import { HomePageNavbar } from "@/app/components/homepage/HomePageNavbar";
+import type { ReactNode } from "react";
 
-type AuthTab = 'login' | 'register';
+type AuthTab = "login" | "register";
 
 interface PublicSiteShellProps {
   children: ReactNode;
@@ -11,10 +11,14 @@ interface PublicSiteShellProps {
 }
 
 const maintenanceEnabled =
-  process.env.NEXT_PUBLIC_SITE_MAINTENANCE_MODE === 'true' ||
-  process.env.SITE_MAINTENANCE_MODE === 'true';
+  process.env.NEXT_PUBLIC_SITE_MAINTENANCE_MODE === "true" ||
+  process.env.SITE_MAINTENANCE_MODE === "true";
 
-export function PublicSiteShell({ children, initialAuthTab, activeHref }: PublicSiteShellProps) {
+export function PublicSiteShell({
+  children,
+  initialAuthTab,
+  activeHref,
+}: PublicSiteShellProps) {
   if (maintenanceEnabled) {
     return (
       <div className="min-h-screen bg-slate-950 px-6 py-16 text-white">
@@ -26,8 +30,8 @@ export function PublicSiteShell({ children, initialAuthTab, activeHref }: Public
             SarkariExams.me is temporarily offline
           </h1>
           <p className="mt-4 text-base text-slate-200">
-            The public website is currently unavailable while maintenance work is underway.
-            Please check back later.
+            The public website is currently unavailable while maintenance work
+            is underway. Please check back later.
           </p>
           <div className="mt-8 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
             Admin access remains available separately from the public site.
