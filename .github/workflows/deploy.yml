@@ -1,11 +1,8 @@
-name: Deploy to Production
+name: Deploy to Production (disabled)
 
+# Temporarily disabled because the site is not live.
 on:
-  workflow_run:
-    workflows:
-      - Main CI
-    types:
-      - completed
+  workflow_dispatch:
 
 permissions:
   contents: read

@@ -1,9 +1,7 @@
-name: Main CI
+name: Main CI (disabled)
 
+# Temporarily disabled because the site is not live.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:

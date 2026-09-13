@@ -1,7 +1,8 @@
-name: PR CI
+name: PR CI (disabled)
 
+# Temporarily disabled because the site is not live.
 on:
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

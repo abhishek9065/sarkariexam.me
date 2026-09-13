@@ -1,5 +1,6 @@
-name: Deploy Preflight
+name: Deploy Preflight (disabled)
 
+# Temporarily disabled because the site is not live.
 on:
   workflow_dispatch:
     inputs:

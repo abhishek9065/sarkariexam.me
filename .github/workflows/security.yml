@@ -1,8 +1,7 @@
-name: Security
+name: Security (disabled)
 
+# Temporarily disabled because the site is not live.
 on:
-  schedule:
-    - cron: '0 3 * * 1'
   workflow_dispatch:
 
 permissions:
